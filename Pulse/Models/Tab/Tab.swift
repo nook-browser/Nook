@@ -5,6 +5,7 @@
 //  Created by Maciek Bagiński on 30/07/2025.
 //
 
+import Foundation
 import AppKit
 import FaviconFinder
 import SwiftUI
