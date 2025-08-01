@@ -8,7 +8,9 @@
 import SwiftUI
 
 struct ContentView: View {
+    @EnvironmentObject var browserManager: BrowserManager
     var body: some View {
         WindowView()
     }
+    
 }

@@ -152,7 +152,6 @@ struct MacButtonsView: View {
             .frame(height: geometry.size.height)
             .padding(.leading, (geometry.size.height / 3) - viewModel.windowPaddingOffset)
         }
-        .frame()
     }
 }
 

@@ -16,6 +16,12 @@ struct EmptyWebsiteView: View {
                 .blendMode(.overlay)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: { 
+            if #available(macOS 26.0, *) {
+                return 12
+            } else {
+                return 6
+            }
+        }()))
     }
 }

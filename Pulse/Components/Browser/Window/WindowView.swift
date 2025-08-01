@@ -8,19 +8,27 @@
 import SwiftUI
 
 struct WindowView: View {
-    @StateObject private var browserManager = BrowserManager()
+    @EnvironmentObject var browserManager: BrowserManager
 
     var body: some View {
         ZStack {
             WindowBackgroundView()
 
-            HStack(spacing: 8) {
+            HStack(spacing: 0) {
                 SidebarView()
-                EmptyWebsiteView()
-                    .ignoresSafeArea()
-            }
+                if browserManager.isSidebarVisible {
+                    SidebarResizeView()
+                }
+                VStack(spacing: 0) {
+                    WebsiteLoadingIndicator()
 
-            .padding(8)
+                    WebsiteView()
+
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.bottom, 8)
+            CommandPaletteView()
         }
         .environmentObject(browserManager)
     }
