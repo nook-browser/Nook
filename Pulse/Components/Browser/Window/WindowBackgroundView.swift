@@ -18,8 +18,15 @@ struct WindowBackgroundView: View {
     }
 
     var body: some View {
-        ZStack {
-            BlurEffectView(material: .hudWindow, state: .active)
+        Group {
+            if #available(macOS 26.0, *) {
+                Rectangle()
+                    .fill(Color.clear)
+                    .blur(radius: 40)
+                    .glassEffect(in: .rect(cornerRadius: 0))
+            } else {
+                BlurEffectView(material: .hudWindow, state: .active)
+            }
         }
         .gesture(dragWindow)
     }
