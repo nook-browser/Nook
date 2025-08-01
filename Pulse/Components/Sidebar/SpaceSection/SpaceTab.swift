@@ -25,7 +25,7 @@ struct SpaceTab: View {
                     .frame(width: 20, height: 20)
                 Text(tabName)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.7))
+                    .foregroundStyle(AppColors.textPrimary)
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Spacer()
@@ -34,9 +34,9 @@ struct SpaceTab: View {
                     Button(action: onClose) {
                         Image(systemName: "xmark")
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(Color.white.opacity(0.7))
+                            .foregroundColor(AppColors.textPrimary)
                             .padding(4)
-                            .background(Color.white.opacity(0.2))
+                            .background(AppColors.controlBackgroundHover)
                             .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -61,9 +61,9 @@ struct SpaceTab: View {
     
     private var backgroundColor: Color {
         if isActive {
-            return Color.white.opacity(0.28)
+            return AppColors.controlBackgroundActive
         } else if isHovering {
-            return Color.white.opacity(0.15)
+            return AppColors.controlBackgroundHover
         } else {
             return Color.clear
         }
