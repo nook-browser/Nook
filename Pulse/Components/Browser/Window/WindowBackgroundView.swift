@@ -31,29 +31,3 @@ struct WindowBackgroundView: View {
         .gesture(dragWindow)
     }
 }
-
-
-#if DEBUG
-struct WindowBackgroundView_Previews: PreviewProvider {
-    static var previews: some View {
-        ZStack {
-            LinearGradient(
-                gradient: Gradient(colors: [.blue, .green]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-
-            WindowBackgroundView()
-                .padding()
-            
-            Text("hi there")
-                .font(.custom("SF Pro", size: 20))
-                .foregroundColor(.gray)
-        }
-        .frame(width: 300, height: 200)
-        .previewLayout(.sizeThatFits)
-    }
-}
-#endif
-
