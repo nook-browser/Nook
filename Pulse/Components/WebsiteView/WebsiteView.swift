@@ -19,7 +19,13 @@ struct WebsiteView: View {
                     .id(currentTab.id)  // This is crucial!
                     .background(Color(nsColor: .windowBackgroundColor))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .clipShape(RoundedRectangle(cornerRadius: { 
+                        if #available(macOS 26.0, *) {
+                            return 12
+                        } else {
+                            return 6
+                        }
+                    }()))
             } else {
                 EmptyWebsiteView()
             }
