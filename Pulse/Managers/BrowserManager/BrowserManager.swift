@@ -33,6 +33,9 @@ class BrowserManager: ObservableObject {
     func updateSidebarWidth(_ width: CGFloat) {
         sidebarWidth = width
         savedSidebarWidth = width
+    }
+    
+    func saveSidebarWidthToDefaults() {
         saveSidebarSettings()
     }
 

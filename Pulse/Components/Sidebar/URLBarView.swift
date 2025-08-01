@@ -17,7 +17,7 @@ struct URLBarView: View {
                     displayURL
                 )
                 .font(.system(size: 12, weight: .medium, design: .default))
-                .foregroundStyle(Color.white.opacity(0.8))
+                .foregroundStyle(AppColors.textPrimary)
                 .lineLimit(1)
                 .truncationMode(.tail)
 
@@ -26,7 +26,7 @@ struct URLBarView: View {
             .padding(.horizontal, 12)
         }
         .frame(maxWidth: .infinity, minHeight: 36, maxHeight: 36)
-        .background(Color.white.opacity(0.08))
+        .background(AppColors.controlBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
     
