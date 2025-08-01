@@ -56,6 +56,7 @@ struct SidebarView: View {
             }
             .frame(width: browserManager.sidebarWidth)
             .padding(.top, 8)
+            .overlay(DragWindowView())
         }
     }
 }
