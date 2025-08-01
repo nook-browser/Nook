@@ -44,10 +44,6 @@ struct PulseCommands: Commands {
 
         // Navigation commands
         CommandGroup(after: .toolbar) {
-            Button("Open Command Palette") {
-                browserManager.openCommandPalette()
-            }
-            .keyboardShortcut("t", modifiers: .command)
 
             Divider()
 
@@ -58,11 +54,7 @@ struct PulseCommands: Commands {
             .keyboardShortcut("t", modifiers: [.command, .shift])
             .disabled(true)  // Enable when implemented
 
-            Button("Close Tab") {
-                browserManager.closeCurrentTab()
-            }
-            .keyboardShortcut("w", modifiers: .command)
-            .disabled(true)  // Enable when implemented
+            Divider()
         }
 
         // View commands
@@ -72,6 +64,25 @@ struct PulseCommands: Commands {
             }
             .keyboardShortcut("l", modifiers: .command)
             .disabled(true)  // Enable when implemented
+        }
+        
+        // File Section
+        CommandGroup(replacing: .saveItem) {
+            Button("New Tab...") {
+                browserManager.openCommandPalette()
+            }
+            .keyboardShortcut("t", modifiers: .command)
+            Button("New Window") {
+                browserManager.openCommandPalette()
+            }
+            .keyboardShortcut("n", modifiers: .command)
+
+            Button("Close Tab") {
+                browserManager.closeCurrentTab()
+            }
+            .keyboardShortcut("w", modifiers: .command)
+            .disabled(browserManager.tabManager.tabs.isEmpty)
+
         }
     }
 }
