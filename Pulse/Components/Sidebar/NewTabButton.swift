@@ -20,10 +20,10 @@ struct NewTabButton: View {
                     Image(systemName: "plus")
                         .font(.system(size: 14))
                         .frame(width: 20, height: 20)
-                        .foregroundStyle(Color.white.opacity(0.3))
+                        .foregroundStyle(AppColors.textSecondary)
                     Text("New Tab")
                         .font(.system(size: 14, weight: .regular))
-                        .foregroundStyle(Color.white.opacity(0.3))
+                        .foregroundStyle(AppColors.textSecondary)
                     Spacer()
             }
             .padding(.horizontal, 10)
@@ -45,9 +45,9 @@ struct NewTabButton: View {
     
     private var backgroundColor: Color {
         if browserManager.isCommandPaletteVisible {
-            return Color.white.opacity(0.28)
+            return AppColors.controlBackgroundActive
         } else if isHovering {
-            return Color.white.opacity(0.15)
+            return AppColors.controlBackgroundHover
         } else {
             return Color.clear
         }

@@ -18,7 +18,9 @@ struct SidebarView: View {
                                 .fill(Color.clear)
                                 .contentShape(Rectangle())
                                 .onTapGesture(count: 2) {
-                                    zoomCurrentWindow()
+                                    DispatchQueue.main.async {
+                                        zoomCurrentWindow()
+                                    }
                                 }
                         )
                         
@@ -39,10 +41,14 @@ struct SidebarView: View {
                                 tabIcon: tab.favicon,
                                 isActive: tab.isCurrentTab,
                                 action: {
-                                    tab.activate()
+                                    DispatchQueue.main.async {
+                                        tab.activate()
+                                    }
                                 },
                                 onClose: {
-                                    tab.closeTab()
+                                    DispatchQueue.main.async {
+                                        tab.closeTab()
+                                    }
                                 },
                             )
 

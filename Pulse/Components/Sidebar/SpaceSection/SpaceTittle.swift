@@ -17,7 +17,7 @@ struct SpaceTittle: View {
                 .font(.system(size: 12))
             Text(spaceName)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.white.opacity(0.4))
+                .foregroundStyle(AppColors.textSecondary)
             Spacer()
         }
         .padding(.horizontal, 6)
