@@ -5,10 +5,8 @@ struct SidebarView: View {
     @State private var draggedTabIndex: Int?
 
     var body: some View {
-        HStack(spacing: 0) {
-            if browserManager.isSidebarVisible {
-                HStack {
-                    VStack(spacing: 8) {
+        if browserManager.isSidebarVisible {
+            VStack(spacing: 8) {
                         HStack(spacing: 2) {
                             NavButtonsView()
                         }
@@ -54,14 +52,10 @@ struct SidebarView: View {
 
                         }
 
-                        Spacer()
-                    }
-                }
-                .frame(width: browserManager.sidebarWidth)
-                .padding(.top, 8)
-                .transition(.move(edge: .leading))
+                Spacer()
             }
+            .frame(width: browserManager.sidebarWidth)
+            .padding(.top, 8)
         }
-        .clipped()
     }
 }
