@@ -25,7 +25,7 @@ struct NavButton: View {
         } label: {
             Image(systemName: iconName)
                 .font(.system(size: 16))
-                .foregroundStyle(disabled ? .white.opacity(0.2) : .white.opacity(0.4))
+                .foregroundStyle(disabled ? AppColors.textQuaternary : AppColors.textSecondary)
                 .padding(4)
                 .contentTransition(.symbolEffect(.replace.upUp.byLayer, options: .nonRepeating))
         }
@@ -33,7 +33,7 @@ struct NavButton: View {
         .disabled(disabled)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(Color.white.opacity(isHovering && !disabled ? 0.2 : 0))
+                .fill(isHovering && !disabled ? AppColors.controlBackgroundHover : Color.clear)
                 .frame(width: 24, height: 24) // Fixed 20x20 square
                 .animation(.easeInOut(duration: 0.15), value: isHovering)
         )

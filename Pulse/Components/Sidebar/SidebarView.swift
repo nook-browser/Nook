@@ -5,10 +5,8 @@ struct SidebarView: View {
     @State private var draggedTabIndex: Int?
 
     var body: some View {
-        HStack(spacing: 0) {
-            if browserManager.isSidebarVisible {
-                HStack {
-                    VStack(spacing: 8) {
+        if browserManager.isSidebarVisible {
+            VStack(spacing: 8) {
                         HStack(spacing: 2) {
                             NavButtonsView()
                         }
@@ -18,7 +16,9 @@ struct SidebarView: View {
                                 .fill(Color.clear)
                                 .contentShape(Rectangle())
                                 .onTapGesture(count: 2) {
-                                    zoomCurrentWindow()
+                                    DispatchQueue.main.async {
+                                        zoomCurrentWindow()
+                                    }
                                 }
                         )
                         
@@ -39,23 +39,23 @@ struct SidebarView: View {
                                 tabIcon: tab.favicon,
                                 isActive: tab.isCurrentTab,
                                 action: {
-                                    tab.activate()
+                                    DispatchQueue.main.async {
+                                        tab.activate()
+                                    }
                                 },
                                 onClose: {
-                                    tab.closeTab()
+                                    DispatchQueue.main.async {
+                                        tab.closeTab()
+                                    }
                                 },
                             )
 
                         }
 
-                        Spacer()
-                    }
-                }
-                .frame(width: browserManager.sidebarWidth)
-                .padding(.top, 8)
-                .transition(.move(edge: .leading))
+                Spacer()
             }
+            .frame(width: browserManager.sidebarWidth)
+            .padding(.top, 8)
         }
-        .clipped()
     }
 }
