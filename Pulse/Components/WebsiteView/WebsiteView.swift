@@ -17,8 +17,15 @@ struct WebsiteView: View {
                 // Add .id() modifier to force view recreation when tab changes
                 TabWebViewWrapper(tab: currentTab)
                     .id(currentTab.id)  // This is crucial!
+                    .background(Color(nsColor: .windowBackgroundColor))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .clipShape(RoundedRectangle(cornerRadius: { 
+                        if #available(macOS 26.0, *) {
+                            return 12
+                        } else {
+                            return 6
+                        }
+                    }()))
             } else {
                 EmptyWebsiteView()
             }

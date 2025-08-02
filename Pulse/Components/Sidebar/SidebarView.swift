@@ -5,57 +5,62 @@ struct SidebarView: View {
     @State private var draggedTabIndex: Int?
 
     var body: some View {
-        HStack(spacing: 0) {
-            if browserManager.isSidebarVisible {
-                HStack {
-                    VStack(spacing: 8) {
-                        HStack(spacing: 2) {
-                            NavButtonsView()
-                        }
-                        .frame(height: 30)
-                        .background(
-                            Rectangle()
-                                .fill(Color.clear)
-                                .contentShape(Rectangle())
-                                .onTapGesture(count: 2) {
+        if browserManager.isSidebarVisible {
+            ZStack {
+                // Draggable background layer
+                DragWindowView()
+                
+                // Content layer (sits on top)
+                VStack(spacing: 8) {
+                    HStack(spacing: 2) {
+                        NavButtonsView()
+                    }
+                    .frame(height: 30)
+                    .background(
+                        Rectangle()
+                            .fill(Color.clear)
+                            .contentShape(Rectangle())
+                            .onTapGesture(count: 2) {
+                                DispatchQueue.main.async {
                                     zoomCurrentWindow()
                                 }
-                        )
-                        
-                        URLBarView()
-                        PinnedGrid()
-                        SpaceTittle(
-                            spaceName: "Development",
-                            spaceIcon: "globe"
-                        )
-                        if(!browserManager.tabManager.tabs.isEmpty) {
-                            SpaceSeparator()
-                        }
-                        NewTabButton()
-                        ForEach(browserManager.tabManager.tabs) { tab in
-                            SpaceTab(
-                                tabName: tab.name,
-                                tabURL: tab.name,
-                                tabIcon: tab.favicon,
-                                isActive: tab.isCurrentTab,
-                                action: {
-                                    tab.activate()
-                                },
-                                onClose: {
-                                    tab.closeTab()
-                                },
-                            )
-
-                        }
-
-                        Spacer()
+                            }
+                    )
+                    
+                    URLBarView()
+                    PinnedGrid()
+                    SpaceTittle(
+                        spaceName: "Development",
+                        spaceIcon: "globe"
+                    )
+                    if(!browserManager.tabManager.tabs.isEmpty) {
+                        SpaceSeparator()
                     }
+                    NewTabButton()
+                    ForEach(browserManager.tabManager.tabs) { tab in
+                        SpaceTab(
+                            tabName: tab.name,
+                            tabURL: tab.name,
+                            tabIcon: tab.favicon,
+                            isActive: tab.isCurrentTab,
+                            action: {
+                                DispatchQueue.main.async {
+                                    tab.activate()
+                                }
+                            },
+                            onClose: {
+                                DispatchQueue.main.async {
+                                    tab.closeTab()
+                                }
+                            },
+                        )
+                    }
+                    
+                    Spacer()
                 }
-                .frame(width: browserManager.sidebarWidth)
                 .padding(.top, 8)
-                .transition(.move(edge: .leading))
             }
+            .frame(width: browserManager.sidebarWidth)
         }
-        .clipped()
     }
 }

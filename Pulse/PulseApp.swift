@@ -94,6 +94,7 @@ struct BackgroundWindowModifier: NSViewRepresentable {
             if let window = view.window {
                 window.toolbar?.isVisible = false
                 window.titlebarAppearsTransparent = true
+                window.backgroundColor = .clear
                 window.titleVisibility = .hidden
                 window.isReleasedWhenClosed = false
                 window.isMovableByWindowBackground = false
