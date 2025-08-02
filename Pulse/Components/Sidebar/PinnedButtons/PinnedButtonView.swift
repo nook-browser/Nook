@@ -25,12 +25,12 @@ struct PinnedButtonView: View {
         } label: {
             Image(systemName: iconName)
                 .font(.system(size: 16))
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(AppColors.textSecondary)
         }
         .buttonStyle(.plain)
         .padding(.vertical, 16)
         .frame(maxWidth: .infinity)
-        .background(Color.white.opacity(0.08))
+        .background(AppColors.controlBackground)
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 }
