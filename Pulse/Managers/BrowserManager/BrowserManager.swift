@@ -7,28 +7,43 @@
 
 import SwiftUI
 
+
+import SwiftData
+
+@MainActor
+final class Persistence {
+    static let shared = Persistence()
+    let container: ModelContainer
+    private init() {
+        container = try! ModelContainer(
+            for: Schema([SpaceEntity.self,TabEntity.self, TabsStateEntity.self])
+        )
+    }
+}
+
+
+@MainActor
 class BrowserManager: ObservableObject {
     @Published var sidebarWidth: CGFloat = 250
     @Published var isSidebarVisible: Bool = true
     @Published var isCommandPaletteVisible: Bool = false
     
-    // TabManager as regular property (not @Published since it's @Observable)
+    var modelContext: ModelContext
     var tabManager: TabManager
+    var settingsManager: SettingsManager
     
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
 
     init() {
-        // Initialize TabManager first
-        self.tabManager = TabManager()
-        
-        loadSidebarSettings()
-        
-        // Set up the bidirectional relationship
+        self.modelContext = Persistence.shared.container.mainContext
+        self.tabManager = TabManager(browserManager: nil,context: modelContext)
+        self.settingsManager = SettingsManager()
         self.tabManager.browserManager = self
-    }
+        self.tabManager.reattachBrowserManager(self)
+        loadSidebarSettings()
 
-    // ... rest of your methods remain the same
+    }
     
     func updateSidebarWidth(_ width: CGFloat) {
         sidebarWidth = width
