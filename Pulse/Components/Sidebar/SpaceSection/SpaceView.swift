@@ -61,6 +61,8 @@ struct SpaceView: View {
             Spacer()
         }
         .frame(width: width)
+        .contentShape(Rectangle())
+        .backgroundDraggable()
         .scrollTargetLayout()
         .onScrollVisibilityChange(threshold: 0.5) { isVisible in
             if isVisible {
