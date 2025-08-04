@@ -23,6 +23,14 @@ struct PulseApp: App {
             PulseCommands(browserManager: browserManager)
         }
 
+        Settings {
+            SettingsView()
+                .background(BackgroundWindowModifier())
+                .ignoresSafeArea(.all)
+                .environmentObject(browserManager)
+        }
+        .windowStyle(.hiddenTitleBar)
+
     }
 }
 
@@ -42,30 +50,15 @@ struct PulseCommands: Commands {
             .keyboardShortcut("s", modifiers: .command)
         }
 
-        // Navigation commands
-        CommandGroup(after: .toolbar) {
-
-            Divider()
-
-            // Future shortcuts can go here
-            Button("New Tab") {
-                browserManager.createNewTab()
-            }
-            .keyboardShortcut("t", modifiers: [.command, .shift])
-            .disabled(true)  // Enable when implemented
-
-            Divider()
-        }
-
         // View commands
         CommandGroup(after: .windowSize) {
             Button("Focus URL Bar") {
                 browserManager.focusURLBar()
             }
             .keyboardShortcut("l", modifiers: .command)
-            .disabled(true)  // Enable when implemented
+            .disabled(true)
         }
-        
+
         // File Section
         CommandGroup(replacing: .saveItem) {
             Button("New Tab...") {

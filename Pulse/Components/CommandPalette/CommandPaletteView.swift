@@ -29,7 +29,6 @@ struct CommandPaletteView: View {
                     Spacer()
 
                     VStack(spacing: 0) {
-                        // Search input
                         HStack(spacing: 12) {
                             Image(
                                 systemName: isLikelyURL(text)
@@ -133,7 +132,6 @@ struct CommandPaletteView: View {
             }
             return .handled
         }
-        // Only animate selection changes
         .animation(.easeInOut(duration: 0.15), value: selectedSuggestionIndex)
     }
 
@@ -152,7 +150,8 @@ struct CommandPaletteView: View {
     }
 
     private func selectSuggestion(_ suggestionText: String) {
-        browserManager.tabManager.createNewTab(url: suggestionText)
+        let tab = browserManager.tabManager.createNewTab(url: suggestionText, in: browserManager.tabManager.currentSpace)
+        print("Created tab \(tab.name) in \(browserManager.tabManager.currentSpace?.name)")
         text = ""
         selectedSuggestionIndex = -1
         browserManager.closeCommandPalette()
