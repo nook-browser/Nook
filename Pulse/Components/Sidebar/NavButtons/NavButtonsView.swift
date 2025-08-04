@@ -41,7 +41,7 @@ struct NavButtonsView: View {
                         print("forward")
 
                     }
-                    NavButton(iconName: "arrow.clockwise") {
+                    RefreshButton() {
                         browserManager.tabManager.currentTab?.refresh()
                     }
                 }
