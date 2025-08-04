@@ -5,19 +5,23 @@
 //  Created by Maciek Bagiński on 30/07/2025.
 //
 
-import Foundation
 import AppKit
 import FaviconFinder
+import Foundation
 import SwiftUI
 import WebKit
 
+@MainActor
 @Observable
 public class Tab: NSObject, Identifiable {
-    public let id = UUID()
+    public let id: UUID
     var url: URL
     var name: String
     var favicon: SwiftUI.Image
     var spaceId: UUID?
+    var index: Int
+
+    private var activeDownloads: [WKDownload: Double] = [:]
 
     // MARK: - Loading State
     enum LoadingState {
@@ -60,7 +64,6 @@ public class Tab: NSObject, Identifiable {
     var canGoBack: Bool = false
     var canGoForward: Bool = false
 
-    // Store the WebView instance to preserve state
     private var _webView: WKWebView?
     var webView: WKWebView {
         if _webView == nil {
@@ -71,51 +74,55 @@ public class Tab: NSObject, Identifiable {
 
     weak var browserManager: BrowserManager?
 
-    // Computed property to check if this is the current tab
     var isCurrentTab: Bool {
         return browserManager?.tabManager.currentTab?.id == id
     }
 
-    // Computed property for backwards compatibility
     var isLoading: Bool {
         return loadingState.isLoading
     }
 
     // MARK: - Initializers
     init(
+        id: UUID = UUID(),
         url: URL = URL(string: "https://www.google.com")!,
         name: String = "New Tab",
         favicon: String = "globe",
         spaceId: UUID? = nil,
+        index: Int = 0,
         browserManager: BrowserManager? = nil
     ) {
+        self.id = id
         self.url = url
         self.name = name
         self.favicon = Image(systemName: favicon)
         self.spaceId = spaceId
+        self.index = index
         self.browserManager = browserManager
         super.init()
 
-        // Fetch real favicon asynchronously
         Task { @MainActor in
             await fetchAndSetFavicon(for: url)
         }
     }
 
     public init(
+        id: UUID = UUID(),
         url: URL = URL(string: "https://www.google.com")!,
         name: String = "New Tab",
         favicon: String = "globe",
-        spaceId: UUID? = nil
+        spaceId: UUID? = nil,
+        index: Int = 0
     ) {
+        self.id = id
         self.url = url
         self.name = name
         self.favicon = Image(systemName: favicon)
         self.spaceId = spaceId
+        self.index = index
         self.browserManager = nil
         super.init()
 
-        // Fetch real favicon asynchronously
         Task { @MainActor in
             await fetchAndSetFavicon(for: url)
         }
@@ -159,26 +166,23 @@ public class Tab: NSObject, Identifiable {
         _webView?.allowsBackForwardNavigationGestures = true
         _webView?.allowsMagnification = true
 
-        // Use the most recent Chrome user agent that matches current versions
         _webView?.customUserAgent =
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15"
-        
-        // Additional properties to better mimic real browser
+
         _webView?.setValue(false, forKey: "drawsBackground")
-        
-        // Set additional realistic browser properties
+
         if let webView = _webView {
-            // Enable inspection for debugging (remove in production)
             if #available(macOS 13.3, *) {
                 webView.isInspectable = true
             }
-            
-            // Configure additional settings
+
             webView.allowsLinkPreview = true
-            webView.configuration.preferences.isFraudulentWebsiteWarningEnabled = true
-            webView.configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
+            webView.configuration.preferences
+                .isFraudulentWebsiteWarningEnabled = true
+            webView.configuration.preferences
+                .javaScriptCanOpenWindowsAutomatically = true
         }
-        
+
         print("Created WebView for tab: \(name)")
         loadURL(url)
     }
@@ -208,7 +212,6 @@ public class Tab: NSObject, Identifiable {
         let request = URLRequest(url: newURL)
         webView.load(request)
 
-        // Fetch favicon for new URL
         Task { @MainActor in
             await fetchAndSetFavicon(for: newURL)
         }
@@ -290,9 +293,6 @@ extension Tab: WKNavigationDelegate {
         didStartProvisionalNavigation navigation: WKNavigation!
     ) {
         loadingState = .didStartProvisionalNavigation
-        print(
-            "🟡 Loading started for: \(webView.url?.absoluteString ?? "unknown URL")"
-        )
 
         if let newURL = webView.url {
             self.url = newURL
@@ -305,9 +305,6 @@ extension Tab: WKNavigationDelegate {
         didCommit navigation: WKNavigation!
     ) {
         loadingState = .didCommit
-        print(
-            "🔄 Content committed for: \(webView.url?.absoluteString ?? "unknown URL")"
-        )
 
         if let newURL = webView.url {
             self.url = newURL
@@ -320,9 +317,6 @@ extension Tab: WKNavigationDelegate {
         didFinish navigation: WKNavigation!
     ) {
         loadingState = .didFinish
-        print(
-            "✅ Loading finished for: \(webView.url?.absoluteString ?? "unknown URL")"
-        )
 
         if let newURL = webView.url {
             self.url = newURL
@@ -354,9 +348,6 @@ extension Tab: WKNavigationDelegate {
         withError error: Error
     ) {
         loadingState = .didFail(error)
-        print(
-            "❌ Navigation failed for: \(webView.url?.absoluteString ?? "unknown URL")"
-        )
         print("Error: \(error.localizedDescription)")
 
         // Set error favicon on navigation failure
@@ -374,9 +365,6 @@ extension Tab: WKNavigationDelegate {
         withError error: Error
     ) {
         loadingState = .didFailProvisionalNavigation(error)
-        print(
-            "🚫 Provisional navigation failed for: \(webView.url?.absoluteString ?? "unknown URL")"
-        )
         print("Error: \(error.localizedDescription)")
 
         // Set connection error favicon
@@ -386,7 +374,7 @@ extension Tab: WKNavigationDelegate {
 
         updateNavigationState()
     }
-    
+
     public func webView(
         _ webView: WKWebView,
         decidePolicyFor navigationAction: WKNavigationAction,
@@ -400,9 +388,45 @@ extension Tab: WKNavigationDelegate {
         decidePolicyFor navigationResponse: WKNavigationResponse,
         decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
     ) {
-        // Allow all responses
+        if let mime = navigationResponse.response.mimeType?.lowercased() {
+            // Force download for images; extend as needed
+            let forceDownloadMIMEs: Set<String> = [
+                "image/jpeg",
+                "image/png",
+                "image/gif",
+                "application/octet-stream",
+            ]
+            if forceDownloadMIMEs.contains(mime) {
+                decisionHandler(.download)
+                return
+            }
+        }
         decisionHandler(.allow)
     }
+
+    //MARK: - Downloads
+    public func webView(
+        _ webView: WKWebView,
+        navigationAction: WKNavigationAction,
+        didBecome download: WKDownload
+    ) {
+        download.delegate = self
+        print(
+            "Download started from navigationAction: \(navigationAction.request.url?.absoluteString ?? "")"
+        )
+    }
+
+    public func webView(
+        _ webView: WKWebView,
+        navigationResponse: WKNavigationResponse,
+        didBecome download: WKDownload
+    ) {
+        download.delegate = self
+        print(
+            "Download started from navigationResponse: \(navigationResponse.response.url?.absoluteString ?? "")"
+        )
+    }
+
 }
 
 // MARK: - WKUIDelegate
@@ -447,5 +471,53 @@ extension Tab {
 
     public override var hash: Int {
         return id.hashValue
+    }
+}
+
+extension Tab: WKDownloadDelegate {
+    public func download(
+        _ download: WKDownload,
+        decideDestinationUsing response: URLResponse,
+        suggestedFilename: String,
+        completionHandler: @escaping (URL?) -> Void
+    ) {
+        guard
+            let downloads = FileManager.default.urls(
+                for: .downloadsDirectory,
+                in: .userDomainMask
+            ).first
+        else {
+            completionHandler(nil)
+            return
+        }
+
+        let defaultName =
+            suggestedFilename.isEmpty ? "download" : suggestedFilename
+        let cleanName = defaultName.replacingOccurrences(of: "/", with: "_")
+
+        var dest = downloads.appendingPathComponent(cleanName)
+        let ext = dest.pathExtension
+        let base = dest.deletingPathExtension().lastPathComponent
+        var counter = 1
+        while FileManager.default.fileExists(atPath: dest.path) {
+            let newName =
+                "\(base) (\(counter))" + (ext.isEmpty ? "" : ".\(ext)")
+            dest = downloads.appendingPathComponent(newName)
+            counter += 1
+        }
+
+        completionHandler(dest)
+    }
+
+    public func downloadDidFinish(_ download: WKDownload) {
+        print("Download finished")
+    }
+
+    public func download(
+        _ download: WKDownload,
+        didFailWithError error: Error,
+        resumeData: Data?
+    ) {
+        print("Download failed: \(error.localizedDescription)")
     }
 }
