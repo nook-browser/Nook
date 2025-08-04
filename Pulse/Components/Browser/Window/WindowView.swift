@@ -30,6 +30,7 @@ struct WindowView: View {
             .padding(.bottom, 8)
 
             CommandPaletteView()
+            DialogView()
         }
         .environmentObject(browserManager)
     }
