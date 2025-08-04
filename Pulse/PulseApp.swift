@@ -57,6 +57,13 @@ struct PulseCommands: Commands {
             }
             .keyboardShortcut("l", modifiers: .command)
             .disabled(true)
+            
+            Divider()
+            
+            Button("Force Quit App") {
+                browserManager.showQuitDialog()
+            }
+            .keyboardShortcut("q", modifiers: .command)
         }
 
         // File Section

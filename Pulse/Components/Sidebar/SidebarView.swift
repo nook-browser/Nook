@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 struct SidebarView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @State private var selectedSpaceID: UUID?
+    @State private var spaceName = ""
 
     var body: some View {
         if browserManager.isSidebarVisible {
@@ -111,7 +112,7 @@ struct SidebarView: View {
                         SpacesList()
                         Spacer()
                         NavButton(iconName: "plus") {
-                            browserManager.tabManager.createSpace(name: "New Space", icon: "sparkles")
+                            showSpaceCreationDialog()
                         }
 
                     }
@@ -132,5 +133,30 @@ struct SidebarView: View {
         withAnimation(.easeInOut(duration: 0.25)) {
             proxy.scrollTo(space.id, anchor: .center)
         }
+    }
+    
+    private func showSpaceCreationDialog() {
+        let dialog = SpaceCreationDialog(
+            spaceName: $spaceName,
+            onSave: {
+                // Create the space with the name from dialog
+                browserManager.tabManager.createSpace(
+                    name: spaceName.isEmpty ? "New Space" : spaceName,
+                    icon: "sparkles"
+                )
+                browserManager.dialogManager.closeDialog()
+                
+                // Reset form
+                spaceName = ""
+            },
+            onCancel: {
+                browserManager.dialogManager.closeDialog()
+                
+                // Reset form
+                spaceName = ""
+            }
+        )
+        
+        browserManager.dialogManager.showDialog(dialog)
     }
 }
