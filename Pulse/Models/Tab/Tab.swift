@@ -19,6 +19,7 @@ public class Tab: NSObject, Identifiable {
     var name: String
     var favicon: SwiftUI.Image
     var spaceId: UUID?
+    var index: Int
 
     private var activeDownloads: [WKDownload: Double] = [:]
 
@@ -88,6 +89,7 @@ public class Tab: NSObject, Identifiable {
         name: String = "New Tab",
         favicon: String = "globe",
         spaceId: UUID? = nil,
+        index: Int = 0,
         browserManager: BrowserManager? = nil
     ) {
         self.id = id
@@ -95,6 +97,7 @@ public class Tab: NSObject, Identifiable {
         self.name = name
         self.favicon = Image(systemName: favicon)
         self.spaceId = spaceId
+        self.index = index
         self.browserManager = browserManager
         super.init()
 
@@ -108,13 +111,15 @@ public class Tab: NSObject, Identifiable {
         url: URL = URL(string: "https://www.google.com")!,
         name: String = "New Tab",
         favicon: String = "globe",
-        spaceId: UUID? = nil
+        spaceId: UUID? = nil,
+        index: Int = 0
     ) {
         self.id = id
         self.url = url
         self.name = name
         self.favicon = Image(systemName: favicon)
         self.spaceId = spaceId
+        self.index = index
         self.browserManager = nil
         super.init()
 

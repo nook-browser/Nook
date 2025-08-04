@@ -17,6 +17,8 @@ struct SpaceView: View {
     let onActivateTab: (Tab) -> Void
     let onCloseTab: (Tab) -> Void
     let onPinTab: (Tab) -> Void
+    let onMoveTabUp: (Tab) -> Void
+    let onMoveTabDown: (Tab) -> Void
 
     var body: some View {
         VStack(spacing: 8) {
@@ -41,14 +43,31 @@ struct SpaceView: View {
                         .transition(.move(edge: .top).combined(with: .opacity))
                         .contextMenu {
                             Button {
-                                onCloseTab(tab)
+                                onMoveTabUp(tab)
                             } label: {
-                                Label("Close tab", systemImage: "xmark")
+                                Label("Move Up", systemImage: "arrow.up")
                             }
+                            .disabled(isFirstTab(tab))
+                            
+                            Button {
+                                onMoveTabDown(tab)
+                            } label: {
+                                Label("Move Down", systemImage: "arrow.down")
+                            }
+                            .disabled(isLastTab(tab))
+                            
+                            Divider()
+                            
                             Button {
                                 onPinTab(tab)
                             } label: {
                                 Label("Pin tab", systemImage: "pin")
+                            }
+                            
+                            Button {
+                                onCloseTab(tab)
+                            } label: {
+                                Label("Close tab", systemImage: "xmark")
                             }
                         }
                         .onDrag {
@@ -71,5 +90,13 @@ struct SpaceView: View {
                 onSetActive()
             }
         }
+    }
+    
+    private func isFirstTab(_ tab: Tab) -> Bool {
+        return tabs.first?.id == tab.id
+    }
+    
+    private func isLastTab(_ tab: Tab) -> Bool {
+        return tabs.last?.id == tab.id
     }
 }
