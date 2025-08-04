@@ -25,15 +25,12 @@ extension View {
 }
 
 private struct BackgroundDraggableModifier<G: Gesture>: ViewModifier {
-    @GestureState private var isDraggingWindow = false
     let gesture: G
 
     func body(content: Content) -> some View {
         content
             .gesture(
-                gesture.updating($isDraggingWindow) { _, state, _ in
-                    state = true
-                }
+                gesture
             )
     }
 }
