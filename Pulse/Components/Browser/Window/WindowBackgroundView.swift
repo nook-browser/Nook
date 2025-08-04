@@ -8,26 +8,32 @@
 import SwiftUI
 
 struct WindowBackgroundView: View {
-    @GestureState var isDraggingWindow = false
-
-    var dragWindow: some Gesture {
-        WindowDragGesture()
-            .updating($isDraggingWindow) { _, state, _ in
-                state = true
-            }
-    }
+    @EnvironmentObject var browserManager: BrowserManager
 
     var body: some View {
         Group {
-            if #available(macOS 26.0, *) {
-                Rectangle()
-                    .fill(Color.clear)
-                    .blur(radius: 40)
-                    .glassEffect(in: .rect(cornerRadius: 0))
+            if(browserManager.settingsManager.isLiquidGlassEnabled) {
+                if #available(macOS 26.0, *) {
+                    Rectangle()
+                        .fill(Color.clear)
+                        .blur(radius: 40)
+                        .glassEffect(in: .rect(cornerRadius: 0))
+                } else {
+                    BlurEffectView(material: browserManager.settingsManager.currentMaterial, state: .active)
+                        .overlay {
+                            Color(hex: "#00000041")
+                                .blendMode(.darken)
+                        }
+                }
             } else {
-                BlurEffectView(material: .hudWindow, state: .active)
+                BlurEffectView(material: browserManager.settingsManager.currentMaterial, state: .active)
+                    .overlay {
+                        Color(hex: "#00000041")
+                            .blendMode(.darken)
+                    }
             }
+            
         }
-        .gesture(dragWindow)
+        .backgroundDraggable()
     }
 }

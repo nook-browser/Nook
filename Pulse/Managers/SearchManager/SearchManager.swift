@@ -27,7 +27,6 @@ class SearchManager {
             case url
         }
         
-        // Custom equality that ignores ID for comparison
         static func == (lhs: SearchSuggestion, rhs: SearchSuggestion) -> Bool {
             return lhs.text == rhs.text && lhs.type == rhs.type
         }
@@ -47,7 +46,6 @@ class SearchManager {
             return
         }
         
-        // Check if it looks like a URL
         if isLikelyURL(query) {
             let urlSuggestion = [SearchSuggestion(text: query, type: .url)]
             updateSuggestionsIfNeeded(urlSuggestion)
@@ -56,7 +54,6 @@ class SearchManager {
         
         isLoading = true
         
-        // Google Suggest API with HTTPS
         let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
         let urlString = "https://suggestqueries.google.com/complete/search?client=firefox&q=\(encodedQuery)"
         
@@ -109,13 +106,11 @@ class SearchManager {
                 suggestions = newSuggestions
             }
         } else {
-            // Update without animation for minor changes
             suggestions = newSuggestions
         }
     }
     
     private func shouldAnimateChange(from oldSuggestions: [SearchSuggestion], to newSuggestions: [SearchSuggestion]) -> Bool {
-        // Always animate if going from empty to non-empty or vice versa
         if oldSuggestions.isEmpty != newSuggestions.isEmpty {
             return true
         }
