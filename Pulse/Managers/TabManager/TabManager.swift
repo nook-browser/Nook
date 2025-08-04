@@ -32,7 +32,7 @@ class TabManager {
 
     var tabs: [Tab] {
         guard let s = currentSpace else { return [] }
-        return tabsBySpace[s.id] ?? []
+        return (tabsBySpace[s.id] ?? []).sorted { $0.index < $1.index }
     }
 
     private func setTabs(_ items: [Tab], for spaceId: UUID) {
@@ -216,12 +216,19 @@ class TabManager {
             print("Invalid URL: \(url). Falling back to default.")
             return createNewTab(in: space)
         }
-        let sid = (space ?? currentSpace)?.id
+        let targetSpace = space ?? currentSpace
+        let sid = targetSpace?.id
+        
+        // Get the next index for this space
+        let existingTabs = sid.flatMap { tabsBySpace[$0] } ?? []
+        let nextIndex = (existingTabs.map { $0.index }.max() ?? -1) + 1
+        
         let newTab = Tab(
             url: validURL,
             name: "New Tab",
             favicon: "globe",
             spaceId: sid,
+            index: nextIndex,
             browserManager: browserManager
         )
         addTab(newTab)
@@ -235,6 +242,57 @@ class TabManager {
             return
         }
         removeTab(currentTab.id)
+    }
+
+    // MARK: - Tab Ordering
+
+    func moveTabUp(_ tabId: UUID) {
+        guard let spaceId = findSpaceForTab(tabId) else { return }
+        var tabs = tabsBySpace[spaceId] ?? []
+        guard let currentIndex = tabs.firstIndex(where: { $0.id == tabId }) else { return }
+        
+        // Can't move the first tab up
+        guard currentIndex > 0 else { return }
+        
+        // Swap with the tab above
+        let tab = tabs[currentIndex]
+        let targetTab = tabs[currentIndex - 1]
+        
+        let tempIndex = tab.index
+        tab.index = targetTab.index
+        targetTab.index = tempIndex
+        
+        setTabs(tabs, for: spaceId)
+        persistSnapshot()
+    }
+
+    func moveTabDown(_ tabId: UUID) {
+        guard let spaceId = findSpaceForTab(tabId) else { return }
+        var tabs = tabsBySpace[spaceId] ?? []
+        guard let currentIndex = tabs.firstIndex(where: { $0.id == tabId }) else { return }
+        
+        // Can't move the last tab down
+        guard currentIndex < tabs.count - 1 else { return }
+        
+        // Swap with the tab below
+        let tab = tabs[currentIndex]
+        let targetTab = tabs[currentIndex + 1]
+        
+        let tempIndex = tab.index
+        tab.index = targetTab.index
+        targetTab.index = tempIndex
+        
+        setTabs(tabs, for: spaceId)
+        persistSnapshot()
+    }
+
+    private func findSpaceForTab(_ tabId: UUID) -> UUID? {
+        for (spaceId, tabs) in tabsBySpace {
+            if tabs.contains(where: { $0.id == tabId }) {
+                return spaceId
+            }
+        }
+        return nil
     }
 
     // MARK: - Pinned tabs (global)
@@ -309,7 +367,7 @@ class TabManager {
 
     // MARK: - Persistence mapping
 
-    private func toTabEntity(_ tab: Tab, isPinned: Bool, index: Int)
+    private func toTabEntity(_ tab: Tab, isPinned: Bool, persistenceIndex: Int)
         -> TabEntity
     {
         TabEntity(
@@ -317,7 +375,7 @@ class TabManager {
             urlString: tab.url.absoluteString,
             name: tab.name,
             isPinned: isPinned,
-            index: index,
+            index: tab.index,
             spaceId: tab.spaceId
         )
     }
@@ -331,6 +389,7 @@ class TabManager {
             name: e.name,
             favicon: "globe",
             spaceId: e.spaceId,
+            index: e.index,
             browserManager: browserManager
         )
         return t
@@ -448,7 +507,7 @@ class TabManager {
                         urlString: tab.url.absoluteString,
                         name: tab.name,
                         isPinned: isPinned,
-                        index: index,
+                        index: tab.index,
                         spaceId: tab.spaceId
                     )
                     context.insert(e!)
@@ -456,7 +515,7 @@ class TabManager {
                     entity.urlString = tab.url.absoluteString
                     entity.name = tab.name
                     entity.isPinned = isPinned
-                    entity.index = index
+                    entity.index = tab.index
                     entity.spaceId = tab.spaceId
                 }
             } catch {
@@ -552,6 +611,6 @@ extension TabManager {
 }
 extension TabManager {
     func tabs(in space: Space) -> [Tab] {
-        tabsBySpace[space.id] ?? []
+        (tabsBySpace[space.id] ?? []).sorted { $0.index < $1.index }
     }
 }

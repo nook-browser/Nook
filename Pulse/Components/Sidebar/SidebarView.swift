@@ -66,6 +66,12 @@ struct SidebarView: View {
                                         },
                                         onPinTab: {
                                             browserManager.tabManager.pinTab($0)
+                                        },
+                                        onMoveTabUp: {
+                                            browserManager.tabManager.moveTabUp($0.id)
+                                        },
+                                        onMoveTabDown: {
+                                            browserManager.tabManager.moveTabDown($0.id)
                                         }
                                     )
                                     .id(space.id)
