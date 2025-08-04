@@ -82,16 +82,14 @@ struct CommandPaletteView: View {
                                     id: \.element.id
                                 ) { index, suggestion in
                                     CommandPaletteSuggestionView(
-                                        favicon: Image(
-                                            systemName: suggestion.type == .url
-                                                ? "link" : "magnifyingglass"
-                                        ),
+                                        favicon: iconForSuggestion(suggestion),
                                         text: suggestion.text,
+                                        isTabSuggestion: isTabSuggestion(suggestion),
                                         isSelected: selectedSuggestionIndex
                                             == index
                                     )
                                     .onTapGesture {
-                                        selectSuggestion(suggestion.text)
+                                        selectSuggestion(suggestion)
                                     }
                                 }
                             }
@@ -116,6 +114,8 @@ struct CommandPaletteView: View {
         .opacity(browserManager.isCommandPaletteVisible ? 1.0 : 0.0)
         .onChange(of: browserManager.isCommandPaletteVisible) { _, newVisible in
             if newVisible {
+                // Set the tab manager when command palette opens
+                searchManager.setTabManager(browserManager.tabManager)
                 DispatchQueue.main.async {
                     isSearchFocused = true
                 }
@@ -136,22 +136,33 @@ struct CommandPaletteView: View {
     }
 
     private func handleReturn() {
-        let finalText: String
-
         if selectedSuggestionIndex >= 0
             && selectedSuggestionIndex < searchManager.suggestions.count
         {
-            finalText = searchManager.suggestions[selectedSuggestionIndex].text
+            let suggestion = searchManager.suggestions[selectedSuggestionIndex]
+            selectSuggestion(suggestion)
         } else {
-            finalText = text
+            // Create new suggestion from text input
+            let newSuggestion = SearchManager.SearchSuggestion(
+                text: text,
+                type: isLikelyURL(text) ? .url : .search
+            )
+            selectSuggestion(newSuggestion)
         }
-
-        selectSuggestion(finalText)
     }
 
-    private func selectSuggestion(_ suggestionText: String) {
-        let tab = browserManager.tabManager.createNewTab(url: suggestionText, in: browserManager.tabManager.currentSpace)
-        print("Created tab \(tab.name) in \(browserManager.tabManager.currentSpace?.name)")
+    private func selectSuggestion(_ suggestion: SearchManager.SearchSuggestion) {
+        switch suggestion.type {
+        case .tab(let existingTab):
+            // Switch to existing tab
+            browserManager.tabManager.setActiveTab(existingTab)
+            print("Switched to existing tab: \(existingTab.name)")
+        case .url, .search:
+            // Create new tab
+            let tab = browserManager.tabManager.createNewTab(url: suggestion.text, in: browserManager.tabManager.currentSpace)
+            print("Created tab \(tab.name) in \(browserManager.tabManager.currentSpace?.name)")
+        }
+        
         text = ""
         selectedSuggestionIndex = -1
         browserManager.closeCommandPalette()
@@ -166,6 +177,26 @@ struct CommandPaletteView: View {
         } else {
             // Up arrow
             selectedSuggestionIndex = max(selectedSuggestionIndex - 1, -1)
+        }
+    }
+    
+    private func iconForSuggestion(_ suggestion: SearchManager.SearchSuggestion) -> Image {
+        switch suggestion.type {
+        case .tab(let tab):
+            return tab.favicon
+        case .url:
+            return Image(systemName: "link")
+        case .search:
+            return Image(systemName: "magnifyingglass")
+        }
+    }
+    
+    private func isTabSuggestion(_ suggestion: SearchManager.SearchSuggestion) -> Bool {
+        switch suggestion.type {
+        case .tab:
+            return true
+        case .search, .url:
+            return false
         }
     }
 }

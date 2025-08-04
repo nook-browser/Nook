@@ -38,6 +38,7 @@ struct SpaceView: View {
                             action: { onActivateTab(tab) },
                             onClose: { onCloseTab(tab) }
                         )
+                        .transition(.move(edge: .top).combined(with: .opacity))
                         .contextMenu {
                             Button {
                                 onCloseTab(tab)
@@ -57,6 +58,7 @@ struct SpaceView: View {
                         }
                     }
                 }
+                .animation(.easeInOut(duration: 0.15), value: tabs.count)
             }
             Spacer()
         }
