@@ -43,34 +43,25 @@ class SettingsManager {
     }
 
     init() {
-        let materialRaw: Int
-        if userDefaults.object(forKey: materialKey) != nil {
-            materialRaw = userDefaults.integer(forKey: materialKey)
-        } else {
-            materialRaw = NSVisualEffectView.Material.selection.rawValue
-            userDefaults.set(materialRaw, forKey: materialKey)
-        }
+        // Register default values
+        userDefaults.register(defaults: [
+            materialKey: NSVisualEffectView.Material.hudWindow.rawValue,
+            liquidGlassKey: false,
+            searchEngineKey: SearchProvider.google.rawValue
+        ])
 
-        let liquidEnabled: Bool
-        if userDefaults.object(forKey: liquidGlassKey) != nil {
-            liquidEnabled = userDefaults.bool(forKey: liquidGlassKey)
-        } else {
-            liquidEnabled = false
-            userDefaults.set(liquidEnabled, forKey: liquidGlassKey)
-        }
+        // Initialize properties from UserDefaults
+        // This will use the registered defaults if no value is set
+        self.currentMaterialRaw = userDefaults.integer(forKey: materialKey)
+        self.isLiquidGlassEnabled = userDefaults.bool(forKey: liquidGlassKey)
 
-        let engine: SearchProvider
-        if let raw = userDefaults.string(forKey: searchEngineKey),
-            let provider = SearchProvider(rawValue: raw)
+        if let rawEngine = userDefaults.string(forKey: searchEngineKey),
+           let provider = SearchProvider(rawValue: rawEngine)
         {
-            engine = provider
+            self.searchEngine = provider
         } else {
-            engine = .google
-            userDefaults.set(engine.rawValue, forKey: searchEngineKey)
+            // Fallback to google if the stored value is somehow invalid
+            self.searchEngine = .google
         }
-
-        self.currentMaterialRaw = materialRaw
-        self.isLiquidGlassEnabled = liquidEnabled
-        self.searchEngine = engine
     }
 }
