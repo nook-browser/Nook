@@ -9,7 +9,6 @@ import Foundation
 
 public let materials: [(name: String, value: NSVisualEffectView.Material)] = [
     ("titlebar", .titlebar),
-    ("selection", .selection),
     ("menu", .menu),
     ("popover", .popover),
     ("sidebar", .sidebar),
