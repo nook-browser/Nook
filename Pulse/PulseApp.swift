@@ -23,25 +23,34 @@ struct PulseApp: App {
             PulseCommands(browserManager: browserManager)
         }
 
-        Settings {
+        WindowGroup("Settings", id: "settings") {
             SettingsView()
-                .background(BackgroundWindowModifier())
-                .ignoresSafeArea(.all)
                 .environmentObject(browserManager)
         }
+        .windowResizability(.contentSize)
         .windowStyle(.hiddenTitleBar)
-
+        .windowToolbarStyle(.unifiedCompact)
     }
 }
 
 struct PulseCommands: Commands {
     let browserManager: BrowserManager
+    @Environment(\.openWindow) private var openWindow
 
     init(browserManager: BrowserManager) {
         self.browserManager = browserManager
     }
 
     var body: some Commands {
+        CommandGroup(replacing: .newItem) {}
+        CommandGroup(replacing: .windowList) {}
+        CommandGroup(replacing: .appSettings) {
+            Button("Settings...") {
+                openWindow(id: "settings")
+            }
+            .keyboardShortcut(",", modifiers: .command)
+        }
+        
         // Sidebar commands
         CommandGroup(after: .sidebar) {
             Button("Toggle Sidebar") {

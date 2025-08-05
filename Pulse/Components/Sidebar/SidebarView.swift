@@ -5,6 +5,7 @@ struct SidebarView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @State private var selectedSpaceID: UUID?
     @State private var spaceName = ""
+    @State private var spaceIcon = ""
 
     var body: some View {
         if browserManager.isSidebarVisible {
@@ -142,18 +143,20 @@ struct SidebarView: View {
                 // Create the space with the name from dialog
                 browserManager.tabManager.createSpace(
                     name: spaceName.isEmpty ? "New Space" : spaceName,
-                    icon: "sparkles"
+                    icon: spaceIcon.isEmpty ? "sparkles" : spaceIcon
                 )
                 browserManager.dialogManager.closeDialog()
                 
                 // Reset form
                 spaceName = ""
+                spaceIcon = ""
             },
             onCancel: {
                 browserManager.dialogManager.closeDialog()
                 
                 // Reset form
                 spaceName = ""
+                spaceIcon = ""
             }
         )
         
