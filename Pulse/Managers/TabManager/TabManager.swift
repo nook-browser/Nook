@@ -62,7 +62,7 @@ class TabManager {
         let space = Space(name: name, icon: icon)
         spaces.append(space)
         tabsBySpace[space.id] = []
-        if currentSpace == nil { currentSpace = space }
+        if currentSpace == nil { currentSpace = space } else { setActiveSpace(space) }
         persistSnapshot()
         return space
     }
