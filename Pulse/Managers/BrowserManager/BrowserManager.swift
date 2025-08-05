@@ -6,9 +6,8 @@
 //
 
 import SwiftUI
-
-
 import SwiftData
+import AppKit
 
 @MainActor
 final class Persistence {
@@ -31,6 +30,7 @@ class BrowserManager: ObservableObject {
     var modelContext: ModelContext
     var tabManager: TabManager
     var settingsManager: SettingsManager
+    var dialogManager: DialogManager
     
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
@@ -39,6 +39,7 @@ class BrowserManager: ObservableObject {
         self.modelContext = Persistence.shared.container.mainContext
         self.tabManager = TabManager(browserManager: nil,context: modelContext)
         self.settingsManager = SettingsManager()
+        self.dialogManager = DialogManager()
         self.tabManager.browserManager = self
         self.tabManager.reattachBrowserManager(self)
         loadSidebarSettings()
@@ -96,6 +97,57 @@ class BrowserManager: ObservableObject {
     func focusURLBar() {
         // TODO: Implement URL bar focus
         print("Focus URL bar")
+    }
+
+    // MARK: - Dialog Methods
+    
+    func showQuitDialog() {
+        dialogManager.showQuitDialog(
+            onAlwaysQuit: {
+                // Save always quit preference
+                self.quitApplication()
+            },
+            onQuit: {
+                self.quitApplication()
+            }
+        )
+    }
+    
+    func showCustomDialog<Header: View, Body: View, Footer: View>(
+        header: Header,
+        body: Body,
+        footer: Footer
+    ) {
+        dialogManager.showDialog(header: header, body: body, footer: footer)
+    }
+    
+    func showCustomDialog<Body: View, Footer: View>(
+        body: Body,
+        footer: Footer
+    ) {
+        dialogManager.showDialog(body: body, footer: footer)
+    }
+    
+    func showCustomDialog<Body: View>(
+        body: Body
+    ) {
+        dialogManager.showDialog(body: body)
+    }
+    
+    func showCustomContentDialog<Content: View>(
+        header: AnyView?,
+        content: Content,
+        footer: AnyView?
+    ) {
+        dialogManager.showCustomContentDialog(header: header, content: content, footer: footer)
+    }
+    
+    func closeDialog() {
+        dialogManager.closeDialog()
+    }
+    
+    private func quitApplication() {
+        NSApplication.shared.terminate(nil)
     }
 
     // MARK: - Private Methods
