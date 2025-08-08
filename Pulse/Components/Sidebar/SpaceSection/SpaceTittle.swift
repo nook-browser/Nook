@@ -9,12 +9,19 @@ struct SpaceTittle: View {
     @State private var isHovering: Bool = false
     @State private var isRenaming: Bool = false
     @State private var draftName: String = ""
+    @State private var showingIconPicker: Bool = false
     @FocusState private var nameFieldFocused: Bool
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: space.icon)
-                .font(.system(size: iconSize))
+            // Show emoji or SF Symbol icon
+            if isEmoji(space.icon) {
+                Text(space.icon)
+                    .font(.system(size: iconSize))
+            } else {
+                Image(systemName: space.icon)
+                    .font(.system(size: iconSize))
+            }
 
             if isRenaming {
                 TextField("", text: $draftName)
@@ -52,6 +59,11 @@ struct SpaceTittle: View {
                     } label: {
                         Label("Rename Space", systemImage: "pencil")
                     }
+                    Button {
+                        showingIconPicker = true
+                    } label: {
+                        Label("Change Icon", systemImage: "face.smiling")
+                    }
                     Button(role: .destructive) {
                         deleteSpace()
                     } label: {
@@ -79,6 +91,14 @@ struct SpaceTittle: View {
             if isRenaming && !focused {
                 commitRename()
             }
+        }
+        .popover(isPresented: $showingIconPicker, arrowEdge: .trailing) {
+            EmojiGridPicker { selectedEmoji in
+                space.icon = selectedEmoji
+                browserManager.tabManager.persistSnapshot()
+                showingIconPicker = false
+            }
+            .padding()
         }
     }
 
@@ -109,5 +129,13 @@ struct SpaceTittle: View {
 
     private func deleteSpace() {
         browserManager.tabManager.removeSpace(space.id)
+    }
+    
+    private func isEmoji(_ string: String) -> Bool {
+        return string.unicodeScalars.contains { scalar in
+            (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF) ||
+            (scalar.value >= 0x2600 && scalar.value <= 0x26FF) ||
+            (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
+        }
     }
 }

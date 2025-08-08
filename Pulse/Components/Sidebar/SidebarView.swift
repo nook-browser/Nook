@@ -139,11 +139,12 @@ struct SidebarView: View {
     private func showSpaceCreationDialog() {
         let dialog = SpaceCreationDialog(
             spaceName: $spaceName,
+            spaceIcon: $spaceIcon,
             onSave: {
                 // Create the space with the name from dialog
                 browserManager.tabManager.createSpace(
                     name: spaceName.isEmpty ? "New Space" : spaceName,
-                    icon: spaceIcon.isEmpty ? "sparkles" : spaceIcon
+                    icon: spaceIcon.isEmpty ? "✨" : spaceIcon
                 )
                 browserManager.dialogManager.closeDialog()
                 
