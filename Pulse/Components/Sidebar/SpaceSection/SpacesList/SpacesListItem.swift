@@ -10,7 +10,8 @@ struct SpacesListItem: View {
     @EnvironmentObject var browserManager: BrowserManager
     var space: Space
     @State private var isHovering: Bool = false
-    @State private var showingIconPicker: Bool = false
+    @State private var selectedEmoji: String = ""
+    @FocusState private var emojiFieldFocused: Bool
 
     private var currentSpaceID: UUID? {
         browserManager.tabManager.currentSpace?.id
@@ -42,18 +43,25 @@ struct SpacesListItem: View {
         .onHover { hovering in
             isHovering = hovering
         }
+        .overlay(
+            // Hidden TextField for capturing emoji selection
+            TextField("", text: $selectedEmoji)
+                .frame(width: 0, height: 0)
+                .opacity(0)
+                .focused($emojiFieldFocused)
+                .onChange(of: selectedEmoji) { _, newValue in
+                    if !newValue.isEmpty {
+                        space.icon = String(newValue.last!)
+                        browserManager.tabManager.persistSnapshot()
+                        selectedEmoji = ""
+                    }
+                }
+        )
         .contextMenu {
             Button("Change Icon...") {
-                showingIconPicker = true
+                emojiFieldFocused = true
+                NSApp.orderFrontCharacterPalette(nil)
             }
-        }
-        .popover(isPresented: $showingIconPicker, arrowEdge: .bottom) {
-            EmojiGridPicker { selectedEmoji in
-                space.icon = selectedEmoji
-                browserManager.tabManager.persistSnapshot()
-                showingIconPicker = false
-            }
-            .padding()
         }
     }
     
