@@ -9,8 +9,9 @@ struct SpaceTittle: View {
     @State private var isHovering: Bool = false
     @State private var isRenaming: Bool = false
     @State private var draftName: String = ""
-    @State private var showingIconPicker: Bool = false
+    @State private var selectedEmoji: String = ""
     @FocusState private var nameFieldFocused: Bool
+    @FocusState private var emojiFieldFocused: Bool
 
     var body: some View {
         HStack(spacing: 6) {
@@ -51,6 +52,19 @@ struct SpaceTittle: View {
             }
 
             Spacer()
+            
+            // Hidden TextField for capturing emoji selection
+            TextField("", text: $selectedEmoji)
+                .frame(width: 0, height: 0)
+                .opacity(0)
+                .focused($emojiFieldFocused)
+                .onChange(of: selectedEmoji) { _, newValue in
+                    if !newValue.isEmpty {
+                        space.icon = String(newValue.last!)
+                        browserManager.tabManager.persistSnapshot()
+                        selectedEmoji = ""
+                    }
+                }
 
             if isHovering {
                 Menu {
@@ -60,7 +74,8 @@ struct SpaceTittle: View {
                         Label("Rename Space", systemImage: "pencil")
                     }
                     Button {
-                        showingIconPicker = true
+                        emojiFieldFocused = true
+                        NSApp.orderFrontCharacterPalette(nil)
                     } label: {
                         Label("Change Icon", systemImage: "face.smiling")
                     }
@@ -91,14 +106,6 @@ struct SpaceTittle: View {
             if isRenaming && !focused {
                 commitRename()
             }
-        }
-        .popover(isPresented: $showingIconPicker, arrowEdge: .trailing) {
-            EmojiGridPicker { selectedEmoji in
-                space.icon = selectedEmoji
-                browserManager.tabManager.persistSnapshot()
-                showingIconPicker = false
-            }
-            .padding()
         }
     }
 
