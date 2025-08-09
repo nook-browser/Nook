@@ -21,8 +21,6 @@ public class Tab: NSObject, Identifiable {
     var spaceId: UUID?
     var index: Int
 
-    private var activeDownloads: [WKDownload: Double] = [:]
-
     // MARK: - Loading State
     enum LoadingState {
         case idle
@@ -159,6 +157,67 @@ public class Tab: NSObject, Identifiable {
     private func setupWebView() {
         // Use the shared configuration for cookie/session sharing
         let configuration = BrowserConfiguration.shared.webViewConfiguration
+        
+        let downloadScript = WKUserScript(
+            source: """
+            (function() {
+                // Override click handlers for download links
+                document.addEventListener('click', function(e) {
+                    var target = e.target;
+                    while (target && target !== document) {
+                        if (target.tagName === 'A' && target.href) {
+                            var href = target.href.toLowerCase();
+                            var downloadExtensions = ['zip', 'rar', '7z', 'tar', 'gz', 'pdf', 'doc', 'docx', 'mp4', 'mp3', 'exe', 'dmg'];
+                            
+                            for (var i = 0; i < downloadExtensions.length; i++) {
+                                if (href.indexOf('.' + downloadExtensions[i]) !== -1) {
+                                    // Force download by creating a new link
+                                    var link = document.createElement('a');
+                                    link.href = target.href;
+                                    link.download = target.download || target.href.split('/').pop();
+                                    link.style.display = 'none';
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    return false;
+                                }
+                            }
+                        }
+                        target = target.parentElement;
+                    }
+                }, true);
+                
+                // Override window.open for download links
+                var originalOpen = window.open;
+                window.open = function(url, name, features) {
+                    if (url && typeof url === 'string') {
+                        var lowerUrl = url.toLowerCase();
+                        var downloadExtensions = ['zip', 'rar', '7z', 'tar', 'gz', 'pdf', 'doc', 'docx', 'mp4', 'mp3', 'exe', 'dmg'];
+                        
+                        for (var i = 0; i < downloadExtensions.length; i++) {
+                            if (lowerUrl.indexOf('.' + downloadExtensions[i]) !== -1) {
+                                // Force download instead of opening in new window
+                                var link = document.createElement('a');
+                                link.href = url;
+                                link.download = url.split('/').pop();
+                                link.style.display = 'none';
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                return null;
+                            }
+                        }
+                    }
+                    return originalOpen.apply(this, arguments);
+                };
+            })();
+            """,
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: false
+        )
+        configuration.userContentController.addUserScript(downloadScript)
 
         _webView = WKWebView(frame: .zero, configuration: configuration)
         _webView?.navigationDelegate = self
@@ -181,6 +240,8 @@ public class Tab: NSObject, Identifiable {
                 .isFraudulentWebsiteWarningEnabled = true
             webView.configuration.preferences
                 .javaScriptCanOpenWindowsAutomatically = true
+            
+            injectDownloadJavaScript(to: webView)
         }
 
         print("Created WebView for tab: \(name)")
@@ -223,6 +284,71 @@ public class Tab: NSObject, Identifiable {
             return
         }
         loadURL(newURL)
+    }
+    
+    // MARK: - JavaScript Injection
+    private func injectDownloadJavaScript(to webView: WKWebView) {
+        let downloadScript = """
+        (function() {
+            // Override click handlers for download links
+            document.addEventListener('click', function(e) {
+                var target = e.target;
+                while (target && target !== document) {
+                    if (target.tagName === 'A' && target.href) {
+                        var href = target.href.toLowerCase();
+                        var downloadExtensions = ['zip', 'rar', '7z', 'tar', 'gz', 'pdf', 'doc', 'docx', 'mp4', 'mp3', 'exe', 'dmg'];
+                        
+                        for (var i = 0; i < downloadExtensions.length; i++) {
+                            if (href.indexOf('.' + downloadExtensions[i]) !== -1) {
+                                // Force download by creating a new link
+                                var link = document.createElement('a');
+                                link.href = target.href;
+                                link.download = target.download || target.href.split('/').pop();
+                                link.style.display = 'none';
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                e.preventDefault();
+                                e.stopPropagation();
+                                return false;
+                            }
+                        }
+                    }
+                    target = target.parentElement;
+                }
+            }, true);
+            
+            // Override window.open for download links
+            var originalOpen = window.open;
+            window.open = function(url, name, features) {
+                if (url && typeof url === 'string') {
+                    var lowerUrl = url.toLowerCase();
+                    var downloadExtensions = ['zip', 'rar', '7z', 'tar', 'gz', 'pdf', 'doc', 'docx', 'mp4', 'mp3', 'exe', 'dmg'];
+                    
+                    for (var i = 0; i < downloadExtensions.length; i++) {
+                        if (lowerUrl.indexOf('.' + downloadExtensions[i]) !== -1) {
+                            // Force download instead of opening in new window
+                            var link = document.createElement('a');
+                            link.href = url;
+                            link.download = url.split('/').pop();
+                            link.style.display = 'none';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            return null;
+                        }
+                    }
+                }
+                return originalOpen.apply(this, arguments);
+            };
+        })();
+        """
+        
+        webView.evaluateJavaScript(downloadScript) { result, error in
+            if let error = error {
+                print("Error injecting download JavaScript: \(error.localizedDescription)")
+            }
+        }
     }
 
     // MARK: - Tab State Management
@@ -337,6 +463,8 @@ extension Tab: WKNavigationDelegate {
                 await self.fetchAndSetFavicon(for: currentURL)
             }
         }
+        
+        injectDownloadJavaScript(to: webView)
 
         updateNavigationState()
     }
@@ -380,6 +508,23 @@ extension Tab: WKNavigationDelegate {
         decidePolicyFor navigationAction: WKNavigationAction,
         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
     ) {
+        if let url = navigationAction.request.url {
+            let pathExtension = url.pathExtension.lowercased()
+            let downloadExtensions: Set<String> = [
+                "zip", "rar", "7z", "tar", "gz", "bz2", "xz",
+                "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+                "mp4", "avi", "mov", "wmv", "flv", "mkv",
+                "mp3", "wav", "aac", "flac",
+                "exe", "dmg", "pkg", "deb", "rpm",
+                "jpg", "jpeg", "png", "gif", "bmp", "tiff", "webp"
+            ]
+            
+            if downloadExtensions.contains(pathExtension) {
+                decisionHandler(.download)
+                return
+            }
+        }
+        
         decisionHandler(.allow)
     }
 
@@ -389,18 +534,71 @@ extension Tab: WKNavigationDelegate {
         decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
     ) {
         if let mime = navigationResponse.response.mimeType?.lowercased() {
-            // Force download for images; extend as needed
             let forceDownloadMIMEs: Set<String> = [
+                // Images
                 "image/jpeg",
                 "image/png",
                 "image/gif",
+                "image/bmp",
+                "image/tiff",
+                "image/webp",
+                // Archives
+                "application/zip",
+                "application/x-zip-compressed",
+                "application/x-rar-compressed",
+                "application/x-7z-compressed",
+                "application/x-tar",
+                "application/gzip",
+                "application/x-gzip",
+                // Documents
+                "application/pdf",
+                "application/msword",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "application/vnd.ms-excel",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "application/vnd.ms-powerpoint",
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                // Media
+                "video/mp4",
+                "video/avi",
+                "video/quicktime",
+                "video/x-msvideo",
+                "audio/mpeg",
+                "audio/wav",
+                "audio/aac",
+                // Executables
+                "application/x-executable",
+                "application/x-dosexec",
+                "application/x-msdownload",
+                // Generic binary
                 "application/octet-stream",
+                "application/binary",
             ]
+            
             if forceDownloadMIMEs.contains(mime) {
                 decisionHandler(.download)
                 return
             }
         }
+        
+        // Also check URL path for common file extensions
+        if let url = navigationResponse.response.url {
+            let pathExtension = url.pathExtension.lowercased()
+            let downloadExtensions: Set<String> = [
+                "zip", "rar", "7z", "tar", "gz", "bz2", "xz",
+                "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+                "mp4", "avi", "mov", "wmv", "flv", "mkv",
+                "mp3", "wav", "aac", "flac",
+                "exe", "dmg", "pkg", "deb", "rpm",
+                "jpg", "jpeg", "png", "gif", "bmp", "tiff", "webp"
+            ]
+            
+            if downloadExtensions.contains(pathExtension) {
+                decisionHandler(.download)
+                return
+            }
+        }
+        
         decisionHandler(.allow)
     }
 
@@ -410,10 +608,11 @@ extension Tab: WKNavigationDelegate {
         navigationAction: WKNavigationAction,
         didBecome download: WKDownload
     ) {
-        download.delegate = self
-        print(
-            "Download started from navigationAction: \(navigationAction.request.url?.absoluteString ?? "")"
-        )
+        let originalURL = navigationAction.request.url ?? URL(string: "https://example.com")!
+        let suggestedFilename = navigationAction.request.url?.lastPathComponent ?? "download"
+        
+        let downloadModel = browserManager?.downloadManager.addDownload(download, originalURL: originalURL, suggestedFilename: suggestedFilename)
+        print("Download started from navigationAction: \(originalURL.absoluteString)")
     }
 
     public func webView(
@@ -421,10 +620,11 @@ extension Tab: WKNavigationDelegate {
         navigationResponse: WKNavigationResponse,
         didBecome download: WKDownload
     ) {
-        download.delegate = self
-        print(
-            "Download started from navigationResponse: \(navigationResponse.response.url?.absoluteString ?? "")"
-        )
+        let originalURL = navigationResponse.response.url ?? URL(string: "https://example.com")!
+        let suggestedFilename = navigationResponse.response.url?.lastPathComponent ?? "download"
+        
+        let downloadModel = browserManager?.downloadManager.addDownload(download, originalURL: originalURL, suggestedFilename: suggestedFilename)
+        print("Download started from navigationResponse: \(originalURL.absoluteString)")
     }
 
 }
@@ -474,50 +674,4 @@ extension Tab {
     }
 }
 
-extension Tab: WKDownloadDelegate {
-    public func download(
-        _ download: WKDownload,
-        decideDestinationUsing response: URLResponse,
-        suggestedFilename: String,
-        completionHandler: @escaping (URL?) -> Void
-    ) {
-        guard
-            let downloads = FileManager.default.urls(
-                for: .downloadsDirectory,
-                in: .userDomainMask
-            ).first
-        else {
-            completionHandler(nil)
-            return
-        }
 
-        let defaultName =
-            suggestedFilename.isEmpty ? "download" : suggestedFilename
-        let cleanName = defaultName.replacingOccurrences(of: "/", with: "_")
-
-        var dest = downloads.appendingPathComponent(cleanName)
-        let ext = dest.pathExtension
-        let base = dest.deletingPathExtension().lastPathComponent
-        var counter = 1
-        while FileManager.default.fileExists(atPath: dest.path) {
-            let newName =
-                "\(base) (\(counter))" + (ext.isEmpty ? "" : ".\(ext)")
-            dest = downloads.appendingPathComponent(newName)
-            counter += 1
-        }
-
-        completionHandler(dest)
-    }
-
-    public func downloadDidFinish(_ download: WKDownload) {
-        print("Download finished")
-    }
-
-    public func download(
-        _ download: WKDownload,
-        didFailWithError error: Error,
-        resumeData: Data?
-    ) {
-        print("Download failed: \(error.localizedDescription)")
-    }
-}
