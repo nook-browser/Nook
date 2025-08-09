@@ -31,6 +31,7 @@ class BrowserManager: ObservableObject {
     var tabManager: TabManager
     var settingsManager: SettingsManager
     var dialogManager: DialogManager
+    var downloadManager: DownloadManager
     
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
@@ -40,6 +41,7 @@ class BrowserManager: ObservableObject {
         self.tabManager = TabManager(browserManager: nil,context: modelContext)
         self.settingsManager = SettingsManager()
         self.dialogManager = DialogManager()
+        self.downloadManager = DownloadManager.shared
         self.tabManager.browserManager = self
         self.tabManager.reattachBrowserManager(self)
         loadSidebarSettings()
