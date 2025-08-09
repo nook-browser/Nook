@@ -448,12 +448,21 @@ class TabManager {
             // State
             let states = try context.fetch(FetchDescriptor<TabsStateEntity>())
             let state = states.first
-            if let sid = state?.currentSpaceID,
-                let match = spaces.first(where: { $0.id == sid })
-            {
-                self.currentSpace = match
+            // Ensure there's always at least one space
+            if spaces.isEmpty {
+                let personalSpace = Space(name: "Personal", icon: "person.crop.circle")
+                spaces.append(personalSpace)
+                tabsBySpace[personalSpace.id] = []
+                self.currentSpace = personalSpace
+                persistSnapshot() // Save the initial space
             } else {
-                self.currentSpace = spaces.first
+                if let sid = state?.currentSpaceID,
+                    let match = spaces.first(where: { $0.id == sid })
+                {
+                    self.currentSpace = match
+                } else {
+                    self.currentSpace = spaces.first
+                }
             }
 
             let allForSelection =

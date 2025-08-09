@@ -453,6 +453,16 @@ extension Tab: WKNavigationDelegate {
             if let title = result as? String {
                 DispatchQueue.main.async {
                     self?.updateTitle(title)
+                    
+                    // Add to global history after title is updated
+                    if let currentURL = webView.url {
+                        self?.browserManager?.historyManager.addVisit(
+                            url: currentURL,
+                            title: title,
+                            timestamp: Date(),
+                            tabId: self?.id
+                        )
+                    }
                 }
             }
         }
