@@ -9,12 +9,20 @@ struct SpaceTittle: View {
     @State private var isHovering: Bool = false
     @State private var isRenaming: Bool = false
     @State private var draftName: String = ""
+    @State private var selectedEmoji: String = ""
     @FocusState private var nameFieldFocused: Bool
+    @FocusState private var emojiFieldFocused: Bool
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: space.icon)
-                .font(.system(size: iconSize))
+            // Show emoji or SF Symbol icon
+            if isEmoji(space.icon) {
+                Text(space.icon)
+                    .font(.system(size: iconSize))
+            } else {
+                Image(systemName: space.icon)
+                    .font(.system(size: iconSize))
+            }
 
             if isRenaming {
                 TextField("", text: $draftName)
@@ -44,6 +52,19 @@ struct SpaceTittle: View {
             }
 
             Spacer()
+            
+            // Hidden TextField for capturing emoji selection
+            TextField("", text: $selectedEmoji)
+                .frame(width: 0, height: 0)
+                .opacity(0)
+                .focused($emojiFieldFocused)
+                .onChange(of: selectedEmoji) { _, newValue in
+                    if !newValue.isEmpty {
+                        space.icon = String(newValue.last!)
+                        browserManager.tabManager.persistSnapshot()
+                        selectedEmoji = ""
+                    }
+                }
 
             if isHovering {
                 Menu {
@@ -51,6 +72,12 @@ struct SpaceTittle: View {
                         startRenaming()
                     } label: {
                         Label("Rename Space", systemImage: "pencil")
+                    }
+                    Button {
+                        emojiFieldFocused = true
+                        NSApp.orderFrontCharacterPalette(nil)
+                    } label: {
+                        Label("Change Icon", systemImage: "face.smiling")
                     }
                     Button(role: .destructive) {
                         deleteSpace()
@@ -109,5 +136,13 @@ struct SpaceTittle: View {
 
     private func deleteSpace() {
         browserManager.tabManager.removeSpace(space.id)
+    }
+    
+    private func isEmoji(_ string: String) -> Bool {
+        return string.unicodeScalars.contains { scalar in
+            (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF) ||
+            (scalar.value >= 0x2600 && scalar.value <= 0x26FF) ||
+            (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
+        }
     }
 }

@@ -6,6 +6,7 @@ struct SidebarView: View {
     @State private var selectedSpaceID: UUID?
     @State private var spaceName = ""
     @State private var spaceIcon = ""
+    @State private var showHistory = false
 
     var body: some View {
         if browserManager.isSidebarVisible {
@@ -29,93 +30,130 @@ struct SidebarView: View {
 
                     URLBarView()
                     PinnedGrid()
-                    ScrollViewReader { proxy in
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(alignment: .top, spacing: 0) {
-                                ForEach(
-                                    browserManager.tabManager.spaces,
-                                    id: \.id
-                                ) { space in
-                                    SpaceView(
-                                        space: space,
-                                        tabs: tabManagerTabs(in: space),
-                                        isActive: browserManager.tabManager
-                                            .currentSpace?.id == space.id,
-                                        width: browserManager.sidebarWidth,
-                                        onSetActive: {
-                                            browserManager.tabManager
-                                                .setActiveSpace(space)
-                                            selectedSpaceID = space.id
-                                            withAnimation(
-                                                .easeInOut(duration: 0.25)
-                                            ) {
-                                                proxy.scrollTo(
-                                                    space.id,
-                                                    anchor: .center
+                    if showHistory {
+                        // History View - only loaded when needed
+                        HistoryView()
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .trailing).combined(with: .opacity),
+                                removal: .move(edge: .leading).combined(with: .opacity)
+                            ))
+                    } else {
+                        // Spaces View - default view
+                        ScrollViewReader { proxy in
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(alignment: .top, spacing: 0) {
+                                    ForEach(
+                                        browserManager.tabManager.spaces,
+                                        id: \.id
+                                    ) { space in
+                                        SpaceView(
+                                            space: space,
+                                            tabs: tabManagerTabs(in: space),
+                                            isActive: browserManager.tabManager
+                                                .currentSpace?.id == space.id,
+                                            width: browserManager.sidebarWidth,
+                                            onSetActive: {
+                                                browserManager.tabManager
+                                                    .setActiveSpace(space)
+                                                selectedSpaceID = space.id
+                                                withAnimation(
+                                                    .easeInOut(duration: 0.25)
+                                                ) {
+                                                    proxy.scrollTo(
+                                                        space.id,
+                                                        anchor: .center
+                                                    )
+                                                }
+                                            },
+                                            onActivateTab: {
+                                                browserManager.tabManager
+                                                    .setActiveTab(
+                                                        $0
+                                                    )
+                                            },
+                                            onCloseTab: {
+                                                browserManager.tabManager.removeTab(
+                                                    $0.id
                                                 )
+                                            },
+                                            onPinTab: {
+                                                browserManager.tabManager.pinTab($0)
+                                            },
+                                            onMoveTabUp: {
+                                                browserManager.tabManager.moveTabUp($0.id)
+                                            },
+                                            onMoveTabDown: {
+                                                browserManager.tabManager.moveTabDown($0.id)
                                             }
-                                        },
-                                        onActivateTab: {
-                                            browserManager.tabManager
-                                                .setActiveTab(
-                                                    $0
-                                                )
-                                        },
-                                        onCloseTab: {
-                                            browserManager.tabManager.removeTab(
-                                                $0.id
-                                            )
-                                        },
-                                        onPinTab: {
-                                            browserManager.tabManager.pinTab($0)
-                                        },
-                                        onMoveTabUp: {
-                                            browserManager.tabManager.moveTabUp($0.id)
-                                        },
-                                        onMoveTabDown: {
-                                            browserManager.tabManager.moveTabDown($0.id)
-                                        }
-                                    )
-                                    .id(space.id)
-                                    .frame(width: browserManager.sidebarWidth)
-                                    .scrollTargetLayout()
+                                        )
+                                        .id(space.id)
+                                        .frame(width: browserManager.sidebarWidth)
+                                        .scrollTargetLayout()
+                                    }
+                                }
+                            }
+                            .frame(width: browserManager.sidebarWidth)
+                            .contentMargins(.horizontal, 0)
+                            .scrollTargetBehavior(.viewAligned)
+                            .onChange(
+                                of: browserManager.tabManager.currentSpace?.id
+                            ) {
+                                _,
+                                newID in
+                                guard let newID else { return }
+                                selectedSpaceID = newID
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    proxy.scrollTo(newID, anchor: .center)
+                                }
+                            }
+                            .onAppear {
+                                selectedSpaceID =
+                                    browserManager.tabManager.currentSpace?.id
+                                if let id = selectedSpaceID {
+                                    proxy.scrollTo(id, anchor: .center)
                                 }
                             }
                         }
-                        .frame(width: browserManager.sidebarWidth)
-                        .contentMargins(.horizontal, 0)
-                        .scrollTargetBehavior(.viewAligned)
-                        .onChange(
-                            of: browserManager.tabManager.currentSpace?.id
-                        ) {
-                            _,
-                            newID in
-                            guard let newID else { return }
-                            selectedSpaceID = newID
-                            withAnimation(.easeInOut(duration: 0.25)) {
-                                proxy.scrollTo(newID, anchor: .center)
-                            }
-                        }
-                        .onAppear {
-                            selectedSpaceID =
-                                browserManager.tabManager.currentSpace?.id
-                            if let id = selectedSpaceID {
-                                proxy.scrollTo(id, anchor: .center)
-                            }
-                        }
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .leading).combined(with: .opacity),
+                            removal: .move(edge: .trailing).combined(with: .opacity)
+                        ))
                     }
                     //MARK: - Bottom
                     HStack {
                         NavButton(iconName: "square.and.arrow.down") {
                             print("Downloads button pressed")
                         }
-                        Spacer()
-                        SpacesList()
-                        Spacer()
-                        NavButton(iconName: "plus") {
-                            showSpaceCreationDialog()
+                        
+                        NavButton(iconName: "clock") {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                showHistory.toggle()
+                            }
                         }
-
+                        
+                        Spacer()
+                        
+                        if !showHistory {
+                            SpacesList()
+                        } else {
+                            Text("History")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        if !showHistory {
+                            NavButton(iconName: "plus") {
+                                showSpaceCreationDialog()
+                            }
+                        } else {
+                            NavButton(iconName: "arrow.left") {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    showHistory = false
+                                }
+                            }
+                        }
                     }
 
                 }
@@ -139,11 +177,12 @@ struct SidebarView: View {
     private func showSpaceCreationDialog() {
         let dialog = SpaceCreationDialog(
             spaceName: $spaceName,
+            spaceIcon: $spaceIcon,
             onSave: {
                 // Create the space with the name from dialog
                 browserManager.tabManager.createSpace(
                     name: spaceName.isEmpty ? "New Space" : spaceName,
-                    icon: spaceIcon.isEmpty ? "sparkles" : spaceIcon
+                    icon: spaceIcon.isEmpty ? "✨" : spaceIcon
                 )
                 browserManager.dialogManager.closeDialog()
                 
