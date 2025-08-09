@@ -15,7 +15,7 @@ final class Persistence {
     let container: ModelContainer
     private init() {
         container = try! ModelContainer(
-            for: Schema([SpaceEntity.self,TabEntity.self, TabsStateEntity.self])
+            for: Schema([SpaceEntity.self,TabEntity.self, TabsStateEntity.self, HistoryEntity.self])
         )
     }
 }
@@ -32,6 +32,7 @@ class BrowserManager: ObservableObject {
     var settingsManager: SettingsManager
     var dialogManager: DialogManager
     var downloadManager: DownloadManager
+    var historyManager: HistoryManager
     
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
@@ -42,6 +43,7 @@ class BrowserManager: ObservableObject {
         self.settingsManager = SettingsManager()
         self.dialogManager = DialogManager()
         self.downloadManager = DownloadManager.shared
+        self.historyManager = HistoryManager(context: modelContext)
         self.tabManager.browserManager = self
         self.tabManager.reattachBrowserManager(self)
         loadSidebarSettings()
