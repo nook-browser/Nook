@@ -76,7 +76,9 @@ final class BrowserManager: ObservableObject {
     }
     
     // MARK: - Command Palette (unchanged)
-    func openCommandPalette() { isCommandPaletteVisible = true }
+    func openCommandPalette() {
+        isCommandPaletteVisible = true
+    }
     func closeCommandPalette() { isCommandPaletteVisible = false }
     func toggleCommandPalette() { isCommandPaletteVisible ? closeCommandPalette() : openCommandPalette() }
     

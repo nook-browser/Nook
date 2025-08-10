@@ -14,10 +14,12 @@ struct SpaceTab: View {
     var isActive: Bool
     var action: () -> Void
     var onClose: () -> Void
+    var splitTab: Tab?
     @State private var isHovering: Bool = false
     
     var body: some View {
         Button(action: action) {
+            
             HStack(spacing: 8) {
                 tabIcon // Directly use the SwiftUI.Image
                     .resizable()

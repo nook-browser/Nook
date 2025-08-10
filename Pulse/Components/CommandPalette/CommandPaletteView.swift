@@ -123,8 +123,12 @@ struct CommandPaletteView: View {
             } else {
                 isSearchFocused = false
                 searchManager.clearSuggestions()
-                text = ""
                 selectedSuggestionIndex = -1
+            }
+            if let url = browserManager.tabManager.currentTab?.url {
+                //decide if tab is being opened as new, or just entering new url into current page???
+                print("url: \(url)")
+                text = url.absoluteString
             }
         }
         .onKeyPress(.escape) {

@@ -29,6 +29,11 @@ struct SidebarView: View {
                     )
                     
                     URLBarView()
+                        .onTapGesture {
+                            print("tapped url bar")
+                            browserManager.openCommandPalette()
+                            
+                        }
                     PinnedGrid()
                     SpaceTittle(
                         spaceName: "Development",
@@ -54,6 +59,7 @@ struct SidebarView: View {
                                     tab.closeTab()
                                 }
                             },
+                            splitTab: tabManager.currentSplittedTab,
                         )
                         .contextMenu {
                             ContextView(browserManager: _browserManager,tab: tab)
@@ -133,10 +139,12 @@ struct ContextView: View {
         // Moving tabs
         Button {
             print("Move Tab to New Window")
+            
         } label: {
             HStack {
                 Image(systemName: "arrow.up.right.square")
                 Text("Move to New Window")
+                
             }
         }
         
