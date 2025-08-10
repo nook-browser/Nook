@@ -86,9 +86,9 @@ class TabManager {
     // FIXED: proper scheme and flags
     func setSplittedTab() {
         guard let manager = browserManager else { return }
-        let right = Tab(url: URL(string: "https://apple.com")!, name: "Apple", favicon: "safari", spaceId: nil, browserManager: browserManager)
+        /*let right = Tab(url: URL(string: "https://apple.com")!, name: "Apple", favicon: "safari", spaceId: nil, browserManager: browserManager)
         addTab(right)
-        currentSplittedTab = right
+        currentSplittedTab = right*/
         manager.hasSplitView = true
         manager.saveSplitSettings()
     }
