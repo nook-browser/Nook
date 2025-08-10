@@ -56,7 +56,7 @@ struct SidebarView: View {
                             },
                         )
                         .contextMenu {
-                            ContextView(browserManager: _browserManager,tab: tab, tabManager: tabManager)
+                            ContextView(browserManager: _browserManager,tab: tab)
                         }
                     }
                     
@@ -72,7 +72,6 @@ struct SidebarView: View {
 struct ContextView: View {
     @EnvironmentObject var browserManager: BrowserManager
     var tab:Tab
-    var tabManager:TabManager
     
     var body: some View {
         // Tab actions
@@ -106,8 +105,9 @@ struct ContextView: View {
         Button {
             print("Split Tab")
             browserManager.hasSplitView = true
-            tabManager.setSplittedTab()
+            browserManager.tabManager.setSplittedTab()
             browserManager.openSplit()
+            
             
         } label: {
             HStack {
@@ -199,12 +199,12 @@ struct ContextView: View {
         Button(role: .destructive) {
             print("Close Other Tabs")
             print(browserManager.tabManager.tabs)
-            for kell in tabManager.tabs {
+            for kell in browserManager.tabManager.tabs {
                 print("tab: \(tab)")
                 print("kek: \(kell)")
                 if kell != tab {
                     print("removing tab: \(kell)")
-                    tabManager.removeTab(kell.id)
+                    browserManager.tabManager.removeTab(kell.id)
                 }
             }
         } label: {
