@@ -23,7 +23,7 @@ struct WindowBackgroundView: View {
                 Rectangle()
                     .fill(Color.clear)
                     .blur(radius: 40)
-                    .glassEffect(in: .rect(cornerRadius: 0))
+                    //.glassEffect(in: .rect(cornerRadius: 0))
             } else {
                 BlurEffectView(material: .hudWindow, state: .active)
             }

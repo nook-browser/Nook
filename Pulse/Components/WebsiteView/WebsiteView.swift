@@ -10,26 +10,71 @@ import WebKit
 
 struct WebsiteView: View {
     @EnvironmentObject var browserManager: BrowserManager
-
+    @State private var liveRatio: CGFloat = 0.5 // mirrors browserManager.splitRatio
+    
     var body: some View {
         Group {
-            if let currentTab = browserManager.tabManager.currentTab {
-                // Add .id() modifier to force view recreation when tab changes
-                TabWebViewWrapper(tab: currentTab)
-                    .id(currentTab.id)  // This is crucial!
-                    .background(Color(nsColor: .windowBackgroundColor))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: { 
-                        if #available(macOS 26.0, *) {
-                            return 12
-                        } else {
-                            return 6
+            if let left = browserManager.tabManager.currentTab {
+                if browserManager.hasSplitView,
+                   let right = browserManager.tabManager.currentSplittedTab {
+                    
+                    if #available(macOS 13.0, *) {
+                        // Native macOS split; uses flexible sizing.
+                        HSplitView {
+                            pane(for: left)
+                                .frame(minWidth: 260)
+                            
+                            pane(for: right)
+                                .frame(minWidth: 260)
                         }
-                    }()))
+                        .onAppear { liveRatio = browserManager.splitRatio }
+                        // If you want precise ratio control, wrap each pane in a sized container
+                        // with GeometryReader and update `browserManager.updateSplitRatio(_:)`.
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        
+                    } else {
+                        // Fallback: manual drag with ratio
+                        GeometryReader { geo in
+                            let width = geo.size.width
+                            HStack(spacing: 0) {
+                                pane(for: left)
+                                    .frame(width: max(260, width * liveRatio))
+                                
+                                Divider().frame(width: 1)
+                                
+                                pane(for: right)
+                                    .frame(width: max(260, width * (1 - liveRatio)))
+                            }
+                            .gesture(
+                                DragGesture(minimumDistance: 0)
+                                    .onChanged { value in
+                                        let newRatio = (value.location.x / width)
+                                        liveRatio = min(max(0.2, newRatio), 0.8)
+                                        browserManager.updateSplitRatio(liveRatio)
+                                    }
+                            )
+                            .onAppear { liveRatio = browserManager.splitRatio }
+                        }
+                    }
+                    
+                } else {
+                    pane(for: left)
+                }
             } else {
                 EmptyWebsiteView()
             }
         }
+    }
+    
+    @ViewBuilder
+    private func pane(for tab: Tab) -> some View {
+        TabWebViewWrapper(tab: tab)
+            .id(tab.id) // critical: different tab == different WKWebView
+            .background(Color(nsColor: .windowBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: {
+                if #available(macOS 14.0, *) { return 12 } else { return 6 }
+            }()))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

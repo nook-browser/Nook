@@ -8,14 +8,13 @@
 import AppKit
 import Observation
 import WebKit
-
 @Observable
 class TabManager {
-weak var browserManager: BrowserManager?
-
-
+    weak var browserManager: BrowserManager?
+    
     var tabs: [Tab] = []
     var currentTab: Tab?
+    var currentSplittedTab: Tab?
     
     init(browserManager: BrowserManager? = nil) {
         self.browserManager = browserManager
@@ -32,98 +31,84 @@ weak var browserManager: BrowserManager?
         if let index = tabs.firstIndex(where: { $0.id == id }) {
             let tab = tabs[index]
             tabs.remove(at: index)
-            
-            // If we're closing the current tab, switch to another tab
             if currentTab?.id == id {
-                if !tabs.isEmpty {
-                    // Switch to the previous tab, or the first tab if this was the first
-                    let newIndex = max(0, index - 1)
-                    currentTab = tabs.indices.contains(newIndex) ? tabs[newIndex] : tabs.first
-                } else {
-                    currentTab = nil
-                }
+                currentTab = tabs.isEmpty ? nil : tabs[max(0, index - 1)]
             }
-            
             print("Removed tab: \(tab.name)")
         }
     }
     
     func setActiveTab(_ tab: Tab) {
-        guard tabs.contains(where: { $0.id == tab.id }) else {
-            print("Tab not found in tabs array")
-            return
-        }
-        
-        // Pause media in the current tab before switching
-        if let oldTab = currentTab, oldTab.id != tab.id {
-            oldTab.pause()
-        }
-        
-        print("Set active tab: \(tab.name) (ID: \(tab.id))")
+        guard tabs.contains(where: { $0.id == tab.id }) else { return }
+        if let old = currentTab, old.id != tab.id { old.pause() }
         currentTab = tab
+        print("Set active tab: \(tab.name) (ID: \(tab.id))")
     }
     
     func closeActiveTab() {
-        guard let currentTab = currentTab else {
-            print("No active tab to close")
-            return
-        }
+        guard let currentTab else { return }
         removeTab(currentTab.id)
     }
     
     func createNewTab(url: String = "https://www.google.com") -> Tab {
         guard let validURL = URL(string: normalizeURL(url)) else {
-            print("Invalid URL: \(url)")
+            print("Invalid URL: \(url) – falling back to Google")
             return createNewTab()
         }
-        print(normalizeURL(url))
-        
         let newTab = Tab(
-            url: validURL,
-            name: "New Tab",
-            favicon: "globe",
-            spaceId: nil,
-            browserManager: browserManager
+            url: validURL, name: "New Tab", favicon: "globe",
+            spaceId: nil, browserManager: browserManager
         )
-        
         addTab(newTab)
         setActiveTab(newTab)
-        
         return newTab
     }
     
+    // NEW: duplicate and next helpers
+    func duplicate(tab: Tab) -> Tab {
+        let clone = Tab(
+            url: tab.url,
+            name: tab.name,
+            favicon: "globe",
+            spaceId: tab.spaceId,
+            browserManager: browserManager
+        )
+        addTab(clone)
+        return clone
+    }
     
+    func nextTab(after tab: Tab) -> Tab? {
+        guard let i = tabs.firstIndex(where: { $0.id == tab.id }) else { return nil }
+        let j = tabs.index(after: i)
+        return j < tabs.endIndex ? tabs[j] : nil
+    }
     
-    // MARK: - Tab Navigation
+    // FIXED: proper scheme and flags
+    func setSplittedTab() {
+        guard let manager = browserManager else { return }
+        let right = Tab(url: URL(string: "https://apple.com")!, name: "Apple", favicon: "safari", spaceId: nil, browserManager: browserManager)
+        addTab(right)
+        currentSplittedTab = right
+        manager.hasSplitView = true
+        manager.saveSplitSettings()
+    }
+    
+    // MARK: - Navigation
     func selectNextTab() {
-        guard !tabs.isEmpty, let current = currentTab else { return }
-        
-        if let currentIndex = tabs.firstIndex(where: { $0.id == current.id }) {
-            let nextIndex = (currentIndex + 1) % tabs.count
-            setActiveTab(tabs[nextIndex])
-        }
+        guard !tabs.isEmpty, let current = currentTab,
+              let i = tabs.firstIndex(where: { $0.id == current.id }) else { return }
+        setActiveTab(tabs[(i + 1) % tabs.count])
     }
     
     func selectPreviousTab() {
-        guard !tabs.isEmpty, let current = currentTab else { return }
-        
-        if let currentIndex = tabs.firstIndex(where: { $0.id == current.id }) {
-            let previousIndex = currentIndex == 0 ? tabs.count - 1 : currentIndex - 1
-            setActiveTab(tabs[previousIndex])
-        }
+        guard !tabs.isEmpty, let current = currentTab,
+              let i = tabs.firstIndex(where: { $0.id == current.id }) else { return }
+        let prev = (i == 0) ? tabs.count - 1 : i - 1
+        setActiveTab(tabs[prev])
     }
     
-    // MARK: - Utility
-    func getTab(by id: UUID) -> Tab? {
-        return tabs.first { $0.id == id }
-    }
-    
-    var tabCount: Int {
-        return tabs.count
-    }
-    
-    var hasCurrentTab: Bool {
-        return currentTab != nil
-    }
-
+    // MARK: - Utils
+    func getTab(by id: UUID) -> Tab? { tabs.first { $0.id == id } }
+    var tabCount: Int { tabs.count }
+    var hasCurrentTab: Bool { currentTab != nil }
 }
