@@ -160,7 +160,7 @@ struct CommandPaletteView: View {
         case .url, .search:
             // Create new tab
             let tab = browserManager.tabManager.createNewTab(url: suggestion.text, in: browserManager.tabManager.currentSpace)
-            print("Created tab \(tab.name) in \(browserManager.tabManager.currentSpace?.name)")
+            print("Created tab \(tab.name) in \(String(describing: browserManager.tabManager.currentSpace?.name))") // Changed this so Xcode doesn't get mad
         }
         
         text = ""
