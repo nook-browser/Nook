@@ -1,5 +1,5 @@
-import AppKit
 import SwiftUI
+import AppKit
 
 struct DragWindowView: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {

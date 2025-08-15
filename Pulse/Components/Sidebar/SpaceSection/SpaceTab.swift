@@ -10,28 +10,26 @@ import SwiftUI
 struct SpaceTab: View {
     var tabName: String
     var tabURL: String
-    var tabIcon: SwiftUI.Image
+    var tabIcon: SwiftUI.Image // Changed from String to SwiftUI.Image
     var isActive: Bool
     var action: () -> Void
     var onClose: () -> Void
     @State private var isHovering: Bool = false
-    @EnvironmentObject var browserManager: BrowserManager
-
+    
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                tabIcon
+                tabIcon // Directly use the SwiftUI.Image
                     .resizable()
                     .scaledToFit()
                     .frame(width: 20, height: 20)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
                 Text(tabName)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(AppColors.textPrimary)
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Spacer()
-
+                
                 if isHovering {
                     Button(action: onClose) {
                         Image(systemName: "xmark")
@@ -53,16 +51,14 @@ struct SpaceTab: View {
             )
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
-        .buttonStyle(PlainButtonStyle())
-        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .buttonStyle(PlainButtonStyle()) // Removes default button styling
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovering = hovering
             }
         }
-
     }
-
+    
     private var backgroundColor: Color {
         if isActive {
             return AppColors.controlBackgroundActive
@@ -73,3 +69,4 @@ struct SpaceTab: View {
         }
     }
 }
+
