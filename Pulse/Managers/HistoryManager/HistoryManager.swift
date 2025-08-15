@@ -66,43 +66,78 @@ class HistoryManager {
     }
     
     func getHistory(days: Int = 7) -> [HistoryEntry] {
+        return getHistory(days: days, page: 0, pageSize: 1000).entries
+    }
+    
+    func getHistory(days: Int = 7, page: Int = 0, pageSize: Int = 50) -> (entries: [HistoryEntry], hasMore: Bool) {
         do {
             let cutoffDate = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
             let predicate = #Predicate<HistoryEntity> { $0.lastVisited >= cutoffDate }
-            let descriptor = FetchDescriptor<HistoryEntity>(
+            
+            // First get total count
+            let countDescriptor = FetchDescriptor<HistoryEntity>(predicate: predicate)
+            let totalCount = (try? context.fetchCount(countDescriptor)) ?? 0
+            
+            // Then get paginated results
+            var descriptor = FetchDescriptor<HistoryEntity>(
                 predicate: predicate,
                 sortBy: [SortDescriptor(\.lastVisited, order: .reverse)]
             )
+            descriptor.fetchLimit = pageSize
+            descriptor.fetchOffset = page * pageSize
             
             let entities = try context.fetch(descriptor)
-            return entities.map { HistoryEntry(from: $0) }
+            let entries = entities.map { HistoryEntry(from: $0) }
+            let hasMore = (page + 1) * pageSize < totalCount
+            
+            return (entries: entries, hasMore: hasMore)
         } catch {
-            print("Error fetching history: \(error)")
-            return []
+            print("Error fetching paginated history: \(error)")
+            return (entries: [], hasMore: false)
         }
     }
     
     func searchHistory(query: String) -> [HistoryEntry] {
-        guard !query.isEmpty else { return getHistory() }
+        return searchHistory(query: query, page: 0, pageSize: 1000).entries
+    }
+    
+    func searchHistory(query: String, page: Int = 0, pageSize: Int = 50) -> (entries: [HistoryEntry], hasMore: Bool) {
+        guard !query.isEmpty else { return getHistory(page: page, pageSize: pageSize) }
         
         do {
-            // Fetch all entries and filter in memory since SwiftData predicates have limitations
-            let descriptor = FetchDescriptor<HistoryEntity>(
+            // For search, we need to fetch more than needed and filter in memory
+            // This is a limitation of SwiftData's predicate system for complex text searches
+            var descriptor = FetchDescriptor<HistoryEntity>(
                 sortBy: [SortDescriptor(\.lastVisited, order: .reverse)]
             )
+            // Limit memory usage for search - fetch reasonable subset for filtering
+            descriptor.fetchLimit = min(5000, maxResults)
             
-            let allEntities = try context.fetch(descriptor)
-            let filteredEntities = allEntities.filter { entity in
+            let entities = try context.fetch(descriptor)
+            let filteredEntities = entities.filter { entity in
                 entity.title.localizedCaseInsensitiveContains(query) ||
                 entity.url.localizedCaseInsensitiveContains(query)
             }
             
-            return filteredEntities.map { HistoryEntry(from: $0) }
+            // Apply pagination to filtered results
+            let startIndex = page * pageSize
+            let endIndex = min(startIndex + pageSize, filteredEntities.count)
+            
+            guard startIndex < filteredEntities.count else {
+                return (entries: [], hasMore: false)
+            }
+            
+            let pageEntries = Array(filteredEntities[startIndex..<endIndex])
+            let hasMore = endIndex < filteredEntities.count
+            
+            return (entries: pageEntries.map { HistoryEntry(from: $0) }, hasMore: hasMore)
         } catch {
             print("Error searching history: \(error)")
-            return []
+            return (entries: [], hasMore: false)
         }
     }
+    
+    private let maxResults: Int = 10000
     
     func getMostVisited(limit: Int = 10) -> [HistoryEntry] {
         do {

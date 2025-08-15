@@ -15,9 +15,6 @@ class BrowserConfiguration {
     lazy var webViewConfiguration: WKWebViewConfiguration = {
         let config = WKWebViewConfiguration()
 
-        // Use shared process pool for cookie/session sharing between tabs
-        config.processPool = processPool
-
         // Use default website data store for persistent cookies
         config.websiteDataStore = WKWebsiteDataStore.default()
 
@@ -37,8 +34,6 @@ class BrowserConfiguration {
 
         return config
     }()
-
-    private lazy var processPool = WKProcessPool()
 
     private init() {}
 }
