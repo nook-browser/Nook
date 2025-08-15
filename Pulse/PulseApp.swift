@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import WebKit
 
 @main
 struct PulseApp: App {
@@ -65,7 +66,6 @@ struct PulseCommands: Commands {
                 browserManager.focusURLBar()
             }
             .keyboardShortcut("l", modifiers: .command)
-            .disabled(true)
             
             Divider()
             
@@ -77,8 +77,8 @@ struct PulseCommands: Commands {
 
         // File Section
         CommandGroup(replacing: .saveItem) {
-            Button("New Tab...") {
-                browserManager.openCommandPalette()
+            Button("New Tab") {
+                _ = browserManager.tabManager.createNewTab()
             }
             .keyboardShortcut("t", modifiers: .command)
             Button("New Window") {
@@ -92,6 +92,85 @@ struct PulseCommands: Commands {
             .keyboardShortcut("w", modifiers: .command)
             .disabled(browserManager.tabManager.tabs.isEmpty)
 
+        }
+        
+        // Privacy/Cookie Commands
+        CommandMenu("Privacy") {
+            Menu("Clear Cookies") {
+                Button("Clear Cookies for Current Site") {
+                    browserManager.clearCurrentPageCookies()
+                }
+                .disabled(browserManager.tabManager.currentTab?.url.host == nil)
+                
+                Button("Clear Expired Cookies") {
+                    browserManager.clearExpiredCookies()
+                }
+                
+                Divider()
+                
+                Button("Clear All Cookies") {
+                    browserManager.clearAllCookies()
+                }
+                
+                Divider()
+                
+                Button("Clear Third-Party Cookies") {
+                    browserManager.clearThirdPartyCookies()
+                }
+                
+                Button("Clear High-Risk Cookies") {
+                    browserManager.clearHighRiskCookies()
+                }
+            }
+            
+            Menu("Clear Cache") {
+                Button("Clear Cache for Current Site") {
+                    browserManager.clearCurrentPageCache()
+                }
+                .disabled(browserManager.tabManager.currentTab?.url.host == nil)
+                
+                Button("Clear Stale Cache") {
+                    browserManager.clearStaleCache()
+                }
+                
+                Button("Clear Disk Cache") {
+                    browserManager.clearDiskCache()
+                }
+                
+                Button("Clear Memory Cache") {
+                    browserManager.clearMemoryCache()
+                }
+                
+                Divider()
+                
+                Button("Clear All Cache") {
+                    browserManager.clearAllCache()
+                }
+                
+                Divider()
+                
+                Button("Clear Personal Data Cache") {
+                    browserManager.clearPersonalDataCache()
+                }
+            }
+            
+            Divider()
+            
+            Button("Privacy Cleanup") {
+                browserManager.performPrivacyCleanup()
+            }
+            
+            Button("Clear Browsing History") {
+                browserManager.historyManager.clearHistory()
+            }
+            
+            Button("Clear All Website Data") {
+                Task {
+                    let dataStore = WKWebsiteDataStore.default()
+                    let dataTypes = WKWebsiteDataStore.allWebsiteDataTypes()
+                    await dataStore.removeData(ofTypes: dataTypes, modifiedSince: Date.distantPast)
+                }
+            }
         }
     }
 }
