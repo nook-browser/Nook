@@ -14,8 +14,9 @@ struct WebsiteView: View {
     var body: some View {
         Group {
             if let currentTab = browserManager.tabManager.currentTab {
+                // Add .id() modifier to force view recreation when tab changes
                 TabWebViewWrapper(tab: currentTab)
-                    .id(currentTab.id)
+                    .id(currentTab.id)  // This is crucial!
                     .background(Color(nsColor: .windowBackgroundColor))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: { 
@@ -43,6 +44,7 @@ struct TabWebViewWrapper: NSViewRepresentable {
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
-        // The webView is managed by the Tab
+        // The webView is managed by the Tab itself
+        // No need to reload or recreate anything
     }
 }
