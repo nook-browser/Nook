@@ -9,25 +9,51 @@ import SwiftUI
 
 struct URLBarView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @State private var isHovering: Bool = false
 
     var body: some View {
-        ZStack {
-            HStack {
-                Text(
-                    displayURL
-                )
-                .font(.system(size: 12, weight: .medium, design: .default))
-                .foregroundStyle(AppColors.textPrimary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-
-                Spacer()
+        Button {
+            browserManager.isCommandPaletteVisible = true
+        } label: {
+            ZStack {
+                HStack(spacing: 8) {
+                    if(browserManager.tabManager.currentTab != nil) {
+                        Text(
+                            displayURL
+                        )
+                        .font(.system(size: 12, weight: .medium, design: .default))
+                        .foregroundStyle(AppColors.textPrimary.opacity(0.5))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    } else {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 12))
+                            .foregroundStyle(AppColors.textPrimary.opacity(0.5))
+                        Text("Search or Enter URL...")
+                            .font(.system(size: 12, weight: .medium, design: .default))
+                            .foregroundStyle(AppColors.textPrimary.opacity(0.5))
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
             }
-            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, minHeight: 36, maxHeight: 36)
+            .background(
+                ZStack {
+                    BlurEffectView(material: browserManager.settingsManager.currentMaterial, state: .active)
+                    Color.white.opacity(isHovering ? 0.2 : 0.1)
+                }
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .onHover { hovering in
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    isHovering = hovering
+                }
+            }
         }
-        .frame(maxWidth: .infinity, minHeight: 36, maxHeight: 36)
-        .background(AppColors.controlBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .buttonStyle(PlainButtonStyle())
+        
     }
     
     private var displayURL: String {
@@ -42,7 +68,6 @@ struct URLBarView: View {
                 return url.absoluteString
             }
             
-            // Remove www prefix if it exists
             let cleanHost = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
             
             return cleanHost
