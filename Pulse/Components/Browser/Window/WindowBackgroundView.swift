@@ -8,26 +8,48 @@
 import SwiftUI
 
 struct WindowBackgroundView: View {
-    @GestureState var isDraggingWindow = false
-
-    var dragWindow: some Gesture {
-        WindowDragGesture()
-            .updating($isDraggingWindow) { _, state, _ in
-                state = true
-            }
-    }
+    @EnvironmentObject var browserManager: BrowserManager
 
     var body: some View {
         Group {
             if #available(macOS 26.0, *) {
-                Rectangle()
-                    .fill(Color.clear)
-                    .blur(radius: 40)
-                    .glassEffect(in: .rect(cornerRadius: 0))
+                if browserManager.settingsManager.isLiquidGlassEnabled {
+                    Rectangle()
+                        .fill(Color.clear)
+                        .blur(radius: 40)
+                        .glassEffect(in: .rect(cornerRadius: 0))
+                        .clipped()
+                } else {
+                    BlurEffectView(
+                        material: browserManager.settingsManager
+                            .currentMaterial,
+                        state: .active
+                    )
+                    .overlay(
+                        Color.black.opacity(0.25)
+                            .blendMode(.darken)
+                    )
+                }
             } else {
-                BlurEffectView(material: .hudWindow, state: .active)
-            }
-        }
-        .gesture(dragWindow)
+                if browserManager.settingsManager.isLiquidGlassEnabled {
+                    Rectangle()
+                        .fill(.clear)
+                        .background(.thinMaterial)  // Use thinMaterial for liquid glass effect for better compatability
+                        .blur(radius: 40)
+                        .clipped()
+                } else {
+                    BlurEffectView(
+                        material: browserManager.settingsManager
+                            .currentMaterial,
+                        state: .active
+                    )
+                    .overlay(
+                        Color.black.opacity(0.25)
+                            .blendMode(.darken)
+                    )
+                }
+            }        }
+        .backgroundDraggable()
     }
 }
+
