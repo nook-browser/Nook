@@ -373,7 +373,7 @@ public class Tab: NSObject, Identifiable {
         let defaultFavicon = SwiftUI.Image(systemName: "globe")
 
         // Skip favicon fetching for non-web schemes
-        guard url.scheme == "http" || url.scheme == "https", let host = url.host
+        guard url.scheme == "http" || url.scheme == "https", url.host != nil
         else {
             await MainActor.run {
                 self.favicon = defaultFavicon
@@ -621,7 +621,7 @@ extension Tab: WKNavigationDelegate {
         let originalURL = navigationAction.request.url ?? URL(string: "https://example.com")!
         let suggestedFilename = navigationAction.request.url?.lastPathComponent ?? "download"
         
-        let downloadModel = browserManager?.downloadManager.addDownload(download, originalURL: originalURL, suggestedFilename: suggestedFilename)
+        _ = browserManager?.downloadManager.addDownload(download, originalURL: originalURL, suggestedFilename: suggestedFilename)
         print("Download started from navigationAction: \(originalURL.absoluteString)")
     }
 
@@ -633,7 +633,7 @@ extension Tab: WKNavigationDelegate {
         let originalURL = navigationResponse.response.url ?? URL(string: "https://example.com")!
         let suggestedFilename = navigationResponse.response.url?.lastPathComponent ?? "download"
         
-        let downloadModel = browserManager?.downloadManager.addDownload(download, originalURL: originalURL, suggestedFilename: suggestedFilename)
+        _ = browserManager?.downloadManager.addDownload(download, originalURL: originalURL, suggestedFilename: suggestedFilename)
         print("Download started from navigationResponse: \(originalURL.absoluteString)")
     }
 
