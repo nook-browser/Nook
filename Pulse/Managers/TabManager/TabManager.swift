@@ -248,7 +248,7 @@ class TabManager {
 
     func moveTabUp(_ tabId: UUID) {
         guard let spaceId = findSpaceForTab(tabId) else { return }
-        var tabs = tabsBySpace[spaceId] ?? []
+        let tabs = tabsBySpace[spaceId] ?? []
         guard let currentIndex = tabs.firstIndex(where: { $0.id == tabId }) else { return }
         
         // Can't move the first tab up
@@ -268,7 +268,7 @@ class TabManager {
 
     func moveTabDown(_ tabId: UUID) {
         guard let spaceId = findSpaceForTab(tabId) else { return }
-        var tabs = tabsBySpace[spaceId] ?? []
+        let tabs = tabsBySpace[spaceId] ?? []
         guard let currentIndex = tabs.firstIndex(where: { $0.id == tabId }) else { return }
         
         // Can't move the last tab down
