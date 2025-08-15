@@ -29,6 +29,7 @@ struct CommandPaletteView: View {
                     Spacer()
 
                     VStack(spacing: 0) {
+                        // Search input
                         HStack(spacing: 12) {
                             Image(
                                 systemName: isLikelyURL(text)
@@ -60,8 +61,8 @@ struct CommandPaletteView: View {
                                     )
                                 }
                         }
-                        .padding(.vertical, 12)
-                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 12)
 
                         // Separator
                         if !searchManager.suggestions.isEmpty {
@@ -82,14 +83,16 @@ struct CommandPaletteView: View {
                                     id: \.element.id
                                 ) { index, suggestion in
                                     CommandPaletteSuggestionView(
-                                        favicon: iconForSuggestion(suggestion),
+                                        favicon: Image(
+                                            systemName: suggestion.type == .url
+                                                ? "link" : "magnifyingglass"
+                                        ),
                                         text: suggestion.text,
-                                        isTabSuggestion: isTabSuggestion(suggestion),
                                         isSelected: selectedSuggestionIndex
                                             == index
                                     )
                                     .onTapGesture {
-                                        selectSuggestion(suggestion)
+                                        selectSuggestion(suggestion.text)
                                     }
                                 }
                             }
@@ -114,8 +117,6 @@ struct CommandPaletteView: View {
         .opacity(browserManager.isCommandPaletteVisible ? 1.0 : 0.0)
         .onChange(of: browserManager.isCommandPaletteVisible) { _, newVisible in
             if newVisible {
-                // Set the tab manager when command palette opens
-                searchManager.setTabManager(browserManager.tabManager)
                 DispatchQueue.main.async {
                     isSearchFocused = true
                 }
@@ -132,37 +133,26 @@ struct CommandPaletteView: View {
             }
             return .handled
         }
+        // Only animate selection changes
         .animation(.easeInOut(duration: 0.15), value: selectedSuggestionIndex)
     }
 
     private func handleReturn() {
+        let finalText: String
+
         if selectedSuggestionIndex >= 0
             && selectedSuggestionIndex < searchManager.suggestions.count
         {
-            let suggestion = searchManager.suggestions[selectedSuggestionIndex]
-            selectSuggestion(suggestion)
+            finalText = searchManager.suggestions[selectedSuggestionIndex].text
         } else {
-            // Create new suggestion from text input
-            let newSuggestion = SearchManager.SearchSuggestion(
-                text: text,
-                type: isLikelyURL(text) ? .url : .search
-            )
-            selectSuggestion(newSuggestion)
+            finalText = text
         }
+
+        selectSuggestion(finalText)
     }
 
-    private func selectSuggestion(_ suggestion: SearchManager.SearchSuggestion) {
-        switch suggestion.type {
-        case .tab(let existingTab):
-            // Switch to existing tab
-            browserManager.tabManager.setActiveTab(existingTab)
-            print("Switched to existing tab: \(existingTab.name)")
-        case .url, .search:
-            // Create new tab
-            let tab = browserManager.tabManager.createNewTab(url: suggestion.text, in: browserManager.tabManager.currentSpace)
-            print("Created tab \(tab.name) in \(String(describing: browserManager.tabManager.currentSpace?.name))") // Changed this so Xcode doesn't get mad
-        }
-        
+    private func selectSuggestion(_ suggestionText: String) {
+        browserManager.tabManager.createNewTab(url: suggestionText)
         text = ""
         selectedSuggestionIndex = -1
         browserManager.closeCommandPalette()
@@ -177,26 +167,6 @@ struct CommandPaletteView: View {
         } else {
             // Up arrow
             selectedSuggestionIndex = max(selectedSuggestionIndex - 1, -1)
-        }
-    }
-    
-    private func iconForSuggestion(_ suggestion: SearchManager.SearchSuggestion) -> Image {
-        switch suggestion.type {
-        case .tab(let tab):
-            return tab.favicon
-        case .url:
-            return Image(systemName: "link")
-        case .search:
-            return Image(systemName: "magnifyingglass")
-        }
-    }
-    
-    private func isTabSuggestion(_ suggestion: SearchManager.SearchSuggestion) -> Bool {
-        switch suggestion.type {
-        case .tab:
-            return true
-        case .search, .url:
-            return false
         }
     }
 }

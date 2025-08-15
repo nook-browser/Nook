@@ -46,7 +46,7 @@ struct SidebarResizeView: View {
                         let currentMouseX = value.location.x
                         let mouseMovement = currentMouseX - startingMouseX
                         let newWidth = startingWidth + mouseMovement
-                        let clampedWidth = max(170, min(400, newWidth))
+                        let clampedWidth = max(100, min(400, newWidth))
                         
                         browserManager.updateSidebarWidth(clampedWidth)
                     }

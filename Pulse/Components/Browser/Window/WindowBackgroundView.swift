@@ -8,48 +8,26 @@
 import SwiftUI
 
 struct WindowBackgroundView: View {
-    @EnvironmentObject var browserManager: BrowserManager
+    @GestureState var isDraggingWindow = false
+
+    var dragWindow: some Gesture {
+        WindowDragGesture()
+            .updating($isDraggingWindow) { _, state, _ in
+                state = true
+            }
+    }
 
     var body: some View {
         Group {
             if #available(macOS 26.0, *) {
-                if browserManager.settingsManager.isLiquidGlassEnabled {
-                    Rectangle()
-                        .fill(Color.clear)
-                        .blur(radius: 40)
-                        .glassEffect(in: .rect(cornerRadius: 0))
-                        .clipped()
-                } else {
-                    BlurEffectView(
-                        material: browserManager.settingsManager
-                            .currentMaterial,
-                        state: .active
-                    )
-                    .overlay(
-                        Color.black.opacity(0.25)
-                            .blendMode(.darken)
-                    )
-                }
+                Rectangle()
+                    .fill(Color.clear)
+                    .blur(radius: 40)
+                    .glassEffect(in: .rect(cornerRadius: 0))
             } else {
-                if browserManager.settingsManager.isLiquidGlassEnabled {
-                    Rectangle()
-                        .fill(.clear)
-                        .background(.thinMaterial)  // Use thinMaterial for liquid glass effect for better compatability
-                        .blur(radius: 40)
-                        .clipped()
-                } else {
-                    BlurEffectView(
-                        material: browserManager.settingsManager
-                            .currentMaterial,
-                        state: .active
-                    )
-                    .overlay(
-                        Color.black.opacity(0.25)
-                            .blendMode(.darken)
-                    )
-                }
-            }        }
-        .backgroundDraggable()
+                BlurEffectView(material: .hudWindow, state: .active)
+            }
+        }
+        .gesture(dragWindow)
     }
 }
-
