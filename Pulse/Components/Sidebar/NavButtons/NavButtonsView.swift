@@ -8,12 +8,11 @@ import SwiftUI
 
 struct NavButtonsView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    var sidebarThreshold: CGFloat = 160
+    var sidebarThreshold: CGFloat = 210
     var body: some View {
         HStack(spacing: 2) {
             MacButtonsView()
                 .frame(width: 70)
-            if browserManager.sidebarWidth > sidebarThreshold {
                 NavButton(iconName: "sidebar.left") {
                     browserManager.toggleSidebar()
                 }
@@ -23,9 +22,9 @@ struct NavButtonsView: View {
             
             if browserManager.sidebarWidth < sidebarThreshold {
                 Menu {
-                    Label("Toggle Sidebar", systemImage: "sidebar.left")
-                    Label("Backward", systemImage: "arrow.backward")
-                    Label("Forward", systemImage: "arrow.forward")
+                    Label("Reload", systemImage: "arrow.clockwise")
+                    Label("Go Back", systemImage: "arrow.backward")
+                    Label("Go Forward", systemImage: "arrow.forward")
                 } label: {
                     NavButton(iconName: "ellipsis")
                 }
@@ -42,7 +41,7 @@ struct NavButtonsView: View {
                         print("forward")
 
                     }
-                    NavButton(iconName: "arrow.clockwise") {
+                    RefreshButton() {
                         browserManager.tabManager.currentTab?.refresh()
                     }
                 }
@@ -50,4 +49,4 @@ struct NavButtonsView: View {
 
         }
     }
-}
+

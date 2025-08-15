@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import WebKit
 
 @main
 struct PulseApp: App {
@@ -23,17 +24,34 @@ struct PulseApp: App {
             PulseCommands(browserManager: browserManager)
         }
 
+        WindowGroup("Settings", id: "settings") {
+            SettingsView()
+                .environmentObject(browserManager)
+        }
+        .windowResizability(.contentSize)
+        .windowStyle(.hiddenTitleBar)
+        .windowToolbarStyle(.unifiedCompact)
     }
 }
 
 struct PulseCommands: Commands {
     let browserManager: BrowserManager
+    @Environment(\.openWindow) private var openWindow
 
     init(browserManager: BrowserManager) {
         self.browserManager = browserManager
     }
 
     var body: some Commands {
+        CommandGroup(replacing: .newItem) {}
+        CommandGroup(replacing: .windowList) {}
+        CommandGroup(replacing: .appSettings) {
+            Button("Settings...") {
+                openWindow(id: "settings")
+            }
+            .keyboardShortcut(",", modifiers: .command)
+        }
+        
         // Sidebar commands
         CommandGroup(after: .sidebar) {
             Button("Toggle Sidebar") {
@@ -42,34 +60,25 @@ struct PulseCommands: Commands {
             .keyboardShortcut("s", modifiers: .command)
         }
 
-        // Navigation commands
-        CommandGroup(after: .toolbar) {
-
-            Divider()
-
-            // Future shortcuts can go here
-            Button("New Tab") {
-                browserManager.createNewTab()
-            }
-            .keyboardShortcut("t", modifiers: [.command, .shift])
-            .disabled(true)  // Enable when implemented
-
-            Divider()
-        }
-
         // View commands
         CommandGroup(after: .windowSize) {
             Button("Focus URL Bar") {
                 browserManager.focusURLBar()
             }
             .keyboardShortcut("l", modifiers: .command)
-            .disabled(true)  // Enable when implemented
+            
+            Divider()
+            
+            Button("Force Quit App") {
+                browserManager.showQuitDialog()
+            }
+            .keyboardShortcut("q", modifiers: .command)
         }
-        
+
         // File Section
         CommandGroup(replacing: .saveItem) {
-            Button("New Tab...") {
-                browserManager.openCommandPalette()
+            Button("New Tab") {
+                _ = browserManager.tabManager.createNewTab()
             }
             .keyboardShortcut("t", modifiers: .command)
             Button("New Window") {
@@ -83,6 +92,85 @@ struct PulseCommands: Commands {
             .keyboardShortcut("w", modifiers: .command)
             .disabled(browserManager.tabManager.tabs.isEmpty)
 
+        }
+        
+        // Privacy/Cookie Commands
+        CommandMenu("Privacy") {
+            Menu("Clear Cookies") {
+                Button("Clear Cookies for Current Site") {
+                    browserManager.clearCurrentPageCookies()
+                }
+                .disabled(browserManager.tabManager.currentTab?.url.host == nil)
+                
+                Button("Clear Expired Cookies") {
+                    browserManager.clearExpiredCookies()
+                }
+                
+                Divider()
+                
+                Button("Clear All Cookies") {
+                    browserManager.clearAllCookies()
+                }
+                
+                Divider()
+                
+                Button("Clear Third-Party Cookies") {
+                    browserManager.clearThirdPartyCookies()
+                }
+                
+                Button("Clear High-Risk Cookies") {
+                    browserManager.clearHighRiskCookies()
+                }
+            }
+            
+            Menu("Clear Cache") {
+                Button("Clear Cache for Current Site") {
+                    browserManager.clearCurrentPageCache()
+                }
+                .disabled(browserManager.tabManager.currentTab?.url.host == nil)
+                
+                Button("Clear Stale Cache") {
+                    browserManager.clearStaleCache()
+                }
+                
+                Button("Clear Disk Cache") {
+                    browserManager.clearDiskCache()
+                }
+                
+                Button("Clear Memory Cache") {
+                    browserManager.clearMemoryCache()
+                }
+                
+                Divider()
+                
+                Button("Clear All Cache") {
+                    browserManager.clearAllCache()
+                }
+                
+                Divider()
+                
+                Button("Clear Personal Data Cache") {
+                    browserManager.clearPersonalDataCache()
+                }
+            }
+            
+            Divider()
+            
+            Button("Privacy Cleanup") {
+                browserManager.performPrivacyCleanup()
+            }
+            
+            Button("Clear Browsing History") {
+                browserManager.historyManager.clearHistory()
+            }
+            
+            Button("Clear All Website Data") {
+                Task {
+                    let dataStore = WKWebsiteDataStore.default()
+                    let dataTypes = WKWebsiteDataStore.allWebsiteDataTypes()
+                    await dataStore.removeData(ofTypes: dataTypes, modifiedSince: Date.distantPast)
+                }
+            }
         }
     }
 }

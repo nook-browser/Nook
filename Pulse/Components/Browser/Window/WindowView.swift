@@ -28,7 +28,9 @@ struct WindowView: View {
             }
             .padding(.horizontal, 8)
             .padding(.bottom, 8)
+
             CommandPaletteView()
+            DialogView()
         }
         .environmentObject(browserManager)
     }

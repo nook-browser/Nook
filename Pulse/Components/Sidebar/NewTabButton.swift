@@ -34,7 +34,7 @@ struct NewTabButton: View {
             )
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
-        .buttonStyle(PlainButtonStyle()) // Removes default button styling
+        .buttonStyle(PlainButtonStyle())
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovering = hovering

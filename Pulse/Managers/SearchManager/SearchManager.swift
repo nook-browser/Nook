@@ -16,6 +16,7 @@ class SearchManager {
     
     private let session = URLSession.shared
     private var searchTask: URLSessionDataTask?
+    private weak var tabManager: TabManager?
     
     struct SearchSuggestion: Identifiable, Equatable {
         let id = UUID()
@@ -25,15 +26,26 @@ class SearchManager {
         enum SuggestionType {
             case search
             case url
+            case tab(Tab)
         }
         
-        // Custom equality that ignores ID for comparison
         static func == (lhs: SearchSuggestion, rhs: SearchSuggestion) -> Bool {
-            return lhs.text == rhs.text && lhs.type == rhs.type
+            switch (lhs.type, rhs.type) {
+            case (.search, .search), (.url, .url):
+                return lhs.text == rhs.text
+            case (.tab(let lhsTab), .tab(let rhsTab)):
+                return lhs.text == rhs.text && lhsTab.id == rhsTab.id
+            default:
+                return false
+            }
         }
     }
     
-    func searchSuggestions(for query: String) {
+    func setTabManager(_ tabManager: TabManager?) {
+        self.tabManager = tabManager
+    }
+    
+    @MainActor func searchSuggestions(for query: String) {
         // Cancel previous request
         searchTask?.cancel()
         
@@ -47,16 +59,76 @@ class SearchManager {
             return
         }
         
-        // Check if it looks like a URL
-        if isLikelyURL(query) {
-            let urlSuggestion = [SearchSuggestion(text: query, type: .url)]
-            updateSuggestionsIfNeeded(urlSuggestion)
+        // Search tabs first
+        let tabSuggestions = searchTabs(for: query)
+        
+        // If we have tab matches, prioritize them
+        if !tabSuggestions.isEmpty {
+            let allSuggestions = tabSuggestions + (isLikelyURL(query) ? [SearchSuggestion(text: query, type: .url)] : [])
+            updateSuggestionsIfNeeded(allSuggestions)
+            
+            // Still fetch web suggestions but combine them
+            fetchWebSuggestions(for: query, prependTabSuggestions: tabSuggestions)
             return
         }
         
+        if isLikelyURL(query) {
+            let urlSuggestion = [SearchSuggestion(text: query, type: .url)]
+            updateSuggestionsIfNeeded(urlSuggestion)
+            fetchWebSuggestions(for: query, prependTabSuggestions: [])
+            return
+        }
+        
+        // Fetch web suggestions
+        fetchWebSuggestions(for: query, prependTabSuggestions: [])
+    }
+    
+    @MainActor private func searchTabs(for query: String) -> [SearchSuggestion] {
+        guard let tabManager = tabManager else { return [] }
+        
+        let lowercaseQuery = query.lowercased()
+        var matchingTabs: [SearchSuggestion] = []
+        
+        // Access tabs directly using proper types
+        let allTabs = tabManager.pinnedTabs + tabManager.tabs
+        
+        for tab in allTabs {
+            let nameMatch = tab.name.lowercased().contains(lowercaseQuery)
+            let urlMatch = tab.url.absoluteString.lowercased().contains(lowercaseQuery)
+            let hostMatch = tab.url.host?.lowercased().contains(lowercaseQuery) ?? false
+            
+            if nameMatch || urlMatch || hostMatch {
+                let suggestion = SearchSuggestion(
+                    text: tab.name,
+                    type: .tab(tab)
+                )
+                matchingTabs.append(suggestion)
+            }
+        }
+        
+        // Sort by relevance (name matches first, then URL matches)
+        let sortedTabs = matchingTabs.sorted { (lhs: SearchSuggestion, rhs: SearchSuggestion) -> Bool in
+            if case .tab(let lhsTab) = lhs.type, case .tab(let rhsTab) = rhs.type {
+                let lhsNameMatch = lhsTab.name.lowercased().contains(lowercaseQuery)
+                let rhsNameMatch = rhsTab.name.lowercased().contains(lowercaseQuery)
+                
+                if lhsNameMatch && !rhsNameMatch {
+                    return true
+                } else if !lhsNameMatch && rhsNameMatch {
+                    return false
+                } else {
+                    return lhsTab.name.count < rhsTab.name.count
+                }
+            }
+            return false
+        }
+        
+        return Array(sortedTabs.prefix(3)) // Limit to 3 tab suggestions
+    }
+    
+    private func fetchWebSuggestions(for query: String, prependTabSuggestions: [SearchSuggestion]) {
         isLoading = true
         
-        // Google Suggest API with HTTPS
         let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
         let urlString = "https://suggestqueries.google.com/complete/search?client=firefox&q=\(encodedQuery)"
         
@@ -83,14 +155,16 @@ class SearchManager {
                         return
                     }
                     
-                    let newSuggestions = suggestionsArray.prefix(5).map { suggestion in
+                    let webSuggestions = suggestionsArray.prefix(5).map { suggestion in
                         SearchSuggestion(
                             text: suggestion,
                             type: isLikelyURL(suggestion) == true ? .url : .search
                         )
                     }
                     
-                    self?.updateSuggestionsIfNeeded(Array(newSuggestions))
+                    // Combine tab suggestions with web suggestions
+                    let combinedSuggestions = prependTabSuggestions + Array(webSuggestions)
+                    self?.updateSuggestionsIfNeeded(combinedSuggestions)
                     
                 } catch {
                     print("JSON parsing error: \(error.localizedDescription)")
@@ -109,13 +183,11 @@ class SearchManager {
                 suggestions = newSuggestions
             }
         } else {
-            // Update without animation for minor changes
             suggestions = newSuggestions
         }
     }
     
     private func shouldAnimateChange(from oldSuggestions: [SearchSuggestion], to newSuggestions: [SearchSuggestion]) -> Bool {
-        // Always animate if going from empty to non-empty or vice versa
         if oldSuggestions.isEmpty != newSuggestions.isEmpty {
             return true
         }
