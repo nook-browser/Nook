@@ -13,6 +13,9 @@ struct SpaceCreationDialog: DialogProtocol {
     let onSave: () -> Void
     let onCancel: () -> Void
     
+    @State private var selectedEmoji: String = ""
+    @FocusState private var emojiFieldFocused: Bool
+    
     init(
         spaceName: Binding<String>,
         spaceIcon: Binding<String>,
@@ -48,10 +51,21 @@ struct SpaceCreationDialog: DialogProtocol {
                     Text("Space Icon")
                         .font(.system(size: 14, weight: .medium))
                     
+                    // Hidden TextField for capturing emoji selection
+                    TextField("", text: $selectedEmoji)
+                        .frame(width: 0, height: 0)
+                        .opacity(0)
+                        .focused($emojiFieldFocused)
+                        .onChange(of: selectedEmoji) { _, newValue in
+                            if !newValue.isEmpty {
+                                spaceIcon = String(newValue.last!)
+                                selectedEmoji = ""
+                            }
+                        }
+                    
                     Button(action: {
-                        // Show a simple picker for now
-                        let emojis = ["🚀", "💡", "🎯", "⚡️", "🔥", "🌟", "💼", "🏠", "🎨", "📱"]
-                        spaceIcon = emojis.randomElement() ?? "✨"
+                        emojiFieldFocused = true
+                        NSApp.orderFrontCharacterPalette(nil)
                     }) {
                         HStack(spacing: 8) {
                             Text(spaceIcon.isEmpty ? "✨" : spaceIcon)

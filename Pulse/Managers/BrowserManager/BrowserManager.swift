@@ -33,6 +33,8 @@ class BrowserManager: ObservableObject {
     var dialogManager: DialogManager
     var downloadManager: DownloadManager
     var historyManager: HistoryManager
+    var cookieManager: CookieManager
+    var cacheManager: CacheManager
     
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
@@ -44,6 +46,8 @@ class BrowserManager: ObservableObject {
         self.dialogManager = DialogManager()
         self.downloadManager = DownloadManager.shared
         self.historyManager = HistoryManager(context: modelContext)
+        self.cookieManager = CookieManager()
+        self.cacheManager = CacheManager()
         self.tabManager.browserManager = self
         self.tabManager.reattachBrowserManager(self)
         loadSidebarSettings()
@@ -99,8 +103,8 @@ class BrowserManager: ObservableObject {
     }
 
     func focusURLBar() {
-        // TODO: Implement URL bar focus
-        print("Focus URL bar")
+        // Open command palette which serves as the URL input
+        isCommandPaletteVisible = true
     }
 
     // MARK: - Dialog Methods
@@ -169,5 +173,90 @@ class BrowserManager: ObservableObject {
     private func saveSidebarSettings() {
         userDefaults.set(savedSidebarWidth, forKey: "sidebarWidth")
         userDefaults.set(isSidebarVisible, forKey: "sidebarVisible")
+    }
+    
+    // MARK: - Cookie Management Methods
+    
+    func clearCurrentPageCookies() {
+        guard let currentTab = tabManager.currentTab,
+              let host = currentTab.url.host else { return }
+        
+        Task {
+            await cookieManager.deleteCookiesForDomain(host)
+        }
+    }
+    
+    func clearAllCookies() {
+        Task {
+            await cookieManager.deleteAllCookies()
+        }
+    }
+    
+    func clearExpiredCookies() {
+        Task {
+            await cookieManager.deleteExpiredCookies()
+        }
+    }
+    
+    // MARK: - Cache Management
+    
+    func clearCurrentPageCache() {
+        guard let currentTab = tabManager.currentTab,
+              let host = currentTab.url.host else { return }
+        
+        Task {
+            await cacheManager.clearCacheForDomain(host)
+        }
+    }
+    
+    func clearStaleCache() {
+        Task {
+            await cacheManager.clearStaleCache()
+        }
+    }
+    
+    func clearDiskCache() {
+        Task {
+            await cacheManager.clearDiskCache()
+        }
+    }
+    
+    func clearMemoryCache() {
+        Task {
+            await cacheManager.clearMemoryCache()
+        }
+    }
+    
+    func clearAllCache() {
+        Task {
+            await cacheManager.clearAllCache()
+        }
+    }
+    
+    // MARK: - Privacy-Compliant Management
+    
+    func clearThirdPartyCookies() {
+        Task {
+            await cookieManager.deleteThirdPartyCookies()
+        }
+    }
+    
+    func clearHighRiskCookies() {
+        Task {
+            await cookieManager.deleteHighRiskCookies()
+        }
+    }
+    
+    func performPrivacyCleanup() {
+        Task {
+            await cookieManager.performPrivacyCleanup()
+            await cacheManager.performPrivacyCompliantCleanup()
+        }
+    }
+    
+    func clearPersonalDataCache() {
+        Task {
+            await cacheManager.clearPersonalDataCache()
+        }
     }
 }

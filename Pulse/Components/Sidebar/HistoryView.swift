@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import FaviconFinder
 
 struct HistoryView: View {
     @EnvironmentObject var browserManager: BrowserManager
@@ -13,12 +14,19 @@ struct HistoryView: View {
     @State private var searchText: String = ""
     @State private var selectedTimeRange: TimeRange = .week
     @State private var isLoading: Bool = false
+    @State private var currentPage: Int = 0
+    @State private var hasMoreResults: Bool = true
+    @State private var isLoadingMore: Bool = false
+    
+    private let pageSize: Int = 50
+    private let maxResults: Int = 1000
+    
     
     enum TimeRange: String, CaseIterable {
-        case today = "Today"
-        case week = "This Week"
-        case month = "This Month"
-        case all = "All Time"
+        case today = "D"
+        case week = "W"
+        case month = "M"
+        case all = "ALL"
         
         var days: Int {
             switch self {
@@ -79,24 +87,28 @@ struct HistoryView: View {
             
             // Time range picker
             if searchText.isEmpty {
-                HStack {
-                    ForEach(TimeRange.allCases, id: \.self) { range in
-                        Button(range.rawValue) {
-                            selectedTimeRange = range
-                            loadHistory()
-                        }
-                        .foregroundColor(selectedTimeRange == range ? .accentColor : .secondary)
-                        .font(.system(size: 12, weight: selectedTimeRange == range ? .semibold : .regular))
-                        .buttonStyle(PlainButtonStyle())
+                HStack(spacing: 4) {
+                    ForEach(Array(TimeRange.allCases.enumerated()), id: \.element) { index, range in
+                        TimeRangeButton(
+                            range: range,
+                            isSelected: selectedTimeRange == range,
+                            onTap: {
+                                selectedTimeRange = range
+                                loadHistory()
+                            }
+                        )
+                        .fixedSize()  // Prevent compression
                         
                         if range != TimeRange.allCases.last {
                             Text("•")
                                 .foregroundColor(AppColors.textTertiary)
                                 .font(.system(size: 8))
+                                .fixedSize()  // Prevent bullet compression
                         }
                     }
+                    Spacer(minLength: 0)  // Flexible spacing
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 8)  // Reduced horizontal padding for narrow sidebar
                 .padding(.bottom, 12)
             }
             
@@ -134,18 +146,42 @@ struct HistoryView: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: 0) {
-                        ForEach(historyEntries) { entry in
+                        ForEach(historyEntries.indices, id: \.self) { index in
+                            let entry = historyEntries[index]
                             HistoryRowView(
                                 entry: entry,
                                 onTap: { openInCurrentTab(entry.url) },
                                 onDelete: { deleteEntry(entry) }
                             )
+                            .onAppear {
+                                // Load more when approaching the end
+                                if index == historyEntries.count - 10 && hasMoreResults && !isLoadingMore {
+                                    loadMoreHistory()
+                                }
+                            }
+                        }
+                        
+                        // Load more indicator
+                        if isLoadingMore {
+                            HStack {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                Text("Loading more...")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(AppColors.textSecondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
                         }
                     }
                 }
             }
         }
         .background(Color.clear)
+        .transition(.asymmetric(
+            insertion: .move(edge: .leading).combined(with: .opacity),
+            removal: .opacity
+        ))
         .onAppear {
             loadHistory()
         }
@@ -155,31 +191,81 @@ struct HistoryView: View {
     
     private func loadHistory() {
         isLoading = true
+        currentPage = 0
         
         Task { @MainActor in
-            let entries = browserManager.historyManager.getHistory(days: selectedTimeRange.days)
+            let result = browserManager.historyManager.getHistory(
+                days: selectedTimeRange.days, 
+                page: currentPage, 
+                pageSize: pageSize
+            )
             
             withAnimation(.easeInOut(duration: 0.2)) {
-                historyEntries = entries
+                historyEntries = result.entries
+                hasMoreResults = result.hasMore
                 isLoading = false
+            }
+        }
+    }
+    
+    private func loadMoreHistory() {
+        guard hasMoreResults && !isLoadingMore else { return }
+        
+        isLoadingMore = true
+        currentPage += 1
+        
+        Task { @MainActor in
+            let result: (entries: [HistoryEntry], hasMore: Bool)
+            
+            if searchText.isEmpty {
+                result = browserManager.historyManager.getHistory(
+                    days: selectedTimeRange.days,
+                    page: currentPage,
+                    pageSize: pageSize
+                )
+            } else {
+                result = browserManager.historyManager.searchHistory(
+                    query: searchText,
+                    page: currentPage,
+                    pageSize: pageSize
+                )
+            }
+            
+            // Add delay for animation performance with large datasets
+            let animationDelay = historyEntries.count > 100 ? 0.1 : 0.2
+            
+            withAnimation(.easeInOut(duration: animationDelay)) {
+                historyEntries.append(contentsOf: result.entries)
+                hasMoreResults = result.hasMore
+                isLoadingMore = false
             }
         }
     }
     
     private func searchHistory() {
         isLoading = true
+        currentPage = 0
         
         Task { @MainActor in
-            let entries: [HistoryEntry]
+            let result: (entries: [HistoryEntry], hasMore: Bool)
             
             if searchText.isEmpty {
-                entries = browserManager.historyManager.getHistory(days: selectedTimeRange.days)
+                result = browserManager.historyManager.getHistory(
+                    days: selectedTimeRange.days,
+                    page: currentPage,
+                    pageSize: pageSize
+                )
             } else {
-                entries = browserManager.historyManager.searchHistory(query: searchText)
+                result = browserManager.historyManager.searchHistory(
+                    query: searchText,
+                    page: currentPage,
+                    pageSize: pageSize
+                )
             }
             
             withAnimation(.easeInOut(duration: 0.2)) {
-                historyEntries = entries
+                historyEntries = result.entries
+                hasMoreResults = result.hasMore
                 isLoading = false
             }
         }
@@ -213,66 +299,111 @@ struct HistoryView: View {
     }
 }
 
+struct TimeRangeButton: View {
+    let range: HistoryView.TimeRange
+    let isSelected: Bool
+    let onTap: () -> Void
+    
+    @State private var isHovered: Bool = false
+    
+    var body: some View {
+        Button(range.rawValue) {
+            onTap()
+        }
+        .foregroundColor(isSelected ? .accentColor : (isHovered ? AppColors.textPrimary : .secondary))
+        .font(.system(size: 11, weight: isSelected ? .semibold : .medium, design: .monospaced))
+        .lineLimit(1)
+        .fixedSize()  // Ensure button never shrinks
+        .padding(.horizontal, 6)  // Reduced padding for narrow widths
+        .padding(.vertical, 4)
+        .frame(minWidth: 24)  // Minimum width to ensure visibility
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(isHovered || isSelected ? Color.secondary.opacity(0.15) : Color.clear)
+        )
+        .buttonStyle(PlainButtonStyle())
+        .onHover { hovered in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovered = hovered
+            }
+        }
+    }
+}
+
 struct HistoryRowView: View {
     let entry: HistoryEntry
     let onTap: () -> Void
     let onDelete: () -> Void
     
     @State private var isHovered: Bool = false
+    @State private var favicon: SwiftUI.Image = Image(systemName: "globe")
     
     var body: some View {
-        HStack(spacing: 12) {
-            // Favicon placeholder
-            RoundedRectangle(cornerRadius: 4)
+        HStack(spacing: 8) {
+            // Favicon
+            RoundedRectangle(cornerRadius: 3)
                 .fill(Color.secondary.opacity(0.2))
                 .frame(width: 16, height: 16)
                 .overlay(
-                    Image(systemName: "globe")
-                        .font(.system(size: 10))
+                    favicon
+                        .resizable()
+                        .interpolation(.high)
+                        .antialiased(true)
+                        .scaledToFit()
+                        .frame(width: 12, height: 12)
                         .foregroundColor(AppColors.textSecondary)
                 )
             
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 1) {
                 Text(entry.displayTitle)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundColor(AppColors.textPrimary)
                     .lineLimit(1)
                     .truncationMode(.tail)
+                    .minimumScaleFactor(0.85)
                 
-                HStack(spacing: 4) {
+                HStack(spacing: 3) {
                     Text(entry.url.host ?? "")
-                        .font(.system(size: 11))
+                        .font(.system(size: 10))
                         .foregroundColor(AppColors.textSecondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
+                        .minimumScaleFactor(0.8)
                     
                     if entry.visitCount > 1 {
-                        Text("• \(entry.visitCount) visits")
-                            .font(.system(size: 11))
+                        Text("• \(entry.visitCount)")
+                            .font(.system(size: 10))
                             .foregroundColor(AppColors.textTertiary)
+                            .fixedSize()
                     }
                 }
                 
                 Text(entry.timeAgo)
-                    .font(.system(size: 10))
+                    .font(.system(size: 9))
                     .foregroundColor(AppColors.textTertiary)
+                    .fixedSize()
             }
             
-            Spacer()
+            Spacer(minLength: 0)
             
             if isHovered {
                 Button(action: onDelete) {
                     Image(systemName: "xmark")
-                        .font(.system(size: 10))
+                        .font(.system(size: 9))
                         .foregroundColor(AppColors.textSecondary)
                 }
                 .buttonStyle(PlainButtonStyle())
                 .help("Remove from history")
+                .transition(.scale.combined(with: .opacity))
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(isHovered ? Color.secondary.opacity(0.1) : Color.clear)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isHovered ? Color.secondary.opacity(0.12) : Color.clear)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 8))
         .onHover { hovered in
             withAnimation(.easeInOut(duration: 0.2)) {
                 isHovered = hovered
@@ -280,6 +411,11 @@ struct HistoryRowView: View {
         }
         .onTapGesture {
             onTap()
+        }
+        .onAppear {
+            Task {
+                await fetchFavicon()
+            }
         }
         .contextMenu {
             Button("Open") { onTap() }
@@ -290,6 +426,42 @@ struct HistoryRowView: View {
             }
             Divider()
             Button("Remove from History") { onDelete() }
+        }
+    }
+    
+    private func fetchFavicon() async {
+        let defaultFavicon = SwiftUI.Image(systemName: "globe")
+        
+        // Skip favicon fetching for non-web schemes
+        guard entry.url.scheme == "http" || entry.url.scheme == "https", entry.url.host != nil else {
+            await MainActor.run {
+                self.favicon = defaultFavicon
+            }
+            return
+        }
+        
+        do {
+            let favicon = try await FaviconFinder(url: entry.url)
+                .fetchFaviconURLs()
+                .download()
+                .largest()
+            
+            if let faviconImage = favicon.image {
+                let nsImage = faviconImage.image
+                let swiftUIImage = SwiftUI.Image(nsImage: nsImage)
+                
+                await MainActor.run {
+                    self.favicon = swiftUIImage
+                }
+            } else {
+                await MainActor.run {
+                    self.favicon = defaultFavicon
+                }
+            }
+        } catch {
+            await MainActor.run {
+                self.favicon = defaultFavicon
+            }
         }
     }
 }
