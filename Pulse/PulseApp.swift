@@ -173,6 +173,19 @@ struct PulseCommands: Commands {
                 }
             }
         }
+        
+        // Extensions Commands
+        CommandMenu("Extensions") {
+            Button("Install Extension...") {
+                browserManager.showExtensionInstallDialog()
+            }
+            .keyboardShortcut("e", modifiers: [.command, .shift])
+            
+            Button("Manage Extensions...") {
+                // Open settings to extensions tab
+                openWindow(id: "settings")
+            }
+        }
     }
 }
 

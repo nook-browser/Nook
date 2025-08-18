@@ -683,5 +683,3 @@ extension Tab {
         return id.hashValue
     }
 }
-
-
