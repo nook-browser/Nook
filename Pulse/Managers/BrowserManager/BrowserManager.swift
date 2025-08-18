@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import AppKit
+import WebKit
 
 @MainActor
 final class Persistence {
@@ -15,7 +16,7 @@ final class Persistence {
     let container: ModelContainer
     private init() {
         container = try! ModelContainer(
-            for: Schema([SpaceEntity.self,TabEntity.self, TabsStateEntity.self, HistoryEntity.self])
+            for: Schema([SpaceEntity.self,TabEntity.self, TabsStateEntity.self, HistoryEntity.self, ExtensionEntity.self, ExtensionPermissionEntity.self, ExtensionHostPermissionEntity.self])
         )
     }
 }
@@ -35,6 +36,7 @@ class BrowserManager: ObservableObject {
     var historyManager: HistoryManager
     var cookieManager: CookieManager
     var cacheManager: CacheManager
+    var extensionManager: ExtensionManager?
     
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
@@ -51,6 +53,12 @@ class BrowserManager: ObservableObject {
         self.tabManager.browserManager = self
         self.tabManager.reattachBrowserManager(self)
         loadSidebarSettings()
+        
+        // Set reference for extension bridge and initialize ExtensionManager
+        if #available(macOS 15.4, *) {
+            BrowserWindowManager.shared.setBrowserManager(self)
+            self.extensionManager = ExtensionManager.shared
+        }
 
     }
     
@@ -271,6 +279,40 @@ class BrowserManager: ObservableObject {
     func clearPersonalDataCache() {
         Task {
             await cacheManager.clearPersonalDataCache()
+        }
+    }
+    
+    // MARK: - Extension Management
+    
+    func showExtensionInstallDialog() {
+        if #available(macOS 15.4, *) {
+            extensionManager?.showExtensionInstallDialog()
+        } else {
+            // Show unsupported OS alert
+            let alert = NSAlert()
+            alert.messageText = "Extensions Not Supported"
+            alert.informativeText = "Extensions require macOS 15.4 or later."
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+        }
+    }
+    
+    func enableExtension(_ extensionId: String) {
+        if #available(macOS 15.4, *) {
+            extensionManager?.enableExtension(extensionId)
+        }
+    }
+    
+    func disableExtension(_ extensionId: String) {
+        if #available(macOS 15.4, *) {
+            extensionManager?.disableExtension(extensionId)
+        }
+    }
+    
+    func uninstallExtension(_ extensionId: String) {
+        if #available(macOS 15.4, *) {
+            extensionManager?.uninstallExtension(extensionId)
         }
     }
 }

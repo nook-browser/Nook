@@ -35,6 +35,13 @@ struct URLBarView: View {
                     }
                     
                     Spacer()
+                    
+                    // Extension action buttons
+                    if #available(macOS 15.4, *),
+                       let extensionManager = browserManager.extensionManager {
+                        ExtensionActionView(extensions: extensionManager.installedExtensions)
+                            .environmentObject(browserManager)
+                    }
                 }
                 .padding(.horizontal, 12)
             }
