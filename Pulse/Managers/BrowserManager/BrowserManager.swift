@@ -78,11 +78,23 @@ class BrowserManager: ObservableObject {
 
     // MARK: - Command Palette
     func openCommandPalette() {
-        isCommandPaletteVisible = true
+        if isCommandPaletteVisible { 
+                   DispatchQueue.main.async {
+            self.isCommandPaletteVisible = false
+        } 
+         } else {
+        DispatchQueue.main.async {
+            self.isCommandPaletteVisible = true
+        }
+         }
+
     }
 
     func closeCommandPalette() {
-        isCommandPaletteVisible = false
+        if !isCommandPaletteVisible { return }
+        DispatchQueue.main.async {
+            self.isCommandPaletteVisible = false
+        }
     }
 
     func toggleCommandPalette() {
@@ -103,8 +115,10 @@ class BrowserManager: ObservableObject {
     }
 
     func focusURLBar() {
-        // Open command palette which serves as the URL input
-        isCommandPaletteVisible = true
+        if isCommandPaletteVisible { return }
+        DispatchQueue.main.async {
+            self.isCommandPaletteVisible = true
+        }
     }
 
     // MARK: - Dialog Methods
