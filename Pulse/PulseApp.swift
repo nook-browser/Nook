@@ -76,9 +76,10 @@ struct PulseCommands: Commands {
         }
 
         // File Section
-        CommandGroup(replacing: .saveItem) {
+        CommandMenu("File") {
+            
             Button("New Tab") {
-                _ = browserManager.tabManager.createNewTab()
+                browserManager.openCommandPalette()
             }
             .keyboardShortcut("t", modifiers: .command)
             Button("New Window") {
