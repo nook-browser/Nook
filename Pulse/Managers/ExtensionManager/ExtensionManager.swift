@@ -9,6 +9,7 @@ import Foundation
 import WebKit
 import SwiftData
 import AppKit
+import SwiftUI
 
 @available(macOS 15.4, *)
 @MainActor
@@ -20,6 +21,8 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     
     private var extensionController: WKWebExtensionController?
     private var extensionContexts: [String: WKWebExtensionContext] = [:]
+    private var actionAnchors: [String: [WeakAnchor]] = [:]
+    private weak var browserManagerRef: BrowserManager?
     
     let context: ModelContext
     
@@ -37,9 +40,13 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     // MARK: - Setup
     
     private func setupExtensionController() {
-        extensionController = WKWebExtensionController()
-        extensionController?.delegate = self
-        print("ExtensionManager: Native WKWebExtensionController initialized with delegate")
+        let controller = WKWebExtensionController()
+        controller.delegate = self
+        // Align controller config with the app's shared web configuration and data store
+        controller.configuration.defaultWebsiteDataStore = WKWebsiteDataStore.default()
+        controller.configuration.webViewConfiguration = BrowserConfiguration.shared.webViewConfiguration
+        extensionController = controller
+        print("ExtensionManager: Native WKWebExtensionController initialized and configured")
     }
     
     // MARK: - Extension Installation
@@ -115,7 +122,45 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         
         let installedExtension = InstalledExtension(from: entity, manifest: manifest)
         print("ExtensionManager: Successfully installed extension '\(installedExtension.name)' with native WKWebExtension")
-        
+
+        // Prompt for requested/optional permissions on first install (if any)
+        if #available(macOS 15.4, *),
+           let displayName = extensionContext.webExtension.displayName {
+            let requestedPermissions = extensionContext.webExtension.requestedPermissions
+            let optionalPermissions = extensionContext.webExtension.optionalPermissions
+            let requestedMatches = extensionContext.webExtension.requestedPermissionMatchPatterns
+            let optionalMatches = extensionContext.webExtension.optionalPermissionMatchPatterns
+            if !requestedPermissions.isEmpty || !requestedMatches.isEmpty || !optionalPermissions.isEmpty || !optionalMatches.isEmpty {
+                self.presentPermissionPrompt(
+                    requestedPermissions: requestedPermissions,
+                    optionalPermissions: optionalPermissions,
+                    requestedMatches: requestedMatches,
+                    optionalMatches: optionalMatches,
+                    extensionDisplayName: displayName,
+                    onDecision: { grantedPerms, grantedMatches in
+                        // Apply permission decisions
+                        for p in requestedPermissions.union(optionalPermissions) {
+                            extensionContext.setPermissionStatus(
+                                grantedPerms.contains(p) ? .grantedExplicitly : .deniedExplicitly,
+                                for: p
+                            )
+                        }
+                        for m in requestedMatches.union(optionalMatches) {
+                            extensionContext.setPermissionStatus(
+                                grantedMatches.contains(m) ? .grantedExplicitly : .deniedExplicitly,
+                                for: m
+                            )
+                        }
+                    },
+                    onCancel: {
+                        // Default deny only for requested; optional remain unchanged
+                        for p in requestedPermissions { extensionContext.setPermissionStatus(.deniedExplicitly, for: p) }
+                        for m in requestedMatches { extensionContext.setPermissionStatus(.deniedExplicitly, for: m) }
+                    }
+                )
+            }
+        }
+
         return installedExtension
     }
     
@@ -320,6 +365,33 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     var nativeController: WKWebExtensionController? {
         return extensionController
     }
+
+    /// Connect the browser manager so we can expose tabs/windows and present UI.
+    func attach(browserManager: BrowserManager) {
+        self.browserManagerRef = browserManager
+    }
+
+    /// Register a UI anchor view for an extension action button to position popovers.
+    func setActionAnchor(for extensionId: String, anchorView: NSView) {
+        let anchor = WeakAnchor(view: anchorView, window: anchorView.window)
+        if actionAnchors[extensionId] == nil { actionAnchors[extensionId] = [] }
+        // Remove stale anchors
+        actionAnchors[extensionId]?.removeAll { $0.view == nil }
+        if let idx = actionAnchors[extensionId]?.firstIndex(where: { $0.view === anchorView }) {
+            actionAnchors[extensionId]?[idx] = anchor
+        } else {
+            actionAnchors[extensionId]?.append(anchor)
+        }
+        if anchor.window == nil {
+            DispatchQueue.main.async { [weak self, weak anchorView] in
+                guard let view = anchorView else { return }
+                let updated = WeakAnchor(view: view, window: view.window)
+                if let idx = self?.actionAnchors[extensionId]?.firstIndex(where: { $0.view === view }) {
+                    self?.actionAnchors[extensionId]?[idx] = updated
+                }
+            }
+        }
+    }
     
     // MARK: - WKWebExtensionControllerDelegate
     
@@ -334,23 +406,178 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             
             // Show the popover
             DispatchQueue.main.async {
-                if let window = NSApp.mainWindow,
-                   let contentView = window.contentView {
-                    
-                    // Find a better position for the popover - maybe relative to the toolbar
-                    let buttonRect = CGRect(x: 100, y: window.frame.height - 100, width: 20, height: 20)
-                    popover.show(relativeTo: buttonRect, of: contentView, preferredEdge: .minY)
-                    
-                    // Complete successfully
-                    completionHandler(nil)
-                } else {
-                    print("❌ DELEGATE: No window/contentView available")
-                    completionHandler(NSError(domain: "ExtensionManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "No window available"]))
+                let targetWindow = NSApp.keyWindow ?? NSApp.mainWindow
+                if let extId = self.extensionContexts.first(where: { $0.value === extensionContext })?.key,
+                   var anchors = self.actionAnchors[extId] {
+                    anchors.removeAll { $0.view == nil }
+                    self.actionAnchors[extId] = anchors
+                    if let win = targetWindow, let match = anchors.first(where: { $0.window === win }), let view = match.view {
+                        popover.show(relativeTo: view.bounds, of: view, preferredEdge: .maxY)
+                        completionHandler(nil)
+                        return
+                    }
+                    if let view = anchors.first?.view {
+                        popover.show(relativeTo: view.bounds, of: view, preferredEdge: .maxY)
+                        completionHandler(nil)
+                        return
+                    }
                 }
+                if let window = targetWindow, let contentView = window.contentView {
+                    let rect = CGRect(x: contentView.bounds.midX - 10, y: contentView.bounds.maxY - 10, width: 20, height: 20)
+                    popover.show(relativeTo: rect, of: contentView, preferredEdge: .minY)
+                    completionHandler(nil)
+                    return
+                }
+
+                print("❌ DELEGATE: No anchor or contentView available")
+                completionHandler(NSError(domain: "ExtensionManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "No window available"]))
             }
         } else {
             print("❌ DELEGATE: No popover available on action")
             completionHandler(NSError(domain: "ExtensionManager", code: 2, userInfo: [NSLocalizedDescriptionKey: "No popover available"]))
         }
+    }
+
+    // MARK: - Windows exposure (tabs/windows APIs)
+    @available(macOS 15.4, *)
+    func webExtensionController(_ controller: WKWebExtensionController, focusedWindowFor extensionContext: WKWebExtensionContext) -> (any WKWebExtensionWindow)? {
+        guard let bm = browserManagerRef else { return nil }
+        return ExtensionWindowAdapter(browserManager: bm)
+    }
+
+    @available(macOS 15.4, *)
+    func webExtensionController(_ controller: WKWebExtensionController, openWindowsFor extensionContext: WKWebExtensionContext) -> [any WKWebExtensionWindow] {
+        guard let bm = browserManagerRef else { return [] }
+        return [ExtensionWindowAdapter(browserManager: bm)]
+    }
+
+    // MARK: - Permission prompting helper (invoked by delegate when needed)
+    @available(macOS 15.4, *)
+    func presentPermissionPrompt(
+        requestedPermissions: Set<WKWebExtension.Permission>,
+        optionalPermissions: Set<WKWebExtension.Permission>,
+        requestedMatches: Set<WKWebExtension.MatchPattern>,
+        optionalMatches: Set<WKWebExtension.MatchPattern>,
+        extensionDisplayName: String,
+        onDecision: @escaping (_ grantedPermissions: Set<WKWebExtension.Permission>, _ grantedMatches: Set<WKWebExtension.MatchPattern>) -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        guard let bm = browserManagerRef else { onCancel(); return }
+
+        // Convert enums to readable strings for UI
+        let reqPerms = requestedPermissions.map { String(describing: $0) }.sorted()
+        let optPerms = optionalPermissions.map { String(describing: $0) }.sorted()
+        let reqHosts = requestedMatches.map { String(describing: $0) }.sorted()
+        let optHosts = optionalMatches.map { String(describing: $0) }.sorted()
+
+        bm.showCustomContentDialog(
+            header: AnyView(DialogHeader(icon: "puzzlepiece.extension", title: "Extension Permissions", subtitle: nil)),
+            content: ExtensionPermissionView(
+                extensionName: extensionDisplayName,
+                requestedPermissions: reqPerms,
+                optionalPermissions: optPerms,
+                requestedHostPermissions: reqHosts,
+                optionalHostPermissions: optHosts,
+                onGrant: { selectedPerms, selectedHosts in
+                    // Map strings back using string description matching across both requested and optional
+                    let allPerms = requestedPermissions.union(optionalPermissions)
+                    let allHosts = requestedMatches.union(optionalMatches)
+                    let grantedPermissions = Set(allPerms.filter { selectedPerms.contains(String(describing: $0)) })
+                    let grantedMatches = Set(allHosts.filter { selectedHosts.contains(String(describing: $0)) })
+                    bm.closeDialog()
+                    onDecision(grantedPermissions, grantedMatches)
+                },
+                onDeny: {
+                    bm.closeDialog()
+                    onCancel()
+                }
+            ),
+            footer: AnyView(EmptyView())
+        )
+    }
+
+    // Delegate entry point for permission requests from extensions at runtime
+    @available(macOS 15.4, *)
+    func webExtensionController(
+        _ controller: WKWebExtensionController,
+        promptForPermissions permissions: Set<WKWebExtension.Permission>,
+        in window: (any WKWebExtensionWindow)? ,
+        for extensionContext: WKWebExtensionContext,
+        completionHandler: @escaping (Error?) -> Void
+    ) {
+        let displayName = extensionContext.webExtension.displayName ?? "Extension"
+        presentPermissionPrompt(
+            requestedPermissions: permissions,
+            optionalPermissions: extensionContext.webExtension.optionalPermissions,
+            requestedMatches: extensionContext.webExtension.requestedPermissionMatchPatterns,
+            optionalMatches: extensionContext.webExtension.optionalPermissionMatchPatterns,
+            extensionDisplayName: displayName,
+            onDecision: { grantedPerms, grantedMatches in
+                for p in permissions.union(extensionContext.webExtension.optionalPermissions) {
+                    extensionContext.setPermissionStatus(
+                        grantedPerms.contains(p) ? .grantedExplicitly : .deniedExplicitly,
+                        for: p
+                    )
+                }
+                for m in extensionContext.webExtension.requestedPermissionMatchPatterns.union(extensionContext.webExtension.optionalPermissionMatchPatterns) {
+                    extensionContext.setPermissionStatus(
+                        grantedMatches.contains(m) ? .grantedExplicitly : .deniedExplicitly,
+                        for: m
+                    )
+                }
+                completionHandler(nil)
+            },
+            onCancel: {
+                for p in permissions { extensionContext.setPermissionStatus(.deniedExplicitly, for: p) }
+                for m in extensionContext.webExtension.requestedPermissionMatchPatterns { extensionContext.setPermissionStatus(.deniedExplicitly, for: m) }
+                completionHandler(nil)
+            }
+        )
+    }
+
+    // Note: We can provide implementations for opening new tabs/windows once the
+    // exact parameter types are finalized for the targeted SDK. These delegate
+    // methods are optional; omitting them avoids type resolution issues across
+    // SDK variations while retaining popup and permission handling.
+
+    @available(macOS 15.4, *)
+    func webExtensionController(
+        _ controller: WKWebExtensionController,
+        promptForPermissionMatchPatterns matchPatterns: Set<WKWebExtension.MatchPattern>,
+        in window: (any WKWebExtensionWindow)?,
+        for extensionContext: WKWebExtensionContext,
+        completionHandler: @escaping (Error?) -> Void
+    ) {
+        let displayName = extensionContext.webExtension.displayName ?? "Extension"
+        presentPermissionPrompt(
+            requestedPermissions: [],
+            optionalPermissions: [],
+            requestedMatches: matchPatterns,
+            optionalMatches: [],
+            extensionDisplayName: displayName,
+            onDecision: { _, grantedMatches in
+                for m in matchPatterns {
+                    extensionContext.setPermissionStatus(
+                        grantedMatches.contains(m) ? .grantedExplicitly : .deniedExplicitly,
+                        for: m
+                    )
+                }
+                completionHandler(nil)
+            },
+            onCancel: {
+                for m in matchPatterns { extensionContext.setPermissionStatus(.deniedExplicitly, for: m) }
+                completionHandler(nil)
+            }
+        )
+    }
+}
+
+// MARK: - Weak View Reference Helper
+final class WeakAnchor {
+    weak var view: NSView?
+    weak var window: NSWindow?
+    init(view: NSView?, window: NSWindow?) {
+        self.view = view
+        self.window = window
     }
 }

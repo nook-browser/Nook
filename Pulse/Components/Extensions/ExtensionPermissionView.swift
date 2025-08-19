@@ -11,8 +11,11 @@ import WebKit
 @available(macOS 15.4, *)
 struct ExtensionPermissionView: View {
     let extensionName: String
-    let permissions: [String]
-    let hostPermissions: [String]
+    // Separate requested vs optional for clearer UX
+    let requestedPermissions: [String]
+    let optionalPermissions: [String]
+    let requestedHostPermissions: [String]
+    let optionalHostPermissions: [String]
     let onGrant: (Set<String>, Set<String>) -> Void
     let onDeny: () -> Void
     
@@ -38,13 +41,35 @@ struct ExtensionPermissionView: View {
             
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    // Standard Permissions
-                    if !permissions.isEmpty {
+                    // Requested Permissions
+                    if !requestedPermissions.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Permissions")
+                            Text("Requested Permissions")
                                 .font(.headline)
-                            
-                            ForEach(permissions, id: \.self) { permission in
+                            ForEach(requestedPermissions, id: \.self) { permission in
+                                PermissionRowView(
+                                    permission: permission,
+                                    description: getPermissionDescription(permission),
+                                    isSelected: Binding(
+                                        get: { selectedPermissions.contains(permission) },
+                                        set: { isSelected in
+                                            if isSelected {
+                                                selectedPermissions.insert(permission)
+                                            } else {
+                                                selectedPermissions.remove(permission)
+                                            }
+                                        }
+                                    )
+                                )
+                            }
+                        }
+                    }
+                    // Optional Permissions
+                    if !optionalPermissions.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Optional Permissions")
+                                .font(.headline)
+                            ForEach(optionalPermissions, id: \.self) { permission in
                                 PermissionRowView(
                                     permission: permission,
                                     description: getPermissionDescription(permission),
@@ -63,13 +88,35 @@ struct ExtensionPermissionView: View {
                         }
                     }
                     
-                    // Host Permissions
-                    if !hostPermissions.isEmpty {
+                    // Requested Host Permissions
+                    if !requestedHostPermissions.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Website Access")
+                            Text("Requested Website Access")
                                 .font(.headline)
-                            
-                            ForEach(hostPermissions, id: \.self) { host in
+                            ForEach(requestedHostPermissions, id: \.self) { host in
+                                PermissionRowView(
+                                    permission: host,
+                                    description: getHostPermissionDescription(host),
+                                    isSelected: Binding(
+                                        get: { selectedHostPermissions.contains(host) },
+                                        set: { isSelected in
+                                            if isSelected {
+                                                selectedHostPermissions.insert(host)
+                                            } else {
+                                                selectedHostPermissions.remove(host)
+                                            }
+                                        }
+                                    )
+                                )
+                            }
+                        }
+                    }
+                    // Optional Host Permissions
+                    if !optionalHostPermissions.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Optional Website Access")
+                                .font(.headline)
+                            ForEach(optionalHostPermissions, id: \.self) { host in
                                 PermissionRowView(
                                     permission: host,
                                     description: getHostPermissionDescription(host),
@@ -114,7 +161,7 @@ struct ExtensionPermissionView: View {
         .frame(width: 500, height: 600)
         .onAppear {
             // Auto-select safe permissions
-            for permission in permissions {
+            for permission in requestedPermissions {
                 if isSafePermission(permission) {
                     selectedPermissions.insert(permission)
                 }
@@ -196,8 +243,10 @@ struct ExtensionPermissionView_Previews: PreviewProvider {
     static var previews: some View {
         ExtensionPermissionView(
             extensionName: "Sample Extension",
-            permissions: ["storage", "activeTab", "tabs"],
-            hostPermissions: ["https://*.google.com/*", "https://github.com/*"],
+            requestedPermissions: ["storage", "activeTab", "tabs"],
+            optionalPermissions: ["notifications"],
+            requestedHostPermissions: ["https://*.google.com/*"],
+            optionalHostPermissions: ["https://github.com/*"],
             onGrant: { _, _ in },
             onDeny: { }
         )
