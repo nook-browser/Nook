@@ -154,70 +154,11 @@ public class Tab: NSObject, Identifiable {
     }
 
     // MARK: - WebView Setup
+    private static var didInjectStorageSinkScript = false
+
     private func setupWebView() {
         // Use the shared configuration for cookie/session sharing
         let configuration = BrowserConfiguration.shared.webViewConfiguration
-        
-        let downloadScript = WKUserScript(
-            source: """
-            (function() {
-                // Override click handlers for download links
-                document.addEventListener('click', function(e) {
-                    var target = e.target;
-                    while (target && target !== document) {
-                        if (target.tagName === 'A' && target.href) {
-                            var href = target.href.toLowerCase();
-                            var downloadExtensions = ['zip', 'rar', '7z', 'tar', 'gz', 'pdf', 'doc', 'docx', 'mp4', 'mp3', 'exe', 'dmg'];
-                            
-                            for (var i = 0; i < downloadExtensions.length; i++) {
-                                if (href.indexOf('.' + downloadExtensions[i]) !== -1) {
-                                    // Force download by creating a new link
-                                    var link = document.createElement('a');
-                                    link.href = target.href;
-                                    link.download = target.download || target.href.split('/').pop();
-                                    link.style.display = 'none';
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    document.body.removeChild(link);
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    return false;
-                                }
-                            }
-                        }
-                        target = target.parentElement;
-                    }
-                }, true);
-                
-                // Override window.open for download links
-                var originalOpen = window.open;
-                window.open = function(url, name, features) {
-                    if (url && typeof url === 'string') {
-                        var lowerUrl = url.toLowerCase();
-                        var downloadExtensions = ['zip', 'rar', '7z', 'tar', 'gz', 'pdf', 'doc', 'docx', 'mp4', 'mp3', 'exe', 'dmg'];
-                        
-                        for (var i = 0; i < downloadExtensions.length; i++) {
-                            if (lowerUrl.indexOf('.' + downloadExtensions[i]) !== -1) {
-                                // Force download instead of opening in new window
-                                var link = document.createElement('a');
-                                link.href = url;
-                                link.download = url.split('/').pop();
-                                link.style.display = 'none';
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                                return null;
-                            }
-                        }
-                    }
-                    return originalOpen.apply(this, arguments);
-                };
-            })();
-            """,
-            injectionTime: .atDocumentEnd,
-            forMainFrameOnly: false
-        )
-        configuration.userContentController.addUserScript(downloadScript)
 
         _webView = WKWebView(frame: .zero, configuration: configuration)
         _webView?.navigationDelegate = self
@@ -240,9 +181,12 @@ public class Tab: NSObject, Identifiable {
                 .isFraudulentWebsiteWarningEnabled = true
             webView.configuration.preferences
                 .javaScriptCanOpenWindowsAutomatically = true
-            // Inject storage.onChanged sink so native can broadcast changes
-            injectStorageChangeSink(to: webView)
-            
+            // Inject storage.onChanged sink once, and use runtime JS for download helpers
+            if !Tab.didInjectStorageSinkScript {
+                injectStorageChangeSink(to: webView)
+                Tab.didInjectStorageSinkScript = true
+            }
+
             injectDownloadJavaScript(to: webView)
         }
 
@@ -708,4 +652,3 @@ extension Tab {
         return id.hashValue
     }
 }
-

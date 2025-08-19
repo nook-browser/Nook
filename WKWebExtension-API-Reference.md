@@ -162,6 +162,16 @@ Represents URL patterns for host permissions.
 - `*://*/*` - All hosts and schemes  
 - `https://*.example.com/*` - Specific domain pattern
 
+### WKWebExtensionContext.PermissionStatus
+Permission status values used with `setPermissionStatus(_:for:)`.
+
+- `unknown` – Status not yet determined
+- `requestedExplicitly` / `requestedImplicitly` – Permission has been requested
+- `grantedExplicitly` / `grantedImplicitly` – Permission granted (explicit = by user)
+- `deniedExplicitly` / `deniedImplicitly` – Permission denied (explicit = by user)
+
+Use explicit variants when applying a user’s choice from your own UI or the controller delegate. For example: grant → `grantedExplicitly`, deny → `deniedExplicitly`.
+
 ---
 
 ## Data Types & Storage

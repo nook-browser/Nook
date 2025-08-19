@@ -7,14 +7,8 @@ struct WebView: NSViewRepresentable {
     var onURLChange: ((String) -> Void)? = nil
 
     func makeNSView(context: Context) -> WKWebView {
-        let configuration = WKWebViewConfiguration()
-        configuration.websiteDataStore = WKWebsiteDataStore.default()
-
-        let preferences = WKWebpagePreferences()
-        preferences.allowsContentJavaScript = true
-        configuration.defaultWebpagePreferences = preferences
-
-        configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
+        // Reuse the shared browser configuration so extensions can inject consistently
+        let configuration = BrowserConfiguration.shared.webViewConfiguration
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
