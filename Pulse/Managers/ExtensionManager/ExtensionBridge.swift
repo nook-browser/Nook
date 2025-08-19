@@ -19,14 +19,20 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
     }
 
     func activeTab(for extensionContext: WKWebExtensionContext) -> (any WKWebExtensionTab)? {
-        guard let t = browserManager.tabManager.currentTab else { return nil }
-        return ExtensionTabAdapter(tab: t, browserManager: browserManager)
+        if let t = browserManager.tabManager.currentTab,
+           let a = ExtensionManager.shared.stableAdapter(for: t)
+        { return a }
+        // Fallback to first available tab
+        if let first = browserManager.tabManager.pinnedTabs.first ?? browserManager.tabManager.tabs.first,
+           let a = ExtensionManager.shared.stableAdapter(for: first)
+        { return a }
+        return nil
     }
 
     func tabs(for extensionContext: WKWebExtensionContext) -> [any WKWebExtensionTab] {
-        // Expose pinned + current space tabs as a flat list
+        // Expose pinned + current space tabs as a flat list using stable adapters
         let all = browserManager.tabManager.pinnedTabs + browserManager.tabManager.tabs
-        return all.map { ExtensionTabAdapter(tab: $0, browserManager: browserManager) }
+        return all.compactMap { ExtensionManager.shared.stableAdapter(for: $0) }
     }
 
     func frame(for extensionContext: WKWebExtensionContext) -> CGRect {
@@ -36,6 +42,10 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
         return .zero
     }
 
+    func screenFrame(for extensionContext: WKWebExtensionContext) -> CGRect {
+        return NSScreen.main?.frame ?? .zero
+    }
+
     func focus(for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
         if let window = NSApp.mainWindow {
             window.makeKeyAndOrderFront(nil)
@@ -43,6 +53,41 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
             completionHandler(nil)
         } else {
             completionHandler(NSError(domain: "ExtensionWindowAdapter", code: 1, userInfo: [NSLocalizedDescriptionKey: "No window to focus"]))
+        }
+    }
+
+    func isPrivate(for extensionContext: WKWebExtensionContext) -> Bool {
+        return false
+    }
+
+    func windowType(for extensionContext: WKWebExtensionContext) -> WKWebExtension.WindowType {
+        return .normal
+    }
+
+    func windowState(for extensionContext: WKWebExtensionContext) -> WKWebExtension.WindowState {
+        return .normal
+    }
+
+    func setWindowState(_ windowState: WKWebExtension.WindowState, for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
+        // For now, we don’t change the native app window state via extension calls
+        completionHandler(nil)
+    }
+
+    func setFrame(_ frame: CGRect, for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
+        if let window = NSApp.mainWindow {
+            window.setFrame(frame, display: true)
+            completionHandler(nil)
+        } else {
+            completionHandler(NSError(domain: "ExtensionWindowAdapter", code: 2, userInfo: [NSLocalizedDescriptionKey: "No window to set frame on"]))
+        }
+    }
+
+    func close(for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
+        if let window = NSApp.mainWindow {
+            window.performClose(nil)
+            completionHandler(nil)
+        } else {
+            completionHandler(NSError(domain: "ExtensionWindowAdapter", code: 3, userInfo: [NSLocalizedDescriptionKey: "No window to close"]))
         }
     }
 }
@@ -70,6 +115,34 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
         return browserManager.tabManager.currentTab?.id == tab.id
     }
 
+    func indexInWindow(for extensionContext: WKWebExtensionContext) -> Int {
+        // Pinned tabs are generally shown before others; map to a stable index
+        if browserManager.tabManager.pinnedTabs.contains(where: { $0.id == tab.id }) {
+            return 0
+        }
+        return tab.index
+    }
+
+    func isLoadingComplete(for extensionContext: WKWebExtensionContext) -> Bool {
+        return !tab.isLoading
+    }
+
+    func isPinned(for extensionContext: WKWebExtensionContext) -> Bool {
+        return browserManager.tabManager.pinnedTabs.contains(where: { $0.id == tab.id })
+    }
+
+    func isMuted(for extensionContext: WKWebExtensionContext) -> Bool {
+        return false
+    }
+
+    func isPlayingAudio(for extensionContext: WKWebExtensionContext) -> Bool {
+        return false
+    }
+
+    func isReaderModeActive(for extensionContext: WKWebExtensionContext) -> Bool {
+        return false
+    }
+
     func activate(for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
         browserManager.tabManager.setActiveTab(tab)
         completionHandler(nil)
@@ -80,4 +153,3 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
         completionHandler(nil)
     }
 }
-

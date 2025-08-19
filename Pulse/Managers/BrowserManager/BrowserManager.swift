@@ -43,6 +43,12 @@ class BrowserManager: ObservableObject {
 
     init() {
         self.modelContext = Persistence.shared.container.mainContext
+        // Prepare native ExtensionManager reference early; defer attach until after init completes.
+        if #available(macOS 15.4, *) {
+            let mgr = ExtensionManager.shared
+            self.extensionManager = mgr
+        }
+
         self.tabManager = TabManager(browserManager: nil,context: modelContext)
         self.settingsManager = SettingsManager()
         self.dialogManager = DialogManager()
@@ -53,11 +59,9 @@ class BrowserManager: ObservableObject {
         self.tabManager.browserManager = self
         self.tabManager.reattachBrowserManager(self)
         loadSidebarSettings()
-        
-        // Initialize native ExtensionManager and attach after all properties are initialized
-        if #available(macOS 15.4, *) {
-            let mgr = ExtensionManager.shared
-            self.extensionManager = mgr
+
+        // Now safe to use `self` in method calls.
+        if #available(macOS 15.4, *), let mgr = self.extensionManager {
             mgr.attach(browserManager: self)
         }
         

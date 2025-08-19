@@ -61,9 +61,14 @@ struct ExtensionActionButton: View {
         }
         
         // Use the PROPER way according to Apple docs: performAction
-        // This will trigger the delegate method for popup presentation
+        // Pass the active tab when available so extensions relying on it (e.g., tabs.query) have context.
         print("✅ Calling performAction() - this should trigger the delegate")
-        extensionContext.performAction(for: nil) // nil = default action, not tab-specific
+        if let current = browserManager.tabManager.currentTab {
+            let adapter = ExtensionTabAdapter(tab: current, browserManager: browserManager)
+            extensionContext.performAction(for: adapter)
+        } else {
+            extensionContext.performAction(for: nil) // fallback to default action
+        }
     }
 }
 
