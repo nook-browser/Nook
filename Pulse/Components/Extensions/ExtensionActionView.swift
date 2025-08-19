@@ -64,8 +64,12 @@ struct ExtensionActionButton: View {
         // Pass the active tab when available so extensions relying on it (e.g., tabs.query) have context.
         print("✅ Calling performAction() - this should trigger the delegate")
         if let current = browserManager.tabManager.currentTab {
-            let adapter = ExtensionTabAdapter(tab: current, browserManager: browserManager)
-            extensionContext.performAction(for: adapter)
+            // Use the stable cached adapter instead of creating a new one
+            if let adapter = ExtensionManager.shared.stableAdapter(for: current) {
+                extensionContext.performAction(for: adapter)
+            } else {
+                extensionContext.performAction(for: nil)
+            }
         } else {
             extensionContext.performAction(for: nil) // fallback to default action
         }

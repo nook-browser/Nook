@@ -24,7 +24,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     private var actionAnchors: [String: [WeakAnchor]] = [:]
     // Stable adapters for tabs/windows used when notifying controller events
     private var tabAdapters: [UUID: ExtensionTabAdapter] = [:]
-    private var windowAdapter: ExtensionWindowAdapter?
+    internal var windowAdapter: ExtensionWindowAdapter?
     private weak var browserManagerRef: BrowserManager?
     
     let context: ModelContext
@@ -53,18 +53,36 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             UserDefaults.standard.set(uuid.uuidString, forKey: "Pulse.WKWebExtensionController.Identifier")
             config = WKWebExtensionController.Configuration(identifier: uuid)
         }
+        
         let controller = WKWebExtensionController(configuration: config)
         controller.delegate = self
-        // Align controller config with the app's shared web configuration and data store
+        
+        // Configure the shared WebView configuration for extension support
+        let sharedWebConfig = BrowserConfiguration.shared.webViewConfiguration
+        
+        // Use the default website data store - WKWebExtension handles storage internally
         controller.configuration.defaultWebsiteDataStore = WKWebsiteDataStore.default()
-        controller.configuration.webViewConfiguration = BrowserConfiguration.shared.webViewConfiguration
-        // Critical: Associate our app's browsing WKWebViews with this controller so content scripts inject.
+        controller.configuration.webViewConfiguration = sharedWebConfig
+        
+        print("ExtensionManager: WKWebExtensionController configured with persistent storage identifier: \(config.identifier?.uuidString ?? "none")")
+        print("   Native storage types supported: .local, .session, .synchronized")
+        
+        // Critical: Associate our app's browsing WKWebViews with this controller so content scripts inject
         if #available(macOS 15.4, *) {
-            BrowserConfiguration.shared.webViewConfiguration.webExtensionController = controller
+            sharedWebConfig.webExtensionController = controller
+            
+            // Ensure JavaScript is enabled for extension APIs
+            sharedWebConfig.preferences.javaScriptEnabled = true
+            
+            print("ExtensionManager: Configured shared WebView configuration with extension controller")
         }
+        
         extensionController = controller
         print("ExtensionManager: Native WKWebExtensionController initialized and configured")
+        print("   Controller ID: \(config.identifier?.uuidString ?? "none")")
+        print("   Data store: \(controller.configuration.defaultWebsiteDataStore)")
     }
+    
     
     // MARK: - Extension Installation
     
@@ -115,11 +133,65 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         let webExtension = try await WKWebExtension(resourceBaseURL: destinationDir)
         let extensionContext = WKWebExtensionContext(for: webExtension)
         
+        // Debug extension details and permissions
+        print("ExtensionManager: Installing extension '\(webExtension.displayName ?? "Unknown")'")
+        print("   Version: \(webExtension.version ?? "Unknown")")
+        print("   Requested permissions: \(webExtension.requestedPermissions)")
+        print("   Requested match patterns: \(webExtension.requestedPermissionMatchPatterns)")
+        
+        // Pre-grant common permissions for extensions that need them (like Dark Reader)
+        let commonPermissions: [WKWebExtension.Permission] = [
+            .storage,
+            .tabs,
+            .activeTab,
+            .alarms,
+            .contextMenus
+        ]
+        
+        for permission in commonPermissions {
+            if webExtension.requestedPermissions.contains(permission) {
+                extensionContext.setPermissionStatus(.grantedExplicitly, for: permission)
+                print("   ✅ Pre-granted \(permission) permission")
+            }
+        }
+        
+        // Pre-grant <all_urls> match pattern if requested
+        for matchPattern in webExtension.requestedPermissionMatchPatterns {
+            extensionContext.setPermissionStatus(.grantedExplicitly, for: matchPattern)
+            print("   ✅ Pre-granted match pattern: \(matchPattern)")
+            print("      Pattern string: '\(matchPattern.description)'")
+        }
+        
+        // Special check for <all_urls>
+        if webExtension.requestedPermissionMatchPatterns.contains(where: { $0.description.contains("all_urls") }) {
+            print("   🌐 Dark Reader has <all_urls> permission - content scripts should work!")
+        }
+        
         // Store context
         extensionContexts[extensionId] = extensionContext
         
         // Load with native controller
         try extensionController?.load(extensionContext)
+        
+        // Debug: Check if this is Dark Reader and log additional info
+        if webExtension.displayName?.lowercased().contains("dark") == true ||
+           webExtension.displayName?.lowercased().contains("reader") == true {
+            print("🌙 DARK READER DETECTED - Adding comprehensive API debugging")
+            print("   Has background content: \(webExtension.hasBackgroundContent)")
+            print("   Has injected content: \(webExtension.hasInjectedContent)")
+            print("   Current permissions after loading: \(extensionContext.currentPermissions)")
+            
+            // Test if Dark Reader can access current tab URL
+            if let windowAdapter = windowAdapter,
+               let activeTab = windowAdapter.activeTab(for: extensionContext),
+               let url = activeTab.url?(for: extensionContext) {
+                print("   🔍 Dark Reader can see active tab URL: \(url)")
+                let hasAccess = extensionContext.hasAccess(to: url)
+                print("   🔐 Has access to current URL: \(hasAccess)")
+            }
+            
+            // WKWebExtension automatically provides Chrome APIs - no manual bridging needed
+        }
         
         // Create extension entity for persistence
         let entity = ExtensionEntity(
@@ -345,6 +417,35 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                                 let webExtension = try await WKWebExtension(resourceBaseURL: URL(fileURLWithPath: entity.packagePath))
                                 let extensionContext = WKWebExtensionContext(for: webExtension)
                                 
+                                // Debug extension details and permissions
+                                print("ExtensionManager: Loading existing extension '\(webExtension.displayName ?? entity.name)'")
+                                print("   Version: \(webExtension.version ?? entity.version)")
+                                print("   Requested permissions: \(webExtension.requestedPermissions)")
+                                print("   Current permissions: \(extensionContext.currentPermissions)")
+                                
+                                // Pre-grant common permissions for existing extensions (like Dark Reader)
+                                let commonPermissions: [WKWebExtension.Permission] = [
+                                    .storage,
+                                    .tabs,
+                                    .activeTab,
+                                    .alarms,
+                                    .contextMenus
+                                ]
+                                
+                                for permission in commonPermissions {
+                                    if webExtension.requestedPermissions.contains(permission) &&
+                                       !extensionContext.currentPermissions.contains(permission) {
+                                        extensionContext.setPermissionStatus(.grantedExplicitly, for: permission)
+                                        print("   ✅ Pre-granted \(permission) permission for existing extension")
+                                    }
+                                }
+                                
+                                // Pre-grant match patterns for existing extensions
+                                for matchPattern in webExtension.requestedPermissionMatchPatterns {
+                                    extensionContext.setPermissionStatus(.grantedExplicitly, for: matchPattern)
+                                    print("   ✅ Pre-granted match pattern for existing extension: \(matchPattern)")
+                                }
+                                
                                 extensionContexts[entity.id] = extensionContext
                                 try extensionController?.load(extensionContext)
 
@@ -410,6 +511,235 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     var nativeController: WKWebExtensionController? {
         return extensionController
     }
+    
+    // MARK: - Debugging Utilities
+    
+    /// Show debugging console for popup troubleshooting
+    func showPopupConsole() {
+        PopupConsole.shared.show()
+    }
+    
+    /// Force refresh window/tab state with extension controller
+    func refreshWindowState() {
+        guard let bm = browserManagerRef, let controller = extensionController else { return }
+        
+        if #available(macOS 15.4, *) {
+            if windowAdapter == nil {
+                windowAdapter = ExtensionWindowAdapter(browserManager: bm)
+            }
+            
+            if let window = windowAdapter {
+                print("[ExtensionManager] 🔄 Refreshing window state with controller...")
+                controller.didFocusWindow(window)
+                
+                // Also refresh current tab
+                if let currentTab = bm.tabManager.currentTab {
+                    let tabAdapter = adapter(for: currentTab, browserManager: bm)
+                    controller.didActivateTab(tabAdapter, previousActiveTab: nil)
+                    controller.didSelectTabs([tabAdapter])
+                    print("[ExtensionManager] 🔄 Refreshed active tab: '\(currentTab.name)'")
+                }
+            }
+        }
+    }
+    
+    /// Get detailed status of extension system
+    func getExtensionSystemStatus() -> [String: Any] {
+        var status: [String: Any] = [:]
+        
+        status["isSupported"] = isExtensionSupportAvailable
+        status["controllerConfigured"] = extensionController != nil
+        status["installedExtensionsCount"] = installedExtensions.count
+        status["loadedContextsCount"] = extensionContexts.count
+        status["browserManagerAttached"] = browserManagerRef != nil
+        
+        if let controller = extensionController {
+            status["controllerID"] = controller.configuration.identifier?.uuidString ?? "none"
+            status["extensionContextsLoaded"] = controller.extensionContexts.count
+        }
+        
+        var extensionDetails: [[String: Any]] = []
+        for ext in installedExtensions {
+            var extInfo: [String: Any] = [:]
+            extInfo["id"] = ext.id
+            extInfo["name"] = ext.name
+            extInfo["enabled"] = ext.isEnabled
+            extInfo["hasContext"] = extensionContexts[ext.id] != nil
+            
+            if let context = extensionContexts[ext.id] {
+                extInfo["isLoaded"] = context.isLoaded
+                extInfo["permissions"] = context.currentPermissions.map { String(describing: $0) }
+                extInfo["hostMatches"] = context.currentPermissionMatchPatterns.map { String(describing: $0) }
+                extInfo["baseURL"] = context.baseURL.absoluteString
+            }
+            
+            extensionDetails.append(extInfo)
+        }
+        status["extensions"] = extensionDetails
+        
+        return status
+    }
+    
+    /// Log comprehensive system status for debugging
+    func logSystemStatus() {
+        let status = getExtensionSystemStatus()
+        print("=== Extension System Status ===")
+        for (key, value) in status {
+            print("  \(key): \(value)")
+        }
+        
+        // Also log current browser state
+        if let bm = browserManagerRef {
+            print("  Browser Manager State:")
+            print("    Current tab: \(bm.tabManager.currentTab?.name ?? "None")")
+            print("    Total tabs: \(bm.tabManager.tabs.count)")
+            print("    Pinned tabs: \(bm.tabManager.pinnedTabs.count)")
+            print("    Current space: \(bm.tabManager.currentSpace?.name ?? "None")")
+            print("    Total spaces: \(bm.tabManager.spaces.count)")
+        }
+        print("===============================")
+    }
+    
+    /// Create a simple test extension for debugging popup issues
+    func createTestExtension() {
+        guard isExtensionSupportAvailable else {
+            print("Extension support not available")
+            return
+        }
+        
+        let testExtensionDir = getExtensionsDirectory().appendingPathComponent("test-extension")
+        
+        do {
+            try FileManager.default.createDirectory(at: testExtensionDir, withIntermediateDirectories: true)
+            
+            // Create manifest.json
+            let manifest = [
+                "manifest_version": 3,
+                "name": "Test Extension",
+                "version": "1.0",
+                "description": "Simple test extension for debugging popup issues",
+                "permissions": ["activeTab", "storage"],
+                "action": [
+                    "default_popup": "popup.html",
+                    "default_title": "Test Extension"
+                ]
+            ] as [String : Any]
+            
+            let manifestData = try JSONSerialization.data(withJSONObject: manifest, options: .prettyPrinted)
+            let manifestURL = testExtensionDir.appendingPathComponent("manifest.json")
+            try manifestData.write(to: manifestURL)
+            
+            // Create popup.html
+            let popupHTML = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <title>Test Extension Popup</title>
+                <style>
+                    body {
+                        width: 300px;
+                        padding: 20px;
+                        font-family: system-ui, sans-serif;
+                    }
+                    .section {
+                        margin-bottom: 15px;
+                        padding: 10px;
+                        border: 1px solid #ccc;
+                        border-radius: 5px;
+                    }
+                    .status {
+                        font-size: 12px;
+                        color: #666;
+                    }
+                    button {
+                        margin: 5px 0;
+                        padding: 5px 10px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="section">
+                    <h3>Test Extension Popup</h3>
+                    <p class="status">If you can see this, the popup is loading correctly!</p>
+                </div>
+                
+                <div class="section">
+                    <h4>API Tests</h4>
+                    <button id="testTabs">Test Tabs API</button>
+                    <button id="testStorage">Test Storage API</button>
+                    <div id="results"></div>
+                </div>
+                
+                <script src="popup.js"></script>
+            </body>
+            </html>
+            """
+            
+            let popupHTMLURL = testExtensionDir.appendingPathComponent("popup.html")
+            try popupHTML.write(to: popupHTMLURL, atomically: true, encoding: .utf8)
+            
+            // Create popup.js
+            let popupJS = """
+            console.log('Test extension popup script loaded');
+            console.log('Extension APIs available:', {
+                browser: typeof browser !== 'undefined',
+                chrome: typeof chrome !== 'undefined',
+                runtime: typeof (browser?.runtime) !== 'undefined',
+                storage: typeof (browser?.storage) !== 'undefined',
+                tabs: typeof (browser?.tabs) !== 'undefined'
+            });
+            
+            document.addEventListener('DOMContentLoaded', function() {
+                const results = document.getElementById('results');
+                
+                function logResult(message) {
+                    console.log(message);
+                    const div = document.createElement('div');
+                    div.textContent = message;
+                    div.style.fontSize = '12px';
+                    div.style.margin = '5px 0';
+                    results.appendChild(div);
+                }
+                
+                document.getElementById('testTabs').addEventListener('click', async function() {
+                    try {
+                        logResult('Testing tabs API...');
+                        const tabs = await browser.tabs.query({active: true, currentWindow: true});
+                        logResult(`✅ Found ${tabs.length} active tabs`);
+                        if (tabs[0]) {
+                            logResult(`Current tab: ${tabs[0].title} - ${tabs[0].url}`);
+                        }
+                    } catch (error) {
+                        logResult(`❌ Tabs API error: ${error.message}`);
+                    }
+                });
+                
+                document.getElementById('testStorage').addEventListener('click', async function() {
+                    try {
+                        logResult('Testing storage API...');
+                        await browser.storage.local.set({testKey: 'testValue'});
+                        const result = await browser.storage.local.get('testKey');
+                        logResult(`✅ Storage test successful: ${JSON.stringify(result)}`);
+                    } catch (error) {
+                        logResult(`❌ Storage API error: ${error.message}`);
+                    }
+                });
+                
+                logResult('Popup loaded successfully!');
+            });
+            """
+            
+            let popupJSURL = testExtensionDir.appendingPathComponent("popup.js")
+            try popupJS.write(to: popupJSURL, atomically: true, encoding: .utf8)
+            
+            print("✅ Created test extension at: \(testExtensionDir.path)")
+            print("   You can now install it using the extension manager")
+            
+        } catch {
+            print("❌ Failed to create test extension: \(error)")
+        }
+    }
 
     /// Connect the browser manager so we can expose tabs/windows and present UI.
     func attach(browserManager: BrowserManager) {
@@ -418,17 +748,48 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         if #available(macOS 15.4, *), let controller = extensionController {
             let adapter = self.windowAdapter ?? ExtensionWindowAdapter(browserManager: browserManager)
             self.windowAdapter = adapter
+            
+            print("ExtensionManager: Notifying controller about window and tabs...")
+            
+            // Important: Notify about window FIRST
             controller.didOpenWindow(adapter)
             controller.didFocusWindow(adapter)
+            
+            // Notify about existing tabs 
+            let allTabs = browserManager.tabManager.pinnedTabs + browserManager.tabManager.tabs
+            for tab in allTabs {
+                let tabAdapter = self.adapter(for: tab, browserManager: browserManager)
+                controller.didOpenTab(tabAdapter)
+            }
+            
+            // Notify about current active tab
+            if let currentTab = browserManager.tabManager.currentTab {
+                let tabAdapter = self.adapter(for: currentTab, browserManager: browserManager)
+                controller.didActivateTab(tabAdapter, previousActiveTab: nil)
+                controller.didSelectTabs([tabAdapter])
+            }
+            
+            print("ExtensionManager: Attached to browser manager and synced \(allTabs.count) tabs in window")
         }
     }
 
     // MARK: - Controller event notifications for tabs
+    private var lastCachedAdapterLog: Date = Date.distantPast
+    
     @available(macOS 15.4, *)
     private func adapter(for tab: Tab, browserManager: BrowserManager) -> ExtensionTabAdapter {
-        if let existing = tabAdapters[tab.id] { return existing }
+        if let existing = tabAdapters[tab.id] { 
+            // Only log cached adapter access every 10 seconds to prevent spam
+            let now = Date()
+            if now.timeIntervalSince(lastCachedAdapterLog) > 10.0 {
+                print("[ExtensionManager] Returning CACHED adapter for '\(tab.name)': \(ObjectIdentifier(existing))")
+                lastCachedAdapterLog = now
+            }
+            return existing 
+        }
         let created = ExtensionTabAdapter(tab: tab, browserManager: browserManager)
         tabAdapters[tab.id] = created
+        print("[ExtensionManager] Created NEW adapter for '\(tab.name)': \(ObjectIdentifier(created))")
         return created
     }
 
@@ -510,117 +871,301 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         print("   Requested perms: \(reqPerms)")
         print("   Optional perms: \(optPerms)")
         
-        // Get the native popover from the action
-        if let popover = action.popupPopover {
-            print("✅ DELEGATE: Native popover available - presenting!")
-            
-            // Show the popover
-            DispatchQueue.main.async {
-                if let webView = action.popupWebView {
-                    // Attach basic navigation logging to detect resource/activation failures
-                    webView.navigationDelegate = self
-                    if #available(macOS 13.3, *) {
-                        webView.isInspectable = true
-                    }
-                    // Attach console helper for manual JS evaluation
-                    PopupConsole.shared.attach(to: webView)
-                    let popupURL = webView.url?.absoluteString ?? "(nil)"
-                    print("   Popup URL: \"\(popupURL)\"")
-                    webView.evaluateJavaScript("document.readyState") { value, _ in
-                        let state = (value as? String) ?? "(unknown)"
-                        print("   Popup document.readyState: \"\(state)\"")
-                    }
+        // Check Dark Reader's access to current page
+        if extensionContext.webExtension.displayName?.lowercased().contains("dark") == true {
+            if let windowAdapter = windowAdapter,
+               let activeTab = windowAdapter.activeTab(for: extensionContext),
+               let url = activeTab.url?(for: extensionContext) {
+                print("   🔍 Current tab URL: \(url)")
+                let hasAccess = extensionContext.hasAccess(to: url)
+                print("   🔐 Has access to current URL: \(hasAccess)")
+                if !hasAccess {
+                    print("   ❌ This is why Dark Reader says 'page is protected by browser'!")
+                    print("   💡 URL might be restricted (chrome://, about:, file://, etc.)")
                 } else {
-                    print("   No popupWebView present on action (yet)")
-                }
-                let targetWindow = NSApp.keyWindow ?? NSApp.mainWindow
-                if let extId = self.extensionContexts.first(where: { $0.value === extensionContext })?.key,
-                   var anchors = self.actionAnchors[extId] {
-                    anchors.removeAll { $0.view == nil }
-                    self.actionAnchors[extId] = anchors
-                    if let win = targetWindow, let match = anchors.first(where: { $0.window === win }), let view = match.view {
-                        popover.show(relativeTo: view.bounds, of: view, preferredEdge: .maxY)
-                        completionHandler(nil)
-                        return
+                    print("   ✅ Dark Reader has permission but still says 'protected' - content script injection issue!")
+                    print("   🔍 Checking if WebView is associated with extension controller...")
+                    
+                    // Check if the current page's WebView is associated with our controller
+                    if let tab = activeTab as? ExtensionTabAdapter {
+                        let webView = tab.tab.webView
+                        let hasController = webView.configuration.webExtensionController != nil
+                        let isSameController = webView.configuration.webExtensionController === extensionController
+                        print("      WebView has extension controller: \(hasController)")
+                        print("      Is same controller: \(isSameController)")
+                        
+                        if !isSameController {
+                            print("      ❌ WebView not associated with extension controller!")
+                            print("      💡 This prevents content script injection")
+                        } else {
+                            print("      ✅ WebView properly associated - testing content script injection...")
+                            
+                            // Test if content scripts are actually injected by checking for Dark Reader's presence
+                            webView.evaluateJavaScript("window.DarkReader !== undefined || document.querySelector('[data-darkreader-scheme]') !== null") { result, error in
+                                if let isDarkReaderPresent = result as? Bool {
+                                    print("      🔍 Dark Reader content scripts detected: \(isDarkReaderPresent)")
+                                    if !isDarkReaderPresent {
+                                        print("      ❌ Content scripts NOT injected - 'world' parameter issue likely!")
+                                        print("      💡 WKWebExtension may not support 'world': 'MAIN'/'ISOLATED' properly")
+                                    }
+                                } else {
+                                    print("      ⚠️ Could not test for Dark Reader content scripts: \(error?.localizedDescription ?? "unknown error")")
+                                }
+                            }
+                        }
                     }
-                    if let view = anchors.first?.view {
-                        popover.show(relativeTo: view.bounds, of: view, preferredEdge: .maxY)
-                        completionHandler(nil)
-                        return
-                    }
                 }
-                if let window = targetWindow, let contentView = window.contentView {
-                    let rect = CGRect(x: contentView.bounds.midX - 10, y: contentView.bounds.maxY - 10, width: 20, height: 20)
-                    popover.show(relativeTo: rect, of: contentView, preferredEdge: .minY)
+            }
+        }
+        
+        // Get the native popover from the action
+        guard let popover = action.popupPopover else {
+            print("❌ DELEGATE: No popover available on action")
+            completionHandler(NSError(domain: "ExtensionManager", code: 2, userInfo: [NSLocalizedDescriptionKey: "No popover available"]))
+            return
+        }
+        
+        print("✅ DELEGATE: Native popover available - configuring and presenting!")
+        
+        // Configure the popup WebView if available
+        if let webView = action.popupWebView {
+            print("   PopupWebView found, configuring...")
+            
+            // Ensure the WebView has proper configuration for extension resources
+            if webView.configuration.webExtensionController == nil {
+                webView.configuration.webExtensionController = controller
+                print("   Attached extension controller to popup WebView")
+            }
+            
+            // Attach navigation delegate for debugging
+            webView.navigationDelegate = self
+            
+            // Enable inspection for debugging
+            if #available(macOS 13.3, *) {
+                webView.isInspectable = true
+            }
+            
+            // Attach console helper for manual JS evaluation
+            PopupConsole.shared.attach(to: webView)
+            
+            // Log initial state
+            let popupURL = webView.url?.absoluteString ?? "(nil)"
+            print("   Popup URL: \"\(popupURL)\"")
+            
+            // Check document readiness
+            webView.evaluateJavaScript("document.readyState") { value, _ in
+                let state = (value as? String) ?? "(unknown)"
+                print("   Popup document.readyState: \"\(state)\"")
+            }
+            
+            // Ensure extension APIs are available
+            let apiCheck = """
+            (() => {
+                return {
+                    hasBrowser: typeof browser !== 'undefined',
+                    hasChrome: typeof chrome !== 'undefined',
+                    hasRuntime: typeof (browser?.runtime) !== 'undefined',
+                    hasStorage: typeof (browser?.storage?.local) !== 'undefined',
+                    hasTabs: typeof (browser?.tabs) !== 'undefined',
+                    location: location.href
+                };
+            })()
+            """
+            
+            webView.evaluateJavaScript(apiCheck) { result, error in
+                if let error = error {
+                    print("   API check error: \(error.localizedDescription)")
+                } else {
+                    print("   API availability: \(String(describing: result))")
+                }
+            }
+        } else {
+            print("   No popupWebView present on action")
+        }
+        
+        // Present the popover on main thread
+        DispatchQueue.main.async {
+            let targetWindow = NSApp.keyWindow ?? NSApp.mainWindow
+            
+            // Try to use registered anchor for this extension
+            if let extId = self.extensionContexts.first(where: { $0.value === extensionContext })?.key,
+               var anchors = self.actionAnchors[extId] {
+                // Clean up stale anchors
+                anchors.removeAll { $0.view == nil }
+                self.actionAnchors[extId] = anchors
+                
+                // Find anchor in current window
+                if let win = targetWindow, let match = anchors.first(where: { $0.window === win }), let view = match.view {
+                    print("   Using registered anchor in current window")
+                    popover.show(relativeTo: view.bounds, of: view, preferredEdge: .maxY)
                     completionHandler(nil)
                     return
                 }
-
-                print("❌ DELEGATE: No anchor or contentView available")
-                completionHandler(NSError(domain: "ExtensionManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "No window available"]))
+                
+                // Use first available anchor
+                if let view = anchors.first?.view {
+                    print("   Using first available anchor")
+                    popover.show(relativeTo: view.bounds, of: view, preferredEdge: .maxY)
+                    completionHandler(nil)
+                    return
+                }
             }
-        } else {
-            print("❌ DELEGATE: No popover available on action")
-            completionHandler(NSError(domain: "ExtensionManager", code: 2, userInfo: [NSLocalizedDescriptionKey: "No popover available"]))
+            
+            // Fallback to center of window
+            if let window = targetWindow, let contentView = window.contentView {
+                let rect = CGRect(x: contentView.bounds.midX - 10, y: contentView.bounds.maxY - 50, width: 20, height: 20)
+                print("   Using fallback anchor in center of window")
+                popover.show(relativeTo: rect, of: contentView, preferredEdge: .minY)
+                completionHandler(nil)
+                return
+            }
+
+            print("❌ DELEGATE: No anchor or contentView available")
+            completionHandler(NSError(domain: "ExtensionManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "No window available"]))
         }
-}
+    }
     
     // MARK: - WKNavigationDelegate (popup diagnostics)
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         let urlString = webView.url?.absoluteString ?? "(nil)"
         print("[Popup] didStartProvisionalNavigation: \"\(urlString)\"")
+        PopupConsole.shared.log("[Navigation] Started loading: \(urlString)")
     }
+    
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         let urlString = webView.url?.absoluteString ?? "(nil)"
         print("[Popup] didCommit: \"\(urlString)\"")
+        PopupConsole.shared.log("[Navigation] Committed: \(urlString)")
     }
+    
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         let urlString = webView.url?.absoluteString ?? "(nil)"
         print("[Popup] didFinish: \"\(urlString)\"")
+        PopupConsole.shared.log("[Navigation] Finished: \(urlString)")
+        
+        // Get document title
         webView.evaluateJavaScript("document.title") { value, _ in
             let title = (value as? String) ?? "(unknown)"
             print("[Popup] document.title: \"\(title)\"")
+            PopupConsole.shared.log("[Document] Title: \(title)")
         }
-        // Quick capability probe for extension APIs commonly used by popups
-        let probe = "(() => ({ href: location.href, title: document.title, hasBrowser: typeof browser, hasChrome: typeof chrome, hasRuntime: typeof (browser && browser.runtime), hasStorageGet: typeof (browser && browser.storage && browser.storage.local && browser.storage.local.get), hasTabsQuery: typeof (browser && browser.tabs && browser.tabs.query), bodyText: (document.body && document.body.innerText ? document.body.innerText.slice(0, 200) : '') }))()"
-        webView.evaluateJavaScript(probe) { value, error in
+        
+        // Comprehensive capability probe for extension APIs
+        let comprehensiveProbe = """
+        (() => {
+            const result = {
+                location: {
+                    href: location.href,
+                    protocol: location.protocol,
+                    host: location.host
+                },
+                document: {
+                    title: document.title,
+                    readyState: document.readyState,
+                    hasBody: !!document.body,
+                    bodyText: document.body ? document.body.innerText.slice(0, 100) : null
+                },
+                apis: {
+                    browser: typeof browser !== 'undefined',
+                    chrome: typeof chrome !== 'undefined',
+                    runtime: typeof (browser?.runtime || chrome?.runtime) !== 'undefined',
+                    storage: {
+                        available: typeof (browser?.storage || chrome?.storage) !== 'undefined',
+                        local: typeof (browser?.storage?.local || chrome?.storage?.local) !== 'undefined',
+                        sync: typeof (browser?.storage?.sync || chrome?.storage?.sync) !== 'undefined'
+                    },
+                    tabs: typeof (browser?.tabs || chrome?.tabs) !== 'undefined',
+                    action: typeof (browser?.action || chrome?.action) !== 'undefined'
+                },
+                errors: []
+            };
+            
+            // Check for common popup errors
+            try {
+                if (typeof browser !== 'undefined' && browser.runtime) {
+                    result.runtime = {
+                        id: browser.runtime.id,
+                        url: browser.runtime.getURL ? browser.runtime.getURL('') : 'getURL not available'
+                    };
+                }
+            } catch (e) {
+                result.errors.push('Runtime error: ' + e.message);
+            }
+            
+            return result;
+        })()
+        """
+        
+        webView.evaluateJavaScript(comprehensiveProbe) { value, error in
             if let error = error {
-                print("[Popup] probe error: \(error.localizedDescription)")
+                print("[Popup] comprehensive probe error: \(error.localizedDescription)")
+                PopupConsole.shared.log("[Error] Probe failed: \(error.localizedDescription)")
             } else if let dict = value as? [String: Any] {
-                print("[Popup] probe: \(dict)")
+                print("[Popup] comprehensive probe: \(dict)")
+                PopupConsole.shared.log("[Probe] APIs: \(dict)")
             } else {
-                print("[Popup] probe: (unexpected result)")
+                print("[Popup] comprehensive probe: unexpected result type")
+                PopupConsole.shared.log("[Warning] Probe returned unexpected result")
             }
         }
-        // Try a live tabs.query from the popup context to catch mapping issues
-        let tabsProbe = "(async () => { try { const r = await browser.tabs.query({active:true, currentWindow:true}); return {len:r.length, id:r[0] && r[0].id, url:r[0] && r[0].url, title:r[0] && r[0].title}; } catch(e) { return {error: (e && e.message) || String(e)} } })()"
-        webView.evaluateJavaScript(tabsProbe) { value, _ in
-            print("[Popup] tabs.query probe: \(String(describing: value))")
-        }
+        
+        // Note: Skipping automatic tabs.query test to avoid potential recursion issues
+        // Extensions will call tabs.query naturally, and we can debug through console
     }
+    
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         print("[Popup] didFail: \(error.localizedDescription)")
+        PopupConsole.shared.log("[Error] Navigation failed: \(error.localizedDescription)")
     }
+    
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         print("[Popup] didFailProvisional: \(error.localizedDescription)")
+        PopupConsole.shared.log("[Error] Provisional navigation failed: \(error.localizedDescription)")
     }
+    
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         print("[Popup] content process terminated")
+        PopupConsole.shared.log("[Critical] WebView process terminated")
     }
 
     // MARK: - Windows exposure (tabs/windows APIs)
+    private var lastFocusedWindowCall: Date = Date.distantPast
+    private var lastOpenWindowsCall: Date = Date.distantPast
+    
     @available(macOS 15.4, *)
     func webExtensionController(_ controller: WKWebExtensionController, focusedWindowFor extensionContext: WKWebExtensionContext) -> (any WKWebExtensionWindow)? {
-        guard let bm = browserManagerRef else { return nil }
-        if windowAdapter == nil { windowAdapter = ExtensionWindowAdapter(browserManager: bm) }
+        // Throttle logging to prevent spam
+        let now = Date()
+        if now.timeIntervalSince(lastFocusedWindowCall) > 10.0 {
+            print("[ExtensionManager] 🎯 focusedWindowFor() called")
+            lastFocusedWindowCall = now
+        }
+        
+        guard let bm = browserManagerRef else { 
+            return nil 
+        }
+        if windowAdapter == nil { 
+            windowAdapter = ExtensionWindowAdapter(browserManager: bm) 
+        }
         return windowAdapter
     }
 
     @available(macOS 15.4, *)
     func webExtensionController(_ controller: WKWebExtensionController, openWindowsFor extensionContext: WKWebExtensionContext) -> [any WKWebExtensionWindow] {
-        guard let bm = browserManagerRef else { return [] }
-        if windowAdapter == nil { windowAdapter = ExtensionWindowAdapter(browserManager: bm) }
-        return [windowAdapter!]
+        // Throttle logging to prevent spam
+        let now = Date()
+        if now.timeIntervalSince(lastOpenWindowsCall) > 10.0 {
+            print("[ExtensionManager] 🎯 openWindowsFor() called")
+            lastOpenWindowsCall = now
+        }
+        
+        guard let bm = browserManagerRef else { 
+            return [] 
+        }
+        if windowAdapter == nil { 
+            windowAdapter = ExtensionWindowAdapter(browserManager: bm) 
+        }
+        return windowAdapter != nil ? [windowAdapter!] : []
     }
 
     // MARK: - Permission prompting helper (invoked by delegate when needed)
