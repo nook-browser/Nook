@@ -15,23 +15,34 @@ public func isValidURL(_ string: String) -> Bool {
         return false
     }
 
-    if let url = URL(string: trimmed),
-        let scheme = url.scheme,
-        ["http", "https", "file", "ftp"].contains(scheme.lowercased()),
-        let host = url.host,
-        !host.isEmpty
-    {
-        return true
+    guard let url = URL(string: trimmed), let scheme = url.scheme?.lowercased() else {
+        return false
     }
 
-    return false
+    switch scheme {
+    case "http", "https", "ftp":
+        // Require a non-empty host for network URLs
+        if let host = url.host, !host.isEmpty { return true }
+        return false
+    case "file":
+        // Allow file URLs without host (e.g., file:///Users/...)
+        return url.path.isEmpty == false
+    case "chrome-extension", "moz-extension":
+        // Extension URLs should include a host (the extension id)
+        return (url.host?.isEmpty == false)
+    default:
+        return false
+    }
 }
 
 /// Normalizes a URL by adding protocol if missing
 public func normalizeURL(_ input: String, provider: SearchProvider) -> String {
     let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
 
-    if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") {
+    // Preserve explicit schemes (including file and extension schemes)
+    if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") ||
+       trimmed.hasPrefix("file://") || trimmed.hasPrefix("chrome-extension://") ||
+       trimmed.hasPrefix("moz-extension://") {
         return trimmed
     }
 

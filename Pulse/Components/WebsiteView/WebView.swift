@@ -36,8 +36,14 @@ struct WebView: NSViewRepresentable {
         guard let url = URL(string: urlString) else { return }
 
         if webView.url != url {
-            let request = URLRequest(url: url)
-            webView.load(request)
+            if url.isFileURL {
+                // Grant read access to the containing directory for local resources
+                let readAccessURL = url.deletingLastPathComponent()
+                webView.loadFileURL(url, allowingReadAccessTo: readAccessURL)
+            } else {
+                let request = URLRequest(url: url)
+                webView.load(request)
+            }
         }
 
         context.coordinator.onTitleChange = onTitleChange

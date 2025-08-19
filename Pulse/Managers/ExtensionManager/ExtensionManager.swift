@@ -26,7 +26,16 @@ final class ExtensionManager: NSObject, ObservableObject {
     
     private var extensionController: WKWebExtensionController?
     private var extensionContexts: [String: WKWebExtensionContext] = [:]
-    private let context: ModelContext
+    // Ephemeral background-like storage per extension (can be persisted later)
+    @MainActor private var ephemeralStorage: [String: [String: Any]] = [:]
+    
+    /// Extension bridge for Chrome API compatibility
+    private let extensionBridge = ExtensionBridge.shared
+    
+    /// Storage bridges for each extension
+    private var storageBridges: [String: ExtensionStorageBridge] = [:]
+    
+    let context: ModelContext
     
     private override init() {
         self.context = Persistence.shared.container.mainContext
@@ -35,6 +44,7 @@ final class ExtensionManager: NSObject, ObservableObject {
         
         if isExtensionSupportAvailable {
             setupExtensionController()
+            setupExtensionBridge()
             loadInstalledExtensions()
         }
     }
@@ -48,6 +58,12 @@ final class ExtensionManager: NSObject, ObservableObject {
         extensionController = WKWebExtensionController()
         
         print("ExtensionManager: WKWebExtensionController initialized")
+    }
+    
+    private func setupExtensionBridge() {
+        // Configure the extension bridge with this manager
+        extensionBridge.configure(with: self)
+        print("ExtensionManager: ExtensionBridge configured for Chrome API compatibility")
     }
     
     // MARK: - Extension Installation
@@ -105,8 +121,12 @@ final class ExtensionManager: NSObject, ObservableObject {
         let webExtension = try await WKWebExtension(resourceBaseURL: destinationDir)
         let context = try WKWebExtensionContext(for: webExtension)
         
-        // Store context
+        // Store context and register with bridge
         extensionContexts[extensionId] = context
+        extensionBridge.registerExtensionContext(context, for: extensionId)
+        
+        // Create storage bridge for this extension
+        storageBridges[extensionId] = extensionBridge.bridgeStorageAPI(for: extensionId)
         
         // Load extension context
         do {
@@ -205,7 +225,7 @@ final class ExtensionManager: NSObject, ObservableObject {
     }
     
     func uninstallExtension(_ extensionId: String) {
-        // Remove from controller
+        // Remove from controller and bridge
         if let context = extensionContexts[extensionId] {
             do {
                 try extensionController?.unload(context)
@@ -213,6 +233,8 @@ final class ExtensionManager: NSObject, ObservableObject {
                 print("ExtensionManager: Failed to unload extension context: \(error.localizedDescription)")
             }
             extensionContexts.removeValue(forKey: extensionId)
+            extensionBridge.unregisterExtensionContext(for: extensionId)
+            storageBridges.removeValue(forKey: extensionId)
         }
         
         // Remove from database
@@ -318,6 +340,10 @@ final class ExtensionManager: NSObject, ObservableObject {
                                 let webContext = try WKWebExtensionContext(for: webExtension)
                                 
                                 extensionContexts[entity.id] = webContext
+                                extensionBridge.registerExtensionContext(webContext, for: entity.id)
+                                
+                                // Create storage bridge for this extension
+                                storageBridges[entity.id] = extensionBridge.bridgeStorageAPI(for: entity.id)
                                 do {
                                     try extensionController?.load(webContext)
                                 } catch {
@@ -345,6 +371,239 @@ final class ExtensionManager: NSObject, ObservableObject {
     private func getExtensionsDirectory() -> URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         return appSupport.appendingPathComponent("Pulse").appendingPathComponent("Extensions")
+    }
+    
+    // MARK: - Storage Bridge Access
+    
+    /// Get the storage bridge for a specific extension
+    func getStorageBridge(for extensionId: String) -> ExtensionStorageBridge? {
+        return storageBridges[extensionId]
+    }
+    
+    /// Create a storage bridge for an extension if it doesn't exist
+    func createStorageBridge(for extensionId: String) -> ExtensionStorageBridge {
+        if let existingBridge = storageBridges[extensionId] {
+            return existingBridge
+        }
+        
+        let bridge = extensionBridge.bridgeStorageAPI(for: extensionId)
+        storageBridges[extensionId] = bridge
+        return bridge
+    }
+}
+
+// MARK: - Runtime Bridge (Popup -> Manager)
+@available(macOS 15.4, *)
+extension ExtensionManager {
+    /// Handle runtime-like messages from popup UI and return a response.
+    /// This simulates a lightweight background script environment.
+    @MainActor
+    func handlePopupRuntimeMessage(extensionId: String, message: Any?) -> Any {
+        guard let obj = message as? [String: Any], let what = obj["what"] as? String else {
+            return ["success": true]
+        }
+
+        switch what {
+        case "getPopupData":
+            let hostUrlScheme: (String, String, String) = {
+                if let bm = BrowserWindowManager.shared.browserManager,
+                   let tab = bm.tabManager.currentTab {
+                    return (tab.url.host ?? "example.com", tab.url.absoluteString, tab.url.scheme ?? "https")
+                }
+                return ("example.com", "https://example.com", "https")
+            }()
+            let host = hostUrlScheme.0
+            let urlStr = hostUrlScheme.1
+            let scheme = hostUrlScheme.2
+            let parts = host.split(separator: ".")
+            let rootHostname = parts.count >= 2 ? parts.suffix(2).joined(separator: ".") : host
+            let origin = scheme + "://" + host
+            return [
+                "hostname": host,
+                "rootHostname": rootHostname,
+                "origin": origin,
+                "pageURL": urlStr,
+                "tabId": 1,
+                "level": 2,
+                "autoReload": true,
+                "dynamicFilteringEnabled": true,
+                "cosmeticFilteringEnabled": true,
+                "netFilteringSwitch": true,
+                "isLargeMediaBlocked": false,
+                "firewallRules": [:] as [String: Any],
+                "disabledFeatures": []
+            ]
+
+        case "setFilteringMode":
+            return obj["level"] as? Int ?? 2
+
+        case "setPendingFilteringMode":
+            return ["success": true]
+
+        case "storageGet":
+            let keys = obj["keys"]
+            let result = storageLocalGet(extensionId: extensionId, keys: keys)
+            print("ExtensionManager: storageGet for \(extensionId), keys: \(String(describing: keys)), result: \(result)")
+            return result
+
+        case "storageSet":
+            if let items = obj["items"] as? [String: Any] {
+                print("ExtensionManager: storageSet for \(extensionId), items: \(items)")
+                storageLocalSet(extensionId: extensionId, items: items)
+                
+                // Notify storage bridge of changes
+                if let storageBridge = storageBridges[extensionId] {
+                    let changes = items.mapValues { value in
+                        ["newValue": value]
+                    }
+                    extensionBridge.notifyStorageChange(extensionId: extensionId, changes: changes, area: "local")
+                }
+            }
+            return ["success": true]
+
+        case "storageRemove":
+            let keys = obj["keys"]
+            let oldData = storageLocalGet(extensionId: extensionId, keys: keys)
+            storageLocalRemove(extensionId: extensionId, keys: keys)
+            
+            // Notify storage bridge of removals
+            if let storageBridge = storageBridges[extensionId] {
+                let changes = oldData.mapValues { value in
+                    ["oldValue": value]
+                }
+                extensionBridge.notifyStorageChange(extensionId: extensionId, changes: changes, area: "local")
+            }
+            return ["success": true]
+
+        case "storageClear":
+            let oldData = storageLocalGet(extensionId: extensionId, keys: nil)
+            storageLocalClear(extensionId: extensionId)
+            
+            // Notify storage bridge of clear
+            if let storageBridge = storageBridges[extensionId] {
+                let changes = oldData.mapValues { value in
+                    ["oldValue": value]
+                }
+                extensionBridge.notifyStorageChange(extensionId: extensionId, changes: changes, area: "local")
+            }
+            return ["success": true]
+
+        default:
+            return ["success": true]
+        }
+    }
+
+    // MARK: Storage helpers
+    @MainActor
+    private func storageLocalGet(extensionId: String, keys: Any?) -> [String: Any] {
+        var out: [String: Any] = [:]
+        do {
+            let predicate = #Predicate<ExtensionStorageEntity> { $0.extensionId == extensionId }
+            let all = try context.fetch(FetchDescriptor<ExtensionStorageEntity>(predicate: predicate))
+            let map: [String: ExtensionStorageEntity] = Dictionary(uniqueKeysWithValues: all.map { ($0.key, $0) })
+            if keys == nil {
+                for (k, v) in map { if let obj = try? JSONSerialization.jsonObject(with: v.valueData) { out[k] = obj } }
+                return out
+            }
+            if let arr = keys as? [String] {
+                for k in arr { if let e = map[k], let obj = try? JSONSerialization.jsonObject(with: e.valueData) { out[k] = obj } else { out[k] = NSNull() } }
+                return out
+            }
+            if let s = keys as? String {
+                if let e = map[s], let obj = try? JSONSerialization.jsonObject(with: e.valueData) { out[s] = obj } else { out[s] = NSNull() }
+                return out
+            }
+            if let def = keys as? [String: Any] {
+                for (k, v) in def {
+                    if let e = map[k], let obj = try? JSONSerialization.jsonObject(with: e.valueData) { out[k] = obj } else { out[k] = v }
+                }
+                return out
+            }
+        } catch {
+            print("ExtensionManager: storageLocalGet error: \(error)")
+        }
+        return out
+    }
+
+    @MainActor
+    private func storageLocalSet(extensionId: String, items: [String: Any]) {
+        do {
+            var changes: [String: [String: Any]] = [:]
+            // capture old values and apply new ones
+            for (k, v) in items {
+                let predicate = #Predicate<ExtensionStorageEntity> { $0.extensionId == extensionId && $0.key == k }
+                let existing = try context.fetch(FetchDescriptor<ExtensionStorageEntity>(predicate: predicate))
+                var oldVal: Any? = nil
+                if let e = existing.first, let obj = try? JSONSerialization.jsonObject(with: e.valueData) { oldVal = obj }
+                let data = try JSONSerialization.data(withJSONObject: v)
+                if let ent = existing.first {
+                    ent.valueData = data
+                    ent.updatedAt = Date()
+                } else {
+                    let ent = ExtensionStorageEntity(extensionId: extensionId, key: k, valueData: data)
+                    context.insert(ent)
+                }
+                var delta: [String: Any] = [:]
+                if let oldVal = oldVal { delta["oldValue"] = oldVal }
+                delta["newValue"] = v
+                changes[k] = delta
+            }
+            try context.save()
+            broadcastStorageChanged(extensionId: extensionId, changes: changes)
+        } catch {
+            print("ExtensionManager: storageLocalSet error: \(error)")
+        }
+    }
+
+    @MainActor
+    private func storageLocalRemove(extensionId: String, keys: Any?) {
+        do {
+            var changes: [String: [String: Any]] = [:]
+            var keyList: [String] = []
+            if let arr = keys as? [String] { keyList = arr }
+            else if let s = keys as? String { keyList = [s] }
+            guard !keyList.isEmpty else { return }
+            let predicate = #Predicate<ExtensionStorageEntity> { $0.extensionId == extensionId && keyList.contains($0.key) }
+            let entities = try context.fetch(FetchDescriptor<ExtensionStorageEntity>(predicate: predicate))
+            for e in entities {
+                if let obj = try? JSONSerialization.jsonObject(with: e.valueData) { changes[e.key] = ["oldValue": obj] }
+                context.delete(e)
+            }
+            try context.save()
+            broadcastStorageChanged(extensionId: extensionId, changes: changes)
+        } catch {
+            print("ExtensionManager: storageLocalRemove error: \(error)")
+        }
+    }
+
+    @MainActor
+    private func storageLocalClear(extensionId: String) {
+        do {
+            var changes: [String: [String: Any]] = [:]
+            let predicate = #Predicate<ExtensionStorageEntity> { $0.extensionId == extensionId }
+            let entities = try context.fetch(FetchDescriptor<ExtensionStorageEntity>(predicate: predicate))
+            for e in entities {
+                if let obj = try? JSONSerialization.jsonObject(with: e.valueData) { changes[e.key] = ["oldValue": obj] }
+                context.delete(e)
+            }
+            try context.save()
+            broadcastStorageChanged(extensionId: extensionId, changes: changes)
+        } catch {
+            print("ExtensionManager: storageLocalClear error: \(error)")
+        }
+    }
+
+    @MainActor
+    private func broadcastStorageChanged(extensionId: String, changes: [String: [String: Any]]) {
+        guard let bm = BrowserWindowManager.shared.browserManager else { return }
+        func eval(_ webView: WKWebView) {
+            if let data = try? JSONSerialization.data(withJSONObject: changes), let json = String(data: data, encoding: .utf8) {
+                let js = "try { window.__pulseStorageChanged && window.__pulseStorageChanged(\(json), 'local'); } catch(e) {}"
+                webView.evaluateJavaScript(js, completionHandler: nil)
+            }
+        }
+        for tab in bm.tabManager.pinnedTabs { eval(tab.webView) }
+        for tab in bm.tabManager.tabs { eval(tab.webView) }
     }
 }
 

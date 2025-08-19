@@ -32,6 +32,11 @@ class BrowserConfiguration {
         // Add application name
         config.applicationNameForUserAgent = "Version/17.4.1 Safari/605.1.15"
 
+        // Allow extension resources to load in main web views
+        let multiHandler = MultiExtensionSchemeHandler()
+        config.setURLSchemeHandler(multiHandler, forURLScheme: "chrome-extension")
+        config.setURLSchemeHandler(multiHandler, forURLScheme: "moz-extension")
+
         return config
     }()
 

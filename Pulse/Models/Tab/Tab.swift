@@ -240,6 +240,10 @@ public class Tab: NSObject, Identifiable {
                 .isFraudulentWebsiteWarningEnabled = true
             webView.configuration.preferences
                 .javaScriptCanOpenWindowsAutomatically = true
+            // Inject content-script loader per webview (handles matches/runAt)
+            injectContentScriptLoader(to: webView)
+            // Inject storage.onChanged sink so native can broadcast changes
+            injectStorageChangeSink(to: webView)
             
             injectDownloadJavaScript(to: webView)
         }
@@ -349,6 +353,126 @@ public class Tab: NSObject, Identifiable {
                 print("Error injecting download JavaScript: \(error.localizedDescription)")
             }
         }
+    }
+
+    // MARK: - Content Script Injection
+    private func injectContentScriptLoader(to webView: WKWebView) {
+        guard let extMgr = browserManager?.extensionManager else { return }
+        let registry = buildContentScriptRegistry(from: extMgr.installedExtensions)
+        guard let registryJSONData = try? JSONSerialization.data(withJSONObject: registry, options: []),
+              let registryJSON = String(data: registryJSONData, encoding: .utf8) else { return }
+
+        let loader = #"""
+        (function(){
+          try {
+            const REG = __REGISTRY__;
+            const url = location.href;
+            const isTop = (window.top === window);
+            function toRegex(pat){
+              if (pat === '<all_urls>') return /^https?:\/\/.+/;
+              const m = pat.match(/^(\*|http|https|file|ftp):\/\/([^\/]+)(\/.*)$/);
+              if (!m) return /^$/;
+              let [, scheme, host, path] = m;
+              let sch = scheme === '*' ? '(https?|file|ftp)' : scheme.replace(/[-/\\^$*+?.()|[\]{}]/g,'\\$&');
+              let h = host === '*' ? '[^/]+' : host.replace(/\./g,'\\.').replace(/^\*\./,'([^/.]+\\.)?').replace(/^\*$/,'[^/]+');
+              let p = path.replace(/\./g,'\\.').replace(/\*/g,'.*');
+              return new RegExp('^' + sch + '://' + h + p + '$');
+            }
+            function matches(list){ return (list||[]).some(p => toRegex(p).test(url)); }
+            function excludes(list){ return (list||[]).some(p => toRegex(p).test(url)); }
+            function permitted(hosts){ if (!hosts || hosts.length===0) return true; return hosts.some(p => toRegex(p).test(url)); }
+            async function injectJS(src, extId){
+              try {
+                const u = 'chrome-extension://' + extId + '/' + src.replace(/^\//,'');
+                const s = document.createElement('script'); s.src = u; s.async = false; s.defer = false;
+                s.addEventListener('error', async ()=>{ try { const res = await fetch(u); if (res.ok) { const code = await res.text(); const s2 = document.createElement('script'); s2.textContent = code; (document.documentElement||document.head||document.body).appendChild(s2); } } catch(e){} });
+                (document.documentElement||document.head||document.body).appendChild(s);
+              } catch(e) { console.log('CS injectJS error', src, e); }
+            }
+            async function injectCSS(href, extId){
+              try {
+                const u = 'chrome-extension://' + extId + '/' + href.replace(/^\//,'');
+                const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = u;
+                l.addEventListener('error', async ()=>{ try { const res = await fetch(u); if (res.ok) { const css = await res.text(); const st = document.createElement('style'); st.textContent = css; (document.documentElement||document.head||document.body).appendChild(st); } } catch(e){} });
+                (document.documentElement||document.head||document.body).appendChild(l);
+              } catch(e) { console.log('CS injectCSS error', href, e); }
+            }
+            function runPhase(phase){
+              (REG.items||[]).forEach(item => {
+                try {
+                  if (phase !== (item.runAt||'document_idle')) return;
+                  if (!isTop && !item.allFrames) return;
+                  if (!matches(item.matches)) return;
+                  if (excludes(item.excludeMatches)) return;
+                  if (!permitted(item.hosts)) return;
+                  (item.css||[]).forEach(href => injectCSS(href, item.extId));
+                  (item.js||[]).forEach(src => injectJS(src, item.extId));
+                } catch(e){ console.log('CS inject item error', e); }
+              });
+            }
+            // document_start
+            runPhase('document_start');
+            // document_end
+            document.addEventListener('DOMContentLoaded', function(){ runPhase('document_end'); }, { once:true });
+            // document_idle
+            window.addEventListener('load', function(){ setTimeout(function(){ runPhase('document_idle'); }, 200); }, { once:true });
+          } catch(e) { console.log('CS loader error', e); }
+        })();
+        """#.replacingOccurrences(of: "__REGISTRY__", with: registryJSON)
+
+        let userScript = WKUserScript(source: loader, injectionTime: .atDocumentStart, forMainFrameOnly: false)
+        webView.configuration.userContentController.addUserScript(userScript)
+    }
+
+    private func injectStorageChangeSink(to webView: WKWebView) {
+        let script = """
+        (function(){
+          try {
+            window.chrome = window.chrome || {};
+            window.chrome.storage = window.chrome.storage || {};
+            if (!window.chrome.storage.onChanged) {
+              const listeners = [];
+              window.chrome.storage.onChanged = {
+                addListener(fn){ if (typeof fn==='function') listeners.push(fn); },
+                removeListener(fn){ const i=listeners.indexOf(fn); if (i>=0) listeners.splice(i,1); },
+                hasListener(fn){ return listeners.includes(fn); },
+                hasListeners(){ return listeners.length>0; }
+              };
+              window.__pulseStorageChanged = function(payload, area){ try { listeners.forEach(fn => { try { fn(payload, area||'local'); } catch(e){} }); } catch(e){} };
+            }
+          } catch(e) { }
+        })();
+        """
+        let user = WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: false)
+        webView.configuration.userContentController.addUserScript(user)
+    }
+
+    private func buildContentScriptRegistry(from exts: [InstalledExtension]) -> [String: Any] {
+        var items: [[String: Any]] = []
+        for ext in exts where ext.isEnabled {
+            if let csArr = ext.manifest["content_scripts"] as? [[String: Any]] {
+                let grantedHosts = browserManager?.extensionManager?.getGrantedHostPermissions(for: ext.id) ?? []
+                for cs in csArr {
+                    let matches = cs["matches"] as? [String] ?? []
+                    let exclude = cs["exclude_matches"] as? [String] ?? []
+                    let allFrames = cs["all_frames"] as? Bool ?? false
+                    let runAt = (cs["run_at"] as? String) ?? "document_idle"
+                    let js = cs["js"] as? [String] ?? []
+                    let css = cs["css"] as? [String] ?? []
+                    items.append([
+                        "extId": ext.id,
+                        "matches": matches,
+                        "excludeMatches": exclude,
+                        "allFrames": allFrames,
+                        "runAt": runAt,
+                        "js": js,
+                        "css": css,
+                        "hosts": grantedHosts
+                    ])
+                }
+            }
+        }
+        return ["items": items]
     }
 
     // MARK: - Tab State Management
