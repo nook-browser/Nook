@@ -15,24 +15,25 @@ class BrowserConfiguration {
     lazy var webViewConfiguration: WKWebViewConfiguration = {
         let config = WKWebViewConfiguration()
 
-        // Use default website data store for persistent cookies
+        // Use default website data store for persistent cookies and extension data
         config.websiteDataStore = WKWebsiteDataStore.default()
 
-        // Configure JavaScript preferences
+        // Configure JavaScript preferences for extension support
         let preferences = WKWebpagePreferences()
         preferences.allowsContentJavaScript = true
         config.defaultWebpagePreferences = preferences
 
-        // Important: Enable these for better Google compatibility
+        // Core WebKit preferences for extensions
+        config.preferences.javaScriptEnabled = true
         config.preferences.javaScriptCanOpenWindowsAutomatically = true
 
         // Media settings
         config.mediaTypesRequiringUserActionForPlayback = []
 
-        // Add application name
+        // User agent for better compatibility
         config.applicationNameForUserAgent = "Version/17.4.1 Safari/605.1.15"
 
-        // Extension URL schemes are handled natively by WKWebExtension
+        // Note: webExtensionController will be set by ExtensionManager during initialization
 
         return config
     }()

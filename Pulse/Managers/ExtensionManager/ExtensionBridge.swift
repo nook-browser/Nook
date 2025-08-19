@@ -12,27 +12,72 @@ import WebKit
 @available(macOS 15.4, *)
 final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
     private unowned let browserManager: BrowserManager
+    private var isProcessingTabsRequest = false
 
     init(browserManager: BrowserManager) {
         self.browserManager = browserManager
         super.init()
     }
+    
+    // MARK: - Window Identity
+    
+    override func isEqual(_ object: Any?) -> Bool {
+        guard let other = object as? ExtensionWindowAdapter else { return false }
+        return other.browserManager === self.browserManager
+    }
+    
+    override var hash: Int {
+        return ObjectIdentifier(browserManager).hashValue
+    }
 
+    private var lastActiveTabCall: Date = Date.distantPast
+    
     func activeTab(for extensionContext: WKWebExtensionContext) -> (any WKWebExtensionTab)? {
+        // Only log every 2 seconds to reduce spam
+        let now = Date()
+        if now.timeIntervalSince(lastActiveTabCall) > 2.0 {
+            print("[ExtensionWindowAdapter] activeTab() called")
+            lastActiveTabCall = now
+        }
+        
         if let t = browserManager.tabManager.currentTab,
-           let a = ExtensionManager.shared.stableAdapter(for: t)
-        { return a }
+           let a = ExtensionManager.shared.stableAdapter(for: t) {
+            return a
+        }
+        
         // Fallback to first available tab
         if let first = browserManager.tabManager.pinnedTabs.first ?? browserManager.tabManager.tabs.first,
-           let a = ExtensionManager.shared.stableAdapter(for: first)
-        { return a }
+           let a = ExtensionManager.shared.stableAdapter(for: first) {
+            return a
+        }
+        
         return nil
     }
 
+    private var lastTabsCall: Date = Date.distantPast
+    
     func tabs(for extensionContext: WKWebExtensionContext) -> [any WKWebExtensionTab] {
+        // Only log every 2 seconds to reduce spam
+        let now = Date()
+        let shouldLog = now.timeIntervalSince(lastTabsCall) > 2.0
+        if shouldLog {
+            let currentTabName = browserManager.tabManager.currentTab?.name ?? "nil"
+            print("[ExtensionWindowAdapter] tabs() called - Current tab: '\(currentTabName)'")
+            lastTabsCall = now
+        }
+        
         // Expose pinned + current space tabs as a flat list using stable adapters
         let all = browserManager.tabManager.pinnedTabs + browserManager.tabManager.tabs
-        return all.compactMap { ExtensionManager.shared.stableAdapter(for: $0) }
+        let adapters = all.compactMap { ExtensionManager.shared.stableAdapter(for: $0) }
+        
+        if shouldLog {
+            print("[ExtensionWindowAdapter] Returning \(adapters.count) tabs to extension")
+            for (index, adapter) in adapters.enumerated() {
+                let tabAdapter = adapter as! ExtensionTabAdapter
+                print("   Tab \(index): '\(tabAdapter.tab.name)' - \(ObjectIdentifier(tabAdapter))")
+            }
+        }
+        return adapters
     }
 
     func frame(for extensionContext: WKWebExtensionContext) -> CGRect {
@@ -94,7 +139,7 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
 
 @available(macOS 15.4, *)
 final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
-    private let tab: Tab
+    internal let tab: Tab  // Changed from private to internal
     private unowned let browserManager: BrowserManager
 
     init(tab: Tab, browserManager: BrowserManager) {
@@ -103,7 +148,15 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
         super.init()
     }
 
+    private var lastMethodCall: Date = Date.distantPast
+    
     func url(for extensionContext: WKWebExtensionContext) -> URL? {
+        // Throttled logging
+        let now = Date()
+        if now.timeIntervalSince(lastMethodCall) > 5.0 {
+            print("[ExtensionTabAdapter] Methods called for tab: '\(tab.name)'")
+            lastMethodCall = now
+        }
         return tab.url
     }
 
@@ -112,7 +165,8 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
     }
 
     func isSelected(for extensionContext: WKWebExtensionContext) -> Bool {
-        return browserManager.tabManager.currentTab?.id == tab.id
+        let isActive = browserManager.tabManager.currentTab?.id == tab.id
+        return isActive
     }
 
     func indexInWindow(for extensionContext: WKWebExtensionContext) -> Int {
@@ -151,5 +205,16 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
     func close(for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
         browserManager.tabManager.removeTab(tab.id)
         completionHandler(nil)
+    }
+    
+    // MARK: - Critical Missing Method
+    
+    func window(for extensionContext: WKWebExtensionContext) -> (any WKWebExtensionWindow)? {
+        // CRITICAL: Must return the same cached window instance every time
+        let manager = ExtensionManager.shared
+        if manager.windowAdapter == nil {
+            manager.windowAdapter = ExtensionWindowAdapter(browserManager: browserManager)
+        }
+        return manager.windowAdapter!
     }
 }

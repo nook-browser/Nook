@@ -141,6 +141,12 @@ class TabManager {
         var arr = tabsBySpace[sid] ?? []
         arr.append(tab)
         setTabs(arr, for: sid)
+        
+        // Notify extension system about new tab
+        if #available(macOS 15.4, *) {
+            ExtensionManager.shared.notifyTabOpened(tab)
+        }
+        
         print("Added tab: \(tab.name) to space \(sid)")
         persistSnapshot()
     }
