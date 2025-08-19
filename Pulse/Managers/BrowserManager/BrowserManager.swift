@@ -54,11 +54,13 @@ class BrowserManager: ObservableObject {
         self.tabManager.reattachBrowserManager(self)
         loadSidebarSettings()
         
-        // Initialize native ExtensionManager
+        // Initialize native ExtensionManager and attach after all properties are initialized
         if #available(macOS 15.4, *) {
-            self.extensionManager = ExtensionManager.shared
+            let mgr = ExtensionManager.shared
+            self.extensionManager = mgr
+            mgr.attach(browserManager: self)
         }
-
+        
     }
     
     func updateSidebarWidth(_ width: CGFloat) {

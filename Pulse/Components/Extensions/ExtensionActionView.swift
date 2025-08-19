@@ -44,6 +44,8 @@ struct ExtensionActionButton: View {
                 }
             }
             .frame(width: 20, height: 20)
+            // Install an invisible anchor view for precise popup positioning
+            .background(ActionAnchorView(extensionId: ext.id))
         }
         .buttonStyle(.plain)
         .help(ext.name)
@@ -68,4 +70,23 @@ struct ExtensionActionButton: View {
 @available(macOS 15.4, *)
 #Preview {
     ExtensionActionView(extensions: [])
+}
+
+// MARK: - Anchor View for Popover Positioning
+private struct ActionAnchorView: NSViewRepresentable {
+    let extensionId: String
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        if #available(macOS 15.4, *) {
+            ExtensionManager.shared.setActionAnchor(for: extensionId, anchorView: view)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        if #available(macOS 15.4, *) {
+            ExtensionManager.shared.setActionAnchor(for: extensionId, anchorView: nsView)
+        }
+    }
 }
