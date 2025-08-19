@@ -63,6 +63,7 @@ public class Tab: NSObject, Identifiable {
     var canGoForward: Bool = false
 
     private var _webView: WKWebView?
+    var didNotifyOpenToExtensions: Bool = false
     var webView: WKWebView {
         if _webView == nil {
             setupWebView()
@@ -192,6 +193,12 @@ public class Tab: NSObject, Identifiable {
 
         print("Created WebView for tab: \(name)")
         loadURL(url)
+
+        // Inform extensions that this tab's view is now open/available
+        if #available(macOS 15.4, *), didNotifyOpenToExtensions == false {
+            ExtensionManager.shared.notifyTabOpened(self)
+            didNotifyOpenToExtensions = true
+        }
     }
 
     // MARK: - Tab Actions
@@ -335,6 +342,9 @@ public class Tab: NSObject, Identifiable {
 
     func updateTitle(_ title: String) {
         self.name = title.isEmpty ? url.host ?? "New Tab" : title
+        if #available(macOS 15.4, *) {
+            ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.title])
+        }
     }
 
     // MARK: - Favicon Logic
@@ -388,6 +398,9 @@ extension Tab: WKNavigationDelegate {
         didStartProvisionalNavigation navigation: WKNavigation!
     ) {
         loadingState = .didStartProvisionalNavigation
+        if #available(macOS 15.4, *) {
+            ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.loading])
+        }
 
         if let newURL = webView.url {
             self.url = newURL
@@ -400,9 +413,15 @@ extension Tab: WKNavigationDelegate {
         didCommit navigation: WKNavigation!
     ) {
         loadingState = .didCommit
+        if #available(macOS 15.4, *) {
+            ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.loading])
+        }
 
         if let newURL = webView.url {
             self.url = newURL
+            if #available(macOS 15.4, *) {
+                ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
+            }
         }
     }
 
@@ -412,9 +431,15 @@ extension Tab: WKNavigationDelegate {
         didFinish navigation: WKNavigation!
     ) {
         loadingState = .didFinish
+        if #available(macOS 15.4, *) {
+            ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.loading])
+        }
 
         if let newURL = webView.url {
             self.url = newURL
+            if #available(macOS 15.4, *) {
+                ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
+            }
         }
 
         webView.evaluateJavaScript("document.title") {
