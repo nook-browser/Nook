@@ -16,7 +16,7 @@ final class Persistence {
     let container: ModelContainer
     private init() {
         container = try! ModelContainer(
-            for: Schema([SpaceEntity.self,TabEntity.self, TabsStateEntity.self, HistoryEntity.self, ExtensionEntity.self, ExtensionPermissionEntity.self, ExtensionHostPermissionEntity.self])
+            for: Schema([SpaceEntity.self, TabEntity.self, TabsStateEntity.self, HistoryEntity.self, ExtensionEntity.self])
         )
     }
 }
@@ -54,9 +54,8 @@ class BrowserManager: ObservableObject {
         self.tabManager.reattachBrowserManager(self)
         loadSidebarSettings()
         
-        // Set reference for extension bridge and initialize ExtensionManager
+        // Initialize native ExtensionManager
         if #available(macOS 15.4, *) {
-            BrowserWindowManager.shared.setBrowserManager(self)
             self.extensionManager = ExtensionManager.shared
         }
 

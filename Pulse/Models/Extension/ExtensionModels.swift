@@ -2,7 +2,7 @@
 //  ExtensionModels.swift
 //  Pulse
 //
-//  Created for WKWebExtension support
+//  Simplified extension models using native WKWebExtension support
 //
 
 import Foundation
@@ -46,55 +46,6 @@ final class ExtensionEntity {
     }
 }
 
-@Model
-final class ExtensionPermissionEntity {
-    @Attribute(.unique) var id: UUID
-    var extensionId: String
-    var permission: String
-    var granted: Bool
-    var grantDate: Date?
-    
-    init(
-        id: UUID = UUID(),
-        extensionId: String,
-        permission: String,
-        granted: Bool,
-        grantDate: Date? = nil
-    ) {
-        self.id = id
-        self.extensionId = extensionId
-        self.permission = permission
-        self.granted = granted
-        self.grantDate = grantDate
-    }
-}
-
-@Model
-final class ExtensionHostPermissionEntity {
-    @Attribute(.unique) var id: UUID
-    var extensionId: String
-    var host: String
-    var granted: Bool
-    var grantDate: Date?
-    var isTemporary: Bool // For activeTab permissions
-    
-    init(
-        id: UUID = UUID(),
-        extensionId: String,
-        host: String,
-        granted: Bool,
-        grantDate: Date? = nil,
-        isTemporary: Bool = false
-    ) {
-        self.id = id
-        self.extensionId = extensionId
-        self.host = host
-        self.granted = granted
-        self.grantDate = grantDate
-        self.isTemporary = isTemporary
-    }
-}
-
 // Runtime models (not persisted)
 struct InstalledExtension {
     let id: String
@@ -121,31 +72,5 @@ struct InstalledExtension {
         self.packagePath = entity.packagePath
         self.iconPath = entity.iconPath
         self.manifest = manifest
-    }
-}
-
-struct ExtensionPermission {
-    let permission: String
-    let granted: Bool
-    let grantDate: Date?
-    
-    init(from entity: ExtensionPermissionEntity) {
-        self.permission = entity.permission
-        self.granted = entity.granted
-        self.grantDate = entity.grantDate
-    }
-}
-
-struct ExtensionHostPermission {
-    let host: String
-    let granted: Bool
-    let grantDate: Date?
-    let isTemporary: Bool
-    
-    init(from entity: ExtensionHostPermissionEntity) {
-        self.host = entity.host
-        self.granted = entity.granted
-        self.grantDate = entity.grantDate
-        self.isTemporary = entity.isTemporary
     }
 }

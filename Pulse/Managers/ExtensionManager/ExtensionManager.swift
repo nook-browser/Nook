@@ -2,23 +2,17 @@
 //  ExtensionManager.swift
 //  Pulse
 //
-//  Created for WKWebExtension support
+//  Simplified ExtensionManager using native WKWebExtension APIs
 //
 
 import Foundation
 import WebKit
 import SwiftData
 import AppKit
-import UniformTypeIdentifiers
-
-// Check if WKWebExtensionController exists in this SDK version
-#if canImport(WebKit)
-import WebKit
-#endif
 
 @available(macOS 15.4, *)
 @MainActor
-final class ExtensionManager: NSObject, ObservableObject {
+final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControllerDelegate {
     static let shared = ExtensionManager()
     
     @Published var installedExtensions: [InstalledExtension] = []
@@ -26,14 +20,6 @@ final class ExtensionManager: NSObject, ObservableObject {
     
     private var extensionController: WKWebExtensionController?
     private var extensionContexts: [String: WKWebExtensionContext] = [:]
-    // Ephemeral background-like storage per extension (can be persisted later)
-    @MainActor private var ephemeralStorage: [String: [String: Any]] = [:]
-    
-    /// Extension bridge for Chrome API compatibility
-    private let extensionBridge = ExtensionBridge.shared
-    
-    /// Storage bridges for each extension
-    private var storageBridges: [String: ExtensionStorageBridge] = [:]
     
     let context: ModelContext
     
@@ -44,7 +30,6 @@ final class ExtensionManager: NSObject, ObservableObject {
         
         if isExtensionSupportAvailable {
             setupExtensionController()
-            setupExtensionBridge()
             loadInstalledExtensions()
         }
     }
@@ -52,18 +37,9 @@ final class ExtensionManager: NSObject, ObservableObject {
     // MARK: - Setup
     
     private func setupExtensionController() {
-        guard isExtensionSupportAvailable else { return }
-        
-        // Initialize extension controller
         extensionController = WKWebExtensionController()
-        
-        print("ExtensionManager: WKWebExtensionController initialized")
-    }
-    
-    private func setupExtensionBridge() {
-        // Configure the extension bridge with this manager
-        extensionBridge.configure(with: self)
-        print("ExtensionManager: ExtensionBridge configured for Chrome API compatibility")
+        extensionController?.delegate = self
+        print("ExtensionManager: Native WKWebExtensionController initialized with delegate")
     }
     
     // MARK: - Extension Installation
@@ -94,48 +70,34 @@ final class ExtensionManager: NSObject, ObservableObject {
     }
     
     private func performInstallation(from sourceURL: URL) async throws -> InstalledExtension {
-        // Create extensions directory if it doesn't exist
         let extensionsDir = getExtensionsDirectory()
         try FileManager.default.createDirectory(at: extensionsDir, withIntermediateDirectories: true)
         
         let extensionId = ExtensionUtils.generateExtensionId()
         let destinationDir = extensionsDir.appendingPathComponent(extensionId)
         
-        // Handle both .zip files and directories
-        var manifestURL: URL
-        
+        // Handle ZIP files and directories
         if sourceURL.pathExtension.lowercased() == "zip" {
-            // Extract ZIP file
             try await extractZip(from: sourceURL, to: destinationDir)
-            manifestURL = destinationDir.appendingPathComponent("manifest.json")
         } else {
-            // Copy directory
             try FileManager.default.copyItem(at: sourceURL, to: destinationDir)
-            manifestURL = destinationDir.appendingPathComponent("manifest.json")
         }
         
-        // Validate manifest
+        // Validate manifest exists
+        let manifestURL = destinationDir.appendingPathComponent("manifest.json")
         let manifest = try ExtensionUtils.validateManifest(at: manifestURL)
         
-        // Create WKWebExtension
+        // Use native WKWebExtension for loading
         let webExtension = try await WKWebExtension(resourceBaseURL: destinationDir)
-        let context = try WKWebExtensionContext(for: webExtension)
+        let extensionContext = WKWebExtensionContext(for: webExtension)
         
-        // Store context and register with bridge
-        extensionContexts[extensionId] = context
-        extensionBridge.registerExtensionContext(context, for: extensionId)
+        // Store context
+        extensionContexts[extensionId] = extensionContext
         
-        // Create storage bridge for this extension
-        storageBridges[extensionId] = extensionBridge.bridgeStorageAPI(for: extensionId)
+        // Load with native controller
+        try extensionController?.load(extensionContext)
         
-        // Load extension context
-        do {
-            try extensionController?.load(context)
-        } catch {
-            throw ExtensionError.installationFailed("Failed to load extension context: \(error.localizedDescription)")
-        }
-        
-        // Create extension entity
+        // Create extension entity for persistence
         let entity = ExtensionEntity(
             id: extensionId,
             name: manifest["name"] as? String ?? "Unknown Extension",
@@ -151,16 +113,13 @@ final class ExtensionManager: NSObject, ObservableObject {
         self.context.insert(entity)
         try self.context.save()
         
-        // Create runtime model
         let installedExtension = InstalledExtension(from: entity, manifest: manifest)
-        
-        print("ExtensionManager: Successfully installed extension '\(installedExtension.name)' with ID: \(extensionId)")
+        print("ExtensionManager: Successfully installed extension '\(installedExtension.name)' with native WKWebExtension")
         
         return installedExtension
     }
     
     private func extractZip(from zipURL: URL, to destinationURL: URL) async throws {
-        // Use NSTask to extract zip (simple approach)
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
         task.arguments = ["-q", zipURL.path, "-d", destinationURL.path]
@@ -174,9 +133,7 @@ final class ExtensionManager: NSObject, ObservableObject {
     }
     
     private func findExtensionIcon(in directory: URL, manifest: [String: Any]) -> String? {
-        // Look for icon in manifest
         if let icons = manifest["icons"] as? [String: String] {
-            // Prefer larger icons
             for size in ["128", "64", "48", "32", "16"] {
                 if let iconPath = icons[size] {
                     let fullPath = directory.appendingPathComponent(iconPath)
@@ -187,7 +144,6 @@ final class ExtensionManager: NSObject, ObservableObject {
             }
         }
         
-        // Look for common icon files
         let commonIconNames = ["icon.png", "logo.png", "icon128.png", "icon64.png"]
         for iconName in commonIconNames {
             let iconURL = directory.appendingPathComponent(iconName)
@@ -206,11 +162,10 @@ final class ExtensionManager: NSObject, ObservableObject {
         
         do {
             try extensionController?.load(context)
+            updateExtensionEnabled(extensionId, enabled: true)
         } catch {
             print("ExtensionManager: Failed to enable extension: \(error.localizedDescription)")
         }
-        
-        updateExtensionEnabled(extensionId, enabled: true)
     }
     
     func disableExtension(_ extensionId: String) {
@@ -218,14 +173,13 @@ final class ExtensionManager: NSObject, ObservableObject {
         
         do {
             try extensionController?.unload(context)
+            updateExtensionEnabled(extensionId, enabled: false)
         } catch {
             print("ExtensionManager: Failed to disable extension: \(error.localizedDescription)")
         }
-        updateExtensionEnabled(extensionId, enabled: false)
     }
     
     func uninstallExtension(_ extensionId: String) {
-        // Remove from controller and bridge
         if let context = extensionContexts[extensionId] {
             do {
                 try extensionController?.unload(context)
@@ -233,27 +187,20 @@ final class ExtensionManager: NSObject, ObservableObject {
                 print("ExtensionManager: Failed to unload extension context: \(error.localizedDescription)")
             }
             extensionContexts.removeValue(forKey: extensionId)
-            extensionBridge.unregisterExtensionContext(for: extensionId)
-            storageBridges.removeValue(forKey: extensionId)
         }
         
-        // Remove from database
+        // Remove from database and filesystem
         do {
             let predicate = #Predicate<ExtensionEntity> { $0.id == extensionId }
             let entities = try self.context.fetch(FetchDescriptor<ExtensionEntity>(predicate: predicate))
             
             for entity in entities {
-                // Remove files
                 let packageURL = URL(fileURLWithPath: entity.packagePath)
                 try? FileManager.default.removeItem(at: packageURL)
-                
-                // Remove from database
                 self.context.delete(entity)
             }
             
             try self.context.save()
-            
-            // Update UI
             installedExtensions.removeAll { $0.id == extensionId }
             
         } catch {
@@ -297,10 +244,8 @@ final class ExtensionManager: NSObject, ObservableObject {
                 switch result {
                 case .success(let ext):
                     print("Successfully installed extension: \(ext.name)")
-                    // Show success alert if needed
                 case .failure(let error):
                     print("Failed to install extension: \(error.localizedDescription)")
-                    // Show error alert
                     self.showErrorAlert(error)
                 }
             }
@@ -324,7 +269,6 @@ final class ExtensionManager: NSObject, ObservableObject {
             var loadedExtensions: [InstalledExtension] = []
             
             for entity in entities {
-                // Try to load manifest
                 let manifestURL = URL(fileURLWithPath: entity.packagePath).appendingPathComponent("manifest.json")
                 
                 do {
@@ -332,23 +276,15 @@ final class ExtensionManager: NSObject, ObservableObject {
                     let installedExtension = InstalledExtension(from: entity, manifest: manifest)
                     loadedExtensions.append(installedExtension)
                     
-                    // Recreate WKWebExtension if enabled
+                    // Recreate native extension if enabled
                     if entity.isEnabled {
                         Task {
                             do {
                                 let webExtension = try await WKWebExtension(resourceBaseURL: URL(fileURLWithPath: entity.packagePath))
-                                let webContext = try WKWebExtensionContext(for: webExtension)
+                                let extensionContext = WKWebExtensionContext(for: webExtension)
                                 
-                                extensionContexts[entity.id] = webContext
-                                extensionBridge.registerExtensionContext(webContext, for: entity.id)
-                                
-                                // Create storage bridge for this extension
-                                storageBridges[entity.id] = extensionBridge.bridgeStorageAPI(for: entity.id)
-                                do {
-                                    try extensionController?.load(webContext)
-                                } catch {
-                                    print("ExtensionManager: Failed to load extension context on startup: \(error.localizedDescription)")
-                                }
+                                extensionContexts[entity.id] = extensionContext
+                                try extensionController?.load(extensionContext)
                             } catch {
                                 print("ExtensionManager: Failed to reload extension '\(entity.name)': \(error)")
                             }
@@ -361,7 +297,7 @@ final class ExtensionManager: NSObject, ObservableObject {
             }
             
             self.installedExtensions = loadedExtensions
-            print("ExtensionManager: Loaded \(loadedExtensions.count) extensions")
+            print("ExtensionManager: Loaded \(loadedExtensions.count) extensions using native WKWebExtension")
             
         } catch {
             print("ExtensionManager: Failed to load installed extensions: \(error)")
@@ -373,325 +309,48 @@ final class ExtensionManager: NSObject, ObservableObject {
         return appSupport.appendingPathComponent("Pulse").appendingPathComponent("Extensions")
     }
     
-    // MARK: - Storage Bridge Access
+    // MARK: - Native Extension Access
     
-    /// Get the storage bridge for a specific extension
-    func getStorageBridge(for extensionId: String) -> ExtensionStorageBridge? {
-        return storageBridges[extensionId]
+    /// Get the native WKWebExtensionContext for an extension
+    func getExtensionContext(for extensionId: String) -> WKWebExtensionContext? {
+        return extensionContexts[extensionId]
     }
     
-    /// Create a storage bridge for an extension if it doesn't exist
-    func createStorageBridge(for extensionId: String) -> ExtensionStorageBridge {
-        if let existingBridge = storageBridges[extensionId] {
-            return existingBridge
-        }
+    /// Get the native WKWebExtensionController
+    var nativeController: WKWebExtensionController? {
+        return extensionController
+    }
+    
+    // MARK: - WKWebExtensionControllerDelegate
+    
+    func webExtensionController(_ controller: WKWebExtensionController, presentActionPopup action: WKWebExtension.Action, for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
+        print("🎉 DELEGATE: Extension wants to present popup!")
+        print("   Action: \(action)")
+        print("   Extension: \(extensionContext.webExtension.displayName ?? "Unknown")")
         
-        let bridge = extensionBridge.bridgeStorageAPI(for: extensionId)
-        storageBridges[extensionId] = bridge
-        return bridge
-    }
-}
-
-// MARK: - Runtime Bridge (Popup -> Manager)
-@available(macOS 15.4, *)
-extension ExtensionManager {
-    /// Handle runtime-like messages from popup UI and return a response.
-    /// This simulates a lightweight background script environment.
-    @MainActor
-    func handlePopupRuntimeMessage(extensionId: String, message: Any?) -> Any {
-        guard let obj = message as? [String: Any], let what = obj["what"] as? String else {
-            return ["success": true]
-        }
-
-        switch what {
-        case "getPopupData":
-            let hostUrlScheme: (String, String, String) = {
-                if let bm = BrowserWindowManager.shared.browserManager,
-                   let tab = bm.tabManager.currentTab {
-                    return (tab.url.host ?? "example.com", tab.url.absoluteString, tab.url.scheme ?? "https")
-                }
-                return ("example.com", "https://example.com", "https")
-            }()
-            let host = hostUrlScheme.0
-            let urlStr = hostUrlScheme.1
-            let scheme = hostUrlScheme.2
-            let parts = host.split(separator: ".")
-            let rootHostname = parts.count >= 2 ? parts.suffix(2).joined(separator: ".") : host
-            let origin = scheme + "://" + host
-            return [
-                "hostname": host,
-                "rootHostname": rootHostname,
-                "origin": origin,
-                "pageURL": urlStr,
-                "tabId": 1,
-                "level": 2,
-                "autoReload": true,
-                "dynamicFilteringEnabled": true,
-                "cosmeticFilteringEnabled": true,
-                "netFilteringSwitch": true,
-                "isLargeMediaBlocked": false,
-                "firewallRules": [:] as [String: Any],
-                "disabledFeatures": []
-            ]
-
-        case "setFilteringMode":
-            return obj["level"] as? Int ?? 2
-
-        case "setPendingFilteringMode":
-            return ["success": true]
-
-        case "storageGet":
-            let keys = obj["keys"]
-            let result = storageLocalGet(extensionId: extensionId, keys: keys)
-            print("ExtensionManager: storageGet for \(extensionId), keys: \(String(describing: keys)), result: \(result)")
-            return result
-
-        case "storageSet":
-            if let items = obj["items"] as? [String: Any] {
-                print("ExtensionManager: storageSet for \(extensionId), items: \(items)")
-                storageLocalSet(extensionId: extensionId, items: items)
-                
-                // Notify storage bridge of changes
-                if let storageBridge = storageBridges[extensionId] {
-                    let changes = items.mapValues { value in
-                        ["newValue": value]
-                    }
-                    extensionBridge.notifyStorageChange(extensionId: extensionId, changes: changes, area: "local")
-                }
-            }
-            return ["success": true]
-
-        case "storageRemove":
-            let keys = obj["keys"]
-            let oldData = storageLocalGet(extensionId: extensionId, keys: keys)
-            storageLocalRemove(extensionId: extensionId, keys: keys)
+        // Get the native popover from the action
+        if let popover = action.popupPopover {
+            print("✅ DELEGATE: Native popover available - presenting!")
             
-            // Notify storage bridge of removals
-            if let storageBridge = storageBridges[extensionId] {
-                let changes = oldData.mapValues { value in
-                    ["oldValue": value]
-                }
-                extensionBridge.notifyStorageChange(extensionId: extensionId, changes: changes, area: "local")
-            }
-            return ["success": true]
-
-        case "storageClear":
-            let oldData = storageLocalGet(extensionId: extensionId, keys: nil)
-            storageLocalClear(extensionId: extensionId)
-            
-            // Notify storage bridge of clear
-            if let storageBridge = storageBridges[extensionId] {
-                let changes = oldData.mapValues { value in
-                    ["oldValue": value]
-                }
-                extensionBridge.notifyStorageChange(extensionId: extensionId, changes: changes, area: "local")
-            }
-            return ["success": true]
-
-        default:
-            return ["success": true]
-        }
-    }
-
-    // MARK: Storage helpers
-    @MainActor
-    private func storageLocalGet(extensionId: String, keys: Any?) -> [String: Any] {
-        var out: [String: Any] = [:]
-        do {
-            let predicate = #Predicate<ExtensionStorageEntity> { $0.extensionId == extensionId }
-            let all = try context.fetch(FetchDescriptor<ExtensionStorageEntity>(predicate: predicate))
-            let map: [String: ExtensionStorageEntity] = Dictionary(uniqueKeysWithValues: all.map { ($0.key, $0) })
-            if keys == nil {
-                for (k, v) in map { if let obj = try? JSONSerialization.jsonObject(with: v.valueData) { out[k] = obj } }
-                return out
-            }
-            if let arr = keys as? [String] {
-                for k in arr { if let e = map[k], let obj = try? JSONSerialization.jsonObject(with: e.valueData) { out[k] = obj } else { out[k] = NSNull() } }
-                return out
-            }
-            if let s = keys as? String {
-                if let e = map[s], let obj = try? JSONSerialization.jsonObject(with: e.valueData) { out[s] = obj } else { out[s] = NSNull() }
-                return out
-            }
-            if let def = keys as? [String: Any] {
-                for (k, v) in def {
-                    if let e = map[k], let obj = try? JSONSerialization.jsonObject(with: e.valueData) { out[k] = obj } else { out[k] = v }
-                }
-                return out
-            }
-        } catch {
-            print("ExtensionManager: storageLocalGet error: \(error)")
-        }
-        return out
-    }
-
-    @MainActor
-    private func storageLocalSet(extensionId: String, items: [String: Any]) {
-        do {
-            var changes: [String: [String: Any]] = [:]
-            // capture old values and apply new ones
-            for (k, v) in items {
-                let predicate = #Predicate<ExtensionStorageEntity> { $0.extensionId == extensionId && $0.key == k }
-                let existing = try context.fetch(FetchDescriptor<ExtensionStorageEntity>(predicate: predicate))
-                var oldVal: Any? = nil
-                if let e = existing.first, let obj = try? JSONSerialization.jsonObject(with: e.valueData) { oldVal = obj }
-                let data = try JSONSerialization.data(withJSONObject: v)
-                if let ent = existing.first {
-                    ent.valueData = data
-                    ent.updatedAt = Date()
+            // Show the popover
+            DispatchQueue.main.async {
+                if let window = NSApp.mainWindow,
+                   let contentView = window.contentView {
+                    
+                    // Find a better position for the popover - maybe relative to the toolbar
+                    let buttonRect = CGRect(x: 100, y: window.frame.height - 100, width: 20, height: 20)
+                    popover.show(relativeTo: buttonRect, of: contentView, preferredEdge: .minY)
+                    
+                    // Complete successfully
+                    completionHandler(nil)
                 } else {
-                    let ent = ExtensionStorageEntity(extensionId: extensionId, key: k, valueData: data)
-                    context.insert(ent)
+                    print("❌ DELEGATE: No window/contentView available")
+                    completionHandler(NSError(domain: "ExtensionManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "No window available"]))
                 }
-                var delta: [String: Any] = [:]
-                if let oldVal = oldVal { delta["oldValue"] = oldVal }
-                delta["newValue"] = v
-                changes[k] = delta
             }
-            try context.save()
-            broadcastStorageChanged(extensionId: extensionId, changes: changes)
-        } catch {
-            print("ExtensionManager: storageLocalSet error: \(error)")
-        }
-    }
-
-    @MainActor
-    private func storageLocalRemove(extensionId: String, keys: Any?) {
-        do {
-            var changes: [String: [String: Any]] = [:]
-            var keyList: [String] = []
-            if let arr = keys as? [String] { keyList = arr }
-            else if let s = keys as? String { keyList = [s] }
-            guard !keyList.isEmpty else { return }
-            let predicate = #Predicate<ExtensionStorageEntity> { $0.extensionId == extensionId && keyList.contains($0.key) }
-            let entities = try context.fetch(FetchDescriptor<ExtensionStorageEntity>(predicate: predicate))
-            for e in entities {
-                if let obj = try? JSONSerialization.jsonObject(with: e.valueData) { changes[e.key] = ["oldValue": obj] }
-                context.delete(e)
-            }
-            try context.save()
-            broadcastStorageChanged(extensionId: extensionId, changes: changes)
-        } catch {
-            print("ExtensionManager: storageLocalRemove error: \(error)")
-        }
-    }
-
-    @MainActor
-    private func storageLocalClear(extensionId: String) {
-        do {
-            var changes: [String: [String: Any]] = [:]
-            let predicate = #Predicate<ExtensionStorageEntity> { $0.extensionId == extensionId }
-            let entities = try context.fetch(FetchDescriptor<ExtensionStorageEntity>(predicate: predicate))
-            for e in entities {
-                if let obj = try? JSONSerialization.jsonObject(with: e.valueData) { changes[e.key] = ["oldValue": obj] }
-                context.delete(e)
-            }
-            try context.save()
-            broadcastStorageChanged(extensionId: extensionId, changes: changes)
-        } catch {
-            print("ExtensionManager: storageLocalClear error: \(error)")
-        }
-    }
-
-    @MainActor
-    private func broadcastStorageChanged(extensionId: String, changes: [String: [String: Any]]) {
-        guard let bm = BrowserWindowManager.shared.browserManager else { return }
-        func eval(_ webView: WKWebView) {
-            if let data = try? JSONSerialization.data(withJSONObject: changes), let json = String(data: data, encoding: .utf8) {
-                let js = "try { window.__pulseStorageChanged && window.__pulseStorageChanged(\(json), 'local'); } catch(e) {}"
-                webView.evaluateJavaScript(js, completionHandler: nil)
-            }
-        }
-        for tab in bm.tabManager.pinnedTabs { eval(tab.webView) }
-        for tab in bm.tabManager.tabs { eval(tab.webView) }
-    }
-}
-
-// MARK: - Permission Management
-@available(macOS 15.4, *)
-extension ExtensionManager {
-    
-    func requestPermissions(for extensionId: String, permissions: [String], hostPermissions: [String]) -> (Set<String>, Set<String>) {
-        // For now, auto-grant safe permissions during development
-        // In production, this would show the permission UI
-        
-        let safePermissions: Set<String> = ["storage", "activeTab"]
-        let grantedPermissions = Set(permissions.filter { safePermissions.contains($0) })
-        
-        // Store granted permissions
-        for permission in grantedPermissions {
-            storePermission(extensionId: extensionId, permission: permission, granted: true)
-        }
-        
-        // For development, allow localhost and common dev domains
-        let devHostPermissions: Set<String> = hostPermissions.filter { host in
-            host.contains("localhost") || host.contains("127.0.0.1") || host.contains("github.com")
-        }.reduce(into: Set<String>()) { result, host in
-            result.insert(host)
-        }
-        
-        for host in devHostPermissions {
-            storeHostPermission(extensionId: extensionId, host: host, granted: true)
-        }
-        
-        return (grantedPermissions, devHostPermissions)
-    }
-    
-    func showPermissionDialog(extensionName: String, permissions: [String], hostPermissions: [String], completion: @escaping (Set<String>, Set<String>) -> Void) {
-        // This would show the permission UI dialog
-        // For now, we'll use the auto-grant logic above
-        let (grantedPerms, grantedHosts) = requestPermissions(for: "", permissions: permissions, hostPermissions: hostPermissions)
-        completion(grantedPerms, grantedHosts)
-    }
-    
-    private func storePermission(extensionId: String, permission: String, granted: Bool) {
-        let permissionEntity = ExtensionPermissionEntity(
-            extensionId: extensionId,
-            permission: permission,
-            granted: granted,
-            grantDate: granted ? Date() : nil
-        )
-        
-        self.context.insert(permissionEntity)
-        try? self.context.save()
-    }
-    
-    func storeHostPermission(extensionId: String, host: String, granted: Bool, isTemporary: Bool = false) {
-        let hostPermissionEntity = ExtensionHostPermissionEntity(
-            extensionId: extensionId,
-            host: host,
-            granted: granted,
-            grantDate: granted ? Date() : nil,
-            isTemporary: isTemporary
-        )
-        
-        self.context.insert(hostPermissionEntity)
-        try? self.context.save()
-    }
-    
-    func getGrantedPermissions(for extensionId: String) -> [String] {
-        do {
-            let predicate = #Predicate<ExtensionPermissionEntity> { 
-                $0.extensionId == extensionId && $0.granted == true 
-            }
-            let permissions = try self.context.fetch(FetchDescriptor<ExtensionPermissionEntity>(predicate: predicate))
-            return permissions.map { $0.permission }
-        } catch {
-            print("ExtensionManager: Failed to fetch permissions: \(error)")
-            return []
-        }
-    }
-    
-    func getGrantedHostPermissions(for extensionId: String) -> [String] {
-        do {
-            let predicate = #Predicate<ExtensionHostPermissionEntity> { 
-                $0.extensionId == extensionId && $0.granted == true 
-            }
-            let hostPermissions = try self.context.fetch(FetchDescriptor<ExtensionHostPermissionEntity>(predicate: predicate))
-            return hostPermissions.map { $0.host }
-        } catch {
-            print("ExtensionManager: Failed to fetch host permissions: \(error)")
-            return []
+        } else {
+            print("❌ DELEGATE: No popover available on action")
+            completionHandler(NSError(domain: "ExtensionManager", code: 2, userInfo: [NSLocalizedDescriptionKey: "No popover available"]))
         }
     }
 }
