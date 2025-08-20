@@ -44,7 +44,7 @@ class BrowserManager: ObservableObject {
     init() {
         self.modelContext = Persistence.shared.container.mainContext
         // Prepare native ExtensionManager reference early; defer attach until after init completes.
-        if #available(macOS 15.4, *) {
+        if #available(macOS 15.5, *) {
             let mgr = ExtensionManager.shared
             self.extensionManager = mgr
         }
@@ -57,13 +57,13 @@ class BrowserManager: ObservableObject {
         self.cookieManager = CookieManager()
         self.cacheManager = CacheManager()
         self.tabManager.browserManager = self
-        self.tabManager.reattachBrowserManager(self)
-        loadSidebarSettings()
-
-        // Now safe to use `self` in method calls.
-        if #available(macOS 15.4, *), let mgr = self.extensionManager {
+        // Attach extension manager BEFORE any WKWebView is created so content scripts can inject
+        if #available(macOS 15.5, *), let mgr = self.extensionManager {
             mgr.attach(browserManager: self)
         }
+
+        self.tabManager.reattachBrowserManager(self)
+        loadSidebarSettings()
         
     }
     
@@ -290,13 +290,13 @@ class BrowserManager: ObservableObject {
     // MARK: - Extension Management
     
     func showExtensionInstallDialog() {
-        if #available(macOS 15.4, *) {
+        if #available(macOS 15.5, *) {
             extensionManager?.showExtensionInstallDialog()
         } else {
             // Show unsupported OS alert
             let alert = NSAlert()
             alert.messageText = "Extensions Not Supported"
-            alert.informativeText = "Extensions require macOS 15.4 or later."
+            alert.informativeText = "Extensions require macOS 15.5 or later."
             alert.alertStyle = .informational
             alert.addButton(withTitle: "OK")
             alert.runModal()
@@ -304,19 +304,19 @@ class BrowserManager: ObservableObject {
     }
     
     func enableExtension(_ extensionId: String) {
-        if #available(macOS 15.4, *) {
+        if #available(macOS 15.5, *) {
             extensionManager?.enableExtension(extensionId)
         }
     }
     
     func disableExtension(_ extensionId: String) {
-        if #available(macOS 15.4, *) {
+        if #available(macOS 15.5, *) {
             extensionManager?.disableExtension(extensionId)
         }
     }
     
     func uninstallExtension(_ extensionId: String) {
-        if #available(macOS 15.4, *) {
+        if #available(macOS 15.5, *) {
             extensionManager?.uninstallExtension(extensionId)
         }
     }

@@ -166,7 +166,7 @@ struct ExtensionsSettingsView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            if #available(macOS 15.4, *) {
+            if #available(macOS 15.5, *) {
                 if let extensionManager = browserManager.extensionManager {
                     // Extension management UI
                     HStack {
@@ -227,7 +227,7 @@ struct ExtensionsSettingsView: View {
                     Text("Extensions Not Supported")
                         .font(.title2)
                         .fontWeight(.medium)
-                    Text("Extensions require macOS 15.4 or later")
+                    Text("Extensions require macOS 15.5 or later")
                         .foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
