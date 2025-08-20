@@ -37,7 +37,7 @@ struct URLBarView: View {
                     Spacer()
                     
                     // Extension action buttons
-                    if #available(macOS 15.4, *),
+                    if #available(macOS 15.5, *),
                        let extensionManager = browserManager.extensionManager {
                         ExtensionActionView(extensions: extensionManager.installedExtensions)
                             .environmentObject(browserManager)
