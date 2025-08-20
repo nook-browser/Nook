@@ -231,10 +231,18 @@ class TabManager {
         in space: Space? = nil
     ) -> Tab {
         let engine = browserManager?.settingsManager.searchEngine ?? .google
-        guard let validURL = URL(string: normalizeURL(url, provider: engine))
+        let normalizedUrl = normalizeURL(url, provider: engine)
+        guard let validURL = URL(string: normalizedUrl)
         else {
             print("Invalid URL: \(url). Falling back to default.")
             return createNewTab(in: space)
+        }
+        
+        // Debug webkit-extension URLs
+        if normalizedUrl.contains("webkit-extension://") {
+            print("🔧 [TabManager] Creating tab with webkit-extension URL: \(normalizedUrl)")
+            print("   Original URL: \(url)")
+            print("   Normalized URL: \(normalizedUrl)")
         }
         let targetSpace = space ?? currentSpace
         let sid = targetSpace?.id
