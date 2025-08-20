@@ -24,6 +24,8 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     private var actionAnchors: [String: [WeakAnchor]] = [:]
     // Map extension UUID (from webkit-extension://<uuid>/...) to target tab adapter for popup-initiated host injections
     private var popupTargetTabs: [String: ExtensionTabAdapter] = [:]
+    // Track active popovers keyed by extension UUID (webkit-extension://<uuid>/)
+    private var activePopoversByHost: [String: NSPopover] = [:]
     // Stable adapters for tabs/windows used when notifying controller events
     private var tabAdapters: [UUID: ExtensionTabAdapter] = [:]
     internal var windowAdapter: ExtensionWindowAdapter?
@@ -1340,6 +1342,64 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             webView.configuration.userContentController.removeScriptMessageHandler(forName: "pulseDiag")
             webView.configuration.userContentController.add(self, name: "pulseDiag")
 
+            // Install a light ResizeObserver to autosize the popover to content
+            let resizeScript = """
+            (function(){
+              try {
+                const post = (label, payload) => { try { webkit.messageHandlers.pulseDiag.postMessage({label, payload, phase:'resize'}); } catch(_){} };
+                const measure = () => {
+                  const d=document, e=d.documentElement, b=d.body;
+                  const w = Math.ceil(Math.max(e.scrollWidth, b?b.scrollWidth:0, e.clientWidth));
+                  const h = Math.ceil(Math.max(e.scrollHeight, b?b.scrollHeight:0, e.clientHeight));
+                  post('popupSize', {w, h});
+                };
+                new ResizeObserver(measure).observe(document.documentElement);
+                window.addEventListener('load', measure);
+                setTimeout(measure, 50); setTimeout(measure, 250); setTimeout(measure, 800);
+              } catch(_){}
+            })();
+            """
+            let user = WKUserScript(source: resizeScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+            webView.configuration.userContentController.addUserScript(user)
+
+            // Minimal polyfills for Chromium-only APIs some extensions feature-detect
+            let polyfillScript = """
+            (function(){
+              try {
+                // Ensure chrome namespace exists
+                window.chrome = window.chrome || {};
+
+                // identity: Safari doesn't support it; recommend opening OAuth in a new tab.
+                if (typeof window.chrome.identity === 'undefined') {
+                  window.chrome.identity = {
+                    launchWebAuthFlow: function(details, callback){
+                      try {
+                        var url = details && details.url ? details.url : null;
+                        var interactive = !!(details && details.interactive);
+                        if (url && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.pulseIdentity) {
+                          window.webkit.messageHandlers.pulseIdentity.postMessage({ url: url, interactive: interactive });
+                        }
+                      } catch(_){}
+                      // Resolve immediately with null to unblock code paths that only check for existence
+                      try { if (typeof callback === 'function') callback(null); } catch(_){}
+                      return Promise.resolve(null);
+                    }
+                  };
+                }
+
+                // webRequestAuthProvider: Chromium-only, define no-op to satisfy feature checks
+                if (typeof window.chrome.webRequestAuthProvider === 'undefined') {
+                  window.chrome.webRequestAuthProvider = {
+                    addListener: function(){},
+                    removeListener: function(){}
+                  };
+                }
+              } catch(_){}
+            })();
+            """
+            let polyfill = WKUserScript(source: polyfillScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
+            webView.configuration.userContentController.addUserScript(polyfill)
+
             // Remember which tab this popup should target for host fallbacks
             if let host = webView.url?.host {
                 // Prefer the action's associated tab if provided; otherwise use the current active tab
@@ -1699,6 +1759,10 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         // Present the popover on main thread
         DispatchQueue.main.async {
             let targetWindow = NSApp.keyWindow ?? NSApp.mainWindow
+            // Remember this popover for autosizing based on popup webView host UUID
+            if let host = action.popupWebView?.url?.host {
+                self.activePopoversByHost[host] = popover
+            }
             
             // Try to use registered anchor for this extension
             if let extId = self.extensionContexts.first(where: { $0.value === extensionContext })?.key,
@@ -1766,14 +1830,41 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             }
             return
         }
+        if message.name == "pulseIdentity" {
+            // Open OAuth in a new tab per Apple's guidance for Safari
+            if let dict = message.body as? [String: Any], let urlString = dict["url"] as? String, let url = URL(string: urlString) {
+                if let bm = browserManagerRef {
+                    let space = bm.tabManager.currentSpace
+                    _ = bm.tabManager.createNewTab(url: url.absoluteString, in: space)
+                }
+            }
+            return
+        }
         if message.name == "pulseDiag" {
-            // Verbose diagnostics from popup — print sanitized summary
-            if let dict = message.body as? [String: Any] {
-                let phase = dict["phase"] as? String ?? "?"
-                let label = dict["label"] as? String ?? "?"
-                print("[Diag] phase=\(phase) label=\(label) payload=\(dict)")
+            // Handle autosize and diagnostics from popup
+            guard let dict = message.body as? [String: Any] else { print("[Diag] Non-dictionary payload received"); return }
+            let label = dict["label"] as? String ?? "?"
+            if label == "popupSize" {
+                if let payload = dict["payload"] as? [String: Any] {
+                    let w = (payload["w"] as? NSNumber)?.doubleValue ?? 0
+                    let h = (payload["h"] as? NSNumber)?.doubleValue ?? 0
+                    if w > 0 && h > 0 {
+                        // Clamp to reasonable bounds
+                        let cw = max(280.0, min(w, 700.0))
+                        let ch = max(120.0, min(h, 800.0))
+                        if let host = message.webView?.url?.host, let pop = activePopoversByHost[host] {
+                            // Update content size on main thread
+                            DispatchQueue.main.async {
+                                if pop.contentSize != NSSize(width: cw, height: ch) {
+                                    pop.contentSize = NSSize(width: cw, height: ch)
+                                }
+                            }
+                        }
+                    }
+                }
             } else {
-                print("[Diag] Non-dictionary payload received")
+                let phase = dict["phase"] as? String ?? "?"
+                print("[Diag] phase=\(phase) label=\(label) payload=\(dict)")
             }
             return
         }
@@ -1861,6 +1952,39 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                 print("[Popup] comprehensive probe: unexpected result type")
                 PopupConsole.shared.log("[Warning] Probe returned unexpected result")
             }
+        }
+
+        // Patch scripting.executeScript in popup context to avoid hard failures on unsupported targets
+        let safeScriptingPatch = """
+        (function(){
+          try {
+            if (typeof chrome !== 'undefined' && chrome.scripting && typeof chrome.scripting.executeScript === 'function') {
+              const originalExec = chrome.scripting.executeScript.bind(chrome.scripting);
+              chrome.scripting.executeScript = async function(opts){
+                try { return await originalExec(opts); }
+                catch (e) { console.warn('shim: executeScript failed', e); return []; }
+              };
+            }
+            if (typeof chrome !== 'undefined' && (!chrome.tabs || typeof chrome.tabs.executeScript !== 'function') && chrome.scripting && typeof chrome.scripting.executeScript === 'function') {
+              chrome.tabs = chrome.tabs || {};
+              chrome.tabs.executeScript = function(tabIdOrDetails, detailsOrCb, maybeCb){
+                function normalize(a,b,c){ let tabId, details, cb; if (typeof a==='number'){ tabId=a; details=b; cb=c; } else { details=a; cb=b; } return {tabId, details: details||{}, cb: (typeof cb==='function')?cb:null}; }
+                const { tabId, details, cb } = normalize(tabIdOrDetails, detailsOrCb, maybeCb);
+                const target = { tabId: tabId||undefined };
+                const files = details && (details.file ? [details.file] : details.files);
+                const code = details && details.code;
+                const opts = { target };
+                if (Array.isArray(files) && files.length) opts.files = files; else if (typeof code==='string') { opts.func = function(src){ try{(0,eval)(src);}catch(e){}}; opts.args=[code]; } else { const p = Promise.resolve([]); if (cb) { try{cb([]);}catch(_){} } return p; }
+                const p = chrome.scripting.executeScript(opts);
+                if (cb) { p.then(r=>{ try{cb(r);}catch(_){} }).catch(_=>{ try{cb([]);}catch(_){} }); }
+                return p;
+              };
+            }
+          } catch(_){}
+        })();
+        """
+        webView.evaluateJavaScript(safeScriptingPatch) { _, err in
+            if let err = err { print("[Popup] safeScriptingPatch error: \(err.localizedDescription)") }
         }
         
         // Note: Skipping automatic tabs.query test to avoid potential recursion issues
@@ -2052,6 +2176,44 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         bm.tabManager.setActiveSpace(newSpace)
         completionHandler(nil)
     }
+
+    // Open the extension's options page in a new tab
+    @available(macOS 15.5, *)
+    func webExtensionController(
+        _ controller: WKWebExtensionController,
+        openOptionsPageFor extensionContext: WKWebExtensionContext,
+        completionHandler: @escaping (Error?) -> Void
+    ) {
+        guard let bm = browserManagerRef else { completionHandler(nil); return }
+        // Prefer SDK-provided URL if available; otherwise compute from manifest
+        if let url = (extensionContext as AnyObject).value(forKey: "optionsPageURL") as? URL ?? self.computeOptionsPageURL(for: extensionContext) {
+            let space = bm.tabManager.currentSpace
+            _ = bm.tabManager.createNewTab(url: url.absoluteString, in: space)
+        }
+        completionHandler(nil)
+    }
+
+    // Resolve options page URL from manifest as a fallback for SDKs that don't expose optionsPageURL
+    @available(macOS 15.5, *)
+    private func computeOptionsPageURL(for context: WKWebExtensionContext) -> URL? {
+        // Try to map the context back to our InstalledExtension via dictionary identity
+        if let extId = extensionContexts.first(where: { $0.value === context })?.key,
+           let inst = installedExtensions.first(where: { $0.id == extId }) {
+            // MV3/MV2: options_ui.page; MV2 legacy: options_page
+            var pagePath: String?
+            if let options = inst.manifest["options_ui"] as? [String: Any], let p = options["page"] as? String, !p.isEmpty {
+                pagePath = p
+            } else if let p = inst.manifest["options_page"] as? String, !p.isEmpty {
+                pagePath = p
+            }
+            if let page = pagePath {
+                let host = context.uniqueIdentifier
+                let urlString = "webkit-extension://\(host)/\(page)"
+                return URL(string: urlString)
+            }
+        }
+        return nil
+    }
     @available(macOS 15.5, *)
     func webExtensionController(
         _ controller: WKWebExtensionController,
@@ -2081,6 +2243,21 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                 completionHandler(nil)
             }
         )
+    }
+
+    // URL-specific access prompts (used for cross-origin network requests from extension contexts)
+    @available(macOS 15.5, *)
+    func webExtensionController(
+        _ controller: WKWebExtensionController,
+        promptForPermissionToAccess urls: Set<URL>,
+        in tab: (any WKWebExtensionTab)? ,
+        for extensionContext: WKWebExtensionContext,
+        completionHandler: @escaping (Set<URL>, Date?) -> Void
+    ) {
+        // Temporarily grant all requested URLs to unblock background networking for popular extensions
+        // TODO: replace with a user-facing prompt + persistence
+        print("[ExtensionManager] Granting URL access to: \(urls.map{ $0.absoluteString })")
+        completionHandler(urls, nil)
     }
 }
 

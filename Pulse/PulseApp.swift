@@ -185,6 +185,13 @@ struct PulseCommands: Commands {
                 // Open settings to extensions tab
                 openWindow(id: "settings")
             }
+
+            if #available(macOS 15.5, *) {
+                Divider()
+                Button("Open Popup Console") {
+                    browserManager.extensionManager?.showPopupConsole()
+                }
+            }
         }
     }
 }

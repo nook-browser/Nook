@@ -197,6 +197,11 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
         return false
     }
 
+    // Critical: provide the actual WKWebView so scripting.executeScript can target this tab
+    func webView(for extensionContext: WKWebExtensionContext) -> WKWebView? {
+        return tab.webView
+    }
+
     func activate(for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
         browserManager.tabManager.setActiveTab(tab)
         completionHandler(nil)

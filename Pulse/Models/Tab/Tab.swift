@@ -155,7 +155,6 @@ public class Tab: NSObject, Identifiable {
     }
 
     // MARK: - WebView Setup
-    private static var didInjectStorageSinkScript = false
 
     private func setupWebView() {
         // Use the shared configuration for cookie/session sharing
@@ -182,13 +181,7 @@ public class Tab: NSObject, Identifiable {
                 .isFraudulentWebsiteWarningEnabled = true
             webView.configuration.preferences
                 .javaScriptCanOpenWindowsAutomatically = true
-            // Inject storage.onChanged sink once, and use runtime JS for download helpers
-            if !Tab.didInjectStorageSinkScript {
-                injectStorageChangeSink(to: webView)
-                Tab.didInjectStorageSinkScript = true
-            }
-
-            injectDownloadJavaScript(to: webView)
+            // No ad-hoc page script injection here; rely on WKWebExtension
         }
 
         print("Created WebView for tab: \(name)")
@@ -239,93 +232,7 @@ public class Tab: NSObject, Identifiable {
         loadURL(newURL)
     }
     
-    // MARK: - JavaScript Injection
-    private func injectDownloadJavaScript(to webView: WKWebView) {
-        let downloadScript = """
-        (function() {
-            // Override click handlers for download links
-            document.addEventListener('click', function(e) {
-                var target = e.target;
-                while (target && target !== document) {
-                    if (target.tagName === 'A' && target.href) {
-                        var href = target.href.toLowerCase();
-                        var downloadExtensions = ['zip', 'rar', '7z', 'tar', 'gz', 'pdf', 'doc', 'docx', 'mp4', 'mp3', 'exe', 'dmg'];
-                        
-                        for (var i = 0; i < downloadExtensions.length; i++) {
-                            if (href.indexOf('.' + downloadExtensions[i]) !== -1) {
-                                // Force download by creating a new link
-                                var link = document.createElement('a');
-                                link.href = target.href;
-                                link.download = target.download || target.href.split('/').pop();
-                                link.style.display = 'none';
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                                e.preventDefault();
-                                e.stopPropagation();
-                                return false;
-                            }
-                        }
-                    }
-                    target = target.parentElement;
-                }
-            }, true);
-            
-            // Override window.open for download links
-            var originalOpen = window.open;
-            window.open = function(url, name, features) {
-                if (url && typeof url === 'string') {
-                    var lowerUrl = url.toLowerCase();
-                    var downloadExtensions = ['zip', 'rar', '7z', 'tar', 'gz', 'pdf', 'doc', 'docx', 'mp4', 'mp3', 'exe', 'dmg'];
-                    
-                    for (var i = 0; i < downloadExtensions.length; i++) {
-                        if (lowerUrl.indexOf('.' + downloadExtensions[i]) !== -1) {
-                            // Force download instead of opening in new window
-                            var link = document.createElement('a');
-                            link.href = url;
-                            link.download = url.split('/').pop();
-                            link.style.display = 'none';
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            return null;
-                        }
-                    }
-                }
-                return originalOpen.apply(this, arguments);
-            };
-        })();
-        """
-        
-        webView.evaluateJavaScript(downloadScript) { result, error in
-            if let error = error {
-                print("Error injecting download JavaScript: \(error.localizedDescription)")
-            }
-        }
-    }
-
-    private func injectStorageChangeSink(to webView: WKWebView) {
-        let script = """
-        (function(){
-          try {
-            window.chrome = window.chrome || {};
-            window.chrome.storage = window.chrome.storage || {};
-            if (!window.chrome.storage.onChanged) {
-              const listeners = [];
-              window.chrome.storage.onChanged = {
-                addListener(fn){ if (typeof fn==='function') listeners.push(fn); },
-                removeListener(fn){ const i=listeners.indexOf(fn); if (i>=0) listeners.splice(i,1); },
-                hasListener(fn){ return listeners.includes(fn); },
-                hasListeners(){ return listeners.length>0; }
-              };
-              window.__pulseStorageChanged = function(payload, area){ try { listeners.forEach(fn => { try { fn(payload, area||'local'); } catch(e){} }); } catch(e){} };
-            }
-          } catch(e) { }
-        })();
-        """
-        let user = WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page)
-        webView.configuration.userContentController.addUserScript(user)
-    }
+    // No custom JavaScript injection
 
     // MARK: - Tab State Management
     func activate() {
@@ -467,9 +374,6 @@ extension Tab: WKNavigationDelegate {
                 await self.fetchAndSetFavicon(for: currentURL)
             }
         }
-        
-        injectDownloadJavaScript(to: webView)
-
         updateNavigationState()
     }
 
