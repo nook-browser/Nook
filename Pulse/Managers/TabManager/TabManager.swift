@@ -106,7 +106,7 @@ class TabManager {
         // Pick a new current tab if needed
         persistSnapshot()
         // Notify extensions about activation change across spaces
-        if #available(macOS 15.4, *), let newActive = currentTab {
+        if #available(macOS 15.5, *), let newActive = currentTab {
             ExtensionManager.shared.notifyTabActivated(newTab: newActive, previous: previousTab)
         }
     }
@@ -143,7 +143,7 @@ class TabManager {
         setTabs(arr, for: sid)
         
         // Notify extension system about new tab
-        if #available(macOS 15.4, *) {
+        if #available(macOS 15.5, *) {
             ExtensionManager.shared.notifyTabOpened(tab)
         }
         
@@ -174,7 +174,7 @@ class TabManager {
 
         guard let tab = removed else { return }
 
-        if #available(macOS 15.4, *) {
+        if #available(macOS 15.5, *) {
             ExtensionManager.shared.notifyTabClosed(tab)
         }
 
@@ -219,7 +219,7 @@ class TabManager {
         {
             currentSpace = sp
         }
-        if #available(macOS 15.4, *) {
+        if #available(macOS 15.5, *) {
             ExtensionManager.shared.notifyTabActivated(newTab: tab, previous: previous)
         }
         persistSnapshot()
@@ -637,7 +637,7 @@ extension TabManager {
         }
         if let ct = self.currentTab { _ = ct.webView }
         // Inform the extension controller about existing tabs and the active tab
-        if #available(macOS 15.4, *) {
+        if #available(macOS 15.5, *) {
             for t in (self.pinnedTabs + self.tabs) where t.didNotifyOpenToExtensions == false {
                 ExtensionManager.shared.notifyTabOpened(t)
                 t.didNotifyOpenToExtensions = true
