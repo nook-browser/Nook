@@ -27,7 +27,7 @@ public func isValidURL(_ string: String) -> Bool {
     case "file":
         // Allow file URLs without host (e.g., file:///Users/...)
         return url.path.isEmpty == false
-    case "chrome-extension", "moz-extension":
+    case "chrome-extension", "moz-extension", "webkit-extension":
         // Extension URLs should include a host (the extension id)
         return (url.host?.isEmpty == false)
     default:
@@ -42,7 +42,7 @@ public func normalizeURL(_ input: String, provider: SearchProvider) -> String {
     // Preserve explicit schemes (including file and extension schemes)
     if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") ||
        trimmed.hasPrefix("file://") || trimmed.hasPrefix("chrome-extension://") ||
-       trimmed.hasPrefix("moz-extension://") {
+       trimmed.hasPrefix("moz-extension://") || trimmed.hasPrefix("webkit-extension://") {
         return trimmed
     }
 
