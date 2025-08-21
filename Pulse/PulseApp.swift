@@ -92,6 +92,12 @@ struct PulseCommands: Commands {
             }
             .keyboardShortcut("w", modifiers: .command)
             .disabled(browserManager.tabManager.tabs.isEmpty)
+            
+            Button("Copy Current URL") {
+                browserManager.copyCurrentURL()
+            }
+            .keyboardShortcut("c", modifiers: [.command, .shift])
+            .disabled(browserManager.tabManager.currentTab != nil ? false : true)
 
         }
         
