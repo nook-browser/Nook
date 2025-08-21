@@ -15,7 +15,8 @@ class BrowserConfiguration {
     lazy var webViewConfiguration: WKWebViewConfiguration = {
         let config = WKWebViewConfiguration()
 
-        // Use default website data store for persistent cookies and extension data
+        // Use default website data store for normal browsing
+        // Extensions use their own separate persistent storage managed by Apple
         config.websiteDataStore = WKWebsiteDataStore.default()
 
         // Configure JavaScript preferences for extension support

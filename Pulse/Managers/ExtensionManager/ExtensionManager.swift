@@ -13,7 +13,7 @@ import SwiftUI
 
 @available(macOS 15.4, *)
 @MainActor
-final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControllerDelegate, WKNavigationDelegate, WKScriptMessageHandler {
+final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControllerDelegate {
     static let shared = ExtensionManager()
     
     @Published var installedExtensions: [InstalledExtension] = []
@@ -22,10 +22,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     private var extensionController: WKWebExtensionController?
     private var extensionContexts: [String: WKWebExtensionContext] = [:]
     private var actionAnchors: [String: [WeakAnchor]] = [:]
-    // Map extension UUID to target tab adapter for popup-initiated host injections
-    private var popupTargetTabs: [String: ExtensionTabAdapter] = [:]
-    // Track active popovers keyed by extension UUID
-    private var activePopoversByHost: [String: NSPopover] = [:]
     // Keep options windows alive per extension id
     private var optionsWindows: [String: NSWindow] = [:]
     // Stable adapters for tabs/windows used when notifying controller events
@@ -53,7 +49,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     // MARK: - Setup
     
     private func setupExtensionController() {
-        // Use a persistent controller configuration with a stable identifier
+        // Use persistent controller configuration with stable identifier
         let config: WKWebExtensionController.Configuration
         if let idString = UserDefaults.standard.string(forKey: "Pulse.WKWebExtensionController.Identifier"),
            let uuid = UUID(uuidString: idString) {
@@ -67,36 +63,90 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         let controller = WKWebExtensionController(configuration: config)
         controller.delegate = self
         
-        // Configure the shared WebView configuration for extension support
+        // Store controller reference first
+        self.extensionController = controller
+        
         let sharedWebConfig = BrowserConfiguration.shared.webViewConfiguration
         
-        // Use the default website data store - WKWebExtension handles storage internally
-        controller.configuration.defaultWebsiteDataStore = WKWebsiteDataStore.default()
+        // Create a persistent data store specifically for extensions
+        // This ensures chrome.storage APIs have a persistent backing store
+        let extensionDataStore = WKWebsiteDataStore(forIdentifier: config.identifier!)
+        
+        // Verify data store is properly initialized
+        if !extensionDataStore.isPersistent {
+            print("⚠️ Warning: Extension data store is not persistent - this may cause storage issues")
+        }
+        
+        controller.configuration.defaultWebsiteDataStore = extensionDataStore
         controller.configuration.webViewConfiguration = sharedWebConfig
         
         print("ExtensionManager: WKWebExtensionController configured with persistent storage identifier: \(config.identifier?.uuidString ?? "none")")
+        print("   Extension data store is persistent: \(extensionDataStore.isPersistent)")
+        print("   Extension data store ID: \(extensionDataStore.identifier?.uuidString ?? "none")")
+        print("   App WebViews use separate default data store for normal browsing")
+        
         print("   Native storage types supported: .local, .session, .synchronized")
         print("   World support (MAIN/ISOLATED): \(ExtensionUtils.isWorldInjectionSupported)")
+        
+        // Handle macOS 15.4+ ViewBridge issues with delayed delegate assignment
+        if #available(macOS 15.4, *) {
+            print("⚠️ Running on macOS 15.4+ - using delayed delegate assignment to avoid ViewBridge issues")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                controller.delegate = self
+            }
+        } else {
+            controller.delegate = self
+        }
         
         // Critical: Associate our app's browsing WKWebViews with this controller so content scripts inject
         if #available(macOS 15.5, *) {
             sharedWebConfig.webExtensionController = controller
             
-            // Ensure JavaScript is enabled for extension APIs
             sharedWebConfig.preferences.javaScriptEnabled = true
             
             print("ExtensionManager: Configured shared WebView configuration with extension controller")
             
-            // CRITICAL FIX: Update existing WebViews that were created before extension controller setup
+            // Update existing WebViews with controller
             updateExistingWebViewsWithController(controller)
         }
         
         extensionController = controller
+        
+        // Verify storage is working after setup
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            self.verifyExtensionStorage()
+        }
+        
         print("ExtensionManager: Native WKWebExtensionController initialized and configured")
         print("   Controller ID: \(config.identifier?.uuidString ?? "none")")
         print("   Data store: \(controller.configuration.defaultWebsiteDataStore)")
     }
     
+    
+    /// Verify extension storage is working properly
+    private func verifyExtensionStorage() {
+        guard let controller = extensionController else { return }
+        
+        guard let dataStore = controller.configuration.defaultWebsiteDataStore else {
+            print("❌ Extension Storage Verification: No data store available.")
+            return
+        }
+        print("📊 Extension Storage Verification:")
+        print("   Data store is persistent: \(dataStore.isPersistent)")
+        print("   Data store identifier: \(dataStore.identifier?.uuidString ?? "nil")")
+        
+        // Test storage accessibility
+        dataStore.fetchDataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes()) { records in
+            DispatchQueue.main.async {
+                print("   Storage records available: \(records.count)")
+                if records.count > 0 {
+                    print("   ✅ Extension storage appears to be working")
+                } else {
+                    print("   ⚠️ No storage records found - this may be normal for new installations")
+                }
+            }
+        }
+    }
     
     // MARK: - WebView Extension Controller Association
     
@@ -112,7 +162,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         var updatedCount = 0
         
         for tab in allTabs {
-            // Access the WebView (this creates it if not exists)
             let webView = tab.webView
             
             if webView.configuration.webExtensionController !== controller {
@@ -120,7 +169,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                 webView.configuration.webExtensionController = controller
                 updatedCount += 1
                 
-                // Also ensure JavaScript is enabled
                 webView.configuration.preferences.javaScriptEnabled = true
             }
         }
@@ -132,146 +180,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         }
     }
 
-    /// Diagnose content script injection issues
-    func diagnoseContentScriptIssues() {
-        print("=== Content Script Injection Diagnosis ===")
-        
-        guard let bm = browserManagerRef else {
-            print("❌ Browser manager not attached")
-            return
-        }
-        
-        guard let currentTab = bm.tabManager.currentTab else {
-            print("❌ No current tab")
-            return
-        }
-        
-        let currentURL = currentTab.url
-        print("🔍 Current tab URL: \(currentURL)")
-        print("🔍 Current tab name: \(currentTab.name)")
-        print("🔍 Tab ID: \(currentTab.id)")
-        
-        // Check URL scheme
-        let url = currentURL
-        let scheme = url.scheme ?? "unknown"
-        let isRestrictedScheme = ["chrome", "about", "file", "moz-extension"].contains(scheme)
-        print("🔍 URL scheme: \(scheme) - \(isRestrictedScheme ? "❌ Restricted" : "✅ Injectable")")
-        
-        if isRestrictedScheme {
-            print("💡 Navigate to http:// or https:// page for content injection tests")
-        }
-        
-        // Check WebView extension controller association
-        let webView = currentTab.webView
-        let hasController = webView.configuration.webExtensionController != nil
-        let isSameController = webView.configuration.webExtensionController === extensionController
-        print("🔍 WebView has extension controller: \(hasController)")
-        print("🔍 Is same controller: \(isSameController)")
-        
-        if !isSameController {
-            print("❌ WebView not properly associated with extension controller!")
-            print("💡 This prevents content script injection - fixing now...")
-            
-            // Fix the association for current tab
-            if let controller = extensionController {
-                print("🔧 Fixing WebView association for current tab...")
-                webView.configuration.webExtensionController = controller
-                webView.configuration.preferences.javaScriptEnabled = true
-                print("✅ WebView association updated for current tab")
-                
-                // Fix all other tabs too
-                if #available(macOS 15.5, *) {
-                    updateExistingWebViewsWithController(controller)
-                }
-            }
-        } else {
-            print("✅ WebView properly associated with extension controller")
-        }
-        
-        // Check extension contexts
-        if let controller = extensionController {
-            print("🔍 Extension controller has \(controller.extensionContexts.count) loaded contexts")
-            
-            for context in controller.extensionContexts {
-                if let displayName = context.webExtension.displayName {
-                    print("  📦 Extension: \(displayName)")
-                    print("     Permissions: \(context.currentPermissions.count)")
-                    print("     Match patterns: \(context.currentPermissionMatchPatterns.count)")
-                    
-                    let url = currentURL
-                    let hasAccess = context.hasAccess(to: url)
-                    print("     Has access to current URL: \(hasAccess ? "✅" : "❌")")
-                }
-            }
-        }
-        
-        // Check tab adapter
-        if let tabAdapter = tabAdapters[currentTab.id] {
-            print("🔍 Tab adapter exists: ✅")
-            print("   Adapter ID: \(ObjectIdentifier(tabAdapter))")
-        } else {
-            print("🔍 Tab adapter exists: ❌")
-            print("💡 Creating tab adapter...")
-            let adapter = self.adapter(for: currentTab, browserManager: bm)
-            print("✅ Tab adapter created: \(ObjectIdentifier(adapter))")
-        }
-        
-        print("==========================================\n")
-    }
-    
-    /// Test MV3 extension functionality
-    func testMV3Functionality() {
-        print("=== MV3 Extension Functionality Test ===")
-        
-        // Check if we have any MV3 extensions installed
-        let mv3Extensions = installedExtensions.filter { $0.manifestVersion == 3 }
-        print("MV3 Extensions installed: \(mv3Extensions.count)")
-        
-        for ext in mv3Extensions {
-            print("\n  Testing: \(ext.name) (v\(ext.version))")
-            
-            if let context = extensionContexts[ext.id] {
-                // Test basic extension state
-                print("    ✅ Extension context loaded: \(context.isLoaded)")
-                print("    ✅ Current permissions: \(context.currentPermissions.count)")
-                print("    ✅ Host access patterns: \(context.currentPermissionMatchPatterns.count)")
-                
-                // Test action availability
-                if let action = context.action(for: nil) {
-                    print("    ✅ Action available - popup: \(action.presentsPopup)")
-                } else {
-                    print("    ⚠️  No action available")
-                }
-                
-                // Test world injection capability
-                if #available(macOS 15.5, *) {
-                    print("    ✅ MAIN/ISOLATED world support available")
-                } else {
-                    print("    ⚠️  Limited world support (macOS 15.4)")
-                }
-            } else {
-                print("    ❌ No extension context found")
-            }
-        }
-        
-        // Test controller state
-        if let controller = extensionController {
-            print("\n  Controller State:")
-            print("    Extension contexts loaded: \(controller.extensionContexts.count)")
-            print("    Web view controller associated: \(BrowserConfiguration.shared.webViewConfiguration.webExtensionController != nil)")
-        }
-        
-        print("\n  Browser State:")
-        if let bm = browserManagerRef {
-            print("    Browser manager attached: ✅")
-            print("    Current tab: \(bm.tabManager.currentTab?.name ?? "None")")
-            print("    Window adapter: \(windowAdapter != nil ? "✅" : "❌")")
-        } else {
-            print("    Browser manager attached: ❌")
-        }
-        
-        print("=====================================\n")
-    }
     
     // MARK: - MV3 Support Methods
     
@@ -283,9 +191,9 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         .scripting,
         .alarms,
         .contextMenus,
-        .declarativeNetRequest, // MV3: For content blocking
-        .webNavigation,         // MV3: For navigation events
-        .cookies               // MV3: For cookie access
+        .declarativeNetRequest,
+        .webNavigation,
+        .cookies
     ]
     
     /// Grant common permissions and MV2 compatibility for an extension context
@@ -302,8 +210,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             }
         }
         
-        // Compatibility: proactively grant scripting and tabs even if not declared.
-        // Apple’s APIs may require these to resolve tab targets and allow injections.
+        // Grant scripting/tabs permissions (required by Apple's APIs)
         if !isExisting || !extensionContext.currentPermissions.contains(.scripting) {
             extensionContext.setPermissionStatus(.grantedExplicitly, for: .scripting)
             print("   ✅ Ensured .scripting is granted\(existingLabel)")
@@ -312,6 +219,10 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             extensionContext.setPermissionStatus(.grantedExplicitly, for: .tabs)
             print("   ✅ Ensured .tabs is granted\(existingLabel)")
         }
+        
+        
+        // Note: Storage permission is handled by Apple's permission prompts
+        // Users are asked when installing extensions that need storage access
     }
     
     /// Validate MV3-specific requirements
@@ -814,337 +725,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
 
     // Action popups remain popovers; options page behavior adjusted below
     
-    /// Force refresh window/tab state with extension controller
-    func refreshWindowState() {
-        guard let bm = browserManagerRef, let controller = extensionController else { return }
-        
-        if #available(macOS 15.5, *) {
-            if windowAdapter == nil {
-                windowAdapter = ExtensionWindowAdapter(browserManager: bm)
-            }
-            
-            if let window = windowAdapter {
-                print("[ExtensionManager] 🔄 Refreshing window state with controller...")
-                controller.didFocusWindow(window)
-                
-                // Also refresh current tab
-                if let currentTab = bm.tabManager.currentTab {
-                    let tabAdapter = adapter(for: currentTab, browserManager: bm)
-                    controller.didActivateTab(tabAdapter, previousActiveTab: nil)
-                    controller.didSelectTabs([tabAdapter])
-                    print("[ExtensionManager] 🔄 Refreshed active tab: '\(currentTab.name)'")
-                }
-            }
-        }
-    }
-    
-    /// Get detailed status of extension system
-    func getExtensionSystemStatus() -> [String: Any] {
-        var status: [String: Any] = [:]
-        
-        status["isSupported"] = isExtensionSupportAvailable
-        status["controllerConfigured"] = extensionController != nil
-        status["installedExtensionsCount"] = installedExtensions.count
-        status["loadedContextsCount"] = extensionContexts.count
-        status["browserManagerAttached"] = browserManagerRef != nil
-        
-        if let controller = extensionController {
-            status["controllerID"] = controller.configuration.identifier?.uuidString ?? "none"
-            status["extensionContextsLoaded"] = controller.extensionContexts.count
-        }
-        
-        var extensionDetails: [[String: Any]] = []
-        for ext in installedExtensions {
-            var extInfo: [String: Any] = [:]
-            extInfo["id"] = ext.id
-            extInfo["name"] = ext.name
-            extInfo["enabled"] = ext.isEnabled
-            extInfo["hasContext"] = extensionContexts[ext.id] != nil
-            
-            if let context = extensionContexts[ext.id] {
-                extInfo["isLoaded"] = context.isLoaded
-                extInfo["permissions"] = context.currentPermissions.map { String(describing: $0) }
-                extInfo["hostMatches"] = context.currentPermissionMatchPatterns.map { String(describing: $0) }
-                extInfo["baseURL"] = context.baseURL.absoluteString
-            }
-            
-            extensionDetails.append(extInfo)
-        }
-        status["extensions"] = extensionDetails
-        
-        return status
-    }
-    
-    func logSystemStatus() {
-        let status = getExtensionSystemStatus()
-        print("=== Extension System Status ===")
-        for (key, value) in status {
-            print("  \(key): \(value)")
-        }
-        
-        // Also log current browser state
-        if let bm = browserManagerRef {
-            print("  Browser Manager State:")
-            print("    Current tab: \(bm.tabManager.currentTab?.name ?? "None")")
-            print("    Total tabs: \(bm.tabManager.tabs.count)")
-            print("    Pinned tabs: \(bm.tabManager.pinnedTabs.count)")
-            print("    Current space: \(bm.tabManager.currentSpace?.name ?? "None")")
-            print("    Total spaces: \(bm.tabManager.spaces.count)")
-        }
-        print("===============================")
-    }
-    
-    /// Install test MV3 extension for generic testing
-    func installTestMV3Extension() {
-        guard isExtensionSupportAvailable else {
-            print("Extension support not available")
-            return
-        }
-        
-        let testExtensionPath = "/tmp/test-mv3-extension"
-        let testExtensionURL = URL(fileURLWithPath: testExtensionPath)
-        
-        guard FileManager.default.fileExists(atPath: testExtensionPath) else {
-            print("❌ Test MV3 extension not found at: \(testExtensionPath)")
-            print("   Run ExtensionManager.shared.createTestMV3Extension() first")
-            return
-        }
-        
-        print("🧪 Installing Test MV3 extension...")
-        
-        installExtension(from: testExtensionURL) { result in
-            switch result {
-            case .success(let ext):
-                print("✅ Successfully installed Test MV3 extension: \(ext.name)")
-                print("   Extension ID: \(ext.id)")
-                print("   Manifest Version: \(ext.manifestVersion)")
-                print("   This extension will:")
-                print("     • Change page fonts to Comic Sans MS")
-                print("     • Add colorful gradients")
-                print("     • Make paragraphs clickable with sparkle effects")
-                print("     • Test MAIN/ISOLATED world injection")
-                print("     • Show world indicators in corners")
-                
-                // Enable the extension immediately
-                self.enableExtension(ext.id)
-                
-                // Test MV3 functionality
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    self.testMV3Functionality()
-                }
-                
-            case .failure(let error):
-                print("❌ Failed to install Test MV3 extension: \(error.localizedDescription)")
-                self.showErrorAlert(error)
-            }
-        }
-    }
-    
-    /// Install MV3 Dark Reader extension for testing
-    func installMV3DarkReader() {
-        guard isExtensionSupportAvailable else {
-            print("Extension support not available")
-            return
-        }
-        
-        let darkReaderPath = "/Users/jonathancaudill/Downloads/DARKREADERMV3"
-        let darkReaderURL = URL(fileURLWithPath: darkReaderPath)
-        
-        guard FileManager.default.fileExists(atPath: darkReaderPath) else {
-            print("❌ Dark Reader MV3 extension not found at: \(darkReaderPath)")
-            return
-        }
-        
-        print("🌙 Installing Dark Reader MV3 extension...")
-        
-        installExtension(from: darkReaderURL) { result in
-            switch result {
-            case .success(let ext):
-                print("✅ Successfully installed Dark Reader MV3: \(ext.name)")
-                print("   Extension ID: \(ext.id)")
-                print("   Manifest Version: \(ext.manifestVersion)")
-                
-                // Enable the extension immediately
-                self.enableExtension(ext.id)
-                
-            case .failure(let error):
-                print("❌ Failed to install Dark Reader MV3: \(error.localizedDescription)")
-                self.showErrorAlert(error)
-            }
-        }
-    }
-    
-    /// Create a simple test extension for debugging popup issues
-    func createTestExtension() {
-        guard isExtensionSupportAvailable else {
-            print("Extension support not available")
-            return
-        }
-        
-        let testExtensionDir = getExtensionsDirectory().appendingPathComponent("test-extension")
-        
-        do {
-            try FileManager.default.createDirectory(at: testExtensionDir, withIntermediateDirectories: true)
-            
-            // Create manifest.json
-            let manifest = [
-                "manifest_version": 3,
-                "name": "Test Extension",
-                "version": "1.0",
-                "description": "Simple test extension for debugging popup issues",
-                "permissions": ["activeTab", "storage"],
-                "action": [
-                    "default_popup": "popup.html",
-                    "default_title": "Test Extension"
-                ]
-            ] as [String : Any]
-            
-            let manifestData = try JSONSerialization.data(withJSONObject: manifest, options: .prettyPrinted)
-            let manifestURL = testExtensionDir.appendingPathComponent("manifest.json")
-            try manifestData.write(to: manifestURL)
-            
-            // Create popup.html
-            let popupHTML = """
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="utf-8">
-                <title>Test Extension Popup</title>
-                <style>
-                    body {
-                        width: 300px;
-                        padding: 20px;
-                        font-family: system-ui, sans-serif;
-                    }
-                    .section {
-                        margin-bottom: 15px;
-                        padding: 10px;
-                        border: 1px solid #ccc;
-                        border-radius: 5px;
-                    }
-                    .status {
-                        font-size: 12px;
-                        color: #666;
-                    }
-                    button {
-                        margin: 5px 0;
-                        padding: 5px 10px;
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="section">
-                    <h3>Test Extension Popup</h3>
-                    <p class="status">If you can see this, the popup is loading correctly!</p>
-                </div>
-                
-                <div class="section">
-                    <h4>API Tests</h4>
-                    <button id="testTabs">Test Tabs API</button>
-                    <button id="testStorage">Test Storage API</button>
-                    <button id="testTabsCreate">Test tabs.create()</button>
-                    <div id="results"></div>
-                </div>
-                
-                <script src="popup.js"></script>
-            </body>
-            </html>
-            """
-            
-            let popupHTMLURL = testExtensionDir.appendingPathComponent("popup.html")
-            try popupHTML.write(to: popupHTMLURL, atomically: true, encoding: .utf8)
-            
-            // Create popup.js
-            let popupJS = """
-            console.log('Test extension popup script loaded');
-            console.log('Extension APIs available:', {
-                browser: typeof browser !== 'undefined',
-                chrome: typeof chrome !== 'undefined',
-                runtime: typeof (browser?.runtime) !== 'undefined',
-                storage: typeof (browser?.storage) !== 'undefined',
-                tabs: typeof (browser?.tabs) !== 'undefined'
-            });
-            
-            document.addEventListener('DOMContentLoaded', function() {
-                const results = document.getElementById('results');
-                
-                function logResult(message) {
-                    console.log(message);
-                    const div = document.createElement('div');
-                    div.textContent = message;
-                    div.style.fontSize = '12px';
-                    div.style.margin = '5px 0';
-                    results.appendChild(div);
-                }
-                
-                document.getElementById('testTabs').addEventListener('click', async function() {
-                    try {
-                        logResult('Testing tabs API...');
-                        const tabs = await browser.tabs.query({active: true, currentWindow: true});
-                        logResult(`✅ Found ${tabs.length} active tabs`);
-                        if (tabs[0]) {
-                            logResult(`Current tab: ${tabs[0].title} - ${tabs[0].url}`);
-                        }
-                    } catch (error) {
-                        logResult(`❌ Tabs API error: ${error.message}`);
-                    }
-                });
-                
-                document.getElementById('testStorage').addEventListener('click', async function() {
-                    try {
-                        logResult('Testing storage API...');
-                        await browser.storage.local.set({testKey: 'testValue'});
-                        const result = await browser.storage.local.get('testKey');
-                        logResult(`✅ Storage test successful: ${JSON.stringify(result)}`);
-                    } catch (error) {
-                        logResult(`❌ Storage API error: ${error.message}`);
-                    }
-                });
-                
-                document.getElementById('testTabsCreate').addEventListener('click', async function() {
-                    try {
-                        logResult('Testing tabs.create()...');
-                        // Test with a simple URL first
-                        const newTab = await browser.tabs.create({
-                            url: 'https://www.google.com',
-                            active: true
-                        });
-                        logResult(`✅ Created tab with ID: ${newTab.id}`);
-                        logResult(`   URL: ${newTab.url}`);
-                        
-                        // Now test with a safari-web-extension URL
-                        setTimeout(async () => {
-                            try {
-                                logResult('Testing safari-web-extension URL...');
-                                const extTab = await browser.tabs.create({
-                                    url: browser.runtime.getURL('popup.html'),
-                                    active: true
-                                });
-                                logResult(`✅ Created extension tab with ID: ${extTab.id}`);
-                            } catch (extError) {
-                                logResult(`❌ Extension URL error: ${extError.message}`);
-                            }
-                        }, 1000);
-                        
-                    } catch (error) {
-                        logResult(`❌ tabs.create() error: ${error.message}`);
-                    }
-                });
-                
-                logResult('Popup loaded successfully!');
-            });
-            """
-            
-            let popupJSURL = testExtensionDir.appendingPathComponent("popup.js")
-            try popupJS.write(to: popupJSURL, atomically: true, encoding: .utf8)
-            
-            print("✅ Created test extension at: \(testExtensionDir.path)")
-            print("   You can now install it using the extension manager")
-            
-        } catch {
-            print("❌ Failed to create test extension: \(error)")
-        }
-    }
 
     /// Connect the browser manager so we can expose tabs/windows and present UI.
     func attach(browserManager: BrowserManager) {
@@ -1262,97 +842,19 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     // MARK: - WKWebExtensionControllerDelegate
     
     func webExtensionController(_ controller: WKWebExtensionController, presentActionPopup action: WKWebExtension.Action, for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
-        print("🎉 DELEGATE: Extension wants to present popup!")
-        print("   Action: \(action)")
-        print("   Extension: \(extensionContext.webExtension.displayName ?? "Unknown")")
-
-        // Debug permission context to help diagnose popup scripts relying on APIs
-        let perms = extensionContext.currentPermissions.map { String(describing: $0) }.sorted()
-        let reqPerms = extensionContext.webExtension.requestedPermissions.map { String(describing: $0) }.sorted()
-        let optPerms = extensionContext.webExtension.optionalPermissions.map { String(describing: $0) }.sorted()
-        let hostMatches = extensionContext.currentPermissionMatchPatterns.map { String(describing: $0) }.sorted()
-        print("   Current perms: \(perms)")
-        print("   Current host matches: \(hostMatches)")
-        print("   Requested perms: \(reqPerms)")
-        print("   Optional perms: \(optPerms)")
+        // Present the extension's action popover; keep behavior minimal and stable
         
         // Ensure critical permissions at popup time (user-invoked -> activeTab should be granted)
         extensionContext.setPermissionStatus(.grantedExplicitly, for: .activeTab)
         extensionContext.setPermissionStatus(.grantedExplicitly, for: .scripting)
         extensionContext.setPermissionStatus(.grantedExplicitly, for: .tabs)
 
-        // Context visibility checks
-        let openTabsCount = extensionContext.openTabs.count
-        let openWindowsCount = extensionContext.openWindows.count
-        let focusedWin = extensionContext.focusedWindow
-        print("   [Diag] Context openTabs: \(openTabsCount) openWindows: \(openWindowsCount) focusedWindow: \(focusedWin != nil ? "yes" : "no")")
-        print("   [Diag] Shared config has controller: \(BrowserConfiguration.shared.webViewConfiguration.webExtensionController != nil)")
-        if let c = BrowserConfiguration.shared.webViewConfiguration.webExtensionController {
-            print("   [Diag] Shared config controller === our controller: \(c === controller)")
-        }
+        // No additional diagnostics
 
-        // Check access to current page
-        if extensionContext.webExtension.displayName?.lowercased().contains("dark") == true {
-            if let windowAdapter = windowAdapter,
-               let activeTab = windowAdapter.activeTab(for: extensionContext),
-               let url = activeTab.url?(for: extensionContext) {
-                print("   🔍 Current tab URL: \(url)")
-                let hasAccess = extensionContext.hasAccess(to: url)
-                print("   🔐 Has access to current URL: \(hasAccess)")
-                if !hasAccess {
-                    print("   ❌ This is why Dark Reader says 'page is protected by browser'!")
-                    print("   💡 URL might be restricted (chrome://, about:, file://, etc.)")
-                } else {
-                    print("   ✅ Dark Reader has permission but still says 'protected' - content script injection issue!")
-                    print("   🔍 Checking if WebView is associated with extension controller...")
-                    
-                    // Check if the current page's WebView is associated with our controller
-                    if let tab = activeTab as? ExtensionTabAdapter {
-                        let webView = tab.tab.webView
-                        let hasController = webView.configuration.webExtensionController != nil
-                        let isSameController = webView.configuration.webExtensionController === extensionController
-                        print("      WebView has extension controller: \(hasController)")
-                        print("      Is same controller: \(isSameController)")
-                        
-                        if !isSameController {
-                            print("      ❌ WebView not associated with extension controller!")
-                            print("      💡 This prevents content script injection")
-                        } else {
-                            print("      ✅ WebView properly associated - testing content script injection...")
-                            
-                            // Test if content scripts are actually injected by checking for Dark Reader's presence
-                            webView.evaluateJavaScript("window.DarkReader !== undefined || document.querySelector('[data-darkreader-scheme]') !== null") { result, error in
-                                if let isDarkReaderPresent = result as? Bool {
-                                    print("      🔍 Dark Reader content scripts detected: \(isDarkReaderPresent)")
-                                    if !isDarkReaderPresent {
-                                        print("      ❌ Content scripts NOT injected - 'world' parameter issue likely!")
-                                        print("      💡 WKWebExtension may not support 'world': 'MAIN'/'ISOLATED' properly")
-                                    }
-                                } else {
-                                    print("      ⚠️ Could not test for Dark Reader content scripts: \(error?.localizedDescription ?? "unknown error")")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        // No extension-specific diagnostics
 
-        // Re-sync controller focus/selection to be extra explicit for scripting target resolution
-        if let window = windowAdapter {
-            controller.didFocusWindow(window)
-            if let active = window.activeTab(for: extensionContext) as? ExtensionTabAdapter {
-                controller.didActivateTab(active, previousActiveTab: nil)
-                controller.didSelectTabs([active])
-                print("   [Diag] Re-synced focus + active tab for scripting target")
-                if let url = active.url(for: extensionContext) {
-                    let hasAccess = extensionContext.hasAccess(to: url)
-                    print("   [Diag] Has access to active URL: \(hasAccess) -> \(url)")
-                }
-            }
-        }
+        // Focus state should already be correct, avoid re-notifying controller during delegate callback
         
-        // Get the native popover from the action
         guard let popover = action.popupPopover else {
             print("❌ DELEGATE: No popover available on action")
             completionHandler(NSError(domain: "ExtensionManager", code: 2, userInfo: [NSLocalizedDescriptionKey: "No popover available"]))
@@ -1361,18 +863,12 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         
         print("✅ DELEGATE: Native popover available - configuring and presenting!")
         
-        // Configure the popup WebView if available
         if let webView = action.popupWebView {
-            print("   PopupWebView found, configuring...")
-
-            // Diagnostic: compare associated tab vs active tab
+            
             if let assoc = action.associatedTab as? ExtensionTabAdapter {
-                print("   [Diag] Action associatedTab adapter: \(ObjectIdentifier(assoc)) for tab '\(assoc.tab.name)'")
             } else {
-                print("   [Diag] Action has no associatedTab")
             }
             if let active = windowAdapter?.activeTab(for: extensionContext) as? ExtensionTabAdapter {
-                print("   [Diag] Active adapter: \(ObjectIdentifier(active)) for tab '\(active.tab.name)'")
             }
             
             // Ensure the WebView has proper configuration for extension resources
@@ -1381,24 +877,15 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                 print("   Attached extension controller to popup WebView")
             }
             
-            // Attach navigation delegate for debugging
-            webView.navigationDelegate = self
-            
             // Enable inspection for debugging
             if #available(macOS 13.3, *) {
                 webView.isInspectable = true
             }
             
-            // Attach console helper for manual JS evaluation
-            PopupConsole.shared.attach(to: webView)
+            // Temporarily disable console helper to test if it's causing container errors
+            // PopupConsole.shared.attach(to: webView)
 
-            // Register a message handler for host-side injection fallback
-            webView.configuration.userContentController.removeScriptMessageHandler(forName: "pulseScripting")
-            webView.configuration.userContentController.add(self, name: "pulseScripting")
-
-            // Register a diagnostic message handler for verbose logging from popup
-            webView.configuration.userContentController.removeScriptMessageHandler(forName: "pulseDiag")
-            webView.configuration.userContentController.add(self, name: "pulseDiag")
+            // No custom message handlers; rely on native MV3 APIs
 
             if shouldAutoSizeActionPopups {
                 // Install a light ResizeObserver to autosize the popover to content
@@ -1460,313 +947,9 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             let polyfill = WKUserScript(source: polyfillScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
             webView.configuration.userContentController.addUserScript(polyfill)
 
-            // Remember which tab this popup should target for host fallbacks
-            if let host = webView.url?.host {
-                // Prefer the action's associated tab if provided; otherwise use the current active tab
-                if let assoc = action.associatedTab as? ExtensionTabAdapter {
-                    popupTargetTabs[host] = assoc
-                } else if let active = windowAdapter?.activeTab(for: extensionContext) as? ExtensionTabAdapter {
-                    popupTargetTabs[host] = active
-                }
-            }
             
-            // Log initial state
-            let popupURL = webView.url?.absoluteString ?? "(nil)"
-            print("   Popup URL: \"\(popupURL)\"")
             
-            // Check document readiness
-            webView.evaluateJavaScript("document.readyState") { value, _ in
-                let state = (value as? String) ?? "(unknown)"
-                print("   Popup document.readyState: \"\(state)\"")
-            }
             
-            // Ensure extension APIs are available (sync-only to avoid Promise result type)
-            let apiCheck = """
-            (function(){
-              try {
-                return {
-                  hasBrowser: (typeof browser !== 'undefined'),
-                  hasChrome: (typeof chrome !== 'undefined'),
-                  hasRuntime: (typeof (browser?.runtime) !== 'undefined') || (typeof (chrome?.runtime) !== 'undefined'),
-                  hasStorage: (typeof (browser?.storage?.local) !== 'undefined') || (typeof (chrome?.storage?.local) !== 'undefined'),
-                  hasTabs: (typeof (browser?.tabs || chrome?.tabs) !== 'undefined'),
-                  hasScriptingAPI: (typeof (browser?.scripting?.executeScript || chrome?.scripting?.executeScript) === 'function'),
-                  location: location.href
-                };
-              } catch(e) { return { error: String(e) }; }
-            })();
-            """
-            
-            webView.evaluateJavaScript(apiCheck) { result, error in
-                if let error = error {
-                    print("   API check error: \(error.localizedDescription)")
-                } else {
-                    print("   API availability: \(String(describing: result))")
-                }
-            }
-
-            // MV3: Enhanced polyfill that handles MAIN/ISOLATED worlds properly
-            // Maps tabs.executeScript(...) to scripting.executeScript(...) with world support
-            // Critical for MV3 extensions like Dark Reader that need MAIN world injection
-            let tabsExecuteScriptPolyfill = """
-            (function(){
-              try {
-                const g = (typeof window !== 'undefined' ? window : self);
-                const chromeNS = g.chrome || g.browser || {};
-                if (!chromeNS.tabs) chromeNS.tabs = {};
-                if (!chromeNS.scripting || typeof chromeNS.scripting.executeScript !== 'function') return;
-                if (typeof chromeNS.tabs.executeScript === 'function') return; // already provided
-
-                function normalize(tabIdOrDetails, detailsOrCb, maybeCb) {
-                  let tabId, details, cb;
-                  if (typeof tabIdOrDetails === 'number') {
-                    tabId = tabIdOrDetails; details = detailsOrCb; cb = maybeCb;
-                  } else {
-                    details = tabIdOrDetails; cb = detailsOrCb;
-                  }
-                  return { tabId, details: details || {}, cb: (typeof cb === 'function') ? cb : null };
-                }
-
-                chromeNS.tabs.executeScript = function(tabIdOrDetails, detailsOrCb, maybeCb) {
-                  const { tabId, details, cb } = normalize(tabIdOrDetails, detailsOrCb, maybeCb);
-                  function buildOpts(realTabId) {
-                    const target = { tabId: realTabId, allFrames: !!details.allFrames };
-                    if (Number.isInteger(details.frameId)) target.frameIds = [details.frameId];
-                    const world = 'MAIN'; // favor page-world compat
-                    const opts = { target, world };
-                    if (typeof details.code === 'string' && details.code.length) {
-                      const src = details.code;
-                      opts.func = function(source){ try { (0,eval)(source); } catch(e){ console.error('executeScript eval error', e); } };
-                      opts.args = [src];
-                    } else if (typeof details.file === 'string') {
-                      opts.files = [details.file];
-                    } else if (Array.isArray(details.files) && details.files.length) {
-                      opts.files = details.files;
-                    } else {
-                      throw new Error('tabs.executeScript: no code/file specified');
-                    }
-                    return opts;
-                  }
-                  async function hostFallback(realTabId) {
-                    try {
-                      if (!(g.webkit && g.webkit.messageHandlers && g.webkit.messageHandlers.pulseScripting)) throw new Error('no-host-bridge');
-                      const details = currentDetails;
-                      let code = details && details.code;
-                      if (!code && (details.file || (details.files && details.files.length))) {
-                        const files = details.file ? [details.file] : details.files;
-                        const texts = [];
-                        for (const f of files) {
-                          const url = (chromeNS.runtime && chromeNS.runtime.getURL) ? chromeNS.runtime.getURL(f) : f;
-                          const res = await fetch(url);
-                          texts.push(await res.text());
-                        }
-                        code = texts.join('\n;');
-                      }
-                      if (typeof code !== 'string' || !code.length) throw new Error('no-code');
-                      g.webkit.messageHandlers.pulseScripting.postMessage({ tabId: realTabId, code, world: 'MAIN' });
-                      return [];
-                    } catch (e) {
-                      console.error('hostFallback failed', e);
-                      return [];
-                    }
-                  }
-
-                  let currentDetails = null;
-
-                  function runWithTabId(realTabId) {
-                    const base = buildOpts(realTabId);
-                    const exec = (opts) => chromeNS.scripting.executeScript(opts);
-                    // Try MAIN first; fall back to ISOLATED and then default (no world)
-                    const tryMain = exec(base);
-                    const tryIso = () => exec(Object.assign({}, base, { world: 'ISOLATED' }));
-                    const tryDefault = () => { const c = Object.assign({}, base); delete c.world; return exec(c); };
-                    const p = tryMain.catch(() => tryIso()).catch(() => tryDefault()).catch(() => hostFallback(realTabId));
-                    if (cb) { p.then((res)=>{ try { cb(res); } catch(_){} }).catch((e)=>{ console.error(e); try { cb(undefined); } catch(_){} }); }
-                    return p;
-                  }
-                  try {
-                    if (typeof tabId === 'number') {
-                      currentDetails = details;
-                      return runWithTabId(tabId);
-                    }
-                    const tabsNS = (chromeNS.tabs || (chromeNS.browser && chromeNS.browser.tabs));
-                    if (tabsNS && typeof tabsNS.query === 'function') {
-                      // Prefer Promise if available (MV3), else callback style
-                      try {
-                        const q = tabsNS.query({active: true, currentWindow: true});
-                        if (q && typeof q.then === 'function') {
-                          return q.then(tabs => { currentDetails = details; return (tabs && tabs[0] && tabs[0].id != null) ? runWithTabId(tabs[0].id) : Promise.reject(new Error('No active tab found')); });
-                        }
-                      } catch (_) {}
-                      // Callback path
-                      return new Promise((resolve, reject) => {
-                        try {
-                          tabsNS.query({active: true, currentWindow: true}, function(tabs){
-                            try {
-                              const tid = (tabs && tabs[0] && tabs[0].id != null) ? tabs[0].id : null;
-                              if (tid == null) { throw new Error('No active tab found'); }
-                              currentDetails = details; resolve(runWithTabId(tid));
-                            } catch (e) { reject(e); }
-                          });
-                        } catch (e) { reject(e); }
-                      });
-                    }
-                    return Promise.reject(new Error('tabs.executeScript: no tabId and cannot determine active tab'));
-                  } catch (e) {
-                    if (cb) { try { cb(undefined); } catch(_){} }
-                    return Promise.reject(e);
-                  }
-                };
-
-                // Helper: resolve active tabId if missing
-                async function resolveActiveTabId() {
-                  const tabsNS = (chromeNS.tabs || (chromeNS.browser && chromeNS.browser.tabs));
-                  if (!tabsNS) return null;
-                  try {
-                    const q = tabsNS.query({active: true, currentWindow: true});
-                    if (q && typeof q.then === 'function') {
-                      const ts = await q; return (ts && ts[0] && ts[0].id != null) ? ts[0].id : null;
-                    }
-                  } catch (_) {}
-                  return await new Promise((resolve)=>{
-                    try { tabsNS.query({active:true,currentWindow:true}, (ts)=>{ try { resolve((ts && ts[0] && ts[0].id != null) ? ts[0].id : null); } catch { resolve(null); } }); } catch { resolve(null); }
-                  });
-                }
-
-                // Wrap MV3 scripting.executeScript to add host fallback and infer target.tabId when missing
-                try {
-                  const originalExec = chromeNS.scripting.executeScript.bind(chromeNS.scripting);
-                  chromeNS.scripting.executeScript = async function(opts){
-                    try {
-                      const o = Object.assign({}, opts||{});
-                      o.target = Object.assign({}, o.target||{});
-                      if (o.target.tabId == null) { const tid = await resolveActiveTabId(); if (tid != null) o.target.tabId = tid; }
-                      return await originalExec(o);
-                    } catch (e) {
-                      try {
-                        if (!(g.webkit && g.webkit.messageHandlers && g.webkit.messageHandlers.pulseScripting)) throw e;
-                        // Build a code string from func/args or fetch files
-                        let code = null;
-                        if (typeof opts.func === 'function') {
-                          const argList = JSON.stringify(Array.isArray(opts.args) ? opts.args : []);
-                          code = `(${opts.func})(...${argList})`;
-                        } else if (Array.isArray(opts.files) && opts.files.length) {
-                          const texts = [];
-                          for (const f of opts.files) {
-                            const url = (chromeNS.runtime && chromeNS.runtime.getURL) ? chromeNS.runtime.getURL(f) : f;
-                            const res = await fetch(url);
-                            texts.push(await res.text());
-                          }
-                          code = texts.join('\n;');
-                        }
-                        if (!code) throw e;
-                        // ensure a tab id for host bridge
-                        let hostTid = (opts.target && opts.target.tabId) || await resolveActiveTabId();
-                        g.webkit.messageHandlers.pulseScripting.postMessage({ tabId: hostTid || null, code, world: (opts.world||'MAIN'), via: 'scripting.wrap' });
-                        return [];
-                      } catch (e2) {
-                        throw e; // surface original error if fallback unsupported
-                      }
-                    }
-                  }
-                } catch(_) {}
-
-                // Wrap MV3 scripting.insertCSS to infer target.tabId and provide host fallback
-                try {
-                  if (chromeNS.scripting && typeof chromeNS.scripting.insertCSS === 'function') {
-                    const originalInsert = chromeNS.scripting.insertCSS.bind(chromeNS.scripting);
-                    chromeNS.scripting.insertCSS = async function(opts){
-                      try {
-                        const o = Object.assign({}, opts||{});
-                        o.target = Object.assign({}, o.target||{});
-                        if (o.target.tabId == null) { const tid = await resolveActiveTabId(); if (tid != null) o.target.tabId = tid; }
-                        // Apple's engine may not support world for CSS; don't set it here
-                        return await originalInsert(o);
-                      } catch (e) {
-                        try {
-                          if (!(g.webkit && g.webkit.messageHandlers && g.webkit.messageHandlers.pulseScripting)) throw e;
-                          // Build CSS text from css or files
-                          let css = opts && opts.css;
-                          if (!css && Array.isArray(opts?.files) && opts.files.length) {
-                            const texts = [];
-                            for (const f of opts.files) {
-                              const url = (chromeNS.runtime && chromeNS.runtime.getURL) ? chromeNS.runtime.getURL(f) : f;
-                              const res = await fetch(url);
-                              texts.push(await res.text());
-                            }
-                            css = texts.join('\n');
-                          }
-                          if (typeof css !== 'string' || !css.length) throw e;
-                          const code = `(() => { try { const el = document.createElement('style'); el.textContent = ${JSON.stringify(css)}; document.documentElement.appendChild(el); return true; } catch(e){ return false; } })();`;
-                          let hostTid = (opts && opts.target && opts.target.tabId) || await resolveActiveTabId();
-                          g.webkit.messageHandlers.pulseScripting.postMessage({ tabId: hostTid || null, code, world: 'MAIN', via: 'scripting.insertCSS.wrap' });
-                          return [];
-                        } catch (e2) {
-                          throw e;
-                        }
-                      }
-                    }
-                  }
-                } catch(_) {}
-
-                // MV2: tabs.insertCSS -> MV3: scripting.insertCSS
-                if (typeof chromeNS.tabs.insertCSS !== 'function' && typeof chromeNS.scripting.insertCSS === 'function') {
-                  chromeNS.tabs.insertCSS = function(tabIdOrDetails, detailsOrCb, maybeCb) {
-                    const { tabId, details, cb } = normalize(tabIdOrDetails, detailsOrCb, maybeCb);
-                    const target = { tabId: tabId };
-                    const css = (typeof details.code === 'string') ? details.code : null;
-                    const files = details.file ? [details.file] : (details.files||null);
-                    if (!css && (!files || !files.length)) {
-                      const err = new Error('tabs.insertCSS: no code/file specified');
-                      if (cb) { try { cb(); } catch(_){} }
-                      return Promise.reject(err);
-                    }
-                    const opts = { target };
-                    if (css) opts.css = css; else opts.files = files;
-                    const p = chromeNS.scripting.insertCSS(opts);
-                    if (cb) { p.then(()=>{ try { cb(); } catch(_){} }).catch((e)=>{ console.error(e); try { cb(); } catch(_){} }); }
-                    return p;
-                  };
-                }
-
-                // MV2: tabs.removeCSS -> MV3: scripting.removeCSS
-                if (typeof chromeNS.tabs.removeCSS !== 'function' && typeof chromeNS.scripting.removeCSS === 'function') {
-                  chromeNS.tabs.removeCSS = function(tabIdOrDetails, detailsOrCb, maybeCb) {
-                    const { tabId, details, cb } = normalize(tabIdOrDetails, detailsOrCb, maybeCb);
-                    const target = { tabId: tabId };
-                    const css = (typeof details.code === 'string') ? details.code : null;
-                    const files = details.file ? [details.file] : (details.files||null);
-                    if (!css && (!files || !files.length)) {
-                      const err = new Error('tabs.removeCSS: no code/file specified');
-                      if (cb) { try { cb(); } catch(_){} }
-                      return Promise.reject(err);
-                    }
-                    const opts = { target };
-                    if (css) opts.css = css; else opts.files = files;
-                    const p = chromeNS.scripting.removeCSS(opts);
-                    if (cb) { p.then(()=>{ try { cb(); } catch(_){} }).catch((e)=>{ console.error(e); try { cb(); } catch(_){} }); }
-                    return p;
-                  };
-                }
-
-                // Expose patched namespaces back to window
-                if (!g.chrome && (g.browser || chromeNS)) { g.chrome = chromeNS; }
-                if (!g.browser && g.chrome) { g.browser = g.chrome; }
-              } catch (e) {
-                console.error('tabs.executeScript polyfill error', e);
-              }
-            })();
-            """
-
-            webView.evaluateJavaScript(tabsExecuteScriptPolyfill) { _, error in
-                if let error = error {
-                    print("   Polyfill injection error: \(error.localizedDescription)")
-                } else {
-                    print("   Installed tabs.executeScript -> scripting.executeScript polyfill in popup context")
-                }
-            }
-
-            // Probe end-to-end MAIN-world injection capability on active tab
             let worldProbe = """
             (async function(){
               try {
@@ -1819,10 +1002,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         // Present the popover on main thread
         DispatchQueue.main.async {
             let targetWindow = NSApp.keyWindow ?? NSApp.mainWindow
-            // Remember this popover (used for diagnostics and, if enabled, autosizing)
-            if let host = action.popupWebView?.url?.host {
-                self.activePopoversByHost[host] = popover
-            }
+            // Keep popover size fixed; no autosizing bookkeeping
             
             // Try to use registered anchor for this extension
             if let extId = self.extensionContexts.first(where: { $0.value === extensionContext })?.key,
@@ -1864,79 +1044,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
 
     // MARK: - WKScriptMessageHandler (popup bridge)
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        if message.name == "pulseScripting" {
-            // Identify the extension by popup file path
-            var extUUID: String? = nil
-            if let urlString = (message.webView?.url?.absoluteString),
-               let url = URL(string: urlString),
-               url.isFileURL {
-                // Extract extension UUID from file path: .../Extensions/{UUID}/...
-                let pathComponents = url.pathComponents
-                if let extensionIndex = pathComponents.firstIndex(of: "Extensions"),
-                   extensionIndex + 1 < pathComponents.count {
-                    let potentialUUID = pathComponents[extensionIndex + 1]
-                    if UUID(uuidString: potentialUUID) != nil {
-                        extUUID = potentialUUID
-                    }
-                }
-            }
-            guard let extUUID, let target = popupTargetTabs[extUUID] else {
-                print("   [Bridge] No popup target tab found for message")
-                return
-            }
-            guard let dict = message.body as? [String: Any] else { return }
-            let code = dict["code"] as? String
-            let world = (dict["world"] as? String) ?? "MAIN"
-            guard let js = code, !js.isEmpty else { return }
-            let pageWV = target.tab.webView
-            pageWV.evaluateJavaScript(js) { result, error in
-                if let error = error {
-                    print("   [Bridge] Injection error (world=\(world)): \(error.localizedDescription)")
-                } else {
-                    print("   [Bridge] Injected code into page via host bridge (world=\(world))")
-                }
-            }
-            return
-        }
-        if message.name == "pulseIdentity" {
-            // Open OAuth in a new tab per Apple's guidance for Safari
-            if let dict = message.body as? [String: Any], let urlString = dict["url"] as? String, let url = URL(string: urlString) {
-                if let bm = browserManagerRef {
-                    let space = bm.tabManager.currentSpace
-                    _ = bm.tabManager.createNewTab(url: url.absoluteString, in: space)
-                }
-            }
-            return
-        }
-        if message.name == "pulseDiag" {
-            // Handle autosize and diagnostics from popup
-            guard let dict = message.body as? [String: Any] else { print("[Diag] Non-dictionary payload received"); return }
-            let label = dict["label"] as? String ?? "?"
-            if label == "popupSize" {
-                // Respect UX: keep popup size fixed; ignore auto-resize suggestions
-                if shouldAutoSizeActionPopups, let payload = dict["payload"] as? [String: Any] {
-                    let w = (payload["w"] as? NSNumber)?.doubleValue ?? 0
-                    let h = (payload["h"] as? NSNumber)?.doubleValue ?? 0
-                    if w > 0 && h > 0 {
-                        // Clamp to reasonable bounds
-                        let cw = max(280.0, min(w, 700.0))
-                        let ch = max(120.0, min(h, 800.0))
-                        if let host = message.webView?.url?.host, let pop = activePopoversByHost[host] {
-                            // Update content size on main thread
-                            DispatchQueue.main.async {
-                                if pop.contentSize != NSSize(width: cw, height: ch) {
-                                    pop.contentSize = NSSize(width: cw, height: ch)
-                                }
-                            }
-                        }
-                    }
-                }
-            } else {
-                let phase = dict["phase"] as? String ?? "?"
-                print("[Diag] phase=\(phase) label=\(label) payload=\(dict)")
-            }
-            return
-        }
+        // No custom message handling
     }
     
     // MARK: - WKNavigationDelegate (popup diagnostics)
@@ -2345,7 +1453,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.allowsBackForwardNavigationGestures = true
         if #available(macOS 13.3, *) { webView.isInspectable = true }
-        webView.navigationDelegate = self
+        // No navigation delegate needed for options page
 
         // Provide a lightweight alias to help extensions that only check `chrome`.
         // This only affects the options page web view, not normal websites.
@@ -2577,3 +1685,4 @@ final class WeakAnchor {
         self.window = window
     }
 }
+

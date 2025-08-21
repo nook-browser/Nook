@@ -44,7 +44,6 @@ struct ExtensionActionButton: View {
                 }
             }
             .frame(width: 20, height: 20)
-            // Install an invisible anchor view for precise popup positioning
             .background(ActionAnchorView(extensionId: ext.id))
         }
         .buttonStyle(.plain)
@@ -54,24 +53,20 @@ struct ExtensionActionButton: View {
     private func showExtensionPopup() {
         print("🎯 Performing action for extension: \(ext.name)")
         
-        // Get the native extension context
         guard let extensionContext = ExtensionManager.shared.getExtensionContext(for: ext.id) else {
             print("❌ No extension context found")
             return
         }
         
-        // Use the PROPER way according to Apple docs: performAction
-        // Pass the active tab when available so extensions relying on it (e.g., tabs.query) have context.
         print("✅ Calling performAction() - this should trigger the delegate")
         if let current = browserManager.tabManager.currentTab {
-            // Use the stable cached adapter instead of creating a new one
             if let adapter = ExtensionManager.shared.stableAdapter(for: current) {
                 extensionContext.performAction(for: adapter)
             } else {
                 extensionContext.performAction(for: nil)
             }
         } else {
-            extensionContext.performAction(for: nil) // fallback to default action
+            extensionContext.performAction(for: nil)
         }
     }
 }

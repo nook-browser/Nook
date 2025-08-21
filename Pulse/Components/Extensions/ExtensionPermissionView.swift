@@ -11,7 +11,6 @@ import WebKit
 @available(macOS 15.4, *)
 struct ExtensionPermissionView: View {
     let extensionName: String
-    // Separate requested vs optional for clearer UX
     let requestedPermissions: [String]
     let optionalPermissions: [String]
     let requestedHostPermissions: [String]
@@ -24,7 +23,6 @@ struct ExtensionPermissionView: View {
     
     var body: some View {
         VStack(spacing: 20) {
-            // Header
             VStack(spacing: 8) {
                 Image(systemName: "puzzlepiece.extension")
                     .font(.system(size: 48))
@@ -41,7 +39,6 @@ struct ExtensionPermissionView: View {
             
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    // Requested Permissions
                     if !requestedPermissions.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Requested Permissions")
@@ -64,7 +61,6 @@ struct ExtensionPermissionView: View {
                             }
                         }
                     }
-                    // Optional Permissions
                     if !optionalPermissions.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Optional Permissions")
@@ -88,7 +84,6 @@ struct ExtensionPermissionView: View {
                         }
                     }
                     
-                    // Requested Host Permissions
                     if !requestedHostPermissions.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Requested Website Access")
@@ -111,7 +106,6 @@ struct ExtensionPermissionView: View {
                             }
                         }
                     }
-                    // Optional Host Permissions
                     if !optionalHostPermissions.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Optional Website Access")
@@ -139,7 +133,6 @@ struct ExtensionPermissionView: View {
             }
             .frame(maxHeight: 300)
             
-            // Action Buttons
             HStack(spacing: 12) {
                 Button("Deny") {
                     onDeny()
@@ -160,7 +153,6 @@ struct ExtensionPermissionView: View {
         .padding(20)
         .frame(width: 500, height: 600)
         .onAppear {
-            // Auto-select safe permissions
             for permission in requestedPermissions {
                 if isSafePermission(permission) {
                     selectedPermissions.insert(permission)

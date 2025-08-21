@@ -160,6 +160,10 @@ public class Tab: NSObject, Identifiable {
     private func setupWebView() {
         var configuration = BrowserConfiguration.shared.webViewConfiguration
         
+        // Debug: Check what data store this WebView will use
+        print("[Tab] Creating WebView with data store ID: \(configuration.websiteDataStore.identifier?.uuidString ?? "default")")
+        print("[Tab] Data store is persistent: \(configuration.websiteDataStore.isPersistent)")
+        
         // CRITICAL: Ensure the configuration has access to extension controller for ALL URLs
         // Extensions may load additional resources that also need access
         if #available(macOS 15.5, *) {
