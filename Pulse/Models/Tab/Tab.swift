@@ -73,6 +73,10 @@ public class Tab: NSObject, Identifiable {
     }
 
     weak var browserManager: BrowserManager?
+    
+    // MARK: - Link Hover Callback
+    var onLinkHover: ((String?) -> Void)? = nil
+    var onCommandHover: ((String?) -> Void)? = nil
 
     var isCurrentTab: Bool {
         return browserManager?.tabManager.currentTab?.id == id
@@ -192,6 +196,15 @@ public class Tab: NSObject, Identifiable {
         _webView?.uiDelegate = self
         _webView?.allowsBackForwardNavigationGestures = true
         _webView?.allowsMagnification = true
+        
+        // Add message handlers for link hover and command functionality
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "linkHover")
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "commandHover")
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "commandClick")
+        
+        _webView?.configuration.userContentController.add(self, name: "linkHover")
+        _webView?.configuration.userContentController.add(self, name: "commandHover")
+        _webView?.configuration.userContentController.add(self, name: "commandClick")
 
         _webView?.customUserAgent =
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15"
@@ -241,6 +254,7 @@ public class Tab: NSObject, Identifiable {
             "document.querySelectorAll('video, audio').forEach(el => el.pause());",
             completionHandler: nil
         )
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "linkHover")
         _webView?.navigationDelegate = nil
         _webView?.uiDelegate = nil
         _webView = nil
@@ -279,6 +293,174 @@ public class Tab: NSObject, Identifiable {
     }
     
     // No custom JavaScript injection
+    // MARK: - JavaScript Injection
+    // MARK: - JavaScript Injection
+    private func injectLinkHoverJavaScript(to webView: WKWebView) {
+        let linkHoverScript = """
+        (function() {
+            var currentHoveredLink = null;
+            var isCommandPressed = false;
+            
+            function sendLinkHover(href) {
+                if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.linkHover) {
+                    window.webkit.messageHandlers.linkHover.postMessage(href);
+                }
+            }
+            
+            function sendCommandHover(href) {
+                if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.commandHover) {
+                    window.webkit.messageHandlers.commandHover.postMessage(href);
+                }
+            }
+            
+            // Track Command key state
+            document.addEventListener('keydown', function(e) {
+                if (e.metaKey) {
+                    isCommandPressed = true;
+                    if (currentHoveredLink) {
+                        sendCommandHover(currentHoveredLink);
+                    }
+                }
+            });
+            
+            document.addEventListener('keyup', function(e) {
+                if (!e.metaKey) {
+                    isCommandPressed = false;
+                    sendCommandHover(null);
+                }
+            });
+            
+            document.addEventListener('mouseover', function(e) {
+                var target = e.target;
+                while (target && target !== document) {
+                    if (target.tagName === 'A' && target.href) {
+                        if (currentHoveredLink !== target.href) {
+                            currentHoveredLink = target.href;
+                            sendLinkHover(target.href);
+                            if (isCommandPressed) {
+                                sendCommandHover(target.href);
+                            }
+                        }
+                        return;
+                    }
+                    target = target.parentElement;
+                }
+            }, true);
+            
+            document.addEventListener('mouseout', function(e) {
+                var target = e.target;
+                while (target && target !== document) {
+                    if (target.tagName === 'A' && target.href) {
+                        if (currentHoveredLink === target.href) {
+                            // Add a small delay before clearing hover state
+                            setTimeout(function() {
+                                if (currentHoveredLink === target.href) {
+                                    currentHoveredLink = null;
+                                    sendLinkHover(null);
+                                    sendCommandHover(null);
+                                }
+                            }, 100);
+                        }
+                        return;
+                    }
+                    target = target.parentElement;
+                }
+            }, true);
+            
+            document.addEventListener('click', function(e) {
+                var target = e.target;
+                while (target && target !== document) {
+                    if (target.tagName === 'A' && target.href && e.metaKey) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        currentHoveredLink = target.href;
+                        sendLinkHover(target.href);
+                        if (isCommandPressed) {
+                            sendCommandHover(target.href);
+                        }
+                        
+                        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.commandClick) {
+                            window.webkit.messageHandlers.commandClick.postMessage(target.href);
+                        }
+                        return false;
+                    }
+                    target = target.parentElement;
+                }
+            }, true);
+        })();
+        """
+        
+        webView.evaluateJavaScript(linkHoverScript) { result, error in
+            if let error = error {
+                print("Error injecting link hover JavaScript: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private func injectDownloadJavaScript(to webView: WKWebView) {
+        let downloadScript = """
+        (function() {
+            // Override click handlers for download links
+            document.addEventListener('click', function(e) {
+                var target = e.target;
+                while (target && target !== document) {
+                    if (target.tagName === 'A' && target.href) {
+                        var href = target.href.toLowerCase();
+                        var downloadExtensions = ['zip', 'rar', '7z', 'tar', 'gz', 'pdf', 'doc', 'docx', 'mp4', 'mp3', 'exe', 'dmg'];
+                        
+                        for (var i = 0; i < downloadExtensions.length; i++) {
+                            if (href.indexOf('.' + downloadExtensions[i]) !== -1) {
+                                // Force download by creating a new link
+                                var link = document.createElement('a');
+                                link.href = target.href;
+                                link.download = target.download || target.href.split('/').pop();
+                                link.style.display = 'none';
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                e.preventDefault();
+                                e.stopPropagation();
+                                return false;
+                            }
+                        }
+                    }
+                    target = target.parentElement;
+                }
+            }, true);
+            
+            // Override window.open for download links
+            var originalOpen = window.open;
+            window.open = function(url, name, features) {
+                if (url && typeof url === 'string') {
+                    var lowerUrl = url.toLowerCase();
+                    var downloadExtensions = ['zip', 'rar', '7z', 'tar', 'gz', 'pdf', 'doc', 'docx', 'mp4', 'mp3', 'exe', 'dmg'];
+                    
+                    for (var i = 0; i < downloadExtensions.length; i++) {
+                        if (lowerUrl.indexOf('.' + downloadExtensions[i]) !== -1) {
+                            // Force download instead of opening in new window
+                            var link = document.createElement('a');
+                            link.href = url;
+                            link.download = url.split('/').pop();
+                            link.style.display = 'none';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            return null;
+                        }
+                    }
+                }
+                return originalOpen.apply(this, arguments);
+            };
+        })();
+        """
+        
+        webView.evaluateJavaScript(downloadScript) { result, error in
+            if let error = error {
+                print("Error injecting download JavaScript: \(error.localizedDescription)")
+            }
+        }
+    }
 
     // MARK: - Tab State Management
     func activate() {
@@ -426,6 +608,9 @@ extension Tab: WKNavigationDelegate {
                 await self.fetchAndSetFavicon(for: currentURL)
             }
         }
+        
+        injectDownloadJavaScript(to: webView)
+        injectLinkHoverJavaScript(to: webView)
         updateNavigationState()
     }
 
@@ -589,6 +774,40 @@ extension Tab: WKNavigationDelegate {
         print("Download started from navigationResponse: \(originalURL.absoluteString)")
     }
 
+}
+
+// MARK: - WKScriptMessageHandler
+extension Tab: WKScriptMessageHandler {
+    public func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        switch message.name {
+        case "linkHover":
+            let href = message.body as? String
+            DispatchQueue.main.async {
+                self.onLinkHover?(href)
+            }
+            
+        case "commandHover":
+            let href = message.body as? String
+            DispatchQueue.main.async {
+                self.onCommandHover?(href)
+            }
+            
+        case "commandClick":
+            if let href = message.body as? String, let url = URL(string: href) {
+                DispatchQueue.main.async {
+                    self.handleCommandClick(url: url)
+                }
+            }
+            
+        default:
+            break
+        }
+    }
+    
+    private func handleCommandClick(url: URL) {
+        // Create a new tab with the URL and focus it
+        browserManager?.tabManager.createNewTab(url: url.absoluteString, in: browserManager?.tabManager.currentSpace)
+    }
 }
 
 // MARK: - WKUIDelegate
