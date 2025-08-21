@@ -68,6 +68,14 @@ struct WebsiteView: View {
                 }
             }
             VStack {
+                HStack {
+                    Spacer()
+                    if browserManager.didCopyURL {
+                        WebsitePopup()
+                            .animation(.spring(response: 0.5, dampingFraction: 0.8), value: browserManager.didCopyURL)
+                            .padding(10)
+                    }
+                }
                 Spacer()
                 HStack {
                     LinkStatusBar(hoveredLink: hoveredLink, isCommandPressed: isCommandPressed)
