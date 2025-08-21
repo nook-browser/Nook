@@ -26,6 +26,7 @@ class BrowserManager: ObservableObject {
     @Published var sidebarWidth: CGFloat = 250
     @Published var isSidebarVisible: Bool = true
     @Published var isCommandPaletteVisible: Bool = false
+    @Published var didCopyURL: Bool = false
     
     var modelContext: ModelContext
     var tabManager: TabManager
@@ -273,4 +274,30 @@ class BrowserManager: ObservableObject {
             await cacheManager.clearPersonalDataCache()
         }
     }
+    
+    func copyCurrentURL() {
+    if let url = tabManager.currentTab?.url.absoluteString {
+        print("Attempting to copy URL: \(url)")
+        
+        DispatchQueue.main.async {
+            NSPasteboard.general.clearContents()
+            let success = NSPasteboard.general.setString(url, forType: .string)
+            let e = NSHapticFeedbackManager.defaultPerformer
+            e.perform(.generic, performanceTime: .drawCompleted)
+            print("Clipboard operation success: \(success)")
+        }
+        
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+            self.didCopyURL = true
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                self.didCopyURL = false
+            }
+        }
+    } else {
+        print("No URL found to copy")
+    }
+}
 }
