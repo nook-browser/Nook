@@ -12,9 +12,6 @@ import WebKit
 class BrowserConfiguration {
     static let shared = BrowserConfiguration()
     
-    @available(macOS 15.4, *)
-    private lazy var extensionURLSchemeHandler = WebKitExtensionURLSchemeHandler()
-
     lazy var webViewConfiguration: WKWebViewConfiguration = {
         let config = WKWebViewConfiguration()
 
@@ -36,10 +33,9 @@ class BrowserConfiguration {
         // User agent for better compatibility
         config.applicationNameForUserAgent = "Version/17.4.1 Safari/605.1.15"
 
-        // Register custom URL scheme handler for webkit-extension URLs
-        if #available(macOS 15.4, *) {
-            config.setURLSchemeHandler(extensionURLSchemeHandler, forURLScheme: "webkit-extension")
-            print("BrowserConfiguration: Registered webkit-extension URL scheme handler")
+        // Enable web inspector for debugging
+        if #available(macOS 13.3, *) {
+            config.preferences.setValue(true, forKey: "developerExtrasEnabled")
         }
 
         // Note: webExtensionController will be set by ExtensionManager during initialization
