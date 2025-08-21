@@ -35,7 +35,10 @@ struct PersistentPopover<Content: View>: NSViewRepresentable {
                 popover.contentSize = contentSize
                 coordinator.popover = popover
                 if let anchor = coordinator.anchorView {
-                    popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: preferredEdge)
+                    // Present on next runloop to avoid starting a CA transaction during commit
+                    DispatchQueue.main.async {
+                        popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: preferredEdge)
+                    }
                 }
             } else {
                 // Update content and size when already shown
@@ -53,7 +56,12 @@ struct PersistentPopover<Content: View>: NSViewRepresentable {
                 }
             }
         } else {
-            coordinator.popover?.performClose(nil)
+            // Close asynchronously to avoid interfering with current commit transactions
+            if let pop = coordinator.popover {
+                DispatchQueue.main.async {
+                    pop.performClose(nil)
+                }
+            }
         }
     }
 
