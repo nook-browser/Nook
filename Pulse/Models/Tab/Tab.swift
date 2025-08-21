@@ -63,8 +63,10 @@ public class Tab: NSObject, Identifiable {
     var canGoForward: Bool = false
 
     private var _webView: WKWebView?
+    var didNotifyOpenToExtensions: Bool = false
     var webView: WKWebView {
         if _webView == nil {
+            print("🔧 [Tab] First webView access, calling setupWebView() for: \(url.absoluteString)")
             setupWebView()
         }
         return _webView!
@@ -158,70 +160,36 @@ public class Tab: NSObject, Identifiable {
     }
 
     // MARK: - WebView Setup
+
     private func setupWebView() {
-        // Use the shared configuration for cookie/session sharing
-        let configuration = BrowserConfiguration.shared.webViewConfiguration
+        var configuration = BrowserConfiguration.shared.webViewConfiguration
         
-        let downloadScript = WKUserScript(
-            source: """
-            (function() {
-                // Override click handlers for download links
-                document.addEventListener('click', function(e) {
-                    var target = e.target;
-                    while (target && target !== document) {
-                        if (target.tagName === 'A' && target.href) {
-                            var href = target.href.toLowerCase();
-                            var downloadExtensions = ['zip', 'rar', '7z', 'tar', 'gz', 'pdf', 'doc', 'docx', 'mp4', 'mp3', 'exe', 'dmg'];
-                            
-                            for (var i = 0; i < downloadExtensions.length; i++) {
-                                if (href.indexOf('.' + downloadExtensions[i]) !== -1) {
-                                    // Force download by creating a new link
-                                    var link = document.createElement('a');
-                                    link.href = target.href;
-                                    link.download = target.download || target.href.split('/').pop();
-                                    link.style.display = 'none';
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    document.body.removeChild(link);
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    return false;
-                                }
-                            }
-                        }
-                        target = target.parentElement;
-                    }
-                }, true);
-                
-                // Override window.open for download links
-                var originalOpen = window.open;
-                window.open = function(url, name, features) {
-                    if (url && typeof url === 'string') {
-                        var lowerUrl = url.toLowerCase();
-                        var downloadExtensions = ['zip', 'rar', '7z', 'tar', 'gz', 'pdf', 'doc', 'docx', 'mp4', 'mp3', 'exe', 'dmg'];
-                        
-                        for (var i = 0; i < downloadExtensions.length; i++) {
-                            if (lowerUrl.indexOf('.' + downloadExtensions[i]) !== -1) {
-                                // Force download instead of opening in new window
-                                var link = document.createElement('a');
-                                link.href = url;
-                                link.download = url.split('/').pop();
-                                link.style.display = 'none';
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                                return null;
-                            }
-                        }
-                    }
-                    return originalOpen.apply(this, arguments);
-                };
-            })();
-            """,
-            injectionTime: .atDocumentEnd,
-            forMainFrameOnly: false
-        )
-        configuration.userContentController.addUserScript(downloadScript)
+        // Debug: Check what data store this WebView will use
+        print("[Tab] Creating WebView with data store ID: \(configuration.websiteDataStore.identifier?.uuidString ?? "default")")
+        print("[Tab] Data store is persistent: \(configuration.websiteDataStore.isPersistent)")
+        
+        // CRITICAL: Ensure the configuration has access to extension controller for ALL URLs
+        // Extensions may load additional resources that also need access
+        if #available(macOS 15.5, *) {
+            print("🔍 [Tab] Checking extension controller setup...")
+            print("   Configuration has controller: \(configuration.webExtensionController != nil)")
+            print("   ExtensionManager has controller: \(ExtensionManager.shared.nativeController != nil)")
+            
+            if configuration.webExtensionController == nil {
+                if let controller = ExtensionManager.shared.nativeController {
+                    configuration.webExtensionController = controller
+                    print("🔧 [Tab] Added extension controller to configuration for resource access")
+                    print("   Controller contexts: \(controller.extensionContexts.count)")
+                } else {
+                    print("❌ [Tab] No extension controller available from ExtensionManager")
+                }
+            } else {
+                print("✅ [Tab] Configuration already has extension controller")
+                if let controller = configuration.webExtensionController {
+                    print("   Controller contexts: \(controller.extensionContexts.count)")
+                }
+            }
+        }
 
         _webView = WKWebView(frame: .zero, configuration: configuration)
         _webView?.navigationDelegate = self
@@ -253,13 +221,28 @@ public class Tab: NSObject, Identifiable {
                 .isFraudulentWebsiteWarningEnabled = true
             webView.configuration.preferences
                 .javaScriptCanOpenWindowsAutomatically = true
-            
-            injectDownloadJavaScript(to: webView)
+            // No ad-hoc page script injection here; rely on WKWebExtension
         }
 
         print("Created WebView for tab: \(name)")
+        // Inform extensions that this tab's view is now open/available BEFORE loading,
+        // so content scripts and messaging can resolve this tab during early document phases
+        if #available(macOS 15.5, *), didNotifyOpenToExtensions == false {
+            ExtensionManager.shared.notifyTabOpened(self)
+            didNotifyOpenToExtensions = true
+        }
         loadURL(url)
     }
+
+    // Minimal hook to satisfy ExtensionManager: update extension controller on existing webView.
+    func applyWebViewConfigurationOverride(_ configuration: WKWebViewConfiguration) {
+        guard let existing = _webView else { return }
+        if #available(macOS 15.5, *), let controller = configuration.webExtensionController {
+            existing.configuration.webExtensionController = controller
+        }
+    }
+
+    
 
     // MARK: - Tab Actions
     func closeTab() {
@@ -284,8 +267,17 @@ public class Tab: NSObject, Identifiable {
     func loadURL(_ newURL: URL) {
         self.url = newURL
         loadingState = .didStartProvisionalNavigation
-        let request = URLRequest(url: newURL)
-        webView.load(request)
+        
+        if newURL.isFileURL {
+            // Grant read access to the containing directory for local resources
+            let directoryURL = newURL.deletingLastPathComponent()
+            print("🔧 [Tab] Loading file URL with directory access: \(directoryURL.path)")
+            webView.loadFileURL(newURL, allowingReadAccessTo: directoryURL)
+        } else {
+            // Regular URL loading
+            let request = URLRequest(url: newURL)
+            webView.load(request)
+        }
 
         Task { @MainActor in
             await fetchAndSetFavicon(for: newURL)
@@ -300,6 +292,8 @@ public class Tab: NSObject, Identifiable {
         loadURL(newURL)
     }
     
+    // No custom JavaScript injection
+    // MARK: - JavaScript Injection
     // MARK: - JavaScript Injection
     private func injectLinkHoverJavaScript(to webView: WKWebView) {
         let linkHoverScript = """
@@ -483,6 +477,9 @@ public class Tab: NSObject, Identifiable {
 
     func updateTitle(_ title: String) {
         self.name = title.isEmpty ? url.host ?? "New Tab" : title
+        if #available(macOS 15.5, *) {
+            ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.title])
+        }
     }
 
     // MARK: - Favicon Logic
@@ -535,7 +532,11 @@ extension Tab: WKNavigationDelegate {
         _ webView: WKWebView,
         didStartProvisionalNavigation navigation: WKNavigation!
     ) {
+        print("🌐 [Tab] didStartProvisionalNavigation for: \(webView.url?.absoluteString ?? "unknown")")
         loadingState = .didStartProvisionalNavigation
+        if #available(macOS 15.5, *) {
+            ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.loading])
+        }
 
         if let newURL = webView.url {
             self.url = newURL
@@ -547,10 +548,17 @@ extension Tab: WKNavigationDelegate {
         _ webView: WKWebView,
         didCommit navigation: WKNavigation!
     ) {
+        print("🌐 [Tab] didCommit navigation for: \(webView.url?.absoluteString ?? "unknown")")
         loadingState = .didCommit
+        if #available(macOS 15.5, *) {
+            ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.loading])
+        }
 
         if let newURL = webView.url {
             self.url = newURL
+            if #available(macOS 15.5, *) {
+                ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
+            }
         }
     }
 
@@ -559,15 +567,23 @@ extension Tab: WKNavigationDelegate {
         _ webView: WKWebView,
         didFinish navigation: WKNavigation!
     ) {
+        print("✅ [Tab] didFinish navigation for: \(webView.url?.absoluteString ?? "unknown")")
         loadingState = .didFinish
+        if #available(macOS 15.5, *) {
+            ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.loading])
+        }
 
         if let newURL = webView.url {
             self.url = newURL
+            if #available(macOS 15.5, *) {
+                ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
+            }
         }
 
         webView.evaluateJavaScript("document.title") {
             [weak self] result, error in
             if let title = result as? String {
+                print("📄 [Tab] Got title from JavaScript: '\(title)'")
                 DispatchQueue.main.async {
                     self?.updateTitle(title)
                     
@@ -581,6 +597,8 @@ extension Tab: WKNavigationDelegate {
                         )
                     }
                 }
+            } else if let jsError = error {
+                print("⚠️ [Tab] Failed to get document.title: \(jsError.localizedDescription)")
             }
         }
 
@@ -593,7 +611,6 @@ extension Tab: WKNavigationDelegate {
         
         injectDownloadJavaScript(to: webView)
         injectLinkHoverJavaScript(to: webView)
-
         updateNavigationState()
     }
 
@@ -603,8 +620,9 @@ extension Tab: WKNavigationDelegate {
         didFail navigation: WKNavigation!,
         withError error: Error
     ) {
+        print("❌ [Tab] didFail navigation for: \(webView.url?.absoluteString ?? "unknown")")
+        print("   Error: \(error.localizedDescription)")
         loadingState = .didFail(error)
-        print("Error: \(error.localizedDescription)")
 
         // Set error favicon on navigation failure
         Task { @MainActor in
@@ -620,8 +638,9 @@ extension Tab: WKNavigationDelegate {
         didFailProvisionalNavigation navigation: WKNavigation!,
         withError error: Error
     ) {
+        print("💥 [Tab] didFailProvisionalNavigation for: \(webView.url?.absoluteString ?? "unknown")")
+        print("   Error: \(error.localizedDescription)")
         loadingState = .didFailProvisionalNavigation(error)
-        print("Error: \(error.localizedDescription)")
 
         // Set connection error favicon
         Task { @MainActor in
@@ -835,5 +854,3 @@ extension Tab {
         return id.hashValue
     }
 }
-
-
