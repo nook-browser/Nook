@@ -66,6 +66,7 @@ public class Tab: NSObject, Identifiable {
     var didNotifyOpenToExtensions: Bool = false
     var webView: WKWebView {
         if _webView == nil {
+            print("🔧 [Tab] First webView access, calling setupWebView() for: \(url.absoluteString)")
             setupWebView()
         }
         return _webView!
@@ -159,57 +160,25 @@ public class Tab: NSObject, Identifiable {
     private func setupWebView() {
         var configuration = BrowserConfiguration.shared.webViewConfiguration
         
-        // For webkit-extension URLs, create a specialized configuration
-        if url.absoluteString.contains("webkit-extension://") {
-            print("🔧 [Tab] Setting up WebView for webkit-extension URL: \(url.absoluteString)")
-            print("   Has extension controller: \(configuration.webExtensionController != nil)")
+        // CRITICAL: Ensure the configuration has access to extension controller for ALL URLs
+        // Extensions may load additional resources that also need access
+        if #available(macOS 15.5, *) {
+            print("🔍 [Tab] Checking extension controller setup...")
+            print("   Configuration has controller: \(configuration.webExtensionController != nil)")
+            print("   ExtensionManager has controller: \(ExtensionManager.shared.nativeController != nil)")
             
-            if let controller = configuration.webExtensionController,
-               let host = url.host {
-                print("   Looking for extension context with UUID: \(host)")
-                let matchingContext = controller.extensionContexts.first { context in
-                    context.uniqueIdentifier == host
-                }
-                if let context = matchingContext {
-                    print("   ✅ Found matching extension context: \(context.webExtension.displayName ?? "Unknown")")
-                    
-                    // CRITICAL FIX: Create a minimal fresh configuration for this extension
-                    print("   🔧 Creating fresh configuration for specific extension...")
-                    
-                    let extensionConfig = WKWebViewConfiguration()
-                    
-                    // Set the specific extension controller that contains this extension context
-                    extensionConfig.webExtensionController = controller
-                    
-                    // Copy only essential settings to avoid conflicts
-                    extensionConfig.websiteDataStore = WKWebsiteDataStore.default()
-                    extensionConfig.preferences.javaScriptEnabled = true
-                    extensionConfig.defaultWebpagePreferences.allowsContentJavaScript = true
-                    
-                    // Use the fresh config
-                    configuration = extensionConfig
-                    
-                    print("   ✅ Created fresh extension configuration")
-                    print("   Extension context ID: \(context.uniqueIdentifier)")
-                    print("   Extension display name: \(context.webExtension.displayName ?? "Unknown")")
-                    
-                    // Debug: Check what the extension manifest says about options
-                    if #available(macOS 15.5, *) {
-                        let manifest = context.webExtension.manifest
-                        print("   📋 Extension manifest keys: \(manifest.keys)")
-                        if let optionsUI = manifest["options_ui"] as? [String: Any] {
-                            print("   🎛️ Options UI config: \(optionsUI)")
-                        }
-                        if let optionsPage = manifest["options_page"] as? String {
-                            print("   📄 Options page: \(optionsPage)")
-                        }
-                    }
+            if configuration.webExtensionController == nil {
+                if let controller = ExtensionManager.shared.nativeController {
+                    configuration.webExtensionController = controller
+                    print("🔧 [Tab] Added extension controller to configuration for resource access")
+                    print("   Controller contexts: \(controller.extensionContexts.count)")
                 } else {
-                    print("   ❌ No matching extension context found!")
-                    print("   Available contexts:")
-                    for context in controller.extensionContexts {
-                        print("     - \(context.uniqueIdentifier): \(context.webExtension.displayName ?? "Unknown")")
-                    }
+                    print("❌ [Tab] No extension controller available from ExtensionManager")
+                }
+            } else {
+                print("✅ [Tab] Configuration already has extension controller")
+                if let controller = configuration.webExtensionController {
+                    print("   Controller contexts: \(controller.extensionContexts.count)")
                 }
             }
         }
@@ -248,6 +217,16 @@ public class Tab: NSObject, Identifiable {
         loadURL(url)
     }
 
+    // Minimal hook to satisfy ExtensionManager: update extension controller on existing webView.
+    func applyWebViewConfigurationOverride(_ configuration: WKWebViewConfiguration) {
+        guard let existing = _webView else { return }
+        if #available(macOS 15.5, *), let controller = configuration.webExtensionController {
+            existing.configuration.webExtensionController = controller
+        }
+    }
+
+    
+
     // MARK: - Tab Actions
     func closeTab() {
         print("Closing tab: \(self.name)")
@@ -271,15 +250,7 @@ public class Tab: NSObject, Identifiable {
         self.url = newURL
         loadingState = .didStartProvisionalNavigation
         
-        // Special handling for webkit-extension URLs
-        if newURL.absoluteString.contains("webkit-extension://") {
-            print("🔧 [Tab] Loading webkit-extension URL with special handling...")
-            print("   URL: \(newURL.absoluteString)")
-            
-            // For webkit-extension URLs, just load directly - the WebView should handle resource serving
-            let request = URLRequest(url: newURL)
-            webView.load(request)
-        } else if newURL.isFileURL {
+        if newURL.isFileURL {
             // Grant read access to the containing directory for local resources
             let directoryURL = newURL.deletingLastPathComponent()
             print("🔧 [Tab] Loading file URL with directory access: \(directoryURL.path)")
@@ -481,20 +452,6 @@ extension Tab: WKNavigationDelegate {
         print("💥 [Tab] didFailProvisionalNavigation for: \(webView.url?.absoluteString ?? "unknown")")
         print("   Error: \(error.localizedDescription)")
         loadingState = .didFailProvisionalNavigation(error)
-        
-        // Debug webkit-extension URL failures
-        if let url = webView.url?.absoluteString, url.contains("webkit-extension://") {
-            print("💥 [Tab] webkit-extension URL failed to load!")
-            print("   URL: \(url)")
-            print("   Error domain: \(error._domain)")
-            print("   Error code: \(error._code)")
-            print("   WebView has extension controller: \(webView.configuration.webExtensionController != nil)")
-            
-            if let nsError = error as NSError? {
-                print("   NSError userInfo: \(nsError.userInfo)")
-            }
-            
-        }
 
         // Set connection error favicon
         Task { @MainActor in

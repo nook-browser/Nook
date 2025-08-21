@@ -238,12 +238,6 @@ class TabManager {
             return createNewTab(in: space)
         }
         
-        // Debug webkit-extension URLs
-        if normalizedUrl.contains("webkit-extension://") {
-            print("🔧 [TabManager] Creating tab with webkit-extension URL: \(normalizedUrl)")
-            print("   Original URL: \(url)")
-            print("   Normalized URL: \(normalizedUrl)")
-        }
         let targetSpace = space ?? currentSpace
         let sid = targetSpace?.id
         
