@@ -86,6 +86,7 @@ class TabManager {
 
     func setActiveSpace(_ space: Space) {
         guard spaces.contains(where: { $0.id == space.id }) else { return }
+        let previousTab = currentTab
         currentSpace = space
 
         let inSpace = tabsBySpace[space.id] ?? []
@@ -102,7 +103,12 @@ class TabManager {
             currentTab = inSpace.first ?? pinnedTabs.first
         }
 
+        // Pick a new current tab if needed
         persistSnapshot()
+        // Notify extensions about activation change across spaces
+        if #available(macOS 15.5, *), let newActive = currentTab {
+            ExtensionManager.shared.notifyTabActivated(newTab: newActive, previous: previousTab)
+        }
     }
 
     func renameSpace(spaceId: UUID, newName: String) {
@@ -135,6 +141,12 @@ class TabManager {
         var arr = tabsBySpace[sid] ?? []
         arr.append(tab)
         setTabs(arr, for: sid)
+        
+        // Notify extension system about new tab
+        if #available(macOS 15.5, *) {
+            ExtensionManager.shared.notifyTabOpened(tab)
+        }
+        
         print("Added tab: \(tab.name) to space \(sid)")
         persistSnapshot()
     }
@@ -161,6 +173,10 @@ class TabManager {
         }
 
         guard let tab = removed else { return }
+
+        if #available(macOS 15.5, *) {
+            ExtensionManager.shared.notifyTabClosed(tab)
+        }
 
         if wasCurrent {
             if tab.spaceId == nil {
@@ -196,11 +212,15 @@ class TabManager {
         guard contains(tab) else {
             return
         }
+        let previous = currentTab
         if let old = currentTab, old.id != tab.id { old.pause() }
         currentTab = tab
         if let sid = tab.spaceId, let sp = spaces.first(where: { $0.id == sid })
         {
             currentSpace = sp
+        }
+        if #available(macOS 15.5, *) {
+            ExtensionManager.shared.notifyTabActivated(newTab: tab, previous: previous)
         }
         persistSnapshot()
     }
@@ -211,11 +231,13 @@ class TabManager {
         in space: Space? = nil
     ) -> Tab {
         let engine = browserManager?.settingsManager.searchEngine ?? .google
-        guard let validURL = URL(string: normalizeURL(url, provider: engine))
+        let normalizedUrl = normalizeURL(url, provider: engine)
+        guard let validURL = URL(string: normalizedUrl)
         else {
             print("Invalid URL: \(url). Falling back to default.")
             return createNewTab(in: space)
         }
+        
         let targetSpace = space ?? currentSpace
         let sid = targetSpace?.id
         
@@ -616,6 +638,16 @@ extension TabManager {
             }
         }
         if let ct = self.currentTab { _ = ct.webView }
+        // Inform the extension controller about existing tabs and the active tab
+        if #available(macOS 15.5, *) {
+            for t in (self.pinnedTabs + self.tabs) where t.didNotifyOpenToExtensions == false {
+                ExtensionManager.shared.notifyTabOpened(t)
+                t.didNotifyOpenToExtensions = true
+            }
+            if let current = self.currentTab {
+                ExtensionManager.shared.notifyTabActivated(newTab: current, previous: nil)
+            }
+        }
     }
 }
 extension TabManager {

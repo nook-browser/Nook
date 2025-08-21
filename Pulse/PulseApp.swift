@@ -179,6 +179,26 @@ struct PulseCommands: Commands {
                 }
             }
         }
+        
+        // Extensions Commands
+        CommandMenu("Extensions") {
+            Button("Install Extension...") {
+                browserManager.showExtensionInstallDialog()
+            }
+            .keyboardShortcut("e", modifiers: [.command, .shift])
+            
+            Button("Manage Extensions...") {
+                // Open settings to extensions tab
+                openWindow(id: "settings")
+            }
+
+            if #available(macOS 15.5, *) {
+                Divider()
+                Button("Open Popup Console") {
+                    browserManager.extensionManager?.showPopupConsole()
+                }
+            }
+        }
     }
 }
 

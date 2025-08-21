@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import AppKit
+import WebKit
 
 @MainActor
 final class Persistence {
@@ -15,7 +16,7 @@ final class Persistence {
     let container: ModelContainer
     private init() {
         container = try! ModelContainer(
-            for: Schema([SpaceEntity.self,TabEntity.self, TabsStateEntity.self, HistoryEntity.self])
+            for: Schema([SpaceEntity.self, TabEntity.self, TabsStateEntity.self, HistoryEntity.self, ExtensionEntity.self])
         )
     }
 }
@@ -36,12 +37,19 @@ class BrowserManager: ObservableObject {
     var historyManager: HistoryManager
     var cookieManager: CookieManager
     var cacheManager: CacheManager
+    var extensionManager: ExtensionManager?
     
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
 
     init() {
         self.modelContext = Persistence.shared.container.mainContext
+        // Prepare native ExtensionManager reference early; defer attach until after init completes.
+        if #available(macOS 15.5, *) {
+            let mgr = ExtensionManager.shared
+            self.extensionManager = mgr
+        }
+
         self.tabManager = TabManager(browserManager: nil,context: modelContext)
         self.settingsManager = SettingsManager()
         self.dialogManager = DialogManager()
@@ -50,9 +58,14 @@ class BrowserManager: ObservableObject {
         self.cookieManager = CookieManager()
         self.cacheManager = CacheManager()
         self.tabManager.browserManager = self
+        // Attach extension manager BEFORE any WKWebView is created so content scripts can inject
+        if #available(macOS 15.5, *), let mgr = self.extensionManager {
+            mgr.attach(browserManager: self)
+        }
+
         self.tabManager.reattachBrowserManager(self)
         loadSidebarSettings()
-
+        
     }
     
     func updateSidebarWidth(_ width: CGFloat) {
@@ -275,29 +288,64 @@ class BrowserManager: ObservableObject {
         }
     }
     
-    func copyCurrentURL() {
-    if let url = tabManager.currentTab?.url.absoluteString {
-        print("Attempting to copy URL: \(url)")
-        
-        DispatchQueue.main.async {
-            NSPasteboard.general.clearContents()
-            let success = NSPasteboard.general.setString(url, forType: .string)
-            let e = NSHapticFeedbackManager.defaultPerformer
-            e.perform(.generic, performanceTime: .drawCompleted)
-            print("Clipboard operation success: \(success)")
+    // MARK: - Extension Management
+    
+    func showExtensionInstallDialog() {
+        if #available(macOS 15.5, *) {
+            extensionManager?.showExtensionInstallDialog()
+        } else {
+            // Show unsupported OS alert
+            let alert = NSAlert()
+            alert.messageText = "Extensions Not Supported"
+            alert.informativeText = "Extensions require macOS 15.5 or later."
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
         }
-        
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-            self.didCopyURL = true
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                self.didCopyURL = false
-            }
-        }
-    } else {
-        print("No URL found to copy")
     }
-}
+    
+    func enableExtension(_ extensionId: String) {
+        if #available(macOS 15.5, *) {
+            extensionManager?.enableExtension(extensionId)
+        }
+    }
+    
+    func disableExtension(_ extensionId: String) {
+        if #available(macOS 15.5, *) {
+            extensionManager?.disableExtension(extensionId)
+        }
+    }
+    
+    func uninstallExtension(_ extensionId: String) {
+        if #available(macOS 15.5, *) {
+            extensionManager?.uninstallExtension(extensionId)
+        }
+    }
+
+    // MARK: - URL Utilities
+    func copyCurrentURL() {
+        if let url = tabManager.currentTab?.url.absoluteString {
+            print("Attempting to copy URL: \(url)")
+            
+            DispatchQueue.main.async {
+                NSPasteboard.general.clearContents()
+                let success = NSPasteboard.general.setString(url, forType: .string)
+                let e = NSHapticFeedbackManager.defaultPerformer
+                e.perform(.generic, performanceTime: .drawCompleted)
+                print("Clipboard operation success: \(success)")
+            }
+            
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                self.didCopyURL = true
+            }
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                    self.didCopyURL = false
+                }
+            }
+        } else {
+            print("No URL found to copy")
+        }
+    }
 }
