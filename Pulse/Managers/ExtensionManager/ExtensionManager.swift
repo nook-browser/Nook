@@ -32,6 +32,8 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     private var tabAdapters: [UUID: ExtensionTabAdapter] = [:]
     internal var windowAdapter: ExtensionWindowAdapter?
     private weak var browserManagerRef: BrowserManager?
+    // Whether to auto-resize extension action popovers to content. Disabled per UX preference.
+    private let shouldAutoSizeActionPopups: Bool = false
 
     // No preference for action popups-as-tabs; keep native popovers per Apple docs
     
@@ -1398,25 +1400,27 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             webView.configuration.userContentController.removeScriptMessageHandler(forName: "pulseDiag")
             webView.configuration.userContentController.add(self, name: "pulseDiag")
 
-            // Install a light ResizeObserver to autosize the popover to content
-            let resizeScript = """
-            (function(){
-              try {
-                const post = (label, payload) => { try { webkit.messageHandlers.pulseDiag.postMessage({label, payload, phase:'resize'}); } catch(_){} };
-                const measure = () => {
-                  const d=document, e=d.documentElement, b=d.body;
-                  const w = Math.ceil(Math.max(e.scrollWidth, b?b.scrollWidth:0, e.clientWidth));
-                  const h = Math.ceil(Math.max(e.scrollHeight, b?b.scrollHeight:0, e.clientHeight));
-                  post('popupSize', {w, h});
-                };
-                new ResizeObserver(measure).observe(document.documentElement);
-                window.addEventListener('load', measure);
-                setTimeout(measure, 50); setTimeout(measure, 250); setTimeout(measure, 800);
-              } catch(_){}
-            })();
-            """
-            let user = WKUserScript(source: resizeScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
-            webView.configuration.userContentController.addUserScript(user)
+            if shouldAutoSizeActionPopups {
+                // Install a light ResizeObserver to autosize the popover to content
+                let resizeScript = """
+                (function(){
+                  try {
+                    const post = (label, payload) => { try { webkit.messageHandlers.pulseDiag.postMessage({label, payload, phase:'resize'}); } catch(_){} };
+                    const measure = () => {
+                      const d=document, e=d.documentElement, b=d.body;
+                      const w = Math.ceil(Math.max(e.scrollWidth, b?b.scrollWidth:0, e.clientWidth));
+                      const h = Math.ceil(Math.max(e.scrollHeight, b?b.scrollHeight:0, e.clientHeight));
+                      post('popupSize', {w, h});
+                    };
+                    new ResizeObserver(measure).observe(document.documentElement);
+                    window.addEventListener('load', measure);
+                    setTimeout(measure, 50); setTimeout(measure, 250); setTimeout(measure, 800);
+                  } catch(_){}
+                })();
+                """
+                let user = WKUserScript(source: resizeScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+                webView.configuration.userContentController.addUserScript(user)
+            }
 
             // Minimal polyfills for Chromium-only APIs some extensions feature-detect
             let polyfillScript = """
@@ -1815,7 +1819,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         // Present the popover on main thread
         DispatchQueue.main.async {
             let targetWindow = NSApp.keyWindow ?? NSApp.mainWindow
-            // Remember this popover for autosizing based on popup webView host UUID
+            // Remember this popover (used for diagnostics and, if enabled, autosizing)
             if let host = action.popupWebView?.url?.host {
                 self.activePopoversByHost[host] = popover
             }
@@ -1909,7 +1913,8 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             guard let dict = message.body as? [String: Any] else { print("[Diag] Non-dictionary payload received"); return }
             let label = dict["label"] as? String ?? "?"
             if label == "popupSize" {
-                if let payload = dict["payload"] as? [String: Any] {
+                // Respect UX: keep popup size fixed; ignore auto-resize suggestions
+                if shouldAutoSizeActionPopups, let payload = dict["payload"] as? [String: Any] {
                     let w = (payload["w"] as? NSNumber)?.doubleValue ?? 0
                     let h = (payload["h"] as? NSNumber)?.doubleValue ?? 0
                     if w > 0 && h > 0 {
