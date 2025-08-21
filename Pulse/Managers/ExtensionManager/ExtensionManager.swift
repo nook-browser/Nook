@@ -2244,72 +2244,89 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         print("   Should be active: \(configuration.shouldBeActive)")
         print("   Should be pinned: \(configuration.shouldBePinned)")
         
-        // Special handling for extension options pages
+        // Special handling for extension page URLs (options, popup, etc.)
         if let url = configuration.url?.absoluteString,
-           url.contains("webkit-extension://"),
-           (url.contains("/options.html") || url.contains("/ui/options/")) {
-            print("🎛️ [DELEGATE] Extension requesting options page")
+           url.contains("webkit-extension://") {
+            print("🎛️ [DELEGATE] Extension requesting internal page: \(url)")
             
-            // Check if the extension actually has an options page declared
-            let manifest = extensionContext.webExtension.manifest
-            let hasOptionsPage = manifest["options_ui"] != nil || manifest["options_page"] != nil
-            
-            if !hasOptionsPage {
-                print("   ⚠️ Extension doesn't declare options_ui/options_page in manifest")
-                print("   🔄 Creating fallback options page...")
+            // Check if this is an options page - present it natively like a popup
+            if url.contains("/options") || url.contains("/settings") {
+                print("   🎛️ Presenting options page natively in popup window")
                 
-                // Create a helpful fallback page explaining the situation
-                let fallbackHTML = """
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <title>\(extensionContext.webExtension.displayName ?? "Extension") Settings</title>
-                        <meta charset="utf-8">
-                        <style>
-                            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
-                                   margin: 40px; background: #f5f5f5; text-align: center; }
-                            .container { max-width: 500px; margin: 0 auto; background: white; 
-                                        padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-                            h1 { color: #333; margin-bottom: 20px; }
-                            .info { background: #e3f2fd; border: 1px solid #2196f3; 
-                                   border-radius: 4px; padding: 15px; margin: 20px 0; text-align: left; }
-                        </style>
-                    </head>
-                    <body>
-                        <div class="container">
-                            <h1>\(extensionContext.webExtension.displayName ?? "Extension") Settings</h1>
-                            <div class="info">
-                                <p><strong>Note:</strong> This extension doesn't provide a dedicated settings page.</p>
-                                <p>You can usually access extension settings through:</p>
-                                <ul>
-                                    <li>Right-clicking the extension icon in the toolbar</li>
-                                    <li>The extension's popup menu</li>
-                                    <li>Browser extension management settings</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </body>
-                    </html>
-                """
-                
-                guard let bm = browserManagerRef else { 
-                    completionHandler(nil, NSError(domain: "ExtensionManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "Browser manager not available"]))
-                    return 
+                // Present options page in a native popup window like the regular popup
+                DispatchQueue.main.async {
+                    // Create a native options window using the same mechanism as popups
+                    let window = NSApp.keyWindow ?? NSApp.mainWindow
+                    if let window = window {
+                        
+                        // Create a popover for the options page
+                        let popover = NSPopover()
+                        popover.contentSize = NSSize(width: 800, height: 600) // Larger for options
+                        popover.behavior = .transient
+                        popover.animates = true
+                        
+                        // Create WebView with the same configuration that works for popups
+                        let config = WKWebViewConfiguration()
+                        if let controller = self.nativeController {
+                            config.webExtensionController = controller
+                            print("   ✅ Set extension controller on WebView config")
+                        }
+                        config.preferences.javaScriptEnabled = true
+                        config.defaultWebpagePreferences.allowsContentJavaScript = true
+                        
+                        let webView = WKWebView(frame: NSRect(origin: .zero, size: popover.contentSize), configuration: config)
+                        
+                        // Load the options page directly from the extension's file system
+                        // Extract the UUID from the webkit-extension URL
+                        if let host = URL(string: url)?.host,
+                           let controller = self.nativeController,
+                           let context = controller.extensionContexts.first(where: { $0.uniqueIdentifier == host }) {
+                            
+                            // Get the extension's base URL (file system path)
+                            let extensionBaseURL = context.baseURL
+                            let optionsFilePath = extensionBaseURL.appendingPathComponent("ui/options/index.html")
+                            
+                            print("   🔧 Loading options page from file system: \(optionsFilePath)")
+                            
+                            if FileManager.default.fileExists(atPath: optionsFilePath.path) {
+                                webView.loadFileURL(optionsFilePath, allowingReadAccessTo: extensionBaseURL)
+                                print("   ✅ Loading options page from file system")
+                            } else {
+                                print("   ❌ Options file not found at: \(optionsFilePath.path)")
+                                // Try loading the webkit-extension URL as fallback
+                                if let optionsURL = URL(string: url) {
+                                    webView.load(URLRequest(url: optionsURL))
+                                }
+                            }
+                        } else {
+                            print("   ❌ Could not find extension context for URL")
+                            // Fallback to webkit-extension URL
+                            if let optionsURL = URL(string: url) {
+                                webView.load(URLRequest(url: optionsURL))
+                            }
+                        }
+                        
+                        // Create view controller and present
+                        let viewController = NSViewController()
+                        viewController.view = webView
+                        popover.contentViewController = viewController
+                        
+                        // Show the popover
+                        if let contentView = window.contentView {
+                            let rect = NSRect(x: contentView.bounds.midX, y: contentView.bounds.midY, width: 1, height: 1)
+                            popover.show(relativeTo: rect, of: contentView, preferredEdge: .minY)
+                        }
+                        
+                        print("   ✅ Presented options page in native popover")
+                    }
+                    
+                    // Return success to the extension
+                    completionHandler(nil, nil)
                 }
-                
-                // Create tab with fallback HTML content
-                let space = bm.tabManager.currentSpace
-                let newTab = bm.tabManager.createNewTab(url: "", in: space)
-                newTab.webView.loadHTMLString(fallbackHTML, baseURL: nil)
-                
-                if configuration.shouldBePinned { bm.tabManager.pinTab(newTab) }
-                if configuration.shouldBeActive { bm.tabManager.setActiveTab(newTab) }
-                
-                print("✅ Created fallback options tab: \(newTab.name)")
-                let tabAdapter = self.stableAdapter(for: newTab)
-                completionHandler(tabAdapter, nil)
                 return
             }
+            
+            print("   🔧 Allowing WebView to serve extension resource directly")
         }
         
         guard let bm = browserManagerRef else { 
@@ -2504,6 +2521,127 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         // TODO: replace with a user-facing prompt + persistence
         print("[ExtensionManager] Granting URL access to: \(urls.map{ $0.absoluteString })")
         completionHandler(urls, nil)
+    }
+    
+    // MARK: - URL Scheme Handler Testing
+    
+    /// Test the webkit-extension URL scheme handler with an existing extension
+    @available(macOS 15.4, *)
+    func testWebKitExtensionURLSchemeHandler() {
+        print("=== WebKit Extension URL Scheme Handler Test ===")
+        
+        guard isExtensionSupportAvailable else {
+            print("❌ Extension support not available")
+            return
+        }
+        
+        // Test with the first available extension
+        guard let firstExtension = installedExtensions.first else {
+            print("❌ No extensions installed for testing")
+            return
+        }
+        
+        let extensionUUID = firstExtension.id
+        print("🧪 Testing with extension UUID: \(extensionUUID)")
+        
+        // Test various URLs
+        let testURLs = [
+            "webkit-extension://\(extensionUUID)/popup.html",
+            "webkit-extension://\(extensionUUID)/manifest.json",
+            "webkit-extension://\(extensionUUID)/css/popup.css",
+            "webkit-extension://\(extensionUUID)/js/popup.js",
+            "webkit-extension://\(extensionUUID)/",  // Should default to index.html
+            "webkit-extension://\(extensionUUID)/nonexistent.html"  // Should fail
+        ]
+        
+        for urlString in testURLs {
+            if let url = URL(string: urlString) {
+                testSingleWebKitExtensionURL(url)
+            }
+        }
+        
+        print("=== WebKit Extension URL Scheme Handler Test Complete ===")
+    }
+    
+    /// List all installed extensions with their UUIDs for easy testing
+    func listInstalledExtensionsForTesting() {
+        print("=== Installed Extensions ===")
+        
+        if installedExtensions.isEmpty {
+            print("❌ No extensions installed")
+            return
+        }
+        
+        for (index, extension) in installedExtensions.enumerated() {
+            print("\(index + 1). \(extension.name)")
+            print("   UUID: \(extension.id)")
+            print("   Version: \(extension.version)")
+            print("   Manifest Version: \(extension.manifestVersion)")
+            print("   Enabled: \(extension.isEnabled)")
+            print("")
+        }
+        
+        print("Use ExtensionManager.shared.testWebKitExtensionURLSchemeHandler() to test URL scheme handler")
+    }
+    
+    @available(macOS 15.4, *)
+    private func testSingleWebKitExtensionURL(_ url: URL) {
+        print("🔍 Testing URL: \(url.absoluteString)")
+        
+        // Create a test WebView with the configured URL scheme handler
+        let webView = WKWebView(frame: .zero, configuration: BrowserConfiguration.shared.webViewConfiguration)
+        
+        // Create a simple navigation delegate to track results
+        let testDelegate = WebKitExtensionTestDelegate()
+        webView.navigationDelegate = testDelegate
+        
+        // Load the URL
+        let request = URLRequest(url: url)
+        webView.load(request)
+        
+        // Give it a moment to load and then check results
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            testDelegate.printResults(for: url)
+        }
+    }
+}
+
+// MARK: - Test Helper Classes
+
+@available(macOS 15.4, *)
+class WebKitExtensionTestDelegate: NSObject, WKNavigationDelegate {
+    private var loadStartTime: Date?
+    private var lastError: Error?
+    private var didFinishLoading = false
+    
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        loadStartTime = Date()
+        didFinishLoading = false
+        lastError = nil
+    }
+    
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        didFinishLoading = true
+    }
+    
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        lastError = error
+    }
+    
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        lastError = error
+    }
+    
+    func printResults(for url: URL) {
+        let elapsed = loadStartTime.map { Date().timeIntervalSince($0) } ?? 0
+        
+        if let error = lastError {
+            print(String(format: "   ❌ Failed to load (%.2fs): %@", elapsed, error.localizedDescription))
+        } else if didFinishLoading {
+            print(String(format: "   ✅ Successfully loaded (%.2fs)", elapsed))
+        } else {
+            print(String(format: "   ⏳ Still loading or timed out (%.2fs)", elapsed))
+        }
     }
 }
 
