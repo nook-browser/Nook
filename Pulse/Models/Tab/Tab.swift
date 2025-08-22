@@ -61,10 +61,23 @@ public class Tab: NSObject, Identifiable {
 
     var canGoBack: Bool = false
     var canGoForward: Bool = false
+    
+    // MARK: - Video State
+    var hasPlayingVideo: Bool = false
+    var hasPiPActive: Bool = false
+    private var videoDetectionTimer: Timer?
 
     private var _webView: WKWebView?
     var didNotifyOpenToExtensions: Bool = false
-    var webView: WKWebView {
+    var webView: WKWebView? {
+        if _webView == nil {
+            print("🔧 [Tab] First webView access, calling setupWebView() for: \(url.absoluteString)")
+            setupWebView()
+        }
+        return _webView
+    }
+    
+    var activeWebView: WKWebView {
         if _webView == nil {
             print("🔧 [Tab] First webView access, calling setupWebView() for: \(url.absoluteString)")
             setupWebView()
@@ -162,7 +175,7 @@ public class Tab: NSObject, Identifiable {
     // MARK: - WebView Setup
 
     private func setupWebView() {
-        var configuration = BrowserConfiguration.shared.webViewConfiguration
+        let configuration = BrowserConfiguration.shared.webViewConfiguration
         
         // Debug: Check what data store this WebView will use
         print("[Tab] Creating WebView with data store ID: \(configuration.websiteDataStore.identifier?.uuidString ?? "default")")
@@ -201,10 +214,12 @@ public class Tab: NSObject, Identifiable {
         _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "linkHover")
         _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "commandHover")
         _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "commandClick")
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "pipStateChange")
         
         _webView?.configuration.userContentController.add(self, name: "linkHover")
         _webView?.configuration.userContentController.add(self, name: "commandHover")
         _webView?.configuration.userContentController.add(self, name: "commandClick")
+        _webView?.configuration.userContentController.add(self, name: "pipStateChange")
 
         _webView?.customUserAgent =
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15"
@@ -259,6 +274,15 @@ public class Tab: NSObject, Identifiable {
         _webView?.uiDelegate = nil
         _webView = nil
 
+        // Clean up video detection
+        videoDetectionTimer?.invalidate()
+        videoDetectionTimer = nil
+        hasPlayingVideo = false
+        hasPiPActive = false
+        
+        // Stop any active PiP
+        PiPManager.shared.stopPiP(for: self)
+
         loadingState = .idle
 
         browserManager?.tabManager.removeTab(self.id)
@@ -272,11 +296,11 @@ public class Tab: NSObject, Identifiable {
             // Grant read access to the containing directory for local resources
             let directoryURL = newURL.deletingLastPathComponent()
             print("🔧 [Tab] Loading file URL with directory access: \(directoryURL.path)")
-            webView.loadFileURL(newURL, allowingReadAccessTo: directoryURL)
+            activeWebView.loadFileURL(newURL, allowingReadAccessTo: directoryURL)
         } else {
             // Regular URL loading
             let request = URLRequest(url: newURL)
-            webView.load(request)
+            activeWebView.load(request)
         }
 
         Task { @MainActor in
@@ -292,8 +316,47 @@ public class Tab: NSObject, Identifiable {
         loadURL(newURL)
     }
     
-    // No custom JavaScript injection
-    // MARK: - JavaScript Injection
+    // MARK: - Video Detection
+    private func startVideoDetection(for webView: WKWebView) {
+        // Stop any existing timer
+        videoDetectionTimer?.invalidate()
+        
+        // Check for videos every 2 seconds
+        videoDetectionTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.checkForPlayingVideos(in: webView)
+            }
+        }
+        
+        // Initial check
+        checkForPlayingVideos(in: webView)
+    }
+    
+    private func checkForPlayingVideos(in webView: WKWebView) {
+        let videoCheckScript = """
+        (() => {
+            const videos = document.querySelectorAll('video');
+            const hasPlaying = Array.from(videos).some(v => 
+                !v.paused && !v.ended && v.readyState >= 2 && 
+                v.offsetWidth > 0 && v.offsetHeight > 0
+            );
+            return { hasPlaying };
+        })();
+        """
+        
+        webView.evaluateJavaScript(videoCheckScript) { [weak self] result, error in
+            if let dict = result as? [String: Bool] {
+                DispatchQueue.main.async {
+                    self?.hasPlayingVideo = dict["hasPlaying"] ?? false
+                }
+            }
+        }
+    }
+    
+    func requestPictureInPicture() {
+        PiPManager.shared.requestPiP(for: self)
+    }
+    
     // MARK: - JavaScript Injection
     private func injectLinkHoverJavaScript(to webView: WKWebView) {
         let linkHoverScript = """
@@ -461,18 +524,91 @@ public class Tab: NSObject, Identifiable {
             }
         }
     }
+    
+    private func injectPiPStateListener(to webView: WKWebView) {
+        let pipStateScript = """
+        (function() {
+            function notifyPiPStateChange(isActive) {
+                if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.pipStateChange) {
+                    window.webkit.messageHandlers.pipStateChange.postMessage({ active: isActive });
+                }
+            }
+            
+            // Listen for standard PiP events
+            document.addEventListener('enterpictureinpicture', function() {
+                console.log('[PiP] Entered PiP via web API');
+                notifyPiPStateChange(true);
+            });
+            
+            document.addEventListener('leavepictureinpicture', function() {
+                console.log('[PiP] Left PiP via web API');
+                notifyPiPStateChange(false);
+            });
+            
+            // Listen for WebKit presentation mode changes
+            const videos = document.querySelectorAll('video');
+            videos.forEach(video => {
+                if (video.webkitSupportsPresentationMode) {
+                    video.addEventListener('webkitpresentationmodechanged', function() {
+                        const isInPiP = video.webkitPresentationMode === 'picture-in-picture';
+                        console.log('[PiP] WebKit presentation mode changed:', video.webkitPresentationMode);
+                        notifyPiPStateChange(isInPiP);
+                    });
+                }
+            });
+            
+            // Also listen for dynamically added videos
+            const observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    mutation.addedNodes.forEach(function(node) {
+                        if (node.tagName === 'VIDEO' && node.webkitSupportsPresentationMode) {
+                            node.addEventListener('webkitpresentationmodechanged', function() {
+                                const isInPiP = node.webkitPresentationMode === 'picture-in-picture';
+                                console.log('[PiP] WebKit presentation mode changed (dynamic):', node.webkitPresentationMode);
+                                notifyPiPStateChange(isInPiP);
+                            });
+                        }
+                    });
+                });
+            });
+            
+            observer.observe(document.body, { childList: true, subtree: true });
+        })();
+        """
+        
+        webView.evaluateJavaScript(pipStateScript) { result, error in
+            if let error = error {
+                print("Error injecting PiP state listener: \(error.localizedDescription)")
+            } else {
+                print("[PiP] State listener injected successfully")
+            }
+        }
+    }
 
     // MARK: - Tab State Management
     func activate() {
         browserManager?.tabManager.setActiveTab(self)
+        
+        // Restart video detection when tab becomes active
+        if let webView = _webView {
+            startVideoDetection(for: webView)
+        }
     }
 
     func pause() {
-        // Pause media when tab becomes inactive
-        _webView?.evaluateJavaScript(
-            "document.querySelectorAll('video, audio').forEach(el => el.pause());",
-            completionHandler: nil
-        )
+        // Don't pause media if PiP is active - let it continue in background
+        if !hasPiPActive && !PiPManager.shared.isPiPActive(for: self) {
+            _webView?.evaluateJavaScript(
+                "document.querySelectorAll('video, audio').forEach(el => el.pause());",
+                completionHandler: nil
+            )
+        }
+        
+        // Stop video detection when tab is inactive (but keep PiP state)
+        videoDetectionTimer?.invalidate()
+        videoDetectionTimer = nil
+        hasPlayingVideo = false
+        // Don't reset hasPiPActive here - let PiP continue
     }
 
     func updateTitle(_ title: String) {
@@ -611,6 +747,8 @@ extension Tab: WKNavigationDelegate {
         
         injectDownloadJavaScript(to: webView)
         injectLinkHoverJavaScript(to: webView)
+        injectPiPStateListener(to: webView)
+        startVideoDetection(for: webView)
         updateNavigationState()
     }
 
@@ -799,6 +937,14 @@ extension Tab: WKScriptMessageHandler {
                 }
             }
             
+        case "pipStateChange":
+            if let dict = message.body as? [String: Any], let active = dict["active"] as? Bool {
+                DispatchQueue.main.async {
+                    print("[PiP] State change detected from web: \(active)")
+                    self.hasPiPActive = active
+                }
+            }
+        
         default:
             break
         }

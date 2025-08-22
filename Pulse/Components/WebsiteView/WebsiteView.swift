@@ -116,7 +116,7 @@ struct TabWebViewWrapper: NSViewRepresentable {
         }
         
         print("Showing WebView for tab: \(tab.name)")
-        return webView
+        return tab.activeWebView
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
