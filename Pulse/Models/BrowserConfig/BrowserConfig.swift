@@ -30,14 +30,29 @@ class BrowserConfiguration {
 
         // Media settings
         config.mediaTypesRequiringUserActionForPlayback = []
+        
+        // Enable Picture-in-Picture for web media
+        config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
+        
+        // Enable background media playback
+        config.allowsAirPlayForMediaPlayback = true
+        if #available(macOS 11.0, *) {
+            config.preferences.setValue(true, forKey: "allowsInlineMediaPlaybackAfterFullscreen")
+        }
 
+        
+        // Enable inline media playback (iOS only - macOS doesn't need this property)
+        #if os(iOS)
+        if #available(iOS 10.0, *) {
+            config.allowsInlineMediaPlayback = true
+        }
+        #endif
+
+        
         // User agent for better compatibility
         config.applicationNameForUserAgent = "Version/17.4.1 Safari/605.1.15"
 
-        // Enable web inspector for debugging
-        if #available(macOS 13.3, *) {
-            config.preferences.setValue(true, forKey: "developerExtrasEnabled")
-        }
+        // Web inspector will be enabled per-webview using isInspectable property
 
         // Note: webExtensionController will be set by ExtensionManager during initialization
 
@@ -45,4 +60,5 @@ class BrowserConfiguration {
     }()
 
     private init() {}
+    
 }

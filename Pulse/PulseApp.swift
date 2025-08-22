@@ -69,6 +69,14 @@ struct PulseCommands: Commands {
             
             Divider()
             
+            Button("Web Inspector") {
+                browserManager.openWebInspector()
+            }
+            .keyboardShortcut("i", modifiers: [.command, .option])
+            .disabled(browserManager.tabManager.currentTab == nil)
+            
+            Divider()
+            
             Button("Force Quit App") {
                 browserManager.showQuitDialog()
             }
