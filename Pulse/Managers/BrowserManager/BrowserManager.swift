@@ -348,4 +348,51 @@ class BrowserManager: ObservableObject {
             print("No URL found to copy")
         }
     }
+    
+    // MARK: - Web Inspector
+    func openWebInspector() {
+        guard let currentTab = tabManager.currentTab else { 
+            print("No current tab to inspect")
+            return 
+        }
+        
+        if #available(macOS 13.3, *) {
+            let webView = currentTab.activeWebView
+            if webView.isInspectable {
+                DispatchQueue.main.async {
+                    // Focus the webview and trigger context menu programmatically
+                    self.presentInspectorContextMenu(for: webView)
+                }
+            } else {
+                print("Web inspector not available for this tab")
+            }
+        } else {
+            print("Web inspector requires macOS 13.3 or later")
+        }
+    }
+    
+    private func presentInspectorContextMenu(for webView: WKWebView) {
+        // Focus the webview first
+        webView.window?.makeFirstResponder(webView)
+        
+        // Create a right-click event at the center of the webview
+        let bounds = webView.bounds
+        let center = NSPoint(x: bounds.midX, y: bounds.midY)
+        
+        let rightClickEvent = NSEvent.mouseEvent(
+            with: .rightMouseDown,
+            location: center,
+            modifierFlags: [],
+            timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: webView.window?.windowNumber ?? 0,
+            context: nil,
+            eventNumber: 0,
+            clickCount: 1,
+            pressure: 1.0
+        )
+        
+        if let event = rightClickEvent {
+            webView.rightMouseDown(with: event)
+        }
+    }
 }
