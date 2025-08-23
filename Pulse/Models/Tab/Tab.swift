@@ -384,28 +384,38 @@ public class Tab: NSObject, Identifiable, ObservableObject {
     func checkMediaState() {
         guard let webView = _webView else { return }
         
-        // Simple state check - the injected script handles most detection automatically
+        // Simple state check - optimized single-pass version
         let mediaCheckScript = """
         (() => {
             const audios = document.querySelectorAll('audio');
             const videos = document.querySelectorAll('video');
             
+            // Single pass through audios
             const hasPlayingAudio = Array.from(audios).some(audio => 
                 !audio.paused && !audio.ended && audio.readyState >= 2
             );
             
-            const hasPlayingVideoWithAudio = Array.from(videos).some(video => 
-                !video.paused && !video.ended && video.readyState >= 2 && 
-                !video.muted && video.volume > 0
-            );
+            // Single pass through videos for all checks
+            let hasPlayingVideoWithAudio = false;
+            let hasPlayingVideo = false;
+            
+            Array.from(videos).forEach(video => {
+                const isPlaying = !video.paused && !video.ended && video.readyState >= 2;
+                if (isPlaying) {
+                    hasPlayingVideo = true;
+                    if (!video.muted && video.volume > 0) {
+                        hasPlayingVideoWithAudio = true;
+                    }
+                }
+            });
+            
+            const hasAudioContent = hasPlayingAudio || hasPlayingVideoWithAudio;
             
             return {
-                hasAudioContent: hasPlayingAudio || hasPlayingVideoWithAudio,
-                hasPlayingAudio: hasPlayingAudio || hasPlayingVideoWithAudio,
+                hasAudioContent: hasAudioContent,
+                hasPlayingAudio: hasAudioContent,
                 hasVideoContent: videos.length > 0,
-                hasPlayingVideo: Array.from(videos).some(video => 
-                    !video.paused && !video.ended && video.readyState >= 2
-                )
+                hasPlayingVideo: hasPlayingVideo
             };
         })();
         """
@@ -479,32 +489,41 @@ public class Tab: NSObject, Identifiable, ObservableObject {
                 const audios = document.querySelectorAll('audio');
                 const videos = document.querySelectorAll('video');
                 
+                // Single pass through audios
                 const hasPlayingAudio = Array.from(audios).some(audio => 
                     !audio.paused && !audio.ended && audio.readyState >= 2
                 );
-                const hasPlayingVideoWithAudio = Array.from(videos).some(video => 
-                    !video.paused && !video.ended && video.readyState >= 2 && 
-                    !video.muted && video.volume > 0
-                );
+                
+                // Single pass through videos for all checks
+                let hasPlayingVideoWithAudio = false;
+                let hasPlayingVideo = false;
+                
+                Array.from(videos).forEach(video => {
+                    const isPlaying = !video.paused && !video.ended && video.readyState >= 2;
+                    if (isPlaying) {
+                        hasPlayingVideo = true;
+                        if (!video.muted && video.volume > 0) {
+                            hasPlayingVideoWithAudio = true;
+                        }
+                    }
+                });
                 
                 // Audio content is simply whether there's currently playing audio
                 const hasAudioContent = hasPlayingAudio || hasPlayingVideoWithAudio;
                 
                 window.webkit.messageHandlers[handlerName].postMessage({
                     hasAudioContent: hasAudioContent,
-                    hasPlayingAudio: hasPlayingAudio || hasPlayingVideoWithAudio,
+                    hasPlayingAudio: hasAudioContent,
                     hasVideoContent: videos.length > 0,
-                    hasPlayingVideo: Array.from(videos).some(video => 
-                        !video.paused && !video.ended && video.readyState >= 2
-                    )
+                    hasPlayingVideo: hasPlayingVideo
                 });
             }
             
             function addAudioListeners(element) {
-                // Listen for media state changes
+                // Listen for media state changes - responsive but not excessive
                 ['play', 'pause', 'ended', 'loadedmetadata', 'canplay', 'volumechange'].forEach(event => {
                     element.addEventListener(event, function() {
-                        setTimeout(checkMediaState, 50);
+                        setTimeout(checkMediaState, 50); // Quick response
                     });
                 });
             }
@@ -544,7 +563,7 @@ public class Tab: NSObject, Identifiable, ObservableObject {
                 });
                 
                 if (hasChanges) {
-                    setTimeout(checkMediaState, 100);
+                    setTimeout(checkMediaState, 100); // Quick response for DOM changes
                 }
             });
             mediaObserver.observe(document.body, { childList: true, subtree: true });
