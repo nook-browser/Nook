@@ -167,6 +167,10 @@ struct PulseCommands: Commands {
                 Button("Clear Personal Data Cache") {
                     browserManager.clearPersonalDataCache()
                 }
+                
+                Button("Clear Favicon Cache") {
+                    browserManager.clearFaviconCache()
+                }
             }
             
             Divider()

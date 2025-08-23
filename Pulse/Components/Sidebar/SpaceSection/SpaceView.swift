@@ -9,9 +9,9 @@ import SwiftUI
 
 struct SpaceView: View {
     let space: Space
-    let tabs: [Tab]
     let isActive: Bool
     let width: CGFloat
+    @EnvironmentObject var browserManager: BrowserManager
 
     let onSetActive: () -> Void
     let onActivateTab: (Tab) -> Void
@@ -20,6 +20,11 @@ struct SpaceView: View {
     let onMoveTabUp: (Tab) -> Void
     let onMoveTabDown: (Tab) -> Void
     let onMuteTab: (Tab) -> Void
+    
+    // Get tabs directly from TabManager to ensure proper observation
+    private var tabs: [Tab] {
+        browserManager.tabManager.tabs(in: space)
+    }
 
     var body: some View {
         VStack(spacing: 8) {

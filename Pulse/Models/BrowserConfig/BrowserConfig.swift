@@ -47,6 +47,20 @@ class BrowserConfiguration {
         return config
     }()
 
+    // MARK: - Cache-Optimized Configuration
+    lazy var cacheOptimizedWebViewConfiguration: WKWebViewConfiguration = {
+        let config = webViewConfiguration
+        
+        // Enable aggressive caching
+        config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
+        config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
+        
+        // Set cache policy preferences
+        config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
+        
+        return config
+    }()
+
     private init() {}
     
 }
