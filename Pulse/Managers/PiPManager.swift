@@ -81,22 +81,46 @@ final class PiPManager: NSObject {
     }
     
     func stopPiP(for tab: Tab) {
-        guard let webView = tab.webView else { return }
+        guard let webView = tab.webView else { 
+            print("[PiP] No webView available for stopping PiP")
+            tab.hasPiPActive = false
+            return 
+        }
+        
+        // Check if webView is still valid and can execute JavaScript
+        guard webView.navigationDelegate != nil else {
+            print("[PiP] WebView delegate is nil, skipping PiP stop")
+            tab.hasPiPActive = false
+            return
+        }
         
         let stopWebPiPScript = """
-        const video = document.querySelector('video');
-        if (video) {
-            if (video.webkitSupportsPresentationMode && video.webkitPresentationMode === 'picture-in-picture') {
-                video.webkitSetPresentationMode('inline');
-            } else if (document.pictureInPictureElement) {
-                document.exitPictureInPicture();
+        (function() {
+            try {
+                const video = document.querySelector('video');
+                if (video) {
+                    if (video.webkitSupportsPresentationMode && video.webkitPresentationMode === 'picture-in-picture') {
+                        video.webkitSetPresentationMode('inline');
+                    } else if (document.pictureInPictureElement) {
+                        document.exitPictureInPicture();
+                    }
+                }
+                return { success: true };
+            } catch (error) {
+                return { success: false, error: error.message };
             }
-        }
+        })();
         """
         
-        webView.evaluateJavaScript(stopWebPiPScript) { _, error in
+        webView.evaluateJavaScript(stopWebPiPScript) { result, error in
             if let error = error {
                 print("[PiP] Error stopping web PiP: \(error.localizedDescription)")
+            } else if let resultDict = result as? [String: Any] {
+                if let success = resultDict["success"] as? Bool, !success {
+                    if let errorMsg = resultDict["error"] as? String {
+                        print("[PiP] JavaScript error stopping PiP: \(errorMsg)")
+                    }
+                }
             }
         }
         

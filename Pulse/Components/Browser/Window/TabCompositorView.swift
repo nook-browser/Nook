@@ -134,6 +134,13 @@ class TabCompositorManager: ObservableObject {
             return
         }
         
+        // Don't unload if tab has playing media
+        if tab.hasPlayingVideo || tab.hasPlayingAudio || tab.hasAudioContent {
+            // Restart timer for tabs with media
+            restartTimer(for: tabId)
+            return
+        }
+        
         // Unload the tab
         unloadTab(tab)
     }
