@@ -118,8 +118,9 @@ struct TabCompositorWrapper: NSViewRepresentable {
         // Update the compositor when tabs change
         updateCompositor(nsView)
         
-        // Update hover callbacks for current tab
+        // Mark current tab as accessed (resets unload timer)
         if let currentTab = browserManager.tabManager.currentTab {
+            browserManager.compositorManager.markTabAccessed(currentTab.id)
             setupHoverCallbacks(for: currentTab)
         }
     }
@@ -128,18 +129,17 @@ struct TabCompositorWrapper: NSViewRepresentable {
         // Remove all existing webview subviews
         containerView.subviews.forEach { $0.removeFromSuperview() }
         
-        // Add all loaded tabs to the compositor
+        // Add all loaded tabs to the compositor but only show the current one
         let allTabs = browserManager.tabManager.pinnedTabs + browserManager.tabManager.tabs
         
         for tab in allTabs {
-            if let webView = tab.webView {
-                // Only add webviews that are actually loaded
+            // Only add tabs that are still in the tab manager (not closed)
+            if !tab.isUnloaded, let webView = tab.webView {
                 webView.frame = containerView.bounds
                 webView.autoresizingMask = [.width, .height]
                 containerView.addSubview(webView)
                 
-                // Simple visibility: hide inactive tabs for performance
-                // Media should continue playing even when hidden (no more forced pause)
+                // Only show the current tab, hide others
                 webView.isHidden = tab.id != browserManager.tabManager.currentTab?.id
             }
         }
