@@ -42,8 +42,8 @@ struct SpaceTab: View {
                     .truncationMode(.tail)
                 Spacer()
 
-                // Mute button (show when tab has playing audio)
-                if tab.hasAudioContent {
+                // Mute button (show when tab has audio content OR is muted)
+                if tab.hasAudioContent || tab.isAudioMuted {
                     Button(action: {
                         onMute()
                     }) {
@@ -88,8 +88,8 @@ struct SpaceTab: View {
             }
         }
         .contextMenu {
-            // Mute/Unmute option (only show if tab has audio content)
-            if tab.hasAudioContent {
+            // Mute/Unmute option (show if tab has audio content OR is muted)
+            if tab.hasAudioContent || tab.isAudioMuted {
                 Button(action: onMute) {
                     Label(tab.isAudioMuted ? "Unmute Audio" : "Mute Audio", 
                           systemImage: tab.isAudioMuted ? "speaker.wave.2" : "speaker.slash")
