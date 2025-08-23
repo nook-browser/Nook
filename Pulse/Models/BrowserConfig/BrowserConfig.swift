@@ -36,18 +36,6 @@ class BrowserConfiguration {
         
         // Enable background media playback
         config.allowsAirPlayForMediaPlayback = true
-        if #available(macOS 11.0, *) {
-            config.preferences.setValue(true, forKey: "allowsInlineMediaPlaybackAfterFullscreen")
-        }
-
-        
-        // Enable inline media playback (iOS only - macOS doesn't need this property)
-        #if os(iOS)
-        if #available(iOS 10.0, *) {
-            config.allowsInlineMediaPlayback = true
-        }
-        #endif
-
         
         // User agent for better compatibility
         config.applicationNameForUserAgent = "Version/17.4.1 Safari/605.1.15"

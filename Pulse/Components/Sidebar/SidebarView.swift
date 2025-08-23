@@ -84,6 +84,9 @@ struct SidebarView: View {
                                             },
                                             onMoveTabDown: {
                                                 browserManager.tabManager.moveTabDown($0.id)
+                                            },
+                                            onMuteTab: { tab in
+                                                tab.toggleMute()
                                             }
                                         )
                                         .id(space.id)

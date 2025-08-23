@@ -19,6 +19,7 @@ struct SpaceView: View {
     let onPinTab: (Tab) -> Void
     let onMoveTabUp: (Tab) -> Void
     let onMoveTabDown: (Tab) -> Void
+    let onMuteTab: (Tab) -> Void
 
     var body: some View {
         VStack(spacing: 8) {
@@ -33,12 +34,10 @@ struct SpaceView: View {
                 VStack(spacing: 2) {
                     ForEach(tabs, id: \.id) { tab in
                         SpaceTab(
-                            tabName: tab.name,
-                            tabURL: tab.url.absoluteString,
-                            tabIcon: tab.favicon,
-                            isActive: tab.isCurrentTab,
+                            tab: tab,
                             action: { onActivateTab(tab) },
-                            onClose: { onCloseTab(tab) }
+                            onClose: { onCloseTab(tab) },
+                            onMute: { onMuteTab(tab) }
                         )
                         .transition(.move(edge: .top).combined(with: .opacity))
                         .contextMenu {
