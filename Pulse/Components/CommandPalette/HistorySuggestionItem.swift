@@ -69,6 +69,14 @@ struct HistorySuggestionItem: View {
             await MainActor.run { self.resolvedFavicon = defaultFavicon }
             return
         }
+        
+        // Check cache first
+        let cacheKey = url.host ?? url.absoluteString
+        if let cachedFavicon = Tab.getCachedFavicon(for: cacheKey) {
+            await MainActor.run { self.resolvedFavicon = cachedFavicon }
+            return
+        }
+        
         do {
             let favicon = try await FaviconFinder(url: url)
                 .fetchFaviconURLs()
@@ -77,6 +85,10 @@ struct HistorySuggestionItem: View {
             if let faviconImage = favicon.image {
                 let nsImage = faviconImage.image
                 let swiftUIImage = SwiftUI.Image(nsImage: nsImage)
+                
+                // Cache the favicon
+                Tab.cacheFavicon(swiftUIImage, for: cacheKey)
+                
                 await MainActor.run { self.resolvedFavicon = swiftUIImage }
             } else {
                 await MainActor.run { self.resolvedFavicon = defaultFavicon }

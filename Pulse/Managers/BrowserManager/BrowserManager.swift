@@ -313,6 +313,10 @@ class BrowserManager: ObservableObject {
         }
     }
     
+    func clearFaviconCache() {
+        cacheManager.clearFaviconCache()
+    }
+    
     // MARK: - Extension Management
     
     func showExtensionInstallDialog() {

@@ -48,7 +48,6 @@ struct SidebarView: View {
                                     ) { space in
                                         SpaceView(
                                             space: space,
-                                            tabs: tabManagerTabs(in: space),
                                             isActive: browserManager.tabManager
                                                 .currentSpace?.id == space.id,
                                             width: browserManager.sidebarWidth,
@@ -167,9 +166,7 @@ struct SidebarView: View {
             .frame(width: browserManager.sidebarWidth)
         }
     }
-    private func tabManagerTabs(in space: Space) -> [Tab] {
-        browserManager.tabManager.tabs(in: space)
-    }
+
 
     func scrollToSpace(_ space: Space, proxy: ScrollViewProxy) {
         withAnimation(.easeInOut(duration: 0.25)) {
