@@ -141,6 +141,9 @@ class CacheManager: ObservableObject {
         let allTypes = WKWebsiteDataStore.allWebsiteDataTypes()
         await dataStore.removeData(ofTypes: allTypes, modifiedSince: Date.distantPast)
         await loadCacheData() // Refresh the list
+        
+        // Also clear favicon cache
+        Tab.clearFaviconCache()
     }
     
     func clearSpecificCache(_ cache: CacheInfo) async {
@@ -151,6 +154,16 @@ class CacheManager: ObservableObject {
             await dataStore.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), for: [record])
             await loadCacheData() // Refresh the list
         }
+    }
+
+    // MARK: - Favicon Cache Management
+    
+    func clearFaviconCache() {
+        Tab.clearFaviconCache()
+    }
+    
+    func getFaviconCacheStats() -> (count: Int, domains: [String]) {
+        return Tab.getFaviconCacheStats()
     }
     
     func searchCache(_ query: String) -> [CacheInfo] {
