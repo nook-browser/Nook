@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct SpaceTab: View {
-    let tab: Tab
+    @ObservedObject var tab: Tab
     var action: () -> Void
     var onClose: () -> Void
     var onMute: () -> Void
