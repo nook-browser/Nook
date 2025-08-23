@@ -6,7 +6,7 @@ You’ll need to set your personal Development Team in Signing to build locally.
 
 Join our Discord to help with development: https://discord.gg/J3XfPvg7Fs
 
-## WebExtensions (WKWebExtension)
+## WebExtensions (WKWebExtension) ***[UNDER HEAVY DEVELOPMENT]***
 
 Pulse integrates native WebKit WebExtensions via `WKWebExtension`, `WKWebExtensionContext`, and `WKWebExtensionController`. This enables standard WebExtensions (MV2/MV3) to run without custom JS shims.
 
