@@ -64,8 +64,14 @@ public class Tab: NSObject, Identifiable {
     
     // MARK: - Video State
     var hasPlayingVideo: Bool = false
+    var hasVideoContent: Bool = false  // Track if tab has any video content
     var hasPiPActive: Bool = false
     private var videoDetectionTimer: Timer?
+    
+    // MARK: - Audio State
+    var hasPlayingAudio: Bool = false
+    var isAudioMuted: Bool = false
+    var hasAudioContent: Bool = false  // Track if tab has any audio content (playing or paused)
 
     private var _webView: WKWebView?
     var didNotifyOpenToExtensions: Bool = false
@@ -210,16 +216,19 @@ public class Tab: NSObject, Identifiable {
         _webView?.allowsBackForwardNavigationGestures = true
         _webView?.allowsMagnification = true
         
-        // Add message handlers for link hover and command functionality
+        // Remove existing handlers first to prevent duplicates
         _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "linkHover")
         _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "commandHover")
         _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "commandClick")
         _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "pipStateChange")
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "mediaStateChange_\(id.uuidString)")
         
+        // Add handlers
         _webView?.configuration.userContentController.add(self, name: "linkHover")
         _webView?.configuration.userContentController.add(self, name: "commandHover")
         _webView?.configuration.userContentController.add(self, name: "commandClick")
         _webView?.configuration.userContentController.add(self, name: "pipStateChange")
+        _webView?.configuration.userContentController.add(self, name: "mediaStateChange_\(id.uuidString)")
 
         _webView?.customUserAgent =
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15"
@@ -269,7 +278,25 @@ public class Tab: NSObject, Identifiable {
             "document.querySelectorAll('video, audio').forEach(el => el.pause());",
             completionHandler: nil
         )
+        
+        // Clean up all message handlers
         _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "linkHover")
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "commandHover")
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "commandClick")
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "pipStateChange")
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "mediaStateChange_\(id.uuidString)")
+        
+        // Clean up media detection tracking for this tab
+        let cleanupScript = """
+        (() => {
+            const tabId = '\(id.uuidString)';
+            if (window.__pulseMediaDetectionInstalled && window.__pulseMediaDetectionInstalled[tabId]) {
+                delete window.__pulseMediaDetectionInstalled[tabId];
+            }
+        })();
+        """
+        _webView?.evaluateJavaScript(cleanupScript, completionHandler: nil)
+        
         _webView?.navigationDelegate = nil
         _webView?.uiDelegate = nil
         _webView = nil
@@ -286,6 +313,12 @@ public class Tab: NSObject, Identifiable {
         loadingState = .idle
 
         browserManager?.tabManager.removeTab(self.id)
+    }
+    
+    deinit {
+        // Ensure cleanup when tab is deallocated
+        // Note: We can't access main actor-isolated properties in deinit
+        // The cleanup will happen in closeTab() method instead
     }
 
     func loadURL(_ newURL: URL) {
@@ -316,38 +349,71 @@ public class Tab: NSObject, Identifiable {
         loadURL(newURL)
     }
     
-    // MARK: - Video Detection
+    // MARK: - Media Detection
     private func startVideoDetection(for webView: WKWebView) {
+        // Only run media detection on the active tab
+        guard isCurrentTab else { return }
+        
         // Stop any existing timer
         videoDetectionTimer?.invalidate()
         
-        // Check for videos every 2 seconds
-        videoDetectionTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.checkForPlayingVideos(in: webView)
-            }
-        }
+        // Use event-driven detection instead of polling
+        injectMediaDetectionScript(to: webView)
         
-        // Initial check
+        // Only do initial check, then rely on events
         checkForPlayingVideos(in: webView)
     }
     
     private func checkForPlayingVideos(in webView: WKWebView) {
-        let videoCheckScript = """
+        // Simple, efficient check for current state
+        let simpleCheckScript = """
         (() => {
             const videos = document.querySelectorAll('video');
-            const hasPlaying = Array.from(videos).some(v => 
+            const audios = document.querySelectorAll('audio');
+            const allMedia = [...videos, ...audios];
+            
+            const hasPlayingVideo = Array.from(videos).some(v => 
                 !v.paused && !v.ended && v.readyState >= 2 && 
                 v.offsetWidth > 0 && v.offsetHeight > 0
             );
-            return { hasPlaying };
+            
+            const hasVideoContent = videos.length > 0;
+            
+            // Check if there's any audio content (playing or paused)
+            const hasAudioContent = allMedia.some(media => 
+                !media.ended && media.readyState >= 2
+            );
+            
+            // Check if audio is currently playing (regardless of mute state)
+            const hasPlayingAudio = allMedia.some(media => 
+                !media.paused && !media.ended && media.readyState >= 2
+            );
+            
+            // Check if any playing audio is muted
+            const isAudioMuted = allMedia.some(media => 
+                !media.paused && !media.ended && media.readyState >= 2 && 
+                (media.muted || media.volume === 0)
+            );
+            
+            return { 
+                hasPlaying: hasPlayingVideo, 
+                hasContent: hasVideoContent,
+                hasAudioContent: hasAudioContent,
+                hasPlayingAudio: hasPlayingAudio,
+                isAudioMuted: isAudioMuted
+            };
         })();
         """
         
-        webView.evaluateJavaScript(videoCheckScript) { [weak self] result, error in
+        webView.evaluateJavaScript(simpleCheckScript) { [weak self] result, error in
             if let dict = result as? [String: Bool] {
                 DispatchQueue.main.async {
                     self?.hasPlayingVideo = dict["hasPlaying"] ?? false
+                    self?.hasVideoContent = dict["hasContent"] ?? false
+                    self?.hasPlayingAudio = dict["hasPlayingAudio"] ?? false
+                    self?.isAudioMuted = dict["isAudioMuted"] ?? false
+                    // Store hasAudioContent for UI logic
+                    self?.hasAudioContent = dict["hasAudioContent"] ?? false
                 }
             }
         }
@@ -355,6 +421,241 @@ public class Tab: NSObject, Identifiable {
     
     func requestPictureInPicture() {
         PiPManager.shared.requestPiP(for: self)
+    }
+    
+    // MARK: - Event-Driven Media Detection
+    private func injectMediaDetectionScript(to webView: WKWebView) {
+        let mediaDetectionScript = """
+        (() => {
+            // Use a unique identifier for this tab to prevent conflicts
+            const tabId = '\(id.uuidString)';
+            if (window.__pulseMediaDetectionInstalled && window.__pulseMediaDetectionInstalled[tabId]) return;
+            
+            // Initialize the global tracking object if it doesn't exist
+            if (!window.__pulseMediaDetectionInstalled) {
+                window.__pulseMediaDetectionInstalled = {};
+            }
+            
+            // Track media state efficiently for this specific tab
+            let mediaState = {
+                hasPlayingVideo: false,
+                hasVideoContent: false,
+                hasAudioContent: false,
+                hasPlayingAudio: false,
+                isAudioMuted: false
+            };
+            
+            // Efficient state update function
+            function updateMediaState() {
+                const videos = document.querySelectorAll('video');
+                const audios = document.querySelectorAll('audio');
+                const allMedia = [...videos, ...audios];
+                
+                const newState = {
+                    hasPlayingVideo: Array.from(videos).some(v => 
+                        !v.paused && !v.ended && v.readyState >= 2 && 
+                        v.offsetWidth > 0 && v.offsetHeight > 0
+                    ),
+                    hasVideoContent: videos.length > 0,
+                    hasAudioContent: allMedia.some(media => 
+                        !media.ended && media.readyState >= 2
+                    ),
+                    hasPlayingAudio: allMedia.some(media => 
+                        !media.paused && !media.ended && media.readyState >= 2
+                    ),
+                    isAudioMuted: allMedia.some(media => 
+                        !media.paused && !media.ended && media.readyState >= 2 && 
+                        (media.muted || media.volume === 0)
+                    )
+                };
+                
+                // Only notify if state changed
+                if (JSON.stringify(mediaState) !== JSON.stringify(newState)) {
+                    mediaState = newState;
+                    const handlerName = 'mediaStateChange_\(id.uuidString)';
+                    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers[handlerName]) {
+                        window.webkit.messageHandlers[handlerName].postMessage(mediaState);
+                    }
+                }
+            }
+            
+            // Event listeners for media state changes (optimized - only essential events)
+            const mediaEvents = ['play', 'pause', 'volumechange'];
+            
+            function addMediaListeners(element) {
+                mediaEvents.forEach(event => {
+                    element.addEventListener(event, updateMediaState, { passive: true });
+                });
+            }
+            
+            // Monitor existing media elements
+            document.querySelectorAll('video, audio').forEach(addMediaListeners);
+            
+            // Monitor for new media elements (lazy observer - only when needed)
+            let observer = null;
+            
+            function startObserver() {
+                if (observer) return; // Already observing
+                
+                observer = new MutationObserver((mutations) => {
+                    let shouldUpdate = false;
+                    
+                    for (const mutation of mutations) {
+                        if (mutation.type === 'childList') {
+                            for (const node of mutation.addedNodes) {
+                                if (node.nodeType === 1) { // Element node
+                                    if (node.tagName === 'VIDEO' || node.tagName === 'AUDIO') {
+                                        addMediaListeners(node);
+                                        shouldUpdate = true;
+                                    } else if (node.querySelector) {
+                                        const mediaElements = node.querySelectorAll('video, audio');
+                                        if (mediaElements.length > 0) {
+                                            mediaElements.forEach(addMediaListeners);
+                                            shouldUpdate = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (shouldUpdate) {
+                        // Debounce updates to avoid excessive calls
+                        clearTimeout(window.__pulseUpdateTimeout);
+                        window.__pulseUpdateTimeout = setTimeout(updateMediaState, 100);
+                    }
+                });
+                
+                observer.observe(document.body, {
+                    childList: true,
+                    subtree: true
+                });
+            }
+            
+            // Only start observing if we find media elements initially
+            const initialMedia = document.querySelectorAll('video, audio');
+            if (initialMedia.length > 0) {
+                startObserver();
+            } else {
+                // Lazy start: only observe if media is added later
+                const lazyObserver = new MutationObserver((mutations) => {
+                    for (const mutation of mutations) {
+                        if (mutation.type === 'childList') {
+                            for (const node of mutation.addedNodes) {
+                                if (node.nodeType === 1) {
+                                    if (node.tagName === 'VIDEO' || node.tagName === 'AUDIO' || 
+                                        (node.querySelector && node.querySelector('video, audio'))) {
+                                        lazyObserver.disconnect();
+                                        startObserver();
+                                        updateMediaState();
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                lazyObserver.observe(document.body, {
+                    childList: true,
+                    subtree: true
+                });
+                
+                // Store lazy observer for cleanup
+                if (!window.__pulseLazyObservers) {
+                    window.__pulseLazyObservers = {};
+                }
+                window.__pulseLazyObservers[tabId] = { observer: lazyObserver };
+            }
+            
+            // Store observer reference for cleanup
+            if (!window.__pulseMediaObservers) {
+                window.__pulseMediaObservers = {};
+            }
+            window.__pulseMediaObservers[tabId] = { observer: observer };
+            
+            // Initial state check
+            updateMediaState();
+            
+            // Mark this tab as having media detection installed
+            window.__pulseMediaDetectionInstalled[tabId] = true;
+        })();
+        """
+        
+        webView.evaluateJavaScript(mediaDetectionScript) { result, error in
+            if let error = error {
+                print("[Media Detection] Setup error: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private func removeMediaDetectionScript(from webView: WKWebView) {
+        let cleanupScript = """
+        (() => {
+            const tabId = '\(id.uuidString)';
+            
+            // Remove this tab's media detection tracking
+            if (window.__pulseMediaDetectionInstalled && window.__pulseMediaDetectionInstalled[tabId]) {
+                delete window.__pulseMediaDetectionInstalled[tabId];
+            }
+            
+            // Remove event listeners if they exist
+            if (window.__pulseMediaObservers && window.__pulseMediaObservers[tabId]) {
+                if (window.__pulseMediaObservers[tabId].observer) {
+                    window.__pulseMediaObservers[tabId].observer.disconnect();
+                }
+                delete window.__pulseMediaObservers[tabId];
+            }
+            
+            // Remove lazy observers if they exist
+            if (window.__pulseLazyObservers && window.__pulseLazyObservers[tabId]) {
+                if (window.__pulseLazyObservers[tabId].observer) {
+                    window.__pulseLazyObservers[tabId].observer.disconnect();
+                }
+                delete window.__pulseLazyObservers[tabId];
+            }
+            
+            // Clear any pending timeouts
+            if (window.__pulseUpdateTimeout) {
+                clearTimeout(window.__pulseUpdateTimeout);
+                delete window.__pulseUpdateTimeout;
+            }
+        })();
+        """
+        
+        webView.evaluateJavaScript(cleanupScript, completionHandler: nil)
+    }
+    
+    // MARK: - Audio Control
+    func toggleMute() {
+        let efficientMuteScript = """
+        (() => {
+            // Simple, efficient mute toggle
+            const mediaElements = document.querySelectorAll('video, audio');
+            const hasUnmutedMedia = Array.from(mediaElements).some(el => !el.muted && el.volume > 0);
+            const targetMutedState = hasUnmutedMedia;
+            
+            // Mute/unmute all media elements
+            mediaElements.forEach(el => {
+                el.muted = targetMutedState;
+                if (targetMutedState) {
+                    el.volume = 0;
+                } else {
+                    el.volume = el.volume || 1.0;
+                }
+            });
+            
+            return targetMutedState;
+        })();
+        """
+        
+        _webView?.evaluateJavaScript(efficientMuteScript) { [weak self] result, error in
+            if let muted = result as? Bool {
+                DispatchQueue.main.async {
+                    self?.isAudioMuted = muted
+                }
+            }
+        }
     }
     
     // MARK: - JavaScript Injection
@@ -573,6 +874,34 @@ public class Tab: NSObject, Identifiable {
             });
             
             observer.observe(document.body, { childList: true, subtree: true });
+            
+            // Listen for cross-origin iframe mute control messages
+            window.addEventListener('message', function(event) {
+                if (event.data && event.data.type === 'PULSE_MUTE_CONTROL') {
+                    // Handle mute control from parent frame
+                    const shouldMute = event.data.muted;
+                    const mediaElements = document.querySelectorAll('video, audio');
+                    mediaElements.forEach(media => {
+                        media.muted = shouldMute;
+                        if (shouldMute) {
+                            media.volume = 0;
+                        } else {
+                            media.volume = media.volume || 1.0;
+                        }
+                    });
+                    
+                    // Also handle Web Audio API if available
+                    if (window.__pulseAudioContexts) {
+                        for (let context of window.__pulseAudioContexts) {
+                            if (shouldMute && context.state === 'running') {
+                                context.suspend().catch(e => console.log('[Iframe Mute] Context suspend error:', e));
+                            } else if (!shouldMute && context.state === 'suspended') {
+                                context.resume().catch(e => console.log('[Iframe Mute] Context resume error:', e));
+                            }
+                        }
+                    }
+                }
+            });
         })();
         """
         
@@ -592,6 +921,8 @@ public class Tab: NSObject, Identifiable {
         // Restart video detection when tab becomes active
         if let webView = _webView {
             startVideoDetection(for: webView)
+            // Also do an immediate check for video content
+            checkForPlayingVideos(in: webView)
         }
     }
 
@@ -604,11 +935,19 @@ public class Tab: NSObject, Identifiable {
             )
         }
         
-        // Stop video detection when tab is inactive (but keep PiP state)
+        // Stop video detection when tab is inactive (but keep video content and PiP state)
         videoDetectionTimer?.invalidate()
         videoDetectionTimer = nil
         hasPlayingVideo = false
-        // Don't reset hasPiPActive here - let PiP continue
+        hasPlayingAudio = false
+        hasAudioContent = false
+        
+        // Remove media detection script from inactive tab to save resources
+        if let webView = _webView {
+            removeMediaDetectionScript(from: webView)
+        }
+        
+        // Don't reset hasVideoContent, isAudioMuted, or hasPiPActive here - let them persist
     }
 
     func updateTitle(_ title: String) {
@@ -942,6 +1281,17 @@ extension Tab: WKScriptMessageHandler {
                 DispatchQueue.main.async {
                     print("[PiP] State change detected from web: \(active)")
                     self.hasPiPActive = active
+                }
+            }
+            
+        case let name where name.hasPrefix("mediaStateChange_"):
+            if let dict = message.body as? [String: Bool] {
+                DispatchQueue.main.async {
+                    self.hasPlayingVideo = dict["hasPlayingVideo"] ?? false
+                    self.hasVideoContent = dict["hasVideoContent"] ?? false
+                    self.hasAudioContent = dict["hasAudioContent"] ?? false
+                    self.hasPlayingAudio = dict["hasPlayingAudio"] ?? false
+                    self.isAudioMuted = dict["isAudioMuted"] ?? false
                 }
             }
         
