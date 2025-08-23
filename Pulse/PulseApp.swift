@@ -11,6 +11,7 @@ import WebKit
 @main
 struct PulseApp: App {
     @StateObject private var browserManager = BrowserManager()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
         WindowGroup {
@@ -18,6 +19,10 @@ struct PulseApp: App {
                 .background(BackgroundWindowModifier())
                 .ignoresSafeArea(.all)
                 .environmentObject(browserManager)
+                .onAppear {
+                    // Connect browser manager to app delegate for cleanup
+                    appDelegate.browserManager = browserManager
+                }
         }
         .windowStyle(.hiddenTitleBar)
         .commands {
@@ -31,6 +36,17 @@ struct PulseApp: App {
         .windowResizability(.contentSize)
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unifiedCompact)
+    }
+}
+
+class AppDelegate: NSObject, NSApplicationDelegate {
+    weak var browserManager: BrowserManager?
+    
+    func applicationWillTerminate(_ notification: Notification) {
+        print("🔄 [App] Application will terminate - cleaning up all tabs")
+        
+        // Clean up all tabs to ensure WKWebView processes are terminated
+        browserManager?.cleanupAllTabs()
     }
 }
 
