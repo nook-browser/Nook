@@ -72,6 +72,15 @@ public class Tab: NSObject, Identifiable {
     var hasPlayingAudio: Bool = false
     var isAudioMuted: Bool = false
     var hasAudioContent: Bool = false  // Track if tab has any audio content (playing or paused)
+    
+    // Performance optimization: debounce media detection
+    private var lastMediaCheck: Date = Date.distantPast
+    private let mediaCheckDebounceInterval: TimeInterval = 0.5  // Don't check more than once per 0.5 seconds
+    
+    // MARK: - Tab State
+    var isUnloaded: Bool {
+        return _webView == nil
+    }
 
     private var _webView: WKWebView?
     var didNotifyOpenToExtensions: Bool = false
@@ -421,6 +430,102 @@ public class Tab: NSObject, Identifiable {
     
     func requestPictureInPicture() {
         PiPManager.shared.requestPiP(for: self)
+    }
+    
+    // MARK: - Audio-Specific Media Detection
+    func checkMediaState() {
+        guard let webView = _webView else { return }
+        
+        // Performance optimization: debounce frequent calls
+        let now = Date()
+        guard now.timeIntervalSince(lastMediaCheck) >= mediaCheckDebounceInterval else {
+            return
+        }
+        lastMediaCheck = now
+        
+        // Use JavaScript to specifically detect audio content (not just any media)
+        let audioDetectionScript = """
+        (() => {
+            const audios = document.querySelectorAll('audio');
+            const videos = document.querySelectorAll('video');
+            
+            // Check for audio elements specifically
+            const hasAudioElements = audios.length > 0;
+            const hasVideoElements = videos.length > 0;
+            
+            // Check if any audio elements are playing
+            const hasPlayingAudio = Array.from(audios).some(audio => 
+                !audio.paused && !audio.ended && audio.readyState >= 2
+            );
+            
+            // Check if any video elements with audio are playing
+            const hasPlayingVideoWithAudio = Array.from(videos).some(video => 
+                !video.paused && !video.ended && video.readyState >= 2 && 
+                video.muted === false && video.volume > 0
+            );
+            
+            // Check if any audio elements exist (playing or not)
+            const hasAudioContent = hasAudioElements || 
+                Array.from(videos).some(video => 
+                    video.readyState >= 2 && video.muted === false && video.volume > 0
+                );
+            
+            return {
+                hasAudioContent: hasAudioContent,
+                hasPlayingAudio: hasPlayingAudio || hasPlayingVideoWithAudio,
+                hasVideoContent: hasVideoElements,
+                hasPlayingVideo: Array.from(videos).some(video => 
+                    !video.paused && !video.ended && video.readyState >= 2
+                )
+            };
+        })();
+        """
+        
+        webView.evaluateJavaScript(audioDetectionScript) { [weak self] result, error in
+            if let error = error {
+                print("[Audio Detection] Error: \(error.localizedDescription)")
+                return
+            }
+            
+            if let state = result as? [String: Bool] {
+                DispatchQueue.main.async {
+                    self?.hasAudioContent = state["hasAudioContent"] ?? false
+                    self?.hasPlayingAudio = state["hasPlayingAudio"] ?? false
+                    self?.hasVideoContent = state["hasVideoContent"] ?? false
+                    self?.hasPlayingVideo = state["hasPlayingVideo"] ?? false
+                }
+            }
+        }
+    }
+    
+    // MARK: - Tab Lifecycle Management
+    func unloadWebView() {
+        print("🔄 [Tab] Unloading webview for: \(name)")
+        
+        // Pause media playback
+        pause()
+        
+        // Remove from compositor if it exists
+        _webView?.removeFromSuperview()
+        
+        // Clean up all message handlers
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "linkHover")
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "commandHover")
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "commandClick")
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "pipStateChange")
+        
+        // Clear the webview reference (this will trigger reload when accessed)
+        _webView = nil
+        
+        // Reset loading state
+        loadingState = .idle
+    }
+    
+    func loadWebViewIfNeeded() {
+        if _webView == nil {
+            print("🔄 [Tab] Loading webview for: \(name)")
+            setupWebView()
+        }
     }
     
     // MARK: - Event-Driven Media Detection
@@ -918,12 +1023,8 @@ public class Tab: NSObject, Identifiable {
     func activate() {
         browserManager?.tabManager.setActiveTab(self)
         
-        // Restart video detection when tab becomes active
-        if let webView = _webView {
-            startVideoDetection(for: webView)
-            // Also do an immediate check for video content
-            checkForPlayingVideos(in: webView)
-        }
+        // Check media state when tab becomes active
+        checkMediaState()
     }
 
     func pause() {
@@ -1087,7 +1188,7 @@ extension Tab: WKNavigationDelegate {
         injectDownloadJavaScript(to: webView)
         injectLinkHoverJavaScript(to: webView)
         injectPiPStateListener(to: webView)
-        startVideoDetection(for: webView)
+        checkMediaState()
         updateNavigationState()
     }
 

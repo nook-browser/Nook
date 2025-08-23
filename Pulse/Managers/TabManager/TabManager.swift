@@ -142,6 +142,11 @@ class TabManager {
         arr.append(tab)
         setTabs(arr, for: sid)
         
+        // Load the tab in compositor if it's the current tab
+        if tab.id == currentTab?.id {
+            browserManager?.compositorManager.loadTab(tab)
+        }
+        
         // Notify extension system about new tab
         if #available(macOS 15.5, *) {
             ExtensionManager.shared.notifyTabOpened(tab)
@@ -213,8 +218,17 @@ class TabManager {
             return
         }
         let previous = currentTab
-        if let old = currentTab, old.id != tab.id { old.pause() }
         currentTab = tab
+        
+        // Load the tab in compositor if needed
+        browserManager?.compositorManager.loadTab(tab)
+        
+        // Update tab visibility in compositor
+        browserManager?.compositorManager.updateTabVisibility(currentTabId: tab.id)
+        
+        // Check media state using native WebKit API
+        tab.checkMediaState()
+        
         if let sid = tab.spaceId, let sp = spaces.first(where: { $0.id == sid })
         {
             currentSpace = sp
@@ -264,6 +278,19 @@ class TabManager {
             return
         }
         removeTab(currentTab.id)
+    }
+    
+    func unloadTab(_ tab: Tab) {
+        browserManager?.compositorManager.unloadTab(tab)
+    }
+    
+    func unloadAllInactiveTabs() {
+        let allTabs = pinnedTabs + tabs
+        for tab in allTabs {
+            if tab.id != currentTab?.id {
+                unloadTab(tab)
+            }
+        }
     }
 
     // MARK: - Tab Ordering

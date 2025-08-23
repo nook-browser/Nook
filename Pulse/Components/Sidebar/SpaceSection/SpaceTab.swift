@@ -18,14 +18,26 @@ struct SpaceTab: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                tab.favicon
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 20, height: 20)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                ZStack {
+                    tab.favicon
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 20, height: 20)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .opacity(tab.isUnloaded ? 0.5 : 1.0)
+                    
+                    if tab.isUnloaded {
+                        Image(systemName: "arrow.down.circle.fill")
+                            .font(.system(size: 8))
+                            .foregroundColor(.secondary)
+                            .background(Color.white)
+                            .clipShape(Circle())
+                            .offset(x: 6, y: -6)
+                    }
+                }
                 Text(tab.name)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(AppColors.textPrimary)
+                    .foregroundStyle(tab.isUnloaded ? AppColors.textSecondary : AppColors.textPrimary)
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Spacer()
@@ -73,6 +85,37 @@ struct SpaceTab: View {
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovering = hovering
+            }
+        }
+        .contextMenu {
+            // Mute/Unmute option (only show if tab has audio content)
+            if tab.hasAudioContent {
+                Button(action: onMute) {
+                    Label(tab.isAudioMuted ? "Unmute Audio" : "Mute Audio", 
+                          systemImage: tab.isAudioMuted ? "speaker.wave.2" : "speaker.slash")
+                }
+                
+                Divider()
+            }
+            
+            // Unload options
+            Button(action: {
+                browserManager.tabManager.unloadTab(tab)
+            }) {
+                Label("Unload Tab", systemImage: "arrow.down.circle")
+            }
+            .disabled(tab.isUnloaded)
+            
+            Button(action: {
+                browserManager.tabManager.unloadAllInactiveTabs()
+            }) {
+                Label("Unload All Inactive Tabs", systemImage: "arrow.down.circle.fill")
+            }
+            
+            Divider()
+            
+            Button(action: onClose) {
+                Label("Close Tab", systemImage: "xmark.circle")
             }
         }
 
