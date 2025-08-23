@@ -38,9 +38,13 @@ class BrowserManager: ObservableObject {
     var cookieManager: CookieManager
     var cacheManager: CacheManager
     var extensionManager: ExtensionManager?
+    var compositorManager: TabCompositorManager
     
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
+    
+    // Compositor container view
+    var compositorContainerView: NSView?
 
     init() {
         self.modelContext = Persistence.shared.container.mainContext
@@ -57,6 +61,9 @@ class BrowserManager: ObservableObject {
         self.historyManager = HistoryManager(context: modelContext)
         self.cookieManager = CookieManager()
         self.cacheManager = CacheManager()
+        self.compositorManager = TabCompositorManager()
+        self.compositorManager.browserManager = self
+        self.compositorManager.setUnloadTimeout(self.settingsManager.tabUnloadTimeout)
         self.tabManager.browserManager = self
         // Attach extension manager BEFORE any WKWebView is created so content scripts can inject
         if #available(macOS 15.5, *), let mgr = self.extensionManager {
@@ -65,6 +72,14 @@ class BrowserManager: ObservableObject {
 
         self.tabManager.reattachBrowserManager(self)
         loadSidebarSettings()
+        
+        // Listen for tab unload timeout changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleTabUnloadTimeoutChange),
+            name: .tabUnloadTimeoutChanged,
+            object: nil
+        )
         
     }
     
@@ -203,6 +218,16 @@ class BrowserManager: ObservableObject {
         userDefaults.set(isSidebarVisible, forKey: "sidebarVisible")
     }
     
+    @objc private func handleTabUnloadTimeoutChange(_ notification: Notification) {
+        if let timeout = notification.userInfo?["timeout"] as? TimeInterval {
+            compositorManager.setUnloadTimeout(timeout)
+        }
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
     // MARK: - Cookie Management Methods
     
     func clearCurrentPageCookies() {
@@ -288,6 +313,10 @@ class BrowserManager: ObservableObject {
         }
     }
     
+    func clearFaviconCache() {
+        cacheManager.clearFaviconCache()
+    }
+    
     // MARK: - Extension Management
     
     func showExtensionInstallDialog() {
@@ -346,6 +375,53 @@ class BrowserManager: ObservableObject {
             }
         } else {
             print("No URL found to copy")
+        }
+    }
+    
+    // MARK: - Web Inspector
+    func openWebInspector() {
+        guard let currentTab = tabManager.currentTab else { 
+            print("No current tab to inspect")
+            return 
+        }
+        
+        if #available(macOS 13.3, *) {
+            let webView = currentTab.activeWebView
+            if webView.isInspectable {
+                DispatchQueue.main.async {
+                    // Focus the webview and trigger context menu programmatically
+                    self.presentInspectorContextMenu(for: webView)
+                }
+            } else {
+                print("Web inspector not available for this tab")
+            }
+        } else {
+            print("Web inspector requires macOS 13.3 or later")
+        }
+    }
+    
+    private func presentInspectorContextMenu(for webView: WKWebView) {
+        // Focus the webview first
+        webView.window?.makeFirstResponder(webView)
+        
+        // Create a right-click event at the center of the webview
+        let bounds = webView.bounds
+        let center = NSPoint(x: bounds.midX, y: bounds.midY)
+        
+        let rightClickEvent = NSEvent.mouseEvent(
+            with: .rightMouseDown,
+            location: center,
+            modifierFlags: [],
+            timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: webView.window?.windowNumber ?? 0,
+            context: nil,
+            eventNumber: 0,
+            clickCount: 1,
+            pressure: 1.0
+        )
+        
+        if let event = rightClickEvent {
+            webView.rightMouseDown(with: event)
         }
     }
 }

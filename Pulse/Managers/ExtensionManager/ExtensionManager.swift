@@ -162,7 +162,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         var updatedCount = 0
         
         for tab in allTabs {
-            let webView = tab.webView
+            guard let webView = tab.webView else { continue }
             
             if webView.configuration.webExtensionController !== controller {
                 print("  📝 Updating WebView for tab: \(tab.name)")
@@ -985,7 +985,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                 if let windowAdapter = self.windowAdapter,
                    let activeTab = windowAdapter.activeTab(for: extensionContext),
                    let tabAdapter = activeTab as? ExtensionTabAdapter {
-                    let pageWV = tabAdapter.tab.webView
+                    guard let pageWV = tabAdapter.tab.webView else { return }
                     pageWV.evaluateJavaScript("document.documentElement.getAttribute('data-pulse-probe')") { val, err in
                         if let err = err {
                             print("   Page probe read error: \(err.localizedDescription)")

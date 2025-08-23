@@ -112,6 +112,41 @@ struct GeneralSettingsView: View {
                 Text("Liquid Glass")
             }
             
+            Divider()
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Tab Unload Timeout")
+                    .font(.headline)
+                
+                Text("Automatically unload inactive tabs to save memory")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                HStack {
+                    Slider(
+                        value: $browserManager.settingsManager.tabUnloadTimeout,
+                        in: 60...1800, // 1 minute to 30 minutes
+                        step: 60
+                    ) {
+                        Text("Tab Unload Timeout")
+                    }
+                    
+                    Text(formatTimeout(browserManager.settingsManager.tabUnloadTimeout))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(width: 80, alignment: .trailing)
+                }
+                
+                HStack {
+                    Button("Unload All Inactive Tabs") {
+                        browserManager.tabManager.unloadAllInactiveTabs()
+                    }
+                    .buttonStyle(.bordered)
+                    
+                    Spacer()
+                }
+            }
+            
             Spacer()
         }
         .padding()
@@ -321,5 +356,15 @@ struct AdvancedSettingsView: View {
             Spacer()
         }
         .padding()
+    }
+}
+
+// MARK: - Helper Functions
+private func formatTimeout(_ seconds: TimeInterval) -> String {
+    let minutes = Int(seconds / 60)
+    if minutes == 1 {
+        return "1 min"
+    } else {
+        return "\(minutes) mins"
     }
 }

@@ -12,14 +12,18 @@ import SwiftUI
 import WebKit
 
 @MainActor
-@Observable
-public class Tab: NSObject, Identifiable {
+public class Tab: NSObject, Identifiable, ObservableObject {
     public let id: UUID
     var url: URL
     var name: String
     var favicon: SwiftUI.Image
     var spaceId: UUID?
     var index: Int
+
+    // MARK: - Favicon Cache
+    private static var faviconCache: [String: SwiftUI.Image] = [:]
+    private static let faviconCacheQueue = DispatchQueue(label: "favicon.cache", attributes: .concurrent)
+    private static let faviconCacheLock = NSLock()
 
     // MARK: - Loading State
     enum LoadingState {
@@ -61,10 +65,47 @@ public class Tab: NSObject, Identifiable {
 
     var canGoBack: Bool = false
     var canGoForward: Bool = false
+    
+    // MARK: - Video State
+    @Published var hasPlayingVideo: Bool = false
+    @Published var hasVideoContent: Bool = false  // Track if tab has any video content
+    @Published var hasPiPActive: Bool = false
+    
+    // MARK: - Audio State
+    @Published var hasPlayingAudio: Bool = false
+    @Published var isAudioMuted: Bool = false {
+        didSet {
+            if oldValue != isAudioMuted {
+                print("🔇 [Tab] isAudioMuted changed from \(oldValue) to \(isAudioMuted) for tab: \(name)")
+            }
+        }
+    }
+    @Published var hasAudioContent: Bool = false {  // Track if tab has any audio content (playing or paused)
+        didSet {
+            if oldValue != hasAudioContent {
+                print("🔊 [Tab] hasAudioContent changed from \(oldValue) to \(hasAudioContent) for tab: \(name)")
+            }
+        }
+    }
+    
+
+    
+    // MARK: - Tab State
+    var isUnloaded: Bool {
+        return _webView == nil
+    }
 
     private var _webView: WKWebView?
     var didNotifyOpenToExtensions: Bool = false
-    var webView: WKWebView {
+    var webView: WKWebView? {
+        if _webView == nil {
+            print("🔧 [Tab] First webView access, calling setupWebView() for: \(url.absoluteString)")
+            setupWebView()
+        }
+        return _webView
+    }
+    
+    var activeWebView: WKWebView {
         if _webView == nil {
             print("🔧 [Tab] First webView access, calling setupWebView() for: \(url.absoluteString)")
             setupWebView()
@@ -162,7 +203,7 @@ public class Tab: NSObject, Identifiable {
     // MARK: - WebView Setup
 
     private func setupWebView() {
-        var configuration = BrowserConfiguration.shared.webViewConfiguration
+        let configuration = BrowserConfiguration.shared.cacheOptimizedWebViewConfiguration
         
         // Debug: Check what data store this WebView will use
         print("[Tab] Creating WebView with data store ID: \(configuration.websiteDataStore.identifier?.uuidString ?? "default")")
@@ -197,14 +238,19 @@ public class Tab: NSObject, Identifiable {
         _webView?.allowsBackForwardNavigationGestures = true
         _webView?.allowsMagnification = true
         
-        // Add message handlers for link hover and command functionality
+        // Remove existing handlers first to prevent duplicates
         _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "linkHover")
         _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "commandHover")
         _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "commandClick")
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "pipStateChange")
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "mediaStateChange_\(id.uuidString)")
         
+        // Add handlers
         _webView?.configuration.userContentController.add(self, name: "linkHover")
         _webView?.configuration.userContentController.add(self, name: "commandHover")
         _webView?.configuration.userContentController.add(self, name: "commandClick")
+        _webView?.configuration.userContentController.add(self, name: "pipStateChange")
+        _webView?.configuration.userContentController.add(self, name: "mediaStateChange_\(id.uuidString)")
 
         _webView?.customUserAgent =
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15"
@@ -254,29 +300,65 @@ public class Tab: NSObject, Identifiable {
             "document.querySelectorAll('video, audio').forEach(el => el.pause());",
             completionHandler: nil
         )
+        
+        // Clean up all message handlers
         _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "linkHover")
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "commandHover")
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "commandClick")
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "pipStateChange")
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "mediaStateChange_\(id.uuidString)")
+        
+        // Clean up media detection tracking for this tab
+        let cleanupScript = """
+        (() => {
+            const tabId = '\(id.uuidString)';
+            if (window.__pulseMediaDetectionInstalled && window.__pulseMediaDetectionInstalled[tabId]) {
+                delete window.__pulseMediaDetectionInstalled[tabId];
+            }
+        })();
+        """
+        _webView?.evaluateJavaScript(cleanupScript, completionHandler: nil)
+        
         _webView?.navigationDelegate = nil
         _webView?.uiDelegate = nil
         _webView = nil
 
+        hasPlayingVideo = false
+        hasPiPActive = false
+        PiPManager.shared.stopPiP(for: self)
+
         loadingState = .idle
 
         browserManager?.tabManager.removeTab(self.id)
+    }
+    
+    deinit {
+        // Ensure cleanup when tab is deallocated
+        // Note: We can't access main actor-isolated properties in deinit
+        // The cleanup will happen in closeTab() method instead
     }
 
     func loadURL(_ newURL: URL) {
         self.url = newURL
         loadingState = .didStartProvisionalNavigation
         
+        // Reset audio tracking for new page
+        hasAudioContent = false
+        hasPlayingAudio = false
+        isAudioMuted = false
+        
         if newURL.isFileURL {
             // Grant read access to the containing directory for local resources
             let directoryURL = newURL.deletingLastPathComponent()
             print("🔧 [Tab] Loading file URL with directory access: \(directoryURL.path)")
-            webView.loadFileURL(newURL, allowingReadAccessTo: directoryURL)
+            activeWebView.loadFileURL(newURL, allowingReadAccessTo: directoryURL)
         } else {
-            // Regular URL loading
-            let request = URLRequest(url: newURL)
-            webView.load(request)
+            // Regular URL loading with aggressive caching
+            var request = URLRequest(url: newURL)
+            request.cachePolicy = .returnCacheDataElseLoad
+            request.timeoutInterval = 30.0
+            print("🚀 [Tab] Loading URL with cache policy: \(request.cachePolicy.rawValue)")
+            activeWebView.load(request)
         }
 
         Task { @MainActor in
@@ -292,8 +374,278 @@ public class Tab: NSObject, Identifiable {
         loadURL(newURL)
     }
     
-    // No custom JavaScript injection
-    // MARK: - JavaScript Injection
+
+    
+    func requestPictureInPicture() {
+        PiPManager.shared.requestPiP(for: self)
+    }
+    
+    // MARK: - Simple Media Detection (mainly for manual checks)
+    func checkMediaState() {
+        guard let webView = _webView else { return }
+        
+        // Simple state check - optimized single-pass version
+        let mediaCheckScript = """
+        (() => {
+            const audios = document.querySelectorAll('audio');
+            const videos = document.querySelectorAll('video');
+            
+            // Single pass through audios
+            const hasPlayingAudio = Array.from(audios).some(audio => 
+                !audio.paused && !audio.ended && audio.readyState >= 2
+            );
+            
+            // Single pass through videos for all checks
+            let hasPlayingVideoWithAudio = false;
+            let hasPlayingVideo = false;
+            
+            Array.from(videos).forEach(video => {
+                const isPlaying = !video.paused && !video.ended && video.readyState >= 2;
+                if (isPlaying) {
+                    hasPlayingVideo = true;
+                    if (!video.muted && video.volume > 0) {
+                        hasPlayingVideoWithAudio = true;
+                    }
+                }
+            });
+            
+            const hasAudioContent = hasPlayingAudio || hasPlayingVideoWithAudio;
+            
+            return {
+                hasAudioContent: hasAudioContent,
+                hasPlayingAudio: hasAudioContent,
+                hasVideoContent: videos.length > 0,
+                hasPlayingVideo: hasPlayingVideo
+            };
+        })();
+        """
+        
+        webView.evaluateJavaScript(mediaCheckScript) { [weak self] result, error in
+            if let error = error {
+                print("[Media Check] Error: \(error.localizedDescription)")
+                return
+            }
+            
+            if let state = result as? [String: Bool] {
+                DispatchQueue.main.async {
+                    self?.hasAudioContent = state["hasAudioContent"] ?? false
+                    self?.hasPlayingAudio = state["hasPlayingAudio"] ?? false
+                    self?.hasVideoContent = state["hasVideoContent"] ?? false
+                    self?.hasPlayingVideo = state["hasPlayingVideo"] ?? false
+                }
+            }
+        }
+    }
+    
+    private func injectMediaDetection(to webView: WKWebView) {
+        let mediaDetectionScript = """
+        (function() {
+            const handlerName = 'mediaStateChange_\(id.uuidString)';
+            
+            // Track current URL for navigation detection
+            window.__pulseCurrentURL = window.location.href;
+            
+            function resetSoundTracking() {
+                console.log('🔄 [Pulse] Reset sound tracking for URL change to:', window.location.href);
+                // Immediately send reset state
+                window.webkit.messageHandlers[handlerName].postMessage({
+                    hasAudioContent: false,
+                    hasPlayingAudio: false,
+                    hasVideoContent: false,
+                    hasPlayingVideo: false
+                });
+                setTimeout(checkMediaState, 100);
+            }
+            
+            // Monitor URL changes (for SPAs like YouTube) - more efficient approach
+            const originalPushState = history.pushState;
+            const originalReplaceState = history.replaceState;
+            
+            // Override pushState and replaceState to catch programmatic navigation
+            history.pushState = function(...args) {
+                originalPushState.apply(history, args);
+                setTimeout(() => {
+                    if (window.location.href !== window.__pulseCurrentURL) {
+                        window.__pulseCurrentURL = window.location.href;
+                        resetSoundTracking();
+                    }
+                }, 0);
+            };
+            
+            history.replaceState = function(...args) {
+                originalReplaceState.apply(history, args);
+                setTimeout(() => {
+                    if (window.location.href !== window.__pulseCurrentURL) {
+                        window.__pulseCurrentURL = window.location.href;
+                        resetSoundTracking();
+                    }
+                }, 0);
+            };
+            
+            // Listen for popstate events (back/forward)
+            window.addEventListener('popstate', resetSoundTracking);
+            
+            function checkMediaState() {
+                const audios = document.querySelectorAll('audio');
+                const videos = document.querySelectorAll('video');
+                
+                // Single pass through audios
+                const hasPlayingAudio = Array.from(audios).some(audio => 
+                    !audio.paused && !audio.ended && audio.readyState >= 2
+                );
+                
+                // Single pass through videos for all checks
+                let hasPlayingVideoWithAudio = false;
+                let hasPlayingVideo = false;
+                
+                Array.from(videos).forEach(video => {
+                    const isPlaying = !video.paused && !video.ended && video.readyState >= 2;
+                    if (isPlaying) {
+                        hasPlayingVideo = true;
+                        if (!video.muted && video.volume > 0) {
+                            hasPlayingVideoWithAudio = true;
+                        }
+                    }
+                });
+                
+                // Audio content is simply whether there's currently playing audio
+                const hasAudioContent = hasPlayingAudio || hasPlayingVideoWithAudio;
+                
+                window.webkit.messageHandlers[handlerName].postMessage({
+                    hasAudioContent: hasAudioContent,
+                    hasPlayingAudio: hasAudioContent,
+                    hasVideoContent: videos.length > 0,
+                    hasPlayingVideo: hasPlayingVideo
+                });
+            }
+            
+            function addAudioListeners(element) {
+                // Listen for media state changes - responsive but not excessive
+                ['play', 'pause', 'ended', 'loadedmetadata', 'canplay', 'volumechange'].forEach(event => {
+                    element.addEventListener(event, function() {
+                        setTimeout(checkMediaState, 50); // Quick response
+                    });
+                });
+            }
+            
+            // Add listeners to existing media
+            document.querySelectorAll('video, audio').forEach(addAudioListeners);
+            
+            // Watch for media elements being added or removed
+            const mediaObserver = new MutationObserver(function(mutations) {
+                let hasChanges = false;
+                mutations.forEach(function(mutation) {
+                    // Check for added media elements
+                    mutation.addedNodes.forEach(function(node) {
+                        if (node.nodeType === 1) {
+                            if (node.tagName === 'VIDEO' || node.tagName === 'AUDIO') {
+                                addAudioListeners(node);
+                                hasChanges = true;
+                            } else if (node.querySelector) {
+                                const mediaElements = node.querySelectorAll('video, audio');
+                                if (mediaElements.length > 0) {
+                                    mediaElements.forEach(addAudioListeners);
+                                    hasChanges = true;
+                                }
+                            }
+                        }
+                    });
+                    
+                    // Check for removed media elements
+                    mutation.removedNodes.forEach(function(node) {
+                        if (node.nodeType === 1) {
+                            if (node.tagName === 'VIDEO' || node.tagName === 'AUDIO' ||
+                                (node.querySelector && node.querySelectorAll('video, audio').length > 0)) {
+                                hasChanges = true;
+                            }
+                        }
+                    });
+                });
+                
+                if (hasChanges) {
+                    setTimeout(checkMediaState, 100); // Quick response for DOM changes
+                }
+            });
+            mediaObserver.observe(document.body, { childList: true, subtree: true });
+            
+            // Check initial state
+            setTimeout(checkMediaState, 500);
+            
+            // Background poller to keep audio content state updated (every 15 seconds)
+            setInterval(() => {
+                checkMediaState();
+            }, 15000); // Every 15 seconds
+        })();
+        """
+        
+        webView.evaluateJavaScript(mediaDetectionScript) { result, error in
+            if let error = error {
+                print("[Media Detection] Error: \(error.localizedDescription)")
+            } else {
+                print("[Media Detection] Audio event tracking injected successfully")
+            }
+        }
+    }
+    
+    func unloadWebView() {
+        print("🔄 [Tab] Unloading webview for: \(name)")
+        pause()
+        
+        // Remove from compositor if it exists
+        _webView?.removeFromSuperview()
+        
+        // Clean up all message handlers
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "linkHover")
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "commandHover")
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "commandClick")
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "pipStateChange")
+        
+        // Clear the webview reference (this will trigger reload when accessed)
+        _webView = nil
+        
+        // Reset loading state
+        loadingState = .idle
+    }
+    
+    func loadWebViewIfNeeded() {
+        if _webView == nil {
+            print("🔄 [Tab] Loading webview for: \(name)")
+            setupWebView()
+        }
+    }
+    
+
+
+    
+    func toggleMute() {
+        let muteScript = """
+        (() => {
+            const mediaElements = document.querySelectorAll('video, audio');
+            const hasUnmutedMedia = Array.from(mediaElements).some(el => !el.muted && el.volume > 0);
+            const targetMutedState = hasUnmutedMedia;
+            
+            mediaElements.forEach(el => {
+                el.muted = targetMutedState;
+                if (targetMutedState) {
+                    el.volume = 0;
+                } else {
+                    el.volume = el.volume || 1.0;
+                }
+            });
+            
+            return targetMutedState;
+        })();
+        """
+        
+        _webView?.evaluateJavaScript(muteScript) { [weak self] result, error in
+            if let muted = result as? Bool {
+                DispatchQueue.main.async {
+                    self?.isAudioMuted = muted
+                }
+            }
+        }
+    }
+    
     // MARK: - JavaScript Injection
     private func injectLinkHoverJavaScript(to webView: WKWebView) {
         let linkHoverScript = """
@@ -461,18 +813,100 @@ public class Tab: NSObject, Identifiable {
             }
         }
     }
+    
+    private func injectPiPStateListener(to webView: WKWebView) {
+        let pipStateScript = """
+        (function() {
+            function notifyPiPStateChange(isActive) {
+                if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.pipStateChange) {
+                    window.webkit.messageHandlers.pipStateChange.postMessage({ active: isActive });
+                }
+            }
+            
+            document.addEventListener('enterpictureinpicture', function() {
+                notifyPiPStateChange(true);
+            });
+            
+            document.addEventListener('leavepictureinpicture', function() {
+                notifyPiPStateChange(false);
+            });
+            
+            const videos = document.querySelectorAll('video');
+            videos.forEach(video => {
+                if (video.webkitSupportsPresentationMode) {
+                    video.addEventListener('webkitpresentationmodechanged', function() {
+                        const isInPiP = video.webkitPresentationMode === 'picture-in-picture';
+                        notifyPiPStateChange(isInPiP);
+                    });
+                }
+            });
+            
+            const observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    mutation.addedNodes.forEach(function(node) {
+                        if (node.tagName === 'VIDEO' && node.webkitSupportsPresentationMode) {
+                            node.addEventListener('webkitpresentationmodechanged', function() {
+                                const isInPiP = node.webkitPresentationMode === 'picture-in-picture';
+                                notifyPiPStateChange(isInPiP);
+                            });
+                        }
+                    });
+                });
+            });
+            
+            observer.observe(document.body, { childList: true, subtree: true });
+            
+            window.addEventListener('message', function(event) {
+                if (event.data && event.data.type === 'PULSE_MUTE_CONTROL') {
+                    const shouldMute = event.data.muted;
+                    const mediaElements = document.querySelectorAll('video, audio');
+                    mediaElements.forEach(media => {
+                        media.muted = shouldMute;
+                        if (shouldMute) {
+                            media.volume = 0;
+                        } else {
+                            media.volume = media.volume || 1.0;
+                        }
+                    });
+                    
+                    if (window.__pulseAudioContexts) {
+                        for (let context of window.__pulseAudioContexts) {
+                            if (shouldMute && context.state === 'running') {
+                                context.suspend().catch(e => console.log('[Iframe Mute] Context suspend error:', e));
+                            } else if (!shouldMute && context.state === 'suspended') {
+                                context.resume().catch(e => console.log('[Iframe Mute] Context resume error:', e));
+                            }
+                        }
+                    }
+                }
+            });
+        })();
+        """
+        
+        webView.evaluateJavaScript(pipStateScript) { result, error in
+            if let error = error {
+                print("Error injecting PiP state listener: \(error.localizedDescription)")
+            } else {
+                print("[PiP] State listener injected successfully")
+            }
+        }
+    }
 
-    // MARK: - Tab State Management
     func activate() {
         browserManager?.tabManager.setActiveTab(self)
+        // Media state is automatically tracked by injected script
     }
 
     func pause() {
-        // Pause media when tab becomes inactive
-        _webView?.evaluateJavaScript(
-            "document.querySelectorAll('video, audio').forEach(el => el.pause());",
-            completionHandler: nil
-        )
+        if !hasPiPActive && !PiPManager.shared.isPiPActive(for: self) {
+            _webView?.evaluateJavaScript(
+                "document.querySelectorAll('video, audio').forEach(el => el.pause());",
+                completionHandler: nil
+            )
+        }
+        
+        hasPlayingVideo = false
+        hasPlayingAudio = false
     }
 
     func updateTitle(_ title: String) {
@@ -495,6 +929,18 @@ public class Tab: NSObject, Identifiable {
             return
         }
 
+        // Check cache first
+        let cacheKey = url.host ?? url.absoluteString
+        if let cachedFavicon = Self.getCachedFavicon(for: cacheKey) {
+            print("🎯 [Favicon] Cache hit for: \(cacheKey)")
+            await MainActor.run {
+                self.favicon = cachedFavicon
+            }
+            return
+        }
+        
+        print("🌐 [Favicon] Cache miss for: \(cacheKey), fetching from network...")
+
         do {
             let favicon = try await FaviconFinder(url: url)
                 .fetchFaviconURLs()
@@ -504,6 +950,10 @@ public class Tab: NSObject, Identifiable {
             if let faviconImage = favicon.image {
                 let nsImage = faviconImage.image
                 let swiftUIImage = SwiftUI.Image(nsImage: nsImage)
+
+                // Cache the favicon
+                Self.cacheFavicon(swiftUIImage, for: cacheKey)
+                print("💾 [Favicon] Cached favicon for: \(cacheKey)")
 
                 await MainActor.run {
                     self.favicon = swiftUIImage
@@ -522,6 +972,42 @@ public class Tab: NSObject, Identifiable {
             }
         }
     }
+
+    // MARK: - Favicon Cache Management
+    static func getCachedFavicon(for key: String) -> SwiftUI.Image? {
+        faviconCacheLock.lock()
+        defer { faviconCacheLock.unlock() }
+        return faviconCache[key]
+    }
+
+    static func cacheFavicon(_ favicon: SwiftUI.Image, for key: String) {
+        faviconCacheLock.lock()
+        defer { faviconCacheLock.unlock() }
+        
+        faviconCache[key] = favicon
+        
+        // Limit cache size to prevent memory issues
+        if faviconCache.count > 100 {
+            // Remove oldest entries (simple FIFO)
+            let keysToRemove = Array(faviconCache.keys.prefix(20))
+            for key in keysToRemove {
+                faviconCache.removeValue(forKey: key)
+            }
+        }
+    }
+
+    // MARK: - Cache Management
+    static func clearFaviconCache() {
+        faviconCacheLock.lock()
+        defer { faviconCacheLock.unlock() }
+        faviconCache.removeAll()
+    }
+    
+    static func getFaviconCacheStats() -> (count: Int, domains: [String]) {
+        faviconCacheLock.lock()
+        defer { faviconCacheLock.unlock() }
+        return (faviconCache.count, Array(faviconCache.keys))
+    }
 }
 
 // MARK: - WKNavigationDelegate
@@ -539,6 +1025,13 @@ extension Tab: WKNavigationDelegate {
         }
 
         if let newURL = webView.url {
+            // Only reset for actual URL changes, not just reloads
+            if newURL.absoluteString != self.url.absoluteString {
+                hasAudioContent = false
+                hasPlayingAudio = false
+                isAudioMuted = false
+                print("🔄 [Tab] Swift reset audio tracking for navigation to: \(newURL.absoluteString)")
+            }
             self.url = newURL
         }
     }
@@ -611,6 +1104,8 @@ extension Tab: WKNavigationDelegate {
         
         injectDownloadJavaScript(to: webView)
         injectLinkHoverJavaScript(to: webView)
+        injectPiPStateListener(to: webView)
+        injectMediaDetection(to: webView)
         updateNavigationState()
     }
 
@@ -799,6 +1294,25 @@ extension Tab: WKScriptMessageHandler {
                 }
             }
             
+        case "pipStateChange":
+            if let dict = message.body as? [String: Any], let active = dict["active"] as? Bool {
+                DispatchQueue.main.async {
+                    print("[PiP] State change detected from web: \(active)")
+                    self.hasPiPActive = active
+                }
+            }
+            
+        case let name where name.hasPrefix("mediaStateChange_"):
+            if let dict = message.body as? [String: Bool] {
+                DispatchQueue.main.async {
+                    self.hasPlayingVideo = dict["hasPlayingVideo"] ?? false
+                    self.hasVideoContent = dict["hasVideoContent"] ?? false
+                    self.hasAudioContent = dict["hasAudioContent"] ?? false
+                    self.hasPlayingAudio = dict["hasPlayingAudio"] ?? false
+                    // Don't override isAudioMuted - it's managed by toggleMute()
+                }
+            }
+        
         default:
             break
         }

@@ -30,19 +30,37 @@ class BrowserConfiguration {
 
         // Media settings
         config.mediaTypesRequiringUserActionForPlayback = []
-
+        
+        // Enable Picture-in-Picture for web media
+        config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
+        
+        // Enable background media playback
+        config.allowsAirPlayForMediaPlayback = true
+        
         // User agent for better compatibility
         config.applicationNameForUserAgent = "Version/17.4.1 Safari/605.1.15"
 
-        // Enable web inspector for debugging
-        if #available(macOS 13.3, *) {
-            config.preferences.setValue(true, forKey: "developerExtrasEnabled")
-        }
+        // Web inspector will be enabled per-webview using isInspectable property
 
         // Note: webExtensionController will be set by ExtensionManager during initialization
 
         return config
     }()
 
+    // MARK: - Cache-Optimized Configuration
+    lazy var cacheOptimizedWebViewConfiguration: WKWebViewConfiguration = {
+        let config = webViewConfiguration
+        
+        // Enable aggressive caching
+        config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
+        config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
+        
+        // Set cache policy preferences
+        config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
+        
+        return config
+    }()
+
     private init() {}
+    
 }
