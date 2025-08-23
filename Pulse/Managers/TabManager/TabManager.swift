@@ -179,6 +179,9 @@ class TabManager {
 
         guard let tab = removed else { return }
 
+        // Force unload the tab from compositor before removing
+        browserManager?.compositorManager.unloadTab(tab)
+
         if #available(macOS 15.5, *) {
             ExtensionManager.shared.notifyTabClosed(tab)
         }

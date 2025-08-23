@@ -198,7 +198,19 @@ class BrowserManager: ObservableObject {
     }
     
     private func quitApplication() {
+        // Clean up all tabs before terminating
+        cleanupAllTabs()
         NSApplication.shared.terminate(nil)
+    }
+    
+    func cleanupAllTabs() {
+        print("🔄 [BrowserManager] Cleaning up all tabs")
+        let allTabs = tabManager.pinnedTabs + tabManager.tabs
+        
+        for tab in allTabs {
+            print("🔄 [BrowserManager] Cleaning up tab: \(tab.name)")
+            tab.closeTab()
+        }
     }
 
     // MARK: - Private Methods
