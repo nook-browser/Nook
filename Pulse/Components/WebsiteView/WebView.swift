@@ -40,7 +40,9 @@ struct WebView: NSViewRepresentable {
                 let readAccessURL = url.deletingLastPathComponent()
                 webView.loadFileURL(url, allowingReadAccessTo: readAccessURL)
             } else {
-                let request = URLRequest(url: url)
+                var request = URLRequest(url: url)
+                request.cachePolicy = .returnCacheDataElseLoad
+                request.timeoutInterval = 30.0
                 webView.load(request)
             }
         }

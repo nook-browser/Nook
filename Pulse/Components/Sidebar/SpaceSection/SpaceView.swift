@@ -9,9 +9,9 @@ import SwiftUI
 
 struct SpaceView: View {
     let space: Space
-    let tabs: [Tab]
     let isActive: Bool
     let width: CGFloat
+    @EnvironmentObject var browserManager: BrowserManager
 
     let onSetActive: () -> Void
     let onActivateTab: (Tab) -> Void
@@ -19,6 +19,12 @@ struct SpaceView: View {
     let onPinTab: (Tab) -> Void
     let onMoveTabUp: (Tab) -> Void
     let onMoveTabDown: (Tab) -> Void
+    let onMuteTab: (Tab) -> Void
+    
+    // Get tabs directly from TabManager to ensure proper observation
+    private var tabs: [Tab] {
+        browserManager.tabManager.tabs(in: space)
+    }
 
     var body: some View {
         VStack(spacing: 8) {
@@ -33,12 +39,10 @@ struct SpaceView: View {
                 VStack(spacing: 2) {
                     ForEach(tabs, id: \.id) { tab in
                         SpaceTab(
-                            tabName: tab.name,
-                            tabURL: tab.url.absoluteString,
-                            tabIcon: tab.favicon,
-                            isActive: tab.isCurrentTab,
+                            tab: tab,
                             action: { onActivateTab(tab) },
-                            onClose: { onCloseTab(tab) }
+                            onClose: { onCloseTab(tab) },
+                            onMute: { onMuteTab(tab) }
                         )
                         .transition(.move(edge: .top).combined(with: .opacity))
                         .contextMenu {
