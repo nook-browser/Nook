@@ -38,9 +38,13 @@ class BrowserManager: ObservableObject {
     var cookieManager: CookieManager
     var cacheManager: CacheManager
     var extensionManager: ExtensionManager?
+    var compositorManager: TabCompositorManager
     
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
+    
+    // Compositor container view
+    var compositorContainerView: NSView?
 
     init() {
         self.modelContext = Persistence.shared.container.mainContext
@@ -57,6 +61,9 @@ class BrowserManager: ObservableObject {
         self.historyManager = HistoryManager(context: modelContext)
         self.cookieManager = CookieManager()
         self.cacheManager = CacheManager()
+        self.compositorManager = TabCompositorManager()
+        self.compositorManager.browserManager = self
+        self.compositorManager.setUnloadTimeout(self.settingsManager.tabUnloadTimeout)
         self.tabManager.browserManager = self
         // Attach extension manager BEFORE any WKWebView is created so content scripts can inject
         if #available(macOS 15.5, *), let mgr = self.extensionManager {
@@ -65,6 +72,14 @@ class BrowserManager: ObservableObject {
 
         self.tabManager.reattachBrowserManager(self)
         loadSidebarSettings()
+        
+        // Listen for tab unload timeout changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleTabUnloadTimeoutChange),
+            name: .tabUnloadTimeoutChanged,
+            object: nil
+        )
         
     }
     
@@ -201,6 +216,16 @@ class BrowserManager: ObservableObject {
     private func saveSidebarSettings() {
         userDefaults.set(savedSidebarWidth, forKey: "sidebarWidth")
         userDefaults.set(isSidebarVisible, forKey: "sidebarVisible")
+    }
+    
+    @objc private func handleTabUnloadTimeoutChange(_ notification: Notification) {
+        if let timeout = notification.userInfo?["timeout"] as? TimeInterval {
+            compositorManager.setUnloadTimeout(timeout)
+        }
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
     
     // MARK: - Cookie Management Methods
