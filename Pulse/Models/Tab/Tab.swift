@@ -294,43 +294,135 @@ public class Tab: NSObject, Identifiable, ObservableObject {
     func closeTab() {
         print("Closing tab: \(self.name)")
 
-        // Stop any media playback and clean up WebView
-        _webView?.stopLoading()
-        _webView?.evaluateJavaScript(
-            "document.querySelectorAll('video, audio').forEach(el => el.pause());",
-            completionHandler: nil
-        )
-        
-        // Clean up all message handlers
-        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "linkHover")
-        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "commandHover")
-        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "commandClick")
-        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "pipStateChange")
-        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "mediaStateChange_\(id.uuidString)")
-        
-        // Clean up media detection tracking for this tab
-        let cleanupScript = """
-        (() => {
-            const tabId = '\(id.uuidString)';
-            if (window.__pulseMediaDetectionInstalled && window.__pulseMediaDetectionInstalled[tabId]) {
-                delete window.__pulseMediaDetectionInstalled[tabId];
-            }
-        })();
-        """
-        _webView?.evaluateJavaScript(cleanupScript, completionHandler: nil)
-        
-        _webView?.navigationDelegate = nil
-        _webView?.uiDelegate = nil
-        _webView = nil
-
-        hasPlayingVideo = false
+        // IMMEDIATELY RESET PiP STATE to prevent any further PiP operations
         hasPiPActive = false
-        PiPManager.shared.stopPiP(for: self)
 
+        // KILL TAB: Complete destruction of WKWebView and all associated processes
+        if let webView = _webView {
+            // 1. STOP EVERYTHING IMMEDIATELY
+            webView.stopLoading()
+            
+            // 2. KILL ALL MEDIA AND PiP VIA JAVASCRIPT (including PiP destruction)
+            let killScript = """
+            (() => {
+                // FORCE KILL ALL PiP SESSIONS FIRST
+                try {
+                    // Exit any active PiP sessions
+                    if (document.pictureInPictureElement) {
+                        document.exitPictureInPicture();
+                    }
+                    
+                    // Force exit WebKit PiP for all videos
+                    document.querySelectorAll('video').forEach(video => {
+                        if (video.webkitSupportsPresentationMode && video.webkitPresentationMode === 'picture-in-picture') {
+                            video.webkitSetPresentationMode('inline');
+                        }
+                    });
+                    
+                    // Disable PiP on all videos permanently
+                    document.querySelectorAll('video').forEach(video => {
+                        video.disablePictureInPicture = true;
+                        video.webkitSupportsPresentationMode = false;
+                    });
+                } catch (e) {
+                    console.log('PiP destruction error:', e);
+                }
+                
+                // Kill all media
+                document.querySelectorAll('video, audio').forEach(el => {
+                    el.pause();
+                    el.currentTime = 0;
+                    el.src = '';
+                    el.load();
+                    el.remove();
+                });
+                
+                // Kill all WebAudio
+                if (window.AudioContext || window.webkitAudioContext) {
+                    if (window.__pulseAudioContexts) {
+                        window.__pulseAudioContexts.forEach(ctx => ctx.close());
+                        delete window.__pulseAudioContexts;
+                    }
+                }
+                
+                // Kill all timers
+                const maxId = setTimeout(() => {}, 0);
+                for (let i = 0; i < maxId; i++) {
+                    clearTimeout(i);
+                    clearInterval(i);
+                }
+                
+                // Force garbage collection if available
+                if (window.gc) {
+                    window.gc();
+                }
+            })();
+            """
+            webView.evaluateJavaScript(killScript) { _, error in
+                if let error = error {
+                    print("[Tab] Error during media/PiP kill: \(error.localizedDescription)")
+                } else {
+                    print("[Tab] Media and PiP successfully killed for: \(self.name)")
+                }
+            }
+            
+            // 4. REMOVE ALL MESSAGE HANDLERS
+            webView.configuration.userContentController.removeScriptMessageHandler(forName: "linkHover")
+            webView.configuration.userContentController.removeScriptMessageHandler(forName: "commandHover")
+            webView.configuration.userContentController.removeScriptMessageHandler(forName: "commandClick")
+            webView.configuration.userContentController.removeScriptMessageHandler(forName: "pipStateChange")
+            webView.configuration.userContentController.removeScriptMessageHandler(forName: "mediaStateChange_\(id.uuidString)")
+            
+            // 5. CLEAR ALL DELEGATES
+            webView.navigationDelegate = nil
+            webView.uiDelegate = nil
+            
+            // 6. REMOVE FROM ALL VIEW HIERARCHIES
+            webView.removeFromSuperview()
+            
+            // 7. FORCE REMOVE FROM COMPOSITOR
+            if let containerView = browserManager?.compositorContainerView {
+                for subview in containerView.subviews {
+                    if subview === webView {
+                        subview.removeFromSuperview()
+                        print("Tab removed from compositor: \(name)")
+                    }
+                }
+            }
+            
+            // 8. FORCE TERMINATE WEB CONTENT PROCESS
+            webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { _ in }
+            webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { _ in }
+            webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { _ in }
+            webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { _ in }
+            webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { _ in }
+            
+            // 9. ACCESS PROCESS POOL TO FORCE TERMINATION
+            _ = webView.configuration.processPool
+            
+            // 10. CLEAR THE REFERENCE
+            _webView = nil
+        }
+
+        // 11. RESET ALL STATE
+        hasPlayingVideo = false
+        hasVideoContent = false
+        hasPlayingAudio = false
+        hasAudioContent = false
+        isAudioMuted = false
+        hasPiPActive = false
         loadingState = .idle
 
+        // 12. FORCE COMPOSITOR UPDATE
+        browserManager?.compositorManager.updateTabVisibility(currentTabId: browserManager?.tabManager.currentTab?.id)
+
+        // 13. REMOVE FROM TAB MANAGER
         browserManager?.tabManager.removeTab(self.id)
+        
+        print("Tab killed: \(name)")
     }
+    
+
     
     deinit {
         // Ensure cleanup when tab is deallocated
@@ -589,22 +681,103 @@ public class Tab: NSObject, Identifiable, ObservableObject {
     
     func unloadWebView() {
         print("🔄 [Tab] Unloading webview for: \(name)")
-        pause()
         
-        // Remove from compositor if it exists
-        _webView?.removeFromSuperview()
+        guard let webView = _webView else {
+            print("🔄 [Tab] WebView already unloaded for: \(name)")
+            return
+        }
         
-        // Clean up all message handlers
-        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "linkHover")
-        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "commandHover")
-        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "commandClick")
-        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "pipStateChange")
+        // FORCE KILL ALL MEDIA AND PROCESSES
+        webView.stopLoading()
+        
+        // Kill all media and PiP via JavaScript
+        let killScript = """
+        (() => {
+            // FORCE KILL ALL PiP SESSIONS FIRST
+            try {
+                // Exit any active PiP sessions
+                if (document.pictureInPictureElement) {
+                    document.exitPictureInPicture();
+                }
+                
+                // Force exit WebKit PiP for all videos
+                document.querySelectorAll('video').forEach(video => {
+                    if (video.webkitSupportsPresentationMode && video.webkitPresentationMode === 'picture-in-picture') {
+                        video.webkitSetPresentationMode('inline');
+                    }
+                });
+                
+                // Disable PiP on all videos permanently
+                document.querySelectorAll('video').forEach(video => {
+                    video.disablePictureInPicture = true;
+                    video.webkitSupportsPresentationMode = false;
+                });
+            } catch (e) {
+                console.log('PiP destruction error:', e);
+            }
+            
+            // Kill all media
+            document.querySelectorAll('video, audio').forEach(el => {
+                el.pause();
+                el.currentTime = 0;
+                el.src = '';
+                el.load();
+                el.remove();
+            });
+            
+            // Kill all WebAudio
+            if (window.AudioContext || window.webkitAudioContext) {
+                if (window.__pulseAudioContexts) {
+                    window.__pulseAudioContexts.forEach(ctx => ctx.close());
+                    delete window.__pulseAudioContexts;
+                }
+            }
+            
+            // Kill all timers
+            const maxId = setTimeout(() => {}, 0);
+            for (let i = 0; i < maxId; i++) {
+                clearTimeout(i);
+                clearInterval(i);
+            }
+            
+            // Force garbage collection if available
+            if (window.gc) {
+                window.gc();
+            }
+        })();
+        """
+        webView.evaluateJavaScript(killScript) { _, error in
+            if let error = error {
+                print("[Tab] Error during media/PiP kill in unload: \(error.localizedDescription)")
+            } else {
+                print("[Tab] Media and PiP successfully killed during unload for: \(self.name)")
+            }
+        }
+        
+        // Clean up message handlers
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "linkHover")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "commandHover")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "commandClick")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "pipStateChange")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "mediaStateChange_\(id.uuidString)")
+        
+        // Remove from view hierarchy and clear delegates
+        webView.removeFromSuperview()
+        webView.navigationDelegate = nil
+        webView.uiDelegate = nil
+        
+        // FORCE TERMINATE THE WEB CONTENT PROCESS
+        webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { _ in }
+        webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { _ in }
+        webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { _ in }
         
         // Clear the webview reference (this will trigger reload when accessed)
         _webView = nil
         
         // Reset loading state
         loadingState = .idle
+        
+        print("💀 [Tab] WebView FORCE UNLOADED for: \(name)")
     }
     
     func loadWebViewIfNeeded() {
