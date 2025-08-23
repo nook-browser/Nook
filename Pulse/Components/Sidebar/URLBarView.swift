@@ -33,9 +33,9 @@ struct URLBarView: View {
                     
                     Spacer()
                     
-                    // PiP button (show when video is playing)
+                    // PiP button (show when video content is available or PiP is active)
                     if let currentTab = browserManager.tabManager.currentTab,
-                       currentTab.hasPlayingVideo {
+                       (currentTab.hasVideoContent || currentTab.hasPiPActive) {
                         Button(action: {
                             currentTab.requestPictureInPicture()
                         }) {

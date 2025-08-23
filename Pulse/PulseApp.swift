@@ -207,6 +207,26 @@ struct PulseCommands: Commands {
                 }
             }
         }
+        
+        // Window Commands
+        CommandMenu("Window") {
+            Button("Toggle Picture in Picture") {
+                browserManager.tabManager.currentTab?.requestPictureInPicture()
+            }
+            .keyboardShortcut("p", modifiers: [.command, .shift])
+            .disabled(browserManager.tabManager.currentTab == nil || 
+                     !(browserManager.tabManager.currentTab?.hasVideoContent == true || 
+                       browserManager.tabManager.currentTab?.hasPiPActive == true))
+            
+            Divider()
+            
+            Button(browserManager.tabManager.currentTab?.isAudioMuted == true ? "Unmute Audio" : "Mute Audio") {
+                browserManager.tabManager.currentTab?.toggleMute()
+            }
+            .keyboardShortcut("m", modifiers: .command)
+            .disabled(browserManager.tabManager.currentTab == nil || 
+                     browserManager.tabManager.currentTab?.hasAudioContent != true)
+        }
     }
 }
 
