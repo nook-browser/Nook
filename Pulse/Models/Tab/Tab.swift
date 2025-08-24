@@ -434,10 +434,10 @@ public class Tab: NSObject, Identifiable, ObservableObject {
         self.url = newURL
         loadingState = .didStartProvisionalNavigation
         
-        // Reset audio tracking for new page
+        // Reset audio tracking for new page but preserve mute state
         hasAudioContent = false
         hasPlayingAudio = false
-        isAudioMuted = false
+        // Note: isAudioMuted is preserved to maintain user's mute preference
         
         if newURL.isFileURL {
             // Grant read access to the containing directory for local resources
@@ -581,17 +581,81 @@ public class Tab: NSObject, Identifiable, ObservableObject {
                 const audios = document.querySelectorAll('audio');
                 const videos = document.querySelectorAll('video');
                 
-                // Single pass through audios
-                const hasPlayingAudio = Array.from(audios).some(audio => 
-                    !audio.paused && !audio.ended && audio.readyState >= 2
-                );
-                
-                // Single pass through videos for all checks
+                // Standard media detection
+                let hasPlayingAudio = false;
                 let hasPlayingVideoWithAudio = false;
                 let hasPlayingVideo = false;
                 
+                // Check audio elements with enhanced detection
+                Array.from(audios).forEach(audio => {
+                    const standardPlaying = !audio.paused && !audio.ended && audio.readyState >= 2;
+                    
+                    // Enhanced detection for DRM content using WebKit properties
+                    let drmAudioPlaying = false;
+                    try {
+                        // Check for decoded audio bytes (WebKit-specific)
+                        if ('webkitAudioDecodedByteCount' in audio) {
+                            const decodedBytes = audio.webkitAudioDecodedByteCount;
+                            if (window.__pulseLastDecodedBytes === undefined) {
+                                window.__pulseLastDecodedBytes = {};
+                            }
+                            const lastBytes = window.__pulseLastDecodedBytes[audio.src] || 0;
+                            if (decodedBytes > lastBytes && audio.currentTime > 0) {
+                                drmAudioPlaying = true;
+                            }
+                            window.__pulseLastDecodedBytes[audio.src] = decodedBytes;
+                        }
+                        
+                        // Check if current time is progressing (for DRM content)
+                        if (!window.__pulseLastCurrentTime) window.__pulseLastCurrentTime = {};
+                        const lastTime = window.__pulseLastCurrentTime[audio.src] || 0;
+                        if (audio.currentTime > lastTime + 0.1 && audio.readyState >= 2) {
+                            drmAudioPlaying = true;
+                        }
+                        window.__pulseLastCurrentTime[audio.src] = audio.currentTime;
+                    } catch (e) {
+                        // Silently continue if WebKit properties aren't available
+                    }
+                    
+                    if (standardPlaying || drmAudioPlaying) {
+                        hasPlayingAudio = true;
+                    }
+                });
+                
+                // Check video elements with enhanced detection
                 Array.from(videos).forEach(video => {
-                    const isPlaying = !video.paused && !video.ended && video.readyState >= 2;
+                    const standardPlaying = !video.paused && !video.ended && video.readyState >= 2;
+                    
+                    // Enhanced detection for DRM video content
+                    let drmVideoPlaying = false;
+                    try {
+                        // Check for decoded bytes (WebKit-specific)
+                        if ('webkitAudioDecodedByteCount' in video || 'webkitVideoDecodedByteCount' in video) {
+                            const audioBytes = video.webkitAudioDecodedByteCount || 0;
+                            const videoBytes = video.webkitVideoDecodedByteCount || 0;
+                            if (!window.__pulseLastVideoBytes) window.__pulseLastVideoBytes = {};
+                            const lastAudioBytes = window.__pulseLastVideoBytes[video.src + '_audio'] || 0;
+                            const lastVideoBytes = window.__pulseLastVideoBytes[video.src + '_video'] || 0;
+                            
+                            if ((audioBytes > lastAudioBytes || videoBytes > lastVideoBytes) && video.currentTime > 0) {
+                                drmVideoPlaying = true;
+                            }
+                            window.__pulseLastVideoBytes[video.src + '_audio'] = audioBytes;
+                            window.__pulseLastVideoBytes[video.src + '_video'] = videoBytes;
+                        }
+                        
+                        // Check if current time is progressing
+                        if (!window.__pulseLastVideoCurrentTime) window.__pulseLastVideoCurrentTime = {};
+                        const lastTime = window.__pulseLastVideoCurrentTime[video.src] || 0;
+                        if (video.currentTime > lastTime + 0.1 && video.readyState >= 2) {
+                            drmVideoPlaying = true;
+                        }
+                        window.__pulseLastVideoCurrentTime[video.src] = video.currentTime;
+                    } catch (e) {
+                        // Silently continue if WebKit properties aren't available
+                    }
+                    
+                    const isPlaying = standardPlaying || drmVideoPlaying;
                     if (isPlaying) {
                         hasPlayingVideo = true;
                         if (!video.muted && video.volume > 0) {
@@ -600,8 +664,45 @@ public class Tab: NSObject, Identifiable, ObservableObject {
                     }
                 });
                 
-                // Audio content is simply whether there's currently playing audio
-                const hasAudioContent = hasPlayingAudio || hasPlayingVideoWithAudio;
+                // Additional heuristic detection for streaming sites
+                let heuristicAudioDetected = false;
+                try {
+                    // Check for common streaming site indicators
+                    const isSpotify = window.location.hostname.includes('spotify.com');
+                    const isYouTube = window.location.hostname.includes('youtube.com') || window.location.hostname.includes('youtu.be');
+                    const isSoundCloud = window.location.hostname.includes('soundcloud.com');
+                    const isAppleMusic = window.location.hostname.includes('music.apple.com');
+                    
+                    if (isSpotify) {
+                        // Look for Spotify-specific indicators
+                        const playButton = document.querySelector('[data-testid="control-button-playpause"]');
+                        const isSpotifyPlaying = playButton && (playButton.getAttribute('aria-label') || '').toLowerCase().includes('pause');
+                        const progressBar = document.querySelector('[data-testid="playback-progressbar"]');
+                        const hasProgress = progressBar && progressBar.getAttribute('aria-valuenow') > 0;
+                        heuristicAudioDetected = isSpotifyPlaying && hasProgress;
+                    } else if (isYouTube) {
+                        // Look for YouTube player state
+                        const player = document.querySelector('.html5-video-player');
+                        const video = document.querySelector('video');
+                        if (player && video) {
+                            heuristicAudioDetected = player.classList.contains('playing-mode') || 
+                                                   (!video.paused && video.currentTime > 0);
+                        }
+                    } else if (isSoundCloud) {
+                        // Look for SoundCloud play state
+                        const playButton = document.querySelector('.playControl');
+                        heuristicAudioDetected = playButton && playButton.classList.contains('playing');
+                    } else if (isAppleMusic) {
+                        // Look for Apple Music play state
+                        const playButton = document.querySelector('button[aria-label*="pause"], button[aria-label*="Pause"]');
+                        heuristicAudioDetected = !!playButton;
+                    }
+                } catch (e) {
+                    // Silently continue if heuristic detection fails
+                }
+                
+                // Combine all detection methods
+                const hasAudioContent = hasPlayingAudio || hasPlayingVideoWithAudio || heuristicAudioDetected;
                 
                 window.webkit.messageHandlers[handlerName].postMessage({
                     hasAudioContent: hasAudioContent,
@@ -613,11 +714,31 @@ public class Tab: NSObject, Identifiable, ObservableObject {
             
             function addAudioListeners(element) {
                 // Listen for media state changes - responsive but not excessive
-                ['play', 'pause', 'ended', 'loadedmetadata', 'canplay', 'volumechange'].forEach(event => {
+                ['play', 'pause', 'ended', 'loadedmetadata', 'canplay', 'volumechange', 'timeupdate'].forEach(event => {
                     element.addEventListener(event, function() {
                         setTimeout(checkMediaState, 50); // Quick response
                     });
                 });
+                
+                // Add DRM-specific event listeners for WebKit
+                try {
+                    if ('webkitneedkey' in element) {
+                        element.addEventListener('webkitneedkey', function() {
+                            console.log('🔐 [Pulse] WebKit DRM key needed event detected');
+                            setTimeout(checkMediaState, 100);
+                        });
+                    }
+                    
+                    // Listen for encrypted content events
+                    if ('encrypted' in element) {
+                        element.addEventListener('encrypted', function() {
+                            console.log('🔐 [Pulse] EME encrypted event detected');
+                            setTimeout(checkMediaState, 100);
+                        });
+                    }
+                } catch (e) {
+                    // Silently continue if DRM events aren't available
+                }
             }
             
             // Add listeners to existing media
@@ -660,13 +781,83 @@ public class Tab: NSObject, Identifiable, ObservableObject {
             });
             mediaObserver.observe(document.body, { childList: true, subtree: true });
             
+            // Add additional monitoring for streaming sites
+            function setupStreamingSiteMonitoring() {
+                const hostname = window.location.hostname;
+                
+                if (hostname.includes('spotify.com')) {
+                    // Monitor Spotify's play button changes
+                    const observer = new MutationObserver(() => {
+                        setTimeout(checkMediaState, 100);
+                    });
+                    
+                    // Watch for changes in Spotify's player UI
+                    const playerArea = document.querySelector('[data-testid="now-playing-widget"]') || document.body;
+                    if (playerArea) {
+                        observer.observe(playerArea, { 
+                            childList: true, 
+                            subtree: true, 
+                            attributes: true,
+                            attributeFilter: ['aria-label', 'class', 'data-testid']
+                        });
+                    }
+                } else if (hostname.includes('youtube.com') || hostname.includes('youtu.be')) {
+                    // Monitor YouTube player state changes
+                    window.addEventListener('yt-navigate-finish', () => {
+                        setTimeout(checkMediaState, 500);
+                    });
+                    
+                    // Watch for player state changes
+                    const observer = new MutationObserver(() => {
+                        setTimeout(checkMediaState, 100);
+                    });
+                    
+                    const playerElement = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
+                    if (playerElement) {
+                        observer.observe(playerElement, { 
+                            attributes: true,
+                            attributeFilter: ['class']
+                        });
+                    }
+                } else if (hostname.includes('soundcloud.com')) {
+                    // Monitor SoundCloud player
+                    const observer = new MutationObserver(() => {
+                        setTimeout(checkMediaState, 100);
+                    });
+                    
+                    const playerElement = document.querySelector('.playControls') || document.body;
+                    observer.observe(playerElement, { 
+                        childList: true, 
+                        subtree: true, 
+                        attributes: true,
+                        attributeFilter: ['class']
+                    });
+                } else if (hostname.includes('music.apple.com')) {
+                    // Monitor Apple Music player
+                    const observer = new MutationObserver(() => {
+                        setTimeout(checkMediaState, 100);
+                    });
+                    
+                    const playerElement = document.querySelector('.web-chrome-playback-controls') || document.body;
+                    observer.observe(playerElement, { 
+                        childList: true, 
+                        subtree: true, 
+                        attributes: true,
+                        attributeFilter: ['aria-label', 'class']
+                    });
+                }
+            }
+            
+            // Setup site-specific monitoring after page load
+            setTimeout(setupStreamingSiteMonitoring, 1000);
+            
             // Check initial state
             setTimeout(checkMediaState, 500);
             
-            // Background poller to keep audio content state updated (every 15 seconds)
+            // More frequent polling for better DRM detection (every 5 seconds instead of 15)
             setInterval(() => {
                 checkMediaState();
-            }, 15000); // Every 15 seconds
+            }, 5000); // Every 5 seconds for better responsiveness
         })();
         """
         
@@ -791,31 +982,26 @@ public class Tab: NSObject, Identifiable, ObservableObject {
 
     
     func toggleMute() {
-        let muteScript = """
-        (() => {
-            const mediaElements = document.querySelectorAll('video, audio');
-            const hasUnmutedMedia = Array.from(mediaElements).some(el => !el.muted && el.volume > 0);
-            const targetMutedState = hasUnmutedMedia;
-            
-            mediaElements.forEach(el => {
-                el.muted = targetMutedState;
-                if (targetMutedState) {
-                    el.volume = 0;
-                } else {
-                    el.volume = el.volume || 1.0;
-                }
-            });
-            
-            return targetMutedState;
-        })();
-        """
-        
-        _webView?.evaluateJavaScript(muteScript) { [weak self] result, error in
-            if let muted = result as? Bool {
-                DispatchQueue.main.async {
-                    self?.isAudioMuted = muted
-                }
+        setMuted(!isAudioMuted)
+    }
+    
+    func setMuted(_ muted: Bool) {
+        guard let webView = _webView else {
+            // Store the desired state even if webView isn't loaded yet
+            DispatchQueue.main.async { [weak self] in
+                self?.isAudioMuted = muted
+                print("🔇 [Tab] Mute state set to \(muted) (webView not loaded yet)")
             }
+            return
+        }
+        
+        // Set the mute state using MuteableWKWebView's muted property
+        webView.isMuted = muted
+        
+        // Update our internal state
+        DispatchQueue.main.async { [weak self] in
+            self?.isAudioMuted = muted
+            print("🔇 [Tab] Mute set to \(muted) using MuteableWKWebView")
         }
     }
     
@@ -1028,31 +1214,6 @@ public class Tab: NSObject, Identifiable, ObservableObject {
             });
             
             observer.observe(document.body, { childList: true, subtree: true });
-            
-            window.addEventListener('message', function(event) {
-                if (event.data && event.data.type === 'PULSE_MUTE_CONTROL') {
-                    const shouldMute = event.data.muted;
-                    const mediaElements = document.querySelectorAll('video, audio');
-                    mediaElements.forEach(media => {
-                        media.muted = shouldMute;
-                        if (shouldMute) {
-                            media.volume = 0;
-                        } else {
-                            media.volume = media.volume || 1.0;
-                        }
-                    });
-                    
-                    if (window.__pulseAudioContexts) {
-                        for (let context of window.__pulseAudioContexts) {
-                            if (shouldMute && context.state === 'running') {
-                                context.suspend().catch(e => console.log('[Iframe Mute] Context suspend error:', e));
-                            } else if (!shouldMute && context.state === 'suspended') {
-                                context.resume().catch(e => console.log('[Iframe Mute] Context resume error:', e));
-                            }
-                        }
-                    }
-                }
-            });
         })();
         """
         
@@ -1202,7 +1363,7 @@ extension Tab: WKNavigationDelegate {
             if newURL.absoluteString != self.url.absoluteString {
                 hasAudioContent = false
                 hasPlayingAudio = false
-                isAudioMuted = false
+                // Note: isAudioMuted is preserved to maintain user's mute preference
                 print("🔄 [Tab] Swift reset audio tracking for navigation to: \(newURL.absoluteString)")
             }
             self.url = newURL
@@ -1280,6 +1441,11 @@ extension Tab: WKNavigationDelegate {
         injectPiPStateListener(to: webView)
         injectMediaDetection(to: webView)
         updateNavigationState()
+        
+        // Apply mute state using MuteableWKWebView if the tab was previously muted
+        if isAudioMuted {
+            setMuted(true)
+        }
     }
 
     // MARK: - Loading Failed (after content started loading)
