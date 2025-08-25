@@ -86,24 +86,40 @@ class TabManager {
 
     func setActiveSpace(_ space: Space) {
         guard spaces.contains(where: { $0.id == space.id }) else { return }
+        
+        // Capture the previous tab before switching
         let previousTab = currentTab
+        
+        // Save the current tab as the active tab for the current space
+        if let currentSpace = self.currentSpace, let currentTab = self.currentTab {
+            if let spaceTabId = currentTab.spaceId, spaceTabId == currentSpace.id {
+                currentSpace.activeTabId = currentTab.id
+            }
+        }
+        
         currentSpace = space
-
         let inSpace = tabsBySpace[space.id] ?? []
 
-        if let ct = currentTab {
+        // Restore the previously active tab for this space IMMEDIATELY
+        let targetTab: Tab?
+        if let activeTabId = space.activeTabId,
+           let activeTab = inSpace.first(where: { $0.id == activeTabId }) {
+            targetTab = activeTab
+        } else if let ct = currentTab {
             if let sid = ct.spaceId, sid != space.id {
-                currentTab = inSpace.first ?? pinnedTabs.first
+                targetTab = inSpace.first ?? pinnedTabs.first
             } else if ct.spaceId == nil {
-                if currentTab == nil, let first = inSpace.first {
-                    currentTab = first
-                }
+                targetTab = inSpace.first ?? pinnedTabs.first
+            } else {
+                targetTab = ct
             }
         } else {
-            currentTab = inSpace.first ?? pinnedTabs.first
+            targetTab = inSpace.first ?? pinnedTabs.first
         }
+        
+        // Simply set the current tab - the UI will update automatically
+        currentTab = targetTab
 
-        // Pick a new current tab if needed
         persistSnapshot()
         // Notify extensions about activation change across spaces
         if #available(macOS 15.5, *), let newActive = currentTab {
@@ -223,6 +239,12 @@ class TabManager {
         let previous = currentTab
         currentTab = tab
         
+        // Save this tab as the active tab for its space
+        if let sid = tab.spaceId, let space = spaces.first(where: { $0.id == sid }) {
+            space.activeTabId = tab.id
+            currentSpace = space
+        }
+        
         // Load the tab in compositor if needed
         browserManager?.compositorManager.loadTab(tab)
         
@@ -231,16 +253,12 @@ class TabManager {
         
         // Check media state using native WebKit API
         tab.checkMediaState()
-        
-        if let sid = tab.spaceId, let sp = spaces.first(where: { $0.id == sid })
-        {
-            currentSpace = sp
-        }
         if #available(macOS 15.5, *) {
             ExtensionManager.shared.notifyTabActivated(newTab: tab, previous: previous)
         }
         persistSnapshot()
     }
+    
 
     @discardableResult
     func createNewTab(

@@ -130,6 +130,15 @@ public class Tab: NSObject, Identifiable, ObservableObject {
     var isCurrentTab: Bool {
         return browserManager?.tabManager.currentTab?.id == id
     }
+    
+    var isActiveInSpace: Bool {
+        guard let spaceId = self.spaceId,
+              let browserManager = self.browserManager,
+              let space = browserManager.tabManager.spaces.first(where: { $0.id == spaceId }) else {
+            return isCurrentTab // Fallback to current tab for pinned tabs or if no space
+        }
+        return space.activeTabId == id
+    }
 
     var isLoading: Bool {
         return loadingState.isLoading
@@ -1275,6 +1284,7 @@ public class Tab: NSObject, Identifiable, ObservableObject {
         (function() {
             var currentHoveredLink = null;
             var isCommandPressed = false;
+            var hoverCheckInterval = null;
             
             function sendLinkHover(href) {
                 if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.linkHover) {
@@ -1305,64 +1315,71 @@ public class Tab: NSObject, Identifiable, ObservableObject {
                 }
             });
             
-            document.addEventListener('mouseover', function(e) {
-                var target = e.target;
-                while (target && target !== document) {
-                    if (target.tagName === 'A' && target.href) {
-                        if (currentHoveredLink !== target.href) {
-                            currentHoveredLink = target.href;
-                            sendLinkHover(target.href);
+            // Use a completely passive approach - add invisible event listeners directly to links
+            function attachLinkListeners() {
+                var links = document.querySelectorAll('a[href]');
+                links.forEach(function(link) {
+                    if (!link.dataset.pulseListener) {
+                        link.dataset.pulseListener = 'true';
+                        
+                        link.addEventListener('mouseenter', function() {
+                            currentHoveredLink = link.href;
+                            sendLinkHover(link.href);
                             if (isCommandPressed) {
-                                sendCommandHover(target.href);
+                                sendCommandHover(link.href);
                             }
-                        }
-                        return;
+                        }, { passive: true });
+                        
+                        link.addEventListener('mouseleave', function() {
+                            if (currentHoveredLink === link.href) {
+                                currentHoveredLink = null;
+                                sendLinkHover(null);
+                                sendCommandHover(null);
+                            }
+                        }, { passive: true });
                     }
-                    target = target.parentElement;
-                }
-            }, true);
+                });
+            }
             
-            document.addEventListener('mouseout', function(e) {
-                var target = e.target;
-                while (target && target !== document) {
-                    if (target.tagName === 'A' && target.href) {
-                        if (currentHoveredLink === target.href) {
-                            // Add a small delay before clearing hover state
-                            setTimeout(function() {
-                                if (currentHoveredLink === target.href) {
-                                    currentHoveredLink = null;
-                                    sendLinkHover(null);
-                                    sendCommandHover(null);
-                                }
-                            }, 100);
-                        }
-                        return;
+            // Initial attachment
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', attachLinkListeners);
+            } else {
+                attachLinkListeners();
+            }
+            
+            // Re-attach when DOM changes (for dynamic content)
+            var observer = new MutationObserver(function(mutations) {
+                var needsReattach = false;
+                mutations.forEach(function(mutation) {
+                    if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                        needsReattach = true;
                     }
-                    target = target.parentElement;
+                });
+                if (needsReattach) {
+                    setTimeout(attachLinkListeners, 100);
                 }
-            }, true);
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
             
+            // Handle command+click for new tabs
             document.addEventListener('click', function(e) {
-                var target = e.target;
-                while (target && target !== document) {
-                    if (target.tagName === 'A' && target.href && e.metaKey) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        
-                        currentHoveredLink = target.href;
-                        sendLinkHover(target.href);
-                        if (isCommandPressed) {
-                            sendCommandHover(target.href);
+                if (e.metaKey) {
+                    var target = e.target;
+                    while (target && target !== document) {
+                        if (target.tagName === 'A' && target.href) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            
+                            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.commandClick) {
+                                window.webkit.messageHandlers.commandClick.postMessage(target.href);
+                            }
+                            return false;
                         }
-                        
-                        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.commandClick) {
-                            window.webkit.messageHandlers.commandClick.postMessage(target.href);
-                        }
-                        return false;
+                        target = target.parentElement;
                     }
-                    target = target.parentElement;
                 }
-            }, true);
+            });
         })();
         """
         
