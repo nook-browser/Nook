@@ -117,26 +117,34 @@ struct GeneralSettingsView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Tab Unload Timeout")
                     .font(.headline)
-                
+
                 Text("Automatically unload inactive tabs to save memory")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                
-                HStack {
-                    Slider(
-                        value: $browserManager.settingsManager.tabUnloadTimeout,
-                        in: 60...1800, // 1 minute to 30 minutes
-                        step: 60
-                    ) {
-                        Text("Tab Unload Timeout")
+
+                // Dropdown with discrete timeout options
+                Picker(
+                    "Tab Unload Timeout",
+                    selection: Binding<TimeInterval>(
+                        get: {
+                            nearestTimeoutOption(to: browserManager.settingsManager.tabUnloadTimeout)
+                        },
+                        set: { newValue in
+                            browserManager.settingsManager.tabUnloadTimeout = newValue
+                        }
+                    )
+                ) {
+                    ForEach(unloadTimeoutOptions, id: \.self) { value in
+                        Text(formatTimeout(value)).tag(value)
                     }
-                    
-                    Text(formatTimeout(browserManager.settingsManager.tabUnloadTimeout))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .frame(width: 80, alignment: .trailing)
                 }
-                
+                .pickerStyle(.menu)
+                .onAppear {
+                    // Coerce any legacy/custom values to the nearest preset
+                    browserManager.settingsManager.tabUnloadTimeout =
+                        nearestTimeoutOption(to: browserManager.settingsManager.tabUnloadTimeout)
+                }
+
                 HStack {
                     Button("Unload All Inactive Tabs") {
                         browserManager.tabManager.unloadAllInactiveTabs()
@@ -360,11 +368,44 @@ struct AdvancedSettingsView: View {
 }
 
 // MARK: - Helper Functions
+private let unloadTimeoutOptions: [TimeInterval] = [
+    300,    // 5 min
+    600,    // 10 min
+    900,    // 15 min
+    1800,   // 30 min
+    2700,   // 45 min
+    3600,   // 1 hr
+    7200,   // 2 hr
+    14400,  // 4 hr
+    28800,  // 8 hr
+    43200,  // 12 hr
+    86400   // 24 hr
+]
+
+private func nearestTimeoutOption(to value: TimeInterval) -> TimeInterval {
+    guard let nearest = unloadTimeoutOptions.min(by: { abs($0 - value) < abs($1 - value) }) else {
+        return value
+    }
+    return nearest
+}
+
 private func formatTimeout(_ seconds: TimeInterval) -> String {
-    let minutes = Int(seconds / 60)
-    if minutes == 1 {
-        return "1 min"
+    if seconds < 3600 { // under 1 hour
+        let minutes = Int(seconds / 60)
+        return minutes == 1 ? "1 min" : "\(minutes) mins"
+    } else if seconds < 86400 { // under 24 hours
+        let hours = seconds / 3600.0
+        let rounded = hours.rounded()
+        let isWhole = abs(hours - rounded) < 0.01
+        if isWhole {
+            let wholeHours = Int(rounded)
+            return wholeHours == 1 ? "1 hr" : "\(wholeHours) hrs"
+        } else {
+            // Show one decimal for non-integer hours
+            return String(format: "%.1f hrs", hours)
+        }
     } else {
-        return "\(minutes) mins"
+        // 24 hours (cap in UI)
+        return "24 hr"
     }
 }
