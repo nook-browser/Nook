@@ -15,6 +15,7 @@ public class Space: NSObject, Identifiable {
     var name: String
     var icon: String
     var color: NSColor
+    var activeTabId: UUID?
 
     init(
         id: UUID = UUID(),
@@ -26,6 +27,7 @@ public class Space: NSObject, Identifiable {
         self.name = name
         self.icon = icon
         self.color = color
+        self.activeTabId = nil
         super.init()
     }
 }

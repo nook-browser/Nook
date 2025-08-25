@@ -121,8 +121,12 @@ struct SpaceTab: View {
 
     }
 
+    private var isCurrentTab: Bool {
+        return browserManager.tabManager.currentTab?.id == tab.id
+    }
+    
     private var backgroundColor: Color {
-        if tab.isCurrentTab {
+        if isCurrentTab {
             return AppColors.controlBackgroundActive
         } else if isHovering {
             return AppColors.controlBackgroundHover
