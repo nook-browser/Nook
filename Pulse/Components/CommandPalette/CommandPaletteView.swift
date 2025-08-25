@@ -24,11 +24,13 @@ struct CommandPaletteView: View {
                 }
                 .gesture(WindowDragGesture())
 
-            VStack(alignment: .center) {
-                HStack(spacing: 0) {
+            GeometryReader { geometry in
+                HStack {
                     Spacer()
-
+                    
+                    // Single box that expands/contracts but stays anchored at top
                     VStack(spacing: 0) {
+                        // Input field - fixed at top of box
                         HStack(spacing: 12) {
                             Image(
                                 systemName: isLikelyURL(text)
@@ -72,7 +74,7 @@ struct CommandPaletteView: View {
                                 .padding(.horizontal, 8)
                         }
 
-                        // Suggestions
+                        // Suggestions - expand the box downward
                         if !searchManager.suggestions.isEmpty {
                             LazyVStack(spacing: 2) {
                                 ForEach(
@@ -98,7 +100,10 @@ struct CommandPaletteView: View {
                         RoundedRectangle(cornerRadius: 12)
                             .stroke(.white.opacity(0.2), lineWidth: 1)
                     )
-
+                    .animation(.easeInOut(duration: 0.15), value: searchManager.suggestions.count)
+                    .alignmentGuide(.top) { _ in -geometry.size.height / 2 }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    
                     Spacer()
                 }
             }
@@ -110,6 +115,10 @@ struct CommandPaletteView: View {
             if newVisible {
                 searchManager.setTabManager(browserManager.tabManager)
                 searchManager.setHistoryManager(browserManager.historyManager)
+                
+                // Pre-fill text if provided and select all for easy replacement
+                text = browserManager.commandPalettePrefilledText
+                
                 DispatchQueue.main.async {
                     isSearchFocused = true
                 }
@@ -152,13 +161,25 @@ struct CommandPaletteView: View {
             browserManager.tabManager.setActiveTab(existingTab)
             print("Switched to existing tab: \(existingTab.name)")
         case .history(let historyEntry):
-            // Create new tab from history entry
-            let tab = browserManager.tabManager.createNewTab(url: historyEntry.url.absoluteString, in: browserManager.tabManager.currentSpace)
-            print("Created tab \(tab.name) from history in \(String(describing: browserManager.tabManager.currentSpace?.name))")
+            if browserManager.shouldNavigateCurrentTab && browserManager.tabManager.currentTab != nil {
+                // Navigate current tab to history URL
+                browserManager.tabManager.currentTab?.loadURL(historyEntry.url.absoluteString)
+                print("Navigated current tab to history URL: \(historyEntry.url)")
+            } else {
+                // Create new tab from history entry
+                let tab = browserManager.tabManager.createNewTab(url: historyEntry.url.absoluteString, in: browserManager.tabManager.currentSpace)
+                print("Created tab \(tab.name) from history in \(String(describing: browserManager.tabManager.currentSpace?.name))")
+            }
         case .url, .search:
-            // Create new tab
-            let tab = browserManager.tabManager.createNewTab(url: suggestion.text, in: browserManager.tabManager.currentSpace)
-            print("Created tab \(tab.name) in \(String(describing: browserManager.tabManager.currentSpace?.name))") // Changed this so Xcode doesn't get mad
+            if browserManager.shouldNavigateCurrentTab && browserManager.tabManager.currentTab != nil {
+                // Navigate current tab to new URL with proper normalization
+                browserManager.tabManager.currentTab?.navigateToURL(suggestion.text)
+                print("Navigated current tab to: \(suggestion.text)")
+            } else {
+                // Create new tab
+                let tab = browserManager.tabManager.createNewTab(url: suggestion.text, in: browserManager.tabManager.currentSpace)
+                print("Created tab \(tab.name) in \(String(describing: browserManager.tabManager.currentSpace?.name))")
+            }
         }
         
         text = ""

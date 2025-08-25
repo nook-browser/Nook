@@ -28,6 +28,8 @@ class BrowserManager: ObservableObject {
     @Published var isSidebarVisible: Bool = true
     @Published var isCommandPaletteVisible: Bool = false
     @Published var didCopyURL: Bool = false
+    @Published var commandPalettePrefilledText: String = ""
+    @Published var shouldNavigateCurrentTab: Bool = false
     
     var modelContext: ModelContext
     var tabManager: TabManager
@@ -112,6 +114,9 @@ class BrowserManager: ObservableObject {
             self.isCommandPaletteVisible = false
         } 
          } else {
+        // Clear prefilled text and set to create new tab
+        commandPalettePrefilledText = ""
+        shouldNavigateCurrentTab = false
         DispatchQueue.main.async {
             self.isCommandPaletteVisible = true
         }
@@ -145,6 +150,15 @@ class BrowserManager: ObservableObject {
 
     func focusURLBar() {
         if isCommandPaletteVisible { return }
+        
+        // Pre-fill with current tab's URL and set to navigate current tab
+        if let currentURL = tabManager.currentTab?.url {
+            commandPalettePrefilledText = currentURL.absoluteString
+        } else {
+            commandPalettePrefilledText = ""
+        }
+        shouldNavigateCurrentTab = true
+        
         DispatchQueue.main.async {
             self.isCommandPaletteVisible = true
         }
