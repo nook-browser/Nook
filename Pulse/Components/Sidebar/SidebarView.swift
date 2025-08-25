@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct SidebarView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @State private var selectedSpaceID: UUID?
+    @State private var isProgrammaticScroll = false
     @State private var spaceName = ""
     @State private var spaceIcon = ""
     @State private var showHistory = false
@@ -40,7 +41,8 @@ struct SidebarView: View {
                             ))
                     } else {
                         // Spaces View - default view
-                        ScrollViewReader { proxy in
+                        ZStack {
+                            // Horizontal pages
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(alignment: .top, spacing: 0) {
                                     ForEach(
@@ -52,33 +54,12 @@ struct SidebarView: View {
                                             isActive: browserManager.tabManager
                                                 .currentSpace?.id == space.id,
                                             width: browserManager.sidebarWidth,
-                                            onSetActive: {
-                                                // When the user scrolls (trackpad) to a new space, switch and give haptic tap
-                                                if browserManager.tabManager.currentSpace?.id != space.id {
-                                                    browserManager.tabManager.setActiveSpace(space)
-                                                    let performer = NSHapticFeedbackManager.defaultPerformer
-                                                    performer.perform(.alignment, performanceTime: .now)
-                                                }
-                                                selectedSpaceID = space.id
-                                                withAnimation(
-                                                    .easeInOut(duration: 0.25)
-                                                ) {
-                                                    proxy.scrollTo(
-                                                        space.id,
-                                                        anchor: .center
-                                                    )
-                                                }
-                                            },
                                             onActivateTab: {
                                                 browserManager.tabManager
-                                                    .setActiveTab(
-                                                        $0
-                                                    )
+                                                    .setActiveTab($0)
                                             },
                                             onCloseTab: {
-                                                browserManager.tabManager.removeTab(
-                                                    $0.id
-                                                )
+                                                browserManager.tabManager.removeTab($0.id)
                                             },
                                             onPinTab: {
                                                 browserManager.tabManager.pinTab($0)
@@ -102,23 +83,51 @@ struct SidebarView: View {
                             .frame(width: browserManager.sidebarWidth)
                             .contentMargins(.horizontal, 0)
                             .scrollTargetBehavior(.viewAligned)
-                            .onChange(
-                                of: browserManager.tabManager.currentSpace?.id
-                            ) {
-                                _,
-                                newID in
-                                guard let newID else { return }
-                                selectedSpaceID = newID
+                            .scrollIndicators(.hidden)
+                            .scrollPosition(
+                                id: Binding(
+                                    get: { selectedSpaceID },
+                                    set: { newID in
+                                        guard !isProgrammaticScroll else {
+                                            // Accept programmatic updates silently
+                                            selectedSpaceID = newID
+                                            isProgrammaticScroll = false
+                                            return
+                                        }
+                                        // If user drags via some other means, just mirror the id
+                                        selectedSpaceID = newID
+                                    }
+                                ),
+                                anchor: .center
+                            )
+
+                            // Trackpad two-finger swipe detector overlay
+                            TwoFingerSwipeDetector(
+                                threshold: 80,
+                                onSwipe: { dir in
+                                    stepSpace(dir)
+                                },
+                                onDelta: { dx in
+                                    print("🧭 TwoFinger deltaX=\(String(format: "%.2f", dx))")
+                                }
+                            )
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                        .onChange(
+                            of: browserManager.tabManager.currentSpace?.id
+                        ) { _, newID in
+                            // Keep scroll position in sync with model changes
+                            guard let newID else { return }
+                            if selectedSpaceID != newID {
+                                isProgrammaticScroll = true
                                 withAnimation(.easeInOut(duration: 0.25)) {
-                                    proxy.scrollTo(newID, anchor: .center)
+                                    selectedSpaceID = newID
                                 }
                             }
-                            .onAppear {
-                                selectedSpaceID =
-                                    browserManager.tabManager.currentSpace?.id
-                                if let id = selectedSpaceID {
-                                    proxy.scrollTo(id, anchor: .center)
-                                }
+                        }
+                        .onAppear {
+                            if selectedSpaceID == nil {
+                                selectedSpaceID = browserManager.tabManager.currentSpace?.id
                             }
                         }
                         .transition(.asymmetric(
@@ -205,5 +214,41 @@ struct SidebarView: View {
         )
         
         browserManager.dialogManager.showDialog(dialog)
+    }
+}
+
+// MARK: - Private helpers
+extension SidebarView {
+    fileprivate func stepSpace(_ direction: TwoFingerSwipeDetector.Direction) {
+        let spaces = browserManager.tabManager.spaces
+        guard !spaces.isEmpty else { return }
+
+        let currentID = browserManager.tabManager.currentSpace?.id ?? selectedSpaceID ?? spaces.first!.id
+        guard let currentIndex = spaces.firstIndex(where: { $0.id == currentID }) else { return }
+
+        let nextIndex: Int
+        switch direction {
+        case .left:
+            // Swipe left → visually move right
+            nextIndex = min(currentIndex + 1, spaces.count - 1)
+        case .right:
+            // Swipe right → visually move left
+            nextIndex = max(currentIndex - 1, 0)
+        }
+
+        guard nextIndex != currentIndex else { return }
+        let nextSpace = spaces[nextIndex]
+
+        // Haptic + logging
+        let performer = NSHapticFeedbackManager.defaultPerformer
+        performer.perform(.alignment, performanceTime: .now)
+        print("🔁 Switching space: #\(currentIndex) \(spaces[currentIndex].name) → #\(nextIndex) \(nextSpace.name) [gesture: \(direction == .left ? "left" : "right")]")
+
+        // Update model and scroll alignment
+        browserManager.tabManager.setActiveSpace(nextSpace)
+        isProgrammaticScroll = true
+        withAnimation(.easeInOut(duration: 0.25)) {
+            selectedSpaceID = nextSpace.id
+        }
     }
 }
