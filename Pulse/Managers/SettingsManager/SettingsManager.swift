@@ -57,7 +57,8 @@ class SettingsManager {
             materialKey: NSVisualEffectView.Material.hudWindow.rawValue,
             liquidGlassKey: false,
             searchEngineKey: SearchProvider.google.rawValue,
-            tabUnloadTimeoutKey: 300.0 // 5 minutes default
+            // Default tab unload timeout: 60 minutes
+            tabUnloadTimeoutKey: 3600.0
         ])
 
         // Initialize properties from UserDefaults
