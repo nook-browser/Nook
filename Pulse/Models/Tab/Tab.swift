@@ -6,6 +6,8 @@
 //
 
 import AppKit
+import AVFoundation
+import CoreAudio
 import FaviconFinder
 import Foundation
 import SwiftUI
@@ -73,20 +75,25 @@ public class Tab: NSObject, Identifiable, ObservableObject {
     
     // MARK: - Audio State
     @Published var hasPlayingAudio: Bool = false
-    @Published var isAudioMuted: Bool = false {
-        didSet {
-            if oldValue != isAudioMuted {
-                print("🔇 [Tab] isAudioMuted changed from \(oldValue) to \(isAudioMuted) for tab: \(name)")
-            }
-        }
-    }
-    @Published var hasAudioContent: Bool = false {  // Track if tab has any audio content (playing or paused)
+    @Published var isAudioMuted: Bool = false
+    @Published var hasAudioContent: Bool = false {
         didSet {
             if oldValue != hasAudioContent {
-                print("🔊 [Tab] hasAudioContent changed from \(oldValue) to \(hasAudioContent) for tab: \(name)")
+                if hasAudioContent {
+                    startNativeAudioMonitoring()
+                } else {
+                    stopNativeAudioMonitoring()
+                }
             }
         }
     }
+    
+    // MARK: - Native Audio Monitoring
+    private var audioDeviceListenerProc: AudioObjectPropertyListenerProc?
+    private var isMonitoringNativeAudio = false
+    private var lastAudioDeviceCheckTime: Date = Date()
+    private var audioMonitoringTimer: Timer?
+    private var hasAddedCoreAudioListener = false
     
 
     
@@ -416,7 +423,10 @@ public class Tab: NSObject, Identifiable, ObservableObject {
         // 12. FORCE COMPOSITOR UPDATE
         browserManager?.compositorManager.updateTabVisibility(currentTabId: browserManager?.tabManager.currentTab?.id)
 
-        // 13. REMOVE FROM TAB MANAGER
+        // 13. STOP NATIVE AUDIO MONITORING
+        stopNativeAudioMonitoring()
+        
+        // 14. REMOVE FROM TAB MANAGER
         browserManager?.tabManager.removeTab(self.id)
         
         print("Tab killed: \(name)")
@@ -434,10 +444,10 @@ public class Tab: NSObject, Identifiable, ObservableObject {
         self.url = newURL
         loadingState = .didStartProvisionalNavigation
         
-        // Reset audio tracking for new page
+        // Reset audio tracking for new page but preserve mute state
         hasAudioContent = false
         hasPlayingAudio = false
-        isAudioMuted = false
+        // Note: isAudioMuted is preserved to maintain user's mute preference
         
         if newURL.isFileURL {
             // Grant read access to the containing directory for local resources
@@ -538,8 +548,6 @@ public class Tab: NSObject, Identifiable, ObservableObject {
             window.__pulseCurrentURL = window.location.href;
             
             function resetSoundTracking() {
-                console.log('🔄 [Pulse] Reset sound tracking for URL change to:', window.location.href);
-                // Immediately send reset state
                 window.webkit.messageHandlers[handlerName].postMessage({
                     hasAudioContent: false,
                     hasPlayingAudio: false,
@@ -549,11 +557,9 @@ public class Tab: NSObject, Identifiable, ObservableObject {
                 setTimeout(checkMediaState, 100);
             }
             
-            // Monitor URL changes (for SPAs like YouTube) - more efficient approach
             const originalPushState = history.pushState;
             const originalReplaceState = history.replaceState;
             
-            // Override pushState and replaceState to catch programmatic navigation
             history.pushState = function(...args) {
                 originalPushState.apply(history, args);
                 setTimeout(() => {
@@ -581,17 +587,81 @@ public class Tab: NSObject, Identifiable, ObservableObject {
                 const audios = document.querySelectorAll('audio');
                 const videos = document.querySelectorAll('video');
                 
-                // Single pass through audios
-                const hasPlayingAudio = Array.from(audios).some(audio => 
-                    !audio.paused && !audio.ended && audio.readyState >= 2
-                );
-                
-                // Single pass through videos for all checks
+                // Standard media detection
+                let hasPlayingAudio = false;
                 let hasPlayingVideoWithAudio = false;
                 let hasPlayingVideo = false;
                 
+                // Check audio elements with enhanced detection
+                Array.from(audios).forEach(audio => {
+                    const standardPlaying = !audio.paused && !audio.ended && audio.readyState >= 2;
+                    
+                    // Enhanced detection for DRM content using WebKit properties
+                    let drmAudioPlaying = false;
+                    try {
+                        // Check for decoded audio bytes (WebKit-specific)
+                        if ('webkitAudioDecodedByteCount' in audio) {
+                            const decodedBytes = audio.webkitAudioDecodedByteCount;
+                            if (window.__pulseLastDecodedBytes === undefined) {
+                                window.__pulseLastDecodedBytes = {};
+                            }
+                            const lastBytes = window.__pulseLastDecodedBytes[audio.src] || 0;
+                            if (decodedBytes > lastBytes && audio.currentTime > 0) {
+                                drmAudioPlaying = true;
+                            }
+                            window.__pulseLastDecodedBytes[audio.src] = decodedBytes;
+                        }
+                        
+                        // Check if current time is progressing (for DRM content)
+                        if (!window.__pulseLastCurrentTime) window.__pulseLastCurrentTime = {};
+                        const lastTime = window.__pulseLastCurrentTime[audio.src] || 0;
+                        if (audio.currentTime > lastTime + 0.1 && audio.readyState >= 2) {
+                            drmAudioPlaying = true;
+                        }
+                        window.__pulseLastCurrentTime[audio.src] = audio.currentTime;
+                    } catch (e) {
+                        // Silently continue if WebKit properties aren't available
+                    }
+                    
+                    if (standardPlaying || drmAudioPlaying) {
+                        hasPlayingAudio = true;
+                    }
+                });
+                
+                // Check video elements with enhanced detection
                 Array.from(videos).forEach(video => {
-                    const isPlaying = !video.paused && !video.ended && video.readyState >= 2;
+                    const standardPlaying = !video.paused && !video.ended && video.readyState >= 2;
+                    
+                    // Enhanced detection for DRM video content
+                    let drmVideoPlaying = false;
+                    try {
+                        // Check for decoded bytes (WebKit-specific)
+                        if ('webkitAudioDecodedByteCount' in video || 'webkitVideoDecodedByteCount' in video) {
+                            const audioBytes = video.webkitAudioDecodedByteCount || 0;
+                            const videoBytes = video.webkitVideoDecodedByteCount || 0;
+                            if (!window.__pulseLastVideoBytes) window.__pulseLastVideoBytes = {};
+                            const lastAudioBytes = window.__pulseLastVideoBytes[video.src + '_audio'] || 0;
+                            const lastVideoBytes = window.__pulseLastVideoBytes[video.src + '_video'] || 0;
+                            
+                            if ((audioBytes > lastAudioBytes || videoBytes > lastVideoBytes) && video.currentTime > 0) {
+                                drmVideoPlaying = true;
+                            }
+                            window.__pulseLastVideoBytes[video.src + '_audio'] = audioBytes;
+                            window.__pulseLastVideoBytes[video.src + '_video'] = videoBytes;
+                        }
+                        
+                        // Check if current time is progressing
+                        if (!window.__pulseLastVideoCurrentTime) window.__pulseLastVideoCurrentTime = {};
+                        const lastTime = window.__pulseLastVideoCurrentTime[video.src] || 0;
+                        if (video.currentTime > lastTime + 0.1 && video.readyState >= 2) {
+                            drmVideoPlaying = true;
+                        }
+                        window.__pulseLastVideoCurrentTime[video.src] = video.currentTime;
+                    } catch (e) {
+                        // Silently continue if WebKit properties aren't available
+                    }
+                    
+                    const isPlaying = standardPlaying || drmVideoPlaying;
                     if (isPlaying) {
                         hasPlayingVideo = true;
                         if (!video.muted && video.volume > 0) {
@@ -600,8 +670,38 @@ public class Tab: NSObject, Identifiable, ObservableObject {
                     }
                 });
                 
-                // Audio content is simply whether there's currently playing audio
-                const hasAudioContent = hasPlayingAudio || hasPlayingVideoWithAudio;
+                // Additional heuristic detection for streaming sites
+                let heuristicAudioDetected = false;
+                try {
+                    // Check for common streaming site indicators
+                    const isSpotify = window.location.hostname.includes('spotify.com');
+                    const isYouTube = window.location.hostname.includes('youtube.com') || window.location.hostname.includes('youtu.be');
+                    const isSoundCloud = window.location.hostname.includes('soundcloud.com');
+                    const isAppleMusic = window.location.hostname.includes('music.apple.com');
+                    
+                    if (isSpotify) {
+                        const playButton = document.querySelector('[data-testid="control-button-playpause"]');
+                        if (playButton) {
+                            const ariaLabel = playButton.getAttribute('aria-label') || '';
+                            heuristicAudioDetected = ariaLabel.toLowerCase().includes('pause');
+                        }
+                    } else if (isYouTube) {
+                        const player = document.querySelector('.html5-video-player');
+                        const video = document.querySelector('video');
+                        if (player && video) {
+                            heuristicAudioDetected = player.classList.contains('playing-mode') || 
+                                                   (!video.paused && video.currentTime > 0);
+                        }
+                    } else if (isSoundCloud) {
+                        const playButton = document.querySelector('.playControl');
+                        heuristicAudioDetected = playButton && playButton.classList.contains('playing');
+                    } else if (isAppleMusic) {
+                        const playButton = document.querySelector('button[aria-label*="pause"], button[aria-label*="Pause"]');
+                        heuristicAudioDetected = !!playButton;
+                    }
+                } catch (e) {}
+                
+                const hasAudioContent = hasPlayingAudio || hasPlayingVideoWithAudio || heuristicAudioDetected;
                 
                 window.webkit.messageHandlers[handlerName].postMessage({
                     hasAudioContent: hasAudioContent,
@@ -612,22 +712,32 @@ public class Tab: NSObject, Identifiable, ObservableObject {
             }
             
             function addAudioListeners(element) {
-                // Listen for media state changes - responsive but not excessive
-                ['play', 'pause', 'ended', 'loadedmetadata', 'canplay', 'volumechange'].forEach(event => {
+                ['play', 'pause', 'ended', 'loadedmetadata', 'canplay', 'volumechange', 'timeupdate'].forEach(event => {
                     element.addEventListener(event, function() {
-                        setTimeout(checkMediaState, 50); // Quick response
+                        setTimeout(checkMediaState, 50);
                     });
                 });
+                
+                try {
+                    if ('webkitneedkey' in element) {
+                        element.addEventListener('webkitneedkey', function() {
+                            setTimeout(checkMediaState, 100);
+                        });
+                    }
+                    
+                    if ('encrypted' in element) {
+                        element.addEventListener('encrypted', function() {
+                            setTimeout(checkMediaState, 100);
+                        });
+                    }
+                } catch (e) {}
             }
             
-            // Add listeners to existing media
             document.querySelectorAll('video, audio').forEach(addAudioListeners);
             
-            // Watch for media elements being added or removed
             const mediaObserver = new MutationObserver(function(mutations) {
                 let hasChanges = false;
                 mutations.forEach(function(mutation) {
-                    // Check for added media elements
                     mutation.addedNodes.forEach(function(node) {
                         if (node.nodeType === 1) {
                             if (node.tagName === 'VIDEO' || node.tagName === 'AUDIO') {
@@ -643,7 +753,6 @@ public class Tab: NSObject, Identifiable, ObservableObject {
                         }
                     });
                     
-                    // Check for removed media elements
                     mutation.removedNodes.forEach(function(node) {
                         if (node.nodeType === 1) {
                             if (node.tagName === 'VIDEO' || node.tagName === 'AUDIO' ||
@@ -655,18 +764,76 @@ public class Tab: NSObject, Identifiable, ObservableObject {
                 });
                 
                 if (hasChanges) {
-                    setTimeout(checkMediaState, 100); // Quick response for DOM changes
+                    setTimeout(checkMediaState, 100);
                 }
             });
             mediaObserver.observe(document.body, { childList: true, subtree: true });
             
-            // Check initial state
-            setTimeout(checkMediaState, 500);
+            function setupStreamingSiteMonitoring() {
+                const hostname = window.location.hostname;
+                
+                if (hostname.includes('spotify.com')) {
+                    const observer = new MutationObserver(() => {
+                        setTimeout(checkMediaState, 100);
+                    });
+                    
+                    const playerArea = document.querySelector('[data-testid="now-playing-widget"]') || document.body;
+                    if (playerArea) {
+                        observer.observe(playerArea, { 
+                            childList: true, 
+                            subtree: true, 
+                            attributes: true,
+                            attributeFilter: ['aria-label', 'class', 'data-testid']
+                        });
+                    }
+                } else if (hostname.includes('youtube.com') || hostname.includes('youtu.be')) {
+                    window.addEventListener('yt-navigate-finish', () => {
+                        setTimeout(checkMediaState, 500);
+                    });
+                    
+                    const observer = new MutationObserver(() => {
+                        setTimeout(checkMediaState, 100);
+                    });
+                    
+                    const playerElement = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
+                    if (playerElement) {
+                        observer.observe(playerElement, { 
+                            attributes: true,
+                            attributeFilter: ['class']
+                        });
+                    }
+                } else if (hostname.includes('soundcloud.com')) {
+                    const observer = new MutationObserver(() => {
+                        setTimeout(checkMediaState, 100);
+                    });
+                    
+                    const playerElement = document.querySelector('.playControls') || document.body;
+                    observer.observe(playerElement, { 
+                        childList: true, 
+                        subtree: true, 
+                        attributes: true,
+                        attributeFilter: ['class']
+                    });
+                } else if (hostname.includes('music.apple.com')) {
+                    const observer = new MutationObserver(() => {
+                        setTimeout(checkMediaState, 100);
+                    });
+                    
+                    const playerElement = document.querySelector('.web-chrome-playback-controls') || document.body;
+                    observer.observe(playerElement, { 
+                        childList: true, 
+                        subtree: true, 
+                        attributes: true,
+                        attributeFilter: ['aria-label', 'class']
+                    });
+                }
+            }
             
-            // Background poller to keep audio content state updated (every 15 seconds)
+            setTimeout(setupStreamingSiteMonitoring, 1000);
+            setTimeout(checkMediaState, 500);
             setInterval(() => {
                 checkMediaState();
-            }, 15000); // Every 15 seconds
+            }, 5000);
         })();
         """
         
@@ -774,6 +941,9 @@ public class Tab: NSObject, Identifiable, ObservableObject {
         // Clear the webview reference (this will trigger reload when accessed)
         _webView = nil
         
+        // Stop native audio monitoring since webview is unloaded
+        stopNativeAudioMonitoring()
+        
         // Reset loading state
         loadingState = .idle
         
@@ -791,32 +961,162 @@ public class Tab: NSObject, Identifiable, ObservableObject {
 
     
     func toggleMute() {
-        let muteScript = """
-        (() => {
-            const mediaElements = document.querySelectorAll('video, audio');
-            const hasUnmutedMedia = Array.from(mediaElements).some(el => !el.muted && el.volume > 0);
-            const targetMutedState = hasUnmutedMedia;
-            
-            mediaElements.forEach(el => {
-                el.muted = targetMutedState;
-                if (targetMutedState) {
-                    el.volume = 0;
-                } else {
-                    el.volume = el.volume || 1.0;
-                }
-            });
-            
-            return targetMutedState;
-        })();
-        """
+        setMuted(!isAudioMuted)
+    }
+    
+    func setMuted(_ muted: Bool) {
+        guard let webView = _webView else {
+            // Store the desired state even if webView isn't loaded yet
+            DispatchQueue.main.async { [weak self] in
+                self?.isAudioMuted = muted
+                print("🔇 [Tab] Mute state set to \(muted) (webView not loaded yet)")
+            }
+            return
+        }
         
-        _webView?.evaluateJavaScript(muteScript) { [weak self] result, error in
-            if let muted = result as? Bool {
-                DispatchQueue.main.async {
-                    self?.isAudioMuted = muted
-                }
+        // Set the mute state using MuteableWKWebView's muted property
+        webView.isMuted = muted
+        
+        // Update our internal state
+        DispatchQueue.main.async { [weak self] in
+            self?.isAudioMuted = muted
+        }
+    }
+    
+    // MARK: - Native Audio Monitoring
+    private func startNativeAudioMonitoring() {
+        guard !isMonitoringNativeAudio else { return }
+        isMonitoringNativeAudio = true
+        
+        audioMonitoringTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.checkNativeAudioActivity()
+        }
+        
+        setupAudioSessionNotifications()
+    }
+    
+    private func stopNativeAudioMonitoring() {
+        guard isMonitoringNativeAudio else { return }
+        isMonitoringNativeAudio = false
+        
+        audioMonitoringTimer?.invalidate()
+        audioMonitoringTimer = nil
+        
+        removeCoreAudioPropertyListeners()
+    }
+    
+    private func setupAudioSessionNotifications() {
+        setupCoreAudioPropertyListeners()
+    }
+    
+    private func setupCoreAudioPropertyListeners() {
+        guard !hasAddedCoreAudioListener else { return }
+        
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        audioDeviceListenerProc = { (objectID, numAddresses, addresses, clientData) in
+            guard let clientData = clientData else { return noErr }
+            let tab = Unmanaged<Tab>.fromOpaque(clientData).takeUnretainedValue()
+            
+            DispatchQueue.main.async {
+                tab.checkNativeAudioActivity()
+            }
+            
+            return noErr
+        }
+        
+        if let listenerProc = audioDeviceListenerProc {
+            let status = AudioObjectAddPropertyListener(
+                AudioObjectID(kAudioObjectSystemObject),
+                &address,
+                listenerProc,
+                Unmanaged.passUnretained(self).toOpaque()
+            )
+            
+            if status == noErr {
+                hasAddedCoreAudioListener = true
             }
         }
+    }
+    
+    private func removeCoreAudioPropertyListeners() {
+        guard hasAddedCoreAudioListener, let listenerProc = audioDeviceListenerProc else { return }
+        
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        
+        let status = AudioObjectRemovePropertyListener(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            listenerProc,
+            Unmanaged.passUnretained(self).toOpaque()
+        )
+        
+        if status == noErr {
+            hasAddedCoreAudioListener = false
+            audioDeviceListenerProc = nil
+        }
+    }
+    
+    private func checkNativeAudioActivity() {
+        let now = Date()
+        guard now.timeIntervalSince(lastAudioDeviceCheckTime) > 0.5 else { return }
+        lastAudioDeviceCheckTime = now
+        
+        let isDeviceActive = isDefaultAudioDeviceActive()
+        
+        if isDeviceActive && hasAudioContent {
+            if !hasPlayingAudio {
+                hasPlayingAudio = true
+            }
+        } else if hasPlayingAudio && !isDeviceActive {
+            hasPlayingAudio = false
+        }
+    }
+    
+    private func isDefaultAudioDeviceActive() -> Bool {
+        var deviceID: AudioDeviceID = 0
+        var dataSize = UInt32(MemoryLayout<AudioDeviceID>.size)
+        
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        
+        let status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            0,
+            nil,
+            &dataSize,
+            &deviceID
+        )
+        
+        guard status == noErr else {
+            return false
+        }
+        
+        var isRunning: UInt32 = 0
+        dataSize = UInt32(MemoryLayout<UInt32>.size)
+        address.mSelector = kAudioDevicePropertyDeviceIsRunningSomewhere
+        
+        let runningStatus = AudioObjectGetPropertyData(
+            deviceID,
+            &address,
+            0,
+            nil,
+            &dataSize,
+            &isRunning
+        )
+        
+        return runningStatus == noErr && isRunning != 0
     }
     
     // MARK: - JavaScript Injection
@@ -1028,31 +1328,6 @@ public class Tab: NSObject, Identifiable, ObservableObject {
             });
             
             observer.observe(document.body, { childList: true, subtree: true });
-            
-            window.addEventListener('message', function(event) {
-                if (event.data && event.data.type === 'PULSE_MUTE_CONTROL') {
-                    const shouldMute = event.data.muted;
-                    const mediaElements = document.querySelectorAll('video, audio');
-                    mediaElements.forEach(media => {
-                        media.muted = shouldMute;
-                        if (shouldMute) {
-                            media.volume = 0;
-                        } else {
-                            media.volume = media.volume || 1.0;
-                        }
-                    });
-                    
-                    if (window.__pulseAudioContexts) {
-                        for (let context of window.__pulseAudioContexts) {
-                            if (shouldMute && context.state === 'running') {
-                                context.suspend().catch(e => console.log('[Iframe Mute] Context suspend error:', e));
-                            } else if (!shouldMute && context.state === 'suspended') {
-                                context.resume().catch(e => console.log('[Iframe Mute] Context resume error:', e));
-                            }
-                        }
-                    }
-                }
-            });
         })();
         """
         
@@ -1202,7 +1477,7 @@ extension Tab: WKNavigationDelegate {
             if newURL.absoluteString != self.url.absoluteString {
                 hasAudioContent = false
                 hasPlayingAudio = false
-                isAudioMuted = false
+                // Note: isAudioMuted is preserved to maintain user's mute preference
                 print("🔄 [Tab] Swift reset audio tracking for navigation to: \(newURL.absoluteString)")
             }
             self.url = newURL
@@ -1280,6 +1555,11 @@ extension Tab: WKNavigationDelegate {
         injectPiPStateListener(to: webView)
         injectMediaDetection(to: webView)
         updateNavigationState()
+        
+        // Apply mute state using MuteableWKWebView if the tab was previously muted
+        if isAudioMuted {
+            setMuted(true)
+        }
     }
 
     // MARK: - Loading Failed (after content started loading)
