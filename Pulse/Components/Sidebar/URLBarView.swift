@@ -69,10 +69,10 @@ struct URLBarView: View {
                 isHovering = hovering
             }
         }
-        // Open the command palette when tapping anywhere in the bar
+        // Focus URL bar when tapping anywhere in the bar
         .contentShape(Rectangle())
         .onTapGesture {
-            browserManager.isCommandPaletteVisible = true
+            browserManager.focusURLBar()
         }
         
     }
