@@ -13,7 +13,6 @@ struct SpaceView: View {
     let width: CGFloat
     @EnvironmentObject var browserManager: BrowserManager
 
-    let onSetActive: () -> Void
     let onActivateTab: (Tab) -> Void
     let onCloseTab: (Tab) -> Void
     let onPinTab: (Tab) -> Void
@@ -89,11 +88,6 @@ struct SpaceView: View {
         .contentShape(Rectangle())
         .backgroundDraggable()
         .scrollTargetLayout()
-        .onScrollVisibilityChange(threshold: 0.5) { isVisible in
-            if isVisible {
-                onSetActive()
-            }
-        }
     }
     
     private func isFirstTab(_ tab: Tab) -> Bool {
