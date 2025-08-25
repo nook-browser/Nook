@@ -50,7 +50,7 @@ struct SpaceCreationDialog: DialogProtocol {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Space Icon")
                         .font(.system(size: 14, weight: .medium))
-                    
+
                     // Hidden TextField for capturing emoji selection
                     TextField("", text: $selectedEmoji)
                         .frame(width: 0, height: 0)
@@ -62,7 +62,7 @@ struct SpaceCreationDialog: DialogProtocol {
                                 selectedEmoji = ""
                             }
                         }
-                    
+
                     Button(action: {
                         emojiFieldFocused = true
                         NSApp.orderFrontCharacterPalette(nil)
@@ -108,4 +108,4 @@ struct SpaceCreationDialog: DialogProtocol {
             )
         )
     }
-} 
+}
