@@ -87,6 +87,7 @@ public class Tab: NSObject, Identifiable, ObservableObject {
             }
         }
     }
+    @Published var pageBackgroundColor: NSColor? = nil
     
     // MARK: - Native Audio Monitoring
     private var audioDeviceListenerProc: AudioObjectPropertyListenerProc?
@@ -245,6 +246,10 @@ public class Tab: NSObject, Identifiable, ObservableObject {
         _webView?.allowsBackForwardNavigationGestures = true
         _webView?.allowsMagnification = true
         
+        if let webView = _webView {
+            setupThemeColorObserver(for: webView)
+        }
+        
         // Remove existing handlers first to prevent duplicates
         _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "linkHover")
         _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "commandHover")
@@ -258,6 +263,7 @@ public class Tab: NSObject, Identifiable, ObservableObject {
         _webView?.configuration.userContentController.add(self, name: "commandClick")
         _webView?.configuration.userContentController.add(self, name: "pipStateChange")
         _webView?.configuration.userContentController.add(self, name: "mediaStateChange_\(id.uuidString)")
+        _webView?.configuration.userContentController.add(self, name: "backgroundColor_\(id.uuidString)")
 
         _webView?.customUserAgent =
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15"
@@ -426,7 +432,12 @@ public class Tab: NSObject, Identifiable, ObservableObject {
         // 13. STOP NATIVE AUDIO MONITORING
         stopNativeAudioMonitoring()
         
-        // 14. REMOVE FROM TAB MANAGER
+        // 14. REMOVE THEME COLOR OBSERVER
+        if let webView = _webView {
+            removeThemeColorObserver(from: webView)
+        }
+        
+        // 15. REMOVE FROM TAB MANAGER
         browserManager?.tabManager.removeTab(self.id)
         
         print("Tab killed: \(name)")
@@ -938,6 +949,11 @@ public class Tab: NSObject, Identifiable, ObservableObject {
         webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { _ in }
         webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { _ in }
         
+        // Remove theme color observer before clearing webview reference
+        if let webView = _webView {
+            removeThemeColorObserver(from: webView)
+        }
+        
         // Clear the webview reference (this will trigger reload when accessed)
         _webView = nil
         
@@ -1117,6 +1133,126 @@ public class Tab: NSObject, Identifiable, ObservableObject {
         )
         
         return runningStatus == noErr && isRunning != 0
+    }
+    
+    // MARK: - Background Color Management
+    private func setupThemeColorObserver(for webView: WKWebView) {
+        if #available(macOS 12.0, *) {
+            webView.addObserver(self, forKeyPath: "themeColor", options: [.new, .initial], context: nil)
+        }
+    }
+    
+    private func removeThemeColorObserver(from webView: WKWebView) {
+        if #available(macOS 12.0, *) {
+            webView.removeObserver(self, forKeyPath: "themeColor")
+        }
+    }
+    
+    public override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
+        if keyPath == "themeColor", let webView = object as? WKWebView {
+            updateBackgroundColor(from: webView)
+        } else {
+            super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
+        }
+    }
+    
+    private func updateBackgroundColor(from webView: WKWebView) {
+        var newColor: NSColor? = nil
+        
+        if #available(macOS 12.0, *) {
+            newColor = webView.themeColor
+        }
+        
+        if let themeColor = newColor {
+            DispatchQueue.main.async { [weak self] in
+                self?.pageBackgroundColor = themeColor
+                webView.underPageBackgroundColor = themeColor
+            }
+        } else {
+            extractBackgroundColorWithJavaScript(from: webView)
+        }
+    }
+    
+    private func extractBackgroundColorWithJavaScript(from webView: WKWebView) {
+        let colorExtractionScript = """
+        (function() {
+            function rgbToHex(r, g, b) {
+                return '#' + [r, g, b].map(x => {
+                    const hex = x.toString(16);
+                    return hex.length === 1 ? '0' + hex : hex;
+                }).join('');
+            }
+            
+            function parseColor(color) {
+                const div = document.createElement('div');
+                div.style.color = color;
+                document.body.appendChild(div);
+                const computedColor = window.getComputedStyle(div).color;
+                document.body.removeChild(div);
+                
+                const match = computedColor.match(/rgb\\((\\d+),\\s*(\\d+),\\s*(\\d+)\\)/);
+                if (match) {
+                    return rgbToHex(parseInt(match[1]), parseInt(match[2]), parseInt(match[3]));
+                }
+                return null;
+            }
+            
+            function extractBackgroundColor() {
+                const body = document.body;
+                const html = document.documentElement;
+                
+                // Try body background first
+                let bodyBg = window.getComputedStyle(body).backgroundColor;
+                if (bodyBg && bodyBg !== 'rgba(0, 0, 0, 0)' && bodyBg !== 'transparent') {
+                    return parseColor(bodyBg);
+                }
+                
+                // Try html background
+                let htmlBg = window.getComputedStyle(html).backgroundColor;
+                if (htmlBg && htmlBg !== 'rgba(0, 0, 0, 0)' && htmlBg !== 'transparent') {
+                    return parseColor(htmlBg);
+                }
+                
+                // Try sampling dominant colors from visible elements
+                const sampleElements = [
+                    document.querySelector('header'),
+                    document.querySelector('nav'),
+                    document.querySelector('main'),
+                    document.querySelector('.container'),
+                    document.querySelector('#main'),
+                    document.querySelector('[class*="background"]'),
+                    document.querySelector('[class*="bg"]')
+                ].filter(el => el);
+                
+                for (const el of sampleElements) {
+                    const bg = window.getComputedStyle(el).backgroundColor;
+                    if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
+                        return parseColor(bg);
+                    }
+                }
+                
+                // Fallback: detect if page looks dark or light and return appropriate gray
+                const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                const textColor = window.getComputedStyle(body).color;
+                const isLightText = textColor && (textColor.includes('255') || textColor.includes('white'));
+                
+                if (isDarkMode || isLightText) {
+                    return '#1a1a1a'; // Dark gray for dark themes
+                } else {
+                    return '#ffffff'; // White for light themes
+                }
+            }
+            
+            const bgColor = extractBackgroundColor();
+            if (bgColor) {
+                window.webkit.messageHandlers['backgroundColor_\(id.uuidString)'].postMessage({
+                    backgroundColor: bgColor
+                });
+            }
+        })();
+        """
+        
+        webView.evaluateJavaScript(colorExtractionScript) { _, _ in }
     }
     
     // MARK: - JavaScript Injection
@@ -1556,6 +1692,9 @@ extension Tab: WKNavigationDelegate {
         injectMediaDetection(to: webView)
         updateNavigationState()
         
+        // Trigger background color extraction
+        updateBackgroundColor(from: webView)
+        
         // Apply mute state using MuteableWKWebView if the tab was previously muted
         if isAudioMuted {
             setMuted(true)
@@ -1765,6 +1904,17 @@ extension Tab: WKScriptMessageHandler {
                     // Don't override isAudioMuted - it's managed by toggleMute()
                 }
             }
+            
+        case let name where name.hasPrefix("backgroundColor_"):
+            if let dict = message.body as? [String: String],
+               let colorHex = dict["backgroundColor"] {
+                DispatchQueue.main.async {
+                    self.pageBackgroundColor = NSColor(hex: colorHex)
+                    if let webView = self._webView, let color = NSColor(hex: colorHex) {
+                        webView.underPageBackgroundColor = color
+                    }
+                }
+            }
         
         default:
             break
@@ -1819,5 +1969,26 @@ extension Tab {
 
     public override var hash: Int {
         return id.hashValue
+    }
+}
+
+// MARK: - NSColor Extension
+extension NSColor {
+    convenience init?(hex: String) {
+        var hexString = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if hexString.hasPrefix("#") {
+            hexString.removeFirst()
+        }
+        
+        guard hexString.count == 6 else { return nil }
+        
+        var rgbValue: UInt64 = 0
+        guard Scanner(string: hexString).scanHexInt64(&rgbValue) else { return nil }
+        
+        let red = CGFloat((rgbValue & 0xFF0000) >> 16) / 255.0
+        let green = CGFloat((rgbValue & 0x00FF00) >> 8) / 255.0
+        let blue = CGFloat(rgbValue & 0x0000FF) / 255.0
+        
+        self.init(red: red, green: green, blue: blue, alpha: 1.0)
     }
 }

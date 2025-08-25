@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import UniformTypeIdentifiers
 
 struct SidebarView: View {
@@ -52,8 +53,12 @@ struct SidebarView: View {
                                                 .currentSpace?.id == space.id,
                                             width: browserManager.sidebarWidth,
                                             onSetActive: {
-                                                browserManager.tabManager
-                                                    .setActiveSpace(space)
+                                                // When the user scrolls (trackpad) to a new space, switch and give haptic tap
+                                                if browserManager.tabManager.currentSpace?.id != space.id {
+                                                    browserManager.tabManager.setActiveSpace(space)
+                                                    let performer = NSHapticFeedbackManager.defaultPerformer
+                                                    performer.perform(.alignment, performanceTime: .now)
+                                                }
                                                 selectedSpaceID = space.id
                                                 withAnimation(
                                                     .easeInOut(duration: 0.25)
