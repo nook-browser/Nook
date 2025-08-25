@@ -9,7 +9,7 @@
 xcuserdata/
 
 # Xcode nonsense
-
+*.pbxproj
 # macOS garbage
 .DS_Store
 
