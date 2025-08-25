@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct SpaceCreationDialog: DialogProtocol {
     @Binding var spaceName: String
@@ -13,8 +14,6 @@ struct SpaceCreationDialog: DialogProtocol {
     let onSave: () -> Void
     let onCancel: () -> Void
     
-    @State private var selectedEmoji: String = ""
-    @FocusState private var emojiFieldFocused: Bool
     
     init(
         spaceName: Binding<String>,
@@ -51,39 +50,7 @@ struct SpaceCreationDialog: DialogProtocol {
                     Text("Space Icon")
                         .font(.system(size: 14, weight: .medium))
 
-                    // Hidden TextField for capturing emoji selection
-                    TextField("", text: $selectedEmoji)
-                        .frame(width: 0, height: 0)
-                        .opacity(0)
-                        .focused($emojiFieldFocused)
-                        .onChange(of: selectedEmoji) { _, newValue in
-                            if !newValue.isEmpty {
-                                spaceIcon = String(newValue.last!)
-                                selectedEmoji = ""
-                            }
-                        }
-
-                    Button(action: {
-                        emojiFieldFocused = true
-                        NSApp.orderFrontCharacterPalette(nil)
-                    }) {
-                        HStack(spacing: 8) {
-                            Text(spaceIcon.isEmpty ? "✨" : spaceIcon)
-                                .font(.system(size: 16))
-                            
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 10))
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(.gray.opacity(0.1))
-                                .stroke(.separator, lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(.plain)
+                    EmojiTextField(text: $spaceIcon)
                 }
             }
         )
@@ -107,5 +74,80 @@ struct SpaceCreationDialog: DialogProtocol {
                 ]
             )
         )
+    }
+}
+
+struct EmojiTextField: NSViewRepresentable {
+    @Binding var text: String
+    
+    func makeNSView(context: Context) -> NSView {
+        let containerView = NSView()
+        
+        let textField = NSTextField()
+        textField.stringValue = text.isEmpty ? "✨" : text
+        textField.delegate = context.coordinator
+        textField.placeholderString = "✨"
+        textField.font = NSFont.systemFont(ofSize: 16)
+        textField.alignment = .center
+        textField.maximumNumberOfLines = 1
+        textField.usesSingleLineMode = true
+        textField.frame = NSRect(x: 0, y: 0, width: 40, height: 24)
+        
+        let button = NSButton()
+        button.title = "▼"
+        button.bezelStyle = .roundRect
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.showEmojiPicker)
+        button.frame = NSRect(x: 45, y: 0, width: 30, height: 24)
+        
+        containerView.addSubview(textField)
+        containerView.addSubview(button)
+        
+        context.coordinator.textField = textField
+        
+        return containerView
+    }
+    
+    func updateNSView(_ nsView: NSView, context: Context) {
+        if let textField = context.coordinator.textField {
+            if textField.stringValue != text {
+                textField.stringValue = text.isEmpty ? "✨" : text
+            }
+        }
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, NSTextFieldDelegate {
+        let parent: EmojiTextField
+        var textField: NSTextField?
+        
+        init(_ parent: EmojiTextField) {
+            self.parent = parent
+        }
+        
+        func controlTextDidChange(_ obj: Notification) {
+            if let textField = obj.object as? NSTextField {
+                let newText = textField.stringValue
+                if !newText.isEmpty {
+                    // Take only the last character (emoji)
+                    let emoji = String(newText.last!)
+                    DispatchQueue.main.async {
+                        self.parent.text = emoji
+                    }
+                    // Clear extra text, keep only the emoji
+                    textField.stringValue = emoji
+                }
+            }
+        }
+        
+        @objc func showEmojiPicker() {
+            if let textField = textField {
+                textField.becomeFirstResponder()
+                NSApp.orderFrontCharacterPalette(textField)
+            }
+        }
     }
 }
