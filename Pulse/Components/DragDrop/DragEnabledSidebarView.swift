@@ -9,22 +9,12 @@ import SwiftUI
 
 struct DragEnabledSidebarView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @StateObject private var dragManager = TabDragManager()
+    private var dragManager = TabDragManager.shared
     
     var body: some View {
-        TabDragContainerView(
-            dragManager: dragManager,
-            onDragCompleted: handleDragCompleted
-        ) {
-            SidebarView()
-                .environmentObject(dragManager)
-        }
-        .insertionLineOverlay(dragManager: dragManager)
-    }
-    
-    private func handleDragCompleted(_ operation: DragOperation) {
-        print("🎯 Handling drag completion: \(operation)")
-        browserManager.tabManager.handleDragOperation(operation)
+        SidebarView()
+            .environmentObject(dragManager)
+            .tabDragManager(dragManager)
     }
 }
 
