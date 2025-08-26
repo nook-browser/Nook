@@ -13,6 +13,7 @@ struct PinnedGrid: View {
     let maxColumns: Int = 3
 
     @EnvironmentObject var browserManager: BrowserManager
+    @Environment(\.tabDragManager) private var dragManager
     @State private var availableWidth: CGFloat = 0
 
     var body: some View {
@@ -23,7 +24,8 @@ struct PinnedGrid: View {
         VStack(spacing: 6) {
             if !items.isEmpty {
                 LazyVGrid(columns: columns, alignment: .center, spacing: rowSpacing) {
-                    ForEach(items, id: \.id) { tab in
+                    ForEach(items.indices, id: \.self) { index in
+                        let tab = items[index]
                         let isActive: Bool = (browserManager.tabManager.currentTab?.id == tab.id)
                         let title: String = safeTitle(tab)
 
@@ -35,6 +37,12 @@ struct PinnedGrid: View {
                             onActivate: { browserManager.tabManager.setActiveTab(tab) },
                             onClose: { browserManager.tabManager.removeTab(tab.id) },
                             onRemovePin: { browserManager.tabManager.unpinTab(tab) }
+                        )
+                        .draggableTab(
+                            tab: tab,
+                            container: .essentials,
+                            index: index,
+                            dragManager: dragManager ?? TabDragManager()
                         )
                     }
                 }

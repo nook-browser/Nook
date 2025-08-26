@@ -80,11 +80,11 @@ struct WebsiteView: View {
                     }
                 }
                 Spacer()
-                HStack {
-                    LinkStatusBar(hoveredLink: hoveredLink, isCommandPressed: isCommandPressed)
-                        .padding(10)
-                    Spacer()
-                }
+//                HStack {
+//                    LinkStatusBar(hoveredLink: hoveredLink, isCommandPressed: isCommandPressed)
+//                        .padding(10)
+//                    Spacer()
+//                }
                 
             }
             

@@ -15,7 +15,7 @@ struct WindowView: View {
             WindowBackgroundView()
 
             HStack(spacing: 0) {
-                SidebarView()
+                DragEnabledSidebarView()
                 if browserManager.isSidebarVisible {
                     SidebarResizeView()
                 }
