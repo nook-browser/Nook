@@ -1,0 +1,96 @@
+//
+//  DraggableTabView.swift
+//  Pulse
+//
+//  Draggable wrapper for tab views with drag state management
+//
+
+import SwiftUI
+import AppKit
+
+struct DraggableTabView<Content: View>: View {
+    let tab: Tab
+    let container: TabDragManager.DragContainer
+    let index: Int
+    let dragManager: TabDragManager
+    let content: Content
+    
+    @State private var dragGesture = false
+    @State private var dragOffset: CGSize = .zero
+    
+    init(
+        tab: Tab,
+        container: TabDragManager.DragContainer,
+        index: Int,
+        dragManager: TabDragManager,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.tab = tab
+        self.container = container
+        self.index = index
+        self.dragManager = dragManager
+        self.content = content()
+    }
+    
+    var body: some View {
+        content
+            .opacity(dragManager.isDragging && dragManager.draggedTab?.id == tab.id ? 0.5 : 1.0)
+            .scaleEffect(dragManager.isDragging && dragManager.draggedTab?.id == tab.id ? 0.95 : 1.0)
+            .offset(dragOffset)
+            .animation(.easeInOut(duration: 0.2), value: dragManager.isDragging)
+            .animation(.easeInOut(duration: 0.2), value: dragOffset)
+            .onDrag {
+                // Start the drag operation
+                DispatchQueue.main.async {
+                    dragManager.startDrag(tab: tab, from: container, at: index)
+                }
+                return NSItemProvider(object: tab.id.uuidString as NSString)
+            }
+            .gesture(
+                DragGesture(coordinateSpace: .global)
+                    .onChanged { value in
+                        if !dragGesture {
+                            dragGesture = true
+                            // Start drag if not already started
+                            if !dragManager.isDragging {
+                                dragManager.startDrag(tab: tab, from: container, at: index)
+                            }
+                        }
+                        
+                        // Update drag offset for visual feedback
+                        dragOffset = value.translation
+                    }
+                    .onEnded { value in
+                        dragGesture = false
+                        dragOffset = .zero
+                        
+                        // End drag operation
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            if dragManager.isDragging && dragManager.draggedTab?.id == tab.id {
+                                _ = dragManager.endDrag(commit: false) // Let drop zone handle commit
+                            }
+                        }
+                    }
+            )
+    }
+}
+
+// MARK: - Extension for easy usage
+
+extension View {
+    func draggableTab(
+        tab: Tab,
+        container: TabDragManager.DragContainer,
+        index: Int,
+        dragManager: TabDragManager
+    ) -> some View {
+        DraggableTabView(
+            tab: tab,
+            container: container,
+            index: index,
+            dragManager: dragManager
+        ) {
+            self
+        }
+    }
+}

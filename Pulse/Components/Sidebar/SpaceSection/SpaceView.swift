@@ -12,6 +12,7 @@ struct SpaceView: View {
     let isActive: Bool
     let width: CGFloat
     @EnvironmentObject var browserManager: BrowserManager
+    @Environment(\.tabDragManager) private var dragManager
 
     let onActivateTab: (Tab) -> Void
     let onCloseTab: (Tab) -> Void
@@ -24,19 +25,72 @@ struct SpaceView: View {
     private var tabs: [Tab] {
         browserManager.tabManager.tabs(in: space)
     }
+    
+    private var spacePinnedTabs: [Tab] {
+        browserManager.tabManager.spacePinnedTabs(for: space.id)
+    }
 
     var body: some View {
         VStack(spacing: 8) {
             SpaceTittle(space: space)
 
-            if !tabs.isEmpty {
+            if !spacePinnedTabs.isEmpty || !tabs.isEmpty {
                 SpaceSeparator()
             }
 
             NewTabButton()
             ScrollView {
                 VStack(spacing: 2) {
-                    ForEach(tabs, id: \.id) { tab in
+                    // Space-level pinned tabs
+                    if !spacePinnedTabs.isEmpty {
+                        ForEach(spacePinnedTabs.indices, id: \.self) { index in
+                            let tab = spacePinnedTabs[index]
+                            SpaceTab(
+                                tab: tab,
+                                action: { onActivateTab(tab) },
+                                onClose: { onCloseTab(tab) },
+                                onMute: { onMuteTab(tab) }
+                            )
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                            .contextMenu {
+                                Button {
+                                    browserManager.tabManager.unpinTabFromSpace(tab)
+                                } label: {
+                                    Label("Unpin from Space", systemImage: "pin.slash")
+                                }
+                                
+                                Button {
+                                    onPinTab(tab) // This will convert to global pinned
+                                } label: {
+                                    Label("Pin Globally", systemImage: "pin.circle")
+                                }
+                                
+                                Divider()
+                                
+                                Button {
+                                    onCloseTab(tab)
+                                } label: {
+                                    Label("Close tab", systemImage: "xmark")
+                                }
+                            }
+                            .draggableTab(
+                                tab: tab,
+                                container: .spacePinned(space.id),
+                                index: index,
+                                dragManager: dragManager ?? TabDragManager()
+                            )
+                        }
+                        
+                        // Divider between space pinned and regular tabs
+                        if !tabs.isEmpty {
+                            Divider()
+                                .padding(.vertical, 4)
+                        }
+                    }
+                    
+                    // Regular tabs
+                    ForEach(tabs.indices, id: \.self) { index in
+                        let tab = tabs[index]
                         SpaceTab(
                             tab: tab,
                             action: { onActivateTab(tab) },
@@ -62,9 +116,15 @@ struct SpaceView: View {
                             Divider()
                             
                             Button {
+                                browserManager.tabManager.pinTabToSpace(tab, spaceId: space.id)
+                            } label: {
+                                Label("Pin to Space", systemImage: "pin")
+                            }
+                            
+                            Button {
                                 onPinTab(tab)
                             } label: {
-                                Label("Pin tab", systemImage: "pin")
+                                Label("Pin Globally", systemImage: "pin.circle")
                             }
                             
                             Button {
@@ -73,11 +133,12 @@ struct SpaceView: View {
                                 Label("Close tab", systemImage: "xmark")
                             }
                         }
-                        .onDrag {
-                            NSItemProvider(
-                                object: tab.id.uuidString as NSString
-                            )
-                        }
+                        .draggableTab(
+                            tab: tab,
+                            container: .spaceRegular(space.id),
+                            index: index,
+                            dragManager: dragManager ?? TabDragManager()
+                        )
                     }
                 }
                 .animation(.easeInOut(duration: 0.15), value: tabs.count)

@@ -15,8 +15,11 @@ class TabManager {
 
     // Normal tabs per space
     private var tabsBySpace: [UUID: [Tab]] = [:]
+    
+    // Space-level pinned tabs per space
+    private var spacePinnedTabs: [UUID: [Tab]] = [:]
 
-    // Pinned tabs (global)
+    // Pinned tabs (global essentials)
     private(set) var pinnedTabs: [Tab] = []
 
     // Currently active tab
@@ -45,13 +48,15 @@ class TabManager {
 
     private func allTabsAllSpaces() -> [Tab] {
         let normals = spaces.flatMap { tabsBySpace[$0.id] ?? [] }
-        return pinnedTabs + normals
+        let spacePinned = spaces.flatMap { spacePinnedTabs[$0.id] ?? [] }
+        return pinnedTabs + spacePinned + normals
     }
 
     private func contains(_ tab: Tab) -> Bool {
         if pinnedTabs.contains(where: { $0.id == tab.id }) { return true }
-        if let sid = tab.spaceId, let arr = tabsBySpace[sid] {
-            return arr.contains(where: { $0.id == tab.id })
+        if let sid = tab.spaceId {
+            if let spacePinned = spacePinnedTabs[sid], spacePinned.contains(where: { $0.id == tab.id }) { return true }
+            if let arr = tabsBySpace[sid], arr.contains(where: { $0.id == tab.id }) { return true }
         }
         return false
     }
@@ -62,6 +67,7 @@ class TabManager {
         let space = Space(name: name, icon: icon)
         spaces.append(space)
         tabsBySpace[space.id] = []
+        spacePinnedTabs[space.id] = []
         if currentSpace == nil { currentSpace = space } else { setActiveSpace(space) }
         persistSnapshot()
         return space
@@ -73,10 +79,12 @@ class TabManager {
         }
         // Move tabs out or close them; here we close normal tabs of the space
         let closing = tabsBySpace[id] ?? []
-        for t in closing {
+        let spacePinnedClosing = spacePinnedTabs[id] ?? []
+        for t in closing + spacePinnedClosing {
             if currentTab?.id == t.id { currentTab = nil }
         }
         tabsBySpace[id] = []
+        spacePinnedTabs[id] = []
         spaces.remove(at: idx)
         if currentSpace?.id == id {
             currentSpace = spaces.first
@@ -178,6 +186,17 @@ class TabManager {
         var removedIndexInCurrentSpace: Int?
 
         for space in spaces {
+            // Check space-pinned tabs first
+            if var spacePinned = spacePinnedTabs[space.id],
+                let i = spacePinned.firstIndex(where: { $0.id == id })
+            {
+                removed = spacePinned.remove(at: i)
+                removedIndexInCurrentSpace =
+                    (space.id == currentSpace?.id) ? i : nil
+                spacePinnedTabs[space.id] = spacePinned
+                break
+            }
+            // Then check regular tabs
             if var arr = tabsBySpace[space.id],
                 let i = arr.firstIndex(where: { $0.id == id })
             {
@@ -204,27 +223,37 @@ class TabManager {
 
         if wasCurrent {
             if tab.spaceId == nil {
+                // Tab was global pinned
                 if !pinnedTabs.isEmpty {
                     currentTab = pinnedTabs.last
                 } else if let cs = currentSpace {
+                    let spacePinned = spacePinnedTabs[cs.id] ?? []
                     let arr = tabsBySpace[cs.id] ?? []
-                    currentTab = arr.last
+                    currentTab = spacePinned.last ?? arr.last
                 } else {
                     currentTab = nil
                 }
             } else if let cs = currentSpace {
+                // Tab was in a space
+                let spacePinned = spacePinnedTabs[cs.id] ?? []
                 let arr = tabsBySpace[cs.id] ?? []
-                if let i = removedIndexInCurrentSpace, !arr.isEmpty {
-                    let newIndex = min(i, arr.count - 1)
-                    currentTab =
-                        arr.indices.contains(newIndex)
-                        ? arr[newIndex] : arr.first
-                } else if !arr.isEmpty {
-                    currentTab = arr.last
-                } else if !pinnedTabs.isEmpty {
-                    currentTab = pinnedTabs.last
+                
+                if let i = removedIndexInCurrentSpace {
+                    // Try to select adjacent tab
+                    let allSpaceTabs = spacePinned + arr
+                    if !allSpaceTabs.isEmpty {
+                        let newIndex = min(i, allSpaceTabs.count - 1)
+                        currentTab = allSpaceTabs.indices.contains(newIndex) 
+                            ? allSpaceTabs[newIndex] 
+                            : allSpaceTabs.first
+                    } else if !pinnedTabs.isEmpty {
+                        currentTab = pinnedTabs.last
+                    } else {
+                        currentTab = nil
+                    }
                 } else {
-                    currentTab = nil
+                    // Fallback to last tab
+                    currentTab = arr.last ?? spacePinned.last ?? pinnedTabs.last
                 }
             }
         }
@@ -312,6 +341,158 @@ class TabManager {
                 unloadTab(tab)
             }
         }
+    }
+
+    // MARK: - Drag & Drop Operations
+    
+    func handleDragOperation(_ operation: DragOperation) {
+        let tab = operation.tab
+        
+        switch (operation.fromContainer, operation.toContainer) {
+        case (.essentials, .essentials):
+            reorderGlobalPinnedTabs(tab, to: operation.toIndex)
+            
+        case (.spacePinned(let fromSpaceId), .spacePinned(let toSpaceId)):
+            if fromSpaceId == toSpaceId {
+                reorderSpacePinnedTabs(tab, in: toSpaceId, to: operation.toIndex)
+            } else {
+                moveTabBetweenSpaces(tab, from: fromSpaceId, to: toSpaceId, asSpacePinned: true, toIndex: operation.toIndex)
+            }
+            
+        case (.spaceRegular(let fromSpaceId), .spaceRegular(let toSpaceId)):
+            if fromSpaceId == toSpaceId {
+                reorderRegularTabs(tab, in: toSpaceId, to: operation.toIndex)
+            } else {
+                moveTabBetweenSpaces(tab, from: fromSpaceId, to: toSpaceId, asSpacePinned: false, toIndex: operation.toIndex)
+            }
+            
+        case (.spaceRegular(let spaceId), .spacePinned(let targetSpaceId)):
+            // Regular tab to space pinned
+            if spaceId == targetSpaceId {
+                pinTabToSpace(tab, spaceId: spaceId)
+                reorderSpacePinnedTabs(tab, in: spaceId, to: operation.toIndex)
+            } else {
+                moveTabBetweenSpaces(tab, from: spaceId, to: targetSpaceId, asSpacePinned: true, toIndex: operation.toIndex)
+            }
+            
+        case (.spacePinned(let spaceId), .spaceRegular(let targetSpaceId)):
+            // Space pinned to regular tab
+            if spaceId == targetSpaceId {
+                unpinTabFromSpace(tab)
+                reorderRegularTabs(tab, in: spaceId, to: operation.toIndex)
+            } else {
+                moveTabBetweenSpaces(tab, from: spaceId, to: targetSpaceId, asSpacePinned: false, toIndex: operation.toIndex)
+            }
+            
+        case (.spaceRegular(_), .essentials):
+            // Regular tab to global pinned
+            pinTab(tab)
+            reorderGlobalPinnedTabs(tab, to: operation.toIndex)
+            
+        case (.spacePinned(_), .essentials):
+            // Space pinned to global pinned
+            pinTab(tab)
+            reorderGlobalPinnedTabs(tab, to: operation.toIndex)
+            
+        case (.essentials, .spaceRegular(let spaceId)):
+            // Global pinned to regular tab
+            unpinTab(tab)
+            tab.spaceId = spaceId
+            addTab(tab)
+            reorderRegularTabs(tab, in: spaceId, to: operation.toIndex)
+            
+        case (.essentials, .spacePinned(let spaceId)):
+            // Global pinned to space pinned
+            unpinTab(tab)
+            pinTabToSpace(tab, spaceId: spaceId)
+            reorderSpacePinnedTabs(tab, in: spaceId, to: operation.toIndex)
+            
+        case (.none, _), (_, .none):
+            print("⚠️ Invalid drag operation: \(operation)")
+        }
+        
+        print("✅ Drag operation completed: \(operation.fromContainer) → \(operation.toContainer)")
+    }
+    
+    private func reorderGlobalPinnedTabs(_ tab: Tab, to index: Int) {
+        guard let currentIndex = pinnedTabs.firstIndex(where: { $0.id == tab.id }) else { return }
+        guard index != currentIndex else { return }
+        
+        pinnedTabs.remove(at: currentIndex)
+        let clampedIndex = min(max(index, 0), pinnedTabs.count)
+        pinnedTabs.insert(tab, at: clampedIndex)
+        
+        // Update indices
+        for (i, pinnedTab) in pinnedTabs.enumerated() {
+            pinnedTab.index = i
+        }
+        
+        persistSnapshot()
+    }
+    
+    private func reorderSpacePinnedTabs(_ tab: Tab, in spaceId: UUID, to index: Int) {
+        guard var spacePinned = spacePinnedTabs[spaceId],
+              let currentIndex = spacePinned.firstIndex(where: { $0.id == tab.id }) else { return }
+        guard index != currentIndex else { return }
+        
+        spacePinned.remove(at: currentIndex)
+        let clampedIndex = min(max(index, 0), spacePinned.count)
+        spacePinned.insert(tab, at: clampedIndex)
+        
+        // Update indices
+        for (i, pinnedTab) in spacePinned.enumerated() {
+            pinnedTab.index = i
+        }
+        
+        spacePinnedTabs[spaceId] = spacePinned
+        persistSnapshot()
+    }
+    
+    private func reorderRegularTabs(_ tab: Tab, in spaceId: UUID, to index: Int) {
+        guard var regularTabs = tabsBySpace[spaceId],
+              let currentIndex = regularTabs.firstIndex(where: { $0.id == tab.id }) else { return }
+        guard index != currentIndex else { return }
+        
+        regularTabs.remove(at: currentIndex)
+        let clampedIndex = min(max(index, 0), regularTabs.count)
+        regularTabs.insert(tab, at: clampedIndex)
+        
+        // Update indices
+        for (i, regularTab) in regularTabs.enumerated() {
+            regularTab.index = i
+        }
+        
+        tabsBySpace[spaceId] = regularTabs
+        persistSnapshot()
+    }
+    
+    private func moveTabBetweenSpaces(_ tab: Tab, from fromSpaceId: UUID, to toSpaceId: UUID, asSpacePinned: Bool, toIndex: Int) {
+        // Remove from source space
+        removeFromCurrentContainer(tab)
+        
+        // Add to target space
+        tab.spaceId = toSpaceId
+        if asSpacePinned {
+            var spacePinned = spacePinnedTabs[toSpaceId] ?? []
+            tab.index = toIndex
+            spacePinned.insert(tab, at: min(toIndex, spacePinned.count))
+            // Update indices
+            for (i, pinnedTab) in spacePinned.enumerated() {
+                pinnedTab.index = i
+            }
+            spacePinnedTabs[toSpaceId] = spacePinned
+        } else {
+            var regularTabs = tabsBySpace[toSpaceId] ?? []
+            tab.index = toIndex
+            regularTabs.insert(tab, at: min(toIndex, regularTabs.count))
+            // Update indices
+            for (i, regularTab) in regularTabs.enumerated() {
+                regularTab.index = i
+            }
+            tabsBySpace[toSpaceId] = regularTabs
+        }
+        
+        persistSnapshot()
     }
 
     // MARK: - Tab Ordering
@@ -412,12 +593,83 @@ class TabManager {
             pinTab(tab)
         }
     }
+    
+    // MARK: - Space-Level Pinned Tabs
+    
+    func spacePinnedTabs(for spaceId: UUID) -> [Tab] {
+        return (spacePinnedTabs[spaceId] ?? []).sorted { $0.index < $1.index }
+    }
+    
+    func pinTabToSpace(_ tab: Tab, spaceId: UUID) {
+        guard contains(tab) else { return }
+        guard let space = spaces.first(where: { $0.id == spaceId }) else { return }
+        
+        // Remove from current location
+        removeFromCurrentContainer(tab)
+        
+        // Add to space pinned tabs
+        tab.spaceId = spaceId
+        var spacePinned = spacePinnedTabs[spaceId] ?? []
+        let nextIndex = (spacePinned.map { $0.index }.max() ?? -1) + 1
+        tab.index = nextIndex
+        spacePinned.append(tab)
+        spacePinnedTabs[spaceId] = spacePinned
+        
+        print("Pinned tab '\(tab.name)' to space '\(space.name)'")
+        persistSnapshot()
+    }
+    
+    func unpinTabFromSpace(_ tab: Tab) {
+        guard let spaceId = tab.spaceId,
+              var spacePinned = spacePinnedTabs[spaceId],
+              let index = spacePinned.firstIndex(where: { $0.id == tab.id }) else { return }
+        
+        // Remove from space pinned tabs
+        let unpinned = spacePinned.remove(at: index)
+        spacePinnedTabs[spaceId] = spacePinned
+        
+        // Add to regular tabs in the same space
+        var regularTabs = tabsBySpace[spaceId] ?? []
+        let nextIndex = (regularTabs.map { $0.index }.max() ?? -1) + 1
+        unpinned.index = nextIndex
+        regularTabs.append(unpinned)
+        tabsBySpace[spaceId] = regularTabs
+        
+        print("Unpinned tab '\(tab.name)' from space")
+        persistSnapshot()
+    }
+    
+    private func removeFromCurrentContainer(_ tab: Tab) {
+        // Remove from global pinned
+        if let index = pinnedTabs.firstIndex(where: { $0.id == tab.id }) {
+            pinnedTabs.remove(at: index)
+            return
+        }
+        
+        // Remove from space pinned
+        if let spaceId = tab.spaceId,
+           var spacePinned = spacePinnedTabs[spaceId],
+           let index = spacePinned.firstIndex(where: { $0.id == tab.id }) {
+            spacePinned.remove(at: index)
+            spacePinnedTabs[spaceId] = spacePinned
+            return
+        }
+        
+        // Remove from regular tabs
+        if let spaceId = tab.spaceId,
+           var regularTabs = tabsBySpace[spaceId],
+           let index = regularTabs.firstIndex(where: { $0.id == tab.id }) {
+            regularTabs.remove(at: index)
+            tabsBySpace[spaceId] = regularTabs
+        }
+    }
 
     // MARK: - Navigation (pinned + current space)
 
     func selectNextTab() {
         let inSpace = tabs
-        let all = pinnedTabs + inSpace
+        let spacePinned = currentSpace.flatMap { spacePinnedTabs(for: $0.id) } ?? []
+        let all = pinnedTabs + spacePinned + inSpace
         guard !all.isEmpty, let current = currentTab else { return }
         guard let currentIndex = all.firstIndex(where: { $0.id == current.id })
         else { return }
@@ -427,7 +679,8 @@ class TabManager {
 
     func selectPreviousTab() {
         let inSpace = tabs
-        let all = pinnedTabs + inSpace
+        let spacePinned = currentSpace.flatMap { spacePinnedTabs(for: $0.id) } ?? []
+        let all = pinnedTabs + spacePinned + inSpace
         guard !all.isEmpty, let current = currentTab else { return }
         guard let currentIndex = all.firstIndex(where: { $0.id == current.id })
         else { return }
@@ -437,7 +690,7 @@ class TabManager {
 
     // MARK: - Persistence mapping
 
-    private func toTabEntity(_ tab: Tab, isPinned: Bool, persistenceIndex: Int)
+    private func toTabEntity(_ tab: Tab, isPinned: Bool, isSpacePinned: Bool, persistenceIndex: Int)
         -> TabEntity
     {
         TabEntity(
@@ -445,6 +698,7 @@ class TabManager {
             urlString: tab.url.absoluteString,
             name: tab.name,
             isPinned: isPinned,
+            isSpacePinned: isSpacePinned,
             index: tab.index,
             spaceId: tab.spaceId
         )
@@ -484,12 +738,14 @@ class TabManager {
             }
             for sp in spaces {
                 tabsBySpace[sp.id] = []
+                spacePinnedTabs[sp.id] = []
             }
 
             // Tabs
             let tabEntities = try context.fetch(FetchDescriptor<TabEntity>())
             let sortedTabs = tabEntities.sorted { a, b in
                 if a.isPinned != b.isPinned { return a.isPinned && !b.isPinned }
+                if a.isSpacePinned != b.isSpacePinned { return a.isSpacePinned && !b.isSpacePinned }
                 if a.spaceId != b.spaceId {
                     return (a.spaceId?.uuidString ?? "")
                         < (b.spaceId?.uuidString ?? "")
@@ -497,10 +753,23 @@ class TabManager {
                 return a.index < b.index
             }
 
-            let pinned = sortedTabs.filter { $0.isPinned }
-            let normals = sortedTabs.filter { !$0.isPinned }
+            let globalPinned = sortedTabs.filter { $0.isPinned }
+            let spacePinned = sortedTabs.filter { $0.isSpacePinned && !$0.isPinned }
+            let normals = sortedTabs.filter { !$0.isPinned && !$0.isSpacePinned }
 
-            self.pinnedTabs = pinned.map(toRuntime)
+            self.pinnedTabs = globalPinned.map(toRuntime)
+            
+            // Load space-pinned tabs
+            for e in spacePinned {
+                let t = toRuntime(e)
+                if let sid = e.spaceId {
+                    var arr = spacePinnedTabs[sid] ?? []
+                    arr.append(t)
+                    spacePinnedTabs[sid] = arr
+                }
+            }
+            
+            // Load regular tabs
             for e in normals {
                 let t = toRuntime(e)
                 if let sid = e.spaceId {
@@ -535,8 +804,10 @@ class TabManager {
                 }
             }
 
+            let spacePinnedForSelection = currentSpace.flatMap { spacePinnedTabs(for: $0.id) } ?? []
             let allForSelection =
                 self.pinnedTabs
+                + spacePinnedForSelection
                 + (currentSpace.flatMap { tabsBySpace[$0.id] } ?? [])
             if let id = state?.currentTabID,
                 let match = allForSelection.first(where: { $0.id == id })
@@ -560,7 +831,9 @@ class TabManager {
         do {
             let all = try context.fetch(FetchDescriptor<TabEntity>())
             let keepIDs = Set(
-                (pinnedTabs + spaces.flatMap { tabsBySpace[$0.id] ?? [] }).map {
+                (pinnedTabs + 
+                 spaces.flatMap { spacePinnedTabs[$0.id] ?? [] } +
+                 spaces.flatMap { tabsBySpace[$0.id] ?? [] }).map {
                     $0.id
                 }
             )
@@ -571,7 +844,7 @@ class TabManager {
             print("Fetch for cleanup failed: \(error)")
         }
 
-        func upsert(tab: Tab, isPinned: Bool, index: Int) {
+        func upsert(tab: Tab, isPinned: Bool, isSpacePinned: Bool, index: Int) {
             do {
                 let wantedID = tab.id
                 let predicate = #Predicate<TabEntity> { $0.id == wantedID }
@@ -586,6 +859,7 @@ class TabManager {
                         urlString: tab.url.absoluteString,
                         name: tab.name,
                         isPinned: isPinned,
+                        isSpacePinned: isSpacePinned,
                         index: tab.index,
                         spaceId: tab.spaceId
                     )
@@ -594,6 +868,7 @@ class TabManager {
                     entity.urlString = tab.url.absoluteString
                     entity.name = tab.name
                     entity.isPinned = isPinned
+                    entity.isSpacePinned = isSpacePinned
                     entity.index = tab.index
                     entity.spaceId = tab.spaceId
                 }
@@ -602,10 +877,22 @@ class TabManager {
             }
         }
 
+        // Save global pinned tabs
+        for (i, t) in pinnedTabs.enumerated() {
+            upsert(tab: t, isPinned: true, isSpacePinned: false, index: i)
+        }
+        
         for (sIndex, sp) in spaces.enumerated() {
+            // Save space-pinned tabs
+            let spacePinned = spacePinnedTabs[sp.id] ?? []
+            for (i, t) in spacePinned.enumerated() {
+                upsert(tab: t, isPinned: false, isSpacePinned: true, index: i)
+            }
+            
+            // Save regular tabs
             let arr = tabsBySpace[sp.id] ?? []
             for (i, t) in arr.enumerated() {
-                upsert(tab: t, isPinned: false, index: i)
+                upsert(tab: t, isPinned: false, isSpacePinned: false, index: i)
             }
 
             do {
@@ -676,11 +963,12 @@ class TabManager {
 extension TabManager {
     func reattachBrowserManager(_ bm: BrowserManager) {
         self.browserManager = bm
-        for t in (self.pinnedTabs + self.tabs) {
+        let spacePinned = currentSpace.flatMap { spacePinnedTabs(for: $0.id) } ?? []
+        for t in (self.pinnedTabs + spacePinned + self.tabs) {
             t.browserManager = bm
         }
         if let current = self.currentTab {
-            let all = self.pinnedTabs + self.tabs
+            let all = self.pinnedTabs + spacePinned + self.tabs
             if let match = all.first(where: { $0.id == current.id }) {
                 self.currentTab = match
             }
@@ -688,7 +976,7 @@ extension TabManager {
         if let ct = self.currentTab { _ = ct.webView }
         // Inform the extension controller about existing tabs and the active tab
         if #available(macOS 15.5, *) {
-            for t in (self.pinnedTabs + self.tabs) where t.didNotifyOpenToExtensions == false {
+            for t in (self.pinnedTabs + spacePinned + self.tabs) where t.didNotifyOpenToExtensions == false {
                 ExtensionManager.shared.notifyTabOpened(t)
                 t.didNotifyOpenToExtensions = true
             }
