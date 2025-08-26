@@ -15,9 +15,28 @@ final class Persistence {
     static let shared = Persistence()
     let container: ModelContainer
     private init() {
-        container = try! ModelContainer(
-            for: Schema([SpaceEntity.self, TabEntity.self, TabsStateEntity.self, HistoryEntity.self, ExtensionEntity.self])
-        )
+        do {
+            let schema = Schema([SpaceEntity.self, TabEntity.self, TabsStateEntity.self, HistoryEntity.self, ExtensionEntity.self])
+            container = try ModelContainer(for: schema)
+        } catch {
+            print("SwiftData container creation failed: \(error)")
+            print("This might be due to schema changes. Resetting database...")
+            
+            // Fallback: Delete the database file and create fresh
+            do {
+                let url = URL.applicationSupportDirectory.appending(path: "default.store")
+                if FileManager.default.fileExists(atPath: url.path()) {
+                    try FileManager.default.removeItem(at: url)
+                    print("Removed old database file")
+                }
+                
+                let schema = Schema([SpaceEntity.self, TabEntity.self, TabsStateEntity.self, HistoryEntity.self, ExtensionEntity.self])
+                container = try ModelContainer(for: schema)
+                print("Database reset and created successfully")
+            } catch {
+                fatalError("Failed to create ModelContainer after reset: \(error)")
+            }
+        }
     }
 }
 
