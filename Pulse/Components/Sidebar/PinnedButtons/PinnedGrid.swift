@@ -5,6 +5,7 @@
 //      Created by Maciek Bagiński on 30/07/2025.
 //    
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct PinnedGrid: View {
     let minButtonWidth: CGFloat = 50
@@ -15,6 +16,7 @@ struct PinnedGrid: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(\.tabDragManager) private var dragManager
     @State private var availableWidth: CGFloat = 0
+    @State private var cellFrames: [Int: CGRect] = [:] // local frames in grid space
 
     var body: some View {
         let items: [Tab] = browserManager.tabManager.pinnedTabs
@@ -22,10 +24,9 @@ struct PinnedGrid: View {
         let columns: [GridItem] = makeColumns(count: colsCount)
 
         VStack(spacing: 6) {
-            if !items.isEmpty {
+            ZStack(alignment: .top) {
                 LazyVGrid(columns: columns, alignment: .center, spacing: rowSpacing) {
-                    ForEach(items.indices, id: \.self) { index in
-                        let tab = items[index]
+                    ForEach(Array(items.enumerated()), id: \.element.id) { index, tab in
                         let isActive: Bool = (browserManager.tabManager.currentTab?.id == tab.id)
                         let title: String = safeTitle(tab)
 
@@ -42,12 +43,39 @@ struct PinnedGrid: View {
                             tab: tab,
                             container: .essentials,
                             index: index,
-                            dragManager: dragManager ?? TabDragManager()
+                            dragManager: dragManager ?? TabDragManager.shared
                         )
+                        .background(GeometryReader { proxy in
+                            // Record each tile's frame in local grid coordinate space
+                            let local = proxy.frame(in: .named("PinnedGridSpace"))
+                            Color.clear.preference(key: PinnedGridCellFramesKey.self, value: [index: local])
+                        })
                     }
                 }
-                .fixedSize(horizontal: false, vertical: true)
+                // Ensure a reasonable drop surface when grid is empty
+                if items.isEmpty {
+                    Color.clear.frame(height: 44)
+                }
             }
+            .coordinateSpace(name: "PinnedGridSpace")
+            .onPreferenceChange(PinnedGridCellFramesKey.self) { frames in
+                cellFrames = frames
+            }
+            .contentShape(Rectangle())
+            .overlay(EssentialsInsertionOverlay(colsCount: colsCount, cellFrames: cellFrames, availableWidth: availableWidth))
+            .onDrop(of: [.text], delegate: UniversalDropDelegate(
+                dragManager: (dragManager ?? TabDragManager.shared),
+                essentialsFramesProvider: { cellFrames },
+                essentialsColumns: { colsCount },
+                essentialsWidth: { availableWidth },
+                spacePinnedFramesProvider: nil,
+                regularFramesProvider: nil,
+                spaceId: nil,
+                onPerform: { op in
+                    browserManager.tabManager.handleDragOperation(op)
+                }
+            ))
+            .fixedSize(horizontal: false, vertical: true)
         }
         .background(widthReader)
         .animation(.easeInOut(duration: 0.18), value: colsCount)
@@ -118,5 +146,81 @@ private struct PinnedTile: View {
                 Label("Remove pinned tab", systemImage: "pin.slash")
             }
         }
+    }
+}
+
+// MARK: - Preference Keys
+private struct PinnedGridCellFramesKey: PreferenceKey {
+    static var defaultValue: [Int: CGRect] = [:]
+    static func reduce(value: inout [Int: CGRect], nextValue: () -> [Int: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { $1 })
+    }
+}
+
+// MARK: - Helpers (factor heavy expressions out for type-checker)
+extension PinnedGrid {
+    @ViewBuilder
+    fileprivate func essentialsInsertionOverlay(cols: Int) -> some View {
+        let dm = dragManager ?? TabDragManager.shared
+        let boundaries = computeEssentialsBoundaries(colsCount: cols)
+        print("🔍 Overlay check - isDragging: \(dm.isDragging), dropTarget: \(dm.dropTarget), insertionIndex: \(dm.insertionIndex)")
+        return SidebarGridInsertionOverlay(
+            isActive: dm.isDragging && dm.dropTarget == .essentials,
+            index: max(dm.insertionIndex, 0),
+            boundaries: boundaries
+        )
+        .onChange(of: dm.isDragging) { _, _ in
+            print("🔄 isDragging changed to: \(dm.isDragging)")
+        }
+    }
+
+    fileprivate func computeEssentialsBoundaries(colsCount: Int) -> [SidebarGridBoundary] {
+        let cw = SidebarDropMath.estimatedGridWidth(from: cellFrames)
+        var boundaries = SidebarDropMath.computeGridBoundaries(
+            frames: cellFrames,
+            columns: colsCount,
+            containerWidth: cw > 0 ? cw : max(availableWidth, minButtonWidth),
+            gridGap: itemSpacing
+        )
+        if boundaries.isEmpty {
+            // Fallback when essentials grid is empty: single horizontal target line
+            let fh: CGFloat = 44
+            let f = CGRect(x: 0, y: fh/2 - 1.5, width: max(availableWidth, minButtonWidth), height: 3)
+            boundaries = [SidebarGridBoundary(index: 0, orientation: .horizontal, frame: f)]
+        }
+        return boundaries
+    }
+}
+
+struct EssentialsInsertionOverlay: View {
+    let colsCount: Int
+    let cellFrames: [Int: CGRect]
+    let availableWidth: CGFloat
+    @ObservedObject var dragManager = TabDragManager.shared
+    
+    var body: some View {
+        let boundaries = computeBoundaries()
+        print("🔍 EssentialsOverlay - isDragging: \(dragManager.isDragging), dropTarget: \(dragManager.dropTarget)")
+        return SidebarGridInsertionOverlay(
+            isActive: dragManager.isDragging && dragManager.dropTarget == .essentials,
+            index: max(dragManager.insertionIndex, 0),
+            boundaries: boundaries
+        )
+    }
+    
+    private func computeBoundaries() -> [SidebarGridBoundary] {
+        let cw = SidebarDropMath.estimatedGridWidth(from: cellFrames)
+        var boundaries = SidebarDropMath.computeGridBoundaries(
+            frames: cellFrames,
+            columns: colsCount,
+            containerWidth: cw > 0 ? cw : max(availableWidth, 50),
+            gridGap: 8
+        )
+        if boundaries.isEmpty {
+            let fh: CGFloat = 44
+            let f = CGRect(x: 0, y: fh/2 - 1.5, width: max(availableWidth, 50), height: 3)
+            boundaries = [SidebarGridBoundary(index: 0, orientation: .horizontal, frame: f)]
+        }
+        return boundaries
     }
 }
