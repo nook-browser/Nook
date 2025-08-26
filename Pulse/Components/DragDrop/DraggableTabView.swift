@@ -42,7 +42,9 @@ struct DraggableTabView<Content: View>: View {
             .onDrag {
                 // Start the drag operation
                 DispatchQueue.main.async {
+                    print("🚀 DraggableTabView starting drag: \(tab.name) - dragManager same as shared: \(dragManager === TabDragManager.shared)")
                     dragManager.startDrag(tab: tab, from: container, at: index)
+                    print("🚀 After startDrag - isDragging: \(dragManager.isDragging)")
                 }
                 return NSItemProvider(object: tab.id.uuidString as NSString)
             }
@@ -64,11 +66,10 @@ struct DraggableTabView<Content: View>: View {
                         dragGesture = false
                         dragOffset = .zero
                         
-                        // End drag operation
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            if dragManager.isDragging && dragManager.draggedTab?.id == tab.id {
-                                _ = dragManager.endDrag(commit: false) // Let drop zone handle commit
-                            }
+                        // End drag operation immediately
+                        print("🛑 Ending drag for \(tab.name)")
+                        if dragManager.isDragging && dragManager.draggedTab?.id == tab.id {
+                            _ = dragManager.endDrag(commit: false) // Let drop zone handle commit
                         }
                     }
             )

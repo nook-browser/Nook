@@ -10,6 +10,9 @@ import AppKit
 
 @MainActor
 class TabDragManager: ObservableObject {
+    // MARK: - Shared Instance
+    static let shared = TabDragManager()
+    
     // MARK: - Drag State
     @Published var isDragging: Bool = false
     @Published var draggedTab: Tab?
@@ -43,21 +46,27 @@ class TabDragManager: ObservableObject {
         draggedTab = tab
         draggedTabOriginalIndex = index
         draggedTabOriginalContainer = container
-        
-        print("🚀 Started dragging: \(tab.name) from \(container) at index \(index)")
+        insertionIndex = 0  // Start with valid index
+        dropTarget = container  // Initialize with source container so overlay shows immediately
+        updateInsertionLineVisibility()
     }
     
     func updateDragTarget(container: DragContainer, insertionIndex: Int, spaceId: UUID? = nil) {
         guard isDragging else { return }
         
         let previousIndex = self.insertionIndex
+        let previousContainer = self.dropTarget
         
+        // Always clamp to prevent crashes - NO NEGATIVE INDICES EVER
+        let validatedIndex = max(0, insertionIndex)
+        
+        // Always update target - no more .none states during drag
         self.dropTarget = container
-        self.insertionIndex = insertionIndex
+        self.insertionIndex = validatedIndex  
         self.insertionSpaceId = spaceId
         
-        // Trigger haptic feedback when insertion line moves
-        if insertionIndex != previousIndex && insertionIndex >= 0 {
+        // Trigger haptic on any change
+        if validatedIndex != previousIndex || container != previousContainer {
             triggerHapticFeedback()
         }
         
@@ -66,7 +75,7 @@ class TabDragManager: ObservableObject {
     
     func updateInsertionLine(frame: CGRect) {
         insertionLineFrame = frame
-        showInsertionLine = isDragging && insertionIndex >= 0
+        showInsertionLine = isDragging
     }
     
     func endDrag(commit: Bool = true) -> DragOperation? {
@@ -95,7 +104,6 @@ class TabDragManager: ObservableObject {
             toSpaceId: insertionSpaceId
         )
         
-        print("✅ Drag completed: \(draggedTab.name) from \(draggedTabOriginalContainer) to \(dropTarget) at \(insertionIndex)")
         
         return operation
     }
@@ -106,12 +114,10 @@ class TabDragManager: ObservableObject {
         
         lastHapticIndex = insertionIndex
         hapticPerformer.perform(.alignment, performanceTime: .now)
-        
-        print("📳 Haptic feedback triggered for insertion at index \(insertionIndex)")
     }
     
     private func updateInsertionLineVisibility() {
-        showInsertionLine = isDragging && insertionIndex >= 0 && dropTarget != .none
+        showInsertionLine = isDragging
     }
     
     private func resetDragState() {
@@ -125,8 +131,6 @@ class TabDragManager: ObservableObject {
         showInsertionLine = false
         insertionLineFrame = .zero
         lastHapticIndex = -1
-        
-        print("🧹 Drag state reset")
     }
 }
 
