@@ -1,33 +1,21 @@
 import SwiftUI
 
+// Dithered gradient rendering
+import CoreGraphics
+
 // Renders the current space's gradient as a bottom background layer
 struct SpaceGradientBackgroundView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var gradientTransitionManager: GradientTransitionManager
 
     private var gradient: SpaceGradient {
-        browserManager.tabManager.currentSpace?.gradient ?? .default
+        gradientTransitionManager.displayGradient
     }
 
     var body: some View {
         ZStack {
-            // Compute start/end points once
-            let points = linePoints(angle: gradient.angle)
-
-            // Base gradient fill with noise overlay sized to rectangle bounds
-            Rectangle()
-                .fill(
-                    LinearGradient(
-                        gradient: Gradient(stops: stops()),
-                        startPoint: points.start,
-                        endPoint: points.end
-                    )
-                )
-                .overlay(
-                    Image("noise_texture")
-                        .resizable(resizingMode: .tile)
-                        .opacity(max(0, min(1, gradient.grain)))
-                        .blendMode(.overlay)
-                )
+            // Properly dithered gradient image respecting current displayGradient
+            DitheredGradientView(gradient: gradient)
         }
         .allowsHitTesting(false) // Entire background should not intercept input
     }

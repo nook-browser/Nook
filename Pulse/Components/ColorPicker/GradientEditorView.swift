@@ -8,10 +8,11 @@ import AppKit
 struct GradientEditorView: View {
     @Binding var gradient: SpaceGradient
     @State private var selectedNodeID: UUID?
+    @EnvironmentObject var gradientTransitionManager: GradientTransitionManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            GradientCanvasEditor(gradient: $gradient, selectedNodeID: $selectedNodeID)
+            GradientCanvasEditor(gradient: $gradient, selectedNodeID: $selectedNodeID, showDitherOverlay: false)
 
             ColorSwatchRowView(selectedColor: selectedColor()) { color in
                 applyColorSelection(color)
@@ -25,6 +26,16 @@ struct GradientEditorView: View {
         }
         .padding(16)
         .onAppear { if selectedNodeID == nil { selectedNodeID = gradient.nodes.first?.id } }
+        .onChange(of: gradient) { newValue in
+            // Live background update while editing
+            gradientTransitionManager.setImmediate(newValue)
+        }
+        .onAppear {
+            gradientTransitionManager.beginInteractivePreview()
+        }
+        .onDisappear {
+            gradientTransitionManager.endInteractivePreview()
+        }
     }
 
     // MARK: - Selection Helpers

@@ -17,14 +17,14 @@ struct AngleDial: View {
                     let a = Double(i) / 24.0 * 2 * .pi
                     Capsule()
                         .fill(Color.primary.opacity(i % 6 == 0 ? 0.35 : 0.18))
-                        .frame(width: i % 6 == 0 ? 3 : 2, height: i % 6 == 0 ? 10 : 6)
-                        .offset(y: -size/2 + 10)
+                        .frame(width: CGFloat(i % 6 == 0 ? 3 : 2), height: CGFloat(i % 6 == 0 ? 10 : 6))
+                        .offset(y: -size/2 + 10.0)
                         .rotationEffect(.radians(a))
                 }
 
                 // needle and handle
                 let a = Angle(degrees: angle)
-                let handle = CGPoint(x: cos(a.radians) * (size/2 - 12), y: sin(a.radians) * (size/2 - 12))
+                let handle = CGPoint(x: cos(a.radians) * (size/2 - 12.0), y: sin(a.radians) * (size/2 - 12.0))
                 Path { p in
                     p.move(to: CGPoint(x: size/2, y: size/2))
                     p.addLine(to: CGPoint(x: size/2 + handle.x, y: size/2 + handle.y))
@@ -49,4 +49,3 @@ struct AngleDial: View {
         }
     }
 }
-

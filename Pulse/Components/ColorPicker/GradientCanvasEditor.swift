@@ -8,10 +8,13 @@ import AppKit
 struct GradientCanvasEditor: View {
     @Binding var gradient: SpaceGradient
     @Binding var selectedNodeID: UUID?
+    var showDitherOverlay: Bool = true
 
     // ephemeral Y-positions (0...1) for visual placement only
     @State private var yPositions: [UUID: CGFloat] = [:]
-    @State private var selectedMode: Int = 0 // 0 sparkle, 1 sun, 2 moon (visual only)
+    @State private var xPositions: [UUID: CGFloat] = [:]
+    @State private var selectedMode: Int = 0 // 0 sparkle, 1 sun, 2 moon
+    @State private var lightness: Double = 0.6 // HSL L component
 
     private let cornerRadius: CGFloat = 16
 
@@ -19,21 +22,25 @@ struct GradientCanvasEditor: View {
         GeometryReader { proxy in
             let width = proxy.size.width
             let height = proxy.size.height
-            let rect = CGRect(origin: .zero, size: proxy.size)
+            let padding: CGFloat = 24
+            let center = CGPoint(x: width/2, y: height/2)
+            let radius = min(width, height)/2 - padding
 
             ZStack {
                 // Gradient background
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(LinearGradient(gradient: Gradient(stops: stops()), startPoint: startPoint(), endPoint: endPoint()))
 
-                // Noise overlay
-                Image("noise_texture")
-                    .resizable()
-                    .scaledToFill()
-                    .opacity(max(0, min(1, gradient.grain)))
-                    .blendMode(.overlay)
-                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                    .allowsHitTesting(false)
+                // Noise overlay (optional)
+                if showDitherOverlay {
+                    Image("noise_texture")
+                        .resizable()
+                        .scaledToFill()
+                        .opacity(max(0, min(1, gradient.grain)))
+                        .blendMode(.overlay)
+                        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                        .allowsHitTesting(false)
+                }
 
                 // Dot grid
                 DotGrid()
@@ -52,17 +59,20 @@ struct GradientCanvasEditor: View {
 
                 // Draggable handles
                 ForEach(gradient.nodes) { node in
-                    let posX = CGFloat(node.location)
+                    let posX = xPositions[node.id] ?? CGFloat(node.location)
                     let posY = yPositions[node.id] ?? defaultY(for: node)
-                    let center = CGPoint(x: posX * width, y: posY * height)
+                    let initial = CGPoint(x: posX * width, y: posY * height)
+                    let clamped = clampToCircle(point: initial, center: center, radius: radius)
 
                     Handle(colorHex: node.colorHex, selected: selectedNodeID == node.id)
-                        .position(center)
+                        .position(clamped)
                         .gesture(DragGesture(minimumDistance: 0)
                             .onChanged { value in
-                                let nx = max(0, min(1, value.location.x / width))
-                                let ny = max(0, min(1, value.location.y / height))
-                                updateNode(node, newX: nx, newY: ny)
+                                // Clamp to circle and map to HSL for color
+                                let clamped = clampToCircle(point: value.location, center: center, radius: radius)
+                                let nx = max(0, min(1, clamped.x / width))
+                                let ny = max(0, min(1, clamped.y / height))
+                                updateNodeFromCanvasDrag(node, newX: nx, newY: ny, absolute: clamped, center: center, radius: radius)
                             }
                         )
                         .onTapGesture { selectedNodeID = node.id }
@@ -91,8 +101,8 @@ struct GradientCanvasEditor: View {
                     .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
             }
             .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .onAppear { ensureYPositions(height: height) }
-            .onChange(of: gradient.nodes) { _ in ensureYPositions(height: height) }
+            .onAppear { ensurePositions(width: width, height: height, center: center, radius: radius) }
+            .onChange(of: gradient.nodes) { _ in ensurePositions(width: width, height: height, center: center, radius: radius) }
         }
         .frame(height: 300)
     }
@@ -106,7 +116,15 @@ struct GradientCanvasEditor: View {
                     .fill(selectedMode == idx ? AnyShapeStyle(.thinMaterial) : AnyShapeStyle(Color.clear))
             )
             .foregroundStyle(selectedMode == idx ? .primary : .secondary)
-            .onTapGesture { selectedMode = idx }
+            .onTapGesture {
+                selectedMode = idx
+                switch idx {
+                case 0: lightness = 0.6 // sparkle
+                case 1: lightness = 0.7 // sun
+                case 2: lightness = 0.45 // moon
+                default: lightness = 0.6
+                }
+            }
     }
 
     private func defaultY(for node: GradientNode) -> CGFloat {
@@ -117,21 +135,103 @@ struct GradientCanvasEditor: View {
         return 0.5
     }
 
-    private func ensureYPositions(height: CGFloat) {
+    private func ensurePositions(width: CGFloat, height: CGFloat, center: CGPoint, radius: CGFloat) {
         for n in gradient.nodes {
             if yPositions[n.id] == nil { yPositions[n.id] = defaultY(for: n) }
+            if xPositions[n.id] == nil { xPositions[n.id] = CGFloat(n.location) }
+            // keep points within circle
+            let pt = CGPoint(x: (xPositions[n.id] ?? CGFloat(n.location)) * width,
+                             y: (yPositions[n.id] ?? defaultY(for: n)) * height)
+            let clamped = clampToCircle(point: pt, center: center, radius: radius)
+            xPositions[n.id] = clamped.x / width
+            yPositions[n.id] = clamped.y / height
         }
-        // drop removed
+        // purge removed
+        xPositions = xPositions.filter { pair in gradient.nodes.contains { $0.id == pair.key } }
         yPositions = yPositions.filter { pair in gradient.nodes.contains { $0.id == pair.key } }
     }
 
-    private func updateNode(_ node: GradientNode, newX: CGFloat, newY: CGFloat) {
-        if let idx = gradient.nodes.firstIndex(where: { $0.id == node.id }) {
-            gradient.nodes[idx].location = Double(newX)
-            yPositions[node.id] = newY
-            gradient.nodes.sort { $0.location < $1.location }
-            selectedNodeID = node.id
+    private func updateNodeFromCanvasDrag(_ node: GradientNode, newX: CGFloat, newY: CGFloat, absolute: CGPoint, center: CGPoint, radius: CGFloat) {
+        guard let idx = gradient.nodes.firstIndex(where: { $0.id == node.id }) else { return }
+        // Update persistent location from X only
+        gradient.nodes[idx].location = Double(newX)
+        // Save visual positions
+        xPositions[node.id] = newX
+        yPositions[node.id] = newY
+        gradient.nodes.sort { $0.location < $1.location }
+        selectedNodeID = node.id
+
+        // Map position on circle to HSL color
+        let hsla = colorFromCircle(point: absolute, center: center, radius: radius, lightness: lightness)
+        let updated = colorWithPreservedAlpha(oldHex: gradient.nodes[idx].colorHex, newColor: hsla)
+        gradient.nodes[idx].colorHex = updated
+
+        // If there are 2 or 3 nodes, auto-place complementary/triadic companions
+        autoPlaceCompanions(primary: node, center: center, radius: radius)
+    }
+
+    private func clampToCircle(point: CGPoint, center: CGPoint, radius: CGFloat) -> CGPoint {
+        let dx = point.x - center.x
+        let dy = point.y - center.y
+        let dist = sqrt(dx*dx + dy*dy)
+        if dist <= radius { return point }
+        let angle = atan2(dy, dx)
+        return CGPoint(x: center.x + cos(angle) * radius, y: center.y + sin(angle) * radius)
+    }
+
+    private func autoPlaceCompanions(primary: GradientNode, center: CGPoint, radius: CGFloat) {
+        guard gradient.nodes.count > 1, let pX = xPositions[primary.id], let pY = yPositions[primary.id] else { return }
+        let width: CGFloat = 1 // we will use normalized x/y in [0,1]
+        let p = CGPoint(x: pX, y: pY)
+        let baseAngle = atan2(p.y - 0.5, p.x - 0.5)
+        let dist = min(0.5, sqrt(pow(p.x - 0.5, 2) + pow(p.y - 0.5, 2)))
+        let offsets: [Double] = gradient.nodes.count == 2 ? [180] : [120, 240]
+        var others = gradient.nodes.filter { $0.id != primary.id }
+        for (i, off) in offsets.enumerated() {
+            if i >= others.count { break }
+            let ang = baseAngle + CGFloat(off * .pi / 180)
+            let pos = CGPoint(x: 0.5 + cos(ang) * dist, y: 0.5 + sin(ang) * dist)
+            let absPt = CGPoint(x: pos.x * (radius*2 + 48), y: pos.y * (radius*2 + 48)) // scale roughly to canvas, not critical
+            let colorHex = colorFromCircle(point: absPt, center: CGPoint(x: radius+24, y: radius+24), radius: radius, lightness: lightness)
+            if let idx = gradient.nodes.firstIndex(where: { $0.id == others[i].id }) {
+                gradient.nodes[idx].colorHex = colorHex
+                xPositions[others[i].id] = pos.x
+                yPositions[others[i].id] = pos.y
+                gradient.nodes[idx].location = Double(pos.x)
+            }
         }
+    }
+
+    private func colorFromCircle(point: CGPoint, center: CGPoint, radius: CGFloat, lightness: Double) -> String {
+        #if canImport(AppKit)
+        let dx = point.x - center.x
+        let dy = point.y - center.y
+        var angle = atan2(dy, dx)
+        if angle < 0 { angle += 2 * .pi }
+        let hue = Double(angle / (2 * .pi))
+        let dist = min(1.0, Double(sqrt(dx*dx + dy*dy) / radius))
+        // Saturation grows with distance from center, keep high near edge
+        let saturation = 0.2 + 0.8 * dist
+        let ns = NSColor(hue: CGFloat(hue), saturation: CGFloat(saturation), brightness: CGFloat(lightness), alpha: 1)
+        return ns.toHexString(includeAlpha: true) ?? "#FFFFFFFF"
+        #else
+        return "#FFFFFFFF"
+        #endif
+    }
+
+    private func colorWithPreservedAlpha(oldHex: String, newColor: String) -> String {
+        let aOld = Color(hex: oldHex)
+        #if canImport(AppKit)
+        var oa: CGFloat = 1
+        var orv: CGFloat = 0, ogv: CGFloat = 0, obv: CGFloat = 0
+        NSColor(aOld).usingColorSpace(.sRGB)?.getRed(&orv, green: &ogv, blue: &obv, alpha: &oa)
+        var nr: CGFloat = 1, ng: CGFloat = 1, nb: CGFloat = 1, na: CGFloat = 1
+        NSColor(Color(hex: newColor)).usingColorSpace(.sRGB)?.getRed(&nr, green: &ng, blue: &nb, alpha: &na)
+        let combined = NSColor(srgbRed: nr, green: ng, blue: nb, alpha: oa)
+        return combined.toHexString(includeAlpha: true) ?? newColor
+        #else
+        return newColor
+        #endif
     }
 
     private func addNode() {
@@ -220,4 +320,3 @@ private struct DotGrid: View {
         }
     }
 }
-

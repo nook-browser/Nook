@@ -60,6 +60,7 @@ class BrowserManager: ObservableObject {
     var cacheManager: CacheManager
     var extensionManager: ExtensionManager?
     var compositorManager: TabCompositorManager
+    var gradientTransitionManager: GradientTransitionManager
     
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
@@ -68,14 +69,14 @@ class BrowserManager: ObservableObject {
     var compositorContainerView: NSView?
 
     init() {
+        // Phase 1: initialize all stored properties
         self.modelContext = Persistence.shared.container.mainContext
-        // Prepare native ExtensionManager reference early; defer attach until after init completes.
         if #available(macOS 15.5, *) {
-            let mgr = ExtensionManager.shared
-            self.extensionManager = mgr
+            self.extensionManager = ExtensionManager.shared
+        } else {
+            self.extensionManager = nil
         }
-
-        self.tabManager = TabManager(browserManager: nil,context: modelContext)
+        self.tabManager = TabManager(browserManager: nil, context: modelContext)
         self.settingsManager = SettingsManager()
         self.dialogManager = DialogManager()
         self.downloadManager = DownloadManager.shared
@@ -83,25 +84,30 @@ class BrowserManager: ObservableObject {
         self.cookieManager = CookieManager()
         self.cacheManager = CacheManager()
         self.compositorManager = TabCompositorManager()
+        self.gradientTransitionManager = GradientTransitionManager()
+        self.compositorContainerView = nil
+
+        // Phase 2: wire dependencies and perform side effects (safe to use self)
         self.compositorManager.browserManager = self
         self.compositorManager.setUnloadTimeout(self.settingsManager.tabUnloadTimeout)
         self.tabManager.browserManager = self
-        // Attach extension manager BEFORE any WKWebView is created so content scripts can inject
+        self.tabManager.reattachBrowserManager(self)
         if #available(macOS 15.5, *), let mgr = self.extensionManager {
+            // Attach extension manager BEFORE any WKWebView is created so content scripts can inject
             mgr.attach(browserManager: self)
         }
-
-        self.tabManager.reattachBrowserManager(self)
+        if let g = self.tabManager.currentSpace?.gradient {
+            self.gradientTransitionManager.setImmediate(g)
+        } else {
+            self.gradientTransitionManager.setImmediate(.default)
+        }
         loadSidebarSettings()
-        
-        // Listen for tab unload timeout changes
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleTabUnloadTimeoutChange),
             name: .tabUnloadTimeoutChanged,
             object: nil
         )
-        
     }
     
     func updateSidebarWidth(_ width: CGFloat) {
@@ -268,13 +274,19 @@ class BrowserManager: ObservableObject {
         )
 
         let content = GradientEditorView(gradient: binding)
+            .environmentObject(self.gradientTransitionManager)
 
         let footer = AnyView(
             DialogFooter(
                 leftButton: DialogButton(
                     text: "Cancel",
                     variant: .secondary,
-                    action: { [weak self] in self?.closeDialog() }
+                    action: { [weak self] in
+                        // Restore background to the saved gradient for this space
+                        self?.gradientTransitionManager.endInteractivePreview()
+                        self?.gradientTransitionManager.transition(to: space.gradient, duration: 0.25)
+                        self?.closeDialog()
+                    }
                 ),
                 rightButtons: [
                     DialogButton(
@@ -284,6 +296,9 @@ class BrowserManager: ObservableObject {
                         action: { [weak self] in
                             // Commit draft to the current space and persist
                             space.gradient = draft.value
+                            // End interactive editing then morph to the committed gradient
+                            self?.gradientTransitionManager.endInteractivePreview()
+                            self?.gradientTransitionManager.transition(to: draft.value, duration: 0.35)
                             self?.tabManager.persistSnapshot()
                             self?.closeDialog()
                         }
