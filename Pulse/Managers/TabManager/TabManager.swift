@@ -113,6 +113,21 @@ class TabManager: ObservableObject {
             prevSpace.activeTabId = prevTab.id
         }
 
+        // Trigger gradient transition before switching space (so we still know previous)
+        if let bm = browserManager {
+            let oldGradient = previousSpace?.gradient
+            let newGradient = space.gradient
+            if let og = oldGradient {
+                if og.visuallyEquals(newGradient) {
+                    bm.gradientTransitionManager.setImmediate(newGradient)
+                } else {
+                    bm.gradientTransitionManager.transition(from: og, to: newGradient)
+                }
+            } else {
+                bm.gradientTransitionManager.setImmediate(newGradient)
+            }
+        }
+
         // Switch to the new space
         currentSpace = space
 
