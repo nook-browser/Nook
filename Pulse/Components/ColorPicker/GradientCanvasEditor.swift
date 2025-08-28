@@ -15,6 +15,8 @@ struct GradientCanvasEditor: View {
     @State private var xPositions: [UUID: CGFloat] = [:]
     @State private var selectedMode: Int = 0 // 0 sparkle, 1 sun, 2 moon
     @State private var lightness: Double = 0.6 // HSL L component
+    // Lock a primary node identity when in 3-node mode
+    @State private var lockedPrimaryID: UUID?
 
     private let cornerRadius: CGFloat = 16
 
@@ -27,9 +29,7 @@ struct GradientCanvasEditor: View {
             let radius = min(width, height)/2 - padding
 
             ZStack {
-                // Gradient background
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(LinearGradient(gradient: Gradient(stops: stops()), startPoint: startPoint(), endPoint: endPoint()))
+                // No gradient preview in the editor canvas; focus on dot grid + handles
 
                 // Noise overlay (optional)
                 if showDitherOverlay {
@@ -64,7 +64,11 @@ struct GradientCanvasEditor: View {
                     let initial = CGPoint(x: posX * width, y: posY * height)
                     let clamped = clampToCircle(point: initial, center: center, radius: radius)
 
-                    Handle(colorHex: node.colorHex, selected: selectedNodeID == node.id)
+                    let primaryID = primaryNodeID()
+                    let isPrimary = (gradient.nodes.count == 3) && (node.id == primaryID)
+                    let handleSize: CGFloat = isPrimary ? 40 : 26
+
+                    Handle(colorHex: node.colorHex, selected: selectedNodeID == node.id, size: handleSize)
                         .position(clamped)
                         .gesture(DragGesture(minimumDistance: 0)
                             .onChanged { value in
@@ -136,6 +140,48 @@ struct GradientCanvasEditor: View {
     }
 
     private func ensurePositions(width: CGFloat, height: CGFloat, center: CGPoint, radius: CGFloat) {
+        // Special layout when exactly 3 nodes: place both companions on the same circular radius as the primary
+        // Also lock the primary node identity once when entering 3-node mode
+        if gradient.nodes.count == 3 {
+            if lockedPrimaryID == nil {
+                lockedPrimaryID = gradient.nodes.min(by: { $0.location < $1.location })?.id
+            } else if !gradient.nodes.contains(where: { $0.id == lockedPrimaryID }) {
+                lockedPrimaryID = gradient.nodes.min(by: { $0.location < $1.location })?.id
+            }
+        } else {
+            lockedPrimaryID = nil
+        }
+        if gradient.nodes.count == 3, let primaryID = primaryNodeID() {
+            let allUnset = gradient.nodes.allSatisfy { xPositions[$0.id] == nil && yPositions[$0.id] == nil }
+            if allUnset {
+                // Seed primary roughly at left; companions across on same radius with small angular spread
+                // Primary
+                if let p = gradient.nodes.first(where: { $0.id == primaryID }) {
+                    let primaryAngle: CGFloat = .pi // left side
+                    let pr = radius * 0.9
+                    let px = center.x + cos(primaryAngle) * pr
+                    let py = center.y + sin(primaryAngle) * pr
+                    xPositions[p.id] = max(0, min(1, px / width))
+                    yPositions[p.id] = max(0, min(1, py / height))
+                    if let i = gradient.nodes.firstIndex(where: { $0.id == p.id }) { gradient.nodes[i].location = Double(xPositions[p.id] ?? 0.1) }
+                }
+                // Companions across at opposite angle ± spread, same radius
+                let spread: CGFloat = 0.35 // ~20°
+                let opposite = 0.0 // right side
+                let rComp = radius * 0.9
+                let companionAngles: [CGFloat] = [opposite - spread, opposite + spread]
+                let companions = gradient.nodes.filter { $0.id != primaryID }
+                for (i, node) in companions.enumerated() where i < 2 {
+                    let ang = companionAngles[i]
+                    let x = center.x + cos(ang) * rComp
+                    let y = center.y + sin(ang) * rComp
+                    xPositions[node.id] = max(0, min(1, x / width))
+                    yPositions[node.id] = max(0, min(1, y / height))
+                    if let idx = gradient.nodes.firstIndex(where: { $0.id == node.id }) { gradient.nodes[idx].location = Double(xPositions[node.id] ?? 0.9) }
+                }
+            }
+        }
+
         for n in gradient.nodes {
             if yPositions[n.id] == nil { yPositions[n.id] = defaultY(for: n) }
             if xPositions[n.id] == nil { xPositions[n.id] = CGFloat(n.location) }
@@ -166,8 +212,12 @@ struct GradientCanvasEditor: View {
         let updated = colorWithPreservedAlpha(oldHex: gradient.nodes[idx].colorHex, newColor: hsla)
         gradient.nodes[idx].colorHex = updated
 
-        // If there are 2 or 3 nodes, auto-place complementary/triadic companions
-        autoPlaceCompanions(primary: node, center: center, radius: radius)
+        // Auto-place only when dragging the primary for 3 nodes, or mirror for 2 nodes
+        if gradient.nodes.count == 3, node.id == primaryNodeID() {
+            autoPlaceCompanions(primary: node, center: center, radius: radius)
+        } else if gradient.nodes.count == 2 {
+            autoPlaceCompanions(primary: node, center: center, radius: radius)
+        }
     }
 
     private func clampToCircle(point: CGPoint, center: CGPoint, radius: CGFloat) -> CGPoint {
@@ -181,26 +231,48 @@ struct GradientCanvasEditor: View {
 
     private func autoPlaceCompanions(primary: GradientNode, center: CGPoint, radius: CGFloat) {
         guard gradient.nodes.count > 1, let pX = xPositions[primary.id], let pY = yPositions[primary.id] else { return }
-        let width: CGFloat = 1 // we will use normalized x/y in [0,1]
-        let p = CGPoint(x: pX, y: pY)
-        let baseAngle = atan2(p.y - 0.5, p.x - 0.5)
-        let dist = min(0.5, sqrt(pow(p.x - 0.5, 2) + pow(p.y - 0.5, 2)))
-        let offsets: [Double] = gradient.nodes.count == 2 ? [180] : [120, 240]
         var others = gradient.nodes.filter { $0.id != primary.id }
-        for (i, off) in offsets.enumerated() {
-            if i >= others.count { break }
-            let ang = baseAngle + CGFloat(off * .pi / 180)
+        if gradient.nodes.count == 3 {
+            // Place both companions on the same circular radius as primary, across with small angular spread
+            let centerNorm = CGPoint(x: 0.5, y: 0.5)
+            let dx = pX - centerNorm.x
+            let dy = pY - centerNorm.y
+            let baseAngle = atan2(dy, dx)
+            let r = min(0.49, sqrt(dx*dx + dy*dy)) // same normalized radius
+            let opposite = baseAngle + .pi
+            let spread: CGFloat = 0.35 // ~20°
+            let angles = [opposite - spread, opposite + spread]
+            for (i, other) in others.enumerated() where i < 2 {
+                let ang = angles[i]
+                let pos = CGPoint(x: centerNorm.x + cos(ang) * r, y: centerNorm.y + sin(ang) * r)
+                let absPt = CGPoint(x: pos.x * (radius*2 + 48), y: pos.y * (radius*2 + 48))
+                let colorHex = colorFromCircle(point: absPt, center: CGPoint(x: radius+24, y: radius+24), radius: radius, lightness: lightness)
+                if let idx = gradient.nodes.firstIndex(where: { $0.id == other.id }) {
+                    gradient.nodes[idx].colorHex = colorHex
+                    xPositions[other.id] = pos.x
+                    yPositions[other.id] = pos.y
+                    gradient.nodes[idx].location = Double(pos.x)
+                }
+            }
+        } else {
+            // Two nodes: place the companion opposite side
+            let p = CGPoint(x: pX, y: pY)
+            let baseAngle = atan2(p.y - 0.5, p.x - 0.5)
+            let dist = min(0.5, sqrt(pow(p.x - 0.5, 2) + pow(p.y - 0.5, 2)))
+            let ang = baseAngle + .pi
             let pos = CGPoint(x: 0.5 + cos(ang) * dist, y: 0.5 + sin(ang) * dist)
-            let absPt = CGPoint(x: pos.x * (radius*2 + 48), y: pos.y * (radius*2 + 48)) // scale roughly to canvas, not critical
-            let colorHex = colorFromCircle(point: absPt, center: CGPoint(x: radius+24, y: radius+24), radius: radius, lightness: lightness)
-            if let idx = gradient.nodes.firstIndex(where: { $0.id == others[i].id }) {
+            if let other = others.first, let idx = gradient.nodes.firstIndex(where: { $0.id == other.id }) {
+                let absPt = CGPoint(x: pos.x * (radius*2 + 48), y: pos.y * (radius*2 + 48))
+                let colorHex = colorFromCircle(point: absPt, center: CGPoint(x: radius+24, y: radius+24), radius: radius, lightness: lightness)
                 gradient.nodes[idx].colorHex = colorHex
-                xPositions[others[i].id] = pos.x
-                yPositions[others[i].id] = pos.y
+                xPositions[other.id] = pos.x
+                yPositions[other.id] = pos.y
                 gradient.nodes[idx].location = Double(pos.x)
             }
         }
     }
+
+    private func primaryNodeID() -> UUID? { lockedPrimaryID ?? gradient.nodes.min(by: { $0.location < $1.location })?.id }
 
     private func colorFromCircle(point: CGPoint, center: CGPoint, radius: CGFloat, lightness: Double) -> String {
         #if canImport(AppKit)
@@ -280,11 +352,12 @@ struct GradientCanvasEditor: View {
 private struct Handle: View {
     let colorHex: String
     let selected: Bool
+    let size: CGFloat
 
     var body: some View {
         Circle()
             .fill(Color(hex: colorHex))
-            .frame(width: 30, height: 30)
+            .frame(width: size, height: size)
             .overlay(
                 Circle().strokeBorder(Color.white, lineWidth: 4)
             )

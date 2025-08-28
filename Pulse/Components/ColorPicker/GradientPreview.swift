@@ -11,8 +11,8 @@ struct GradientPreview: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(LinearGradient(gradient: Gradient(stops: stops()), startPoint: startPoint(), endPoint: endPoint()))
+            DitheredGradientView(gradient: gradient)
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
 
             if showDitherOverlay {
                 Image("noise_texture")
@@ -30,27 +30,5 @@ struct GradientPreview: View {
         .frame(width: size.width, height: size.height)
         .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
         .drawingGroup()
-    }
-
-    private func stops() -> [Gradient.Stop] {
-        gradient.nodes
-            .sorted { $0.location < $1.location }
-            .map { node in
-                Gradient.Stop(color: Color(hex: node.colorHex), location: CGFloat(node.location))
-            }
-    }
-
-    private func startPoint() -> UnitPoint {
-        let theta = Angle(degrees: gradient.angle).radians
-        let dx = cos(theta)
-        let dy = sin(theta)
-        return UnitPoint(x: 0.5 - 0.5 * dx, y: 0.5 - 0.5 * dy)
-    }
-
-    private func endPoint() -> UnitPoint {
-        let theta = Angle(degrees: gradient.angle).radians
-        let dx = cos(theta)
-        let dy = sin(theta)
-        return UnitPoint(x: 0.5 + 0.5 * dx, y: 0.5 + 0.5 * dy)
     }
 }

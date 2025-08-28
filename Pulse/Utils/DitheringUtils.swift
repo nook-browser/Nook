@@ -1,20 +1,106 @@
 import SwiftUI
 import CoreGraphics
+import simd
+
+// MARK: - Backing scale environment
+private struct BackingScaleKey: EnvironmentKey {
+    static var defaultValue: CGFloat = 1.0
+}
+
+extension EnvironmentValues {
+    var backingScale: CGFloat {
+        get { self[BackingScaleKey.self] }
+        set { self[BackingScaleKey.self] = newValue }
+    }
+}
+
+#if canImport(AppKit)
+private final class BackingScaleNSView: NSView {
+    var onScaleChange: ((CGFloat) -> Void)?
+    private var obs: [NSObjectProtocol] = []
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        update()
+        registerNotifications()
+    }
+
+    deinit { unregisterNotifications() }
+
+    private func registerNotifications() {
+        unregisterNotifications()
+        if let window = window {
+            let center = NotificationCenter.default
+            obs.append(center.addObserver(forName: NSWindow.didChangeBackingPropertiesNotification, object: window, queue: .main) { [weak self] _ in self?.update() })
+            obs.append(center.addObserver(forName: NSWindow.didChangeScreenNotification, object: window, queue: .main) { [weak self] _ in self?.update() })
+        }
+    }
+
+    private func unregisterNotifications() {
+        let center = NotificationCenter.default
+        for o in obs { center.removeObserver(o) }
+        obs.removeAll()
+    }
+
+    private func update() {
+        let s = window?.screen?.backingScaleFactor ?? window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 1.0
+        onScaleChange?(s)
+    }
+}
+
+private struct BackingScaleReader: NSViewRepresentable {
+    @Binding var scale: CGFloat
+    func makeNSView(context: Context) -> BackingScaleNSView {
+        let v = BackingScaleNSView()
+        v.onScaleChange = { [weak v] s in
+            if v != nil { scale = s }
+        }
+        return v
+    }
+    func updateNSView(_ nsView: BackingScaleNSView, context: Context) {}
+}
+#endif
+
+private struct BackingScaleEnvironment<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+    #if canImport(AppKit)
+    @State private var scale: CGFloat = 1.0
+    #endif
+    var body: some View {
+        #if canImport(AppKit)
+        content()
+            .background(BackingScaleReader(scale: $scale).frame(width: 0, height: 0))
+            .environment(\.backingScale, scale)
+        #else
+        content().environment(\.backingScale, 1.0)
+        #endif
+    }
+}
+
+#if canImport(AppKit)
+// MARK: - Cached color lookup for hex
+fileprivate let _DitherColorCache = NSCache<NSString, NSColor>()
+fileprivate func cachedNSColor(hex: String) -> NSColor {
+    if let c = _DitherColorCache.object(forKey: hex as NSString) { return c }
+    let ns = NSColor(Color(hex: hex)).usingColorSpace(.sRGB) ?? .black
+    _DitherColorCache.setObject(ns, forKey: hex as NSString)
+    return ns
+}
+#endif
 
 // MARK: - DitheredGradientView (async + cached)
 // Uses a renderer to generate a dithered image off the main thread; falls back to SwiftUI gradient.
 struct DitheredGradientView: View {
     let gradient: SpaceGradient
     @StateObject private var renderer = DitheredGradientRenderer()
+    @EnvironmentObject var gradientTransitionManager: GradientTransitionManager
+    @Environment(\.backingScale) private var backingScale
 
     var body: some View {
+        BackingScaleEnvironment {
         GeometryReader { proxy in
             let logicalSize = proxy.size
-            #if canImport(AppKit)
-            let scale = NSScreen.main?.backingScaleFactor ?? 1.0
-            #else
-            let scale = 1.0
-            #endif
+            let scale = Double(backingScale)
             // Cap pixel count for performance (e.g., ~3MP)
             let maxPixels: Double = 3_000_000
             let targetPixels = Double(logicalSize.width * logicalSize.height) * Double(scale * scale)
@@ -28,31 +114,51 @@ struct DitheredGradientView: View {
                 Rectangle()
                     .fill(LinearGradient(gradient: Gradient(stops: Self.stops(gradient)), startPoint: pts.start, endPoint: pts.end))
 
-                if let image = renderer.image {
+                // Only overlay the dithered image when not actively animating
+                if !(gradientTransitionManager.isAnimating || gradientTransitionManager.isEditing), let image = renderer.image {
                     Image(decorative: image, scale: renderScale, orientation: .up)
                         .resizable()
                         .scaledToFill()
                 }
             }
             .onAppear {
-                renderer.update(gradient: gradient, size: renderSize, scale: renderScale)
+                renderer.update(gradient: gradient, size: renderSize, scale: renderScale, allowDithering: !(gradientTransitionManager.isAnimating || gradientTransitionManager.isEditing))
             }
             .onChange(of: gradient) { g in
-                renderer.update(gradient: g, size: renderSize, scale: renderScale)
+                renderer.update(gradient: g, size: renderSize, scale: renderScale, allowDithering: !(gradientTransitionManager.isAnimating || gradientTransitionManager.isEditing))
             }
             .onChange(of: logicalSize) { _ in
-                renderer.update(gradient: gradient, size: renderSize, scale: renderScale)
+                renderer.update(gradient: gradient, size: renderSize, scale: renderScale, allowDithering: !(gradientTransitionManager.isAnimating || gradientTransitionManager.isEditing))
             }
+            .onChange(of: gradientTransitionManager.isAnimating) { anim in
+                // When animation toggles off, generate the high-quality image
+                renderer.update(gradient: gradient, size: renderSize, scale: renderScale, allowDithering: !(anim || gradientTransitionManager.isEditing))
+            }
+            .onChange(of: gradientTransitionManager.isEditing) { editing in
+                renderer.update(gradient: gradient, size: renderSize, scale: renderScale, allowDithering: !(gradientTransitionManager.isAnimating || editing))
+            }
+        }
         }
     }
 
     private static func stops(_ g: SpaceGradient) -> [Gradient.Stop] {
         var mapped: [Gradient.Stop] = g.sortedNodes.map { node in
-            Gradient.Stop(color: Color(hex: node.colorHex), location: CGFloat(node.location))
+            #if canImport(AppKit)
+            let c = Color(nsColor: cachedNSColor(hex: node.colorHex))
+            #else
+            let c = Color(hex: node.colorHex)
+            #endif
+            return Gradient.Stop(color: c, location: CGFloat(node.location))
         }
         if mapped.count == 0 {
             let def = SpaceGradient.default
-            mapped = def.sortedNodes.map { Gradient.Stop(color: Color(hex: $0.colorHex), location: CGFloat($0.location)) }
+            mapped = def.sortedNodes.map {
+                #if canImport(AppKit)
+                Gradient.Stop(color: Color(nsColor: cachedNSColor(hex: $0.colorHex)), location: CGFloat($0.location))
+                #else
+                Gradient.Stop(color: Color(hex: $0.colorHex), location: CGFloat($0.location))
+                #endif
+            }
         } else if mapped.count == 1 {
             let single = mapped[0]
             mapped = [Gradient.Stop(color: single.color, location: 0.0), Gradient.Stop(color: single.color, location: 1.0)]
@@ -78,7 +184,7 @@ private func shouldSkipDithering(_ gradient: SpaceGradient) -> Bool {
     // Compute max per-channel delta as a simple banding risk metric
     #if canImport(AppKit)
     func rgba(_ hex: String) -> (Double, Double, Double, Double) {
-        let ns = NSColor(Color(hex: hex)).usingColorSpace(.sRGB) ?? .black
+        let ns = cachedNSColor(hex: hex)
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         ns.getRed(&r, green: &g, blue: &b, alpha: &a)
         return (Double(r), Double(g), Double(b), Double(a))
@@ -97,8 +203,6 @@ private func shouldSkipDithering(_ gradient: SpaceGradient) -> Bool {
 func generateDitheredGradient(gradient: SpaceGradient, size: CGSize) -> CGImage? {
     // Use default nodes when empty
     let nodes = gradient.nodes.isEmpty ? SpaceGradient.default.nodes : gradient.nodes
-    // Heuristic fast-path: skip in low-risk cases
-    if shouldSkipDithering(gradient) { return nil }
     let width = max(1, Int(size.width.rounded()))
     let height = max(1, Int(size.height.rounded()))
     let colorSpace = CGColorSpaceCreateDeviceRGB()
@@ -115,6 +219,98 @@ func generateDitheredGradient(gradient: SpaceGradient, size: CGSize) -> CGImage?
                               bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
     else { return nil }
 
+    // Triadic path disabled for consistency with linear gradient preview
+    if false && nodes.count == 3 {
+        guard let buffer = ctx.data else { return ctx.makeImage() }
+        let ptr = buffer.bindMemory(to: UInt8.self, capacity: width * height * bytesPerPixel)
+
+        #if canImport(AppKit)
+        func rgba(_ hex: String) -> (Double, Double, Double, Double) {
+            let ns = NSColor(Color(hex: hex)).usingColorSpace(.sRGB) ?? .black
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 1
+            ns.getRed(&r, green: &g, blue: &b, alpha: &a)
+            return (Double(r), Double(g), Double(b), Double(a))
+        }
+        #else
+        func rgba(_ hex: String) -> (Double, Double, Double, Double) { return (1,1,1,1) }
+        #endif
+
+        let sorted = nodes.sorted { $0.location < $1.location }
+        let cA = rgba(sorted[0].colorHex)
+        let cB = rgba(sorted[1].colorHex)
+        let cC = rgba(sorted[2].colorHex)
+
+        // Anchor points (normalized 0..1)
+        let pA = SIMD2<Double>(0.08, 0.50)
+        let pB = SIMD2<Double>(0.92, 0.25)
+        let pC = SIMD2<Double>(0.92, 0.75)
+
+        // Precompute for barycentric
+        let v0 = pB - pA
+        let v1 = pC - pA
+        let d00 = simd_dot(v0, v0)
+        let d01 = simd_dot(v0, v1)
+        let d11 = simd_dot(v1, v1)
+        let denom = (d00 * d11 - d01 * d01)
+
+        // Ordered dithering
+        let bayer = bayerMatrix4x4()
+        let grain = max(0.0, min(1.0, gradient.grain))
+        let amplitude = (0.6 + 1.4 * grain) / 255.0
+
+        for y in 0..<height {
+            for x in 0..<width {
+                let idx = (y * width + x) * bytesPerPixel
+                let nx = Double(x) / Double(max(1, width - 1))
+                let ny = Double(y) / Double(max(1, height - 1))
+                let p = SIMD2<Double>(nx, ny)
+
+                let v2 = p - pA
+                let d20 = simd_dot(v2, v0)
+                let d21 = simd_dot(v2, v1)
+                var v = (d11 * d20 - d01 * d21) / (denom == 0 ? 1 : denom)
+                var w = (d00 * d21 - d01 * d20) / (denom == 0 ? 1 : denom)
+                var u = 1.0 - v - w
+
+                u = max(0.0, u)
+                v = max(0.0, v)
+                w = max(0.0, w)
+                var sum = u + v + w
+                if sum < 1e-6 {
+                    let dA = simd_length(p - pA)
+                    let dB = simd_length(p - pB)
+                    let dC = simd_length(p - pC)
+                    if dA <= dB && dA <= dC { u = 1; v = 0; w = 0; sum = 1 }
+                    else if dB <= dC { u = 0; v = 1; w = 0; sum = 1 }
+                    else { u = 0; v = 0; w = 1; sum = 1 }
+                }
+                let inv = 1.0 / sum
+                u *= inv; v *= inv; w *= inv
+
+                // Blend premultiplied
+                let a = u*cA.3 + v*cB.3 + w*cC.3
+                let r = u*cA.0*cA.3 + v*cB.0*cB.3 + w*cC.0*cC.3
+                let g = u*cA.1*cA.3 + v*cB.1*cB.3 + w*cC.1*cC.3
+                let b = u*cA.2*cA.3 + v*cB.2*cB.3 + w*cC.2*cC.3
+
+                // Ordered noise
+                let th = bayer[y & 3][x & 3]
+                let n = Double(th - 0.5) * amplitude
+                let rn = min(1.0, max(0.0, r + n))
+                let gn = min(1.0, max(0.0, g + n))
+                let bn = min(1.0, max(0.0, b + n))
+                let an = min(1.0, max(0.0, a))
+
+                ptr[idx + 2] = UInt8(min(255, max(0, Int(round(rn * 255)))))
+                ptr[idx + 1] = UInt8(min(255, max(0, Int(round(gn * 255)))))
+                ptr[idx + 0] = UInt8(min(255, max(0, Int(round(bn * 255)))))
+                ptr[idx + 3] = UInt8(min(255, max(0, Int(round(an * 255)))))
+            }
+        }
+
+        return ctx.makeImage()
+    }
+
     // First: draw the gradient into the bitmap using Core Graphics (no per-pixel hex conversions)
     drawLinearGradientCG(gradientNodes: nodes, angle: gradient.angle, width: width, height: height, context: ctx)
 
@@ -124,11 +320,9 @@ func generateDitheredGradient(gradient: SpaceGradient, size: CGSize) -> CGImage?
     // Build 4x4 Bayer matrix scaled to [0,1]
     let bayer = bayerMatrix4x4()
 
-    // Quantization strength driven by grain in [0,1]
-    let strength = max(0.0, min(1.0, gradient.grain))
-    // When strength == 0, disable dithering; otherwise map to 2..16 levels
-    let levels = strength <= 0.0001 ? 0 : Int(ceil(2 + 14 * strength))
-    if levels == 0 { return ctx.makeImage() }
+    // Dither amplitude ~ LSBs, scaled by grain. Using 0.6..2.0 LSB to avoid visible noise while breaking bands.
+    let grain = max(0.0, min(1.0, gradient.grain))
+    let amplitude = (0.6 + 1.4 * grain) / 255.0
 
     for y in 0..<height {
         for x in 0..<width {
@@ -138,12 +332,14 @@ func generateDitheredGradient(gradient: SpaceGradient, size: CGSize) -> CGImage?
             let r = Double(ptr[idx + 2]) / 255.0
             let a = Double(ptr[idx + 3]) / 255.0
             let th = bayer[y & 3][x & 3]
-            let rq = ditherQuantize(r, levels: levels, threshold: th)
-            let gq = ditherQuantize(g, levels: levels, threshold: th)
-            let bq = ditherQuantize(b, levels: levels, threshold: th)
-            ptr[idx + 2] = UInt8(min(255, max(0, Int(round(rq * 255)))))
-            ptr[idx + 1] = UInt8(min(255, max(0, Int(round(gq * 255)))))
-            ptr[idx + 0] = UInt8(min(255, max(0, Int(round(bq * 255)))))
+            // Add small ordered noise around 0 using Bayer threshold
+            let n = Double(th - 0.5) * amplitude
+            let rn = min(1.0, max(0.0, r + n))
+            let gn = min(1.0, max(0.0, g + n))
+            let bn = min(1.0, max(0.0, b + n))
+            ptr[idx + 2] = UInt8(min(255, max(0, Int(round(rn * 255)))))
+            ptr[idx + 1] = UInt8(min(255, max(0, Int(round(gn * 255)))))
+            ptr[idx + 0] = UInt8(min(255, max(0, Int(round(bn * 255)))))
             ptr[idx + 3] = UInt8(min(255, max(0, Int(round(a * 255)))))
         }
     }
@@ -151,10 +347,10 @@ func generateDitheredGradient(gradient: SpaceGradient, size: CGSize) -> CGImage?
     return ctx.makeImage()
 }
 
+// Retained for potential future use if posterization is desired.
 private func ditherQuantize(_ v: Double, levels: Int, threshold: Float) -> Double {
     let lv = max(2, levels)
-    let step = 1.0 / Double(lv - 1) // quantization step
-    // Bias by threshold in [-0.5, 0.5] scaled by half-step
+    let step = 1.0 / Double(lv - 1)
     let bias = Double(threshold - 0.5) * step
     let q = (v + bias) / step
     let iq = round(q)
@@ -234,7 +430,7 @@ private func drawLinearGradientCG(gradientNodes: [GradientNode], angle: Double, 
     colors.reserveCapacity(nodes.count)
     locations.reserveCapacity(nodes.count)
     for n in nodes {
-        let ns = NSColor(Color(hex: n.colorHex)).usingColorSpace(.sRGB) ?? .black
+        let ns = cachedNSColor(hex: n.colorHex)
         colors.append(ns.cgColor)
         locations.append(CGFloat(n.location))
     }
@@ -252,7 +448,8 @@ private func drawLinearGradientCG(gradientNodes: [GradientNode], angle: Double, 
     let start = CGPoint(x: bounds.minX + bounds.width * sx, y: bounds.minY + bounds.height * sy)
     let end = CGPoint(x: bounds.minX + bounds.width * ex, y: bounds.minY + bounds.height * ey)
     ctx.saveGState()
-    ctx.drawLinearGradient(gradient, start: start, end: end, options: [])
+    // Extend beyond start/end to guarantee full-rect coverage (prevents corner slivers)
+    ctx.drawLinearGradient(gradient, start: start, end: end, options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
     ctx.restoreGState()
     #endif
 }
@@ -263,9 +460,14 @@ final class DitheredGradientRenderer: ObservableObject {
     private var workItem: DispatchWorkItem?
     private static var cache = NSCache<NSString, CGImage>()
 
-    func update(gradient: SpaceGradient, size: CGSize, scale: Double) {
+    func update(gradient: SpaceGradient, size: CGSize, scale: Double, allowDithering: Bool) {
         // Debounce rapid updates
         workItem?.cancel()
+        if !allowDithering || shouldSkipDithering(gradient) {
+            // During animations or when banding is unlikely, clear image and rely on lightweight gradient
+            DispatchQueue.main.async { [weak self] in self?.image = nil }
+            return
+        }
         let item = DispatchWorkItem { [weak self] in
             let key = self?.cacheKey(gradient: gradient, size: size)
             if let key = key, let cached = Self.cache.object(forKey: key as NSString) {
