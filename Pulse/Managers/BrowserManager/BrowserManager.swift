@@ -265,13 +265,8 @@ class BrowserManager: ObservableObject {
             set: { draft.value = $0 }
         )
 
-        let header = AnyView(
-            DialogHeader(
-                icon: "paintpalette",
-                title: "Customize Space Gradient",
-                subtitle: space.name
-            )
-        )
+        // Compact dialog: remove header icon/title to save vertical space
+        let header: AnyView? = nil
 
         let content = GradientEditorView(gradient: binding)
             .environmentObject(self.gradientTransitionManager)

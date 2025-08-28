@@ -15,6 +15,7 @@ struct SpaceGradientBackgroundView: View {
     var body: some View {
         ZStack {
             // Properly dithered gradient image respecting current displayGradient
+            // While animating, DitheredGradientView will show a lightweight gradient.
             DitheredGradientView(gradient: gradient)
         }
         .allowsHitTesting(false) // Entire background should not intercept input

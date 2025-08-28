@@ -104,3 +104,146 @@ extension SpaceGradient {
         return angleEqual && grainEqual
     }
 }
+
+// MARK: - Animatable Conformance
+// Provide an animatable representation so SwiftUI can smoothly interpolate gradients.
+// We flatten angle, grain and up to maxStops nodes (RGBA + location) into a VectorArithmetic.
+extension SpaceGradient: Animatable {
+    static let maxStopsForAnimation = 8
+
+    struct AnimVector: VectorArithmetic {
+        // Fixed-size vector: [(cosθ, sinθ), grain, (r,g,b,a,loc) * maxStops]
+        static let width = 2 + 1 + maxStopsForAnimation * 5
+        var scalars: [Double] = Array(repeating: 0, count: width)
+
+        static var zero: AnimVector { AnimVector() }
+        static func + (lhs: AnimVector, rhs: AnimVector) -> AnimVector {
+            var out = AnimVector()
+            for i in 0..<width { out.scalars[i] = lhs.scalars[i] + rhs.scalars[i] }
+            return out
+        }
+        static func - (lhs: AnimVector, rhs: AnimVector) -> AnimVector {
+            var out = AnimVector()
+            for i in 0..<width { out.scalars[i] = lhs.scalars[i] - rhs.scalars[i] }
+            return out
+        }
+        mutating func scale(by rhs: Double) {
+            for i in 0..<Self.width { scalars[i] *= rhs }
+        }
+        var magnitudeSquared: Double {
+            scalars.reduce(0) { $0 + $1*$1 }
+        }
+        static func == (lhs: AnimVector, rhs: AnimVector) -> Bool {
+            // Not strictly required for VectorArithmetic but handy for stability
+            guard lhs.scalars.count == rhs.scalars.count else { return false }
+            for i in 0..<lhs.scalars.count {
+                if lhs.scalars[i] != rhs.scalars[i] { return false }
+            }
+            return true
+        }
+    }
+
+    var animatableData: AnimVector {
+        get { SpaceGradient.encodeToAnimVector(self) }
+        set { self = SpaceGradient.decodeFromAnimVector(newValue, fallback: self) }
+    }
+
+    private static func encodeToAnimVector(_ g: SpaceGradient) -> AnimVector {
+        var out = AnimVector()
+        // Normalize
+        let theta = Angle(degrees: g.angle).radians
+        let cosT = cos(theta)
+        let sinT = sin(theta)
+        let grain = min(1, max(0, g.grain))
+        let sorted = g.sortedNodes
+
+        // Prepare nodes padded to count and then to maxStops
+        var nodes: [GradientNode] = sorted
+        if nodes.isEmpty {
+            nodes = SpaceGradient.default.sortedNodes
+        }
+        if nodes.count == 1 {
+            let n = nodes[0]
+            nodes = [GradientNode(id: n.id, colorHex: n.colorHex, location: 0.0), GradientNode(colorHex: n.colorHex, location: 1.0)]
+        }
+        if nodes.count < maxStopsForAnimation, let last = nodes.last {
+            nodes.append(contentsOf: Array(repeating: GradientNode(colorHex: last.colorHex, location: last.location), count: maxStopsForAnimation - nodes.count))
+        }
+        if nodes.count > maxStopsForAnimation { nodes = Array(nodes.prefix(maxStopsForAnimation)) }
+
+        out.scalars[0] = cosT
+        out.scalars[1] = sinT
+        out.scalars[2] = grain
+
+        var idx = 3
+        for n in nodes {
+            #if canImport(AppKit)
+            let ns = cachedNSColor(for: n.colorHex)
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+            ns.getRed(&r, green: &g, blue: &b, alpha: &a)
+            out.scalars[idx + 0] = Double(r)
+            out.scalars[idx + 1] = Double(g)
+            out.scalars[idx + 2] = Double(b)
+            out.scalars[idx + 3] = Double(a)
+            #else
+            out.scalars[idx + 0] = 1
+            out.scalars[idx + 1] = 1
+            out.scalars[idx + 2] = 1
+            out.scalars[idx + 3] = 1
+            #endif
+            out.scalars[idx + 4] = min(1, max(0, n.location))
+            idx += 5
+        }
+
+        return out
+    }
+
+    private static func decodeFromAnimVector(_ v: AnimVector, fallback: SpaceGradient) -> SpaceGradient {
+        let cosT = v.scalars[0]
+        let sinT = v.scalars[1]
+        // Recover angle from cos/sin
+        var angleDeg = Angle(radians: atan2(sinT, cosT)).degrees
+        if angleDeg < 0 { angleDeg += 360 }
+        let grain = min(1, max(0, v.scalars[2]))
+
+        var nodes: [GradientNode] = []
+        nodes.reserveCapacity(maxStopsForAnimation)
+        var idx = 3
+        for _ in 0..<maxStopsForAnimation {
+            let r = min(1, max(0, v.scalars[idx + 0]))
+            let g = min(1, max(0, v.scalars[idx + 1]))
+            let b = min(1, max(0, v.scalars[idx + 2]))
+            let a = min(1, max(0, v.scalars[idx + 3]))
+            let loc = min(1, max(0, v.scalars[idx + 4]))
+            #if canImport(AppKit)
+            let ns = NSColor(srgbRed: CGFloat(r), green: CGFloat(g), blue: CGFloat(b), alpha: CGFloat(a))
+            let hex = ns.toHexString(includeAlpha: true) ?? "#FFFFFFFF"
+            #else
+            let hex = "#FFFFFFFF"
+            #endif
+            nodes.append(GradientNode(colorHex: hex, location: loc))
+            idx += 5
+        }
+
+        // Ensure monotonic locations to avoid visual artifacts
+        var last: Double = 0.0
+        for i in 0..<nodes.count {
+            if nodes[i].location < last { nodes[i].location = last }
+            last = nodes[i].location
+        }
+        if nodes.last?.location ?? 1.0 < 1.0 { nodes[nodes.count - 1].location = 1.0 }
+
+        return SpaceGradient(angle: angleDeg, nodes: nodes, grain: grain)
+    }
+}
+
+#if canImport(AppKit)
+// MARK: - Cached NSColor for hex strings (to reduce per-frame parsing)
+private let _SpaceGradientColorCache = NSCache<NSString, NSColor>()
+private func cachedNSColor(for hex: String) -> NSColor {
+    if let c = _SpaceGradientColorCache.object(forKey: hex as NSString) { return c }
+    let ns = NSColor(Color(hex: hex)).usingColorSpace(.sRGB) ?? .black
+    _SpaceGradientColorCache.setObject(ns, forKey: hex as NSString)
+    return ns
+}
+#endif
