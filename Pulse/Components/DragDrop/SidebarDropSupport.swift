@@ -147,6 +147,8 @@ struct SidebarSectionDropDelegate: DropDelegate {
     let container: TabDragManager.DragContainer
     let boundariesProvider: () -> [CGFloat]
     let insertionLineFrameProvider: (() -> CGRect)?
+    // Optional global container frame provider for converting local frames to global
+    let globalFrameProvider: (() -> CGRect)?
     let onPerform: (DragOperation) -> Void
 
     func validateDrop(info: DropInfo) -> Bool { true }
@@ -185,8 +187,20 @@ struct SidebarSectionDropDelegate: DropDelegate {
             // Empty zone: use global insertion line via frame provider
             if let frameProvider = insertionLineFrameProvider {
                 let frame = frameProvider()
-                print("📐 [SidebarSectionDropDelegate] Empty zone frame: \(frame)")
-                dragManager.updateInsertionLine(frame: frame)
+                print("📐 [SidebarSectionDropDelegate] Empty zone frame (raw): \(frame)")
+                // If a global container frame is provided, convert local to global by offsetting
+                if let containerFrame = globalFrameProvider?() {
+                    let converted = CGRect(
+                        x: containerFrame.minX + frame.minX,
+                        y: containerFrame.minY + frame.minY,
+                        width: frame.width,
+                        height: frame.height
+                    )
+                    print("📐 [SidebarSectionDropDelegate] Empty zone frame (global): \(converted)")
+                    dragManager.updateInsertionLine(frame: converted)
+                } else {
+                    dragManager.updateInsertionLine(frame: frame)
+                }
             } else {
                 print("⚠️ [SidebarSectionDropDelegate] No frame provider for empty zone")
                 dragManager.updateInsertionLine(frame: .zero)
@@ -197,18 +211,29 @@ struct SidebarSectionDropDelegate: DropDelegate {
             
             // Calculate the frame for the insertion line at the target index
             let targetY = (index < boundaries.count) ? boundaries[index] : (boundaries.last ?? 0)
-            let containerWidth: CGFloat = 200 // Approximate sidebar width
             let lineHeight: CGFloat = 3
-            
-            let insertionFrame = CGRect(
-                x: 10,
-                y: targetY - lineHeight/2,
-                width: containerWidth - 20,
-                height: lineHeight
-            )
-            
-            print("📐 [SidebarSectionDropDelegate] Calculated insertion frame: \(insertionFrame)")
-            dragManager.updateInsertionLine(frame: insertionFrame)
+
+            if let containerFrame = globalFrameProvider?() {
+                // Convert local boundary Y into global coordinates using container frame
+                let insertionFrame = CGRect(
+                    x: containerFrame.minX + 10,
+                    y: containerFrame.minY + targetY - lineHeight/2,
+                    width: max(containerFrame.width - 20, 1),
+                    height: lineHeight
+                )
+                print("📐 [SidebarSectionDropDelegate] Calculated insertion frame (global): \(insertionFrame)")
+                dragManager.updateInsertionLine(frame: insertionFrame)
+            } else {
+                let containerWidth: CGFloat = 200 // Fallback sidebar width
+                let insertionFrame = CGRect(
+                    x: 10,
+                    y: targetY - lineHeight/2,
+                    width: containerWidth - 20,
+                    height: lineHeight
+                )
+                print("📐 [SidebarSectionDropDelegate] Calculated insertion frame (local): \(insertionFrame)")
+                dragManager.updateInsertionLine(frame: insertionFrame)
+            }
         }
         
         // Add state consistency checks before updating drag target
@@ -472,5 +497,3 @@ private func performMoveHaptic() {
     NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
 #endif
 }
-
-
