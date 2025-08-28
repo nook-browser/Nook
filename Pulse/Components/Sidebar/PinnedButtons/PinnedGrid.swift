@@ -18,12 +18,24 @@ struct PinnedGrid: View {
     @State private var availableWidth: CGFloat = 0
     @State private var cellFrames: [Int: CGRect] = [:] // local frames in grid space
     @State private var cachedBoundaries: [SidebarGridBoundary] = []
+    @State private var gridGlobalFrame: CGRect = .zero
 
     var body: some View {
         let items: [Tab] = browserManager.tabManager.pinnedTabs
         let colsCount: Int = columnCount(for: availableWidth, itemCount: items.count)
         let columns: [GridItem] = makeColumns(count: colsCount)
-        let boundaries = computeBoundaries(colsCount: colsCount)
+        let localBoundaries = computeBoundaries(colsCount: colsCount)
+        // Convert local boundary frames to global coordinates using the grid's global frame
+        let globalBoundaries: [SidebarGridBoundary] = localBoundaries.map { b in
+            let f = b.frame
+            let converted = CGRect(
+                x: gridGlobalFrame.minX + f.minX,
+                y: gridGlobalFrame.minY + f.minY,
+                width: f.width,
+                height: f.height
+            )
+            return SidebarGridBoundary(index: b.index, orientation: b.orientation, frame: converted)
+        }
 
         VStack(spacing: 6) {
             ZStack(alignment: .top) {
@@ -68,16 +80,25 @@ struct PinnedGrid: View {
             .overlay(SidebarGridInsertionOverlay(
                 isActive: (dragManager ?? TabDragManager.shared).isDragging && (dragManager ?? TabDragManager.shared).dropTarget == .essentials,
                 index: max((dragManager ?? TabDragManager.shared).insertionIndex, 0),
-                boundaries: boundaries
+                boundaries: localBoundaries
             ))
             .onDrop(of: [.text], delegate: SidebarGridDropDelegate(
                 dragManager: (dragManager ?? TabDragManager.shared),
-                boundariesProvider: { boundaries },
+                boundariesProvider: { globalBoundaries },
                 onPerform: { op in browserManager.tabManager.handleDragOperation(op) }
             ))
             .fixedSize(horizontal: false, vertical: true)
         }
         .background(widthReader)
+        .background(
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { gridGlobalFrame = proxy.frame(in: .global) }
+                    .onChange(of: proxy.frame(in: .global)) { _, newFrame in
+                        gridGlobalFrame = newFrame
+                    }
+            }
+        )
         .animation(.easeInOut(duration: 0.18), value: colsCount)
         .animation(.easeInOut(duration: 0.18), value: items.count)
     }
@@ -173,4 +194,4 @@ private struct PinnedGridCellFramesKey: PreferenceKey {
     }
 }
 
-
+// no-op
