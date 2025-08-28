@@ -7,6 +7,9 @@
 
 import Foundation
 import SwiftData
+import SwiftUI
+
+// Stores Space persistence, including gradient configuration
 
 @Model
 final class SpaceEntity {
@@ -14,11 +17,13 @@ final class SpaceEntity {
     var name: String
     var icon: String
     var index: Int
+    var gradientData: Data = SpaceGradient.default.encoded ?? Data()
 
-    init(id: UUID, name: String, icon: String, index: Int) {
+    init(id: UUID, name: String, icon: String, index: Int, gradientData: Data = SpaceGradient.default.encoded ?? Data()) {
         self.id = id
         self.name = name
         self.icon = icon
         self.index = index
+        self.gradientData = gradientData
     }
 }
