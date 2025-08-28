@@ -32,7 +32,7 @@ struct WindowView: View {
             CommandPaletteView()
             DialogView()
             
-            // Global insertion line overlay - above everything including web view
+            // Working insertion line overlay
             InsertionLineView(dragManager: TabDragManager.shared)
         }
         .environmentObject(browserManager)
