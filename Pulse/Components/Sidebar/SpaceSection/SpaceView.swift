@@ -20,6 +20,9 @@ struct SpaceView: View {
     @State private var cachedRegularBoundaries: [CGFloat] = []
     @State private var cachedPinnedEmptyBoundaries: [CGFloat] = [20] // top third of 60
     @State private var cachedRegularEmptyBoundaries: [CGFloat] = [50.0/3.0]
+    // Global frames for pinned and regular sections
+    @State private var pinnedSectionGlobalFrame: CGRect = .zero
+    @State private var regularSectionGlobalFrame: CGRect = .zero
     
     let onActivateTab: (Tab) -> Void
     let onCloseTab: (Tab) -> Void
@@ -96,6 +99,13 @@ struct SpaceView: View {
                             cachedSpacePinnedBoundaries = []
                         }
                     }
+                    .background(GeometryReader { proxy in
+                        Color.clear
+                            .onAppear { pinnedSectionGlobalFrame = proxy.frame(in: .global) }
+                            .onChange(of: proxy.frame(in: .global)) { _, newFrame in
+                                pinnedSectionGlobalFrame = newFrame
+                            }
+                    })
                     .overlay(
                         SpacePinnedInsertionOverlay(spaceId: space.id, boundaries: cachedSpacePinnedBoundaries)
                     )
@@ -112,16 +122,26 @@ struct SpaceView: View {
                             return cachedSpacePinnedBoundaries
                         },
                         insertionLineFrameProvider: {
-                            // Ensure insertionLineFrameProvider handles edge cases properly
-                            let validWidth = max(width, 0)
-                            return CGRect(x: 0, y: 22, width: validWidth, height: 3)
+                            // Provide a GLOBAL frame for the insertion line
+                            let section = pinnedSectionGlobalFrame
+                            let validWidth = max(section.width, 0)
+                            let y = section.minY + 22
+                            return CGRect(x: section.minX, y: y, width: validWidth, height: 3)
                         },
+                        globalFrameProvider: { pinnedSectionGlobalFrame },
                         onPerform: { op in browserManager.tabManager.handleDragOperation(op) }
                     ))
                 } else {
                     // Empty pinned section: provide a clear, easy drop target
                     ZStack { Color.clear.frame(height: 60) }
                         .coordinateSpace(name: pinnedSectionSpaceName)
+                        .background(GeometryReader { proxy in
+                            Color.clear
+                                .onAppear { pinnedSectionGlobalFrame = proxy.frame(in: .global) }
+                                .onChange(of: proxy.frame(in: .global)) { _, newFrame in
+                                    pinnedSectionGlobalFrame = newFrame
+                                }
+                        })
                         .overlay(
                             SpacePinnedInsertionOverlay(spaceId: space.id, boundaries: cachedPinnedEmptyBoundaries)
                         )
@@ -138,11 +158,13 @@ struct SpaceView: View {
                                 return cachedPinnedEmptyBoundaries 
                             },
                             insertionLineFrameProvider: {
-                                // Add error handling for edge cases
-                                let validWidth = max(width, 0)
-                                let validY = max(60.0/3.0, 0)
-                                return CGRect(x: 0, y: validY, width: validWidth, height: 3)
+                                // Provide a GLOBAL frame for the insertion line
+                                let section = pinnedSectionGlobalFrame
+                                let validWidth = max(section.width, 0)
+                                let y = max(60.0/3.0, 0)
+                                return CGRect(x: section.minX, y: section.minY + y, width: validWidth, height: 3)
                             },
+                            globalFrameProvider: { pinnedSectionGlobalFrame },
                             onPerform: { op in browserManager.tabManager.handleDragOperation(op) }
                         ))
                 }
@@ -222,6 +244,13 @@ struct SpaceView: View {
                                     cachedRegularBoundaries = []
                                 }
                             }
+                            .background(GeometryReader { proxy in
+                                Color.clear
+                                    .onAppear { regularSectionGlobalFrame = proxy.frame(in: .global) }
+                                    .onChange(of: proxy.frame(in: .global)) { _, newFrame in
+                                        regularSectionGlobalFrame = newFrame
+                                    }
+                            })
                             .overlay(
                                 SpaceRegularInsertionOverlay(spaceId: space.id, boundaries: cachedRegularBoundaries)
                             )
@@ -238,16 +267,25 @@ struct SpaceView: View {
                                     return cachedRegularBoundaries
                                 },
                                 insertionLineFrameProvider: {
-                                    // Ensure coordinate space transformations don't fail
-                                    let validWidth = max(width, 0)
-                                    return CGRect(x: 0, y: 20, width: validWidth, height: 3)
+                                    // Provide a GLOBAL frame for the insertion line
+                                    let section = regularSectionGlobalFrame
+                                    let validWidth = max(section.width, 0)
+                                    return CGRect(x: section.minX, y: section.minY + 20, width: validWidth, height: 3)
                                 },
+                                globalFrameProvider: { regularSectionGlobalFrame },
                                 onPerform: { op in browserManager.tabManager.handleDragOperation(op) }
                             ))
                         } else {
                             // Empty regular section: provide a drop target
                             ZStack { Color.clear.frame(height: 50) }
                                 .coordinateSpace(name: regularSectionSpaceName)
+                                .background(GeometryReader { proxy in
+                                    Color.clear
+                                        .onAppear { regularSectionGlobalFrame = proxy.frame(in: .global) }
+                                        .onChange(of: proxy.frame(in: .global)) { _, newFrame in
+                                            regularSectionGlobalFrame = newFrame
+                                        }
+                                })
                                 .overlay(
                                     SpaceRegularInsertionOverlay(spaceId: space.id, boundaries: cachedRegularEmptyBoundaries)
                                 )
@@ -264,11 +302,13 @@ struct SpaceView: View {
                                         return cachedRegularEmptyBoundaries 
                                     },
                                     insertionLineFrameProvider: {
-                                        // Improve error handling when coordinate space transformations fail
-                                        let validWidth = max(width, 0)
-                                        let validY = max(50.0/3.0, 0)
-                                        return CGRect(x: 0, y: validY, width: validWidth, height: 3)
+                                        // Provide a GLOBAL frame for the insertion line
+                                        let section = regularSectionGlobalFrame
+                                        let validWidth = max(section.width, 0)
+                                        let y = max(50.0/3.0, 0)
+                                        return CGRect(x: section.minX, y: section.minY + y, width: validWidth, height: 3)
                                     },
+                                    globalFrameProvider: { regularSectionGlobalFrame },
                                     onPerform: { op in browserManager.tabManager.handleDragOperation(op) }
                                 ))
                         }
@@ -309,6 +349,8 @@ struct SpaceView: View {
         }
     }
     
+    // (no global frame preference keys)
+    
     
     struct SpacePinnedInsertionOverlay: View {
         let spaceId: UUID
@@ -343,4 +385,5 @@ struct SpaceView: View {
             )
         }
     }
+    
 }

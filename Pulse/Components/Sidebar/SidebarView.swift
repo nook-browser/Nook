@@ -176,6 +176,7 @@ struct SidebarView: View {
                 }
                 .padding(.top, 8)
                 .frame(width: browserManager.sidebarWidth)
+
             }
             .frame(width: browserManager.sidebarWidth)
         }
