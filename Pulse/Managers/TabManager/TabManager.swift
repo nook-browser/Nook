@@ -207,13 +207,13 @@ class TabManager {
 
     @discardableResult
     func createNewTab(
-        url: String = "https://www.google.com",
+        url: String? = nil,
         in space: Space? = nil
     ) -> Tab {
         let engine = browserManager?.settingsManager.searchEngine ?? .google
-        guard let validURL = URL(string: normalizeURL(url, provider: engine))
+        guard let validURL = URL(string: normalizeURL(url ?? engine.host, provider: engine))
         else {
-            print("Invalid URL: \(url). Falling back to default.")
+            print("Invalid URL: \(url ?? engine.host). Falling back to default.")
             return createNewTab(in: space)
         }
         let targetSpace = space ?? currentSpace
