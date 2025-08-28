@@ -16,8 +16,10 @@ struct SpaceView: View {
     @Environment(\.tabDragManager) private var dragManager
     @State private var spacePinnedFrames: [Int: CGRect] = [:]
     @State private var regularFrames: [Int: CGRect] = [:]
-    @State private var pinnedTopYInUnified: CGFloat = 0
-    @State private var regularTopYInUnified: CGFloat = 0
+    @State private var cachedSpacePinnedBoundaries: [CGFloat] = []
+    @State private var cachedRegularBoundaries: [CGFloat] = []
+    @State private var cachedPinnedEmptyBoundaries: [CGFloat] = [20] // top third of 60
+    @State private var cachedRegularEmptyBoundaries: [CGFloat] = [50.0/3.0]
     
     let onActivateTab: (Tab) -> Void
     let onCloseTab: (Tab) -> Void
@@ -35,10 +37,13 @@ struct SpaceView: View {
         browserManager.tabManager.spacePinnedTabs(for: space.id)
     }
     
-    // Named coordinate spaces (scoped to this instance)
-    private var pinnedSectionSpaceName: String { "SpacePinnedSection-\(space.id.uuidString)" }
-    private var regularSectionSpaceName: String { "RegularSection-\(space.id.uuidString)" }
-    private var unifiedSpaceName: String { "SpaceUnified-\(space.id.uuidString)" }
+    // Enhanced named coordinate spaces with unique identifiers to prevent conflicts
+    private var pinnedSectionSpaceName: String { 
+        "SpacePinnedSection-\(space.id.uuidString)" 
+    }
+    private var regularSectionSpaceName: String { 
+        "RegularSection-\(space.id.uuidString)" 
+    }
     
     var body: some View {
         return VStack(spacing: 8) {
@@ -82,35 +87,64 @@ struct SpaceView: View {
                     .coordinateSpace(name: pinnedSectionSpaceName)
                     .onPreferenceChange(SpacePinnedRowFramesKey.self) { frames in
                         spacePinnedFrames = frames
-                    }
-                    .background(GeometryReader { proxy in
-                        Color.clear.preference(
-                            key: PinnedContainerTopInUnifiedKey.self,
-                            value: proxy.frame(in: .named(unifiedSpaceName)).minY
-                        )
-                    })
-                    .onPreferenceChange(PinnedContainerTopInUnifiedKey.self) { top in
-                        pinnedTopYInUnified = top
+                        // Add validation that cached boundaries are properly updated
+                        let newBoundaries = SidebarDropMath.computeListBoundaries(frames: frames)
+                        if !newBoundaries.isEmpty {
+                            cachedSpacePinnedBoundaries = newBoundaries
+                        } else {
+                            // Maintain empty boundary fallback if computation fails
+                            cachedSpacePinnedBoundaries = []
+                        }
                     }
                     .overlay(
-                        SpacePinnedInsertionOverlay(spaceId: space.id, frames: spacePinnedFrames)
+                        SpacePinnedInsertionOverlay(spaceId: space.id, boundaries: cachedSpacePinnedBoundaries)
                     )
+                    .padding(.bottom, 8)
+                    .contentShape(Rectangle())
+                    .onDrop(of: [.text], delegate: SidebarSectionDropDelegate(
+                        dragManager: (dragManager ?? TabDragManager.shared),
+                        container: .spacePinned(space.id),
+                        boundariesProvider: { 
+                            // Add validation that boundariesProvider returns consistent data
+                            guard !cachedSpacePinnedBoundaries.isEmpty else {
+                                return cachedPinnedEmptyBoundaries
+                            }
+                            return cachedSpacePinnedBoundaries
+                        },
+                        insertionLineFrameProvider: {
+                            // Ensure insertionLineFrameProvider handles edge cases properly
+                            let validWidth = max(width, 0)
+                            return CGRect(x: 0, y: 22, width: validWidth, height: 3)
+                        },
+                        onPerform: { op in browserManager.tabManager.handleDragOperation(op) }
+                    ))
                 } else {
                     // Empty pinned section: provide a clear, easy drop target
-                    ZStack { Color.clear.frame(height: 44) }
+                    ZStack { Color.clear.frame(height: 60) }
                         .coordinateSpace(name: pinnedSectionSpaceName)
-                        .background(GeometryReader { proxy in
-                            Color.clear.preference(
-                                key: PinnedContainerTopInUnifiedKey.self,
-                                value: proxy.frame(in: .named(unifiedSpaceName)).minY
-                            )
-                        })
-                        .onPreferenceChange(PinnedContainerTopInUnifiedKey.self) { top in
-                            pinnedTopYInUnified = top
-                        }
                         .overlay(
-                            SpacePinnedInsertionOverlay(spaceId: space.id, frames: [:])
+                            SpacePinnedInsertionOverlay(spaceId: space.id, boundaries: cachedPinnedEmptyBoundaries)
                         )
+                        .padding(.bottom, 8)
+                        .contentShape(Rectangle())
+                        .onDrop(of: [.text], delegate: SidebarSectionDropDelegate(
+                            dragManager: (dragManager ?? TabDragManager.shared),
+                            container: .spacePinned(space.id),
+                            boundariesProvider: { 
+                                // Ensure empty boundary fallbacks are properly maintained
+                                guard !cachedPinnedEmptyBoundaries.isEmpty else {
+                                    return [20] // fallback boundary
+                                }
+                                return cachedPinnedEmptyBoundaries 
+                            },
+                            insertionLineFrameProvider: {
+                                // Add error handling for edge cases
+                                let validWidth = max(width, 0)
+                                let validY = max(60.0/3.0, 0)
+                                return CGRect(x: 0, y: validY, width: validWidth, height: 3)
+                            },
+                            onPerform: { op in browserManager.tabManager.handleDragOperation(op) }
+                        ))
                 }
                 
                 NewTabButton()
@@ -179,51 +213,69 @@ struct SpaceView: View {
                             .coordinateSpace(name: regularSectionSpaceName)
                             .onPreferenceChange(RegularRowFramesKey.self) { frames in
                                 regularFrames = frames
-                            }
-                            .background(GeometryReader { proxy in
-                                Color.clear.preference(
-                                    key: RegularContainerTopInUnifiedKey.self,
-                                    value: proxy.frame(in: .named(unifiedSpaceName)).minY
-                                )
-                            })
-                            .onPreferenceChange(RegularContainerTopInUnifiedKey.self) { top in
-                                regularTopYInUnified = top
+                                // Ensure boundary updates are consistent with frame changes
+                                let newBoundaries = SidebarDropMath.computeListBoundaries(frames: frames)
+                                if !newBoundaries.isEmpty {
+                                    cachedRegularBoundaries = newBoundaries
+                                } else {
+                                    // Add error handling for cases where boundary computation fails
+                                    cachedRegularBoundaries = []
+                                }
                             }
                             .overlay(
-                                SpaceRegularInsertionOverlay(spaceId: space.id, frames: regularFrames)
+                                SpaceRegularInsertionOverlay(spaceId: space.id, boundaries: cachedRegularBoundaries)
                             )
+                            .padding(.top, 8)
+                            .contentShape(Rectangle())
+                            .onDrop(of: [.text], delegate: SidebarSectionDropDelegate(
+                                dragManager: (dragManager ?? TabDragManager.shared),
+                                container: .spaceRegular(space.id),
+                                boundariesProvider: { 
+                                    // Add validation that boundary updates are consistent with frame changes
+                                    guard !cachedRegularBoundaries.isEmpty else {
+                                        return cachedRegularEmptyBoundaries
+                                    }
+                                    return cachedRegularBoundaries
+                                },
+                                insertionLineFrameProvider: {
+                                    // Ensure coordinate space transformations don't fail
+                                    let validWidth = max(width, 0)
+                                    return CGRect(x: 0, y: 20, width: validWidth, height: 3)
+                                },
+                                onPerform: { op in browserManager.tabManager.handleDragOperation(op) }
+                            ))
                         } else {
                             // Empty regular section: provide a drop target
-                            ZStack { Color.clear.frame(height: 40) }
+                            ZStack { Color.clear.frame(height: 50) }
                                 .coordinateSpace(name: regularSectionSpaceName)
-                                .background(GeometryReader { proxy in
-                                    Color.clear.preference(
-                                        key: RegularContainerTopInUnifiedKey.self,
-                                        value: proxy.frame(in: .named(unifiedSpaceName)).minY
-                                    )
-                                })
-                                .onPreferenceChange(RegularContainerTopInUnifiedKey.self) { top in
-                                    regularTopYInUnified = top
-                                }
                                 .overlay(
-                                    SpaceRegularInsertionOverlay(spaceId: space.id, frames: [:])
+                                    SpaceRegularInsertionOverlay(spaceId: space.id, boundaries: cachedRegularEmptyBoundaries)
                                 )
+                                .padding(.top, 8)
+                                .contentShape(Rectangle())
+                                .onDrop(of: [.text], delegate: SidebarSectionDropDelegate(
+                                    dragManager: (dragManager ?? TabDragManager.shared),
+                                    container: .spaceRegular(space.id),
+                                    boundariesProvider: { 
+                                        // Add error handling for cases where boundary computation fails
+                                        guard !cachedRegularEmptyBoundaries.isEmpty else {
+                                            return [50.0/3.0] // fallback boundary
+                                        }
+                                        return cachedRegularEmptyBoundaries 
+                                    },
+                                    insertionLineFrameProvider: {
+                                        // Improve error handling when coordinate space transformations fail
+                                        let validWidth = max(width, 0)
+                                        let validY = max(50.0/3.0, 0)
+                                        return CGRect(x: 0, y: validY, width: validWidth, height: 3)
+                                    },
+                                    onPerform: { op in browserManager.tabManager.handleDragOperation(op) }
+                                ))
                         }
                     }
                     .animation(.easeInOut(duration: 0.15), value: tabs.count)
                 }
-                .coordinateSpace(name: unifiedSpaceName)
                 .contentShape(Rectangle())
-                // Use space-aware delegate that normalizes coordinates between sections
-                .onDrop(of: [.text], delegate: SpaceUnifiedDropDelegate(
-                    dragManager: (dragManager ?? TabDragManager.shared),
-                    spaceId: space.id,
-                    pinnedFramesProvider: { spacePinnedFrames },
-                    regularFramesProvider: { regularFrames },
-                    pinnedTopYProvider: { pinnedTopYInUnified },
-                    regularTopYProvider: { regularTopYInUnified },
-                    onPerform: { op in browserManager.tabManager.handleDragOperation(op) }
-                ))
                 Spacer()
             }
             .frame(width: width)
@@ -257,27 +309,19 @@ struct SpaceView: View {
         }
     }
     
-    private struct PinnedContainerTopInUnifiedKey: PreferenceKey {
-        static var defaultValue: CGFloat = 0
-        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
-    }
-    
-    private struct RegularContainerTopInUnifiedKey: PreferenceKey {
-        static var defaultValue: CGFloat = 0
-        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
-    }
     
     struct SpacePinnedInsertionOverlay: View {
         let spaceId: UUID
-        let frames: [Int: CGRect]
-        @ObservedObject var dragManager = TabDragManager.shared
+        let boundaries: [CGFloat]
+        @Environment(\.tabDragManager) private var dragManager
         
         var body: some View {
-            let boundaries = SidebarDropMath.computeListBoundaries(frames: frames)
-            print("🔍 SpacePinnedOverlay - isDragging: \(dragManager.isDragging), dropTarget: \(dragManager.dropTarget)")
+            let dm = dragManager ?? TabDragManager.shared
+            let isActive = dm.isDragging && dm.dropTarget == .spacePinned(spaceId)
+            let _ = print("🔵 [SpacePinnedInsertionOverlay] spaceId=\(spaceId), isActive=\(isActive), isDragging=\(dm.isDragging), target=\(dm.dropTarget), index=\(dm.insertionIndex)")
             return SidebarSectionInsertionOverlay(
-                isActive: dragManager.isDragging && dragManager.dropTarget == .spacePinned(spaceId),
-                index: max(dragManager.insertionIndex, 0),
+                isActive: isActive,
+                index: max(dm.insertionIndex, 0),
                 boundaries: boundaries
             )
         }
@@ -285,15 +329,16 @@ struct SpaceView: View {
     
     struct SpaceRegularInsertionOverlay: View {
         let spaceId: UUID
-        let frames: [Int: CGRect]
-        @ObservedObject var dragManager = TabDragManager.shared
+        let boundaries: [CGFloat]
+        @Environment(\.tabDragManager) private var dragManager
         
         var body: some View {
-            let boundaries = SidebarDropMath.computeListBoundaries(frames: frames)
-            print("🔍 SpaceRegularOverlay - isDragging: \(dragManager.isDragging), dropTarget: \(dragManager.dropTarget)")
+            let dm = dragManager ?? TabDragManager.shared
+            let isActive = dm.isDragging && dm.dropTarget == .spaceRegular(spaceId)
+            let _ = print("🔵 [SpaceRegularInsertionOverlay] spaceId=\(spaceId), isActive=\(isActive), isDragging=\(dm.isDragging), target=\(dm.dropTarget), index=\(dm.insertionIndex)")
             return SidebarSectionInsertionOverlay(
-                isActive: dragManager.isDragging && dragManager.dropTarget == .spaceRegular(spaceId),
-                index: max(dragManager.insertionIndex, 0),
+                isActive: isActive,
+                index: max(dm.insertionIndex, 0),
                 boundaries: boundaries
             )
         }

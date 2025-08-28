@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct SidebarView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @Environment(\.tabDragManager) private var dragManager
     @State private var selectedSpaceID: UUID?
     @State private var isProgrammaticScroll = false
     @State private var spaceName = ""
@@ -176,7 +177,6 @@ struct SidebarView: View {
                 .padding(.top, 8)
                 .frame(width: browserManager.sidebarWidth)
             }
-
             .frame(width: browserManager.sidebarWidth)
         }
     }
