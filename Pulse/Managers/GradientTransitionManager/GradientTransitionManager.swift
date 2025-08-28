@@ -1,107 +1,72 @@
 import Foundation
 import SwiftUI
-import QuartzCore
 
 @MainActor
 final class GradientTransitionManager: ObservableObject {
     @Published var displayGradient: SpaceGradient = .default
     @Published private(set) var isEditing: Bool = false
+    @Published var isAnimating: Bool = false
+    private var animationToken: UUID?
 
-    private var timer: Timer?
-    private var startTime: TimeInterval = 0
-    private var duration: TimeInterval = 0.45
-    private var fromGradient: SpaceGradient = .default
-    private var toGradient: SpaceGradient = .default
-    private var animation: Animation = .easeInOut
-
+    // MARK: - Immediate update (no animation)
     func setImmediate(_ gradient: SpaceGradient) {
-        cancelTimer()
-        displayGradient = gradient
+        var tx = Transaction()
+        tx.disablesAnimations = true
+        withTransaction(tx) {
+            self.displayGradient = gradient
+        }
     }
 
+    // MARK: - Editing lifecycle (no longer blocks transitions)
     func beginInteractivePreview() {
-        cancelTimer()
         isEditing = true
     }
 
     func endInteractivePreview() {
-        cancelTimer()
         isEditing = false
     }
 
+    // MARK: - SwiftUI-driven transition
     func transition(from: SpaceGradient? = nil,
                     to: SpaceGradient,
                     duration: TimeInterval = 0.45,
                     animation: Animation = .easeInOut) {
-        // Suppress transitions while an interactive edit is in progress
-        if isEditing { return }
-        cancelTimer()
+        // If duration is zero (or negative), jump immediately
+        guard duration > 0 else { setImmediate(to); return }
 
-        self.duration = max(0.0, duration)
-        self.animation = animation
-        self.fromGradient = from ?? displayGradient
-        self.toGradient = to
+        // Flip on lightweight mode for renderers
+        isAnimating = true
 
-        guard self.duration > 0 else {
-            setImmediate(to)
-            return
+        // If a specific starting gradient is provided, snap to it without animation first
+        if let from {
+            var tx = Transaction()
+            tx.disablesAnimations = true
+            withTransaction(tx) { self.displayGradient = from }
         }
 
-        self.startTime = CACurrentMediaTime()
+        // Use the provided animation/timing, scaled to approximate the requested duration
+        // Base against previous default of ~0.45s
+        let speedFactor = max(0.001, 0.45 / max(0.001, duration))
+        let anim = animation.speed(speedFactor)
 
-        // Drive updates ~60fps
-        let t = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            self.tick()
-        }
-        self.timer = t
-        RunLoop.main.add(t, forMode: .common)
-    }
+        // Tokenize this transition to avoid races on overlapping transitions
+        let token = UUID()
+        self.animationToken = token
 
-    private func tick() {
-        let now = CACurrentMediaTime()
-        var progress = (now - startTime) / duration
-        if progress >= 1.0 {
-            progress = 1.0
+        withAnimation(anim) {
+            self.displayGradient = to
         }
 
-        // Ease progress using SwiftUI animation timing curve by mapping to timing function.
-        // Since we cannot directly sample Animation, approximate with .easeInOut by using a cosine blend.
-        let eased = easeInOut(progress)
-
-        let interpolated = interpolateGradient(from: fromGradient, to: toGradient, progress: eased)
-        // Assign directly; easing already applied above. Avoid implicit animations every frame.
-        self.displayGradient = interpolated
-
-        if progress >= 1.0 {
-            cancelTimer()
-            // Ensure final value lands exactly on target
-            self.displayGradient = toGradient
+        // After animation completes, make sure we land exactly on the final value
+        // and toggle dithering back on.
+        let expectedEnd = to
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64((duration + 0.02) * 1_000_000_000))
+            // Ensure final value is exact and disable animations for this set
+            if self.animationToken == token {
+                self.setImmediate(expectedEnd)
+                self.isAnimating = false
+            }
         }
     }
-
-    private func cancelTimer() {
-        timer?.invalidate()
-        timer = nil
-    }
-
-    deinit {
-        // Timer will be released with this object; no actor hop here.
-    }
-}
-
-// MARK: - Interpolation helpers
-@MainActor
-private func interpolateGradient(from: SpaceGradient, to: SpaceGradient, progress: Double) -> SpaceGradient {
-    // Normalize nodes count
-    let (aNodes, bNodes) = normalizeGradientNodes(from: from.nodes, to: to.nodes)
-    let nodes = interpolateGradientNodes(from: aNodes, to: bNodes, progress: progress)
-    let angle = interpolateAngle(from: from.angle, to: to.angle, progress: progress)
-    let grain = from.grain + (to.grain - from.grain) * progress
-    return SpaceGradient(angle: angle, nodes: nodes, grain: grain)
-}
-
-private func easeInOut(_ t: Double) -> Double {
-    // Cosine-based easeInOut (similar to .easeInOut)
-    return 0.5 - 0.5 * cos(Double.pi * min(1, max(0, t)))
 }

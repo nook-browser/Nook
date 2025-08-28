@@ -18,6 +18,11 @@ struct GradientEditorView: View {
                 applyColorSelection(color)
             }
 
+            // Opacity control for selected node
+            TransparencySlider(selectedNode: bindingSelectedNode()) { updated in
+                updateNode(updated)
+            }
+
             HStack(spacing: 16) {
                 GrainSlider(value: $gradient.grain)
                 AngleDial(angle: $gradient.angle)
@@ -27,8 +32,12 @@ struct GradientEditorView: View {
         .padding(16)
         .onAppear { if selectedNodeID == nil { selectedNodeID = gradient.nodes.first?.id } }
         .onChange(of: gradient) { newValue in
-            // Live background update while editing
-            gradientTransitionManager.setImmediate(newValue)
+            // Live preview should bypass animations entirely
+            var tx = Transaction()
+            tx.disablesAnimations = true
+            withTransaction(tx) {
+                gradientTransitionManager.setImmediate(newValue)
+            }
         }
         .onAppear {
             gradientTransitionManager.beginInteractivePreview()
