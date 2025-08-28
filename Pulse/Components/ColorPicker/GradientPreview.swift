@@ -4,6 +4,7 @@ import SwiftUI
 // Live preview for SpaceGradient with grain overlay
 struct GradientPreview: View {
     @Binding var gradient: SpaceGradient
+    var showDitherOverlay: Bool = true
 
     private let cornerRadius: CGFloat = 12
     private let size = CGSize(width: 300, height: 160)
@@ -13,13 +14,15 @@ struct GradientPreview: View {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .fill(LinearGradient(gradient: Gradient(stops: stops()), startPoint: startPoint(), endPoint: endPoint()))
 
-            Image("noise_texture")
-                .resizable()
-                .scaledToFill()
-                .opacity(max(0, min(1, gradient.grain)))
-                .blendMode(.overlay)
-                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                .allowsHitTesting(false)
+            if showDitherOverlay {
+                Image("noise_texture")
+                    .resizable()
+                    .scaledToFill()
+                    .opacity(max(0, min(1, gradient.grain)))
+                    .blendMode(.overlay)
+                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                    .allowsHitTesting(false)
+            }
 
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
@@ -51,4 +54,3 @@ struct GradientPreview: View {
         return UnitPoint(x: 0.5 + 0.5 * dx, y: 0.5 + 0.5 * dy)
     }
 }
-

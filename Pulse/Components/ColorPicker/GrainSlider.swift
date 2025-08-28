@@ -11,19 +11,27 @@ struct GrainSlider: View {
             let h = proxy.size.height
 
             ZStack {
-                // Sine wave track
+                // Track background
                 RoundedRectangle(cornerRadius: h/2, style: .continuous)
                     .fill(Color.black.opacity(0.08))
 
-                SineWave()
-                    .stroke(Color.black.opacity(0.35), lineWidth: 3)
+                // Interpolated wave: amplitude goes 0 -> max with value
+                let amplitude = max(0.001, value) * (h * 0.22)
+                InterpolatedWave(amplitude: amplitude)
+                    .stroke(
+                        LinearGradient(colors: [
+                            Color.black.opacity(0.15),
+                            Color.black.opacity(0.45)
+                        ], startPoint: .leading, endPoint: .trailing),
+                        lineWidth: 3
+                    )
                     .padding(.horizontal, 16)
 
                 // Thumb
                 let x = CGFloat(value) * w
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(Color.white)
-                    .frame(width: 18, height: h - 8)
+                    .frame(width: 14 + CGFloat(value) * 10, height: (h - 8) + CGFloat(value) * 6)
                     .position(x: min(max(9, x), w - 9), y: h/2)
                     .shadow(color: .black.opacity(0.12), radius: 1, x: 0, y: 1)
             }
@@ -36,19 +44,19 @@ struct GrainSlider: View {
     }
 }
 
-private struct SineWave: Shape {
+private struct InterpolatedWave: Shape {
+    let amplitude: CGFloat // 0 = line, else sine amplitude
     func path(in rect: CGRect) -> Path {
         var p = Path()
         let midY = rect.midY
-        let amp = rect.height * 0.18
         let length = rect.width
         p.move(to: CGPoint(x: rect.minX, y: midY))
         let step: CGFloat = 2
+        let period: CGFloat = 18
         for x in stride(from: CGFloat(0), through: length, by: step) {
-            let y = sin(x / 18) * amp + midY
+            let y = sin(x / period) * amplitude + midY
             p.addLine(to: CGPoint(x: rect.minX + x, y: y))
         }
         return p
     }
 }
-

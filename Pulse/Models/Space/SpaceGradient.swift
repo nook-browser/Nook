@@ -82,3 +82,25 @@ extension SpaceGradient {
         self.init(angle: angle, nodes: nodes, grain: grain)
     }
 }
+
+// MARK: - Visual Equality
+extension SpaceGradient {
+    func visuallyEquals(_ other: SpaceGradient, epsilon: Double = 0.5, grainEpsilon: Double = 0.01) -> Bool {
+        // Compare angle and grain with tolerances
+        let angleDiff = abs(self.angle - other.angle).truncatingRemainder(dividingBy: 360)
+        let angleEqual: Bool = angleDiff < epsilon || abs(angleDiff - 360) < epsilon
+        let grainEqual = abs(self.grain - other.grain) <= grainEpsilon
+
+        // Compare nodes ignoring IDs; order by location
+        let aNodes = self.sortedNodes
+        let bNodes = other.sortedNodes
+        if aNodes.count != bNodes.count { return false }
+        for i in 0..<aNodes.count {
+            let a = aNodes[i]
+            let b = bNodes[i]
+            if a.colorHex.caseInsensitiveCompare(b.colorHex) != .orderedSame { return false }
+            if abs(a.location - b.location) > 1e-4 { return false }
+        }
+        return angleEqual && grainEqual
+    }
+}
