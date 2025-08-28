@@ -143,35 +143,17 @@ class TabDragNSView: NSView {
     }
     
     private func updateDropTarget(at location: NSPoint) {
-        // This method will be enhanced to calculate insertion points
-        // based on the location and the current view hierarchy
+        // The TabDragManager already has all the information we need!
+        // The sidebar components (PinnedGrid, SpaceView) are already calling
+        // dragManager.updateDragTarget() and dragManager.updateInsertionLine()
+        // with the correct values. We just need to let them handle it.
         
-        // For now, we'll implement basic logic that will be expanded
+        // This container view doesn't need to calculate frames - the individual
+        // UI components know their own geometry and handle insertion line positioning
         Task { @MainActor in
-            let (container, index, spaceId) = calculateDropTarget(at: location)
-            dragManager.updateDragTarget(container: container, insertionIndex: index, spaceId: spaceId)
-            
-            // Update insertion line position
-            if let insertionFrame = calculateInsertionLineFrame(at: location, index: index) {
-                dragManager.updateInsertionLine(frame: insertionFrame)
-            }
+            // Simple fallback - let the specialized components handle precise positioning
+            print("🎯 [TabDragContainerView] Drag at \(location) - letting specialized components handle targeting")
         }
     }
     
-    private func calculateDropTarget(at location: NSPoint) -> (TabDragManager.DragContainer, Int, UUID?) {
-        // This is where we'll implement the logic to determine:
-        // 1. Which container (essentials, space pinned, space regular) we're over
-        // 2. What index position we should insert at
-        // 3. Which space ID (if applicable)
-        
-        // For now, return placeholder values
-        // This will be enhanced when we integrate with the actual UI components
-        return (.none, -1, nil)
-    }
-    
-    private func calculateInsertionLineFrame(at location: NSPoint, index: Int) -> CGRect? {
-        // Calculate where the insertion line should appear
-        // This will be enhanced with actual geometry calculations
-        return nil
-    }
 }

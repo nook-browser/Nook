@@ -1,11 +1,12 @@
 import AppKit
+import Combine
 import Observation
 import SwiftData
 import WebKit
 
 @MainActor
 @Observable
-class TabManager {
+class TabManager: ObservableObject {
     weak var browserManager: BrowserManager?
     private let context: ModelContext
 
@@ -21,6 +22,11 @@ class TabManager {
 
     // Pinned tabs (global essentials)
     private(set) var pinnedTabs: [Tab] = []
+    
+    // Essentials API - provides read-only access to global pinned tabs
+    var essentialTabs: [Tab] {
+        return pinnedTabs
+    }
 
     // Currently active tab
     private(set) var currentTab: Tab?
@@ -28,7 +34,9 @@ class TabManager {
     init(browserManager: BrowserManager? = nil, context: ModelContext) {
         self.browserManager = browserManager
         self.context = context
-        loadFromStore()
+        Task { @MainActor in
+            loadFromStore()
+        }
     }
 
     // MARK: - Convenience
@@ -613,6 +621,28 @@ class TabManager {
         }
     }
     
+    // MARK: - Essentials API
+    
+    func addToEssentials(_ tab: Tab) {
+        pinTab(tab)
+    }
+    
+    func removeFromEssentials(_ tab: Tab) {
+        unpinTab(tab)
+    }
+    
+    func reorderEssential(_ tab: Tab, to index: Int) {
+        reorderGlobalPinnedTabs(tab, to: index)
+    }
+    
+    func reorderRegular(_ tab: Tab, in spaceId: UUID, to index: Int) {
+        reorderRegularTabs(tab, in: spaceId, to: index)
+    }
+    
+    func reorderSpacePinned(_ tab: Tab, in spaceId: UUID, to index: Int) {
+        reorderSpacePinnedTabs(tab, in: spaceId, to: index)
+    }
+    
     // MARK: - Space-Level Pinned Tabs
     
     func spacePinnedTabs(for spaceId: UUID) -> [Tab] {
@@ -741,7 +771,6 @@ class TabManager {
 
     // MARK: - SwiftData load/save
 
-    @MainActor
     private func loadFromStore() {
         do {
             // Spaces
@@ -846,7 +875,6 @@ class TabManager {
         }
     }
 
-    @MainActor
     public func persistSnapshot() {
         do {
             let all = try context.fetch(FetchDescriptor<TabEntity>())
@@ -981,7 +1009,13 @@ class TabManager {
 }
 
 extension TabManager {
-    func reattachBrowserManager(_ bm: BrowserManager) {
+    nonisolated func reattachBrowserManager(_ bm: BrowserManager) {
+        Task { @MainActor in
+            await _reattachBrowserManager(bm)
+        }
+    }
+    
+    private func _reattachBrowserManager(_ bm: BrowserManager) async {
         self.browserManager = bm
         let spacePinned = currentSpace.flatMap { spacePinnedTabs(for: $0.id) } ?? []
         for t in (self.pinnedTabs + spacePinned + self.tabs) {

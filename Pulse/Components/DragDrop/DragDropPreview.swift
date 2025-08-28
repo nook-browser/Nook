@@ -93,7 +93,9 @@ class MockTabManager: ObservableObject {
     }
     
     func handleDragOperation(_ operation: DragOperation) {
+#if DEBUG
         print("🎯 Mock drag operation: \(operation.fromContainer) → \(operation.toContainer) at \(operation.toIndex)")
+#endif
         
         // Mock implementation - just reorder within same container for now
         switch (operation.fromContainer, operation.toContainer) {
@@ -111,7 +113,9 @@ class MockTabManager: ObservableObject {
             }
             
         default:
+#if DEBUG
             print("Cross-container moves not implemented in preview")
+#endif
         }
     }
     
@@ -174,7 +178,11 @@ struct MockTabView: View {
                 Spacer()
                 
                 if isHovering {
-                    Button(action: { print("Close \(tab.name)") }) {
+                    Button(action: { 
+#if DEBUG
+print("Close \(tab.name)")
+#endif
+ }) {
                         Image(systemName: "xmark")
                             .font(.system(size: 8, weight: .medium))
                             .foregroundColor(.primary)
@@ -201,11 +209,27 @@ struct MockTabView: View {
             }
         }
         .contextMenu {
-            Button("Move Up") { print("Move \(tab.name) up") }
-            Button("Move Down") { print("Move \(tab.name) down") }
+            Button("Move Up") { 
+#if DEBUG
+print("Move \(tab.name) up")
+#endif
+ }
+            Button("Move Down") { 
+#if DEBUG
+print("Move \(tab.name) down")
+#endif
+ }
             Divider()
-            Button("Pin to Space") { print("Pin \(tab.name) to space") }
-            Button("Pin Globally") { print("Pin \(tab.name) globally") }
+            Button("Pin to Space") { 
+#if DEBUG
+print("Pin \(tab.name) to space")
+#endif
+ }
+            Button("Pin Globally") { 
+#if DEBUG
+print("Pin \(tab.name) globally")
+#endif
+ }
         }
     }
 }
@@ -239,7 +263,11 @@ struct MockPinnedTabView: View {
             }
         }
         .contextMenu {
-            Button("Unpin") { print("Unpin \(tab.name)") }
+            Button("Unpin") { 
+#if DEBUG
+print("Unpin \(tab.name)")
+#endif
+ }
         }
     }
 }
@@ -284,7 +312,9 @@ struct DragDropPreview: View {
                             ForEach(tabManager.globalPinnedTabs.indices, id: \.self) { index in
                                 let tab = tabManager.globalPinnedTabs[index]
                                 MockPinnedTabView(tab: tab) {
+#if DEBUG
                                     print("Activated: \(tab.name)")
+#endif
                                 }
                                 .onDrag {
                                     dragManager.startDrag(tab: convertToRealTab(tab), from: .essentials, at: index)
@@ -341,7 +371,9 @@ struct DragDropPreview: View {
                                             }
                                             
                                             MockTabView(tab: tab) {
+#if DEBUG
                                                 print("Activated: \(tab.name)")
+#endif
                                             }
                                             .onDrag {
                                                 dragManager.startDrag(tab: convertToRealTab(tab), from: .spacePinned(currentSpace.id), at: index)
@@ -387,7 +419,9 @@ struct DragDropPreview: View {
                                             }
                                             
                                             MockTabView(tab: tab) {
+#if DEBUG
                                                 print("Activated: \(tab.name)")
+#endif
                                             }
                                             .onDrag {
                                                 dragManager.startDrag(tab: convertToRealTab(tab), from: .spaceRegular(currentSpace.id), at: index)
@@ -437,7 +471,9 @@ struct DragDropPreview: View {
     }
     
     private func handleDragCompleted(_ operation: DragOperation) {
+#if DEBUG
         print("🎯 Drag completed: \(operation)")
+#endif
         tabManager.handleDragOperation(operation)
     }
     
@@ -454,16 +490,22 @@ struct DragDropPreview: View {
     }
     
     private func handleDrop(providers: [NSItemProvider], toContainer: TabDragManager.DragContainer, atIndex: Int) -> Bool {
+#if DEBUG
         print("🎯 Drop attempted: container=\(toContainer), index=\(atIndex)")
+#endif
         
         guard let draggedTab = dragManager.draggedTab else {
+#if DEBUG
             print("❌ No dragged tab found")
+#endif
             return false
         }
         
         // Find the mock tab to move
         guard let mockTab = findMockTab(by: draggedTab.id) else {
+#if DEBUG
             print("❌ Could not find mock tab with ID: \(draggedTab.id)")
+#endif
             return false
         }
         
@@ -476,7 +518,9 @@ struct DragDropPreview: View {
         // End the drag
         _ = dragManager.endDrag(commit: true)
         
+#if DEBUG
         print("✅ Successfully moved \(mockTab.name) to \(toContainer) at index \(atIndex)")
+#endif
         return true
     }
     
@@ -534,7 +578,9 @@ struct DragDropPreview: View {
             tab.spaceId = spaceId
             
         case .none:
+#if DEBUG
             print("❌ Invalid drop container")
+#endif
         }
     }
 }

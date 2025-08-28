@@ -40,11 +40,13 @@ struct DraggableTabView<Content: View>: View {
             .animation(.easeInOut(duration: 0.2), value: dragManager.isDragging)
             .animation(.easeInOut(duration: 0.2), value: dragOffset)
             .onDrag {
-                // Start the drag operation
+                // Start the drag operation with state validation
                 DispatchQueue.main.async {
-                    print("🚀 DraggableTabView starting drag: \(tab.name) - dragManager same as shared: \(dragManager === TabDragManager.shared)")
+                    // Harden the start guard to prevent concurrent drags
+                    guard !dragManager.isDragging else {
+                        return
+                    }
                     dragManager.startDrag(tab: tab, from: container, at: index)
-                    print("🚀 After startDrag - isDragging: \(dragManager.isDragging)")
                 }
                 return NSItemProvider(object: tab.id.uuidString as NSString)
             }
@@ -53,7 +55,7 @@ struct DraggableTabView<Content: View>: View {
                     .onChanged { value in
                         if !dragGesture {
                             dragGesture = true
-                            // Start drag if not already started
+                            // Enhanced drag gesture coordination - prevent duplicate drag start calls
                             if !dragManager.isDragging {
                                 dragManager.startDrag(tab: tab, from: container, at: index)
                             }
@@ -64,12 +66,22 @@ struct DraggableTabView<Content: View>: View {
                     }
                     .onEnded { value in
                         dragGesture = false
-                        dragOffset = .zero
                         
-                        // End drag operation immediately
-                        print("🛑 Ending drag for \(tab.name)")
+                        // Ensure drag offset is properly reset in all scenarios
+                        withAnimation(.easeOut(duration: 0.15)) {
+                            dragOffset = .zero
+                        }
+                        
+                        // Enhanced drag end handling with state validation
                         if dragManager.isDragging && dragManager.draggedTab?.id == tab.id {
-                            _ = dragManager.endDrag(commit: false) // Let drop zone handle commit
+                            // Add validation that the drag manager is in the expected state
+                            guard dragManager.draggedTab != nil else {
+                                return
+                            }
+                            // Only cancel drag if no valid drop target
+                            if dragManager.dropTarget == .none {
+                                dragManager.cancelDrag()
+                            }
                         }
                     }
             )

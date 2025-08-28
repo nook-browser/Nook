@@ -118,23 +118,23 @@ struct SidebarDropMath {
 
     static func computeListBoundaries(frames: [Int: CGRect]) -> [CGFloat] {
         let count = frames.count
-        guard count > 0 else { return [20] } // Single boundary for empty areas
+        guard count > 0 else { return [] }
         let ordered = (0..<count).compactMap { frames[$0] }
-        guard ordered.count == count else { return [20] }
+        guard ordered.count == count else { return [] }
 
         var boundaries: [CGFloat] = []
         
-        // Before first item - extend upward to connect with above sections
-        boundaries.append(max(0, ordered[0].minY - 30))
+        // Before first item
+        boundaries.append(ordered[0].minY)
         
-        // Between each pair of items  
+        // Between each pair of items - simple midpoints
         for i in 0..<(count - 1) {
             let midpoint = (ordered[i].maxY + ordered[i + 1].minY) / 2
             boundaries.append(midpoint)
         }
         
         // After last item
-        boundaries.append(ordered[count - 1].maxY + 4)
+        boundaries.append(ordered[count - 1].maxY)
         
         return boundaries
     }
@@ -146,11 +146,13 @@ struct SidebarSectionDropDelegate: DropDelegate {
     let dragManager: TabDragManager
     let container: TabDragManager.DragContainer
     let boundariesProvider: () -> [CGFloat]
+    let insertionLineFrameProvider: (() -> CGRect)?
     let onPerform: (DragOperation) -> Void
 
     func validateDrop(info: DropInfo) -> Bool { true }
 
     func dropEntered(info: DropInfo) {
+        print("🎯 [SidebarSectionDropDelegate] Drop entered: container=\(container), location=\(info.location)")
         updateTarget(with: info)
     }
 
@@ -171,7 +173,49 @@ struct SidebarSectionDropDelegate: DropDelegate {
     private func updateTarget(with info: DropInfo) -> Int {
         let y = info.location.y
         let index = insertionIndex(forY: y)
-        dragManager.updateDragTarget(container: container, insertionIndex: index, spaceId: spaceId)
+        let boundaries = boundariesProvider()
+        
+        // Enhanced state validation - ensure insertionIndex is always valid for current container
+        guard index >= 0 else {
+            return 0
+        }
+        
+        // Handle insertion line coordination between global and local overlays
+        if boundaries.isEmpty {
+            // Empty zone: use global insertion line via frame provider
+            if let frameProvider = insertionLineFrameProvider {
+                let frame = frameProvider()
+                print("📐 [SidebarSectionDropDelegate] Empty zone frame: \(frame)")
+                dragManager.updateInsertionLine(frame: frame)
+            } else {
+                print("⚠️ [SidebarSectionDropDelegate] No frame provider for empty zone")
+                dragManager.updateInsertionLine(frame: .zero)
+            }
+        } else {
+            // Non-empty zone: calculate insertion line frame based on boundaries
+            print("📐 [SidebarSectionDropDelegate] Non-empty boundaries: \(boundaries.count) items")
+            
+            // Calculate the frame for the insertion line at the target index
+            let targetY = (index < boundaries.count) ? boundaries[index] : (boundaries.last ?? 0)
+            let containerWidth: CGFloat = 200 // Approximate sidebar width
+            let lineHeight: CGFloat = 3
+            
+            let insertionFrame = CGRect(
+                x: 10,
+                y: targetY - lineHeight/2,
+                width: containerWidth - 20,
+                height: lineHeight
+            )
+            
+            print("📐 [SidebarSectionDropDelegate] Calculated insertion frame: \(insertionFrame)")
+            dragManager.updateInsertionLine(frame: insertionFrame)
+        }
+        
+        // Add state consistency checks before updating drag target
+        if validateDragManagerState(for: container, index: index) {
+            dragManager.updateDragTarget(container: container, insertionIndex: index, spaceId: spaceId)
+        }
+        
         performMoveHapticIfNeeded(currentIndex: index)
         return index
     }
@@ -186,21 +230,50 @@ struct SidebarSectionDropDelegate: DropDelegate {
 
     private func insertionIndex(forY y: CGFloat) -> Int {
         let boundaries = boundariesProvider()
-        guard !boundaries.isEmpty else { return 0 }
-        var bestIndex = 0
-        var bestDist = CGFloat.greatestFiniteMagnitude
-        for (i, b) in boundaries.enumerated() {
-            let d = abs(b - y)
-            if d < bestDist {
-                bestDist = d
-                bestIndex = i
+        
+        // Enhanced empty zone handling - ensure we never return invalid indices
+        guard !boundaries.isEmpty else { 
+            return 0 
+        }
+        
+        // Add bounds checking for Y coordinates
+        guard y.isFinite && !y.isNaN else {
+            return 0
+        }
+        
+        // Simple Y-coordinate comparison against midpoints
+        for (i, boundary) in boundaries.enumerated() {
+            if y <= boundary {
+                return max(0, i) // Ensure index is never negative
             }
         }
-        return max(0, min(bestIndex, boundaries.count - 1))
+        
+        // Enhanced fallback - ensure we never return invalid indices
+        let maxIndex = boundaries.count - 1
+        return max(0, maxIndex)
     }
 
     private func performMoveHapticIfNeeded(currentIndex: Int) {
         // Let TabDragManager handle haptics to avoid duplicate calls
+    }
+    
+    // MARK: - State validation helpers
+    
+    private func validateDragManagerState(for container: TabDragManager.DragContainer, index: Int) -> Bool {
+        // Ensure the drag manager's current state is consistent with the delegate's container
+        guard dragManager.isDragging else { return false }
+        
+        // Add checks that prevent invalid state transitions
+        if index < 0 { return false }
+        
+        // Validate that insertion indices are appropriate for the current container content
+        switch container {
+        case .none:
+            return false
+        case .essentials, .spacePinned, .spaceRegular:
+            // Basic validation - more sophisticated checks could be added
+            return true
+        }
     }
 }
 
@@ -230,13 +303,36 @@ struct SidebarGridDropDelegate: DropDelegate {
     @discardableResult
     private func updateTarget(with info: DropInfo) -> Int {
         let index = insertionIndex(for: info.location)
+        
+        // Add state consistency checks for grid delegate
+        guard validateGridDragManagerState(for: index) else {
+            return index
+        }
+        
         dragManager.updateDragTarget(container: container, insertionIndex: index, spaceId: nil)
+        
+        // Calculate and set insertion line frame for grid
+        let bounds = boundariesProvider()
+        if !bounds.isEmpty, let boundary = bounds.first(where: { $0.index == index }) {
+            print("📐 [SidebarGridDropDelegate] Grid insertion frame: \(boundary.frame)")
+            dragManager.updateInsertionLine(frame: boundary.frame)
+        } else {
+            print("📐 [SidebarGridDropDelegate] No boundary found for index \(index)")
+            dragManager.updateInsertionLine(frame: .zero)
+        }
+        
         return index
     }
 
     private func insertionIndex(for point: CGPoint) -> Int {
         let bounds = boundariesProvider()
         guard !bounds.isEmpty else { return 0 }
+        
+        // Add validation for point coordinates
+        guard point.x.isFinite && point.y.isFinite && !point.x.isNaN && !point.y.isNaN else {
+            return 0
+        }
+        
         var best = bounds[0]
         var bestDist = distance(point, to: bounds[0])
         for b in bounds.dropFirst() {
@@ -246,7 +342,9 @@ struct SidebarGridDropDelegate: DropDelegate {
                 best = b
             }
         }
-        return best.index
+        
+        // Ensure returned index is valid
+        return max(0, best.index)
     }
 
     private func distance(_ p: CGPoint, to b: SidebarGridBoundary) -> CGFloat {
@@ -269,6 +367,18 @@ struct SidebarGridDropDelegate: DropDelegate {
             return hypot(dx, dy)
         }
     }
+    
+    // MARK: - State validation helpers
+    
+    private func validateGridDragManagerState(for index: Int) -> Bool {
+        // Ensure the drag manager's current state is consistent with the grid delegate
+        guard dragManager.isDragging else { return false }
+        
+        // Validate that insertion indices are appropriate for grid container
+        guard index >= 0 else { return false }
+        
+        return true
+    }
 }
 
 // MARK: - Overlay Helpers
@@ -279,23 +389,41 @@ struct SidebarSectionInsertionOverlay: View {
     let boundaries: [CGFloat]
 
     var body: some View {
-        GeometryReader { proxy in
+        let _ = print("🟦 [SidebarSectionInsertionOverlay] isActive=\(isActive), index=\(index), boundaries.count=\(boundaries.count)")
+        return GeometryReader { proxy in
             ZStack {
                 if isActive {
+                    let _ = print("🟦 [SidebarSectionInsertionOverlay] Showing blue line at index \(index)")
                     let y: CGFloat = {
                         if !boundaries.isEmpty, index >= 0, index < boundaries.count {
                             return min(max(boundaries[index], 1.5), proxy.size.height - 1.5)
                         } else {
-                            return proxy.size.height / 2
+                            // Enhanced empty zone fallback - position at top third rather than center
+                            return max(proxy.size.height / 3, 1.5)
                         }
                     }()
                     
-                    Rectangle()
-                        .fill(Color.red)
-                        .frame(height: 10)
+                    let _ = print("🟦 [SidebarSectionInsertionOverlay] Blue line y-position: \(y)")
+                    
+                    // Enhanced styling for better visibility
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.blue.opacity(0.9),
+                                    Color.blue,
+                                    Color.blue.opacity(0.9)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: proxy.size.width, height: 4)
                         .position(x: proxy.size.width / 2, y: y)
-                        .shadow(color: .black, radius: 2)
-                        .animation(.easeInOut(duration: 0.12), value: index)
+                        .shadow(color: Color.black.opacity(0.3), radius: 1, x: 0, y: 1)
+                        .animation(.easeInOut(duration: 0.15), value: index)
+                        .transition(.scale.combined(with: .opacity))
+                        .zIndex(999) // High z-index to appear above content
                 }
             }
         }
@@ -345,212 +473,4 @@ private func performMoveHaptic() {
 #endif
 }
 
-// MARK: - Universal Drop Delegate (finds closest gap everywhere)
 
-struct UniversalDropDelegate: DropDelegate {
-    let dragManager: TabDragManager
-    let essentialsFramesProvider: () -> [Int: CGRect] 
-    let essentialsColumns: () -> Int
-    let essentialsWidth: () -> CGFloat
-    let spacePinnedFramesProvider: (() -> [Int: CGRect])?
-    let regularFramesProvider: (() -> [Int: CGRect])?
-    let spaceId: UUID?
-    let onPerform: (DragOperation) -> Void
-    
-    func validateDrop(info: DropInfo) -> Bool { true }
-    
-    func dropEntered(info: DropInfo) { updateClosestTarget(with: info) }
-    
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        updateClosestTarget(with: info)
-        return DropProposal(operation: .move)
-    }
-    
-    func performDrop(info: DropInfo) -> Bool {
-        _ = updateClosestTarget(with: info)
-        if let op = dragManager.endDrag(commit: true) {
-            onPerform(op)
-        }
-        return true
-    }
-    
-    private func updateClosestTarget(with info: DropInfo) {
-        let point = info.location
-        
-        var closestDistance = CGFloat.greatestFiniteMagnitude
-        var closestContainer = TabDragManager.DragContainer.essentials
-        var closestIndex = 0
-        var targetSpaceId: UUID? = nil
-        
-        // Check essentials grid boundaries
-        let essentialsFrames = essentialsFramesProvider()
-        let essentialsBoundaries = SidebarDropMath.computeGridBoundaries(
-            frames: essentialsFrames,
-            columns: essentialsColumns(),
-            containerWidth: max(essentialsWidth(), 150),
-            gridGap: 8
-        )
-        
-        for boundary in essentialsBoundaries {
-            let distance = distanceToGridBoundary(point, boundary)
-            if distance < closestDistance {
-                closestDistance = distance
-                closestContainer = .essentials
-                closestIndex = boundary.index
-                targetSpaceId = nil
-            }
-        }
-        
-        // Check space pinned if available
-        if let spacePinnedFrames = spacePinnedFramesProvider?(), let sid = spaceId {
-            let pinnedBoundaries = SidebarDropMath.computeListBoundaries(frames: spacePinnedFrames)
-            for (idx, boundary) in pinnedBoundaries.enumerated() {
-                let distance = abs(point.y - boundary)
-                if distance < closestDistance {
-                    closestDistance = distance
-                    closestContainer = .spacePinned(sid)
-                    closestIndex = idx
-                    targetSpaceId = sid
-                }
-            }
-        }
-        
-        // Check space regular if available
-        if let regularFrames = regularFramesProvider?(), let sid = spaceId {
-            let regularBoundaries = SidebarDropMath.computeListBoundaries(frames: regularFrames)
-            for (idx, boundary) in regularBoundaries.enumerated() {
-                let distance = abs(point.y - boundary)
-                if distance < closestDistance {
-                    closestDistance = distance
-                    closestContainer = .spaceRegular(sid)
-                    closestIndex = idx
-                    targetSpaceId = sid
-                }
-            }
-        }
-        
-        // Always update with the closest target found  
-        print("🎯 Updating drag target: \(closestContainer) index: \(closestIndex)")
-        dragManager.updateDragTarget(
-            container: closestContainer,
-            insertionIndex: max(0, closestIndex),
-            spaceId: targetSpaceId
-        )
-    }
-    
-    private func distanceToGridBoundary(_ point: CGPoint, _ boundary: SidebarGridBoundary) -> CGFloat {
-        let frame = boundary.frame
-        let dx: CGFloat
-        let dy: CGFloat
-        
-        // Calculate distance to boundary frame
-        if point.x < frame.minX {
-            dx = frame.minX - point.x
-        } else if point.x > frame.maxX {
-            dx = point.x - frame.maxX
-        } else {
-            dx = 0
-        }
-        
-        if point.y < frame.minY {
-            dy = frame.minY - point.y
-        } else if point.y > frame.maxY {
-            dy = point.y - frame.maxY
-        } else {
-            dy = 0
-        }
-        
-        return hypot(dx, dy)
-    }
-}
-
-// MARK: - Original Space Drop Delegate (kept for compatibility)
-
-struct SpaceUnifiedDropDelegate: DropDelegate {
-    let dragManager: TabDragManager
-    let spaceId: UUID
-    let pinnedFramesProvider: () -> [Int: CGRect]
-    let regularFramesProvider: () -> [Int: CGRect]
-    let pinnedTopYProvider: () -> CGFloat
-    let regularTopYProvider: () -> CGFloat
-    let onPerform: (DragOperation) -> Void
-
-    func validateDrop(info: DropInfo) -> Bool { true }
-
-    func dropEntered(info: DropInfo) {
-        updateTarget(with: info)
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        updateTarget(with: info)
-        return DropProposal(operation: .move)
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        _ = updateTarget(with: info)
-        if let op = dragManager.endDrag(commit: true) {
-            onPerform(op)
-        }
-        return true
-    }
-
-    @discardableResult
-    private func updateTarget(with info: DropInfo) -> Int {
-        let y = info.location.y
-        let pTop = pinnedTopYProvider()
-        let rTop = regularTopYProvider()
-        let pinnedFrames = pinnedFramesProvider()
-        let regularFrames = regularFramesProvider()
-
-        // Build unified-space boundaries for both sections
-        let pinnedBoundariesUnified: [CGFloat] = SidebarDropMath
-            .computeListBoundaries(frames: pinnedFrames)
-            .map { $0 + pTop }
-        let regularBoundariesUnified: [CGFloat] = SidebarDropMath
-            .computeListBoundaries(frames: regularFrames)
-            .map { $0 + rTop }
-
-        // If both empty, pick section by absolute position relative to their tops
-        if pinnedBoundariesUnified.isEmpty && regularBoundariesUnified.isEmpty {
-            let choosePinned = y < rTop
-            let idx = 0
-            dragManager.updateDragTarget(
-                container: choosePinned ? .spacePinned(spaceId) : .spaceRegular(spaceId),
-                insertionIndex: idx,
-                spaceId: spaceId
-            )
-            return idx
-        }
-
-        // Iterate all boundaries and pick the closest one across both sections
-        var bestContainer: TabDragManager.DragContainer = .spaceRegular(spaceId)
-        var bestIndex: Int = 0
-        var bestDistance: CGFloat = .greatestFiniteMagnitude
-
-        for (i, b) in pinnedBoundariesUnified.enumerated() {
-            let d = abs(b - y)
-            if d < bestDistance {
-                bestDistance = d
-                bestContainer = .spacePinned(spaceId)
-                bestIndex = i
-            }
-        }
-
-        for (i, b) in regularBoundariesUnified.enumerated() {
-            let d = abs(b - y)
-            if d < bestDistance {
-                bestDistance = d
-                bestContainer = .spaceRegular(spaceId)
-                bestIndex = i
-            }
-        }
-
-        // Update drag target with winning container/index
-        dragManager.updateDragTarget(
-            container: bestContainer,
-            insertionIndex: max(0, bestIndex),
-            spaceId: spaceId
-        )
-        return bestIndex
-    }
-}
