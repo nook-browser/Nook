@@ -102,43 +102,61 @@ class TabManager: ObservableObject {
 
     func setActiveSpace(_ space: Space) {
         guard spaces.contains(where: { $0.id == space.id }) else { return }
-        
-        // Capture the previous tab before switching
-        let previousTab = currentTab
-        
-        // Save the current tab as the active tab for the current space
-        if let currentSpace = self.currentSpace, let currentTab = self.currentTab {
-            if let spaceTabId = currentTab.spaceId, spaceTabId == currentSpace.id {
-                currentSpace.activeTabId = currentTab.id
-            }
-        }
-        
-        currentSpace = space
-        let inSpace = tabsBySpace[space.id] ?? []
 
-        // Restore the previously active tab for this space IMMEDIATELY
-        let targetTab: Tab?
-        if let activeTabId = space.activeTabId,
-           let activeTab = inSpace.first(where: { $0.id == activeTabId }) {
-            targetTab = activeTab
-        } else if let ct = currentTab {
-            if let sid = ct.spaceId, sid != space.id {
-                targetTab = inSpace.first ?? pinnedTabs.first
-            } else if ct.spaceId == nil {
-                targetTab = inSpace.first ?? pinnedTabs.first
-            } else {
-                targetTab = ct
-            }
-        } else {
-            targetTab = inSpace.first ?? pinnedTabs.first
+        // Capture the previous state before switching
+        let previousTab = currentTab
+        let previousSpace = currentSpace
+
+        // Always remember the active tab for the outgoing space
+        if let prevSpace = previousSpace, let prevTab = previousTab {
+            // Remember regardless of tab container (regular, space-pinned, or global pinned)
+            prevSpace.activeTabId = prevTab.id
         }
-        
-        // Simply set the current tab - the UI will update automatically
-        currentTab = targetTab
+
+        // Switch to the new space
+        currentSpace = space
+
+        // Tabs in this space
+        let inSpace = tabsBySpace[space.id] ?? []
+        let spacePinned = spacePinnedTabs[space.id] ?? []
+
+        // Restore the last active tab for this space, including global pinned
+        var targetTab: Tab?
+        if let activeId = space.activeTabId {
+            if let match = inSpace.first(where: { $0.id == activeId }) {
+                targetTab = match
+            } else if let match = spacePinned.first(where: { $0.id == activeId }) {
+                targetTab = match
+            } else if let match = pinnedTabs.first(where: { $0.id == activeId }) {
+                targetTab = match
+            }
+        }
+
+        // Fallbacks
+        if targetTab == nil {
+            if let ct = currentTab {
+                if let sid = ct.spaceId, sid == space.id {
+                    targetTab = ct
+                } else {
+                    // Prefer something in the space; otherwise use a global pinned
+                    targetTab = inSpace.first ?? spacePinned.first ?? pinnedTabs.first
+                }
+            } else {
+                targetTab = inSpace.first ?? spacePinned.first ?? pinnedTabs.first
+            }
+        }
+
+        // Decide if active tab actually changes
+        let isTabChanging = (targetTab?.id != currentTab?.id)
+
+        // Update active tab only if it changed
+        if isTabChanging {
+            currentTab = targetTab
+        }
 
         persistSnapshot()
-        // Notify extensions about activation change across spaces
-        if #available(macOS 15.5, *), let newActive = currentTab {
+        // Notify extensions only on real activation change
+        if isTabChanging, #available(macOS 15.5, *), let newActive = currentTab {
             ExtensionManager.shared.notifyTabActivated(newTab: newActive, previous: previousTab)
         }
     }
@@ -277,10 +295,14 @@ class TabManager: ObservableObject {
         let previous = currentTab
         currentTab = tab
         
-        // Save this tab as the active tab for its space
+        // Save this tab as the active tab for the appropriate space
         if let sid = tab.spaceId, let space = spaces.first(where: { $0.id == sid }) {
+            // Tab belongs to a specific space (regular or space-pinned)
             space.activeTabId = tab.id
             currentSpace = space
+        } else if let cs = currentSpace {
+            // Tab is globally pinned; remember it for the current space too
+            cs.activeTabId = tab.id
         }
         
         // Load the tab in compositor if needed
