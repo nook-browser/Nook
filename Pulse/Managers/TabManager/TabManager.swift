@@ -71,8 +71,8 @@ class TabManager: ObservableObject {
 
     // MARK: - Space Management
     @discardableResult
-    func createSpace(name: String, icon: String = "square.grid.2x2") -> Space {
-        let space = Space(name: name, icon: icon)
+    func createSpace(name: String, icon: String = "square.grid.2x2", gradient: SpaceGradient = .default) -> Space {
+        let space = Space(name: name, icon: icon, gradient: gradient)
         spaces.append(space)
         tabsBySpace[space.id] = []
         spacePinnedTabs[space.id] = []
@@ -805,6 +805,7 @@ class TabManager: ObservableObject {
                     id: $0.id,
                     name: $0.name,
                     icon: $0.icon,
+                    gradient: SpaceGradient.decode($0.gradientData)
                 )
             }
             for sp in spaces {
@@ -860,7 +861,7 @@ class TabManager: ObservableObject {
             let state = states.first
             // Ensure there's always at least one space
             if spaces.isEmpty {
-                let personalSpace = Space(name: "Personal", icon: "person.crop.circle")
+                let personalSpace = Space(name: "Personal", icon: "person.crop.circle", gradient: .default)
                 spaces.append(personalSpace)
                 tabsBySpace[personalSpace.id] = []
                 self.currentSpace = personalSpace
@@ -974,17 +975,31 @@ class TabManager: ObservableObject {
                     .first
 
                 if e == nil {
-                    e = SpaceEntity(
-                        id: sp.id,
-                        name: sp.name,
-                        icon: sp.icon,
-                        index: sIndex
-                    )
+                    if let data = sp.gradient.encoded {
+                        e = SpaceEntity(
+                            id: sp.id,
+                            name: sp.name,
+                            icon: sp.icon,
+                            index: sIndex,
+                            gradientData: data
+                        )
+                    } else {
+                        // Fall back to model's default value; don't override on failure
+                        e = SpaceEntity(
+                            id: sp.id,
+                            name: sp.name,
+                            icon: sp.icon,
+                            index: sIndex
+                        )
+                    }
                     context.insert(e!)
                 } else if let entity = e {
                     entity.name = sp.name
                     entity.icon = sp.icon
                     entity.index = sIndex
+                    if let data = sp.gradient.encoded {
+                        entity.gradientData = data
+                    }
                 }
             } catch {
                 print("Space upsert failed: \(error)")

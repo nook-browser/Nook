@@ -226,6 +226,79 @@ class BrowserManager: ObservableObject {
         dialogManager.showCustomContentDialog(header: header, content: content, footer: footer)
     }
     
+    // MARK: - Appearance / Gradient Editing
+    private final class GradientDraft: ObservableObject {
+        @Published var value: SpaceGradient
+        init(_ value: SpaceGradient) { self.value = value }
+    }
+
+    func showGradientEditor() {
+        guard let space = tabManager.currentSpace else {
+            // Consistent in-app dialog when no space is available
+            let header = AnyView(
+                DialogHeader(
+                    icon: "paintpalette",
+                    title: "No Space Available",
+                    subtitle: "Create a space to customize its gradient."
+                )
+            )
+            let footer = AnyView(
+                DialogFooter(rightButtons: [
+                    DialogButton(text: "OK", variant: .primary) { [weak self] in
+                        self?.closeDialog()
+                    }
+                ])
+            )
+            showCustomContentDialog(header: header, content: Color.clear.frame(height: 0), footer: footer)
+            return
+        }
+
+        let draft = GradientDraft(space.gradient)
+        let binding = Binding<SpaceGradient>(
+            get: { draft.value },
+            set: { draft.value = $0 }
+        )
+
+        let header = AnyView(
+            DialogHeader(
+                icon: "paintpalette",
+                title: "Customize Space Gradient",
+                subtitle: space.name
+            )
+        )
+
+        let content = GradientEditorView(gradient: binding)
+
+        let footer = AnyView(
+            DialogFooter(
+                leftButton: DialogButton(
+                    text: "Cancel",
+                    variant: .secondary,
+                    action: { [weak self] in self?.closeDialog() }
+                ),
+                rightButtons: [
+                    DialogButton(
+                        text: "Save",
+                        iconName: "checkmark",
+                        variant: .primary,
+                        action: { [weak self] in
+                            // Commit draft to the current space and persist
+                            space.gradient = draft.value
+                            self?.tabManager.persistSnapshot()
+                            self?.closeDialog()
+                        }
+                    )
+                ]
+            )
+        )
+
+        showCustomContentDialog(
+            header: header,
+            content: content,
+            footer: footer
+        )
+    }
+
     func closeDialog() {
         dialogManager.closeDialog()
     }
