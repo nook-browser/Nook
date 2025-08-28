@@ -8,50 +8,52 @@
 import SwiftUI
 
 struct InsertionLineView: View {
-    let dragManager: TabDragManager
+    @ObservedObject var dragManager: TabDragManager
+    
+    init(dragManager: TabDragManager) {
+        self.dragManager = dragManager
+    }
     
     var body: some View {
         let shouldShow = dragManager.showInsertionLine && shouldShowInsertionLine
         
         return GeometryReader { geometry in
             ZStack {
-                // MASSIVE TEST - Fill the entire window with bright color when dragging
-                if dragManager.isDragging {
-                    let _ = print("🔥 [InsertionLineView] DRAWING MASSIVE TEST VIEW - isDragging=true")
-                    Rectangle()
-                        .fill(Color.red.opacity(0.8)) // Semi-transparent red overlay
-                        .frame(
-                            width: geometry.size.width,
-                            height: geometry.size.height
-                        )
-                        .zIndex(9999)
-                        .overlay(
-                            Text("DRAG TEST - CAN YOU SEE THIS?")
-                                .font(.system(size: 48, weight: .black))
-                                .foregroundColor(.white)
-                                .shadow(color: .black, radius: 4, x: 2, y: 2)
-                        )
-                } else {
-                    let _ = print("🔥 [InsertionLineView] Not dragging - isDragging=false")
-                }
-                
                 if shouldShow {
-                    let _ = print("👁️ [InsertionLineView] Showing insertion line at frame: \(dragManager.insertionLineFrame)")
-                    let _ = print("👁️ [InsertionLineView] Effective position: x=\(effectiveFrameX), y=\(effectiveFrameY), width=\(effectiveFrameWidth)")
-                    let _ = print("👁️ [InsertionLineView] Geometry size: \(geometry.size)")
+                    let frame = dragManager.insertionLineFrame
                     
-                    // TEST: Fixed position to see if it renders at all
-                    Rectangle()
-                        .fill(Color.yellow) // Bright yellow for visibility
-                        .frame(width: 200, height: 50) // Large and thick
-                        .position(x: geometry.size.width / 2, y: geometry.size.height / 2) // Center of screen
-                        .animation(.easeInOut(duration: 0.15), value: dragManager.insertionLineFrame)
-                        .zIndex(8000) // Very high z-index
-                        .overlay(
-                            Text("INSERTION LINE TEST")
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(.black)
+                    // Convert relative container coordinates to absolute window coordinates
+                    let windowX = effectiveFrameX + 8  // Add sidebar padding (8pt)
+                    
+                    // Y coordinate conversion is more complex:
+                    // 1. Add nav/URL bar offset (~70pt)  
+                    // 2. Add essentials grid height (~150pt)
+                    // 3. Add scroll offset for the space this coordinate belongs to
+                    // 4. Add the space header heights for spaces above this one
+                    let baseOffset: CGFloat = 70 + 150  // nav + essentials
+                    let spaceOffset = calculateSpaceOffset(for: dragManager.dropTarget)
+                    let windowY = effectiveFrameY + baseOffset + spaceOffset
+                    
+                    let _ = print("🎯 [Coordinate Conversion] relative(\(effectiveFrameY)) + base(\(baseOffset)) + space(\(spaceOffset)) = window(\(windowY))")
+                    
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.red.opacity(0.9),
+                                    Color.red,
+                                    Color.red.opacity(0.9)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
                         )
+                        .frame(width: effectiveFrameWidth, height: 4)
+                        .position(x: windowX, y: windowY)
+                        .animation(.easeInOut(duration: 0.15), value: dragManager.insertionLineFrame)
+                        .shadow(color: Color.black.opacity(0.3), radius: 1, x: 0, y: 1)
+                        .transition(.scale.combined(with: .opacity))
+                        .zIndex(9999) // Very high z-index to ensure visibility
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -59,7 +61,7 @@ struct InsertionLineView: View {
         .allowsHitTesting(false) // Don't interfere with drag operations
     }
     
-    // MARK: - Empty Zone Enhancements
+    // MARK: - Computed Properties
     
     private var shouldShowInsertionLine: Bool {
         let hasValidFrame = dragManager.insertionLineFrame != .zero
@@ -85,6 +87,34 @@ struct InsertionLineView: View {
         // Z-index considerations - use frame if valid, otherwise reasonable fallback
         let frameY = dragManager.insertionLineFrame.midY
         return frameY > 0 ? frameY : 20 // Fallback to top area position
+    }
+    
+    private func calculateSpaceOffset(for target: TabDragManager.DragContainer) -> CGFloat {
+        // Calculate vertical offset for the specific space container
+        // This is an approximation - ideally we'd get actual space positions
+        
+        switch target {
+        case .none, .essentials:
+            return 0 // Already handled in baseOffset
+            
+        case .spacePinned(let spaceId), .spaceRegular(let spaceId):
+            // For now, assume first space starts immediately after essentials
+            // Each space has a header (~30pt) + pinned section (~variable) + regular section
+            // This is a simplified calculation - in reality you'd want to:
+            // 1. Get the actual space index/order
+            // 2. Sum up the heights of all spaces above this one
+            // 3. Account for scroll position
+            
+            // Simple approximation: assume we're in the first space
+            let spaceHeaderHeight: CGFloat = 30
+            let averagePinnedSectionHeight: CGFloat = 60 // varies by space
+            
+            if case .spacePinned = target {
+                return spaceHeaderHeight // Just the space header
+            } else {
+                return spaceHeaderHeight + averagePinnedSectionHeight // Header + pinned section
+            }
+        }
     }
 }
 

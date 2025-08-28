@@ -14,7 +14,11 @@ class TabDragManager: ObservableObject {
     static let shared = TabDragManager()
     
     // MARK: - Drag State
-    @Published var isDragging: Bool = false
+    @Published var isDragging: Bool = false {
+        didSet {
+            print("🔥🔥🔥 [TabDragManager] isDragging changed: \(oldValue) -> \(isDragging)")
+        }
+    }
     @Published var draggedTab: Tab?
     @Published var draggedTabOriginalIndex: Int = -1
     @Published var draggedTabOriginalContainer: DragContainer = .none
