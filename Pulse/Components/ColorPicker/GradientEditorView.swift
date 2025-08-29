@@ -9,6 +9,9 @@ struct GradientEditorView: View {
     @Binding var gradient: SpaceGradient
     @State private var selectedNodeID: UUID?
     @EnvironmentObject var gradientTransitionManager: GradientTransitionManager
+    @State private var nodeOpacity: Double = 1.0
+
+    // No throttling: update in real time
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -23,21 +26,32 @@ struct GradientEditorView: View {
                 updateNode(updated)
             }
 
-            HStack(spacing: 16) {
-                GrainSlider(value: $gradient.grain)
-                AngleDial(angle: $gradient.angle)
-                    .frame(width: 120, height: 120)
+            // Compact opacity control replacing the previous GrainSlider
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Opacity")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(String(format: "%.0f%%", nodeOpacity * 100))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Slider(value: $nodeOpacity, in: 0...1)
+                    .disabled(bindingSelectedNode().wrappedValue == nil)
             }
         }
         .padding(16)
         .onAppear { if selectedNodeID == nil { selectedNodeID = gradient.nodes.first?.id } }
+        .onAppear { syncNodeOpacity() }
         .onChange(of: gradient) { newValue in
-            // Live preview should bypass animations entirely
-            var tx = Transaction()
-            tx.disablesAnimations = true
-            withTransaction(tx) {
-                gradientTransitionManager.setImmediate(newValue)
-            }
+            gradientTransitionManager.displayGradient = newValue
+        }
+        .onChange(of: selectedNodeID) { _ in
+            syncNodeOpacity()
+        }
+        .onChange(of: nodeOpacity) { _ in
+            applyNodeOpacity()
         }
         .onAppear {
             gradientTransitionManager.beginInteractivePreview()
@@ -96,4 +110,29 @@ struct GradientEditorView: View {
     }
 
     // No bespoke hex helpers: rely on Color(hex:) and NSColor.toHexString
+
+    // MARK: - Opacity Helpers (compact control)
+    private func syncNodeOpacity() {
+        guard let idx = selectedNodeIndex() else { nodeOpacity = 1.0; return }
+        #if canImport(AppKit)
+        let ns = NSColor(Color(hex: gradient.nodes[idx].colorHex)).usingColorSpace(.sRGB)
+        var a: CGFloat = 1.0
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0
+        ns?.getRed(&r, green: &g, blue: &b, alpha: &a)
+        nodeOpacity = Double(a)
+        #else
+        nodeOpacity = 1.0
+        #endif
+    }
+
+    private func applyNodeOpacity() {
+        guard let idx = selectedNodeIndex() else { return }
+        #if canImport(AppKit)
+        let base = NSColor(Color(hex: gradient.nodes[idx].colorHex)).usingColorSpace(.sRGB) ?? NSColor(srgbRed: 1, green: 1, blue: 1, alpha: 1)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, _a: CGFloat = 1
+        base.getRed(&r, green: &g, blue: &b, alpha: &_a)
+        let updated = NSColor(srgbRed: r, green: g, blue: b, alpha: CGFloat(nodeOpacity))
+        gradient.nodes[idx].colorHex = updated.toHexString(includeAlpha: true) ?? gradient.nodes[idx].colorHex
+        #endif
+    }
 }

@@ -166,7 +166,7 @@ struct GradientCanvasEditor: View {
                     if let i = gradient.nodes.firstIndex(where: { $0.id == p.id }) { gradient.nodes[i].location = Double(xPositions[p.id] ?? 0.1) }
                 }
                 // Companions across at opposite angle ± spread, same radius
-                let spread: CGFloat = 0.35 // ~20°
+                let spread: CGFloat = 0.6 // ~34°
                 let opposite = 0.0 // right side
                 let rComp = radius * 0.9
                 let companionAngles: [CGFloat] = [opposite - spread, opposite + spread]
@@ -240,7 +240,7 @@ struct GradientCanvasEditor: View {
             let baseAngle = atan2(dy, dx)
             let r = min(0.49, sqrt(dx*dx + dy*dy)) // same normalized radius
             let opposite = baseAngle + .pi
-            let spread: CGFloat = 0.35 // ~20°
+            let spread: CGFloat = 0.6 // ~34°
             let angles = [opposite - spread, opposite + spread]
             for (i, other) in others.enumerated() where i < 2 {
                 let ang = angles[i]
