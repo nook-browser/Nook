@@ -114,7 +114,8 @@ struct DitheredGradientView: View {
                 Rectangle()
                     .fill(LinearGradient(gradient: Gradient(stops: Self.stops(gradient)), startPoint: pts.start, endPoint: pts.end))
 
-                // Only overlay the dithered image when not actively animating
+                // Overlay the generated image only when not animating/editing,
+                // so SwiftUI's fallback gradient can animate space transitions.
                 if !(gradientTransitionManager.isAnimating || gradientTransitionManager.isEditing), let image = renderer.image {
                     Image(decorative: image, scale: renderScale, orientation: .up)
                         .resizable()
@@ -200,7 +201,7 @@ private func shouldSkipDithering(_ gradient: SpaceGradient) -> Bool {
     return false
 }
 
-func generateDitheredGradient(gradient: SpaceGradient, size: CGSize) -> CGImage? {
+func generateDitheredGradient(gradient: SpaceGradient, size: CGSize, allowDithering: Bool) -> CGImage? {
     // Use default nodes when empty
     let nodes = gradient.nodes.isEmpty ? SpaceGradient.default.nodes : gradient.nodes
     let width = max(1, Int(size.width.rounded()))
@@ -219,8 +220,8 @@ func generateDitheredGradient(gradient: SpaceGradient, size: CGSize) -> CGImage?
                               bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
     else { return nil }
 
-    // Triadic path disabled for consistency with linear gradient preview
-    if false && nodes.count == 3 {
+    // Triadic barycentric blend for 3 nodes
+    if nodes.count == 3 {
         guard let buffer = ctx.data else { return ctx.makeImage() }
         let ptr = buffer.bindMemory(to: UInt8.self, capacity: width * height * bytesPerPixel)
 
@@ -253,10 +254,10 @@ func generateDitheredGradient(gradient: SpaceGradient, size: CGSize) -> CGImage?
         let d11 = simd_dot(v1, v1)
         let denom = (d00 * d11 - d01 * d01)
 
-        // Ordered dithering
+        // Ordered dithering (optional during editing)
         let bayer = bayerMatrix4x4()
         let grain = max(0.0, min(1.0, gradient.grain))
-        let amplitude = (0.6 + 1.4 * grain) / 255.0
+        let amplitude = (allowDithering ? (0.6 + 1.4 * grain) : 0.0) / 255.0
 
         for y in 0..<height {
             for x in 0..<width {
@@ -320,9 +321,9 @@ func generateDitheredGradient(gradient: SpaceGradient, size: CGSize) -> CGImage?
     // Build 4x4 Bayer matrix scaled to [0,1]
     let bayer = bayerMatrix4x4()
 
-    // Dither amplitude ~ LSBs, scaled by grain. Using 0.6..2.0 LSB to avoid visible noise while breaking bands.
+    // Dither amplitude ~ LSBs, scaled by grain. Disable during editing for performance.
     let grain = max(0.0, min(1.0, gradient.grain))
-    let amplitude = (0.6 + 1.4 * grain) / 255.0
+    let amplitude = (allowDithering ? (0.6 + 1.4 * grain) : 0.0) / 255.0
 
     for y in 0..<height {
         for x in 0..<width {
@@ -463,18 +464,14 @@ final class DitheredGradientRenderer: ObservableObject {
     func update(gradient: SpaceGradient, size: CGSize, scale: Double, allowDithering: Bool) {
         // Debounce rapid updates
         workItem?.cancel()
-        if !allowDithering || shouldSkipDithering(gradient) {
-            // During animations or when banding is unlikely, clear image and rely on lightweight gradient
-            DispatchQueue.main.async { [weak self] in self?.image = nil }
-            return
-        }
         let item = DispatchWorkItem { [weak self] in
             let key = self?.cacheKey(gradient: gradient, size: size)
             if let key = key, let cached = Self.cache.object(forKey: key as NSString) {
                 DispatchQueue.main.async { self?.image = cached }
                 return
             }
-            let img = generateDitheredGradient(gradient: gradient, size: size)
+            // Compute image; renderer decides whether to apply dithering based on flag and gradient
+            let img = generateDitheredGradient(gradient: gradient, size: size, allowDithering: allowDithering && !shouldSkipDithering(gradient))
             if let img, let key = key {
                 Self.cache.setObject(img, forKey: key as NSString)
             }
