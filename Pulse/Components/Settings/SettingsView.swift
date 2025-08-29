@@ -29,7 +29,7 @@ struct SettingsView: View {
                 
                 // Tab list
                 List(selection: $selectedTab) {
-                    ForEach([SettingsTabs.general, .privacy, .spaces, .profiles, .shortcuts, .advanced], id: \.self) { tab in
+                    ForEach([SettingsTabs.general, .privacy, .spaces, .profiles, .shortcuts, .extensions, .advanced], id: \.self) { tab in
                         Label(tab.name, systemImage: tab.icon)
                             .tag(tab)
                     }
@@ -66,6 +66,8 @@ struct SettingsView: View {
                         ProfilesSettingsView()
                     case .shortcuts:
                         ShortcutsSettingsView()
+                    case .extensions:
+                        ExtensionsSettingsView()
                     case .advanced:
                         AdvancedSettingsView()
                     }
@@ -108,6 +110,49 @@ struct GeneralSettingsView: View {
             
             Toggle(isOn: $browserManager.settingsManager.isLiquidGlassEnabled) {
                 Text("Liquid Glass")
+            }
+            
+            Divider()
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Tab Unload Timeout")
+                    .font(.headline)
+
+                Text("Automatically unload inactive tabs to save memory")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                // Dropdown with discrete timeout options
+                Picker(
+                    "Tab Unload Timeout",
+                    selection: Binding<TimeInterval>(
+                        get: {
+                            nearestTimeoutOption(to: browserManager.settingsManager.tabUnloadTimeout)
+                        },
+                        set: { newValue in
+                            browserManager.settingsManager.tabUnloadTimeout = newValue
+                        }
+                    )
+                ) {
+                    ForEach(unloadTimeoutOptions, id: \.self) { value in
+                        Text(formatTimeout(value)).tag(value)
+                    }
+                }
+                .pickerStyle(.menu)
+                .onAppear {
+                    // Coerce any legacy/custom values to the nearest preset
+                    browserManager.settingsManager.tabUnloadTimeout =
+                        nearestTimeoutOption(to: browserManager.settingsManager.tabUnloadTimeout)
+                }
+
+                HStack {
+                    Button("Unload All Inactive Tabs") {
+                        browserManager.tabManager.unloadAllInactiveTabs()
+                    }
+                    .buttonStyle(.bordered)
+                    
+                    Spacer()
+                }
             }
             
             Spacer()
@@ -158,6 +203,157 @@ struct ShortcutsSettingsView: View {
     }
 }
 
+struct ExtensionsSettingsView: View {
+    @EnvironmentObject var browserManager: BrowserManager
+    @State private var showingInstallDialog = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if #available(macOS 15.5, *) {
+                if let extensionManager = browserManager.extensionManager {
+                    // Extension management UI
+                    HStack {
+                        Text("Installed Extensions")
+                            .font(.headline)
+                        Spacer()
+                        Button("Install Extension...") {
+                            browserManager.showExtensionInstallDialog()
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    
+                    Divider()
+                    
+                    if extensionManager.installedExtensions.isEmpty {
+                        VStack(spacing: 12) {
+                            Image(systemName: "puzzlepiece.extension")
+                                .font(.system(size: 48))
+                                .foregroundColor(.secondary)
+                            Text("No Extensions Installed")
+                                .font(.title2)
+                                .fontWeight(.medium)
+                            Text("Install browser extensions to enhance your browsing experience")
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing: 12) {
+                                ForEach(extensionManager.installedExtensions, id: \.id) { ext in
+                                    ExtensionRowView(extension: ext)
+                                        .environmentObject(browserManager)
+                                }
+                            }
+                            .padding(.vertical)
+                        }
+                    }
+                } else {
+                    VStack(spacing: 12) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 48))
+                            .foregroundColor(.orange)
+                        Text("Extension Manager Unavailable")
+                            .font(.title2)
+                            .fontWeight(.medium)
+                        Text("Extension support is not properly initialized")
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            } else {
+                // Unsupported OS version
+                VStack(spacing: 12) {
+                    Image(systemName: "puzzlepiece.extension")
+                        .font(.system(size: 48))
+                        .foregroundColor(.secondary)
+                    Text("Extensions Not Supported")
+                        .font(.title2)
+                        .fontWeight(.medium)
+                    Text("Extensions require macOS 15.5 or later")
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .padding()
+        .frame(minWidth: 520, minHeight: 360)
+    }
+}
+
+struct ExtensionRowView: View {
+    let `extension`: InstalledExtension
+    @EnvironmentObject var browserManager: BrowserManager
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Extension icon
+            Group {
+                if let iconPath = `extension`.iconPath,
+                   let nsImage = NSImage(contentsOfFile: iconPath) {
+                    Image(nsImage: nsImage)
+                        .resizable()
+                } else {
+                    Image(systemName: "puzzlepiece.extension")
+                        .foregroundColor(.blue)
+                }
+            }
+            .frame(width: 32, height: 32)
+            .background(Color(.controlBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            
+            // Extension info
+            VStack(alignment: .leading, spacing: 2) {
+                Text(`extension`.name)
+                    .font(.headline)
+                    .lineLimit(1)
+                
+                HStack(spacing: 8) {
+                    Text("v\(`extension`.version)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    if let description = `extension`.description {
+                        Text("•")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(description)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            // Controls
+            HStack(spacing: 8) {
+                Toggle("", isOn: Binding(
+                    get: { `extension`.isEnabled },
+                    set: { isEnabled in
+                        if isEnabled {
+                            browserManager.enableExtension(`extension`.id)
+                        } else {
+                            browserManager.disableExtension(`extension`.id)
+                        }
+                    }
+                ))
+                .toggleStyle(.switch)
+                
+                Button("Remove") {
+                    browserManager.uninstallExtension(`extension`.id)
+                }
+                .buttonStyle(.bordered)
+                .foregroundColor(.red)
+            }
+        }
+        .padding(12)
+        .background(Color(.controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
 struct AdvancedSettingsView: View {
     var body: some View {
         VStack {
@@ -168,5 +364,48 @@ struct AdvancedSettingsView: View {
             Spacer()
         }
         .padding()
+    }
+}
+
+// MARK: - Helper Functions
+private let unloadTimeoutOptions: [TimeInterval] = [
+    300,    // 5 min
+    600,    // 10 min
+    900,    // 15 min
+    1800,   // 30 min
+    2700,   // 45 min
+    3600,   // 1 hr
+    7200,   // 2 hr
+    14400,  // 4 hr
+    28800,  // 8 hr
+    43200,  // 12 hr
+    86400   // 24 hr
+]
+
+private func nearestTimeoutOption(to value: TimeInterval) -> TimeInterval {
+    guard let nearest = unloadTimeoutOptions.min(by: { abs($0 - value) < abs($1 - value) }) else {
+        return value
+    }
+    return nearest
+}
+
+private func formatTimeout(_ seconds: TimeInterval) -> String {
+    if seconds < 3600 { // under 1 hour
+        let minutes = Int(seconds / 60)
+        return minutes == 1 ? "1 min" : "\(minutes) mins"
+    } else if seconds < 86400 { // under 24 hours
+        let hours = seconds / 3600.0
+        let rounded = hours.rounded()
+        let isWhole = abs(hours - rounded) < 0.01
+        if isWhole {
+            let wholeHours = Int(rounded)
+            return wholeHours == 1 ? "1 hr" : "\(wholeHours) hrs"
+        } else {
+            // Show one decimal for non-integer hours
+            return String(format: "%.1f hrs", hours)
+        }
+    } else {
+        // 24 hours (cap in UI)
+        return "24 hr"
     }
 }

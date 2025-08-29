@@ -7,14 +7,8 @@ struct WebView: NSViewRepresentable {
     var onURLChange: ((String) -> Void)? = nil
 
     func makeNSView(context: Context) -> WKWebView {
-        let configuration = WKWebViewConfiguration()
-        configuration.websiteDataStore = WKWebsiteDataStore.default()
-
-        let preferences = WKWebpagePreferences()
-        preferences.allowsContentJavaScript = true
-        configuration.defaultWebpagePreferences = preferences
-
-        configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
+        // Reuse the shared browser configuration so extensions can inject consistently
+        let configuration = BrowserConfiguration.shared.webViewConfiguration
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
@@ -22,6 +16,11 @@ struct WebView: NSViewRepresentable {
 
         webView.allowsBackForwardNavigationGestures = true
         webView.allowsMagnification = true
+        
+        // Enable web inspector for debugging
+        if #available(macOS 13.3, *) {
+            webView.isInspectable = true
+        }
 
         webView.customUserAgent =
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
@@ -36,8 +35,16 @@ struct WebView: NSViewRepresentable {
         guard let url = URL(string: urlString) else { return }
 
         if webView.url != url {
-            let request = URLRequest(url: url)
-            webView.load(request)
+            if url.isFileURL {
+                // Grant read access to the containing directory for local resources
+                let readAccessURL = url.deletingLastPathComponent()
+                webView.loadFileURL(url, allowingReadAccessTo: readAccessURL)
+            } else {
+                var request = URLRequest(url: url)
+                request.cachePolicy = .returnCacheDataElseLoad
+                request.timeoutInterval = 30.0
+                webView.load(request)
+            }
         }
 
         context.coordinator.onTitleChange = onTitleChange
