@@ -159,6 +159,15 @@ struct SidebarView: View {
             currentScrollID = targetScrollPosition
             print("🔄 Initialized activeSpaceIndex: \(activeSpaceIndex), currentScrollID: \(targetScrollPosition)")
         }
+        .onChange(of: browserManager.tabManager.currentSpace?.id) { _, _ in
+            // Space was changed programmatically (e.g., clicking bottom icons)
+            let newSpaceIndex = targetScrollPosition
+            if newSpaceIndex != activeSpaceIndex {
+                print("🎯 Programmatic space change - snapping to space \(newSpaceIndex)")
+                activeSpaceIndex = newSpaceIndex
+                currentScrollID = newSpaceIndex
+            }
+        }
         .onScrollPhaseChange { oldPhase, newPhase in
             if newPhase == .interacting && oldPhase == .idle {
                 // Drag just started - fire haptic after short delay
