@@ -6,6 +6,7 @@ final class GradientTransitionManager: ObservableObject {
     @Published var displayGradient: SpaceGradient = .default
     @Published private(set) var isEditing: Bool = false
     @Published var isAnimating: Bool = false
+    @Published var preferBarycentricDuringAnimation: Bool = false
     private var animationToken: UUID?
 
     // MARK: - Immediate update (no animation)
@@ -37,6 +38,10 @@ final class GradientTransitionManager: ObservableObject {
         // Flip on lightweight mode for renderers
         isAnimating = true
 
+        // Prefer barycentric shader during animation if both ends are tri-color
+        if let from { self.preferBarycentricDuringAnimation = (from.nodes.count == 3 && to.nodes.count == 3) }
+        else { self.preferBarycentricDuringAnimation = (to.nodes.count == 3) }
+
         // If a specific starting gradient is provided, snap to it without animation first
         if let from {
             var tx = Transaction()
@@ -66,6 +71,7 @@ final class GradientTransitionManager: ObservableObject {
             if self.animationToken == token {
                 self.setImmediate(expectedEnd)
                 self.isAnimating = false
+                self.preferBarycentricDuringAnimation = false
             }
         }
     }

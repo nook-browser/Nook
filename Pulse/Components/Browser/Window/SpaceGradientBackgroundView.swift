@@ -14,7 +14,8 @@ struct SpaceGradientBackgroundView: View {
 
     var body: some View {
         ZStack {
-            if gradient.nodes.count == 3 {
+            let useTriShader: Bool = gradientTransitionManager.isAnimating ? gradientTransitionManager.preferBarycentricDuringAnimation : (gradient.nodes.count == 3)
+            if useTriShader {
                 // GPU barycentric blend for tri-color gradients
                 BarycentricTriGradientView(gradient: gradient)
             } else {
