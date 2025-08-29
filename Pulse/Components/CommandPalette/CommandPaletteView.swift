@@ -1,6 +1,6 @@
 //
 //  CommandPaletteView.swift
-//  Alto
+//  Nook
 //
 //  Created by Maciek Bagiński on 28/07/2025.
 //
@@ -24,11 +24,13 @@ struct CommandPaletteView: View {
                 }
                 .gesture(WindowDragGesture())
 
-            VStack(alignment: .center) {
-                HStack(spacing: 0) {
+            GeometryReader { geometry in
+                HStack {
                     Spacer()
-
+                    
+                    // Single box that expands/contracts but stays anchored at top
                     VStack(spacing: 0) {
+                        // Input field - fixed at top of box
                         HStack(spacing: 12) {
                             Image(
                                 systemName: isLikelyURL(text)
@@ -60,8 +62,8 @@ struct CommandPaletteView: View {
                                     )
                                 }
                         }
-                        .padding(.vertical, 12)
-                        .padding(.horizontal, 16)
+                        .padding(.vertical, 16)
+                        .padding(.horizontal, 20)
 
                         // Separator
                         if !searchManager.suggestions.isEmpty {
@@ -72,7 +74,7 @@ struct CommandPaletteView: View {
                                 .padding(.horizontal, 8)
                         }
 
-                        // Suggestions
+                        // Suggestions - expand the box downward
                         if !searchManager.suggestions.isEmpty {
                             LazyVStack(spacing: 2) {
                                 ForEach(
@@ -81,13 +83,7 @@ struct CommandPaletteView: View {
                                     ),
                                     id: \.element.id
                                 ) { index, suggestion in
-                                    CommandPaletteSuggestionView(
-                                        favicon: iconForSuggestion(suggestion),
-                                        text: suggestion.text,
-                                        isTabSuggestion: isTabSuggestion(suggestion),
-                                        isSelected: selectedSuggestionIndex
-                                            == index
-                                    )
+                                    suggestionRow(for: suggestion, isSelected: selectedSuggestionIndex == index)
                                     .onTapGesture {
                                         selectSuggestion(suggestion)
                                     }
@@ -97,14 +93,17 @@ struct CommandPaletteView: View {
                             .padding(.vertical, 4)
                         }
                     }
-                    .frame(width: 500)
+                    .frame(width: 600)
                     .background(.thinMaterial)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(.white.opacity(0.1), lineWidth: 1)
+                            .stroke(.white.opacity(0.2), lineWidth: 1)
                     )
-
+                    .animation(.easeInOut(duration: 0.15), value: searchManager.suggestions.count)
+                    .alignmentGuide(.top) { _ in -geometry.size.height / 2 }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    
                     Spacer()
                 }
             }
@@ -114,8 +113,12 @@ struct CommandPaletteView: View {
         .opacity(browserManager.isCommandPaletteVisible ? 1.0 : 0.0)
         .onChange(of: browserManager.isCommandPaletteVisible) { _, newVisible in
             if newVisible {
-                // Set the tab manager when command palette opens
                 searchManager.setTabManager(browserManager.tabManager)
+                searchManager.setHistoryManager(browserManager.historyManager)
+                
+                // Pre-fill text if provided and select all for easy replacement
+                text = browserManager.commandPalettePrefilledText
+                
                 DispatchQueue.main.async {
                     isSearchFocused = true
                 }
@@ -157,10 +160,26 @@ struct CommandPaletteView: View {
             // Switch to existing tab
             browserManager.tabManager.setActiveTab(existingTab)
             print("Switched to existing tab: \(existingTab.name)")
+        case .history(let historyEntry):
+            if browserManager.shouldNavigateCurrentTab && browserManager.tabManager.currentTab != nil {
+                // Navigate current tab to history URL
+                browserManager.tabManager.currentTab?.loadURL(historyEntry.url.absoluteString)
+                print("Navigated current tab to history URL: \(historyEntry.url)")
+            } else {
+                // Create new tab from history entry
+                let tab = browserManager.tabManager.createNewTab(url: historyEntry.url.absoluteString, in: browserManager.tabManager.currentSpace)
+                print("Created tab \(tab.name) from history in \(String(describing: browserManager.tabManager.currentSpace?.name))")
+            }
         case .url, .search:
-            // Create new tab
-            let tab = browserManager.tabManager.createNewTab(url: suggestion.text, in: browserManager.tabManager.currentSpace)
-            print("Created tab \(tab.name) in \(String(describing: browserManager.tabManager.currentSpace?.name))") // Changed this so Xcode doesn't get mad
+            if browserManager.shouldNavigateCurrentTab && browserManager.tabManager.currentTab != nil {
+                // Navigate current tab to new URL with proper normalization
+                browserManager.tabManager.currentTab?.navigateToURL(suggestion.text)
+                print("Navigated current tab to: \(suggestion.text)")
+            } else {
+                // Create new tab
+                let tab = browserManager.tabManager.createNewTab(url: suggestion.text, in: browserManager.tabManager.currentSpace)
+                print("Created tab \(tab.name) in \(String(describing: browserManager.tabManager.currentSpace?.name))")
+            }
         }
         
         text = ""
@@ -172,10 +191,8 @@ struct CommandPaletteView: View {
         let maxIndex = searchManager.suggestions.count - 1
 
         if direction > 0 {
-            // Down arrow
             selectedSuggestionIndex = min(selectedSuggestionIndex + 1, maxIndex)
         } else {
-            // Up arrow
             selectedSuggestionIndex = max(selectedSuggestionIndex - 1, -1)
         }
     }
@@ -184,6 +201,8 @@ struct CommandPaletteView: View {
         switch suggestion.type {
         case .tab(let tab):
             return tab.favicon
+        case .history:
+            return Image(systemName: "globe")
         case .url:
             return Image(systemName: "link")
         case .search:
@@ -191,11 +210,34 @@ struct CommandPaletteView: View {
         }
     }
     
+    @ViewBuilder
+    private func suggestionRow(for suggestion: SearchManager.SearchSuggestion, isSelected: Bool) -> some View {
+        switch suggestion.type {
+        case .tab(let tab):
+            TabSuggestionItem(tab: tab, isSelected: isSelected)
+        case .history(let entry):
+            HistorySuggestionItem(entry: entry, isSelected: isSelected)
+        case .url:
+            GenericSuggestionItem(icon: Image(systemName: "link"), text: suggestion.text, isSelected: isSelected)
+        case .search:
+            GenericSuggestionItem(icon: Image(systemName: "magnifyingglass"), text: suggestion.text, isSelected: isSelected)
+        }
+    }
+    
+    private func urlForSuggestion(_ suggestion: SearchManager.SearchSuggestion) -> URL? {
+        switch suggestion.type {
+        case .history(let entry):
+            return entry.url
+        default:
+            return nil
+        }
+    }
+    
     private func isTabSuggestion(_ suggestion: SearchManager.SearchSuggestion) -> Bool {
         switch suggestion.type {
         case .tab:
             return true
-        case .search, .url:
+        case .search, .url, .history:
             return false
         }
     }

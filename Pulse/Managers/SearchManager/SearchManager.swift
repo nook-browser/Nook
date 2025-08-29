@@ -17,6 +17,7 @@ class SearchManager {
     private let session = URLSession.shared
     private var searchTask: URLSessionDataTask?
     private weak var tabManager: TabManager?
+    private weak var historyManager: HistoryManager?
     
     struct SearchSuggestion: Identifiable, Equatable {
         let id = UUID()
@@ -27,6 +28,7 @@ class SearchManager {
             case search
             case url
             case tab(Tab)
+            case history(HistoryEntry)
         }
         
         static func == (lhs: SearchSuggestion, rhs: SearchSuggestion) -> Bool {
@@ -35,6 +37,8 @@ class SearchManager {
                 return lhs.text == rhs.text
             case (.tab(let lhsTab), .tab(let rhsTab)):
                 return lhs.text == rhs.text && lhsTab.id == rhsTab.id
+            case (.history(let lhsHistory), .history(let rhsHistory)):
+                return lhs.text == rhs.text && lhsHistory.id == rhsHistory.id
             default:
                 return false
             }
@@ -43,6 +47,10 @@ class SearchManager {
     
     func setTabManager(_ tabManager: TabManager?) {
         self.tabManager = tabManager
+    }
+    
+    func setHistoryManager(_ historyManager: HistoryManager?) {
+        self.historyManager = historyManager
     }
     
     @MainActor func searchSuggestions(for query: String) {
@@ -62,25 +70,34 @@ class SearchManager {
         // Search tabs first
         let tabSuggestions = searchTabs(for: query)
         
-        // If we have tab matches, prioritize them
-        if !tabSuggestions.isEmpty {
-            let allSuggestions = tabSuggestions + (isLikelyURL(query) ? [SearchSuggestion(text: query, type: .url)] : [])
-            updateSuggestionsIfNeeded(allSuggestions)
-            
-            // Still fetch web suggestions but combine them
-            fetchWebSuggestions(for: query, prependTabSuggestions: tabSuggestions)
-            return
-        }
+        // Search history
+        let historySuggestions = searchHistory(for: query)
         
+        // Combine suggestions: tabs first, then history, then web suggestions
+        var allSuggestions: [SearchSuggestion] = []
+        
+        // Add tab suggestions (limit to 2 to leave room for history)
+        let maxTabSuggestions = 2
+        let limitedTabSuggestions = Array(tabSuggestions.prefix(maxTabSuggestions))
+        allSuggestions.append(contentsOf: limitedTabSuggestions)
+        
+        // Add history suggestions (limit to leave room for web suggestions)
+        let maxHistorySuggestions = 2
+        let limitedHistorySuggestions = Array(historySuggestions.prefix(maxHistorySuggestions))
+        allSuggestions.append(contentsOf: limitedHistorySuggestions)
+        
+        // Add URL suggestion if query looks like a URL
         if isLikelyURL(query) {
-            let urlSuggestion = [SearchSuggestion(text: query, type: .url)]
-            updateSuggestionsIfNeeded(urlSuggestion)
-            fetchWebSuggestions(for: query, prependTabSuggestions: [])
-            return
+            allSuggestions.append(SearchSuggestion(text: query, type: .url))
         }
         
-        // Fetch web suggestions
-        fetchWebSuggestions(for: query, prependTabSuggestions: [])
+        // Update suggestions immediately with what we have
+        if !allSuggestions.isEmpty {
+            updateSuggestionsIfNeeded(allSuggestions)
+        }
+        
+        // Fetch web suggestions and combine them, but limit total to 5
+        fetchWebSuggestions(for: query, prependTabSuggestions: allSuggestions)
     }
     
     @MainActor private func searchTabs(for query: String) -> [SearchSuggestion] {
@@ -126,6 +143,54 @@ class SearchManager {
         return Array(sortedTabs.prefix(3)) // Limit to 3 tab suggestions
     }
     
+    @MainActor private func searchHistory(for query: String) -> [SearchSuggestion] {
+        guard let historyManager = historyManager else { return [] }
+        
+        let lowercaseQuery = query.lowercased()
+        let historyEntries = historyManager.searchHistory(query: query, page: 0, pageSize: 20)
+        
+        var matchingHistory: [SearchSuggestion] = []
+        
+        for entry in historyEntries.entries {
+            let titleMatch = entry.title.lowercased().contains(lowercaseQuery)
+            let urlMatch = entry.url.absoluteString.lowercased().contains(lowercaseQuery)
+            let hostMatch = entry.url.host?.lowercased().contains(lowercaseQuery) ?? false
+            
+            if titleMatch || urlMatch || hostMatch {
+                let suggestion = SearchSuggestion(
+                    text: entry.displayTitle,
+                    type: .history(entry)
+                )
+                matchingHistory.append(suggestion)
+            }
+        }
+        
+        // Sort by relevance (title matches first, then URL matches, then by visit count and recency)
+        let sortedHistory = matchingHistory.sorted { (lhs: SearchSuggestion, rhs: SearchSuggestion) -> Bool in
+            if case .history(let lhsHistory) = lhs.type, case .history(let rhsHistory) = rhs.type {
+                let lhsTitleMatch = lhsHistory.title.lowercased().contains(lowercaseQuery)
+                let rhsTitleMatch = rhsHistory.title.lowercased().contains(lowercaseQuery)
+                
+                // First prioritize title matches
+                if lhsTitleMatch && !rhsTitleMatch {
+                    return true
+                } else if !lhsTitleMatch && rhsTitleMatch {
+                    return false
+                } else {
+                    // Then prioritize by visit count and recency
+                    if lhsHistory.visitCount != rhsHistory.visitCount {
+                        return lhsHistory.visitCount > rhsHistory.visitCount
+                    } else {
+                        return lhsHistory.lastVisited > rhsHistory.lastVisited
+                    }
+                }
+            }
+            return false
+        }
+        
+        return sortedHistory
+    }
+    
     private func fetchWebSuggestions(for query: String, prependTabSuggestions: [SearchSuggestion]) {
         isLoading = true
         
@@ -162,9 +227,10 @@ class SearchManager {
                         )
                     }
                     
-                    // Combine tab suggestions with web suggestions
+                    // Combine suggestions but limit total to 5
                     let combinedSuggestions = prependTabSuggestions + Array(webSuggestions)
-                    self?.updateSuggestionsIfNeeded(combinedSuggestions)
+                    let limitedSuggestions = Array(combinedSuggestions.prefix(5))
+                    self?.updateSuggestionsIfNeeded(limitedSuggestions)
                     
                 } catch {
                     print("JSON parsing error: \(error.localizedDescription)")

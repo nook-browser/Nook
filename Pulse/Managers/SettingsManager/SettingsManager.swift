@@ -14,6 +14,7 @@ class SettingsManager {
     private let materialKey = "settings.currentMaterialRaw"
     private let searchEngineKey = "settings.searchEngine"
     private let liquidGlassKey = "settings.isLiquidGlassEnabled"
+    private let tabUnloadTimeoutKey = "settings.tabUnloadTimeout"
 
     // Stored properties
     var isLiquidGlassEnabled: Bool {
@@ -41,13 +42,23 @@ class SettingsManager {
             userDefaults.set(searchEngine.rawValue, forKey: searchEngineKey)
         }
     }
+    
+    var tabUnloadTimeout: TimeInterval {
+        didSet {
+            userDefaults.set(tabUnloadTimeout, forKey: tabUnloadTimeoutKey)
+            // Notify compositor manager of timeout change
+            NotificationCenter.default.post(name: .tabUnloadTimeoutChanged, object: nil, userInfo: ["timeout": tabUnloadTimeout])
+        }
+    }
 
     init() {
         // Register default values
         userDefaults.register(defaults: [
             materialKey: NSVisualEffectView.Material.hudWindow.rawValue,
             liquidGlassKey: false,
-            searchEngineKey: SearchProvider.google.rawValue
+            searchEngineKey: SearchProvider.google.rawValue,
+            // Default tab unload timeout: 60 minutes
+            tabUnloadTimeoutKey: 3600.0
         ])
 
         // Initialize properties from UserDefaults
@@ -63,5 +74,13 @@ class SettingsManager {
             // Fallback to google if the stored value is somehow invalid
             self.searchEngine = .google
         }
+        
+        // Initialize tab unload timeout
+        self.tabUnloadTimeout = userDefaults.double(forKey: tabUnloadTimeoutKey)
     }
+}
+
+// MARK: - Notification Names
+extension Notification.Name {
+    static let tabUnloadTimeoutChanged = Notification.Name("tabUnloadTimeoutChanged")
 }

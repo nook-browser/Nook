@@ -12,6 +12,7 @@ enum SettingsTabs {
     case spaces
     case profiles
     case shortcuts
+    case extensions
     case advanced
     
     var name: String {
@@ -21,6 +22,7 @@ enum SettingsTabs {
         case .spaces: return "Spaces"
         case .profiles: return "Profiles"
         case .shortcuts: return "Shortcuts"
+        case .extensions: return "Extensions"
         case .advanced: return "Advanced"
         }
     }
@@ -32,6 +34,7 @@ enum SettingsTabs {
         case .spaces: return "folder"
         case .profiles: return "person.circle"
         case .shortcuts: return "keyboard"
+        case .extensions: return "puzzlepiece.extension"
         case .advanced: return "wrench.and.screwdriver"
         }
     }

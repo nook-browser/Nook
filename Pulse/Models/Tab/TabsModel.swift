@@ -13,7 +13,8 @@ final class TabEntity {
     @Attribute(.unique) var id: UUID
     var urlString: String
     var name: String
-    var isPinned: Bool
+    var isPinned: Bool // Global pinned (essentials)
+    var isSpacePinned: Bool = false // Space-level pinned
     var index: Int
     var spaceId: UUID?
 
@@ -22,6 +23,7 @@ final class TabEntity {
         urlString: String,
         name: String,
         isPinned: Bool,
+        isSpacePinned: Bool = false,
         index: Int,
         spaceId: UUID?
     ) {
@@ -29,6 +31,7 @@ final class TabEntity {
         self.urlString = urlString
         self.name = name
         self.isPinned = isPinned
+        self.isSpacePinned = isSpacePinned
         self.index = index
         self.spaceId = spaceId
     }

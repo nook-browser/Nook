@@ -8,15 +8,35 @@
 import SwiftUI
 import SwiftData
 import AppKit
+import WebKit
 
 @MainActor
 final class Persistence {
     static let shared = Persistence()
     let container: ModelContainer
     private init() {
-        container = try! ModelContainer(
-            for: Schema([SpaceEntity.self,TabEntity.self, TabsStateEntity.self, HistoryEntity.self])
-        )
+        do {
+            let schema = Schema([SpaceEntity.self, TabEntity.self, TabsStateEntity.self, HistoryEntity.self, ExtensionEntity.self])
+            container = try ModelContainer(for: schema)
+        } catch {
+            print("SwiftData container creation failed: \(error)")
+            print("This might be due to schema changes. Resetting database...")
+            
+            // Fallback: Delete the database file and create fresh
+            do {
+                let url = URL.applicationSupportDirectory.appending(path: "default.store")
+                if FileManager.default.fileExists(atPath: url.path()) {
+                    try FileManager.default.removeItem(at: url)
+                    print("Removed old database file")
+                }
+                
+                let schema = Schema([SpaceEntity.self, TabEntity.self, TabsStateEntity.self, HistoryEntity.self, ExtensionEntity.self])
+                container = try ModelContainer(for: schema)
+                print("Database reset and created successfully")
+            } catch {
+                fatalError("Failed to create ModelContainer after reset: \(error)")
+            }
+        }
     }
 }
 
@@ -26,6 +46,9 @@ class BrowserManager: ObservableObject {
     @Published var sidebarWidth: CGFloat = 250
     @Published var isSidebarVisible: Bool = true
     @Published var isCommandPaletteVisible: Bool = false
+    @Published var didCopyURL: Bool = false
+    @Published var commandPalettePrefilledText: String = ""
+    @Published var shouldNavigateCurrentTab: Bool = false
     
     var modelContext: ModelContext
     var tabManager: TabManager
@@ -35,23 +58,56 @@ class BrowserManager: ObservableObject {
     var historyManager: HistoryManager
     var cookieManager: CookieManager
     var cacheManager: CacheManager
+    var extensionManager: ExtensionManager?
+    var compositorManager: TabCompositorManager
+    var gradientTransitionManager: GradientTransitionManager
     
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
+    
+    // Compositor container view
+    var compositorContainerView: NSView?
 
     init() {
+        // Phase 1: initialize all stored properties
         self.modelContext = Persistence.shared.container.mainContext
-        self.tabManager = TabManager(browserManager: nil,context: modelContext)
+        if #available(macOS 15.5, *) {
+            self.extensionManager = ExtensionManager.shared
+        } else {
+            self.extensionManager = nil
+        }
+        self.tabManager = TabManager(browserManager: nil, context: modelContext)
         self.settingsManager = SettingsManager()
         self.dialogManager = DialogManager()
         self.downloadManager = DownloadManager.shared
         self.historyManager = HistoryManager(context: modelContext)
         self.cookieManager = CookieManager()
         self.cacheManager = CacheManager()
+        self.compositorManager = TabCompositorManager()
+        self.gradientTransitionManager = GradientTransitionManager()
+        self.compositorContainerView = nil
+
+        // Phase 2: wire dependencies and perform side effects (safe to use self)
+        self.compositorManager.browserManager = self
+        self.compositorManager.setUnloadTimeout(self.settingsManager.tabUnloadTimeout)
         self.tabManager.browserManager = self
         self.tabManager.reattachBrowserManager(self)
+        if #available(macOS 15.5, *), let mgr = self.extensionManager {
+            // Attach extension manager BEFORE any WKWebView is created so content scripts can inject
+            mgr.attach(browserManager: self)
+        }
+        if let g = self.tabManager.currentSpace?.gradient {
+            self.gradientTransitionManager.setImmediate(g)
+        } else {
+            self.gradientTransitionManager.setImmediate(.default)
+        }
         loadSidebarSettings()
-
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleTabUnloadTimeoutChange),
+            name: .tabUnloadTimeoutChanged,
+            object: nil
+        )
     }
     
     func updateSidebarWidth(_ width: CGFloat) {
@@ -78,11 +134,26 @@ class BrowserManager: ObservableObject {
 
     // MARK: - Command Palette
     func openCommandPalette() {
-        isCommandPaletteVisible = true
+        if isCommandPaletteVisible { 
+                   DispatchQueue.main.async {
+            self.isCommandPaletteVisible = false
+        } 
+         } else {
+        // Clear prefilled text and set to create new tab
+        commandPalettePrefilledText = ""
+        shouldNavigateCurrentTab = false
+        DispatchQueue.main.async {
+            self.isCommandPaletteVisible = true
+        }
+         }
+
     }
 
     func closeCommandPalette() {
-        isCommandPaletteVisible = false
+        if !isCommandPaletteVisible { return }
+        DispatchQueue.main.async {
+            self.isCommandPaletteVisible = false
+        }
     }
 
     func toggleCommandPalette() {
@@ -103,8 +174,19 @@ class BrowserManager: ObservableObject {
     }
 
     func focusURLBar() {
-        // Open command palette which serves as the URL input
-        isCommandPaletteVisible = true
+        if isCommandPaletteVisible { return }
+        
+        // Pre-fill with current tab's URL and set to navigate current tab
+        if let currentURL = tabManager.currentTab?.url {
+            commandPalettePrefilledText = currentURL.absoluteString
+        } else {
+            commandPalettePrefilledText = ""
+        }
+        shouldNavigateCurrentTab = true
+        
+        DispatchQueue.main.async {
+            self.isCommandPaletteVisible = true
+        }
     }
 
     // MARK: - Dialog Methods
@@ -150,12 +232,101 @@ class BrowserManager: ObservableObject {
         dialogManager.showCustomContentDialog(header: header, content: content, footer: footer)
     }
     
+    // MARK: - Appearance / Gradient Editing
+    private final class GradientDraft: ObservableObject {
+        @Published var value: SpaceGradient
+        init(_ value: SpaceGradient) { self.value = value }
+    }
+
+    func showGradientEditor() {
+        guard let space = tabManager.currentSpace else {
+            // Consistent in-app dialog when no space is available
+            let header = AnyView(
+                DialogHeader(
+                    icon: "paintpalette",
+                    title: "No Space Available",
+                    subtitle: "Create a space to customize its gradient."
+                )
+            )
+            let footer = AnyView(
+                DialogFooter(rightButtons: [
+                    DialogButton(text: "OK", variant: .primary) { [weak self] in
+                        self?.closeDialog()
+                    }
+                ])
+            )
+            showCustomContentDialog(header: header, content: Color.clear.frame(height: 0), footer: footer)
+            return
+        }
+
+        let draft = GradientDraft(space.gradient)
+        let binding = Binding<SpaceGradient>(
+            get: { draft.value },
+            set: { draft.value = $0 }
+        )
+
+        // Compact dialog: remove header icon/title to save vertical space
+        let header: AnyView? = nil
+
+        let content = GradientEditorView(gradient: binding)
+            .environmentObject(self.gradientTransitionManager)
+
+        let footer = AnyView(
+            DialogFooter(
+                leftButton: DialogButton(
+                    text: "Cancel",
+                    variant: .secondary,
+                    action: { [weak self] in
+                        // Restore background to the saved gradient for this space
+                        self?.gradientTransitionManager.endInteractivePreview()
+                        self?.gradientTransitionManager.transition(to: space.gradient, duration: 0.25)
+                        self?.closeDialog()
+                    }
+                ),
+                rightButtons: [
+                    DialogButton(
+                        text: "Save",
+                        iconName: "checkmark",
+                        variant: .primary,
+                        action: { [weak self] in
+                            // Commit draft to the current space and persist
+                            space.gradient = draft.value
+                            // End interactive editing then morph to the committed gradient
+                            self?.gradientTransitionManager.endInteractivePreview()
+                            self?.gradientTransitionManager.transition(to: draft.value, duration: 0.35)
+                            self?.tabManager.persistSnapshot()
+                            self?.closeDialog()
+                        }
+                    )
+                ]
+            )
+        )
+
+        showCustomContentDialog(
+            header: header,
+            content: content,
+            footer: footer
+        )
+    }
+
     func closeDialog() {
         dialogManager.closeDialog()
     }
     
     private func quitApplication() {
+        // Clean up all tabs before terminating
+        cleanupAllTabs()
         NSApplication.shared.terminate(nil)
+    }
+    
+    func cleanupAllTabs() {
+        print("🔄 [BrowserManager] Cleaning up all tabs")
+        let allTabs = tabManager.pinnedTabs + tabManager.tabs
+        
+        for tab in allTabs {
+            print("🔄 [BrowserManager] Cleaning up tab: \(tab.name)")
+            tab.closeTab()
+        }
     }
 
     // MARK: - Private Methods
@@ -173,6 +344,16 @@ class BrowserManager: ObservableObject {
     private func saveSidebarSettings() {
         userDefaults.set(savedSidebarWidth, forKey: "sidebarWidth")
         userDefaults.set(isSidebarVisible, forKey: "sidebarVisible")
+    }
+    
+    @objc private func handleTabUnloadTimeoutChange(_ notification: Notification) {
+        if let timeout = notification.userInfo?["timeout"] as? TimeInterval {
+            compositorManager.setUnloadTimeout(timeout)
+        }
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
     
     // MARK: - Cookie Management Methods
@@ -257,6 +438,118 @@ class BrowserManager: ObservableObject {
     func clearPersonalDataCache() {
         Task {
             await cacheManager.clearPersonalDataCache()
+        }
+    }
+    
+    func clearFaviconCache() {
+        cacheManager.clearFaviconCache()
+    }
+    
+    // MARK: - Extension Management
+    
+    func showExtensionInstallDialog() {
+        if #available(macOS 15.5, *) {
+            extensionManager?.showExtensionInstallDialog()
+        } else {
+            // Show unsupported OS alert
+            let alert = NSAlert()
+            alert.messageText = "Extensions Not Supported"
+            alert.informativeText = "Extensions require macOS 15.5 or later."
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+        }
+    }
+    
+    func enableExtension(_ extensionId: String) {
+        if #available(macOS 15.5, *) {
+            extensionManager?.enableExtension(extensionId)
+        }
+    }
+    
+    func disableExtension(_ extensionId: String) {
+        if #available(macOS 15.5, *) {
+            extensionManager?.disableExtension(extensionId)
+        }
+    }
+    
+    func uninstallExtension(_ extensionId: String) {
+        if #available(macOS 15.5, *) {
+            extensionManager?.uninstallExtension(extensionId)
+        }
+    }
+
+    // MARK: - URL Utilities
+    func copyCurrentURL() {
+        if let url = tabManager.currentTab?.url.absoluteString {
+            print("Attempting to copy URL: \(url)")
+            
+            DispatchQueue.main.async {
+                NSPasteboard.general.clearContents()
+                let success = NSPasteboard.general.setString(url, forType: .string)
+                let e = NSHapticFeedbackManager.defaultPerformer
+                e.perform(.generic, performanceTime: .drawCompleted)
+                print("Clipboard operation success: \(success)")
+            }
+            
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                self.didCopyURL = true
+            }
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                    self.didCopyURL = false
+                }
+            }
+        } else {
+            print("No URL found to copy")
+        }
+    }
+    
+    // MARK: - Web Inspector
+    func openWebInspector() {
+        guard let currentTab = tabManager.currentTab else { 
+            print("No current tab to inspect")
+            return 
+        }
+        
+        if #available(macOS 13.3, *) {
+            let webView = currentTab.activeWebView
+            if webView.isInspectable {
+                DispatchQueue.main.async {
+                    // Focus the webview and trigger context menu programmatically
+                    self.presentInspectorContextMenu(for: webView)
+                }
+            } else {
+                print("Web inspector not available for this tab")
+            }
+        } else {
+            print("Web inspector requires macOS 13.3 or later")
+        }
+    }
+    
+    private func presentInspectorContextMenu(for webView: WKWebView) {
+        // Focus the webview first
+        webView.window?.makeFirstResponder(webView)
+        
+        // Create a right-click event at the center of the webview
+        let bounds = webView.bounds
+        let center = NSPoint(x: bounds.midX, y: bounds.midY)
+        
+        let rightClickEvent = NSEvent.mouseEvent(
+            with: .rightMouseDown,
+            location: center,
+            modifierFlags: [],
+            timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: webView.window?.windowNumber ?? 0,
+            context: nil,
+            eventNumber: 0,
+            clickCount: 1,
+            pressure: 1.0
+        )
+        
+        if let event = rightClickEvent {
+            webView.rightMouseDown(with: event)
         }
     }
 }
