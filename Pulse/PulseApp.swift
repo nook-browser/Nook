@@ -247,6 +247,15 @@ struct PulseCommands: Commands {
             .disabled(browserManager.tabManager.currentTab == nil || 
                      browserManager.tabManager.currentTab?.hasAudioContent != true)
         }
+
+        // Appearance Commands
+        CommandMenu("Appearance") {
+            Button("Customize Space Gradient...") {
+                browserManager.showGradientEditor()
+            }
+            .keyboardShortcut("g", modifiers: [.command, .shift])
+            .disabled(browserManager.tabManager.currentSpace == nil)
+        }
     }
 }
 
