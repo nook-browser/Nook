@@ -440,6 +440,15 @@ struct HistoryRowView: View {
             return
         }
         
+        // Check cache first
+        let cacheKey = entry.url.host ?? entry.url.absoluteString
+        if let cachedFavicon = Tab.getCachedFavicon(for: cacheKey) {
+            await MainActor.run {
+                self.favicon = cachedFavicon
+            }
+            return
+        }
+        
         do {
             let favicon = try await FaviconFinder(url: entry.url)
                 .fetchFaviconURLs()
@@ -449,6 +458,9 @@ struct HistoryRowView: View {
             if let faviconImage = favicon.image {
                 let nsImage = faviconImage.image
                 let swiftUIImage = SwiftUI.Image(nsImage: nsImage)
+                
+                // Cache the favicon
+                Tab.cacheFavicon(swiftUIImage, for: cacheKey)
                 
                 await MainActor.run {
                     self.favicon = swiftUIImage

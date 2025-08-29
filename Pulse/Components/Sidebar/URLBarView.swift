@@ -12,11 +12,8 @@ struct URLBarView: View {
     @State private var isHovering: Bool = false
 
     var body: some View {
-        Button {
-            browserManager.isCommandPaletteVisible = true
-        } label: {
-            ZStack {
-                HStack(spacing: 8) {
+        ZStack {
+            HStack(spacing: 8) {
                     if(browserManager.tabManager.currentTab != nil) {
                         Text(
                             displayURL
@@ -35,24 +32,48 @@ struct URLBarView: View {
                     }
                     
                     Spacer()
+                    
+                    // PiP button (show when video content is available or PiP is active)
+                    if let currentTab = browserManager.tabManager.currentTab,
+                       (currentTab.hasVideoContent || currentTab.hasPiPActive) {
+                        Button(action: {
+                            currentTab.requestPictureInPicture()
+                        }) {
+                            Image(systemName: currentTab.hasPiPActive ? "pip.exit" : "pip.enter")
+                                .font(.system(size: 12))
+                                .foregroundStyle(AppColors.textPrimary.opacity(currentTab.hasPiPActive ? 1.0 : 0.7))
+                        }
+                        .buttonStyle(.plain)
+                        .help(currentTab.hasPiPActive ? "Exit Picture in Picture" : "Enter Picture in Picture")
+                    }
+                    
+                    // Extension action buttons
+                    if #available(macOS 15.5, *),
+                       let extensionManager = browserManager.extensionManager {
+                        ExtensionActionView(extensions: extensionManager.installedExtensions)
+                            .environmentObject(browserManager)
+                    }
                 }
                 .padding(.horizontal, 12)
+        }
+        .frame(maxWidth: .infinity, minHeight: 36, maxHeight: 36)
+        .background(
+            ZStack {
+                BlurEffectView(material: browserManager.settingsManager.currentMaterial, state: .active)
+                Color.white.opacity(isHovering ? 0.2 : 0.1)
             }
-            .frame(maxWidth: .infinity, minHeight: 36, maxHeight: 36)
-            .background(
-                ZStack {
-                    BlurEffectView(material: browserManager.settingsManager.currentMaterial, state: .active)
-                    Color.white.opacity(isHovering ? 0.2 : 0.1)
-                }
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .onHover { hovering in
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    isHovering = hovering
-                }
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovering = hovering
             }
         }
-        .buttonStyle(PlainButtonStyle())
+        // Focus URL bar when tapping anywhere in the bar
+        .contentShape(Rectangle())
+        .onTapGesture {
+            browserManager.focusURLBar()
+        }
         
     }
     

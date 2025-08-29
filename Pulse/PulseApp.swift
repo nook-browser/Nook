@@ -11,6 +11,7 @@ import WebKit
 @main
 struct PulseApp: App {
     @StateObject private var browserManager = BrowserManager()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
         WindowGroup {
@@ -18,6 +19,10 @@ struct PulseApp: App {
                 .background(BackgroundWindowModifier())
                 .ignoresSafeArea(.all)
                 .environmentObject(browserManager)
+                .onAppear {
+                    // Connect browser manager to app delegate for cleanup
+                    appDelegate.browserManager = browserManager
+                }
         }
         .windowStyle(.hiddenTitleBar)
         .commands {
@@ -31,6 +36,17 @@ struct PulseApp: App {
         .windowResizability(.contentSize)
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unifiedCompact)
+    }
+}
+
+class AppDelegate: NSObject, NSApplicationDelegate {
+    weak var browserManager: BrowserManager?
+    
+    func applicationWillTerminate(_ notification: Notification) {
+        print("🔄 [App] Application will terminate - cleaning up all tabs")
+        
+        // Clean up all tabs to ensure WKWebView processes are terminated
+        browserManager?.cleanupAllTabs()
     }
 }
 
@@ -69,6 +85,14 @@ struct PulseCommands: Commands {
             
             Divider()
             
+            Button("Web Inspector") {
+                browserManager.openWebInspector()
+            }
+            .keyboardShortcut("i", modifiers: [.command, .option])
+            .disabled(browserManager.tabManager.currentTab == nil)
+            
+            Divider()
+            
             Button("Force Quit App") {
                 browserManager.showQuitDialog()
             }
@@ -76,9 +100,10 @@ struct PulseCommands: Commands {
         }
 
         // File Section
-        CommandGroup(replacing: .saveItem) {
+        CommandMenu("File") {
+            
             Button("New Tab") {
-                _ = browserManager.tabManager.createNewTab()
+                browserManager.openCommandPalette()
             }
             .keyboardShortcut("t", modifiers: .command)
             Button("New Window") {
@@ -91,6 +116,12 @@ struct PulseCommands: Commands {
             }
             .keyboardShortcut("w", modifiers: .command)
             .disabled(browserManager.tabManager.tabs.isEmpty)
+            
+            Button("Copy Current URL") {
+                browserManager.copyCurrentURL()
+            }
+            .keyboardShortcut("c", modifiers: [.command, .shift])
+            .disabled(browserManager.tabManager.currentTab != nil ? false : true)
 
         }
         
@@ -152,6 +183,10 @@ struct PulseCommands: Commands {
                 Button("Clear Personal Data Cache") {
                     browserManager.clearPersonalDataCache()
                 }
+                
+                Button("Clear Favicon Cache") {
+                    browserManager.clearFaviconCache()
+                }
             }
             
             Divider()
@@ -171,6 +206,55 @@ struct PulseCommands: Commands {
                     await dataStore.removeData(ofTypes: dataTypes, modifiedSince: Date.distantPast)
                 }
             }
+        }
+        
+        // Extensions Commands
+        CommandMenu("Extensions") {
+            Button("Install Extension...") {
+                browserManager.showExtensionInstallDialog()
+            }
+            .keyboardShortcut("e", modifiers: [.command, .shift])
+            
+            Button("Manage Extensions...") {
+                // Open settings to extensions tab
+                openWindow(id: "settings")
+            }
+
+            if #available(macOS 15.5, *) {
+                Divider()
+                Button("Open Popup Console") {
+                    browserManager.extensionManager?.showPopupConsole()
+                }
+            }
+        }
+        
+        // Window Commands
+        CommandMenu("Window") {
+            Button("Toggle Picture in Picture") {
+                browserManager.tabManager.currentTab?.requestPictureInPicture()
+            }
+            .keyboardShortcut("p", modifiers: [.command, .shift])
+            .disabled(browserManager.tabManager.currentTab == nil || 
+                     !(browserManager.tabManager.currentTab?.hasVideoContent == true || 
+                       browserManager.tabManager.currentTab?.hasPiPActive == true))
+            
+            Divider()
+            
+            Button(browserManager.tabManager.currentTab?.isAudioMuted == true ? "Unmute Audio" : "Mute Audio") {
+                browserManager.tabManager.currentTab?.toggleMute()
+            }
+            .keyboardShortcut("m", modifiers: .command)
+            .disabled(browserManager.tabManager.currentTab == nil || 
+                     browserManager.tabManager.currentTab?.hasAudioContent != true)
+        }
+
+        // Appearance Commands
+        CommandMenu("Appearance") {
+            Button("Customize Space Gradient...") {
+                browserManager.showGradientEditor()
+            }
+            .keyboardShortcut("g", modifiers: [.command, .shift])
+            .disabled(browserManager.tabManager.currentSpace == nil)
         }
     }
 }

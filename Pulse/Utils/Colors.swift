@@ -1,4 +1,8 @@
 import SwiftUI
+import Foundation
+#if canImport(AppKit)
+import AppKit
+#endif
 
 struct AppColors {
     static let textPrimary = Color(nsColor: .labelColor)
@@ -48,4 +52,33 @@ extension Color {
             opacity: Double(a) / 255
         )
     }
+    
+    #if canImport(AppKit)
+    func toHexString(includeAlpha: Bool = false) -> String? {
+        let ns = NSColor(self)
+        return ns.toHexString(includeAlpha: includeAlpha)
+    }
+    #endif
 }
+
+#if canImport(AppKit)
+extension NSColor {
+    func toHexString(includeAlpha: Bool = false) -> String? {
+        guard let rgb = usingColorSpace(.sRGB) else { return nil }
+        var r: CGFloat = 0
+        var g: CGFloat = 0
+        var b: CGFloat = 0
+        var a: CGFloat = 0
+        rgb.getRed(&r, green: &g, blue: &b, alpha: &a)
+        let ri = Int(round(r * 255))
+        let gi = Int(round(g * 255))
+        let bi = Int(round(b * 255))
+        if includeAlpha {
+            let ai = Int(round(a * 255))
+            return String(format: "#%02X%02X%02X%02X", ai, ri, gi, bi)
+        } else {
+            return String(format: "#%02X%02X%02X", ri, gi, bi)
+        }
+    }
+}
+#endif

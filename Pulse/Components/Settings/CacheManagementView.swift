@@ -73,7 +73,8 @@ struct CacheManagementView: View {
                     .fontWeight(.semibold)
                 
                 let stats = cacheManager.getCacheStats()
-                Text("\(stats.total) cache entries • \(formatSize(stats.totalSize)) total • \(stats.staleCount) stale")
+                let faviconStats = cacheManager.getFaviconCacheStats()
+                Text("\(stats.total) cache entries • \(formatSize(stats.totalSize)) total • \(stats.staleCount) stale • \(faviconStats.count) favicons cached")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -105,6 +106,12 @@ struct CacheManagementView: View {
                     Button("Clear Memory Cache") {
                         Task {
                             await cacheManager.clearMemoryCache()
+                        }
+                    }
+                    
+                    Button("Clear Favicon Cache") {
+                        Task {
+                            cacheManager.clearFaviconCache()
                         }
                     }
                     
