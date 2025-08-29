@@ -14,9 +14,14 @@ struct SpaceGradientBackgroundView: View {
 
     var body: some View {
         ZStack {
-            // Properly dithered gradient image respecting current displayGradient
-            // While animating, DitheredGradientView will show a lightweight gradient.
-            DitheredGradientView(gradient: gradient)
+            if gradient.nodes.count == 3 {
+                // GPU barycentric blend for tri-color gradients
+                BarycentricTriGradientView(gradient: gradient)
+            } else {
+                // Properly dithered gradient image respecting current displayGradient
+                // While animating, DitheredGradientView will show a lightweight gradient.
+                DitheredGradientView(gradient: gradient)
+            }
         }
         .allowsHitTesting(false) // Entire background should not intercept input
     }
