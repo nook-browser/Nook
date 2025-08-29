@@ -6,8 +6,14 @@ import AppKit
 // MARK: - BarycentricTriGradientView
 // GPU shader-based tri-color gradient using barycentric interpolation.
 // Expects exactly 3 nodes; falls back to a linear gradient otherwise.
-struct BarycentricTriGradientView: View {
-    let gradient: SpaceGradient
+struct BarycentricTriGradientView: View, Animatable {
+    var gradient: SpaceGradient
+
+    // Bridge SpaceGradient's animatable data so SwiftUI drives shader args smoothly
+    var animatableData: SpaceGradient.AnimVector {
+        get { gradient.animatableData }
+        set { gradient.animatableData = newValue }
+    }
 
     // Fixed anchor positions in normalized space (left, top-right, bottom-right)
     private let pA = SIMD2<Double>(0.08, 0.50)
@@ -15,7 +21,8 @@ struct BarycentricTriGradientView: View {
     private let pC = SIMD2<Double>(0.92, 0.75)
 
     var body: some View {
-        if gradient.nodes.count == 3 {
+        let nodes = gradient.sortedNodes
+        if nodes.count >= 3 {
             Canvas { context, size in
                 let rect = CGRect(origin: .zero, size: size)
                 let shader = Self.makeShader(gradient: gradient, size: size, pA: pA, pB: pB, pC: pC)
@@ -33,7 +40,7 @@ struct BarycentricTriGradientView: View {
         let nodes = gradient.sortedNodes
         // Map nodes by location: left = primary (min location), then the others
         guard nodes.count >= 3 else {
-            // Defensive fallback
+            // Should be handled by caller; return a benign shader
             let function = ShaderFunction(library: .default, name: "baryTriGradient")
             return Shader(function: function, arguments: [
                 .color(.clear), .color(.clear), .color(.clear),
