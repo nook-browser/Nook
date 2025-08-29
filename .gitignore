@@ -95,3 +95,10 @@ fastlane/test_output
 # https://github.com/johnno1962/injectionforxcode
 
 iOSInjectionProject/
+# IDE
+.vscode/
+
+# Xcode build junk
+DerivedData/
+*.xcresult
+*.log
