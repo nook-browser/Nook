@@ -38,9 +38,12 @@ final class GradientColorManager: ObservableObject {
         // Flip on lightweight mode for renderers
         isAnimating = true
 
-        // Prefer barycentric shader during animation if both ends are tri-color
-        if let from { self.preferBarycentricDuringAnimation = (from.nodes.count == 3 && to.nodes.count == 3) }
-        else { self.preferBarycentricDuringAnimation = (to.nodes.count == 3) }
+        // Prefer barycentric shader during animation if both ends are 1–3 colors
+        if let from {
+            self.preferBarycentricDuringAnimation = (from.nodes.count <= 3 && to.nodes.count <= 3)
+        } else {
+            self.preferBarycentricDuringAnimation = (to.nodes.count <= 3)
+        }
 
         // If a specific starting gradient is provided, snap to it without animation first
         if let from {

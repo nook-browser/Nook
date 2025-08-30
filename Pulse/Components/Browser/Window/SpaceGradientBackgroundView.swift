@@ -14,10 +14,10 @@ struct SpaceGradientBackgroundView: View {
 
     var body: some View {
         ZStack {
-            let useTriShader: Bool = gradientColorManager.isAnimating ? gradientColorManager.preferBarycentricDuringAnimation : (gradient.nodes.count == 3)
-            if useTriShader {
-                // GPU barycentric blend for tri-color gradients
-                BarycentricTriGradientView(gradient: gradient)
+            let useShader: Bool = gradientColorManager.isAnimating ? gradientColorManager.preferBarycentricDuringAnimation : (gradient.nodes.count <= 3)
+            if useShader {
+                // GPU barycentric blend for 1–3 color gradients with smooth transitions
+                BarycentricGradientView(gradient: gradient)
             } else {
                 // Properly dithered gradient image respecting current displayGradient
                 // While animating, DitheredGradientView will show a lightweight gradient.

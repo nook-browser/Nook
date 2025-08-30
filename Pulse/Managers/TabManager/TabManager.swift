@@ -3,12 +3,328 @@ import Combine
 import Observation
 import SwiftData
 import WebKit
+import OSLog
+
+// MARK: - Persistence Actor & Types
+
+/// Serializes all SwiftData writes for Tab snapshots and provides
+/// a best-effort atomic save using a child ModelContext pattern.
+actor PersistenceActor {
+    private let container: ModelContainer
+    private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Pulse", category: "TabPersistence")
+
+    // Lightweight, in-memory backup of the most recent snapshot
+    // to allow quick recovery if atomic operations fail mid-flight.
+    private var lastBackupJSON: Data?
+
+    enum PersistenceError: Error {
+        case concurrencyConflict
+        case dataCorruption
+        case storageFailure
+        case rollbackFailed
+        case invalidModelState
+    }
+
+    init(container: ModelContainer) {
+        self.container = container
+    }
+
+    // MARK: Snapshot Types
+    struct SnapshotTab: Codable {
+        let id: UUID
+        let urlString: String
+        let name: String
+        let index: Int
+        let spaceId: UUID?
+        let isPinned: Bool
+        let isSpacePinned: Bool
+    }
+
+    struct SnapshotSpace: Codable {
+        let id: UUID
+        let name: String
+        let icon: String
+        let index: Int
+        let gradientData: Data?
+        let activeTabId: UUID?
+    }
+
+    struct SnapshotState: Codable {
+        let currentTabID: UUID?
+        let currentSpaceID: UUID?
+    }
+
+    struct Snapshot: Codable {
+        let spaces: [SnapshotSpace]
+        let tabs: [SnapshotTab]
+        let state: SnapshotState
+    }
+
+    // Coalescing control
+    private var latestGeneration: Int = 0
+
+    // MARK: - Public API (Actor)
+    // Returns true if the atomic path succeeded. False if a fallback or staleness short-circuit occurred.
+    func persist(snapshot: Snapshot, generation: Int) async -> Bool {
+        // Coalesce stale generations
+        if generation < self.latestGeneration {
+            Self.log.debug("[persist] Skipping stale snapshot generation=\(generation) < latest=\(self.latestGeneration)")
+            return false
+        }
+        self.latestGeneration = generation
+        let start = Date()
+        Self.log.debug("[persist] Starting atomic persistence…")
+        do {
+            // Backup current intent/state to JSON first
+            try createDataSnapshot(snapshot)
+            try await performAtomicPersistence(snapshot)
+            Self.log.notice("[persist] Atomic persistence completed in \(String(format: "%.2f", Date().timeIntervalSince(start)))s")
+            return true
+        } catch {
+            let classified = classify(error)
+            Self.log.error("[persist] Atomic persistence failed (\(String(describing: classified), privacy: .public)): \(String(describing: error), privacy: .public)")
+
+            // Attempt graceful recovery: try best-effort fallback, else restore
+            do {
+                try await performBestEffortPersistence(snapshot)
+                Self.log.notice("[persist] Fallback persistence succeeded after atomic failure")
+                return false
+            } catch {
+                Self.log.fault("[persist] Fallback persistence failed: \(String(describing: error), privacy: .public). Attempting recovery from backup…")
+                do {
+                    try await recoverFromBackup()
+                    Self.log.notice("[persist] Recovered from in-memory backup snapshot")
+                    return false
+                } catch {
+                    Self.log.fault("[persist] Backup recovery failed: \(String(describing: error), privacy: .public)")
+                    return false
+                }
+            }
+        }
+    }
+
+    // MARK: - Atomic Transaction Helper
+    private func performAtomicPersistence(_ snapshot: Snapshot) async throws {
+        let ctx = ModelContext(container)
+        ctx.autosaveEnabled = false
+
+        // Validate inputs before writing
+        try validateInput(snapshot)
+
+        // 1) Cleanup orphans for TabEntity
+        do {
+            let all = try ctx.fetch(FetchDescriptor<TabEntity>())
+            let keepIDs = Set(snapshot.tabs.map { $0.id })
+            for e in all where !keepIDs.contains(e.id) { ctx.delete(e) }
+        } catch {
+            throw classify(error)
+        }
+
+        // 2) Upsert tabs: global pinned, space pinned, and regular
+        for tab in snapshot.tabs {
+            try upsertTab(in: ctx, tab)
+        }
+
+        // 3) Upsert spaces and cleanup removed spaces
+        for space in snapshot.spaces {
+            try upsertSpace(in: ctx, space)
+        }
+        do {
+            let allSpaces = try ctx.fetch(FetchDescriptor<SpaceEntity>())
+            let keep = Set(snapshot.spaces.map { $0.id })
+            for e in allSpaces where !keep.contains(e.id) { ctx.delete(e) }
+        } catch {
+            throw classify(error)
+        }
+
+        // 4) Upsert state
+        do {
+            let states = try ctx.fetch(FetchDescriptor<TabsStateEntity>())
+            let state = states.first ?? {
+                let s = TabsStateEntity(currentTabID: nil, currentSpaceID: nil)
+                ctx.insert(s)
+                return s
+            }()
+            state.currentTabID = snapshot.state.currentTabID
+            state.currentSpaceID = snapshot.state.currentSpaceID
+        } catch {
+            throw classify(error)
+        }
+
+        // 5) Integrity validation before save (so failures abort atomically)
+        try validateDataIntegrity(in: ctx, snapshot: snapshot)
+
+        // 6) Save (commit atomic set)
+        do {
+            try ctx.save()
+        } catch {
+            throw classify(error)
+        }
+
+        // 7) Post-save integrity check (non-fatal)
+        do {
+            try validateDataIntegrity(in: ctx, snapshot: snapshot)
+        } catch {
+            Self.log.error("[persist] Post-save integrity validation reported issues: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    // MARK: - Entity Ops
+    private func upsertTab(in ctx: ModelContext, _ t: SnapshotTab) throws {
+        let predicate = #Predicate<TabEntity> { $0.id == t.id }
+        let existing = try ctx.fetch(FetchDescriptor<TabEntity>(predicate: predicate)).first
+        if let e = existing {
+            e.urlString = t.urlString
+            e.name = t.name
+            e.isPinned = t.isPinned
+            e.isSpacePinned = t.isSpacePinned
+            e.index = t.index
+            e.spaceId = t.spaceId
+        } else {
+            let e = TabEntity(
+                id: t.id,
+                urlString: t.urlString,
+                name: t.name,
+                isPinned: t.isPinned,
+                isSpacePinned: t.isSpacePinned,
+                index: t.index,
+                spaceId: t.spaceId
+            )
+            ctx.insert(e)
+        }
+    }
+
+    private func upsertSpace(in ctx: ModelContext, _ s: SnapshotSpace) throws {
+        let predicate = #Predicate<SpaceEntity> { $0.id == s.id }
+        let existing = try ctx.fetch(FetchDescriptor<SpaceEntity>(predicate: predicate)).first
+        if let e = existing {
+            e.name = s.name
+            e.icon = s.icon
+            e.index = s.index
+            if let data = s.gradientData { e.gradientData = data }
+        } else {
+            let e = SpaceEntity(id: s.id, name: s.name, icon: s.icon, index: s.index, gradientData: s.gradientData ?? (SpaceGradient.default.encoded ?? Data()))
+            ctx.insert(e)
+        }
+    }
+
+    // MARK: - Backup & Recovery
+    private func createDataSnapshot(_ snapshot: Snapshot) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        self.lastBackupJSON = try encoder.encode(snapshot)
+    }
+
+    private func recoverFromBackup() async throws {
+        guard let data = lastBackupJSON else { return }
+        let decoder = JSONDecoder()
+        let snapshot = try decoder.decode(Snapshot.self, from: data)
+        try await performBestEffortPersistence(snapshot)
+    }
+
+    // Best-effort non-atomic writes on the main context. Used only as a fallback.
+    private func performBestEffortPersistence(_ snapshot: Snapshot) async throws {
+        let ctx = ModelContext(container)
+        ctx.autosaveEnabled = false
+        // Cleanup tabs
+        do {
+            let all = try ctx.fetch(FetchDescriptor<TabEntity>())
+            let keepIDs = Set(snapshot.tabs.map { $0.id })
+            for e in all where !keepIDs.contains(e.id) { ctx.delete(e) }
+        } catch {
+            throw classify(error)
+        }
+        // Upserts
+        for t in snapshot.tabs {
+            do { try upsertTab(in: ctx, t) } catch { throw classify(error) }
+        }
+        for s in snapshot.spaces {
+            do { try upsertSpace(in: ctx, s) } catch { throw classify(error) }
+        }
+        do {
+            let allSpaces = try ctx.fetch(FetchDescriptor<SpaceEntity>())
+            let keep = Set(snapshot.spaces.map { $0.id })
+            for e in allSpaces where !keep.contains(e.id) { ctx.delete(e) }
+        } catch {
+            throw classify(error)
+        }
+        do {
+            let states = try ctx.fetch(FetchDescriptor<TabsStateEntity>())
+            let st = states.first ?? {
+                let s = TabsStateEntity(currentTabID: nil, currentSpaceID: nil)
+                ctx.insert(s)
+                return s
+            }()
+            st.currentTabID = snapshot.state.currentTabID
+            st.currentSpaceID = snapshot.state.currentSpaceID
+        } catch {
+            throw classify(error)
+        }
+        do {
+            try ctx.save()
+        } catch {
+            throw classify(error)
+        }
+    }
+
+    // MARK: - Validation
+    private func validateInput(_ snapshot: Snapshot) throws {
+        // Basic invariants: indices non-negative, ids unique
+        if snapshot.tabs.contains(where: { $0.index < 0 }) { throw PersistenceError.invalidModelState }
+        let tabIDs = Set(snapshot.tabs.map { $0.id })
+        if tabIDs.count != snapshot.tabs.count { throw PersistenceError.invalidModelState }
+        let spaceIDs = Set(snapshot.spaces.map { $0.id })
+        if spaceIDs.count != snapshot.spaces.count { throw PersistenceError.invalidModelState }
+        // Ensure all spaceIds referenced by tabs exist (or are nil) and flag invariants
+        for t in snapshot.tabs {
+            if let sid = t.spaceId, !spaceIDs.contains(sid) { throw PersistenceError.invalidModelState }
+            // Mutual exclusivity of pinned flags
+            if t.isPinned && t.isSpacePinned { throw PersistenceError.invalidModelState }
+            // Global pinned cannot have a spaceId
+            if t.isPinned && t.spaceId != nil { throw PersistenceError.invalidModelState }
+            // Space-pinned must have a spaceId
+            if t.isSpacePinned && t.spaceId == nil { throw PersistenceError.invalidModelState }
+        }
+    }
+
+    private func validateDataIntegrity(in ctx: ModelContext, snapshot: Snapshot) throws {
+        // Fetch back a small subset to ensure relationships look sane
+        do {
+            let tabs: [TabEntity] = try ctx.fetch(FetchDescriptor<TabEntity>())
+            let spaces: [SpaceEntity] = try ctx.fetch(FetchDescriptor<SpaceEntity>())
+            let spaceIDs = Set(spaces.map { $0.id })
+            for t in tabs {
+                if let sid = t.spaceId, !spaceIDs.contains(sid) {
+                    throw PersistenceError.dataCorruption
+                }
+            }
+        } catch {
+            throw classify(error)
+        }
+    }
+
+    // MARK: - Error Classification
+    private func classify(_ error: Error) -> PersistenceError {
+        let ns = error as NSError
+        let domain = ns.domain.lowercased()
+        let desc = (ns.userInfo[NSLocalizedDescriptionKey] as? String)?.lowercased() ?? ns.localizedDescription.lowercased()
+
+        if domain.contains("swiftdata") || domain.contains("coredata") {
+            if desc.contains("conflict") || desc.contains("busy") || desc.contains("locked") { return .concurrencyConflict }
+            if desc.contains("corrupt") || desc.contains("malformed") { return .dataCorruption }
+            if desc.contains("rollback") { return .rollbackFailed }
+            return .storageFailure
+        }
+        return .storageFailure
+    }
+}
 
 @MainActor
 @Observable
 class TabManager: ObservableObject {
     weak var browserManager: BrowserManager?
     private let context: ModelContext
+    private let persistence: PersistenceActor
 
     // Spaces
     public private(set) var spaces: [Space] = []
@@ -34,6 +350,7 @@ class TabManager: ObservableObject {
     init(browserManager: BrowserManager? = nil, context: ModelContext) {
         self.browserManager = browserManager
         self.context = context
+        self.persistence = PersistenceActor(container: context.container)
         Task { @MainActor in
             loadFromStore()
         }
@@ -775,22 +1092,6 @@ class TabManager: ObservableObject {
         if previousIndex < all.count { setActiveTab(all[previousIndex]) }
     }
 
-    // MARK: - Persistence mapping
-
-    private func toTabEntity(_ tab: Tab, isPinned: Bool, isSpacePinned: Bool, persistenceIndex: Int)
-        -> TabEntity
-    {
-        TabEntity(
-            id: tab.id,
-            urlString: tab.url.absoluteString,
-            name: tab.name,
-            isPinned: isPinned,
-            isSpacePinned: isSpacePinned,
-            index: tab.index,
-            spaceId: tab.spaceId
-        )
-    }
-
     private func toRuntime(_ e: TabEntity) -> Tab {
         let url =
             URL(string: e.urlString) ?? URL(string: "https://www.google.com")!
@@ -919,150 +1220,98 @@ class TabManager: ObservableObject {
         }
     }
 
-    public func persistSnapshot() {
-        do {
-            let all = try context.fetch(FetchDescriptor<TabEntity>())
-            let keepIDs = Set(
-                (pinnedTabs + 
-                 spaces.flatMap { spacePinnedTabs[$0.id] ?? [] } +
-                 spaces.flatMap { tabsBySpace[$0.id] ?? [] }).map {
-                    $0.id
-                }
-            )
-            for e in all where !keepIDs.contains(e.id) {
-                context.delete(e)
-            }
-        } catch {
-            print("Fetch for cleanup failed: \(error)")
-        }
+    private var snapshotGeneration: Int = 0
 
-        func upsert(tab: Tab, isPinned: Bool, isSpacePinned: Bool, index: Int) {
-            do {
-                let wantedID = tab.id
-                let predicate = #Predicate<TabEntity> { $0.id == wantedID }
-                var e =
-                    try context
-                    .fetch(FetchDescriptor<TabEntity>(predicate: predicate))
-                    .first
-
-                if e == nil {
-                    e = TabEntity(
-                        id: tab.id,
-                        urlString: tab.url.absoluteString,
-                        name: tab.name,
-                        isPinned: isPinned,
-                        isSpacePinned: isSpacePinned,
-                        index: tab.index,
-                        spaceId: tab.spaceId
-                    )
-                    context.insert(e!)
-                } else if let entity = e {
-                    entity.urlString = tab.url.absoluteString
-                    entity.name = tab.name
-                    entity.isPinned = isPinned
-                    entity.isSpacePinned = isSpacePinned
-                    entity.index = tab.index
-                    entity.spaceId = tab.spaceId
-                }
-            } catch {
-                print("Upsert failed: \(error)")
-            }
+    public nonisolated func persistSnapshot() {
+        Task { [weak self] in
+            _ = await self?.persistSnapshotAwaitingResult()
         }
+    }
 
-        // Save global pinned tabs
-        for (i, t) in pinnedTabs.enumerated() {
-            upsert(tab: t, isPinned: true, isSpacePinned: false, index: i)
+    // Returns true if atomic path succeeded; false if fallback was used or stale
+    public nonisolated func persistSnapshotAwaitingResult() async -> Bool {
+        // Build snapshot and capture a generation on MainActor
+        let payload: (PersistenceActor.Snapshot, Int)? = await MainActor.run { [weak self] in
+            guard let strong = self else { return nil }
+            strong.snapshotGeneration &+= 1
+            let gen = strong.snapshotGeneration
+            let snap = strong._buildSnapshot()
+            return (snap, gen)
         }
-        
+        guard let (snapshot, generation) = payload else {
+            // In case self was deallocated while switching actors
+            return false
+        }
+        return await persistence.persist(snapshot: snapshot, generation: generation)
+    }
+
+    // Build a persistence snapshot from the current in-memory state (MainActor)
+    private func _buildSnapshot() -> PersistenceActor.Snapshot {
+        // Spaces in order
+        var spaceSnapshots: [PersistenceActor.SnapshotSpace] = []
+        spaceSnapshots.reserveCapacity(spaces.count)
         for (sIndex, sp) in spaces.enumerated() {
-            // Save space-pinned tabs
-            let spacePinned = spacePinnedTabs[sp.id] ?? []
-            for (i, t) in spacePinned.enumerated() {
-                upsert(tab: t, isPinned: false, isSpacePinned: true, index: i)
-            }
-            
-            // Save regular tabs
-            let arr = tabsBySpace[sp.id] ?? []
-            for (i, t) in arr.enumerated() {
-                upsert(tab: t, isPinned: false, isSpacePinned: false, index: i)
-            }
-
-            do {
-                let spaceID = sp.id
-                let predicate = #Predicate<SpaceEntity> { $0.id == spaceID }
-                var e =
-                    try context
-                    .fetch(FetchDescriptor<SpaceEntity>(predicate: predicate))
-                    .first
-
-                if e == nil {
-                    if let data = sp.gradient.encoded {
-                        e = SpaceEntity(
-                            id: sp.id,
-                            name: sp.name,
-                            icon: sp.icon,
-                            index: sIndex,
-                            gradientData: data
-                        )
-                    } else {
-                        // Fall back to model's default value; don't override on failure
-                        e = SpaceEntity(
-                            id: sp.id,
-                            name: sp.name,
-                            icon: sp.icon,
-                            index: sIndex
-                        )
-                    }
-                    context.insert(e!)
-                } else if let entity = e {
-                    entity.name = sp.name
-                    entity.icon = sp.icon
-                    entity.index = sIndex
-                    if let data = sp.gradient.encoded {
-                        entity.gradientData = data
-                    }
-                }
-            } catch {
-                print("Space upsert failed: \(error)")
-            }
-        }
-
-        do {
-            let allSpaces = try context.fetch(FetchDescriptor<SpaceEntity>())
-            let keep = Set(spaces.map { $0.id })
-            for e in allSpaces where !keep.contains(e.id) {
-                context.delete(e)
-            }
-        } catch {
-            print("Space cleanup failed: \(error)")
-        }
-
-        do {
-            let allStates = try context.fetch(
-                FetchDescriptor<TabsStateEntity>()
+            let ss = PersistenceActor.SnapshotSpace(
+                id: sp.id,
+                name: sp.name,
+                icon: sp.icon,
+                index: sIndex,
+                gradientData: sp.gradient.encoded,
+                activeTabId: sp.activeTabId
             )
-            let state =
-                allStates.first
-                ?? {
-                    let s = TabsStateEntity(
-                        currentTabID: nil,
-                        currentSpaceID: nil
-                    )
-                    context.insert(s)
-                    return s
-                }()
-            state.currentTabID = currentTab?.id
-            state.currentSpaceID = currentSpace?.id
-        } catch {
-            print("State upsert failed: \(error)")
+            spaceSnapshots.append(ss)
         }
 
-        do {
-            try context.save()
-            print("SwiftData snapshot saved.")
-        } catch {
-            print("SwiftData save error: \(error)")
+        // Tabs: global pinned, space pinned, and regular, with indices normalized per container
+        var tabSnapshots: [PersistenceActor.SnapshotTab] = []
+        // Global pinned
+        for (i, t) in pinnedTabs.enumerated() {
+            tabSnapshots.append(.init(
+                id: t.id,
+                urlString: t.url.absoluteString,
+                name: t.name,
+                index: i,
+                spaceId: nil,
+                isPinned: true,
+                isSpacePinned: false
+            ))
         }
+        // Per-space collections
+        for sp in spaces {
+            // Space-pinned for this space
+            let spPinned = (spacePinnedTabs[sp.id] ?? []).sorted { $0.index < $1.index }
+            for (i, t) in spPinned.enumerated() {
+                tabSnapshots.append(.init(
+                    id: t.id,
+                    urlString: t.url.absoluteString,
+                    name: t.name,
+                    index: i,
+                    spaceId: sp.id,
+                    isPinned: false,
+                    isSpacePinned: true
+                ))
+            }
+            // Regular tabs for this space
+            let regs = (tabsBySpace[sp.id] ?? []).sorted { $0.index < $1.index }
+            for (i, t) in regs.enumerated() {
+                tabSnapshots.append(.init(
+                    id: t.id,
+                    urlString: t.url.absoluteString,
+                    name: t.name,
+                    index: i,
+                    spaceId: sp.id,
+                    isPinned: false,
+                    isSpacePinned: false
+                ))
+            }
+        }
+
+        let state = PersistenceActor.SnapshotState(
+            currentTabID: currentTab?.id,
+            currentSpaceID: currentSpace?.id
+        )
+
+        return PersistenceActor.Snapshot(spaces: spaceSnapshots, tabs: tabSnapshots, state: state)
     }
 }
 
