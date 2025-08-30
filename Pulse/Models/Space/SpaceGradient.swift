@@ -53,6 +53,27 @@ struct SpaceGradient: Codable, Hashable {
         nodes.sorted { $0.location < $1.location }
     }
 
+    // MARK: - Primary Color
+    // Defines a "primary" color for a space derived from the gradient.
+    // Rule: pick the node with the lowest location (leading stop). If no nodes
+    // are defined, fall back to the system accent-derived default.
+    var primaryColorHex: String {
+        if let first = sortedNodes.first { return first.colorHex }
+        return SpaceGradient.accentHex()
+    }
+
+    #if canImport(SwiftUI)
+    var primaryColor: Color {
+        Color(hex: primaryColorHex)
+    }
+    #endif
+
+    #if canImport(AppKit)
+    var primaryNSColor: NSColor {
+        cachedNSColor(for: primaryColorHex)
+    }
+    #endif
+
     private static func accentHex() -> String {
         #if canImport(AppKit)
         let accent = NSColor.controlAccentColor

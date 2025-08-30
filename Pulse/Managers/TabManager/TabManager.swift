@@ -119,12 +119,12 @@ class TabManager: ObservableObject {
             let newGradient = space.gradient
             if let og = oldGradient {
                 if og.visuallyEquals(newGradient) {
-                    bm.gradientTransitionManager.setImmediate(newGradient)
+                    bm.gradientColorManager.setImmediate(newGradient)
                 } else {
-                    bm.gradientTransitionManager.transition(from: og, to: newGradient)
+                    bm.gradientColorManager.transition(from: og, to: newGradient)
                 }
             } else {
-                bm.gradientTransitionManager.setImmediate(newGradient)
+                bm.gradientColorManager.setImmediate(newGradient)
             }
         }
 
@@ -908,6 +908,12 @@ class TabManager: ObservableObject {
             print(
                 "Current Space: \(currentSpace?.name ?? "None"), Tab: \(currentTab?.name ?? "None")"
             )
+
+            // Ensure the window background uses the startup space's gradient.
+            // Use an immediate set to avoid an initial animation.
+            if let bm = self.browserManager, let g = self.currentSpace?.gradient {
+                bm.gradientColorManager.setImmediate(g)
+            }
         } catch {
             print("SwiftData load error: \(error)")
         }
@@ -1089,6 +1095,11 @@ extension TabManager {
             if let current = self.currentTab {
                 ExtensionManager.shared.notifyTabActivated(newTab: current, previous: nil)
             }
+        }
+
+        // After reattaching, ensure gradient matches the restored current space.
+        if let g = self.currentSpace?.gradient {
+            bm.gradientColorManager.setImmediate(g)
         }
     }
 }

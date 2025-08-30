@@ -93,7 +93,7 @@ fileprivate func cachedNSColor(hex: String) -> NSColor {
 struct DitheredGradientView: View {
     let gradient: SpaceGradient
     @StateObject private var renderer = DitheredGradientRenderer()
-    @EnvironmentObject var gradientTransitionManager: GradientTransitionManager
+    @EnvironmentObject var gradientColorManager: GradientColorManager
     @Environment(\.backingScale) private var backingScale
 
     var body: some View {
@@ -116,27 +116,27 @@ struct DitheredGradientView: View {
 
                 // Overlay the generated image only when not animating/editing,
                 // so SwiftUI's fallback gradient can animate space transitions.
-                if !(gradientTransitionManager.isAnimating || gradientTransitionManager.isEditing), let image = renderer.image {
+                if !(gradientColorManager.isAnimating || gradientColorManager.isEditing), let image = renderer.image {
                     Image(decorative: image, scale: renderScale, orientation: .up)
                         .resizable()
                         .scaledToFill()
                 }
             }
             .onAppear {
-                renderer.update(gradient: gradient, size: renderSize, scale: renderScale, allowDithering: !(gradientTransitionManager.isAnimating || gradientTransitionManager.isEditing))
+                renderer.update(gradient: gradient, size: renderSize, scale: renderScale, allowDithering: !(gradientColorManager.isAnimating || gradientColorManager.isEditing))
             }
             .onChange(of: gradient) { g in
-                renderer.update(gradient: g, size: renderSize, scale: renderScale, allowDithering: !(gradientTransitionManager.isAnimating || gradientTransitionManager.isEditing))
+                renderer.update(gradient: g, size: renderSize, scale: renderScale, allowDithering: !(gradientColorManager.isAnimating || gradientColorManager.isEditing))
             }
             .onChange(of: logicalSize) { _ in
-                renderer.update(gradient: gradient, size: renderSize, scale: renderScale, allowDithering: !(gradientTransitionManager.isAnimating || gradientTransitionManager.isEditing))
+                renderer.update(gradient: gradient, size: renderSize, scale: renderScale, allowDithering: !(gradientColorManager.isAnimating || gradientColorManager.isEditing))
             }
-            .onChange(of: gradientTransitionManager.isAnimating) { anim in
+            .onChange(of: gradientColorManager.isAnimating) { anim in
                 // When animation toggles off, generate the high-quality image
-                renderer.update(gradient: gradient, size: renderSize, scale: renderScale, allowDithering: !(anim || gradientTransitionManager.isEditing))
+                renderer.update(gradient: gradient, size: renderSize, scale: renderScale, allowDithering: !(anim || gradientColorManager.isEditing))
             }
-            .onChange(of: gradientTransitionManager.isEditing) { editing in
-                renderer.update(gradient: gradient, size: renderSize, scale: renderScale, allowDithering: !(gradientTransitionManager.isAnimating || editing))
+            .onChange(of: gradientColorManager.isEditing) { editing in
+                renderer.update(gradient: gradient, size: renderSize, scale: renderScale, allowDithering: !(gradientColorManager.isAnimating || editing))
             }
         }
         }

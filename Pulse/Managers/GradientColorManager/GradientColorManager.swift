@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 @MainActor
-final class GradientTransitionManager: ObservableObject {
+final class GradientColorManager: ObservableObject {
     @Published var displayGradient: SpaceGradient = .default
     @Published private(set) var isEditing: Bool = false
     @Published var isAnimating: Bool = false
@@ -74,5 +74,13 @@ final class GradientTransitionManager: ObservableObject {
                 self.preferBarycentricDuringAnimation = false
             }
         }
+    }
+}
+
+extension GradientColorManager {
+    // Space-specific accent color derived from the currently displayed gradient.
+    // Views can access this via `@EnvironmentObject var gradientColorManager`.
+    var primaryColor: Color {
+        displayGradient.primaryColor
     }
 }
