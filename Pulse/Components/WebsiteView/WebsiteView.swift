@@ -59,13 +59,13 @@ struct WebsiteView: View {
                     )
                     .background(Color(nsColor: .windowBackgroundColor))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: { 
+                    .clipShape(RoundedRectangle(cornerRadius: {
                         if #available(macOS 26.0, *) {
                             return 12
                         } else {
                             return 6
                         }
-                    }()))
+                    }(), style: .continuous))
                 } else {
                     EmptyWebsiteView()
                 }
@@ -207,3 +207,4 @@ struct TabWebViewWrapper: NSViewRepresentable {
         // The webView is managed by the Tab
     }
 }
+
