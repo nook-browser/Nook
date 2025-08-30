@@ -24,6 +24,7 @@ struct SpaceGradientBackgroundView: View {
                 DitheredGradientView(gradient: gradient)
             }
         }
+        .opacity(max(0.0, min(1.0, gradient.opacity)))
         .allowsHitTesting(false) // Entire background should not intercept input
     }
 
