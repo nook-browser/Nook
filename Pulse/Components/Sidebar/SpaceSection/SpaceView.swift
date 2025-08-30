@@ -18,7 +18,7 @@ struct SpaceView: View {
     @State private var regularFrames: [Int: CGRect] = [:]
     @State private var cachedSpacePinnedBoundaries: [CGFloat] = []
     @State private var cachedRegularBoundaries: [CGFloat] = []
-    @State private var cachedPinnedEmptyBoundaries: [CGFloat] = [20] // top third of 60
+    @State private var cachedPinnedEmptyBoundaries: [CGFloat] = [] // empty zone uses explicit frame provider
     @State private var cachedRegularEmptyBoundaries: [CGFloat] = [50.0/3.0]
     // Global frames for pinned and regular sections
     @State private var pinnedSectionGlobalFrame: CGRect = .zero
@@ -133,7 +133,7 @@ struct SpaceView: View {
                     ))
                 } else {
                     // Empty pinned section: provide a clear, easy drop target
-                    ZStack { Color.clear.frame(height: 60) }
+                    ZStack { Color.clear.frame(height: 1) }
                         .coordinateSpace(name: pinnedSectionSpaceName)
                         .background(GeometryReader { proxy in
                             Color.clear
@@ -153,16 +153,18 @@ struct SpaceView: View {
                             boundariesProvider: { 
                                 // Ensure empty boundary fallbacks are properly maintained
                                 guard !cachedPinnedEmptyBoundaries.isEmpty else {
-                                    return [20] // fallback boundary
+                                    return [] // no boundaries → use frame provider
                                 }
-                                return cachedPinnedEmptyBoundaries 
+                                return cachedPinnedEmptyBoundaries
                             },
                             insertionLineFrameProvider: {
                                 // Provide a GLOBAL frame for the insertion line
                                 let section = pinnedSectionGlobalFrame
-                                let validWidth = max(section.width, 0)
-                                let y = max(60.0/3.0, 0)
-                                return CGRect(x: section.minX, y: section.minY + y, width: validWidth, height: 3)
+                                let lineHeight: CGFloat = 3
+                                let validWidth = max(section.width - 20, 1) // match non-empty margins
+                                let yLocal = max((section.height - lineHeight) / 2, 0) // center within tiny area
+                                // Return LOCAL coordinates; delegate converts using globalFrameProvider
+                                return CGRect(x: 10, y: yLocal, width: validWidth, height: lineHeight)
                             },
                             globalFrameProvider: { pinnedSectionGlobalFrame },
                             onPerform: { op in browserManager.tabManager.handleDragOperation(op) }
