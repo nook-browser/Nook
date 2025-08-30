@@ -10,12 +10,15 @@ import SwiftUI
 struct CommandPaletteView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @State private var searchManager = SearchManager()
+    @Environment(\.colorScheme) var colorScheme
 
     @FocusState private var isSearchFocused: Bool
     @State private var text: String = ""
     @State private var selectedSuggestionIndex: Int = -1
 
     var body: some View {
+        let isDark = colorScheme == .dark
+        
         ZStack {
             Color.black.opacity(0.2)
                 .ignoresSafeArea()
@@ -36,12 +39,13 @@ struct CommandPaletteView: View {
                                 systemName: isLikelyURL(text)
                                     ? "globe" : "magnifyingglass"
                             )
-                            .foregroundStyle(.secondary)
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(AppColors.textPrimary)
 
                             TextField("Search or enter address", text: $text)
                                 .textFieldStyle(.plain)
                                 .font(.system(size: 16, weight: .regular))
+                                .foregroundColor(AppColors.textPrimary)
                                 .focused($isSearchFocused)
                                 .onKeyPress(.return) {
                                     handleReturn()
@@ -63,15 +67,16 @@ struct CommandPaletteView: View {
                                 }
                         }
                         .padding(.vertical, 16)
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, 13)
 
                         // Separator
                         if !searchManager.suggestions.isEmpty {
                             RoundedRectangle(cornerRadius: 100)
-                                .fill(Color.white.opacity(0.1))
+                                .fill(Color.white.opacity(0.4))
                                 .frame(height: 1)
                                 .frame(maxWidth: .infinity)
                                 .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
                         }
 
                         // Suggestions - expand the box downward
@@ -84,9 +89,13 @@ struct CommandPaletteView: View {
                                     id: \.element.id
                                 ) { index, suggestion in
                                     suggestionRow(for: suggestion, isSelected: selectedSuggestionIndex == index)
-                                    .onTapGesture {
-                                        selectSuggestion(suggestion)
-                                    }
+                                        .padding(8)
+                                        .background(selectedSuggestionIndex == index ? Color.blue.opacity(1.0) : Color.clear)
+                                        .cornerRadius(6)
+                                        .foregroundStyle(AppColors.textPrimary) // ensure text and images get correct styling
+                                        .onTapGesture {
+                                            selectSuggestion(suggestion)
+                                        }
                                 }
                             }
                             .padding(.horizontal, 4)
@@ -94,11 +103,12 @@ struct CommandPaletteView: View {
                         }
                     }
                     .frame(width: 600)
+                    .background(isDark ? Color.white.opacity(0.3) : Color.white.opacity(0.8))
                     .background(.thinMaterial)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(.white.opacity(0.2), lineWidth: 1)
+                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
                     )
                     .animation(.easeInOut(duration: 0.15), value: searchManager.suggestions.count)
                     .alignmentGuide(.top) { _ in -geometry.size.height / 2 }
@@ -215,12 +225,16 @@ struct CommandPaletteView: View {
         switch suggestion.type {
         case .tab(let tab):
             TabSuggestionItem(tab: tab, isSelected: isSelected)
+                .foregroundStyle(AppColors.textPrimary)
         case .history(let entry):
             HistorySuggestionItem(entry: entry, isSelected: isSelected)
+                .foregroundStyle(AppColors.textPrimary)
         case .url:
             GenericSuggestionItem(icon: Image(systemName: "link"), text: suggestion.text, isSelected: isSelected)
+                .foregroundStyle(AppColors.textPrimary)
         case .search:
             GenericSuggestionItem(icon: Image(systemName: "magnifyingglass"), text: suggestion.text, isSelected: isSelected)
+                .foregroundStyle(AppColors.textPrimary)
         }
     }
     
@@ -242,3 +256,89 @@ struct CommandPaletteView: View {
         }
     }
 }
+
+#if DEBUG
+#Preview("Manual Command Palette Preview") {
+    @Previewable @Environment(\.colorScheme) var colorScheme
+    let isDark = colorScheme == .dark
+    ZStack {
+        Color.black.opacity(0.2)
+            .ignoresSafeArea()
+
+        VStack(spacing: 0) {
+            // Fake search input row
+            HStack(spacing: 12) {
+                Image(systemName: "globe")
+                    .foregroundStyle(.secondary)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(AppColors.textPrimary)
+
+                Rectangle()
+                    .fill(Color.white.opacity(0.2))
+                    .frame(height: 20)
+                    .cornerRadius(4)
+            }
+            .padding(.vertical, 16)
+            .padding(.horizontal, 13)
+
+            // Separator
+            RoundedRectangle(cornerRadius: 100)
+                .fill(Color.white.opacity(0.4))
+                .frame(height: 1)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+            // Fake suggestion rows
+            VStack(spacing: 2) {
+                HStack(spacing: 12) {
+                    Image(systemName: "globe")
+                        .foregroundStyle(AppColors.textPrimary)
+                        .frame(width: 18, height: 18)
+                    Text("History Entry Example")
+                        .foregroundStyle(AppColors.textPrimary)
+                    Spacer()
+                }
+                .padding(8)
+                .background(Color.blue.opacity(0.3))
+                .cornerRadius(6)
+
+                HStack(spacing: 12) {
+                    Image(systemName: "link")
+                        .foregroundStyle(AppColors.textPrimary)
+                        .frame(width: 18, height: 18)
+                    Text("https://example.com")
+                        .foregroundStyle(AppColors.textPrimary)
+                    Spacer()
+                }
+                .padding(8)
+                .background(Color.clear)
+                .cornerRadius(6)
+
+                HStack(spacing: 12) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(AppColors.textPrimary)
+                        .frame(width: 18, height: 18)
+                    Text("Search query example")
+                        .foregroundStyle(AppColors.textPrimary)
+                    Spacer()
+                }
+                .padding(8)
+                .background(Color.clear)
+                .cornerRadius(6)
+            }
+            .padding(.horizontal, 4)
+            .padding(.vertical, 4)
+        }
+        .frame(width: 600)
+        .background(isDark ? Color.white.opacity(0.3) : Color.white.opacity(0.8))
+        .background(.thinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+        )
+        .padding()
+    }
+}
+#endif
+
