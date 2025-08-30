@@ -34,7 +34,7 @@ struct TabSuggestionItem: View {
                     .foregroundStyle(.white.opacity(0.5))
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 5)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
         .onHover { hovering in

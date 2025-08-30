@@ -38,7 +38,7 @@ struct HistorySuggestionItem: View {
             }
             Spacer()
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 5)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
         .onHover { hovering in
