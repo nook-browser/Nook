@@ -32,7 +32,8 @@ struct PinnedTabView: View {
             ZStack {
                 // Background replaced with RoundedRectangle directly
                 RoundedRectangle(cornerRadius: corner, style: .continuous)
-                    .fill(Color.white.opacity(isActive ? 1.0 : 0.4))
+                    .fill(Color.white.opacity(isActive ? 1.0 : isHovered ? 0.6 : 0.4))
+                    .animation(.easeInOut(duration: 0.2), value: isHovered)
                     .shadow(color: isActive ? Color.gray : Color.clear, radius: 1, y: 1)
 
                 tabIcon
@@ -58,6 +59,9 @@ struct PinnedTabView: View {
             .contentShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
         }
         .buttonStyle(.plain)
+        .onHover { hovering in
+            self.isHovered = hovering
+        }
     }
 
     // MARK: - Favicon stroke overlay
@@ -102,3 +106,4 @@ struct PinnedTabView: View {
         }
     }
 }
+

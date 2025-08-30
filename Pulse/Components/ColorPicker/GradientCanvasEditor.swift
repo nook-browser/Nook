@@ -9,7 +9,7 @@ struct GradientCanvasEditor: View {
     @Binding var gradient: SpaceGradient
     @Binding var selectedNodeID: UUID?
     var showDitherOverlay: Bool = true
-    @EnvironmentObject var gradientTransitionManager: GradientTransitionManager
+    @EnvironmentObject var gradientColorManager: GradientColorManager
 
     // ephemeral Y-positions (0...1) for visual placement only
     @State private var yPositions: [UUID: CGFloat] = [:]
@@ -221,7 +221,7 @@ struct GradientCanvasEditor: View {
         }
 
         // Push live update to background
-        gradientTransitionManager.setImmediate(gradient)
+        gradientColorManager.setImmediate(gradient)
     }
 
     private func clampToCircle(point: CGPoint, center: CGPoint, radius: CGFloat) -> CGPoint {
@@ -320,7 +320,7 @@ struct GradientCanvasEditor: View {
         gradient.nodes.sort { $0.location < $1.location }
         selectedNodeID = new.id
         yPositions[new.id] = 0.5
-        gradientTransitionManager.setImmediate(gradient)
+        gradientColorManager.setImmediate(gradient)
     }
 
     private func removeNode() {
@@ -334,7 +334,7 @@ struct GradientCanvasEditor: View {
             yPositions.removeValue(forKey: removed.id)
             selectedNodeID = gradient.nodes.last?.id
         }
-        gradientTransitionManager.setImmediate(gradient)
+        gradientColorManager.setImmediate(gradient)
     }
 
     private func stops() -> [Gradient.Stop] {
