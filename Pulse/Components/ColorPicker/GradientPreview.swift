@@ -30,5 +30,6 @@ struct GradientPreview: View {
         .frame(width: size.width, height: size.height)
         .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
         .drawingGroup()
+        .opacity(max(0.0, min(1.0, gradient.opacity)))
     }
 }
