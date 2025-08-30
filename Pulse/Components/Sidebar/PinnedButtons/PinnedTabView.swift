@@ -23,22 +23,17 @@ struct PinnedTabView: View {
     private let innerPadding: CGFloat = 16
 
     // Stroke overlay tunables
-    private let strokeThickness: CGFloat = 3.0   // ring thickness
+    private let strokeThickness: CGFloat = 2.0   // ring thickness
     private let faviconScale: CGFloat = 9.0      // favicon scale to fit the ring
     private let faviconBlur: CGFloat = 70.0      // blur applied to favicon
 
     var body: some View {
         Button(action: action) {
             ZStack {
-                // Background
-                ZStack {
-                    BlurEffectView(
-                        material: browserManager.settingsManager.currentMaterial,
-                        state: .active
-                    )
-                    Color.white.opacity(isActive ? 0.3 : 0.2)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
+                // Background replaced with RoundedRectangle directly
+                RoundedRectangle(cornerRadius: corner, style: .continuous)
+                    .fill(Color.white.opacity(isActive ? 1.0 : 0.4))
+                    .shadow(color: isActive ? Color.gray : Color.clear, radius: 1, y: 1)
 
                 tabIcon
                     .resizable()
@@ -82,6 +77,7 @@ struct PinnedTabView: View {
                 let ringMask = ZStack {
                     outerRect
                         .fill(Color.white)
+                        .shadow(color: .clear, radius: 0)
 
                     innerRect
                         .inset(by: thickness)
