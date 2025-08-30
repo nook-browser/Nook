@@ -9,6 +9,8 @@ import SwiftUI
 struct SpacesListItem: View {
     @EnvironmentObject var browserManager: BrowserManager
     var space: Space
+    var isActive: Bool
+    var compact: Bool
     @State private var isHovering: Bool = false
     @State private var selectedEmoji: String = ""
     @FocusState private var emojiFieldFocused: Bool
@@ -17,29 +19,44 @@ struct SpacesListItem: View {
         browserManager.tabManager.currentSpace?.id
     }
     
+    private var cellSize: CGFloat { compact && !isActive ? 16 : 24 }
+    private let dotVisualSize: CGFloat = 6
+    private let cornerRadius: CGFloat = 6
+    
     var body: some View {
         Button {
             browserManager.tabManager.setActiveSpace(space)
         } label: {
-            if isEmoji(space.icon) {
-                Text(space.icon)
-                    .font(.system(size: 14))
-                    .padding(4)
-            } else {
-                Image(systemName: space.icon)
-                    .font(.system(size: 14))
-                    .foregroundStyle(AppColors.textSecondary)
-                    .padding(4)
-                    .contentTransition(.symbolEffect(.replace.upUp.byLayer, options: .nonRepeating))
+            ZStack {
+                if compact && !isActive {
+                    Circle()
+                        .fill(AppColors.textTertiary)
+                        .frame(width: dotVisualSize, height: dotVisualSize)
+                } else {
+                    if isEmoji(space.icon) {
+                        // Fixed inner content size to avoid glyph cropping
+                        Text(space.icon)
+                            .font(.system(size: 14))
+                            .frame(width: 20, height: 20)
+                    } else {
+                        Image(systemName: space.icon)
+                            .font(.system(size: 14))
+                            .foregroundStyle(AppColors.textSecondary)
+                            .frame(width: 20, height: 20)
+                            .contentTransition(.symbolEffect(.replace.upUp.byLayer, options: .nonRepeating))
+                    }
+                }
             }
+            .frame(width: cellSize, height: cellSize)
+            .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
         }
         .buttonStyle(.plain)
         .background(
-            RoundedRectangle(cornerRadius: 6)
+            RoundedRectangle(cornerRadius: cornerRadius)
                 .fill(isHovering ? AppColors.controlBackgroundHover : Color.clear)
-                .frame(width: 24, height: 24)
-                .animation(.easeInOut(duration: 0.15), value: isHovering)
         )
+        .frame(width: cellSize, height: cellSize)
+        .layoutPriority(isActive ? 1 : 0)
         .onHover { hovering in
             isHovering = hovering
         }
