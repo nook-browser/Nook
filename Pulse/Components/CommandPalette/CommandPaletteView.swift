@@ -9,6 +9,7 @@ import SwiftUI
 
 struct CommandPaletteView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var gradientColorManager: GradientColorManager
     @State private var searchManager = SearchManager()
     @Environment(\.colorScheme) var colorScheme
 
@@ -67,7 +68,7 @@ struct CommandPaletteView: View {
                                 }
                         }
                         .padding(.vertical, 16)
-                        .padding(.horizontal, 13)
+                        .padding(.horizontal, 16)
 
                         // Separator
                         if !searchManager.suggestions.isEmpty {
@@ -90,8 +91,9 @@ struct CommandPaletteView: View {
                                 ) { index, suggestion in
                                     suggestionRow(for: suggestion, isSelected: selectedSuggestionIndex == index)
                                         .padding(8)
-                                        .background(selectedSuggestionIndex == index ? Color.blue.opacity(1.0) : Color.clear)
-                                        .cornerRadius(6)
+                                        .background(selectedSuggestionIndex == index ? gradientColorManager.primaryColor : Color.clear)
+                                        .cornerRadius(10)
+                                        .font(.system(size: 16, weight: .regular))
                                         .foregroundStyle(AppColors.textPrimary) // ensure text and images get correct styling
                                         .onTapGesture {
                                             selectSuggestion(suggestion)
@@ -256,89 +258,3 @@ struct CommandPaletteView: View {
         }
     }
 }
-
-#if DEBUG
-#Preview("Manual Command Palette Preview") {
-    @Previewable @Environment(\.colorScheme) var colorScheme
-    let isDark = colorScheme == .dark
-    ZStack {
-        Color.black.opacity(0.2)
-            .ignoresSafeArea()
-
-        VStack(spacing: 0) {
-            // Fake search input row
-            HStack(spacing: 12) {
-                Image(systemName: "globe")
-                    .foregroundStyle(.secondary)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(AppColors.textPrimary)
-
-                Rectangle()
-                    .fill(Color.white.opacity(0.2))
-                    .frame(height: 20)
-                    .cornerRadius(4)
-            }
-            .padding(.vertical, 16)
-            .padding(.horizontal, 13)
-
-            // Separator
-            RoundedRectangle(cornerRadius: 100)
-                .fill(Color.white.opacity(0.4))
-                .frame(height: 1)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-            // Fake suggestion rows
-            VStack(spacing: 2) {
-                HStack(spacing: 12) {
-                    Image(systemName: "globe")
-                        .foregroundStyle(AppColors.textPrimary)
-                        .frame(width: 18, height: 18)
-                    Text("History Entry Example")
-                        .foregroundStyle(AppColors.textPrimary)
-                    Spacer()
-                }
-                .padding(8)
-                .background(Color.blue.opacity(0.3))
-                .cornerRadius(6)
-
-                HStack(spacing: 12) {
-                    Image(systemName: "link")
-                        .foregroundStyle(AppColors.textPrimary)
-                        .frame(width: 18, height: 18)
-                    Text("https://example.com")
-                        .foregroundStyle(AppColors.textPrimary)
-                    Spacer()
-                }
-                .padding(8)
-                .background(Color.clear)
-                .cornerRadius(6)
-
-                HStack(spacing: 12) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(AppColors.textPrimary)
-                        .frame(width: 18, height: 18)
-                    Text("Search query example")
-                        .foregroundStyle(AppColors.textPrimary)
-                    Spacer()
-                }
-                .padding(8)
-                .background(Color.clear)
-                .cornerRadius(6)
-            }
-            .padding(.horizontal, 4)
-            .padding(.vertical, 4)
-        }
-        .frame(width: 600)
-        .background(isDark ? Color.white.opacity(0.3) : Color.white.opacity(0.8))
-        .background(.thinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.2), lineWidth: 1)
-        )
-        .padding()
-    }
-}
-#endif
-

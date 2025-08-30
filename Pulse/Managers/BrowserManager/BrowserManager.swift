@@ -60,7 +60,7 @@ class BrowserManager: ObservableObject {
     var cacheManager: CacheManager
     var extensionManager: ExtensionManager?
     var compositorManager: TabCompositorManager
-    var gradientTransitionManager: GradientTransitionManager
+    var gradientColorManager: GradientColorManager
     
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
@@ -84,7 +84,7 @@ class BrowserManager: ObservableObject {
         self.cookieManager = CookieManager()
         self.cacheManager = CacheManager()
         self.compositorManager = TabCompositorManager()
-        self.gradientTransitionManager = GradientTransitionManager()
+        self.gradientColorManager = GradientColorManager()
         self.compositorContainerView = nil
 
         // Phase 2: wire dependencies and perform side effects (safe to use self)
@@ -97,9 +97,9 @@ class BrowserManager: ObservableObject {
             mgr.attach(browserManager: self)
         }
         if let g = self.tabManager.currentSpace?.gradient {
-            self.gradientTransitionManager.setImmediate(g)
+            self.gradientColorManager.setImmediate(g)
         } else {
-            self.gradientTransitionManager.setImmediate(.default)
+            self.gradientColorManager.setImmediate(.default)
         }
         loadSidebarSettings()
         NotificationCenter.default.addObserver(
@@ -269,7 +269,7 @@ class BrowserManager: ObservableObject {
         let header: AnyView? = nil
 
         let content = GradientEditorView(gradient: binding)
-            .environmentObject(self.gradientTransitionManager)
+            .environmentObject(self.gradientColorManager)
 
         let footer = AnyView(
             DialogFooter(
@@ -278,8 +278,8 @@ class BrowserManager: ObservableObject {
                     variant: .secondary,
                     action: { [weak self] in
                         // Restore background to the saved gradient for this space
-                        self?.gradientTransitionManager.endInteractivePreview()
-                        self?.gradientTransitionManager.transition(to: space.gradient, duration: 0.25)
+                        self?.gradientColorManager.endInteractivePreview()
+                        self?.gradientColorManager.transition(to: space.gradient, duration: 0.25)
                         self?.closeDialog()
                     }
                 ),
@@ -292,8 +292,8 @@ class BrowserManager: ObservableObject {
                             // Commit draft to the current space and persist
                             space.gradient = draft.value
                             // End interactive editing then morph to the committed gradient
-                            self?.gradientTransitionManager.endInteractivePreview()
-                            self?.gradientTransitionManager.transition(to: draft.value, duration: 0.35)
+                            self?.gradientColorManager.endInteractivePreview()
+                            self?.gradientColorManager.transition(to: draft.value, duration: 0.35)
                             self?.tabManager.persistSnapshot()
                             self?.closeDialog()
                         }

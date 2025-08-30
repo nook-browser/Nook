@@ -8,7 +8,7 @@ import AppKit
 struct GradientEditorView: View {
     @Binding var gradient: SpaceGradient
     @State private var selectedNodeID: UUID?
-    @EnvironmentObject var gradientTransitionManager: GradientTransitionManager
+    @EnvironmentObject var gradientColorManager: GradientColorManager
 
     // No throttling: update in real time
 
@@ -29,15 +29,15 @@ struct GradientEditorView: View {
         .onAppear { if selectedNodeID == nil { selectedNodeID = gradient.nodes.first?.id } }
         .onChange(of: gradient) { newValue in
             // Scrubbing should be immediate to avoid animation token races
-            gradientTransitionManager.setImmediate(newValue)
+            gradientColorManager.setImmediate(newValue)
         }
         .onAppear {
             // Ensure background starts from the current draft gradient
-            gradientTransitionManager.setImmediate(gradient)
-            gradientTransitionManager.beginInteractivePreview()
+            gradientColorManager.setImmediate(gradient)
+            gradientColorManager.beginInteractivePreview()
         }
         .onDisappear {
-            gradientTransitionManager.endInteractivePreview()
+            gradientColorManager.endInteractivePreview()
         }
     }
 
@@ -88,7 +88,7 @@ struct GradientEditorView: View {
         guard let idx = gradient.nodes.firstIndex(where: { $0.id == updated.id }) else { return }
         gradient.nodes[idx] = updated
         // Live update when transparency slider changes
-        gradientTransitionManager.setImmediate(gradient)
+        gradientColorManager.setImmediate(gradient)
     }
 
     // No bespoke hex helpers: rely on Color(hex:) and NSColor.toHexString
