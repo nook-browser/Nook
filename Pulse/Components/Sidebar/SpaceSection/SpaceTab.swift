@@ -13,6 +13,7 @@ struct SpaceTab: View {
     var onClose: () -> Void
     var onMute: () -> Void
     @State private var isHovering: Bool = false
+    @State private var isCloseHovering: Bool = false
     @EnvironmentObject var browserManager: BrowserManager
 
     var body: some View {
@@ -30,14 +31,14 @@ struct SpaceTab: View {
                         Image(systemName: "arrow.down.circle.fill")
                             .font(.system(size: 8))
                             .foregroundColor(.secondary)
-                            .background(Color.white)
+                            .background(Color.gray)
                             .clipShape(Circle())
                             .offset(x: 6, y: -6)
                     }
                 }
                 Text(tab.name)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(tab.isUnloaded ? AppColors.textSecondary : AppColors.textPrimary)
+                    .foregroundStyle(tab.isUnloaded ? AppColors.textSecondary : textTab)
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Spacer()
@@ -49,7 +50,7 @@ struct SpaceTab: View {
                     }) {
                         Image(systemName: tab.isAudioMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(tab.isAudioMuted ? AppColors.textSecondary : AppColors.textPrimary)
+                            .foregroundColor(tab.isAudioMuted ? AppColors.textSecondary : textTab)
                             .padding(4)
                             .background(AppColors.controlBackgroundHover)
                             .clipShape(RoundedRectangle(cornerRadius: 6))
@@ -62,14 +63,17 @@ struct SpaceTab: View {
                 if isHovering {
                     Button(action: onClose) {
                         Image(systemName: "xmark")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(AppColors.textPrimary)
+                            .font(.system(size: 12, weight: .heavy))
+                            .foregroundColor(textTab)
                             .padding(4)
-                            .background(AppColors.controlBackgroundHover)
+                            .background(isCloseHovering ? AppColors.controlBackgroundHover : Color.clear)
                             .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .transition(.scale.combined(with: .opacity))
+                    .onHover { hovering in
+                        isCloseHovering = hovering
+                    }
+                    // .transition(.scale.combined(with: .opacity))
                 }
             }
             .padding(.horizontal, 10)
@@ -118,7 +122,7 @@ struct SpaceTab: View {
                 Label("Close Tab", systemImage: "xmark.circle")
             }
         }
-
+        .shadow(color: tab.isActiveInSpace ? Color.gray : Color.clear, radius: tab.isActiveInSpace ? 1 : 0, y: 1)
     }
 
     private var isCurrentTab: Bool {
@@ -127,11 +131,19 @@ struct SpaceTab: View {
     
     private var backgroundColor: Color {
         if isCurrentTab {
-            return AppColors.controlBackgroundActive
+            return AppColors.activeTab
         } else if isHovering {
             return AppColors.controlBackgroundHover
         } else {
             return Color.clear
         }
     }
+    private var textTab: Color {
+        if isCurrentTab {
+            return Color.black
+        } else {
+            return AppColors.textSecondary
+        }
+    }
+
 }
