@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 @MainActor
-final class GradientTransitionManager: ObservableObject {
+final class GradientColorManager: ObservableObject {
     @Published var displayGradient: SpaceGradient = .default
     @Published private(set) var isEditing: Bool = false
     @Published var isAnimating: Bool = false
@@ -38,9 +38,12 @@ final class GradientTransitionManager: ObservableObject {
         // Flip on lightweight mode for renderers
         isAnimating = true
 
-        // Prefer barycentric shader during animation if both ends are tri-color
-        if let from { self.preferBarycentricDuringAnimation = (from.nodes.count == 3 && to.nodes.count == 3) }
-        else { self.preferBarycentricDuringAnimation = (to.nodes.count == 3) }
+        // Prefer barycentric shader during animation if both ends are 1–3 colors
+        if let from {
+            self.preferBarycentricDuringAnimation = (from.nodes.count <= 3 && to.nodes.count <= 3)
+        } else {
+            self.preferBarycentricDuringAnimation = (to.nodes.count <= 3)
+        }
 
         // If a specific starting gradient is provided, snap to it without animation first
         if let from {
@@ -74,5 +77,13 @@ final class GradientTransitionManager: ObservableObject {
                 self.preferBarycentricDuringAnimation = false
             }
         }
+    }
+}
+
+extension GradientColorManager {
+    // Space-specific accent color derived from the currently displayed gradient.
+    // Views can access this via `@EnvironmentObject var gradientColorManager`.
+    var primaryColor: Color {
+        displayGradient.primaryColor
     }
 }

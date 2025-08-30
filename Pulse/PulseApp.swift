@@ -7,6 +7,7 @@
 
 import SwiftUI
 import WebKit
+import OSLog
 
 @main
 struct PulseApp: App {
@@ -40,13 +41,62 @@ struct PulseApp: App {
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
+    private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Pulse", category: "AppTermination")
     weak var browserManager: BrowserManager?
     
+    // Prefer async termination path to avoid MainActor deadlocks
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        AppDelegate.log.info("applicationShouldTerminate: returning terminateLater and starting async persistence")
+
+        // Minimal fallback if BrowserManager is unavailable
+        guard let manager = browserManager else {
+            // Attempt a best-effort save via shared persistence container
+            do {
+                let ctx = Persistence.shared.container.mainContext
+                try ctx.save()
+                AppDelegate.log.info("Fallback save without BrowserManager succeeded")
+            } catch {
+                AppDelegate.log.error("Fallback save without BrowserManager failed: \(String(describing: error))")
+            }
+            return .terminateNow
+        }
+
+        Task { @MainActor in
+            let overallStart = CFAbsoluteTimeGetCurrent()
+            AppDelegate.log.info("Termination task started on MainActor")
+
+            // Phase 1: Atomic snapshot persistence (non-throwing Bool)
+            let persistStart = CFAbsoluteTimeGetCurrent()
+            let atomic: Bool = await manager.tabManager.persistSnapshotAwaitingResult()
+            let pdt = CFAbsoluteTimeGetCurrent() - persistStart
+            AppDelegate.log.info("Atomic persistence \(atomic ? "succeeded" : "did not run; fallback used") in \(String(format: "%.3f", pdt))s")
+
+            // Phase 2: Ensure SwiftData changes are committed
+            let contextSaveStart = CFAbsoluteTimeGetCurrent()
+            do {
+                try manager.modelContext.save()
+                let sdt = CFAbsoluteTimeGetCurrent() - contextSaveStart
+                AppDelegate.log.info("Context save completed in \(String(format: "%.3f", sdt))s")
+            } catch {
+                let sdt = CFAbsoluteTimeGetCurrent() - contextSaveStart
+                AppDelegate.log.error("Context save failed in \(String(format: "%.3f", sdt))s: \(String(describing: error))")
+            }
+
+            // Phase 3: Graceful cleanup
+            manager.cleanupAllTabs()
+            AppDelegate.log.info("Cleanup completed; WKWebView processes terminated")
+
+            let total = CFAbsoluteTimeGetCurrent() - overallStart
+            AppDelegate.log.info("Termination task finished in \(String(format: "%.3f", total))s; replying to terminate")
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+
+        return .terminateLater
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
-        print("🔄 [App] Application will terminate - cleaning up all tabs")
-        
-        // Clean up all tabs to ensure WKWebView processes are terminated
-        browserManager?.cleanupAllTabs()
+        // Keep minimal to avoid MainActor deadlocks; main work happens in applicationShouldTerminate
+        AppDelegate.log.info("applicationWillTerminate called")
     }
 }
 

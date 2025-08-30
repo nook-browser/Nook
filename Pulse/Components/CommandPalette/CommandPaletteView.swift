@@ -9,13 +9,17 @@ import SwiftUI
 
 struct CommandPaletteView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var gradientColorManager: GradientColorManager
     @State private var searchManager = SearchManager()
+    @Environment(\.colorScheme) var colorScheme
 
     @FocusState private var isSearchFocused: Bool
     @State private var text: String = ""
     @State private var selectedSuggestionIndex: Int = -1
 
     var body: some View {
+        let isDark = colorScheme == .dark
+        
         ZStack {
             Color.black.opacity(0.2)
                 .ignoresSafeArea()
@@ -36,12 +40,13 @@ struct CommandPaletteView: View {
                                 systemName: isLikelyURL(text)
                                     ? "globe" : "magnifyingglass"
                             )
-                            .foregroundStyle(.secondary)
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(AppColors.textPrimary)
 
                             TextField("Search or enter address", text: $text)
                                 .textFieldStyle(.plain)
                                 .font(.system(size: 16, weight: .regular))
+                                .foregroundColor(AppColors.textPrimary)
                                 .focused($isSearchFocused)
                                 .onKeyPress(.return) {
                                     handleReturn()
@@ -63,15 +68,16 @@ struct CommandPaletteView: View {
                                 }
                         }
                         .padding(.vertical, 16)
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, 16)
 
                         // Separator
                         if !searchManager.suggestions.isEmpty {
                             RoundedRectangle(cornerRadius: 100)
-                                .fill(Color.white.opacity(0.1))
+                                .fill(Color.white.opacity(0.4))
                                 .frame(height: 1)
                                 .frame(maxWidth: .infinity)
                                 .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
                         }
 
                         // Suggestions - expand the box downward
@@ -84,9 +90,14 @@ struct CommandPaletteView: View {
                                     id: \.element.id
                                 ) { index, suggestion in
                                     suggestionRow(for: suggestion, isSelected: selectedSuggestionIndex == index)
-                                    .onTapGesture {
-                                        selectSuggestion(suggestion)
-                                    }
+                                        .padding(8)
+                                        .background(selectedSuggestionIndex == index ? gradientColorManager.primaryColor : Color.clear)
+                                        .cornerRadius(10)
+                                        .font(.system(size: 16, weight: .regular))
+                                        .foregroundStyle(AppColors.textPrimary) // ensure text and images get correct styling
+                                        .onTapGesture {
+                                            selectSuggestion(suggestion)
+                                        }
                                 }
                             }
                             .padding(.horizontal, 4)
@@ -94,11 +105,12 @@ struct CommandPaletteView: View {
                         }
                     }
                     .frame(width: 600)
+                    .background(isDark ? Color.white.opacity(0.3) : Color.white.opacity(0.8))
                     .background(.thinMaterial)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(.white.opacity(0.2), lineWidth: 1)
+                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
                     )
                     .animation(.easeInOut(duration: 0.15), value: searchManager.suggestions.count)
                     .alignmentGuide(.top) { _ in -geometry.size.height / 2 }
@@ -215,12 +227,16 @@ struct CommandPaletteView: View {
         switch suggestion.type {
         case .tab(let tab):
             TabSuggestionItem(tab: tab, isSelected: isSelected)
+                .foregroundStyle(AppColors.textPrimary)
         case .history(let entry):
             HistorySuggestionItem(entry: entry, isSelected: isSelected)
+                .foregroundStyle(AppColors.textPrimary)
         case .url:
             GenericSuggestionItem(icon: Image(systemName: "link"), text: suggestion.text, isSelected: isSelected)
+                .foregroundStyle(AppColors.textPrimary)
         case .search:
             GenericSuggestionItem(icon: Image(systemName: "magnifyingglass"), text: suggestion.text, isSelected: isSelected)
+                .foregroundStyle(AppColors.textPrimary)
         }
     }
     
