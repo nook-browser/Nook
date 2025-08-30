@@ -1,15 +1,11 @@
 import SwiftUI
-#if canImport(AppKit)
-import AppKit
-#endif
 
 // MARK: - TransparencySlider
-// Controls alpha channel of selected gradient node
+// Controls global opacity of the gradient layer
 struct TransparencySlider: View {
-    @Binding var selectedNode: GradientNode?
-    var onCommit: (GradientNode) -> Void
-
-    @State private var opacityValue: Double = 1.0
+    @Binding var gradient: SpaceGradient
+    @EnvironmentObject var gradientColorManager: GradientColorManager
+    @State private var localOpacity: Double = 1.0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -18,7 +14,7 @@ struct TransparencySlider: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text(String(format: "%.0f%%", opacityValue * 100))
+                Text(String(format: "%.0f%%", localOpacity * 100))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -28,51 +24,59 @@ struct TransparencySlider: View {
                     .frame(width: 48, height: 28)
                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
 
-                Slider(value: $opacityValue, in: 0...1)
-                    .disabled(selectedNode == nil)
+                Slider(value: $localOpacity, in: 0...1)
             }
         }
-        .onChange(of: selectedNode?.colorHex) { _ in syncOpacityFromSelection() }
-        .onChange(of: opacityValue) { _ in applyOpacityChange() }
-        .onAppear { syncOpacityFromSelection() }
+        .onAppear { localOpacity = clamp(gradient.opacity) }
+        .onChange(of: gradient.opacity) { _, newValue in localOpacity = clamp(newValue) }
+        .onChange(of: localOpacity) { _, newValue in
+            gradient.opacity = clamp(newValue)
+            // Push live background update immediately
+            gradientColorManager.setImmediate(gradient)
+        }
     }
 
     private var opacityPreview: some View {
         ZStack {
             CheckerboardBackground()
-            if let hex = selectedNode?.colorHex {
-                Color(hex: hex).opacity(opacityValue)
-            } else {
-                Color.clear
-            }
+            // Lightweight gradient preview inline
+            let pts = linePoints(angle: gradient.angle)
+            Rectangle()
+                .fill(LinearGradient(gradient: Gradient(stops: stops()), startPoint: pts.start, endPoint: pts.end))
+                .opacity(clamp(localOpacity))
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
         }
     }
 
-    private func syncOpacityFromSelection() {
-        guard let hex = selectedNode?.colorHex else { opacityValue = 1.0; return }
-        #if canImport(AppKit)
-        let ns = NSColor(Color(hex: hex)).usingColorSpace(.sRGB)
-        var a: CGFloat = 1.0
-        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0
-        ns?.getRed(&r, green: &g, blue: &b, alpha: &a)
-        opacityValue = Double(a)
-        #else
-        opacityValue = 1.0
-        #endif
+    private func clamp(_ v: Double) -> Double { min(1.0, max(0.0, v)) }
+
+    private func stops() -> [Gradient.Stop] {
+        var mapped: [Gradient.Stop] = gradient.sortedNodes.map { node in
+            Gradient.Stop(color: Color(hex: node.colorHex), location: CGFloat(node.location))
+        }
+        if mapped.count == 0 {
+            let def = SpaceGradient.default
+            mapped = def.sortedNodes.map { node in
+                Gradient.Stop(color: Color(hex: node.colorHex), location: CGFloat(node.location))
+            }
+        } else if mapped.count == 1 {
+            let single = mapped[0]
+            mapped = [
+                Gradient.Stop(color: single.color, location: 0.0),
+                Gradient.Stop(color: single.color, location: 1.0)
+            ]
+        }
+        return mapped
     }
 
-    private func applyOpacityChange() {
-        guard var node = selectedNode else { return }
-        #if canImport(AppKit)
-        let base = NSColor(Color(hex: node.colorHex)).usingColorSpace(.sRGB) ?? NSColor(srgbRed: 1, green: 1, blue: 1, alpha: 1)
-        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, _a: CGFloat = 1
-        base.getRed(&r, green: &g, blue: &b, alpha: &_a)
-        let updated = NSColor(srgbRed: r, green: g, blue: b, alpha: CGFloat(opacityValue))
-        node.colorHex = updated.toHexString(includeAlpha: true) ?? node.colorHex
-        #endif
-        onCommit(node)
+    private func linePoints(angle: Double) -> (start: UnitPoint, end: UnitPoint) {
+        let theta = Angle(degrees: angle).radians
+        let dx = cos(theta)
+        let dy = sin(theta)
+        let start = UnitPoint(x: 0.5 - 0.5 * dx, y: 0.5 - 0.5 * dy)
+        let end = UnitPoint(x: 0.5 + 0.5 * dx, y: 0.5 + 0.5 * dy)
+        return (start, end)
     }
 }
 

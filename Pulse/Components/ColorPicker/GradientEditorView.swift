@@ -20,10 +20,8 @@ struct GradientEditorView: View {
                 applyColorSelection(color)
             }
 
-            // Opacity control for selected node
-            TransparencySlider(selectedNode: bindingSelectedNode()) { updated in
-                updateNode(updated)
-            }
+            // Global transparency for the whole gradient layer
+            TransparencySlider(gradient: $gradient)
         }
         .padding(16)
         .onAppear { if selectedNodeID == nil { selectedNodeID = gradient.nodes.first?.id } }
@@ -82,13 +80,6 @@ struct GradientEditorView: View {
         let combined = NSColor(srgbRed: nr, green: ng, blue: nb, alpha: oldA)
         gradient.nodes[idx].colorHex = combined.toHexString(includeAlpha: true) ?? gradient.nodes[idx].colorHex
         #endif
-    }
-
-    private func updateNode(_ updated: GradientNode) {
-        guard let idx = gradient.nodes.firstIndex(where: { $0.id == updated.id }) else { return }
-        gradient.nodes[idx] = updated
-        // Live update when transparency slider changes
-        gradientColorManager.setImmediate(gradient)
     }
 
     // No bespoke hex helpers: rely on Color(hex:) and NSColor.toHexString
