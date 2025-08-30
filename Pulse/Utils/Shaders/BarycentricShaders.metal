@@ -48,3 +48,54 @@ half4 baryTriGradient(float2 position,
     half3 rgb = (a > 0) ? rgbPremul / a : rgbPremul;
     return half4(rgb, a);
 }
+
+// Adaptive barycentric gradient supporting 1–3 active colors.
+// sA/sB/sC are activation weights in [0,1] for each vertex color.
+// We renormalize barycentric coordinates by these activation weights so that
+// disabling a vertex does not darken the result.
+half4 baryAdaptiveGradient(float2 position,
+                           half4 ca,
+                           half4 cb,
+                           half4 cc,
+                           float2 size,
+                           float2 pA,
+                           float2 pB,
+                           float2 pC,
+                           float sA,
+                           float sB,
+                           float sC) [[ stitchable ]] {
+    // Normalize to [0,1]
+    float2 uv = float2(position.x / max(size.x, 1.0),
+                       position.y / max(size.y, 1.0));
+
+    // Barycentric coords
+    float2 v0 = pB - pA;
+    float2 v1 = pC - pA;
+    float2 v2 = uv - pA;
+    float d00 = dot(v0, v0);
+    float d01 = dot(v0, v1);
+    float d11 = dot(v1, v1);
+    float d20 = dot(v2, v0);
+    float d21 = dot(v2, v1);
+    float denom = max(d00 * d11 - d01 * d01, 1e-6);
+    float v = (d11 * d20 - d01 * d21) / denom;
+    float w = (d00 * d21 - d01 * d20) / denom;
+    float u = 1.0 - v - w;
+
+    // Clamp and apply activation weights
+    u = max(0.0, u) * max(0.0, sA);
+    v = max(0.0, v) * max(0.0, sB);
+    w = max(0.0, w) * max(0.0, sC);
+    float sum = u + v + w;
+    if (sum < 1e-6) {
+        // Fallback: if all inactive, just show A
+        return half4(ca.rgb, ca.a);
+    }
+    u /= sum; v /= sum; w /= sum;
+
+    // Premultiplied blend
+    half a = u * ca.a + v * cb.a + w * cc.a;
+    half3 rgbPremul = (half3(ca.rgb) * ca.a) * u + (half3(cb.rgb) * cb.a) * v + (half3(cc.rgb) * cc.a) * w;
+    half3 rgb = (a > 0) ? rgbPremul / a : rgbPremul;
+    return half4(rgb, a);
+}

@@ -47,7 +47,7 @@ struct WindowView: View {
             InsertionLineView(dragManager: TabDragManager.shared)
         }
         .environmentObject(browserManager)
-        .environmentObject(browserManager.gradientTransitionManager)
+        .environmentObject(browserManager.gradientColorManager)
     }
 
 }
