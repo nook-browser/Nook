@@ -10,7 +10,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @State private var selectedTab: SettingsTabs = .general
+    
 
     var body: some View {
         HSplitView {
@@ -28,7 +28,7 @@ struct SettingsView: View {
                 Divider()
                 
                 // Tab list
-                List(selection: $selectedTab) {
+                List(selection: $browserManager.settingsManager.currentSettingsTab) {
                     ForEach([SettingsTabs.general, .privacy, .spaces, .profiles, .shortcuts, .extensions, .advanced], id: \.self) { tab in
                         Label(tab.name, systemImage: tab.icon)
                             .tag(tab)
@@ -42,9 +42,9 @@ struct SettingsView: View {
             VStack(spacing: 0) {
                 // Tab content header
                 HStack {
-                    Image(systemName: selectedTab.icon)
+                    Image(systemName: browserManager.settingsManager.currentSettingsTab.icon)
                         .foregroundColor(.blue)
-                    Text(selectedTab.name)
+                    Text(browserManager.settingsManager.currentSettingsTab.name)
                         .font(.title2)
                         .fontWeight(.semibold)
                     Spacer()
@@ -55,7 +55,7 @@ struct SettingsView: View {
                 
                 // Tab content
                 Group {
-                    switch selectedTab {
+                    switch browserManager.settingsManager.currentSettingsTab {
                     case .general:
                         GeneralSettingsView()
                     case .privacy:
