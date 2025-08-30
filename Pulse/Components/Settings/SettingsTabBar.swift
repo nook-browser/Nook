@@ -8,7 +8,6 @@ import SwiftUI
 
 struct SettingsTabBar: View {
     @EnvironmentObject var browserManager: BrowserManager
-    var currentTab: SettingsTabs = .general
 
     var body: some View {
         ZStack {
@@ -20,7 +19,7 @@ struct SettingsTabBar: View {
                 MacButtonsView()
                     .frame(width: 70, height: 32)
                 Spacer()
-                Text(currentTab.name)
+                Text(browserManager.settingsManager.currentSettingsTab.name)
                     .font(.headline)
                 Spacer()
             }

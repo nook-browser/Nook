@@ -15,6 +15,7 @@ class SettingsManager {
     private let searchEngineKey = "settings.searchEngine"
     private let liquidGlassKey = "settings.isLiquidGlassEnabled"
     private let tabUnloadTimeoutKey = "settings.tabUnloadTimeout"
+    var currentSettingsTab: SettingsTabs = .general
 
     // Stored properties
     var isLiquidGlassEnabled: Bool {
