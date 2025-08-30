@@ -59,13 +59,13 @@ struct WebsiteView: View {
                     )
                     .background(Color(nsColor: .windowBackgroundColor))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: { 
+                    .clipShape(RoundedRectangle(cornerRadius: {
                         if #available(macOS 26.0, *) {
                             return 12
                         } else {
                             return 6
                         }
-                    }()))
+                    }(), style: .continuous))
                 } else {
                     EmptyWebsiteView()
                 }
@@ -130,7 +130,15 @@ struct TabCompositorWrapper: NSViewRepresentable {
         containerView.subviews.forEach { $0.removeFromSuperview() }
         
         // Add all loaded tabs to the compositor but only show the current one
-        let allTabs = browserManager.tabManager.pinnedTabs + browserManager.tabManager.tabs
+        // Include: global pinned, space-pinned for current space, and regular tabs in current space
+        let currentSpacePinned: [Tab] = {
+            if let space = browserManager.tabManager.currentSpace {
+                return browserManager.tabManager.spacePinnedTabs(for: space.id)
+            } else {
+                return []
+            }
+        }()
+        let allTabs = browserManager.tabManager.pinnedTabs + currentSpacePinned + browserManager.tabManager.tabs
         
         for tab in allTabs {
             // Only add tabs that are still in the tab manager (not closed)
@@ -199,3 +207,4 @@ struct TabWebViewWrapper: NSViewRepresentable {
         // The webView is managed by the Tab
     }
 }
+
