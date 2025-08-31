@@ -149,16 +149,29 @@ struct GradientCanvasEditor: View {
             } else if !gradient.nodes.contains(where: { $0.id == lockedPrimaryID }) {
                 lockedPrimaryID = gradient.nodes.min(by: { $0.location < $1.location })?.id
             }
-        } else {
+            // Publish the locked primary as the preferred primary for background mapping
+            gradientColorManager.preferredPrimaryNodeID = lockedPrimaryID
+        } else if gradient.nodes.count == 2 {
+            // No locked primary in 2-node mode; keep or choose a stable preferred primary
             lockedPrimaryID = nil
+            if let pid = gradientColorManager.preferredPrimaryNodeID,
+               gradient.nodes.contains(where: { $0.id == pid }) {
+                // keep existing preferred
+            } else {
+                gradientColorManager.preferredPrimaryNodeID = gradient.nodes.min(by: { $0.location < $1.location })?.id
+            }
+        } else {
+            // Single node: trivially the only node is primary
+            lockedPrimaryID = nil
+            gradientColorManager.preferredPrimaryNodeID = gradient.nodes.first?.id
         }
         if gradient.nodes.count == 3, let primaryID = primaryNodeID() {
             let allUnset = gradient.nodes.allSatisfy { xPositions[$0.id] == nil && yPositions[$0.id] == nil }
             if allUnset {
-                // Seed primary roughly at left; companions across on same radius with small angular spread
-                // Primary
+                // Seed primary at top-left; companions at top-right and bottom-center (same radius)
+                // Primary (top-left)
                 if let p = gradient.nodes.first(where: { $0.id == primaryID }) {
-                    let primaryAngle: CGFloat = .pi // left side
+                    let primaryAngle: CGFloat = (.pi * 3.0) / 4.0 // 135° (top-left)
                     let pr = radius * 0.9
                     let px = center.x + cos(primaryAngle) * pr
                     let py = center.y + sin(primaryAngle) * pr
@@ -166,11 +179,9 @@ struct GradientCanvasEditor: View {
                     yPositions[p.id] = max(0, min(1, py / height))
                     if let i = gradient.nodes.firstIndex(where: { $0.id == p.id }) { gradient.nodes[i].location = Double(xPositions[p.id] ?? 0.1) }
                 }
-                // Companions across at opposite angle ± spread, same radius
-                let spread: CGFloat = 0.6 // ~34°
-                let opposite = 0.0 // right side
+                // Companions: [top-right, bottom-center]
                 let rComp = radius * 0.9
-                let companionAngles: [CGFloat] = [opposite - spread, opposite + spread]
+                let companionAngles: [CGFloat] = [(.pi / 4.0), (-.pi / 2.0)] // 45°, -90°
                 let companions = gradient.nodes.filter { $0.id != primaryID }
                 for (i, node) in companions.enumerated() where i < 2 {
                     let ang = companionAngles[i]
@@ -207,16 +218,24 @@ struct GradientCanvasEditor: View {
         yPositions[node.id] = newY
         gradient.nodes.sort { $0.location < $1.location }
         selectedNodeID = node.id
+        // Mark the currently dragged node as the active primary for background rendering
+        // Only do this for the designated primary in 3-node mode, or for 1–2 nodes.
+        // Mark active primary only when dragging the designated primary
+        // (in 3-node mode uses locked primary; in 2-node mode uses preferredPrimary).
+        let designatedPrimary = primaryNodeID()
+        if node.id == designatedPrimary {
+            gradientColorManager.activePrimaryNodeID = node.id
+        }
 
         // Map position on circle to HSL color
         let hsla = colorFromCircle(point: absolute, center: center, radius: radius, lightness: lightness)
         let updated = colorWithPreservedAlpha(oldHex: gradient.nodes[idx].colorHex, newColor: hsla)
         gradient.nodes[idx].colorHex = updated
 
-        // Auto-place only when dragging the primary for 3 nodes, or mirror for 2 nodes
+        // Auto-place companions only when dragging the designated primary
         if gradient.nodes.count == 3, node.id == primaryNodeID() {
             autoPlaceCompanions(primary: node, center: center, radius: radius)
-        } else if gradient.nodes.count == 2 {
+        } else if gradient.nodes.count == 2, node.id == primaryNodeID() {
             autoPlaceCompanions(primary: node, center: center, radius: radius)
         }
 
@@ -249,10 +268,7 @@ struct GradientCanvasEditor: View {
             for (i, other) in others.enumerated() where i < 2 {
                 let ang = angles[i]
                 let pos = CGPoint(x: centerNorm.x + cos(ang) * r, y: centerNorm.y + sin(ang) * r)
-                let absPt = CGPoint(x: pos.x * (radius*2 + 48), y: pos.y * (radius*2 + 48))
-                let colorHex = colorFromCircle(point: absPt, center: CGPoint(x: radius+24, y: radius+24), radius: radius, lightness: lightness)
                 if let idx = gradient.nodes.firstIndex(where: { $0.id == other.id }) {
-                    gradient.nodes[idx].colorHex = colorHex
                     xPositions[other.id] = pos.x
                     yPositions[other.id] = pos.y
                     gradient.nodes[idx].location = Double(pos.x)
@@ -266,9 +282,6 @@ struct GradientCanvasEditor: View {
             let ang = baseAngle + .pi
             let pos = CGPoint(x: 0.5 + cos(ang) * dist, y: 0.5 + sin(ang) * dist)
             if let other = others.first, let idx = gradient.nodes.firstIndex(where: { $0.id == other.id }) {
-                let absPt = CGPoint(x: pos.x * (radius*2 + 48), y: pos.y * (radius*2 + 48))
-                let colorHex = colorFromCircle(point: absPt, center: CGPoint(x: radius+24, y: radius+24), radius: radius, lightness: lightness)
-                gradient.nodes[idx].colorHex = colorHex
                 xPositions[other.id] = pos.x
                 yPositions[other.id] = pos.y
                 gradient.nodes[idx].location = Double(pos.x)
@@ -276,7 +289,13 @@ struct GradientCanvasEditor: View {
         }
     }
 
-    private func primaryNodeID() -> UUID? { lockedPrimaryID ?? gradient.nodes.min(by: { $0.location < $1.location })?.id }
+    private func primaryNodeID() -> UUID? {
+        if let locked = lockedPrimaryID { return locked }
+        if gradient.nodes.count <= 2 {
+            return gradientColorManager.preferredPrimaryNodeID ?? gradient.nodes.min(by: { $0.location < $1.location })?.id
+        }
+        return gradient.nodes.min(by: { $0.location < $1.location })?.id
+    }
 
     private func colorFromCircle(point: CGPoint, center: CGPoint, radius: CGFloat, lightness: Double) -> String {
         #if canImport(AppKit)
@@ -286,9 +305,12 @@ struct GradientCanvasEditor: View {
         if angle < 0 { angle += 2 * .pi }
         let hue = Double(angle / (2 * .pi))
         let dist = min(1.0, Double(sqrt(dx*dx + dy*dy) / radius))
-        // Saturation grows with distance from center, keep high near edge
-        let saturation = 0.2 + 0.8 * dist
-        let ns = NSColor(hue: CGFloat(hue), saturation: CGFloat(saturation), brightness: CGFloat(lightness), alpha: 1)
+        // Make colors more potent near center, lighter/pastel near the edge
+        // - High saturation at center, reduced toward edge
+        // - Brightness lifts slightly toward edge for a pastel effect
+        let saturation = max(0.0, min(1.0, 0.95 - 0.75 * dist))
+        let brightness = max(0.0, min(1.0, lightness + 0.30 * dist))
+        let ns = NSColor(hue: CGFloat(hue), saturation: CGFloat(saturation), brightness: CGFloat(brightness), alpha: 1)
         return ns.toHexString(includeAlpha: true) ?? "#FFFFFFFF"
         #else
         return "#FFFFFFFF"
@@ -321,6 +343,13 @@ struct GradientCanvasEditor: View {
         selectedNodeID = new.id
         yPositions[new.id] = 0.5
         gradientColorManager.setImmediate(gradient)
+        // Update preferred primary mapping based on new count
+        if gradient.nodes.count == 3 {
+            if lockedPrimaryID == nil { lockedPrimaryID = gradient.nodes.min(by: { $0.location < $1.location })?.id }
+            gradientColorManager.preferredPrimaryNodeID = lockedPrimaryID
+        } else {
+            gradientColorManager.preferredPrimaryNodeID = nil
+        }
     }
 
     private func removeNode() {
@@ -335,6 +364,16 @@ struct GradientCanvasEditor: View {
             selectedNodeID = gradient.nodes.last?.id
         }
         gradientColorManager.setImmediate(gradient)
+        // Update preferred primary mapping based on new count
+        if gradient.nodes.count == 3 {
+            if lockedPrimaryID == nil || (lockedPrimaryID != nil && !gradient.nodes.contains(where: { $0.id == lockedPrimaryID })) {
+                lockedPrimaryID = gradient.nodes.min(by: { $0.location < $1.location })?.id
+            }
+            gradientColorManager.preferredPrimaryNodeID = lockedPrimaryID
+        } else {
+            lockedPrimaryID = nil
+            gradientColorManager.preferredPrimaryNodeID = nil
+        }
     }
 
     private func stops() -> [Gradient.Stop] {
