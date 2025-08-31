@@ -287,9 +287,13 @@ class BrowserManager: ObservableObject {
     @Published var sidebarWidth: CGFloat = 250
     @Published var isSidebarVisible: Bool = true
     @Published var isCommandPaletteVisible: Bool = false
+    // Mini palette shown when clicking the URL bar
+    @Published var isMiniCommandPaletteVisible: Bool = false
     @Published var didCopyURL: Bool = false
     @Published var commandPalettePrefilledText: String = ""
     @Published var shouldNavigateCurrentTab: Bool = false
+    // Frame of the URL bar within the window; used to anchor the mini palette precisely
+    @Published var urlBarFrame: CGRect = .zero
     
     var modelContext: ModelContext
     var tabManager: TabManager
@@ -383,6 +387,8 @@ class BrowserManager: ObservableObject {
         // Clear prefilled text and set to create new tab
         commandPalettePrefilledText = ""
         shouldNavigateCurrentTab = false
+        // Ensure mini palette is closed when opening full palette
+        self.isMiniCommandPaletteVisible = false
         DispatchQueue.main.async {
             self.isCommandPaletteVisible = true
         }
@@ -391,9 +397,12 @@ class BrowserManager: ObservableObject {
     }
 
     func closeCommandPalette() {
-        if !isCommandPaletteVisible { return }
-        DispatchQueue.main.async {
-            self.isCommandPaletteVisible = false
+        // Close both variants
+        if isCommandPaletteVisible || isMiniCommandPaletteVisible {
+            DispatchQueue.main.async {
+                self.isCommandPaletteVisible = false
+                self.isMiniCommandPaletteVisible = false
+            }
         }
     }
 
@@ -415,8 +424,7 @@ class BrowserManager: ObservableObject {
     }
 
     func focusURLBar() {
-        if isCommandPaletteVisible { return }
-        
+        // Open the mini palette anchored to the URL bar
         // Pre-fill with current tab's URL and set to navigate current tab
         if let currentURL = tabManager.currentTab?.url {
             commandPalettePrefilledText = currentURL.absoluteString
@@ -424,9 +432,10 @@ class BrowserManager: ObservableObject {
             commandPalettePrefilledText = ""
         }
         shouldNavigateCurrentTab = true
-        
+        // Ensure full-screen palette is closed
+        self.isCommandPaletteVisible = false
         DispatchQueue.main.async {
-            self.isCommandPaletteVisible = true
+            self.isMiniCommandPaletteVisible = true
         }
     }
 

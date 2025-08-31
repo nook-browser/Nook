@@ -7,6 +7,13 @@ final class GradientColorManager: ObservableObject {
     @Published private(set) var isEditing: Bool = false
     @Published var isAnimating: Bool = false
     @Published var preferBarycentricDuringAnimation: Bool = false
+    // While editing, the node being dragged should be treated as the
+    // primary color (mapped to the top-left barycentric anchor).
+    // Views can set this to a node's UUID; clear when editing ends.
+    @Published var activePrimaryNodeID: UUID?
+    // Persisted primary node preference (used when not actively dragging).
+    // Points to the node that should map to the top-left anchor.
+    @Published var preferredPrimaryNodeID: UUID?
     private var animationToken: UUID?
 
     // MARK: - Immediate update (no animation)
@@ -25,6 +32,8 @@ final class GradientColorManager: ObservableObject {
 
     func endInteractivePreview() {
         isEditing = false
+        // Clear transient primary when editing ends
+        activePrimaryNodeID = nil
     }
 
     // MARK: - SwiftUI-driven transition
@@ -84,6 +93,10 @@ extension GradientColorManager {
     // Space-specific accent color derived from the currently displayed gradient.
     // Views can access this via `@EnvironmentObject var gradientColorManager`.
     var primaryColor: Color {
-        displayGradient.primaryColor
+        if let pid = activePrimaryNodeID ?? preferredPrimaryNodeID,
+           let node = displayGradient.nodes.first(where: { $0.id == pid }) {
+            return Color(hex: node.colorHex)
+        }
+        return displayGradient.primaryColor
     }
 }

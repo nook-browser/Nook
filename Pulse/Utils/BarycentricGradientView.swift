@@ -21,10 +21,15 @@ struct BarycentricGradientView: View, Animatable {
         set { gradient.animatableData = newValue }
     }
 
-    // Fixed anchor positions in normalized space (left, top-right, bottom-right)
-    private let pA = SIMD2<Double>(0.08, 0.50)
-    private let pB = SIMD2<Double>(0.92, 0.25)
-    private let pC = SIMD2<Double>(0.92, 0.75)
+    // Anchor inset controls how far in from the edges the color anchors sit.
+    // Increasing this pulls anchors inward (shrinks individual lobes),
+    // decreasing pushes them toward the edges (expands individual lobes).
+    private let anchorInset: Double = 0.08
+
+    // Fixed anchor positions in normalized space (top-left, top-right, bottom-center)
+    private var pA: SIMD2<Double> { SIMD2<Double>(anchorInset, anchorInset) }
+    private var pB: SIMD2<Double> { SIMD2<Double>(1.0 - anchorInset, anchorInset) }
+    private var pC: SIMD2<Double> { SIMD2<Double>(0.5, 1.0 - anchorInset) }
 
     var body: some View {
         let nodes = gradient.sortedNodes
@@ -38,7 +43,8 @@ struct BarycentricGradientView: View, Animatable {
                 pA: pA, pB: pB, pC: pC,
                 previousCount: previousCount,
                 currentCount: count,
-                t: 1.0
+                t: 1.0,
+                primaryID: gradientColorManager.activePrimaryNodeID ?? gradientColorManager.preferredPrimaryNodeID
             )
             context.fill(Path(rect), with: .shader(shader))
         }
@@ -52,8 +58,14 @@ struct BarycentricGradientView: View, Animatable {
     private static func makeShader(gradient: SpaceGradient,
                                    size: CGSize,
                                    pA: SIMD2<Double>, pB: SIMD2<Double>, pC: SIMD2<Double>,
-                                   previousCount: Int, currentCount: Int, t: Double) -> Shader {
-        let nodes = gradient.sortedNodes
+                                   previousCount: Int, currentCount: Int, t: Double,
+                                   primaryID: UUID?) -> Shader {
+        // Start from location-sorted nodes, then move the active primary to the front
+        var nodes = gradient.sortedNodes
+        if let pid = primaryID, let idx = nodes.firstIndex(where: { $0.id == pid }) {
+            let primary = nodes.remove(at: idx)
+            nodes.insert(primary, at: 0)
+        }
         // Select up to first 3 nodes; duplicate last color if fewer
         let nA = nodes.count > 0 ? nodes[0] : SpaceGradient.default.sortedNodes[0]
         let nB = nodes.count > 1 ? nodes[1] : nA

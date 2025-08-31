@@ -128,8 +128,8 @@ struct PulseCommands: Commands {
 
         // View commands
         CommandGroup(after: .windowSize) {
-            Button("Focus URL Bar") {
-                browserManager.focusURLBar()
+            Button("New URL / Search") {
+                browserManager.openCommandPalette()
             }
             .keyboardShortcut("l", modifiers: .command)
             
