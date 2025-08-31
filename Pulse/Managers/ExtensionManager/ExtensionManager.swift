@@ -605,9 +605,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             }
             
             try self.context.save()
-            installedExtensions.removeAll { $0.id == extensionId }
-            print("GOT HERE??")
-            
+            installedExtensions.removeAll { $0.id == extensionId }            
         } catch {
             print("ExtensionManager: Failed to uninstall extension: \(error)")
         }
