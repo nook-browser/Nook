@@ -462,7 +462,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             return nil
         }
         
-        let key = getLocaleText(key: "description")        
         
         // Create extension entity for persistence
         let entity = ExtensionEntity(
@@ -607,6 +606,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             
             try self.context.save()
             installedExtensions.removeAll { $0.id == extensionId }
+            print("GOT HERE??")
             
         } catch {
             print("ExtensionManager: Failed to uninstall extension: \(error)")
