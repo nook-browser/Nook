@@ -8,52 +8,37 @@
 import AppKit
 import SwiftUI
 
+// MARK: - Settings Root
 struct SettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    
+    @EnvironmentObject var gradientColorManager: GradientColorManager
 
     var body: some View {
-        HSplitView {
-            // Sidebar
-            VStack(spacing: 0) {
-                // Tab bar header
-                HStack {
-                    Text("Settings")
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                    Spacer()
-                }
-                .padding()
-                
-                Divider()
-                
-                // Tab list
-                List(selection: $browserManager.settingsManager.currentSettingsTab) {
-                    ForEach([SettingsTabs.general, .privacy, .spaces, .profiles, .shortcuts, .extensions, .advanced], id: \.self) { tab in
-                        Label(tab.name, systemImage: tab.icon)
-                            .tag(tab)
+        ZStack {
+            // Ambient background using the current space gradient
+            SpaceGradientBackgroundView()
+                .environmentObject(browserManager)
+                .environmentObject(gradientColorManager)
+                .overlay(.ultraThinMaterial)
+                .ignoresSafeArea()
+
+            VStack(spacing: 16) {
+                // Top bar with title and horizontal tabs
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Text("Pulse")
+                            .font(.system(size: 24, weight: .semibold))
+                        Text("Settings")
+                            .foregroundStyle(.secondary)
+                            .font(.system(size: 24, weight: .semibold))
+                        Spacer()
                     }
+                    SettingsTabStrip(selection: $browserManager.settingsManager.currentSettingsTab)
                 }
-                .listStyle(.sidebar)
-            }
-            .frame(minWidth: 200, maxWidth: 250)
-            
-            // Content
-            VStack(spacing: 0) {
-                // Tab content header
-                HStack {
-                    Image(systemName: browserManager.settingsManager.currentSettingsTab.icon)
-                        .foregroundColor(.blue)
-                    Text(browserManager.settingsManager.currentSettingsTab.name)
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                    Spacer()
-                }
-                .padding()
-                
-                Divider()
-                
-                // Tab content
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+
+                // Content area
                 Group {
                     switch browserManager.settingsManager.currentSettingsTab {
                     case .general:
@@ -72,10 +57,68 @@ struct SettingsView: View {
                         AdvancedSettingsView()
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
             }
         }
-        .frame(minWidth: 800, minHeight: 600)
+        .frame(minWidth: 960, minHeight: 640)
+    }
+}
+
+// MARK: - Horizontal Tab Bar
+struct SettingsTabStrip: View {
+    @Binding var selection: SettingsTabs
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(SettingsTabs.ordered, id: \.self) { tab in
+                    SettingsTabItem(tab: tab, isSelected: tab == selection)
+                        .onTapGesture { selection = tab }
+                }
+            }
+            .padding(6)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.ultraThinMaterial)
+                    .shadow(color: Color.black.opacity(0.08), radius: 10, y: 4)
+            )
+        }
+    }
+}
+
+struct SettingsTabItem: View {
+    let tab: SettingsTabs
+    let isSelected: Bool
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: tab.icon)
+                .font(.system(size: 18, weight: .semibold))
+                .symbolVariant(isSelected ? .fill : .none)
+            Text(tab.name)
+                .font(.system(size: 12, weight: .medium))
+        }
+        .foregroundStyle(isSelected ? .primary : .secondary)
+        .frame(width: 88, height: 64)
+        .background(
+            ZStack {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(.thinMaterial)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .strokeBorder(Color.primary.opacity(0.08))
+                        )
+                } else {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color(NSColor.controlBackgroundColor).opacity(0.6))
+                }
+            }
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 10))
+        .animation(.snappy, value: isSelected)
     }
 }
 
@@ -83,82 +126,103 @@ struct SettingsView: View {
 
 struct GeneralSettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Picker(
-                "Background Material",
-                selection: $browserManager.settingsManager.currentMaterialRaw
-            ) {
-                ForEach(materials, id: \.value.rawValue) { material in
-                    Text(material.name).tag(material.value.rawValue)
-                }
-            }
-            .pickerStyle(.menu)
-            
-            Divider()
-            
-            Picker(
-                "Search Engine",
-                selection: $browserManager.settingsManager.searchEngine
-            ) {
-                ForEach(SearchProvider.allCases) { provider in
-                    Text(provider.displayName).tag(provider)
-                }
-            }
-            .pickerStyle(.menu)
-            
-            Toggle(isOn: $browserManager.settingsManager.isLiquidGlassEnabled) {
-                Text("Liquid Glass")
-            }
-            
-            Divider()
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Tab Unload Timeout")
-                    .font(.headline)
+        HStack(alignment: .top, spacing: 16) {
+            // Hero card
+            SettingsHeroCard()
+                .frame(width: 320, height: 420)
 
-                Text("Automatically unload inactive tabs to save memory")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-
-                // Dropdown with discrete timeout options
-                Picker(
-                    "Tab Unload Timeout",
-                    selection: Binding<TimeInterval>(
-                        get: {
-                            nearestTimeoutOption(to: browserManager.settingsManager.tabUnloadTimeout)
-                        },
-                        set: { newValue in
-                            browserManager.settingsManager.tabUnloadTimeout = newValue
+            // Right side stacked cards
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    SettingsSectionCard(title: "Appearance", subtitle: "Window materials and visual style") {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text("Background Material")
+                            Spacer()
+                            Picker("Background Material", selection: $browserManager.settingsManager.currentMaterialRaw) {
+                                ForEach(materials, id: \.value.rawValue) { material in
+                                    Text(material.name).tag(material.value.rawValue)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .frame(width: 220)
                         }
-                    )
-                ) {
-                    ForEach(unloadTimeoutOptions, id: \.self) { value in
-                        Text(formatTimeout(value)).tag(value)
-                    }
-                }
-                .pickerStyle(.menu)
-                .onAppear {
-                    // Coerce any legacy/custom values to the nearest preset
-                    browserManager.settingsManager.tabUnloadTimeout =
-                        nearestTimeoutOption(to: browserManager.settingsManager.tabUnloadTimeout)
-                }
 
-                HStack {
-                    Button("Unload All Inactive Tabs") {
-                        browserManager.tabManager.unloadAllInactiveTabs()
+                        Divider().opacity(0.4)
+
+                        Toggle(isOn: $browserManager.settingsManager.isLiquidGlassEnabled) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Liquid Glass")
+                                Text("Enable frosted translucency for UI surfaces")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                     }
-                    .buttonStyle(.bordered)
-                    
-                    Spacer()
+
+                    SettingsSectionCard(title: "Search", subtitle: "Default provider for address bar") {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text("Search Engine")
+                            Spacer()
+                            Picker("Search Engine", selection: $browserManager.settingsManager.searchEngine) {
+                                ForEach(SearchProvider.allCases) { provider in
+                                    Text(provider.displayName).tag(provider)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .frame(width: 220)
+                        }
+                    }
+
+                    SettingsSectionCard(title: "Performance", subtitle: "Manage memory by unloading inactive tabs") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(alignment: .firstTextBaseline) {
+                                Text("Tab Unload Timeout")
+                                Spacer()
+                                Picker("Tab Unload Timeout",
+                                       selection: Binding<TimeInterval>(
+                                           get: {
+                                               nearestTimeoutOption(to: browserManager.settingsManager.tabUnloadTimeout)
+                                           },
+                                           set: { newValue in
+                                               browserManager.settingsManager.tabUnloadTimeout = newValue
+                                           }
+                                       )
+                                ) {
+                                    ForEach(unloadTimeoutOptions, id: \.self) { value in
+                                        Text(formatTimeout(value)).tag(value)
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .frame(width: 220)
+                                .onAppear {
+                                    browserManager.settingsManager.tabUnloadTimeout =
+                                        nearestTimeoutOption(to: browserManager.settingsManager.tabUnloadTimeout)
+                                }
+                            }
+
+                            Text("Automatically unload inactive tabs to reduce memory usage.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            HStack {
+                                Button("Unload All Inactive Tabs") {
+                                    browserManager.tabManager.unloadAllInactiveTabs()
+                                }
+                                .buttonStyle(.bordered)
+                                Spacer()
+                            }
+                        }
+                    }
                 }
+                .padding(.trailing, 4)
             }
-            
-            Spacer()
         }
-        .padding()
-        .frame(minWidth: 520, minHeight: 360)
+        .frame(minHeight: 480)
     }
 }
 
@@ -166,40 +230,19 @@ struct GeneralSettingsView: View {
 
 struct SpacesSettingsView: View {
     var body: some View {
-        VStack {
-            Text("Spaces Settings")
-                .font(.title)
-            Text("Coming soon...")
-                .foregroundColor(.secondary)
-            Spacer()
-        }
-        .padding()
+        SettingsPlaceholderView(title: "Spaces", subtitle: "Customize workspaces and groups", icon: "rectangle.3.group")
     }
 }
 
 struct ProfilesSettingsView: View {
     var body: some View {
-        VStack {
-            Text("Profiles Settings")
-                .font(.title)
-            Text("Coming soon...")
-                .foregroundColor(.secondary)
-            Spacer()
-        }
-        .padding()
+        SettingsPlaceholderView(title: "Profiles", subtitle: "Switch between browsing personas", icon: "person.crop.circle")
     }
 }
 
 struct ShortcutsSettingsView: View {
     var body: some View {
-        VStack {
-            Text("Shortcuts Settings")
-                .font(.title)
-            Text("Coming soon...")
-                .foregroundColor(.secondary)
-            Spacer()
-        }
-        .padding()
+        SettingsPlaceholderView(title: "Shortcuts", subtitle: "Keyboard and quick actions", icon: "keyboard")
     }
 }
 
@@ -356,14 +399,7 @@ struct ExtensionRowView: View {
 
 struct AdvancedSettingsView: View {
     var body: some View {
-        VStack {
-            Text("Advanced Settings")
-                .font(.title)
-            Text("Coming soon...")
-                .foregroundColor(.secondary)
-            Spacer()
-        }
-        .padding()
+        SettingsPlaceholderView(title: "Advanced", subtitle: "Power features and diagnostics", icon: "wrench.and.screwdriver")
     }
 }
 
@@ -387,6 +423,119 @@ private func nearestTimeoutOption(to value: TimeInterval) -> TimeInterval {
         return value
     }
     return nearest
+}
+
+// MARK: - Styled Components
+struct SettingsSectionCard<Content: View>: View {
+    let title: String
+    var subtitle: String? = nil
+    @ViewBuilder var content: Content
+
+    init(title: String, subtitle: String? = nil, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.subtitle = subtitle
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.headline)
+                if let subtitle { Text(subtitle).font(.caption).foregroundStyle(.secondary) }
+            }
+            content
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.thinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(Color.primary.opacity(0.08))
+                )
+                .shadow(color: Color.black.opacity(0.08), radius: 12, y: 6)
+        )
+    }
+}
+
+struct SettingsHeroCard: View {
+    @EnvironmentObject var gradientColorManager: GradientColorManager
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .strokeBorder(Color.primary.opacity(0.08))
+                    )
+                BarycentricGradientView(gradient: gradientColorManager.displayGradient)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(12)
+            }
+            .frame(height: 220)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Pulse")
+                    .font(.system(size: 24, weight: .bold))
+                Text("BROWSER")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            HStack(spacing: 12) {
+                Image(systemName: "square.and.arrow.up")
+                Image(systemName: "doc.on.doc")
+                Image(systemName: "gearshape")
+            }
+            .foregroundStyle(.secondary)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.thinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(Color.primary.opacity(0.08))
+                )
+                .shadow(color: Color.black.opacity(0.1), radius: 14, y: 6)
+        )
+    }
+}
+
+struct SettingsPlaceholderView: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+
+    var body: some View {
+        VStack(alignment: .center, spacing: 16) {
+            HStack { Spacer() }
+            VStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 48, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Text(title).font(.title2).fontWeight(.semibold)
+                Text(subtitle).foregroundStyle(.secondary)
+            }
+            .padding(32)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(.thinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .strokeBorder(Color.primary.opacity(0.08))
+                    )
+                    .shadow(color: Color.black.opacity(0.08), radius: 12, y: 6)
+            )
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.vertical, 20)
+    }
 }
 
 private func formatTimeout(_ seconds: TimeInterval) -> String {
