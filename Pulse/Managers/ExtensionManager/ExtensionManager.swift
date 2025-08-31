@@ -403,13 +403,74 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             // WKWebExtension automatically provides Chrome APIs - no manual bridging needed
         }
         
+        func getLocaleText(key: String) -> String? {
+            guard let manifestValue = manifest[key] as? String else {
+                return nil
+            }
+            
+            if manifestValue.hasPrefix("__MSG_") {
+                let localesDirectory = destinationDir.appending(path: "_locales")
+                guard FileManager.default.fileExists(atPath: localesDirectory.path(percentEncoded: false)) else {
+                    return nil
+                }
+                
+                var pathToDirectory: URL? = nil
+                
+                do {
+                    let items = try FileManager.default.contentsOfDirectory(at: localesDirectory, includingPropertiesForKeys: nil)
+                    for item in items {
+                        // TODO: Get user locale
+                        if item.lastPathComponent.hasPrefix("en") {
+                            pathToDirectory = item
+                            break
+                        }
+                    }
+                } catch {
+                    return nil
+                }
+                
+                guard let pathToDirectory = pathToDirectory else {
+                    return nil
+                }
+                
+                let messagesPath = pathToDirectory.appending(path: "messages.json")
+                guard FileManager.default.fileExists(atPath: messagesPath.path(percentEncoded: false)) else {
+                    return nil
+                }
+                
+                do {
+                    let data = try Data(contentsOf: messagesPath)
+                    guard let manifest = try JSONSerialization.jsonObject(with: data) as? [String: [String: String]] else {
+                        throw ExtensionError.invalidManifest("Invalid JSON structure")
+                    }
+                    
+                    // Remove the __MSG_ from the start and the __ at the end
+                    let formattedManifestValue = String(manifestValue.dropFirst(6).dropLast(2))
+                                        
+                    guard let messageText = manifest[formattedManifestValue]?["message"] as? String else {
+                        return nil
+                    }
+                    
+                    return messageText
+                } catch {
+                    return nil
+                }
+                
+                
+            }
+            
+            return nil
+        }
+        
+        let key = getLocaleText(key: "description")        
+        
         // Create extension entity for persistence
         let entity = ExtensionEntity(
             id: extensionId,
             name: manifest["name"] as? String ?? "Unknown Extension",
             version: manifest["version"] as? String ?? "1.0",
             manifestVersion: manifest["manifest_version"] as? Int ?? 3,
-            extensionDescription: manifest["description"] as? String,
+            extensionDescription: getLocaleText(key: "description") ?? "",
             isEnabled: true,
             packagePath: destinationDir.path,
             iconPath: findExtensionIcon(in: destinationDir, manifest: manifest)
