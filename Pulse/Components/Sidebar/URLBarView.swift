@@ -64,6 +64,15 @@ struct URLBarView: View {
             }
         )
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        // Report the frame in the window space so we can overlay the mini palette above all content
+        .background(
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: URLBarFramePreferenceKey.self,
+                    value: proxy.frame(in: .named("WindowSpace"))
+                )
+            }
+        )
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovering = hovering
