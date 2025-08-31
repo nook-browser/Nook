@@ -33,6 +33,7 @@ struct PulseApp: App {
         WindowGroup("Settings", id: "settings") {
             SettingsView()
                 .environmentObject(browserManager)
+                .environmentObject(browserManager.gradientColorManager)
         }
         .windowResizability(.contentSize)
         .windowStyle(.hiddenTitleBar)

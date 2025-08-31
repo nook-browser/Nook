@@ -6,7 +6,7 @@
 //
 import Foundation
 
-enum SettingsTabs {
+enum SettingsTabs: Hashable, CaseIterable {
     case general
     case privacy
     case spaces
@@ -14,6 +14,11 @@ enum SettingsTabs {
     case shortcuts
     case extensions
     case advanced
+    
+    // Ordered list for horizontal tab bar
+    static var ordered: [SettingsTabs] {
+        return [.general, .privacy, .profiles, .spaces, .shortcuts, .extensions, .advanced]
+    }
     
     var name: String {
         switch self {
@@ -31,8 +36,8 @@ enum SettingsTabs {
         switch self {
         case .general: return "gearshape"
         case .privacy: return "lock.shield"
-        case .spaces: return "folder"
-        case .profiles: return "person.circle"
+        case .spaces: return "rectangle.3.group"
+        case .profiles: return "person.crop.circle"
         case .shortcuts: return "keyboard"
         case .extensions: return "puzzlepiece.extension"
         case .advanced: return "wrench.and.screwdriver"
