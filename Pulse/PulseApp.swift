@@ -268,6 +268,7 @@ struct PulseCommands: Commands {
             Button("Manage Extensions...") {
                 // Open settings to extensions tab
                 openWindow(id: "settings")
+                browserManager.settingsManager.currentSettingsTab = .extensions
             }
 
             if #available(macOS 15.5, *) {
