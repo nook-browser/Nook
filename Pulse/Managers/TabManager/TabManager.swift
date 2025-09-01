@@ -377,6 +377,13 @@ class TabManager: ObservableObject {
         return pinnedTabs + spacePinned + normals
     }
 
+    // Public accessor for managers that need to iterate tabs (e.g., privacy, rules updates)
+    func allTabs() -> [Tab] {
+        let normals = spaces.flatMap { tabsBySpace[$0.id] ?? [] }
+        let spacePinned = spaces.flatMap { spacePinnedTabs[$0.id] ?? [] }
+        return pinnedTabs + spacePinned + normals
+    }
+
     private func contains(_ tab: Tab) -> Bool {
         if pinnedTabs.contains(where: { $0.id == tab.id }) { return true }
         if let sid = tab.spaceId {
