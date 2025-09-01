@@ -162,7 +162,11 @@ struct PulseCommands: Commands {
             .keyboardShortcut("n", modifiers: .command)
 
             Button("Close Tab") {
-                browserManager.closeCurrentTab()
+                if browserManager.isCommandPaletteVisible {
+                    browserManager.closeCommandPalette()
+                } else {
+                    browserManager.closeCurrentTab()
+                }
             }
             .keyboardShortcut("w", modifiers: .command)
             .disabled(browserManager.tabManager.tabs.isEmpty)
