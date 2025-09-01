@@ -306,6 +306,7 @@ class BrowserManager: ObservableObject {
     var extensionManager: ExtensionManager?
     var compositorManager: TabCompositorManager
     var gradientColorManager: GradientColorManager
+    var trackingProtectionManager: TrackingProtectionManager
     
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
@@ -330,6 +331,7 @@ class BrowserManager: ObservableObject {
         self.cacheManager = CacheManager()
         self.compositorManager = TabCompositorManager()
         self.gradientColorManager = GradientColorManager()
+        self.trackingProtectionManager = TrackingProtectionManager()
         self.compositorContainerView = nil
 
         // Phase 2: wire dependencies and perform side effects (safe to use self)
@@ -346,6 +348,8 @@ class BrowserManager: ObservableObject {
         } else {
             self.gradientColorManager.setImmediate(.default)
         }
+        self.trackingProtectionManager.attach(browserManager: self)
+        self.trackingProtectionManager.setEnabled(self.settingsManager.blockCrossSiteTracking)
         loadSidebarSettings()
         NotificationCenter.default.addObserver(
             self,
@@ -353,6 +357,15 @@ class BrowserManager: ObservableObject {
             name: .tabUnloadTimeoutChanged,
             object: nil
         )
+
+        NotificationCenter.default.addObserver(
+            forName: .blockCrossSiteTrackingChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            guard let enabled = note.userInfo?["enabled"] as? Bool else { return }
+            self?.trackingProtectionManager.setEnabled(enabled)
+        }
     }
     
     func updateSidebarWidth(_ width: CGFloat) {
