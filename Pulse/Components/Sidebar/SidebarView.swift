@@ -75,7 +75,10 @@ struct SidebarView: View {
                     .backgroundDraggable()
 
                     URLBarView()
-                    PinnedGrid()
+                    // Container to support PinnedGrid slide transitions without clipping
+                    ZStack {
+                        PinnedGrid(width: browserManager.sidebarWidth)
+                    }
                     if showHistory {
                         historyView
                     } else {
