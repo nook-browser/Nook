@@ -11,13 +11,30 @@ import SwiftUI
 
 @MainActor
 class CacheManager: ObservableObject {
-    private let dataStore: WKWebsiteDataStore
+    // Active data store for cache operations. Switchable per profile.
+    private var dataStore: WKWebsiteDataStore
+    // Optional profile context for diagnostics and profiling
+    var currentProfileId: UUID?
     @Published private(set) var cacheEntries: [CacheInfo] = []
     @Published private(set) var domainGroups: [DomainCacheGroup] = []
     @Published private(set) var isLoading: Bool = false
     
     init(dataStore: WKWebsiteDataStore? = nil) {
         self.dataStore = dataStore ?? WKWebsiteDataStore.default()
+    }
+
+    // MARK: - Profile Switching
+    /// Switch the underlying data store to operate within a different profile boundary.
+    /// Clears in-memory state and optionally reloads cache data from the new store.
+    func switchDataStore(_ newDataStore: WKWebsiteDataStore, profileId: UUID? = nil, eagerLoad: Bool = true) {
+        self.dataStore = newDataStore
+        self.currentProfileId = profileId
+        self.cacheEntries = []
+        self.domainGroups = []
+        print("🔁 [CacheManager] Switched data store -> profile: \(profileId?.uuidString ?? "nil"), persistent: \(newDataStore.isPersistent)")
+        if eagerLoad {
+            Task { await self.loadCacheData() }
+        }
     }
     
     // MARK: - Public Methods
@@ -159,11 +176,16 @@ class CacheManager: ObservableObject {
     // MARK: - Favicon Cache Management
     
     func clearFaviconCache() {
+        // Favicon cache is global by design (shared across profiles for better reuse)
+        // Only diagnostics include the current profile context.
+        print("🧹 [CacheManager] Clearing favicon cache for profile=\(currentProfileId?.uuidString ?? "nil") [global cache]")
         Tab.clearFaviconCache()
     }
     
     func getFaviconCacheStats() -> (count: Int, domains: [String]) {
-        return Tab.getFaviconCacheStats()
+        let stats = Tab.getFaviconCacheStats()
+        print("📊 [CacheManager] Favicon cache stats for profile=\(currentProfileId?.uuidString ?? "nil"): count=\(stats.count)")
+        return stats
     }
     
     func searchCache(_ query: String) -> [CacheInfo] {
@@ -212,14 +234,15 @@ class CacheManager: ObservableObject {
         let diskSize = cacheEntries.reduce(0) { $0 + $1.diskUsage }
         let memorySize = cacheEntries.reduce(0) { $0 + $1.memoryUsage }
         let staleCount = cacheEntries.filter { $0.isStale }.count
-        
-        return (
+        let stats = (
             total: cacheEntries.count,
             totalSize: totalSize,
             diskSize: diskSize,
             memorySize: memorySize,
             staleCount: staleCount
         )
+        print("📊 [CacheManager] Stats for profile=\(currentProfileId?.uuidString ?? "nil"): total=\(stats.total), size=\(stats.totalSize), disk=\(stats.diskSize), mem=\(stats.memorySize), stale=\(stats.staleCount)")
+        return stats
     }
     
     func getCacheTypeBreakdown() -> [CacheType: Int64] {
@@ -230,7 +253,7 @@ class CacheManager: ObservableObject {
                 breakdown[type, default: 0] += cache.size
             }
         }
-        
+        print("📊 [CacheManager] Type breakdown computed for profile=\(currentProfileId?.uuidString ?? "nil")")
         return breakdown
     }
     

@@ -138,7 +138,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
                 return []
             }
         }()
-        let allTabs = browserManager.tabManager.pinnedTabs + currentSpacePinned + browserManager.tabManager.tabs
+        let allTabs = browserManager.tabManager.essentialTabs + currentSpacePinned + browserManager.tabManager.tabs
         
         for tab in allTabs {
             // Only add tabs that are still in the tab manager (not closed)
@@ -207,4 +207,3 @@ struct TabWebViewWrapper: NSViewRepresentable {
         // The webView is managed by the Tab
     }
 }
-

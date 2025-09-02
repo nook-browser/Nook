@@ -235,8 +235,502 @@ struct SpacesSettingsView: View {
 }
 
 struct ProfilesSettingsView: View {
+    @EnvironmentObject var browserManager: BrowserManager
+    @State private var creatingName: String = ""
+    @State private var creatingIcon: String = "person.crop.circle"
+    @State private var renamingName: String = ""
+    @State private var renamingIcon: String = "person.crop.circle"
+    @State private var profileToRename: Profile? = nil
+    @State private var profileToDelete: Profile? = nil
+
     var body: some View {
-        SettingsPlaceholderView(title: "Profiles", subtitle: "Switch between browsing personas", icon: "person.crop.circle")
+        VStack(alignment: .leading, spacing: 16) {
+            // Profiles list and actions
+            SettingsSectionCard(title: "Profiles", subtitle: "Create, switch, and manage browsing personas") {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        PulseButton(text: "Create Profile", iconName: "plus", variant: .primary) {
+                            showCreateDialog()
+                        }
+                        .accessibilityLabel("Create Profile")
+                        .accessibilityHint("Open dialog to create a new profile")
+
+                        Spacer()
+                    }
+
+                    Divider().opacity(0.4)
+
+                    if browserManager.profileManager.profiles.isEmpty {
+                        HStack(spacing: 8) {
+                            Image(systemName: "person.crop.circle")
+                                .foregroundColor(.secondary)
+                            Text("No profiles yet. Create one to get started.")
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 8)
+                    } else {
+                        VStack(spacing: 8) {
+                            ForEach(browserManager.profileManager.profiles, id: \.id) { profile in
+                                ProfileRowView(
+                                    profile: profile,
+                                    isCurrent: browserManager.currentProfile?.id == profile.id,
+                                    spacesCount: spacesCount(for: profile),
+                                    tabsCount: tabsCount(for: profile),
+                                    dataSizeDescription: "Shared store",
+                                    pinnedCount: pinnedCount(for: profile),
+                                    onMakeCurrent: { Task { await browserManager.switchToProfile(profile) } },
+                                    onRename: { startRename(profile) },
+                                    onDelete: { startDelete(profile) },
+                                    onManageData: { showDataManagement(for: profile) }
+                                )
+                                .accessibilityLabel("Profile \(profile.name)")
+                                .accessibilityHint(browserManager.currentProfile?.id == profile.id ? "Current profile" : "Inactive profile")
+                            }
+                        }
+                    }
+                }
+                
+                Divider().opacity(0.4)
+                
+                // Migration controls appear under the profile list
+                MigrationControls()
+                    .environmentObject(browserManager)
+                
+                Divider().opacity(0.4)
+                
+                // Export / Import actions (placeholders)
+                HStack(spacing: 8) {
+                    PulseButton(text: "Export Current Profile", iconName: "square.and.arrow.up") {
+                        showExportPlaceholder()
+                    }
+                    .accessibilityLabel("Export current profile")
+                    
+                    PulseButton(text: "Import Profile", iconName: "square.and.arrow.down") {
+                        showImportPlaceholder()
+                    }
+                    .accessibilityLabel("Import profile")
+                    
+                    Spacer()
+                }
+            }
+
+            
+
+            // Space assignments management
+            SettingsSectionCard(title: "Space Assignments", subtitle: "Assign spaces to specific profiles") {
+                VStack(alignment: .leading, spacing: 12) {
+                    // Bulk actions
+                    HStack(spacing: 8) {
+                        PulseButton(text: "Assign All to Current Profile", iconName: "checkmark.circle") {
+                            assignAllSpacesToCurrentProfile()
+                        }
+                        .accessibilityLabel("Assign all spaces to current profile")
+
+                        PulseButton(text: "Reset to Default Profile", iconName: "arrow.uturn.backward") {
+                            resetAllSpaceAssignments()
+                        }
+                        .accessibilityLabel("Reset space assignments to none")
+
+                        PulseButton(text: "Auto-assign by Usage", iconName: "sparkles") {
+                            showAutoAssignPlaceholder()
+                        }
+                        .accessibilityLabel("Auto assign by usage (placeholder)")
+
+                        Spacer()
+                    }
+
+                    Divider().opacity(0.4)
+
+                    if browserManager.tabManager.spaces.isEmpty {
+                        HStack(spacing: 8) {
+                            Image(systemName: "rectangle.3.group")
+                                .foregroundStyle(.secondary)
+                            Text("No spaces yet. Create a space to assign profiles.")
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 8)
+                    } else {
+                        VStack(spacing: 8) {
+                            ForEach(browserManager.tabManager.spaces, id: \.id) { space in
+                                SpaceAssignmentRowView(space: space)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer()
+        }
+        .padding()
+    }
+
+    // MARK: - Helpers
+    private func spacesCount(for profile: Profile) -> Int {
+        browserManager.tabManager.spaces.filter { $0.profileId == profile.id }.count
+    }
+
+    private func tabsCount(for profile: Profile) -> Int {
+        let spaceIds = Set(browserManager.tabManager.spaces.filter { $0.profileId == profile.id }.map { $0.id })
+        return browserManager.tabManager.allTabs().filter { tab in
+            if let sid = tab.spaceId { return spaceIds.contains(sid) }
+            return false
+        }.count
+    }
+
+    private func pinnedCount(for profile: Profile) -> Int {
+        // Count space‑pinned tabs in spaces assigned to this profile
+        let spaceIds = browserManager.tabManager.spaces
+            .filter { $0.profileId == profile.id }
+            .map { $0.id }
+        var total = 0
+        for sid in spaceIds {
+            total += browserManager.tabManager.spacePinnedTabs(for: sid).count
+        }
+        return total
+    }
+
+    // MARK: - Actions
+    private func showCreateDialog() {
+        creatingName = ""
+        creatingIcon = "person.crop.circle"
+        let dialog = ProfileCreationDialog(
+            profileName: $creatingName,
+            profileIcon: $creatingIcon,
+            isNameAvailable: { proposed in
+                let trimmed = proposed.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { return false }
+                return !browserManager.profileManager.profiles.contains { $0.name.caseInsensitiveCompare(trimmed) == .orderedSame }
+            },
+            onSave: {
+                let trimmed = creatingName.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { return }
+                let safeIcon = creatingIcon.isEmpty ? "person.crop.circle" : creatingIcon
+                let created = browserManager.profileManager.createProfile(name: trimmed, icon: safeIcon)
+                Task { await browserManager.switchToProfile(created) }
+                browserManager.dialogManager.closeDialog()
+            },
+            onCancel: { browserManager.dialogManager.closeDialog() }
+        )
+        browserManager.dialogManager.showDialog(dialog)
+    }
+
+    private func startRename(_ profile: Profile) {
+        profileToRename = profile
+        renamingName = profile.name
+        renamingIcon = profile.icon
+        let dialog = ProfileRenameDialog(
+            originalProfile: profile,
+            profileName: $renamingName,
+            profileIcon: $renamingIcon,
+            isNameAvailable: { proposed in
+                let trimmed = proposed.trimmingCharacters(in: .whitespacesAndNewlines)
+                return !browserManager.profileManager.profiles.contains { $0.id != profile.id && $0.name.caseInsensitiveCompare(trimmed) == .orderedSame }
+            },
+            onSave: {
+                guard let p = profileToRename else { return }
+                let trimmed = renamingName.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { return }
+                p.name = trimmed
+                p.icon = renamingIcon
+                browserManager.profileManager.persistProfiles()
+                browserManager.dialogManager.closeDialog()
+            },
+            onCancel: { browserManager.dialogManager.closeDialog() }
+        )
+        browserManager.dialogManager.showDialog(dialog)
+    }
+
+    private func startDelete(_ profile: Profile) {
+        let isLast = browserManager.profileManager.profiles.count <= 1
+        let stats = (
+            spaces: spacesCount(for: profile),
+            tabs: tabsCount(for: profile)
+        )
+        let dialog = ProfileDeleteConfirmationDialog(
+            profileName: profile.name,
+            profileIcon: profile.icon,
+            spacesCount: stats.spaces,
+            tabsCount: stats.tabs,
+            isLastProfile: isLast,
+            onDelete: {
+                guard browserManager.profileManager.profiles.count > 1 else {
+                    browserManager.dialogManager.closeDialog()
+                    return
+                }
+                browserManager.deleteProfile(profile)
+            },
+            onCancel: { browserManager.dialogManager.closeDialog() }
+        )
+        browserManager.dialogManager.showDialog(dialog)
+    }
+
+    private func showDataManagement(for profile: Profile) {
+        // Placeholder: show info dialog
+        let header = AnyView(DialogHeader(icon: "internaldrive", title: "Manage Data", subtitle: "Per‑profile data isolation coming soon"))
+        let content = VStack(alignment: .leading, spacing: 12) {
+            Text("Currently, profiles share a single website data store.")
+            Text("Privacy tools are available under the Privacy tab.")
+                .foregroundStyle(.secondary)
+        }
+        let footer = AnyView(DialogFooter(rightButtons: [
+            DialogButton(text: "Close", variant: .primary) { browserManager.dialogManager.closeDialog() }
+        ]))
+        browserManager.dialogManager.showCustomContentDialog(header: header, content: AnyView(content), footer: footer)
+    }
+
+    private func showExportPlaceholder() {
+        let header = AnyView(DialogHeader(icon: "square.and.arrow.up", title: "Export Profile", subtitle: "Coming soon"))
+        let body = AnyView(Text("Profile export is not yet implemented."))
+        let footer = AnyView(DialogFooter(rightButtons: [DialogButton(text: "OK", variant: .primary) { browserManager.dialogManager.closeDialog() }]))
+        browserManager.dialogManager.showCustomContentDialog(header: header, content: body, footer: footer)
+    }
+
+    private func showImportPlaceholder() {
+        let header = AnyView(DialogHeader(icon: "square.and.arrow.down", title: "Import Profile", subtitle: "Coming soon"))
+        let body = AnyView(Text("Profile import is not yet implemented."))
+        let footer = AnyView(DialogFooter(rightButtons: [DialogButton(text: "OK", variant: .primary) { browserManager.dialogManager.closeDialog() }]))
+        browserManager.dialogManager.showCustomContentDialog(header: header, content: body, footer: footer)
+    }
+
+    // MARK: - Space assignment helpers and views
+    private func assign(space: Space, to id: UUID?) {
+        browserManager.tabManager.assign(spaceId: space.id, toProfile: id)
+    }
+
+    private func assignAllSpacesToCurrentProfile() {
+        guard let pid = browserManager.currentProfile?.id else { return }
+        for sp in browserManager.tabManager.spaces {
+            browserManager.tabManager.assign(spaceId: sp.id, toProfile: pid)
+        }
+    }
+
+    private func resetAllSpaceAssignments() {
+        for sp in browserManager.tabManager.spaces {
+            browserManager.tabManager.assign(spaceId: sp.id, toProfile: nil)
+        }
+    }
+
+    private func showAutoAssignPlaceholder() {
+        let header = AnyView(DialogHeader(icon: "sparkles", title: "Auto-assign by Usage", subtitle: "Coming soon"))
+        let body = AnyView(Text("Automatic assignment based on recent tab activity will be available in a future update."))
+        let footer = AnyView(DialogFooter(rightButtons: [DialogButton(text: "OK", variant: .primary) { browserManager.dialogManager.closeDialog() }]))
+        browserManager.dialogManager.showCustomContentDialog(header: header, content: body, footer: footer)
+    }
+
+    private func resolvedProfile(for id: UUID?) -> Profile? {
+        guard let id else { return nil }
+        return browserManager.profileManager.profiles.first(where: { $0.id == id })
+    }
+
+    private struct SpaceAssignmentRowView: View {
+        @EnvironmentObject var browserManager: BrowserManager
+        let space: Space
+
+        var body: some View {
+            HStack(spacing: 12) {
+                // Space icon
+                Group {
+                    if isEmoji(space.icon) {
+                        Text(space.icon)
+                            .font(.system(size: 14))
+                            .frame(width: 24, height: 24)
+                    } else {
+                        Image(systemName: space.icon)
+                            .font(.system(size: 14))
+                            .foregroundStyle(AppColors.textSecondary)
+                            .frame(width: 24, height: 24)
+                    }
+                }
+                .background(Color(.controlBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(space.name)
+                        .font(.subheadline)
+                    HStack(spacing: 6) {
+                        SpaceProfileBadge(space: space, size: .compact)
+                            .environmentObject(browserManager)
+                        Text(currentProfileName)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                // Quick action to set to current profile
+                if let current = browserManager.currentProfile {
+                    Button {
+                        assign(space: space, to: current.id)
+                    } label: {
+                        Label("Assign to \(current.name)", systemImage: "checkmark.circle")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+
+                // Profile picker menu
+                Menu {
+                    // Use compact picker inside menu
+                    let binding = Binding<UUID?>(
+                        get: { space.profileId },
+                        set: { newId in assign(space: space, to: newId) }
+                    )
+                    Text("Current: \(currentProfileName)")
+                        .foregroundStyle(.secondary)
+                    Divider()
+                    ProfilePickerView(selectedProfileId: binding, onSelect: { _ in }, compact: true, showNoneOption: true)
+                        .environmentObject(browserManager)
+                } label: {
+                    Label("Change", systemImage: "person.crop.circle")
+                        .labelStyle(.titleAndIcon)
+                }
+                .menuStyle(.borderlessButton)
+            }
+            .padding(10)
+            .background(Color(.controlBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+
+        private var currentProfileName: String {
+            if let pid = space.profileId,
+               let p = browserManager.profileManager.profiles.first(where: { $0.id == pid }) {
+                return p.name
+            }
+            return "No Profile"
+        }
+
+        private func assign(space: Space, to id: UUID?) {
+            browserManager.tabManager.assign(spaceId: space.id, toProfile: id)
+        }
+
+        private func isEmoji(_ string: String) -> Bool {
+            return string.unicodeScalars.contains { scalar in
+                (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF) ||
+                (scalar.value >= 0x2600 && scalar.value <= 0x26FF) ||
+                (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
+            }
+        }
+    }
+}
+
+// MARK: - Migration Controls
+private struct MigrationControls: View {
+    @EnvironmentObject var browserManager: BrowserManager
+    @State private var legacySummary: BrowserManager.LegacyDataSummary? = nil
+    @State private var lastDetectionDate: Date? = nil
+    @State private var showingCancelConfirm: Bool = false
+
+    private var hasLegacyData: Bool {
+        (legacySummary?.hasAny) ?? false
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                PulseButton(text: "Detect Legacy Data", iconName: "magnifyingglass") {
+                    Task { @MainActor in
+                        let summary = await browserManager.detectLegacySharedData()
+                        legacySummary = summary
+                        lastDetectionDate = Date()
+                    }
+                }
+                .accessibilityLabel("Detect Legacy Data")
+
+                PulseButton(text: "Migrate to Current Profile", iconName: "arrow.down.to.line") {
+                    browserManager.startMigrationToCurrentProfile()
+                }
+                .disabled(browserManager.isMigrationInProgress == true)
+                .accessibilityLabel("Migrate shared data to current profile")
+
+                PulseButton(text: "Start Fresh", iconName: "trash") {
+                    Task { @MainActor in
+                        await browserManager.clearSharedDataAfterMigration()
+                        legacySummary = nil
+                    }
+                }
+                .tint(.red)
+                .accessibilityLabel("Clear shared website data without migration")
+
+                Spacer()
+            }
+
+            if let summary = legacySummary {
+                HStack(spacing: 8) {
+                    Image(systemName: summary.hasAny ? "exclamationmark.circle" : "checkmark.circle")
+                        .foregroundStyle(summary.hasAny ? .orange : .green)
+                    Text(summary.hasAny ? "Legacy data detected — \(summary.estimatedDescription)" : "No legacy shared data found")
+                        .font(.subheadline)
+                    if let dt = lastDetectionDate {
+                        Text("• \(DateFormatter.localizedString(from: dt, dateStyle: .none, timeStyle: .short))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else {
+                HStack(spacing: 8) {
+                    Image(systemName: "info.circle")
+                        .foregroundStyle(.secondary)
+                    Text("Scan for cookies and site data in the shared store and migrate them into \(browserManager.currentProfile?.name ?? "current profile").")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if browserManager.isMigrationInProgress, let mp = browserManager.migrationProgress {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(mp.currentStep)
+                        Spacer()
+                        Text("\(Int(mp.progress * 100))%")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    ProgressView(value: mp.progress)
+                        .progressViewStyle(.linear)
+                        .frame(maxWidth: 420)
+                    HStack(spacing: 8) {
+                        Button("Cancel") { showingCancelConfirm = true }
+                            .buttonStyle(.bordered)
+                            .tint(.red)
+                        Text("Estimated time: a few seconds")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .confirmationDialog("Cancel migration?", isPresented: $showingCancelConfirm) {
+                    Button("Cancel Migration", role: .destructive) {
+                        browserManager.migrationTask?.cancel()
+                        browserManager.isMigrationInProgress = false
+                        browserManager.migrationProgress = nil
+                    }
+                    Button("Continue", role: .cancel) {}
+                }
+            }
+
+            Divider().opacity(0.4)
+
+            // Export/Import placeholders with profile context
+            HStack(spacing: 8) {
+                PulseButton(text: "Export Current Profile", iconName: "square.and.arrow.up") {
+                    // Placeholder; future: export WK data + SwiftData snapshot
+                    // Reuse existing placeholders for now
+                    // showExportPlaceholder() is defined in parent view; keep UI consistent
+                    // For now, present a minimal dialog here
+                    let header = AnyView(DialogHeader(icon: "square.and.arrow.up", title: "Export Profile", subtitle: browserManager.currentProfile?.name ?? ""))
+                    let body = AnyView(Text("Export is not implemented yet.").font(.body))
+                    let footer = AnyView(DialogFooter(rightButtons: [DialogButton(text: "OK", variant: .primary) { browserManager.dialogManager.closeDialog() }]))
+                    browserManager.dialogManager.showCustomContentDialog(header: header, content: body, footer: footer)
+                }
+                PulseButton(text: "Import Into Current", iconName: "square.and.arrow.down") {
+                    let header = AnyView(DialogHeader(icon: "square.and.arrow.down", title: "Import Profile", subtitle: browserManager.currentProfile?.name ?? ""))
+                    let body = AnyView(Text("Import is not implemented yet.").font(.body))
+                    let footer = AnyView(DialogFooter(rightButtons: [DialogButton(text: "OK", variant: .primary) { browserManager.dialogManager.closeDialog() }]))
+                    browserManager.dialogManager.showCustomContentDialog(header: header, content: body, footer: footer)
+                }
+                Spacer()
+            }
+        }
     }
 }
 

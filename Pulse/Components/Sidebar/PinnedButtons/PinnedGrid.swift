@@ -21,7 +21,8 @@ struct PinnedGrid: View {
     @State private var gridGlobalFrame: CGRect = .zero
 
     var body: some View {
-        let items: [Tab] = browserManager.tabManager.pinnedTabs
+        // Use profile-filtered essentials
+        let items: [Tab] = browserManager.tabManager.essentialTabs
         let colsCount: Int = columnCount(for: availableWidth, itemCount: items.count)
         let columns: [GridItem] = makeColumns(count: colsCount)
         let localBoundaries = computeBoundaries(colsCount: colsCount)
