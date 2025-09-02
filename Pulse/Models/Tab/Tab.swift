@@ -10,6 +10,7 @@ import AVFoundation
 import CoreAudio
 import FaviconFinder
 import Foundation
+import Combine
 import SwiftUI
 import WebKit
 
@@ -23,6 +24,9 @@ public class Tab: NSObject, Identifiable, ObservableObject {
     var index: Int
 
     // MARK: - Favicon Cache
+    // Global favicon cache shared across profiles by design to increase hit rate
+    // and reduce duplicate downloads. If per-profile isolation is required later,
+    // this can be namespaced by profileId in the cache key.
     private static var faviconCache: [String: SwiftUI.Image] = [:]
     private static let faviconCacheQueue = DispatchQueue(label: "favicon.cache", attributes: .concurrent)
     private static let faviconCacheLock = NSLock()
@@ -95,6 +99,7 @@ public class Tab: NSObject, Identifiable, ObservableObject {
     private var lastAudioDeviceCheckTime: Date = Date()
     private var audioMonitoringTimer: Timer?
     private var hasAddedCoreAudioListener = false
+    private var profileAwaitCancellable: AnyCancellable?
     
 
     
@@ -220,10 +225,34 @@ public class Tab: NSObject, Identifiable, ObservableObject {
     // MARK: - WebView Setup
 
     private func setupWebView() {
-        let configuration = BrowserConfiguration.shared.cacheOptimizedWebViewConfiguration
+        let resolvedProfile = resolveProfile()
+        let configuration: WKWebViewConfiguration
+        if let profile = resolvedProfile {
+            configuration = BrowserConfiguration.shared.cacheOptimizedWebViewConfiguration(for: profile)
+        } else {
+            // Edge case: currentProfile not yet available. Delay creating WKWebView until it resolves.
+            if profileAwaitCancellable == nil {
+                print("[Tab] No profile resolved yet; deferring WebView creation and observing currentProfile…")
+                profileAwaitCancellable = browserManager?
+                    .$currentProfile
+                    .receive(on: RunLoop.main)
+                    .sink { [weak self] value in
+                        guard let self = self else { return }
+                        if value != nil && self._webView == nil {
+                            self.profileAwaitCancellable?.cancel()
+                            self.profileAwaitCancellable = nil
+                            self.setupWebView()
+                        }
+                    }
+            }
+            return
+        }
         
         // Debug: Check what data store this WebView will use
-        print("[Tab] Creating WebView with data store ID: \(configuration.websiteDataStore.identifier?.uuidString ?? "default")")
+        let profileInfo = resolvedProfile.map { "\($0.name) [\($0.id.uuidString)]" } ?? "nil"
+        print("[Tab] Resolved profile: \(profileInfo)")
+        let storeIdString: String = configuration.websiteDataStore.identifier?.uuidString ?? "default"
+        print("[Tab] Creating WebView with data store ID: \(storeIdString)")
         print("[Tab] Data store is persistent: \(configuration.websiteDataStore.isPersistent)")
         
         // CRITICAL: Ensure the configuration has access to extension controller for ALL URLs
@@ -300,6 +329,21 @@ public class Tab: NSObject, Identifiable, ObservableObject {
             didNotifyOpenToExtensions = true
         }
         loadURL(url)
+    }
+
+    // Resolve the Profile for this tab via its space association, or fall back to currentProfile
+    private func resolveProfile() -> Profile? {
+        // Attempt to resolve via associated space
+        if let sid = spaceId,
+           let space = browserManager?.tabManager.spaces.first(where: { $0.id == sid }) {
+            if let pid = space.profileId,
+               let profile = browserManager?.profileManager.profiles.first(where: { $0.id == pid }) {
+                return profile
+            }
+        }
+        // Fallback to the current profile
+        if let cp = browserManager?.currentProfile { return cp }
+        return nil
     }
 
     // Minimal hook to satisfy ExtensionManager: update extension controller on existing webView.
@@ -448,6 +492,10 @@ public class Tab: NSObject, Identifiable, ObservableObject {
         
         // 15. REMOVE FROM TAB MANAGER
         browserManager?.tabManager.removeTab(self.id)
+        
+        // Cancel any pending profile observation
+        profileAwaitCancellable?.cancel()
+        profileAwaitCancellable = nil
         
         print("Tab killed: \(name)")
     }
@@ -1695,13 +1743,15 @@ extension Tab: WKNavigationDelegate {
                 DispatchQueue.main.async {
                     self?.updateTitle(title)
                     
-                    // Add to global history after title is updated
+                    // Add to profile-aware history after title is updated
                     if let currentURL = webView.url {
+                        let profileId = self?.resolveProfile()?.id ?? self?.browserManager?.currentProfile?.id
                         self?.browserManager?.historyManager.addVisit(
                             url: currentURL,
                             title: title,
                             timestamp: Date(),
-                            tabId: self?.id
+                            tabId: self?.id,
+                            profileId: profileId
                         )
                     }
                 }

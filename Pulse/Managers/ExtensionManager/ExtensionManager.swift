@@ -18,6 +18,8 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     
     @Published var installedExtensions: [InstalledExtension] = []
     @Published var isExtensionSupportAvailable: Bool = false
+    // Scope note: Installed/enabled state is global across profiles; extension storage/state
+    // (chrome.storage, cookies, etc.) is isolated per-profile via profile-specific data stores.
     
     private var extensionController: WKWebExtensionController?
     private var extensionContexts: [String: WKWebExtensionContext] = [:]
@@ -34,6 +36,10 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     // No preference for action popups-as-tabs; keep native popovers per Apple docs
     
     let context: ModelContext
+    
+    // Profile-aware extension storage
+    private var profileExtensionStores: [UUID: WKWebsiteDataStore] = [:]
+    var currentProfileId: UUID?
     
     private override init() {
         self.context = Persistence.shared.container.mainContext
@@ -68,9 +74,19 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         
         let sharedWebConfig = BrowserConfiguration.shared.webViewConfiguration
         
-        // Create a persistent data store specifically for extensions
-        // This ensures chrome.storage APIs have a persistent backing store
-        let extensionDataStore = WKWebsiteDataStore(forIdentifier: config.identifier!)
+        // Create or select a persistent data store for extensions.
+        // If we already have a profile context, use a profile-specific store; otherwise use a shared fallback.
+        let extensionDataStore: WKWebsiteDataStore
+        if let pid = currentProfileId {
+            extensionDataStore = getExtensionDataStore(for: pid)
+        } else {
+            // Fallback shared persistent store until a profile is assigned
+            if #available(macOS 15.4, *) {
+                extensionDataStore = WKWebsiteDataStore(forIdentifier: config.identifier!)
+            } else {
+                extensionDataStore = WKWebsiteDataStore.default()
+            }
+        }
         
         // Verify data store is properly initialized
         if !extensionDataStore.isPersistent {
@@ -114,7 +130,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         
         // Verify storage is working after setup
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            self.verifyExtensionStorage()
+            self.verifyExtensionStorage(self.currentProfileId)
         }
         
         print("ExtensionManager: Native WKWebExtensionController initialized and configured")
@@ -124,14 +140,18 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     
     
     /// Verify extension storage is working properly
-    private func verifyExtensionStorage() {
+    private func verifyExtensionStorage(_ profileId: UUID? = nil) {
         guard let controller = extensionController else { return }
         
         guard let dataStore = controller.configuration.defaultWebsiteDataStore else {
             print("❌ Extension Storage Verification: No data store available.")
             return
         }
-        print("📊 Extension Storage Verification:")
+        if let pid = profileId {
+            print("📊 Extension Storage Verification (profile=\(pid.uuidString)):")
+        } else {
+            print("📊 Extension Storage Verification:")
+        }
         print("   Data store is persistent: \(dataStore.isPersistent)")
         print("   Data store identifier: \(dataStore.identifier?.uuidString ?? "nil")")
         
@@ -144,6 +164,47 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                 } else {
                     print("   ⚠️ No storage records found - this may be normal for new installations")
                 }
+            }
+        }
+    }
+
+    // MARK: - Profile-aware Data Store Management
+    private func getExtensionDataStore(for profileId: UUID) -> WKWebsiteDataStore {
+        if let store = profileExtensionStores[profileId] {
+            return store
+        }
+        // Use a persistent store identified by the profile UUID for deterministic mapping when available
+        let store: WKWebsiteDataStore
+        if #available(macOS 15.4, *) {
+            store = WKWebsiteDataStore(forIdentifier: profileId)
+        } else {
+            store = WKWebsiteDataStore.default()
+        }
+        profileExtensionStores[profileId] = store
+        print("🔧 [ExtensionManager] Created/loaded extension data store for profile=\(profileId.uuidString) (persistent=\(store.isPersistent))")
+        return store
+    }
+
+    func switchProfile(_ profileId: UUID) {
+        guard let controller = extensionController else { return }
+        let store = getExtensionDataStore(for: profileId)
+        controller.configuration.defaultWebsiteDataStore = store
+        currentProfileId = profileId
+        print("🔁 [ExtensionManager] Switched controller data store to profile=\(profileId.uuidString)")
+        // Verify storage on the new profile
+        verifyExtensionStorage(profileId)
+    }
+
+    func clearExtensionData(for profileId: UUID) {
+        let store = getExtensionDataStore(for: profileId)
+        store.fetchDataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes()) { records in
+            Task { @MainActor in
+                if records.isEmpty {
+                    print("🧹 [ExtensionManager] No extension data records to clear for profile=\(profileId.uuidString)")
+                } else {
+                    print("🧹 [ExtensionManager] Clearing \(records.count) extension data records for profile=\(profileId.uuidString)")
+                }
+                await store.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), for: records)
             }
         }
     }
@@ -1745,4 +1806,3 @@ final class WeakAnchor {
         self.window = window
     }
 }
-

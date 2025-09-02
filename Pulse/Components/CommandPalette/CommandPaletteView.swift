@@ -43,7 +43,25 @@ struct CommandPaletteView: View {
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(AppColors.textPrimary)
 
-                            TextField("Search or enter address", text: $text)
+                            // Profile indicator (icon + name)
+                            if let p = browserManager.currentProfile {
+                                HStack(spacing: 6) {
+                                    if isEmoji(p.icon) {
+                                        Text(p.icon).font(.system(size: 12))
+                                    } else {
+                                        Image(systemName: p.icon).font(.system(size: 12, weight: .semibold))
+                                    }
+                                    Text(p.name)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(.thinMaterial)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                            }
+
+                            TextField("\(browserManager.currentProfile?.name ?? "")".isEmpty ? "Search or enter address" : "Search \(browserManager.currentProfile!.name) or enter address", text: $text)
                                 .textFieldStyle(.plain)
                                 .font(.system(size: 16, weight: .regular))
                                 .foregroundColor(AppColors.textPrimary)
@@ -117,6 +135,7 @@ struct CommandPaletteView: View {
             if newVisible {
                 searchManager.setTabManager(browserManager.tabManager)
                 searchManager.setHistoryManager(browserManager.historyManager)
+                searchManager.updateProfileContext()
                 
                 // Pre-fill text if provided and select all for easy replacement
                 text = browserManager.commandPalettePrefilledText
@@ -129,6 +148,14 @@ struct CommandPaletteView: View {
                 searchManager.clearSuggestions()
                 text = ""
                 selectedSuggestionIndex = -1
+            }
+        }
+        // Keep search profile context updated while palette is open
+        .onChange(of: browserManager.currentProfile?.id) { _, _ in
+            if browserManager.isCommandPaletteVisible {
+                searchManager.updateProfileContext()
+                // Clear suggestions to avoid cross-profile residue
+                searchManager.clearSuggestions()
             }
         }
         .onKeyPress(.escape) {
@@ -145,6 +172,14 @@ struct CommandPaletteView: View {
             }
         }
         .animation(.easeInOut(duration: 0.15), value: selectedSuggestionIndex)
+    }
+
+    private func isEmoji(_ string: String) -> Bool {
+        return string.unicodeScalars.contains { scalar in
+            (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF) ||
+            (scalar.value >= 0x2600 && scalar.value <= 0x26FF) ||
+            (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
+        }
     }
 
     // MARK: - Suggestions List Subview

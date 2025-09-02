@@ -44,11 +44,18 @@ struct SpaceTittle: View {
                         cancelRename()
                     }
             } else {
-                Text(space.name)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(AppColors.textSecondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                HStack(spacing: 6) {
+                    Text(space.name)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(AppColors.textSecondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    // Profile badge next to the name
+                    if (space.profileId != nil || browserManager.profileManager.profiles.count > 1) {
+                        SpaceProfileBadge(space: space, size: .normal)
+                            .environmentObject(browserManager)
+                    }
+                }
             }
 
             Spacer()
@@ -68,6 +75,22 @@ struct SpaceTittle: View {
 
             if isHovering {
                 Menu {
+                    // Profile assignment submenu
+                    Menu("Assign to Profile") {
+                        // Quick info item
+                        let currentName = resolvedProfileName(for: space.profileId) ?? "None"
+                        Text("Current: \(currentName)")
+                            .foregroundStyle(.secondary)
+                        Divider()
+                        ProfilePickerView(
+                            selectedProfileId: Binding(get: { space.profileId }, set: { assignProfile($0) }),
+                            onSelect: { _ in },
+                            compact: true,
+                            showNoneOption: true
+                        )
+                        .environmentObject(browserManager)
+                    }
+                    Divider()
                     Button {
                         startRenaming()
                     } label: {
@@ -107,6 +130,40 @@ struct SpaceTittle: View {
                 commitRename()
             }
         }
+        // Provide a right-click context menu mirroring the hover menu
+        .contextMenu {
+            // Profile assignment submenu
+            Menu("Assign to Profile") {
+                let currentName = resolvedProfileName(for: space.profileId) ?? "None"
+                Text("Current: \(currentName)")
+                    .foregroundStyle(.secondary)
+                Divider()
+                ProfilePickerView(
+                    selectedProfileId: Binding(get: { space.profileId }, set: { assignProfile($0) }),
+                    onSelect: { _ in },
+                    compact: true,
+                    showNoneOption: true
+                )
+                .environmentObject(browserManager)
+            }
+            Divider()
+            Button {
+                startRenaming()
+            } label: {
+                Label("Rename Space", systemImage: "pencil")
+            }
+            Button {
+                emojiFieldFocused = true
+                NSApp.orderFrontCharacterPalette(nil)
+            } label: {
+                Label("Change Icon", systemImage: "face.smiling")
+            }
+            Button(role: .destructive) {
+                deleteSpace()
+            } label: {
+                Label("Delete Space", systemImage: "trash")
+            }
+        }
     }
 
     // MARK: - Actions
@@ -136,6 +193,15 @@ struct SpaceTittle: View {
 
     private func deleteSpace() {
         browserManager.tabManager.removeSpace(space.id)
+    }
+
+    private func assignProfile(_ id: UUID?) {
+        browserManager.tabManager.assign(spaceId: space.id, toProfile: id)
+    }
+    
+    private func resolvedProfileName(for id: UUID?) -> String? {
+        guard let id else { return nil }
+        return browserManager.profileManager.profiles.first(where: { $0.id == id })?.name
     }
     
     private func isEmoji(_ string: String) -> Bool {

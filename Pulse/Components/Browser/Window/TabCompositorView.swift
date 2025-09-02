@@ -28,7 +28,7 @@ struct TabCompositorView: NSViewRepresentable {
                 return browserManager.tabManager.spacePinnedTabs(for: space.id)
             } else { return [] }
         }()
-        let allTabs = browserManager.tabManager.pinnedTabs + currentSpacePinned + browserManager.tabManager.tabs
+        let allTabs = browserManager.tabManager.essentialTabs + currentSpacePinned + browserManager.tabManager.tabs
         
         for tab in allTabs {
             if let webView = tab.webView {
@@ -158,7 +158,7 @@ class TabCompositorManager: ObservableObject {
                 return browserManager.tabManager.spacePinnedTabs(for: space.id)
             } else { return [] }
         }()
-        let allTabs = browserManager.tabManager.pinnedTabs + currentSpacePinned + browserManager.tabManager.tabs
+        let allTabs = browserManager.tabManager.essentialTabs + currentSpacePinned + browserManager.tabManager.tabs
         return allTabs.first { $0.id == id }
     }
     
@@ -169,7 +169,7 @@ class TabCompositorManager: ObservableObject {
                 return browserManager.tabManager.spacePinnedTabs(for: space.id)
             } else { return [] }
         }()
-        let allTabs = browserManager.tabManager.pinnedTabs + currentSpacePinned + browserManager.tabManager.tabs
+        let allTabs = browserManager.tabManager.essentialTabs + currentSpacePinned + browserManager.tabManager.tabs
         return allTabs.first { $0.webView === webView }
     }
     
