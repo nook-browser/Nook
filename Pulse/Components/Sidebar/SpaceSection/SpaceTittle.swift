@@ -50,11 +50,6 @@ struct SpaceTittle: View {
                         .foregroundStyle(AppColors.textSecondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
-                    // Profile badge next to the name
-                    if (space.profileId != nil || browserManager.profileManager.profiles.count > 1) {
-                        SpaceProfileBadge(space: space, size: .normal)
-                            .environmentObject(browserManager)
-                    }
                 }
             }
 

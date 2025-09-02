@@ -43,25 +43,7 @@ struct CommandPaletteView: View {
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(AppColors.textPrimary)
 
-                            // Profile indicator (icon + name)
-                            if let p = browserManager.currentProfile {
-                                HStack(spacing: 6) {
-                                    if isEmoji(p.icon) {
-                                        Text(p.icon).font(.system(size: 12))
-                                    } else {
-                                        Image(systemName: p.icon).font(.system(size: 12, weight: .semibold))
-                                    }
-                                    Text(p.name)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(.thinMaterial)
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
-                            }
-
-                            TextField("\(browserManager.currentProfile?.name ?? "")".isEmpty ? "Search or enter address" : "Search \(browserManager.currentProfile!.name) or enter address", text: $text)
+                            TextField("Search or enter address", text: $text)
                                 .textFieldStyle(.plain)
                                 .font(.system(size: 16, weight: .regular))
                                 .foregroundColor(AppColors.textPrimary)

@@ -299,6 +299,8 @@ class BrowserManager: ObservableObject {
     // Toast state for profile switching feedback
     @Published var profileSwitchToast: ProfileSwitchToast?
     @Published var isShowingProfileSwitchToast: Bool = false
+    // Indicates an in-progress animated profile transition for coordinating UI
+    @Published var isTransitioningProfile: Bool = false
     // Migration state
     @Published var migrationProgress: MigrationProgress?
     @Published var isMigrationInProgress: Bool = false
@@ -319,7 +321,7 @@ class BrowserManager: ObservableObject {
     
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
-    private var isSwitchingProfile: Bool = false
+    var isSwitchingProfile: Bool = false
     
     // Compositor container view
     var compositorContainerView: NSView?
@@ -412,26 +414,27 @@ class BrowserManager: ObservableObject {
 
             let previousProfile = self.currentProfile
             print("🔀 [BrowserManager] Switching to profile: \(profile.name) (\(profile.id.uuidString)) from: \(previousProfile?.name ?? "none")")
-            self.currentProfile = profile
-            // Switch data stores for cookie/cache
-            self.cookieManager.switchDataStore(profile.dataStore, profileId: profile.id)
-            self.cacheManager.switchDataStore(profile.dataStore, profileId: profile.id)
-            // Update history filtering
-            self.historyManager.switchProfile(profile.id)
-            // TabManager awareness (updates currentTab/currentSpace visibility)
-            self.tabManager.handleProfileSwitch()
-            // Update extension manager
-            if #available(macOS 15.5, *), let mgr = self.extensionManager {
-                mgr.switchProfile(profile.id)
+            withAnimation(.easeInOut(duration: 0.35)) {
+                self.isTransitioningProfile = true
+                self.currentProfile = profile
+                // Switch data stores for cookie/cache
+                self.cookieManager.switchDataStore(profile.dataStore, profileId: profile.id)
+                self.cacheManager.switchDataStore(profile.dataStore, profileId: profile.id)
+                // Update history filtering
+                self.historyManager.switchProfile(profile.id)
+                // TabManager awareness (updates currentTab/currentSpace visibility)
+                self.tabManager.handleProfileSwitch()
+                // Update extension manager
+                if #available(macOS 15.5, *), let mgr = self.extensionManager {
+                    mgr.switchProfile(profile.id)
+                }
             }
-            // Animate gradient to the active space of the new profile
-            let newGradient = self.tabManager.currentSpace?.gradient ?? .default
-            self.gradientColorManager.transition(to: newGradient, duration: 0.35)
             // Show toast and haptic feedback
             self.showProfileSwitchToast(from: previousProfile, to: profile)
             NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .drawCompleted)
-            // Trigger any UI updates if needed
-            self.objectWillChange.send()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                self.isTransitioningProfile = false
+            }
         }
     }
     
