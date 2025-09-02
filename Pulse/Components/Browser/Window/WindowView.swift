@@ -48,6 +48,19 @@ struct WindowView: View {
             
             // Working insertion line overlay
             InsertionLineView(dragManager: TabDragManager.shared)
+
+            // Profile switch toast overlay
+            if browserManager.isShowingProfileSwitchToast, let toast = browserManager.profileSwitchToast {
+                ProfileSwitchToastView(toast: toast)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .padding(.top, 60)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .top).combined(with: .opacity),
+                        removal: .opacity
+                    ))
+                    .animation(.spring(response: 0.5, dampingFraction: 0.8), value: browserManager.isShowingProfileSwitchToast)
+                    .onTapGesture { browserManager.hideProfileSwitchToast() }
+            }
         }
         // Named coordinate space for geometry preferences
         .coordinateSpace(name: "WindowSpace")
@@ -59,6 +72,72 @@ struct WindowView: View {
         .environmentObject(browserManager.gradientColorManager)
     }
 
+}
+
+// MARK: - Profile Switch Toast View
+private struct ProfileSwitchToastView: View {
+    @EnvironmentObject var browserManager: BrowserManager
+    let toast: BrowserManager.ProfileSwitchToast
+
+    private func iconView(for icon: String) -> some View {
+        Group {
+            if isEmoji(icon) {
+                Text(icon)
+                    .font(.system(size: 16))
+                    .frame(width: 28, height: 28)
+            } else {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 28, height: 28)
+            }
+        }
+        .foregroundStyle(.primary)
+        .background(.thinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            // From -> To icons
+            if let from = toast.fromProfile {
+                iconView(for: from.icon)
+                    .overlay(alignment: .trailing) {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.secondary)
+                            .offset(x: 12)
+                    }
+            }
+            iconView(for: toast.toProfile.icon)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Switched to \(toast.toProfile.name)")
+                    .font(.system(size: 13, weight: .semibold))
+                Text(DateFormatter.localizedString(from: toast.timestamp, dateStyle: .none, timeStyle: .short))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: 360)
+        .background(.ultraThinMaterial)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.primary.opacity(0.08))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.08), radius: 14, y: 6)
+    }
+
+    private func isEmoji(_ string: String) -> Bool {
+        return string.unicodeScalars.contains { scalar in
+            (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF) ||
+            (scalar.value >= 0x2600 && scalar.value <= 0x26FF) ||
+            (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
+        }
+    }
 }
 
 // MARK: - Mini Command Palette Overlay (above sidebar and webview)

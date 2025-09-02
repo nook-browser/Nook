@@ -11,6 +11,8 @@ import SwiftData
 @Model
 final class ExtensionEntity {
     @Attribute(.unique) var id: String
+    // Installation scope note: Extensions are installed/enabled globally across profiles.
+    // Storage/state for extensions is profile-isolated via ExtensionManager data stores.
     var name: String
     var version: String
     var manifestVersion: Int
