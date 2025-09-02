@@ -60,15 +60,7 @@ struct SpacesListItem: View {
         .onHover { hovering in
             isHovering = hovering
         }
-        .overlay(alignment: .bottomTrailing) {
-            // Show only when there is an explicit assignment or multiple profiles exist,
-            // and hide in dot mode (compact && !isActive)
-            if (space.profileId != nil || browserManager.profileManager.profiles.count > 1) && !(compact && !isActive) {
-                SpaceProfileBadge(space: space, size: .compact)
-                    .environmentObject(browserManager)
-                    .offset(x: 1.5, y: 1.5)
-            }
-        }
+        // Removed profile badge overlay to reduce UI noise
         .overlay(
             // Hidden TextField for capturing emoji selection
             TextField("", text: $selectedEmoji)

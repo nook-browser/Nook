@@ -361,6 +361,8 @@ class TabManager: ObservableObject {
     private var pinnedByProfile: [UUID: [Tab]] = [:]
     // Pinned tabs encountered during load that have no profile assignment yet
     private var pendingPinnedWithoutProfile: [Tab] = []
+    // Space activation to resume after a deferred profile switch
+    private var pendingSpaceActivation: UUID?
     
     // Essentials API - profile-filtered view of global pinned tabs
     var pinnedTabs: [Tab] {
@@ -483,6 +485,38 @@ class TabManager: ObservableObject {
 
     func setActiveSpace(_ space: Space) {
         guard spaces.contains(where: { $0.id == space.id }) else { return }
+
+        // Edge case: assign space to current profile if missing
+        if space.profileId == nil {
+            if let pid = browserManager?.currentProfile?.id {
+                assign(spaceId: space.id, toProfile: pid)
+            } else {
+                print("⚠️ [TabManager] Activating space without profile while currentProfile is nil — deferring assignment")
+            }
+        }
+
+        // Auto-switch profile if the target space belongs to a different profile
+        if let targetProfileId = space.profileId, let bm = browserManager {
+            // Skip scheduling if a switch or transition is already in progress
+            if bm.isTransitioningProfile == true || bm.isSwitchingProfile == true {
+                // Avoid concurrent or nested profile switches
+            } else {
+                let currentProfileId = bm.currentProfile?.id
+                if currentProfileId == nil || currentProfileId != targetProfileId {
+                    if let targetProfile = bm.profileManager.profiles.first(where: { $0.id == targetProfileId }) {
+                        // Remember target space and switch profiles asynchronously
+                        pendingSpaceActivation = space.id
+                        Task { [weak bm] in
+                            await bm?.switchToProfile(targetProfile)
+                        }
+                        // Return early; profile switch will resume activation via handleProfileSwitch
+                        return
+                    } else {
+                        print("⚠️ [TabManager] Target profile not found for space \(space.name)")
+                    }
+                }
+            }
+        }
 
         // Capture the previous state before switching
         let previousTab = currentTab
@@ -1568,6 +1602,14 @@ extension TabManager {
     /// Notify TabManager that the active profile changed.
     /// Ensures the currentTab is visible for the new profile and updates compositor.
     func handleProfileSwitch() {
+        // Resume any pending space activation scheduled prior to the profile switch
+        if let id = pendingSpaceActivation {
+            pendingSpaceActivation = nil
+            if let target = spaces.first(where: { $0.id == id }) {
+                setActiveSpace(target)
+            }
+        }
+
         // Trigger UI refresh due to computed pinnedTabs/essentialTabs changes
         objectWillChange.send()
         // Build the set of visible tabs under the new profile

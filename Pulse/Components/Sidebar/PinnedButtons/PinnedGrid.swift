@@ -8,6 +8,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct PinnedGrid: View {
+    let width: CGFloat
     let minButtonWidth: CGFloat = 50
     let itemSpacing: CGFloat = 8
     let rowSpacing: CGFloat = 6
@@ -15,7 +16,6 @@ struct PinnedGrid: View {
 
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(\.tabDragManager) private var dragManager
-    @State private var availableWidth: CGFloat = 0
     @State private var cellFrames: [Int: CGRect] = [:] // local frames in grid space
     @State private var cachedBoundaries: [SidebarGridBoundary] = []
     @State private var gridGlobalFrame: CGRect = .zero
@@ -23,7 +23,7 @@ struct PinnedGrid: View {
     var body: some View {
         // Use profile-filtered essentials
         let items: [Tab] = browserManager.tabManager.essentialTabs
-        let colsCount: Int = columnCount(for: availableWidth, itemCount: items.count)
+        let colsCount: Int = columnCount(for: width, itemCount: items.count)
         let columns: [GridItem] = makeColumns(count: colsCount)
         let localBoundaries = computeBoundaries(colsCount: colsCount)
         // Convert local boundary frames to global coordinates using the grid's global frame
@@ -37,83 +37,88 @@ struct PinnedGrid: View {
             )
             return SidebarGridBoundary(index: b.index, orientation: b.orientation, frame: converted)
         }
+        ZStack { // Container to support transitions
+            VStack(spacing: 6) {
+                ZStack(alignment: .top) {
+                    LazyVGrid(columns: columns, alignment: .center, spacing: rowSpacing) {
+                        ForEach(Array(items.enumerated()), id: \.element.id) { index, tab in
+                            let isActive: Bool = (browserManager.tabManager.currentTab?.id == tab.id)
+                            let title: String = safeTitle(tab)
 
-        VStack(spacing: 6) {
-            ZStack(alignment: .top) {
-                LazyVGrid(columns: columns, alignment: .center, spacing: rowSpacing) {
-                    ForEach(Array(items.enumerated()), id: \.element.id) { index, tab in
-                        let isActive: Bool = (browserManager.tabManager.currentTab?.id == tab.id)
-                        let title: String = safeTitle(tab)
-
-                        PinnedTile(
-                            title: title,
-                            urlString: tab.url.absoluteString,
-                            icon: tab.favicon,
-                            isActive: isActive,
-                            onActivate: { browserManager.tabManager.setActiveTab(tab) },
-                            onClose: { browserManager.tabManager.removeTab(tab.id) },
-                            onRemovePin: { browserManager.tabManager.unpinTab(tab) }
-                        )
-                        .draggableTab(
-                            tab: tab,
-                            container: .essentials,
-                            index: index,
-                            dragManager: dragManager ?? TabDragManager.shared
-                        )
-                        .background(GeometryReader { proxy in
-                            // Record each tile's frame in local grid coordinate space
-                            let local = proxy.frame(in: .named("PinnedGridSpace"))
-                            Color.clear.preference(key: PinnedGridCellFramesKey.self, value: [index: local])
-                        })
+                            PinnedTile(
+                                title: title,
+                                urlString: tab.url.absoluteString,
+                                icon: tab.favicon,
+                                isActive: isActive,
+                                onActivate: { browserManager.tabManager.setActiveTab(tab) },
+                                onClose: { browserManager.tabManager.removeTab(tab.id) },
+                                onRemovePin: { browserManager.tabManager.unpinTab(tab) }
+                            )
+                            .draggableTab(
+                                tab: tab,
+                                container: .essentials,
+                                index: index,
+                                dragManager: dragManager ?? TabDragManager.shared
+                            )
+                            .background(GeometryReader { proxy in
+                                // Record each tile's frame in local grid coordinate space
+                                let local = proxy.frame(in: .named("PinnedGridSpace"))
+                                Color.clear.preference(key: PinnedGridCellFramesKey.self, value: [index: local])
+                            })
+                        }
+                    }
+                    // Ensure a reasonable drop surface when grid is empty
+                    if items.isEmpty {
+                        Color.clear.frame(height: 44)
                     }
                 }
-                // Ensure a reasonable drop surface when grid is empty
-                if items.isEmpty {
-                    Color.clear.frame(height: 44)
+                .coordinateSpace(name: "PinnedGridSpace")
+                .onPreferenceChange(PinnedGridCellFramesKey.self) { frames in
+                    cellFrames = frames
+                    cachedBoundaries = computeBoundaries(colsCount: colsCount)
+                }
+                .contentShape(Rectangle())
+                .overlay(SidebarGridInsertionOverlay(
+                    isActive: (dragManager ?? TabDragManager.shared).isDragging && (dragManager ?? TabDragManager.shared).dropTarget == .essentials && !browserManager.isTransitioningProfile,
+                    index: max((dragManager ?? TabDragManager.shared).insertionIndex, 0),
+                    boundaries: localBoundaries
+                ))
+                .onDrop(of: [.text], delegate: SidebarGridDropDelegate(
+                    dragManager: (dragManager ?? TabDragManager.shared),
+                    boundariesProvider: { globalBoundaries },
+                    onPerform: { op in browserManager.tabManager.handleDragOperation(op) }
+                ))
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            .id(browserManager.currentProfile?.id) // Treat as a new view when profile changes
+            .transition(.asymmetric(
+                insertion: .move(edge: .leading).combined(with: .opacity),
+                removal: .move(edge: .trailing).combined(with: .opacity)
+            ))
+            .background(
+                GeometryReader { proxy in
+                    Color.clear
+                        .onAppear {
+                            var t = Transaction(); t.disablesAnimations = true
+                            withTransaction(t) { gridGlobalFrame = proxy.frame(in: .global) }
+                        }
+                        .onChange(of: proxy.frame(in: .global)) { _, newFrame in
+                            var t = Transaction(); t.disablesAnimations = true
+                            withTransaction(t) { gridGlobalFrame = newFrame }
+                        }
+                }
+            )
+            .animation(browserManager.isTransitioningProfile ? nil : .easeInOut(duration: 0.18), value: colsCount)
+            .animation(browserManager.isTransitioningProfile ? nil : .easeInOut(duration: 0.18), value: items.count)
+            .allowsHitTesting(!browserManager.isTransitioningProfile)
+            .onChange(of: browserManager.isTransitioningProfile) { transitioning in
+                if transitioning {
+                    (dragManager ?? TabDragManager.shared).cancelDrag()
                 }
             }
-            .coordinateSpace(name: "PinnedGridSpace")
-            .onPreferenceChange(PinnedGridCellFramesKey.self) { frames in
-                cellFrames = frames
-                cachedBoundaries = computeBoundaries(colsCount: colsCount)
-            }
-            .contentShape(Rectangle())
-            .overlay(SidebarGridInsertionOverlay(
-                isActive: (dragManager ?? TabDragManager.shared).isDragging && (dragManager ?? TabDragManager.shared).dropTarget == .essentials,
-                index: max((dragManager ?? TabDragManager.shared).insertionIndex, 0),
-                boundaries: localBoundaries
-            ))
-            .onDrop(of: [.text], delegate: SidebarGridDropDelegate(
-                dragManager: (dragManager ?? TabDragManager.shared),
-                boundariesProvider: { globalBoundaries },
-                onPerform: { op in browserManager.tabManager.handleDragOperation(op) }
-            ))
-            .fixedSize(horizontal: false, vertical: true)
-        }
-        .background(widthReader)
-        .background(
-            GeometryReader { proxy in
-                Color.clear
-                    .onAppear { gridGlobalFrame = proxy.frame(in: .global) }
-                    .onChange(of: proxy.frame(in: .global)) { _, newFrame in
-                        gridGlobalFrame = newFrame
-                    }
-            }
-        )
-        .animation(.easeInOut(duration: 0.18), value: colsCount)
-        .animation(.easeInOut(duration: 0.18), value: items.count)
-    }
-
-    private var widthReader: some View {
-        GeometryReader { proxy in
-            Color.clear
-                .onAppear { availableWidth = proxy.size.width }
-                .onChange(of: proxy.size.width) { _, newWidth in
-                    availableWidth = newWidth
-                }
         }
     }
-
+    
     private func safeTitle(_ tab: Tab) -> String {
         let t = tab.name.trimmingCharacters(in: .whitespacesAndNewlines)
         return t.isEmpty ? (tab.url.host ?? "New Tab") : t
@@ -146,12 +151,12 @@ struct PinnedGrid: View {
         var boundaries = SidebarDropMath.computeGridBoundaries(
             frames: cellFrames,
             columns: colsCount,
-            containerWidth: cw > 0 ? cw : max(availableWidth, minButtonWidth),
+            containerWidth: cw > 0 ? cw : max(width, minButtonWidth),
             gridGap: itemSpacing
         )
         if boundaries.isEmpty {
             let fh: CGFloat = 44
-            let f = CGRect(x: 0, y: fh/2 - 1.5, width: max(availableWidth, minButtonWidth), height: 3)
+            let f = CGRect(x: 0, y: fh/2 - 1.5, width: max(width, minButtonWidth), height: 3)
             boundaries = [SidebarGridBoundary(index: 0, orientation: .horizontal, frame: f)]
         }
         return boundaries
