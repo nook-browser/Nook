@@ -25,20 +25,16 @@ struct PinnedTabView: View {
     // Stroke overlay tunables
     private let strokeThickness: CGFloat = 2.0   // ring thickness
     private let faviconScale: CGFloat = 9.0      // favicon scale to fit the ring
-    private let faviconBlur: CGFloat = 100.0       // blur applied to favicon
+    private let faviconBlur: CGFloat = 70.0      // blur applied to favicon
 
     var body: some View {
         Button(action: action) {
             ZStack {
-                // Background
-                ZStack {
-                    BlurEffectView(
-                        material: browserManager.settingsManager.currentMaterial,
-                        state: .active
-                    )
-                    Color.white.opacity(isActive ? 0.3 : 0.2)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: corner))
+                // Background replaced with RoundedRectangle directly
+                RoundedRectangle(cornerRadius: corner, style: .continuous)
+                    .fill(Color.white.opacity(isActive ? 1.0 : isHovered ? 0.6 : 0.4))
+                    .animation(.easeInOut(duration: 0.2), value: isHovered)
+                    .shadow(color: isActive ? Color.gray : Color.clear, radius: 1, y: 1)
 
                 tabIcon
                     .resizable()
@@ -60,9 +56,12 @@ struct PinnedTabView: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .contentShape(RoundedRectangle(cornerRadius: corner))
+            .contentShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
         }
         .buttonStyle(.plain)
+        .onHover { hovering in
+            self.isHovered = hovering
+        }
     }
 
     // MARK: - Favicon stroke overlay
@@ -75,13 +74,14 @@ struct PinnedTabView: View {
     ) -> some View {
         GeometryReader { proxy in
             let size = proxy.size
-            let outerRect = RoundedRectangle(cornerRadius: corner)
-            let innerRect = RoundedRectangle(cornerRadius: max(0, corner - 1))
+            let outerRect = RoundedRectangle(cornerRadius: corner, style: .continuous)
+            let innerRect = RoundedRectangle(cornerRadius: max(0, corner + 1), style: .continuous)
 
             ZStack {
                 let ringMask = ZStack {
                     outerRect
                         .fill(Color.white)
+                        .shadow(color: .clear, radius: 0)
 
                     innerRect
                         .inset(by: thickness)
@@ -106,3 +106,4 @@ struct PinnedTabView: View {
         }
     }
 }
+

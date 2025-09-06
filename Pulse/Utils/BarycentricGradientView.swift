@@ -3,11 +3,17 @@ import SwiftUI
 import AppKit
 #endif
 
-// MARK: - BarycentricTriGradientView
-// GPU shader-based tri-color gradient using barycentric interpolation.
-// Expects exactly 3 nodes; falls back to a linear gradient otherwise.
-struct BarycentricTriGradientView: View, Animatable {
+// MARK: - BarycentricGradientView
+// GPU shader-based gradient using barycentric interpolation across up to 3 colors.
+// - Supports 1, 2, and 3 color schemes.
+// - Smoothly animates activation between counts (1<->2<->3) in Metal.
+struct BarycentricGradientView: View, Animatable {
     var gradient: SpaceGradient
+    @EnvironmentObject private var gradientColorManager: GradientColorManager
+
+    // Track transitions between color-count modes for smooth activation
+    @State private var previousCount: Int = 0
+    @State private var activationProgress: Double = 1.0
 
     // Bridge SpaceGradient's animatable data so SwiftUI drives shader args smoothly
     var animatableData: SpaceGradient.AnimVector {
@@ -15,43 +21,55 @@ struct BarycentricTriGradientView: View, Animatable {
         set { gradient.animatableData = newValue }
     }
 
-    // Fixed anchor positions in normalized space (left, top-right, bottom-right)
-    private let pA = SIMD2<Double>(0.08, 0.50)
-    private let pB = SIMD2<Double>(0.92, 0.25)
-    private let pC = SIMD2<Double>(0.92, 0.75)
+    // Anchor inset controls how far in from the edges the color anchors sit.
+    // Increasing this pulls anchors inward (shrinks individual lobes),
+    // decreasing pushes them toward the edges (expands individual lobes).
+    private let anchorInset: Double = 0.08
+
+    // Fixed anchor positions in normalized space (top-left, top-right, bottom-center)
+    private var pA: SIMD2<Double> { SIMD2<Double>(anchorInset, anchorInset) }
+    private var pB: SIMD2<Double> { SIMD2<Double>(1.0 - anchorInset, anchorInset) }
+    private var pC: SIMD2<Double> { SIMD2<Double>(0.5, 1.0 - anchorInset) }
 
     var body: some View {
         let nodes = gradient.sortedNodes
-        if nodes.count >= 3 {
-            Canvas { context, size in
-                let rect = CGRect(origin: .zero, size: size)
-                let shader = Self.makeShader(gradient: gradient, size: size, pA: pA, pB: pB, pC: pC)
-                context.fill(Path(rect), with: .shader(shader))
-            }
-        } else {
-            // Fallback to existing SwiftUI linear gradient behavior (angle respected)
-            let pts = Self.linePoints(angle: gradient.angle)
-            Rectangle()
-                .fill(LinearGradient(gradient: Gradient(stops: Self.stops(gradient)), startPoint: pts.start, endPoint: pts.end))
+        let count = max(1, min(3, nodes.count))
+
+        Canvas { context, size in
+            let rect = CGRect(origin: .zero, size: size)
+            let shader = Self.makeShader(
+                gradient: gradient,
+                size: size,
+                pA: pA, pB: pB, pC: pC,
+                previousCount: previousCount,
+                currentCount: count,
+                t: 1.0,
+                primaryID: gradientColorManager.activePrimaryNodeID ?? gradientColorManager.preferredPrimaryNodeID
+            )
+            context.fill(Path(rect), with: .shader(shader))
+        }
+        .onAppear {
+            let c = max(1, min(3, gradient.sortedNodes.count))
+            previousCount = c
+            activationProgress = 1.0
         }
     }
 
-    private static func makeShader(gradient: SpaceGradient, size: CGSize, pA: SIMD2<Double>, pB: SIMD2<Double>, pC: SIMD2<Double>) -> Shader {
-        let nodes = gradient.sortedNodes
-        // Map nodes by location: left = primary (min location), then the others
-        guard nodes.count >= 3 else {
-            // Should be handled by caller; return a benign shader
-            let function = ShaderFunction(library: .default, name: "baryTriGradient")
-            return Shader(function: function, arguments: [
-                .color(.clear), .color(.clear), .color(.clear),
-                .float2(size),
-                .float2(CGSize.zero), .float2(CGSize.zero), .float2(CGSize.zero)
-            ])
+    private static func makeShader(gradient: SpaceGradient,
+                                   size: CGSize,
+                                   pA: SIMD2<Double>, pB: SIMD2<Double>, pC: SIMD2<Double>,
+                                   previousCount: Int, currentCount: Int, t: Double,
+                                   primaryID: UUID?) -> Shader {
+        // Start from location-sorted nodes, then move the active primary to the front
+        var nodes = gradient.sortedNodes
+        if let pid = primaryID, let idx = nodes.firstIndex(where: { $0.id == pid }) {
+            let primary = nodes.remove(at: idx)
+            nodes.insert(primary, at: 0)
         }
-
-        let nA = nodes[0]
-        let nB = nodes[1]
-        let nC = nodes[2]
+        // Select up to first 3 nodes; duplicate last color if fewer
+        let nA = nodes.count > 0 ? nodes[0] : SpaceGradient.default.sortedNodes[0]
+        let nB = nodes.count > 1 ? nodes[1] : nA
+        let nC = nodes.count > 2 ? nodes[2] : nB
         #if canImport(AppKit)
         let cA = Color(nsColor: NSColor(Color(hex: nA.colorHex)).usingColorSpace(.sRGB) ?? .black)
         let cB = Color(nsColor: NSColor(Color(hex: nB.colorHex)).usingColorSpace(.sRGB) ?? .black)
@@ -62,13 +80,29 @@ struct BarycentricTriGradientView: View, Animatable {
         let cC = Color(hex: nC.colorHex)
         #endif
 
-        let function = ShaderFunction(library: .default, name: "baryTriGradient")
+        // Activation profiles for counts 1,2,3 respectively
+        func weights(for count: Int) -> (Double, Double, Double) {
+            switch max(1, min(3, count)) {
+            case 1: return (1, 0, 0)
+            case 2: return (1, 1, 0)
+            default: return (1, 1, 1)
+            }
+        }
+        let (a0, b0, c0) = weights(for: previousCount)
+        let (a1, b1, c1) = weights(for: currentCount)
+        // Interpolate activation smoothly
+        let sA = a0 + (a1 - a0) * t
+        let sB = b0 + (b1 - b0) * t
+        let sC = c0 + (c1 - c0) * t
+
+        let function = ShaderFunction(library: .default, name: "baryAdaptiveGradient")
         return Shader(function: function, arguments: [
             .color(cA), .color(cB), .color(cC),
             .float2(size),
             .float2(CGSize(width: pA.x, height: pA.y)),
             .float2(CGSize(width: pB.x, height: pB.y)),
             .float2(CGSize(width: pC.x, height: pC.y)),
+            .float(sA), .float(sB), .float(sC)
         ])
     }
 

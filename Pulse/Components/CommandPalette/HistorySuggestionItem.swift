@@ -38,11 +38,9 @@ struct HistorySuggestionItem: View {
             }
             Spacer()
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 5)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
-        .background(backgroundColor)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovered = hovering
@@ -50,16 +48,6 @@ struct HistorySuggestionItem: View {
         }
         .onAppear {
             Task { await fetchFavicon(for: entry.url) }
-        }
-    }
-    
-    private var backgroundColor: Color {
-        if isSelected {
-            return Color.white.opacity(0.25)
-        } else if isHovered {
-            return Color.white.opacity(0.15)
-        } else {
-            return Color.clear
         }
     }
     
@@ -98,5 +86,4 @@ struct HistorySuggestionItem: View {
         }
     }
 }
-
 

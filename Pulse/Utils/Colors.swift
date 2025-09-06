@@ -16,6 +16,7 @@ struct AppColors {
     static let controlBackground = Color(nsColor: .controlBackgroundColor)
     static let controlBackgroundHover = Color(nsColor: .controlColor)
     static let controlBackgroundActive = Color.white.opacity(0.3)
+    static let activeTab = Color.white.opacity(1.0)
 }
 
 extension Color {

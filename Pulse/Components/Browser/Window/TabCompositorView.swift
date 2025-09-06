@@ -22,7 +22,13 @@ struct TabCompositorView: NSViewRepresentable {
         containerView.subviews.forEach { $0.removeFromSuperview() }
         
         // Add all loaded tabs to the compositor
-        let allTabs = browserManager.tabManager.pinnedTabs + browserManager.tabManager.tabs
+        // Include: global pinned, space-pinned for current space, and regular tabs in current space
+        let currentSpacePinned: [Tab] = {
+            if let space = browserManager.tabManager.currentSpace {
+                return browserManager.tabManager.spacePinnedTabs(for: space.id)
+            } else { return [] }
+        }()
+        let allTabs = browserManager.tabManager.essentialTabs + currentSpacePinned + browserManager.tabManager.tabs
         
         for tab in allTabs {
             if let webView = tab.webView {
@@ -147,13 +153,23 @@ class TabCompositorManager: ObservableObject {
     
     private func findTab(by id: UUID) -> Tab? {
         guard let browserManager = browserManager else { return nil }
-        let allTabs = browserManager.tabManager.pinnedTabs + browserManager.tabManager.tabs
+        let currentSpacePinned: [Tab] = {
+            if let space = browserManager.tabManager.currentSpace {
+                return browserManager.tabManager.spacePinnedTabs(for: space.id)
+            } else { return [] }
+        }()
+        let allTabs = browserManager.tabManager.essentialTabs + currentSpacePinned + browserManager.tabManager.tabs
         return allTabs.first { $0.id == id }
     }
     
     private func findTabByWebView(_ webView: WKWebView) -> Tab? {
         guard let browserManager = browserManager else { return nil }
-        let allTabs = browserManager.tabManager.pinnedTabs + browserManager.tabManager.tabs
+        let currentSpacePinned: [Tab] = {
+            if let space = browserManager.tabManager.currentSpace {
+                return browserManager.tabManager.spacePinnedTabs(for: space.id)
+            } else { return [] }
+        }()
+        let allTabs = browserManager.tabManager.essentialTabs + currentSpacePinned + browserManager.tabManager.tabs
         return allTabs.first { $0.webView === webView }
     }
     
@@ -177,5 +193,3 @@ class TabCompositorManager: ObservableObject {
     // MARK: - Dependencies
     weak var browserManager: BrowserManager?
 }
-
-

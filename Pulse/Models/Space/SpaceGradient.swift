@@ -15,8 +15,10 @@ struct SpaceGradient: Codable, Hashable {
     var angle: Double
     var nodes: [GradientNode]
     var grain: Double
+    // Global opacity for the entire gradient layer (0..1)
+    var opacity: Double
 
-    init(angle: Double, nodes: [GradientNode], grain: Double) {
+    init(angle: Double, nodes: [GradientNode], grain: Double, opacity: Double = 1.0) {
         // Normalize angle to [0, 360)
         var normalized = angle.truncatingRemainder(dividingBy: 360.0)
         if normalized < 0 { normalized += 360.0 }
@@ -24,13 +26,14 @@ struct SpaceGradient: Codable, Hashable {
         // Clamp grain to [0,1]
         self.grain = max(0.0, min(1.0, grain))
         self.nodes = nodes
+        self.opacity = max(0.0, min(1.0, opacity))
     }
 
     static var `default`: SpaceGradient {
         let hex = SpaceGradient.accentHex()
         let n1 = GradientNode(colorHex: hex, location: 0.0)
         let n2 = GradientNode(colorHex: hex, location: 1.0)
-        return SpaceGradient(angle: 45.0, nodes: [n1, n2], grain: 0.05)
+        return SpaceGradient(angle: 45.0, nodes: [n1, n2], grain: 0.05, opacity: 1.0)
     }
 
     var encoded: Data? {
@@ -53,6 +56,27 @@ struct SpaceGradient: Codable, Hashable {
         nodes.sorted { $0.location < $1.location }
     }
 
+    // MARK: - Primary Color
+    // Defines a "primary" color for a space derived from the gradient.
+    // Rule: pick the node with the lowest location (leading stop). If no nodes
+    // are defined, fall back to the system accent-derived default.
+    var primaryColorHex: String {
+        if let first = sortedNodes.first { return first.colorHex }
+        return SpaceGradient.accentHex()
+    }
+
+    #if canImport(SwiftUI)
+    var primaryColor: Color {
+        Color(hex: primaryColorHex)
+    }
+    #endif
+
+    #if canImport(AppKit)
+    var primaryNSColor: NSColor {
+        cachedNSColor(for: primaryColorHex)
+    }
+    #endif
+
     private static func accentHex() -> String {
         #if canImport(AppKit)
         let accent = NSColor.controlAccentColor
@@ -74,22 +98,26 @@ struct SpaceGradient: Codable, Hashable {
 
 // MARK: - Codable (custom decode for normalization)
 extension SpaceGradient {
+    enum CodingKeys: String, CodingKey { case angle, nodes, grain, opacity }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let angle = try container.decode(Double.self, forKey: .angle)
         let nodes = try container.decode([GradientNode].self, forKey: .nodes)
         let grain = try container.decode(Double.self, forKey: .grain)
-        self.init(angle: angle, nodes: nodes, grain: grain)
+        let opacity = try container.decodeIfPresent(Double.self, forKey: .opacity) ?? 1.0
+        self.init(angle: angle, nodes: nodes, grain: grain, opacity: opacity)
     }
 }
 
 // MARK: - Visual Equality
 extension SpaceGradient {
-    func visuallyEquals(_ other: SpaceGradient, epsilon: Double = 0.5, grainEpsilon: Double = 0.01) -> Bool {
+    func visuallyEquals(_ other: SpaceGradient, epsilon: Double = 0.5, grainEpsilon: Double = 0.01, opacityEpsilon: Double = 0.01) -> Bool {
         // Compare angle and grain with tolerances
         let angleDiff = abs(self.angle - other.angle).truncatingRemainder(dividingBy: 360)
         let angleEqual: Bool = angleDiff < epsilon || abs(angleDiff - 360) < epsilon
         let grainEqual = abs(self.grain - other.grain) <= grainEpsilon
+        let opacityEqual = abs(self.opacity - other.opacity) <= opacityEpsilon
 
         // Compare nodes ignoring IDs; order by location
         let aNodes = self.sortedNodes
@@ -101,7 +129,7 @@ extension SpaceGradient {
             if a.colorHex.caseInsensitiveCompare(b.colorHex) != .orderedSame { return false }
             if abs(a.location - b.location) > 1e-4 { return false }
         }
-        return angleEqual && grainEqual
+        return angleEqual && grainEqual && opacityEqual
     }
 }
 

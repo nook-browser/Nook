@@ -75,7 +75,10 @@ struct SidebarView: View {
                     .backgroundDraggable()
 
                     URLBarView()
-                    PinnedGrid()
+                    // Container to support PinnedGrid slide transitions without clipping
+                    ZStack {
+                        PinnedGrid(width: browserManager.sidebarWidth)
+                    }
                     if showHistory {
                         historyView
                     } else {
@@ -150,9 +153,27 @@ struct SidebarView: View {
         .contentMargins(.horizontal, 0)
         .scrollTargetLayout()
         .coordinateSpace(name: "SidebarGlobal")
-        .scrollTargetBehavior(.paging)
+        .scrollTargetBehavior(.viewAligned)
         .scrollIndicators(.hidden)
-        .scrollPosition(id: $currentScrollID)
+        .scrollPosition(id: $currentScrollID, anchor: .topLeading)
+        // Keep the active space locked to the leading edge when resizing
+        .onChange(of: browserManager.sidebarWidth) { _, _ in
+            // Force a re-snap by clearing then restoring the target id without animation.
+            // Some SwiftUI versions ignore setting the same id; this guarantees an update.
+            let target = activeSpaceIndex
+            var t = Transaction()
+            t.disablesAnimations = true
+            withTransaction(t) {
+                currentScrollID = nil
+            }
+            DispatchQueue.main.async {
+                var t2 = Transaction()
+                t2.disablesAnimations = true
+                withTransaction(t2) {
+                    currentScrollID = target
+                }
+            }
+        }
         .onAppear {
             // Initialize to current active space
             activeSpaceIndex = targetScrollPosition

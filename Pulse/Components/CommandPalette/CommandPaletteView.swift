@@ -9,13 +9,17 @@ import SwiftUI
 
 struct CommandPaletteView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var gradientColorManager: GradientColorManager
     @State private var searchManager = SearchManager()
+    @Environment(\.colorScheme) var colorScheme
 
     @FocusState private var isSearchFocused: Bool
     @State private var text: String = ""
     @State private var selectedSuggestionIndex: Int = -1
 
     var body: some View {
+        let isDark = colorScheme == .dark
+        
         ZStack {
             Color.black.opacity(0.2)
                 .ignoresSafeArea()
@@ -36,12 +40,13 @@ struct CommandPaletteView: View {
                                 systemName: isLikelyURL(text)
                                     ? "globe" : "magnifyingglass"
                             )
-                            .foregroundStyle(.secondary)
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(AppColors.textPrimary)
 
                             TextField("Search or enter address", text: $text)
                                 .textFieldStyle(.plain)
                                 .font(.system(size: 16, weight: .regular))
+                                .foregroundColor(AppColors.textPrimary)
                                 .focused($isSearchFocused)
                                 .onKeyPress(.return) {
                                     handleReturn()
@@ -63,42 +68,39 @@ struct CommandPaletteView: View {
                                 }
                         }
                         .padding(.vertical, 16)
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, 16)
 
                         // Separator
                         if !searchManager.suggestions.isEmpty {
                             RoundedRectangle(cornerRadius: 100)
-                                .fill(Color.white.opacity(0.1))
+                                .fill(Color.white.opacity(0.4))
                                 .frame(height: 1)
                                 .frame(maxWidth: .infinity)
                                 .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
                         }
 
                         // Suggestions - expand the box downward
                         if !searchManager.suggestions.isEmpty {
-                            LazyVStack(spacing: 2) {
-                                ForEach(
-                                    Array(
-                                        searchManager.suggestions.enumerated()
-                                    ),
-                                    id: \.element.id
-                                ) { index, suggestion in
-                                    suggestionRow(for: suggestion, isSelected: selectedSuggestionIndex == index)
-                                    .onTapGesture {
-                                        selectSuggestion(suggestion)
-                                    }
+                            let suggestions = searchManager.suggestions
+                            CommandPaletteSuggestionsListView(
+                                suggestions: suggestions,
+                                selectedIndex: $selectedSuggestionIndex,
+                                onSelect: { suggestion in
+                                    selectSuggestion(suggestion)
                                 }
-                            }
+                            )
                             .padding(.horizontal, 4)
                             .padding(.vertical, 4)
                         }
                     }
                     .frame(width: 600)
+                    .background(isDark ? Color.white.opacity(0.3) : Color.white.opacity(0.8))
                     .background(.thinMaterial)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(.white.opacity(0.2), lineWidth: 1)
+                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
                     )
                     .animation(.easeInOut(duration: 0.15), value: searchManager.suggestions.count)
                     .alignmentGuide(.top) { _ in -geometry.size.height / 2 }
@@ -115,6 +117,7 @@ struct CommandPaletteView: View {
             if newVisible {
                 searchManager.setTabManager(browserManager.tabManager)
                 searchManager.setHistoryManager(browserManager.historyManager)
+                searchManager.updateProfileContext()
                 
                 // Pre-fill text if provided and select all for easy replacement
                 text = browserManager.commandPalettePrefilledText
@@ -129,13 +132,80 @@ struct CommandPaletteView: View {
                 selectedSuggestionIndex = -1
             }
         }
+        // Keep search profile context updated while palette is open
+        .onChange(of: browserManager.currentProfile?.id) { _, _ in
+            if browserManager.isCommandPaletteVisible {
+                searchManager.updateProfileContext()
+                // Clear suggestions to avoid cross-profile residue
+                searchManager.clearSuggestions()
+            }
+        }
         .onKeyPress(.escape) {
             DispatchQueue.main.async {
                 browserManager.closeCommandPalette()
             }
             return .handled
         }
+        .onChange(of: searchManager.suggestions.count) { _, newCount in
+            if newCount == 0 {
+                selectedSuggestionIndex = -1
+            } else if selectedSuggestionIndex >= newCount {
+                selectedSuggestionIndex = -1
+            }
+        }
         .animation(.easeInOut(duration: 0.15), value: selectedSuggestionIndex)
+    }
+
+    private func isEmoji(_ string: String) -> Bool {
+        return string.unicodeScalars.contains { scalar in
+            (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF) ||
+            (scalar.value >= 0x2600 && scalar.value <= 0x26FF) ||
+            (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
+        }
+    }
+
+    // MARK: - Suggestions List Subview
+    private struct CommandPaletteSuggestionsListView: View {
+        @EnvironmentObject var gradientColorManager: GradientColorManager
+        let suggestions: [SearchManager.SearchSuggestion]
+        @Binding var selectedIndex: Int
+        let onSelect: (SearchManager.SearchSuggestion) -> Void
+
+        var body: some View {
+            LazyVStack(spacing: 2) {
+                ForEach(suggestions.indices, id: \.self) { index in
+                    let suggestion = suggestions[index]
+                    row(for: suggestion, isSelected: selectedIndex == index)
+                        .padding(8)
+                        .background(selectedIndex == index ? gradientColorManager.primaryColor : Color.clear)
+                        .cornerRadius(10)
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundStyle(AppColors.textPrimary)
+                        .contentShape(Rectangle())
+                        .onHover { hovering in
+                            withAnimation(.easeInOut(duration: 0.12)) {
+                                if hovering { selectedIndex = index }
+                                else if selectedIndex == index { selectedIndex = -1 }
+                            }
+                        }
+                        .onTapGesture { onSelect(suggestion) }
+                }
+            }
+        }
+
+        @ViewBuilder
+        private func row(for suggestion: SearchManager.SearchSuggestion, isSelected: Bool) -> some View {
+            switch suggestion.type {
+            case .tab(let tab):
+                TabSuggestionItem(tab: tab, isSelected: isSelected)
+            case .history(let entry):
+                HistorySuggestionItem(entry: entry, isSelected: isSelected)
+            case .url:
+                GenericSuggestionItem(icon: Image(systemName: "link"), text: suggestion.text, isSelected: isSelected)
+            case .search:
+                GenericSuggestionItem(icon: Image(systemName: "magnifyingglass"), text: suggestion.text, isSelected: isSelected)
+            }
+        }
     }
 
     private func handleReturn() {
@@ -215,12 +285,16 @@ struct CommandPaletteView: View {
         switch suggestion.type {
         case .tab(let tab):
             TabSuggestionItem(tab: tab, isSelected: isSelected)
+                .foregroundStyle(AppColors.textPrimary)
         case .history(let entry):
             HistorySuggestionItem(entry: entry, isSelected: isSelected)
+                .foregroundStyle(AppColors.textPrimary)
         case .url:
             GenericSuggestionItem(icon: Image(systemName: "link"), text: suggestion.text, isSelected: isSelected)
+                .foregroundStyle(AppColors.textPrimary)
         case .search:
             GenericSuggestionItem(icon: Image(systemName: "magnifyingglass"), text: suggestion.text, isSelected: isSelected)
+                .foregroundStyle(AppColors.textPrimary)
         }
     }
     

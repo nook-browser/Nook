@@ -20,13 +20,15 @@ public class Space: NSObject, Identifiable {
     var color: NSColor
     var gradient: SpaceGradient
     var activeTabId: UUID?
+    var profileId: UUID?
 
     init(
         id: UUID = UUID(),
         name: String,
         icon: String = "square.grid.2x2",
         color: NSColor = .controlAccentColor,
-        gradient: SpaceGradient = .default
+        gradient: SpaceGradient = .default,
+        profileId: UUID? = nil
     ) {
         self.id = id
         self.name = name
@@ -34,6 +36,7 @@ public class Space: NSObject, Identifiable {
         self.color = color
         self.gradient = gradient
         self.activeTabId = nil
+        self.profileId = profileId
         super.init()
     }
 }
