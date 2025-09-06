@@ -8,7 +8,7 @@ import AppKit
 struct GradientEditorView: View {
     @Binding var gradient: SpaceGradient
     @State private var selectedNodeID: UUID?
-    @EnvironmentObject var gradientTransitionManager: GradientTransitionManager
+    @EnvironmentObject var gradientColorManager: GradientColorManager
 
     // No throttling: update in real time
 
@@ -20,24 +20,22 @@ struct GradientEditorView: View {
                 applyColorSelection(color)
             }
 
-            // Opacity control for selected node
-            TransparencySlider(selectedNode: bindingSelectedNode()) { updated in
-                updateNode(updated)
-            }
+            // Global transparency for the whole gradient layer
+            TransparencySlider(gradient: $gradient)
         }
         .padding(16)
         .onAppear { if selectedNodeID == nil { selectedNodeID = gradient.nodes.first?.id } }
         .onChange(of: gradient) { newValue in
             // Scrubbing should be immediate to avoid animation token races
-            gradientTransitionManager.setImmediate(newValue)
+            gradientColorManager.setImmediate(newValue)
         }
         .onAppear {
             // Ensure background starts from the current draft gradient
-            gradientTransitionManager.setImmediate(gradient)
-            gradientTransitionManager.beginInteractivePreview()
+            gradientColorManager.setImmediate(gradient)
+            gradientColorManager.beginInteractivePreview()
         }
         .onDisappear {
-            gradientTransitionManager.endInteractivePreview()
+            gradientColorManager.endInteractivePreview()
         }
     }
 
@@ -82,13 +80,6 @@ struct GradientEditorView: View {
         let combined = NSColor(srgbRed: nr, green: ng, blue: nb, alpha: oldA)
         gradient.nodes[idx].colorHex = combined.toHexString(includeAlpha: true) ?? gradient.nodes[idx].colorHex
         #endif
-    }
-
-    private func updateNode(_ updated: GradientNode) {
-        guard let idx = gradient.nodes.firstIndex(where: { $0.id == updated.id }) else { return }
-        gradient.nodes[idx] = updated
-        // Live update when transparency slider changes
-        gradientTransitionManager.setImmediate(gradient)
     }
 
     // No bespoke hex helpers: rely on Color(hex:) and NSColor.toHexString

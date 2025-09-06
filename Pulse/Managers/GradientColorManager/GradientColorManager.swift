@@ -2,11 +2,18 @@ import Foundation
 import SwiftUI
 
 @MainActor
-final class GradientTransitionManager: ObservableObject {
+final class GradientColorManager: ObservableObject {
     @Published var displayGradient: SpaceGradient = .default
     @Published private(set) var isEditing: Bool = false
     @Published var isAnimating: Bool = false
     @Published var preferBarycentricDuringAnimation: Bool = false
+    // While editing, the node being dragged should be treated as the
+    // primary color (mapped to the top-left barycentric anchor).
+    // Views can set this to a node's UUID; clear when editing ends.
+    @Published var activePrimaryNodeID: UUID?
+    // Persisted primary node preference (used when not actively dragging).
+    // Points to the node that should map to the top-left anchor.
+    @Published var preferredPrimaryNodeID: UUID?
     private var animationToken: UUID?
 
     // MARK: - Immediate update (no animation)
@@ -25,6 +32,8 @@ final class GradientTransitionManager: ObservableObject {
 
     func endInteractivePreview() {
         isEditing = false
+        // Clear transient primary when editing ends
+        activePrimaryNodeID = nil
     }
 
     // MARK: - SwiftUI-driven transition
@@ -38,9 +47,12 @@ final class GradientTransitionManager: ObservableObject {
         // Flip on lightweight mode for renderers
         isAnimating = true
 
-        // Prefer barycentric shader during animation if both ends are tri-color
-        if let from { self.preferBarycentricDuringAnimation = (from.nodes.count == 3 && to.nodes.count == 3) }
-        else { self.preferBarycentricDuringAnimation = (to.nodes.count == 3) }
+        // Prefer barycentric shader during animation if both ends are 1–3 colors
+        if let from {
+            self.preferBarycentricDuringAnimation = (from.nodes.count <= 3 && to.nodes.count <= 3)
+        } else {
+            self.preferBarycentricDuringAnimation = (to.nodes.count <= 3)
+        }
 
         // If a specific starting gradient is provided, snap to it without animation first
         if let from {
@@ -74,5 +86,17 @@ final class GradientTransitionManager: ObservableObject {
                 self.preferBarycentricDuringAnimation = false
             }
         }
+    }
+}
+
+extension GradientColorManager {
+    // Space-specific accent color derived from the currently displayed gradient.
+    // Views can access this via `@EnvironmentObject var gradientColorManager`.
+    var primaryColor: Color {
+        if let pid = activePrimaryNodeID ?? preferredPrimaryNodeID,
+           let node = displayGradient.nodes.first(where: { $0.id == pid }) {
+            return Color(hex: node.colorHex)
+        }
+        return displayGradient.primaryColor
     }
 }

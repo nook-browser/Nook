@@ -15,6 +15,8 @@ class SettingsManager {
     private let searchEngineKey = "settings.searchEngine"
     private let liquidGlassKey = "settings.isLiquidGlassEnabled"
     private let tabUnloadTimeoutKey = "settings.tabUnloadTimeout"
+    private let blockXSTKey = "settings.blockCrossSiteTracking"
+    var currentSettingsTab: SettingsTabs = .general
 
     // Stored properties
     var isLiquidGlassEnabled: Bool {
@@ -51,6 +53,13 @@ class SettingsManager {
         }
     }
 
+    var blockCrossSiteTracking: Bool {
+        didSet {
+            userDefaults.set(blockCrossSiteTracking, forKey: blockXSTKey)
+            NotificationCenter.default.post(name: .blockCrossSiteTrackingChanged, object: nil, userInfo: ["enabled": blockCrossSiteTracking])
+        }
+    }
+
     init() {
         // Register default values
         userDefaults.register(defaults: [
@@ -58,7 +67,8 @@ class SettingsManager {
             liquidGlassKey: false,
             searchEngineKey: SearchProvider.google.rawValue,
             // Default tab unload timeout: 60 minutes
-            tabUnloadTimeoutKey: 3600.0
+            tabUnloadTimeoutKey: 3600.0,
+            blockXSTKey: false
         ])
 
         // Initialize properties from UserDefaults
@@ -77,10 +87,12 @@ class SettingsManager {
         
         // Initialize tab unload timeout
         self.tabUnloadTimeout = userDefaults.double(forKey: tabUnloadTimeoutKey)
+        self.blockCrossSiteTracking = userDefaults.bool(forKey: blockXSTKey)
     }
 }
 
 // MARK: - Notification Names
 extension Notification.Name {
     static let tabUnloadTimeoutChanged = Notification.Name("tabUnloadTimeoutChanged")
+    static let blockCrossSiteTrackingChanged = Notification.Name("blockCrossSiteTrackingChanged")
 }

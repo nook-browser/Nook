@@ -34,27 +34,13 @@ struct TabSuggestionItem: View {
                     .foregroundStyle(.white.opacity(0.5))
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 5)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
-        .background(backgroundColor)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovered = hovering
             }
         }
     }
-    
-    private var backgroundColor: Color {
-        if isSelected {
-            return Color.white.opacity(0.25)
-        } else if isHovered {
-            return Color.white.opacity(0.15)
-        } else {
-            return Color.clear
-        }
-    }
 }
-
-

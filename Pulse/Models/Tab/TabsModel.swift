@@ -17,6 +17,8 @@ final class TabEntity {
     var isSpacePinned: Bool = false // Space-level pinned
     var index: Int
     var spaceId: UUID?
+    // Profile association for global pinned tabs (essentials). Optional for migration compatibility.
+    var profileId: UUID?
 
     init(
         id: UUID,
@@ -25,7 +27,8 @@ final class TabEntity {
         isPinned: Bool,
         isSpacePinned: Bool = false,
         index: Int,
-        spaceId: UUID?
+        spaceId: UUID?,
+        profileId: UUID? = nil
     ) {
         self.id = id
         self.urlString = urlString
@@ -34,6 +37,7 @@ final class TabEntity {
         self.isSpacePinned = isSpacePinned
         self.index = index
         self.spaceId = spaceId
+        self.profileId = profileId
     }
 }
 
