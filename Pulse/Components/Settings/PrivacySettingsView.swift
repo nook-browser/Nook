@@ -140,16 +140,19 @@ struct PrivacySettingsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Privacy Controls")
                     .font(.headline)
-                
+
                 VStack(alignment: .leading, spacing: 8) {
+                    // Activated: Block cross‑site tracking via content rules + iframe cookie shim
+                    Toggle("Block Cross-Site Tracking", isOn: $browserManager.settingsManager.blockCrossSiteTracking)
+                        .onChange(of: browserManager.settingsManager.blockCrossSiteTracking) { enabled in
+                            browserManager.trackingProtectionManager.setEnabled(enabled)
+                        }
+
+                    // Placeholders for future refinements
                     Toggle("Block Third-Party Cookies", isOn: .constant(false))
-                        .disabled(true) // TODO: Implement
-                    
-                    Toggle("Block Cross-Site Tracking", isOn: .constant(false))
-                        .disabled(true) // TODO: Implement
-                    
-                    Toggle("Prevent Cross-Site Tracking", isOn: .constant(false))
-                        .disabled(true) // TODO: Implement
+                        .disabled(true)
+                    Toggle("Prevent Cross-Site Tracking (ITP)", isOn: .constant(false))
+                        .disabled(true)
                 }
                 .padding()
                 .background(Color(NSColor.controlBackgroundColor))

@@ -14,17 +14,26 @@ import Observation
 class HistoryManager {
     private let context: ModelContext
     private let maxHistoryDays: Int = 100
+    // Current profile context for filtering and assignment
+    var currentProfileId: UUID?
     
-    init(context: ModelContext) {
+    init(context: ModelContext, profileId: UUID? = nil) {
         self.context = context
+        self.currentProfileId = profileId
         Task {
             await cleanupOldHistory()
         }
     }
+
+    // MARK: - Profile Switching
+    func switchProfile(_ profileId: UUID?) {
+        self.currentProfileId = profileId
+        print("🔁 [HistoryManager] Switched to profile: \(profileId?.uuidString ?? "nil")")
+    }
     
     // MARK: - Public Methods
     
-    func addVisit(url: URL, title: String, timestamp: Date = Date(), tabId: UUID?) {
+    func addVisit(url: URL, title: String, timestamp: Date = Date(), tabId: UUID?, profileId: UUID? = nil) {
         // Skip non-web URLs
         guard url.scheme == "http" || url.scheme == "https" else { return }
         
@@ -37,15 +46,25 @@ class HistoryManager {
         do {
             // Check if we already have this URL
             let urlString = url.absoluteString
-            let predicate = #Predicate<HistoryEntity> { $0.url == urlString }
-            let existing = try context.fetch(FetchDescriptor<HistoryEntity>(predicate: predicate))
+            // Prefer a simple fetch filtered in-memory to avoid complex SwiftData predicate issues.
+            let existingAll = try context.fetch(FetchDescriptor<HistoryEntity>())
+            let existing = existingAll.filter { $0.url == urlString }
+            let targetProfileId = profileId ?? currentProfileId
             
-            if let existingEntry = existing.first {
+            // Prefer same-profile entry; otherwise, only fallback to a nil-profile entry (do NOT merge across other profiles)
+            let existingEntrySameProfile = existing.first(where: { $0.profileId == targetProfileId })
+            let existingEntryNilProfile = existing.first(where: { $0.profileId == nil })
+            let existingEntry = existingEntrySameProfile ?? existingEntryNilProfile
+
+            if let existingEntry = existingEntry {
                 // Update existing entry
                 existingEntry.visitCount += 1
                 existingEntry.lastVisited = timestamp
                 existingEntry.title = title.isEmpty ? existingEntry.title : title
                 existingEntry.tabId = tabId
+                if existingEntry.profileId == nil {
+                    existingEntry.profileId = targetProfileId
+                }
             } else {
                 // Create new entry
                 let newEntry = HistoryEntity(
@@ -54,7 +73,8 @@ class HistoryManager {
                     visitDate: timestamp,
                     tabId: tabId,
                     visitCount: 1,
-                    lastVisited: timestamp
+                    lastVisited: timestamp,
+                    profileId: targetProfileId
                 )
                 context.insert(newEntry)
             }
@@ -72,22 +92,28 @@ class HistoryManager {
     func getHistory(days: Int = 7, page: Int = 0, pageSize: Int = 50) -> (entries: [HistoryEntry], hasMore: Bool) {
         do {
             let cutoffDate = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
-            let predicate = #Predicate<HistoryEntity> { $0.lastVisited >= cutoffDate }
-            
-            // First get total count
-            let countDescriptor = FetchDescriptor<HistoryEntity>(predicate: predicate)
+            let profileFilter = currentProfileId
+            // Fetch by date only; apply profile filtering in-memory for stability
+            let basePredicate = #Predicate<HistoryEntity> { e in e.lastVisited >= cutoffDate }
+            // First get total count by date
+            let countDescriptor = FetchDescriptor<HistoryEntity>(predicate: basePredicate)
             let totalCount = (try? context.fetchCount(countDescriptor)) ?? 0
-            
-            // Then get paginated results
+            // Then get paginated results by date, sorted by recency
             var descriptor = FetchDescriptor<HistoryEntity>(
-                predicate: predicate,
+                predicate: basePredicate,
                 sortBy: [SortDescriptor(\.lastVisited, order: .reverse)]
             )
             descriptor.fetchLimit = pageSize
             descriptor.fetchOffset = page * pageSize
             
             let entities = try context.fetch(descriptor)
-            let entries = entities.map { HistoryEntry(from: $0) }
+            let filteredByProfile: [HistoryEntity]
+            if let pf = profileFilter {
+                filteredByProfile = entities.filter { $0.profileId == pf || $0.profileId == nil }
+            } else {
+                filteredByProfile = entities
+            }
+            let entries = filteredByProfile.map { HistoryEntry(from: $0) }
             let hasMore = (page + 1) * pageSize < totalCount
             
             return (entries: entries, hasMore: hasMore)
@@ -107,6 +133,7 @@ class HistoryManager {
         do {
             // For search, we need to fetch more than needed and filter in memory
             // This is a limitation of SwiftData's predicate system for complex text searches
+            let profileFilter = currentProfileId
             var descriptor = FetchDescriptor<HistoryEntity>(
                 sortBy: [SortDescriptor(\.lastVisited, order: .reverse)]
             )
@@ -114,9 +141,13 @@ class HistoryManager {
             descriptor.fetchLimit = min(5000, maxResults)
             
             let entities = try context.fetch(descriptor)
+            // Apply text filtering and profile filtering
             let filteredEntities = entities.filter { entity in
                 entity.title.localizedCaseInsensitiveContains(query) ||
                 entity.url.localizedCaseInsensitiveContains(query)
+            }.filter { entity in
+                guard let pf = profileFilter else { return true }
+                return entity.profileId == pf || entity.profileId == nil
             }
             
             // Apply pagination to filtered results
@@ -141,6 +172,7 @@ class HistoryManager {
     
     func getMostVisited(limit: Int = 10) -> [HistoryEntry] {
         do {
+            let profileFilter = currentProfileId
             var descriptor = FetchDescriptor<HistoryEntity>(
                 sortBy: [
                     SortDescriptor(\.visitCount, order: .reverse),
@@ -149,7 +181,10 @@ class HistoryManager {
             )
             descriptor.fetchLimit = limit
             
-            let entities = try context.fetch(descriptor)
+            let entities = try context.fetch(descriptor).filter { entity in
+                guard let pf = profileFilter else { return true }
+                return entity.profileId == pf || entity.profileId == nil
+            }
             return entities.map { HistoryEntry(from: $0) }
         } catch {
             print("Error fetching most visited: \(error)")
@@ -157,19 +192,27 @@ class HistoryManager {
         }
     }
     
-    func clearHistory(olderThan days: Int = 0) {
+    func clearHistory(olderThan days: Int = 0, profileId: UUID? = nil) {
         do {
             let cutoffDate = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
-            let predicate = #Predicate<HistoryEntity> { $0.visitDate < cutoffDate }
-            let descriptor = FetchDescriptor<HistoryEntity>(predicate: predicate)
-            
-            let entitiesToDelete = try context.fetch(descriptor)
+            let pf = profileId ?? currentProfileId
+            // Fetch by date only; profile filtering in-memory for stability
+            let datePredicate = #Predicate<HistoryEntity> { e in e.visitDate < cutoffDate }
+            let descriptor = FetchDescriptor<HistoryEntity>(predicate: datePredicate)
+            var entitiesToDelete = try context.fetch(descriptor)
+            if let p = pf {
+                entitiesToDelete = entitiesToDelete.filter { $0.profileId == p }
+            }
             for entity in entitiesToDelete {
                 context.delete(entity)
             }
             
             try context.save()
-            print("Cleared \(entitiesToDelete.count) history entries older than \(days) days")
+            if let p = pf {
+                print("Cleared \(entitiesToDelete.count) history entries older than \(days) days for profile=\(p.uuidString)")
+            } else {
+                print("Cleared \(entitiesToDelete.count) history entries older than \(days) days (all profiles)")
+            }
         } catch {
             print("Error clearing history: \(error)")
         }
@@ -177,7 +220,8 @@ class HistoryManager {
     
     func deleteHistoryEntry(_ entryId: UUID) {
         do {
-            let predicate = #Predicate<HistoryEntity> { $0.id == entryId }
+            let eid = entryId
+            let predicate = #Predicate<HistoryEntity> { e in e.id == eid }
             let descriptor = FetchDescriptor<HistoryEntity>(predicate: predicate)
             
             if let entity = try context.fetch(descriptor).first {
@@ -193,6 +237,22 @@ class HistoryManager {
     
     private func cleanupOldHistory() async {
         clearHistory(olderThan: maxHistoryDays)
+    }
+
+    // MARK: - Stats
+    func getHistoryStats(for profileId: UUID?) -> (count: Int, uniqueHosts: Int) {
+        do {
+            let pf = profileId ?? currentProfileId
+            let entities = try context.fetch(FetchDescriptor<HistoryEntity>()).filter { entity in
+                guard let p = pf else { return true }
+                return entity.profileId == p || entity.profileId == nil
+            }
+            let hosts: Set<String> = Set(entities.compactMap { URL(string: $0.url)?.host })
+            return (count: entities.count, uniqueHosts: hosts.count)
+        } catch {
+            print("Error computing history stats: \(error)")
+            return (0, 0)
+        }
     }
 }
 

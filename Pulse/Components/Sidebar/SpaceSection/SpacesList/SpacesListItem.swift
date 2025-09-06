@@ -9,6 +9,8 @@ import SwiftUI
 struct SpacesListItem: View {
     @EnvironmentObject var browserManager: BrowserManager
     var space: Space
+    var isActive: Bool
+    var compact: Bool
     @State private var isHovering: Bool = false
     @State private var selectedEmoji: String = ""
     @FocusState private var emojiFieldFocused: Bool
@@ -17,32 +19,48 @@ struct SpacesListItem: View {
         browserManager.tabManager.currentSpace?.id
     }
     
+    private var cellSize: CGFloat { compact && !isActive ? 16 : 24 }
+    private let dotVisualSize: CGFloat = 6
+    private let cornerRadius: CGFloat = 6
+    
     var body: some View {
         Button {
             browserManager.tabManager.setActiveSpace(space)
         } label: {
-            if isEmoji(space.icon) {
-                Text(space.icon)
-                    .font(.system(size: 14))
-                    .padding(4)
-            } else {
-                Image(systemName: space.icon)
-                    .font(.system(size: 14))
-                    .foregroundStyle(AppColors.textSecondary)
-                    .padding(4)
-                    .contentTransition(.symbolEffect(.replace.upUp.byLayer, options: .nonRepeating))
+            ZStack {
+                if compact && !isActive {
+                    Circle()
+                        .fill(AppColors.textTertiary)
+                        .frame(width: dotVisualSize, height: dotVisualSize)
+                } else {
+                    if isEmoji(space.icon) {
+                        // Fixed inner content size to avoid glyph cropping
+                        Text(space.icon)
+                            .font(.system(size: 14))
+                            .frame(width: 20, height: 20)
+                    } else {
+                        Image(systemName: space.icon)
+                            .font(.system(size: 14))
+                            .foregroundStyle(AppColors.textSecondary)
+                            .frame(width: 20, height: 20)
+                            .contentTransition(.symbolEffect(.replace.upUp.byLayer, options: .nonRepeating))
+                    }
+                }
             }
+            .frame(width: cellSize, height: cellSize)
+            .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
         }
         .buttonStyle(.plain)
         .background(
-            RoundedRectangle(cornerRadius: 6)
+            RoundedRectangle(cornerRadius: cornerRadius)
                 .fill(isHovering ? AppColors.controlBackgroundHover : Color.clear)
-                .frame(width: 24, height: 24)
-                .animation(.easeInOut(duration: 0.15), value: isHovering)
         )
+        .frame(width: cellSize, height: cellSize)
+        .layoutPriority(isActive ? 1 : 0)
         .onHover { hovering in
             isHovering = hovering
         }
+        // Removed profile badge overlay to reduce UI noise
         .overlay(
             // Hidden TextField for capturing emoji selection
             TextField("", text: $selectedEmoji)
@@ -58,6 +76,20 @@ struct SpacesListItem: View {
                 }
         )
         .contextMenu {
+            // Profile assignment
+            let currentName = resolvedProfileName(for: space.profileId) ?? "None"
+            Text("Current Profile: \(currentName)")
+                .foregroundStyle(.secondary)
+            Divider()
+            ProfilePickerView(
+                selectedProfileId: Binding(get: { space.profileId }, set: { assignProfile($0) }),
+                onSelect: { _ in },
+                compact: true,
+                showNoneOption: true
+            )
+            .environmentObject(browserManager)
+
+            Divider()
             Button("Change Icon...") {
                 emojiFieldFocused = true
                 NSApp.orderFrontCharacterPalette(nil)
@@ -79,5 +111,14 @@ struct SpacesListItem: View {
             (scalar.value >= 0x2600 && scalar.value <= 0x26FF) ||
             (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
         }
+    }
+
+    private func assignProfile(_ id: UUID?) {
+        browserManager.tabManager.assign(spaceId: space.id, toProfile: id)
+    }
+
+    private func resolvedProfileName(for id: UUID?) -> String? {
+        guard let id else { return nil }
+        return browserManager.profileManager.profiles.first(where: { $0.id == id })?.name
     }
 }

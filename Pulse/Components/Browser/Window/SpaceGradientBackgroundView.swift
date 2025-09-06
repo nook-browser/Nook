@@ -6,24 +6,25 @@ import CoreGraphics
 // Renders the current space's gradient as a bottom background layer
 struct SpaceGradientBackgroundView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var gradientTransitionManager: GradientTransitionManager
+    @EnvironmentObject var gradientColorManager: GradientColorManager
 
     private var gradient: SpaceGradient {
-        gradientTransitionManager.displayGradient
+        gradientColorManager.displayGradient
     }
 
     var body: some View {
         ZStack {
-            let useTriShader: Bool = gradientTransitionManager.isAnimating ? gradientTransitionManager.preferBarycentricDuringAnimation : (gradient.nodes.count == 3)
-            if useTriShader {
-                // GPU barycentric blend for tri-color gradients
-                BarycentricTriGradientView(gradient: gradient)
+            let useShader: Bool = gradientColorManager.isAnimating ? gradientColorManager.preferBarycentricDuringAnimation : (gradient.nodes.count <= 3)
+            if useShader {
+                // GPU barycentric blend for 1–3 color gradients with smooth transitions
+                BarycentricGradientView(gradient: gradient)
             } else {
                 // Properly dithered gradient image respecting current displayGradient
                 // While animating, DitheredGradientView will show a lightweight gradient.
                 DitheredGradientView(gradient: gradient)
             }
         }
+        .opacity(max(0.0, min(1.0, gradient.opacity)))
         .allowsHitTesting(false) // Entire background should not intercept input
     }
 
