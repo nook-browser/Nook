@@ -21,6 +21,7 @@ struct SpaceView: View {
     let onMoveTabUp: (Tab) -> Void
     let onMoveTabDown: (Tab) -> Void
     let onMuteTab: (Tab) -> Void
+    @EnvironmentObject var splitManager: SplitViewManager
     
     // Get tabs directly from TabManager to ensure proper observation
     private var tabs: [Tab] {
@@ -109,38 +110,98 @@ struct SpaceView: View {
                     VStack(spacing: 2) {
                         if !tabs.isEmpty {
                             VStack(spacing: 2) {
-                                ForEach(tabs, id: \.id) { tab in
-                                    SpaceTab(
-                                        tab: tab,
-                                        action: { onActivateTab(tab) },
-                                        onClose: { onCloseTab(tab) },
-                                        onMute: { onMuteTab(tab) }
-                                    )
-                                    .transition(.move(edge: .top).combined(with: .opacity))
-                                    .contextMenu {
-                                        Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right) } label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
-                                        Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left) } label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
-                                        Divider()
-                                        Button { onMoveTabUp(tab) } label: { Label("Move Up", systemImage: "arrow.up") }
-                                        .disabled(isFirstTab(tab))
-                                        Button { onMoveTabDown(tab) } label: { Label("Move Down", systemImage: "arrow.down") }
-                                        .disabled(isLastTab(tab))
-                                        Divider()
-                                        Button { browserManager.tabManager.pinTabToSpace(tab, spaceId: space.id) } label: { Label("Pin to Space", systemImage: "pin") }
-                                        Button { onPinTab(tab) } label: { Label("Pin Globally", systemImage: "pin.circle") }
-                                        Button { onCloseTab(tab) } label: { Label("Close tab", systemImage: "xmark") }
+                                let split = splitManager
+                                if split.isSplit,
+                                   let leftId = split.leftTabId, let rightId = split.rightTabId,
+                                   let leftIdx = tabs.firstIndex(where: { $0.id == leftId }),
+                                   let rightIdx = tabs.firstIndex(where: { $0.id == rightId })
+                                {
+                                    let firstIdx = min(leftIdx, rightIdx)
+                                    let secondIdx = max(leftIdx, rightIdx)
+                                    ForEach(Array(tabs.enumerated()), id: \.element.id) { pair in
+                                        let (idx, tab) = pair
+                                        if idx == firstIdx {
+                                            let left = tabs[leftIdx]
+                                            let right = tabs[rightIdx]
+                                            SplitTabRow(
+                                                left: left,
+                                                right: right,
+                                                spaceId: space.id,
+                                                draggedItem: $draggedItem,
+                                                onActivate: onActivateTab,
+                                                onClose: onCloseTab
+                                            )
+                                            .environmentObject(browserManager)
+                                        } else if idx == secondIdx {
+                                            EmptyView()
+                                        } else {
+                                            SpaceTab(
+                                                tab: tab,
+                                                action: { onActivateTab(tab) },
+                                                onClose: { onCloseTab(tab) },
+                                                onMute: { onMuteTab(tab) }
+                                            )
+                                            .transition(.move(edge: .top).combined(with: .opacity))
+                                            .contextMenu {
+                                                Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right) } label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
+                                                Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left) } label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
+                                                Divider()
+                                                Button { onMoveTabUp(tab) } label: { Label("Move Up", systemImage: "arrow.up") }
+                                                .disabled(isFirstTab(tab))
+                                                Button { onMoveTabDown(tab) } label: { Label("Move Down", systemImage: "arrow.down") }
+                                                .disabled(isLastTab(tab))
+                                                Divider()
+                                                Button { browserManager.tabManager.pinTabToSpace(tab, spaceId: space.id) } label: { Label("Pin to Space", systemImage: "pin") }
+                                                Button { onPinTab(tab) } label: { Label("Pin Globally", systemImage: "pin.circle") }
+                                                Button { onCloseTab(tab) } label: { Label("Close tab", systemImage: "xmark") }
+                                            }
+                                            .onTabDrag(tab.id, draggedItem: $draggedItem)
+                                            .opacity(draggedItem == tab.id ? 0.0 : 1.0)
+                                            .onDrop(
+                                                of: [.text],
+                                                delegate: SidebarTabDropDelegateSimple(
+                                                    item: tab,
+                                                    draggedItem: $draggedItem,
+                                                    targetSection: .spaceRegular(space.id),
+                                                    tabManager: browserManager.tabManager
+                                                )
+                                            )
+                                        }
                                     }
-                                    .onTabDrag(tab.id, draggedItem: $draggedItem)
-                                    .opacity(draggedItem == tab.id ? 0.0 : 1.0)
-                                    .onDrop(
-                                        of: [.text],
-                                        delegate: SidebarTabDropDelegateSimple(
-                                            item: tab,
-                                            draggedItem: $draggedItem,
-                                            targetSection: .spaceRegular(space.id),
-                                            tabManager: browserManager.tabManager
+                                } else {
+                                    ForEach(tabs, id: \.id) { tab in
+                                        SpaceTab(
+                                            tab: tab,
+                                            action: { onActivateTab(tab) },
+                                            onClose: { onCloseTab(tab) },
+                                            onMute: { onMuteTab(tab) }
                                         )
-                                    )
+                                        .transition(.move(edge: .top).combined(with: .opacity))
+                                        .contextMenu {
+                                            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right) } label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
+                                            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left) } label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
+                                            Divider()
+                                            Button { onMoveTabUp(tab) } label: { Label("Move Up", systemImage: "arrow.up") }
+                                            .disabled(isFirstTab(tab))
+                                            Button { onMoveTabDown(tab) } label: { Label("Move Down", systemImage: "arrow.down") }
+                                            .disabled(isLastTab(tab))
+                                            Divider()
+                                            Button { browserManager.tabManager.pinTabToSpace(tab, spaceId: space.id) } label: { Label("Pin to Space", systemImage: "pin") }
+                                            Button { onPinTab(tab) } label: { Label("Pin Globally", systemImage: "pin.circle") }
+                                            Button { onCloseTab(tab) } label: { Label("Close tab", systemImage: "xmark") }
+                                        }
+                                        .onTabDrag(tab.id, draggedItem: $draggedItem)
+                                        .opacity(draggedItem == tab.id ? 0.0 : 1.0)
+                                        .onDrop(
+                                            of: [.text],
+                                            delegate: SidebarTabDropDelegateSimple(
+                                                item: tab,
+                                                draggedItem: $draggedItem,
+                                                targetSection: .spaceRegular(space.id),
+                                                tabManager: browserManager.tabManager
+                                            )
+                                        )
+                                    }
                                 }
                             }
                             .contentShape(Rectangle())
@@ -178,6 +239,9 @@ struct SpaceView: View {
             .contentShape(Rectangle())
             // Avoid window-drag gestures in the sidebar content area
             .scrollTargetLayout()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .tabDragDidEnd)) { _ in
+            draggedItem = nil
         }
         
         func isFirstTab(_ tab: Tab) -> Bool {
