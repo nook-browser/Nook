@@ -182,17 +182,19 @@ class TabCompositorManager: ObservableObject {
         let leftId = split.leftTabId
         let rightId = split.rightTabId
 
-        for subview in containerView.subviews {
-            if let webView = subview as? WKWebView {
-                // Find the tab for this webview
-                if let tab = findTabByWebView(webView) {
-                    if split.isSplit {
-                        // In split mode show both panes; hide others
-                        webView.isHidden = !(tab.id == leftId || tab.id == rightId)
-                    } else {
-                        // Simple visibility: hide inactive tabs for performance
-                        webView.isHidden = tab.id != currentTabId
-                    }
+        func enumerateWebViews(in view: NSView, handler: (WKWebView) -> Void) {
+            for s in view.subviews {
+                if let w = s as? WKWebView { handler(w) }
+                else { enumerateWebViews(in: s, handler: handler) }
+            }
+        }
+
+        enumerateWebViews(in: containerView) { webView in
+            if let tab = findTabByWebView(webView) {
+                if split.isSplit {
+                    webView.isHidden = !(tab.id == leftId || tab.id == rightId)
+                } else {
+                    webView.isHidden = tab.id != currentTabId
                 }
             }
         }
