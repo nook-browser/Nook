@@ -70,6 +70,7 @@ struct WindowView: View {
         }
         .environmentObject(browserManager)
         .environmentObject(browserManager.gradientColorManager)
+        .environmentObject(browserManager.splitManager)
     }
 
 }

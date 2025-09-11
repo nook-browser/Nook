@@ -278,7 +278,8 @@ public class Tab: NSObject, Identifiable, ObservableObject {
             }
         }
 
-        _webView = WKWebView(frame: .zero, configuration: configuration)
+        _webView = FocusableWKWebView(frame: .zero, configuration: configuration)
+        if let fv = _webView as? FocusableWKWebView { fv.owningTab = self }
         _webView?.navigationDelegate = self
         _webView?.uiDelegate = self
         _webView?.allowsBackForwardNavigationGestures = true

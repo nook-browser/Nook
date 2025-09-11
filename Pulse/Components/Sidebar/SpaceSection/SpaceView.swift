@@ -55,6 +55,9 @@ struct SpaceView: View {
                             )
                             .transition(.move(edge: .top).combined(with: .opacity))
                             .contextMenu {
+                                Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right) } label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
+                                Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left) } label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
+                                Divider()
                                 Button { browserManager.tabManager.unpinTabFromSpace(tab) } label: { Label("Unpin from Space", systemImage: "pin.slash") }
                                 Button { onPinTab(tab) } label: { Label("Pin Globally", systemImage: "pin.circle") }
                                 Divider()
@@ -115,6 +118,9 @@ struct SpaceView: View {
                                     )
                                     .transition(.move(edge: .top).combined(with: .opacity))
                                     .contextMenu {
+                                        Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right) } label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
+                                        Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left) } label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
+                                        Divider()
                                         Button { onMoveTabUp(tab) } label: { Label("Move Up", systemImage: "arrow.up") }
                                         .disabled(isFirstTab(tab))
                                         Button { onMoveTabDown(tab) } label: { Label("Move Down", systemImage: "arrow.down") }
