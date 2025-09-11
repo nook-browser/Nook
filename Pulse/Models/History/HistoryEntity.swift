@@ -17,6 +17,8 @@ class HistoryEntity {
     var tabId: UUID?
     var visitCount: Int
     var lastVisited: Date
+    // Optional profile association for backward compatibility during migration
+    var profileId: UUID?
     
     init(
         id: UUID = UUID(),
@@ -25,7 +27,8 @@ class HistoryEntity {
         visitDate: Date = Date(),
         tabId: UUID? = nil,
         visitCount: Int = 1,
-        lastVisited: Date = Date()
+        lastVisited: Date = Date(),
+        profileId: UUID? = nil
     ) {
         self.id = id
         self.url = url
@@ -34,5 +37,6 @@ class HistoryEntity {
         self.tabId = tabId
         self.visitCount = visitCount
         self.lastVisited = lastVisited
+        self.profileId = profileId
     }
 }

@@ -242,9 +242,10 @@ func generateDitheredGradient(gradient: SpaceGradient, size: CGSize, allowDither
         let cC = rgba(sorted[2].colorHex)
 
         // Anchor points (normalized 0..1)
-        let pA = SIMD2<Double>(0.08, 0.50)
-        let pB = SIMD2<Double>(0.92, 0.25)
-        let pC = SIMD2<Double>(0.92, 0.75)
+        let inset: Double = 0.08 // controls lobe size by moving anchors inward
+        let pA = SIMD2<Double>(inset, inset)            // top-left
+        let pB = SIMD2<Double>(1.0 - inset, inset)      // top-right
+        let pC = SIMD2<Double>(0.5, 1.0 - inset)        // bottom-center
 
         // Precompute for barycentric
         let v0 = pB - pA

@@ -18,6 +18,7 @@ class SearchManager {
     private var searchTask: URLSessionDataTask?
     private weak var tabManager: TabManager?
     private weak var historyManager: HistoryManager?
+    private var currentProfileId: UUID?
     
     struct SearchSuggestion: Identifiable, Equatable {
         let id = UUID()
@@ -47,10 +48,22 @@ class SearchManager {
     
     func setTabManager(_ tabManager: TabManager?) {
         self.tabManager = tabManager
+        // Hop to MainActor to update profile context safely
+        Task { @MainActor in
+            self.updateProfileContext()
+        }
     }
     
     func setHistoryManager(_ historyManager: HistoryManager?) {
         self.historyManager = historyManager
+    }
+
+    @MainActor func updateProfileContext() {
+        let pid = tabManager?.browserManager?.currentProfile?.id
+        currentProfileId = pid
+        #if DEBUG
+        if let pid { print("🔎 [SearchManager] Profile context updated: \(pid.uuidString)") }
+        #endif
     }
     
     @MainActor func searchSuggestions(for query: String) {
@@ -105,9 +118,8 @@ class SearchManager {
         
         let lowercaseQuery = query.lowercased()
         var matchingTabs: [SearchSuggestion] = []
-        
-        // Access tabs directly using proper types
-        let allTabs = tabManager.pinnedTabs + tabManager.tabs
+        // Use TabManager's profile-aware access (handles fallback internally)
+        let allTabs: [Tab] = tabManager.allTabsForCurrentProfile()
         
         for tab in allTabs {
             let nameMatch = tab.name.lowercased().contains(lowercaseQuery)
