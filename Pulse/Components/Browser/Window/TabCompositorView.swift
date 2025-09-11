@@ -178,13 +178,21 @@ class TabCompositorManager: ObservableObject {
         guard let browserManager = browserManager,
               let containerView = browserManager.compositorContainerView else { return }
         
+        let split = browserManager.splitManager
+        let leftId = split.leftTabId
+        let rightId = split.rightTabId
+
         for subview in containerView.subviews {
             if let webView = subview as? WKWebView {
                 // Find the tab for this webview
                 if let tab = findTabByWebView(webView) {
-                    // Simple visibility: hide inactive tabs for performance
-                    // Media should continue playing even when hidden (no more forced pause)
-                    webView.isHidden = tab.id != currentTabId
+                    if split.isSplit {
+                        // In split mode show both panes; hide others
+                        webView.isHidden = !(tab.id == leftId || tab.id == rightId)
+                    } else {
+                        // Simple visibility: hide inactive tabs for performance
+                        webView.isHidden = tab.id != currentTabId
+                    }
                 }
             }
         }
