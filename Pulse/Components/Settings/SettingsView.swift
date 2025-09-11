@@ -8,118 +8,98 @@
 import AppKit
 import SwiftUI
 
-// MARK: - Settings Root
+// MARK: - Settings Root (Native macOS Settings)
 struct SettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var gradientColorManager: GradientColorManager
 
     var body: some View {
-        ZStack {
-            // Ambient background using the current space gradient
-            SpaceGradientBackgroundView()
-                .environmentObject(browserManager)
-                .environmentObject(gradientColorManager)
-                .overlay(.ultraThinMaterial)
-                .ignoresSafeArea()
+        TabView(selection: $browserManager.settingsManager.currentSettingsTab) {
+            SettingsPane {
+                GeneralSettingsView()
+            }
+                .tag(SettingsTabs.general)
 
-            VStack(spacing: 16) {
-                // Top bar with title and horizontal tabs
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 8) {
-                        Text("Pulse")
-                            .font(.system(size: 24, weight: .semibold))
-                        Text("Settings")
-                            .foregroundStyle(.secondary)
-                            .font(.system(size: 24, weight: .semibold))
-                        Spacer()
-                    }
-                    SettingsTabStrip(selection: $browserManager.settingsManager.currentSettingsTab)
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
+            SettingsPane {
+                PrivacySettingsView()
+            }
+                .tag(SettingsTabs.privacy)
 
-                // Content area
-                Group {
-                    switch browserManager.settingsManager.currentSettingsTab {
-                    case .general:
-                        GeneralSettingsView()
-                    case .privacy:
-                        PrivacySettingsView()
-                    case .spaces:
-                        SpacesSettingsView()
-                    case .profiles:
-                        ProfilesSettingsView()
-                    case .shortcuts:
-                        ShortcutsSettingsView()
-                    case .extensions:
-                        ExtensionsSettingsView()
-                    case .advanced:
-                        AdvancedSettingsView()
+            SettingsPane {
+                ProfilesSettingsView()
+            }
+                .tag(SettingsTabs.profiles)
+
+            SettingsPane {
+                SpacesSettingsView()
+            }
+                .tag(SettingsTabs.spaces)
+
+            SettingsPane {
+                ShortcutsSettingsView()
+            }
+                .tag(SettingsTabs.shortcuts)
+
+            SettingsPane {
+                ExtensionsSettingsView()
+            }
+                .tag(SettingsTabs.extensions)
+
+            SettingsPane {
+                AdvancedSettingsView()
+            }
+                .tag(SettingsTabs.advanced)
+        }
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                Picker("Settings Tabs", selection: $browserManager.settingsManager.currentSettingsTab) {
+                    ForEach(SettingsTabs.ordered, id: \.self) { tab in
+                        Image(systemName: tab.icon)
+                            .help(tab.name)
+                            .tag(tab)
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 20)
+                .pickerStyle(.segmented)
+                .labelsHidden()
             }
         }
-        .frame(minWidth: 960, minHeight: 640)
+    }
+}
+
+// MARK: - Reusable pane wrapper: fixed height + scrolling
+private struct SettingsPane<Content: View>: View {
+    let content: Content
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+    private let fixedHeight: CGFloat = 620
+    private let minWidth: CGFloat = 760
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                content
+            }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .padding(20)
+        }
+        .scrollIndicators(.automatic)
+        .frame(minWidth: minWidth)
+        .frame(minHeight: fixedHeight, idealHeight: fixedHeight, maxHeight: fixedHeight)
     }
 }
 
 // MARK: - Horizontal Tab Bar
+// Legacy custom tab strip retained for reference but no longer used.
 struct SettingsTabStrip: View {
     @Binding var selection: SettingsTabs
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(SettingsTabs.ordered, id: \.self) { tab in
-                    SettingsTabItem(tab: tab, isSelected: tab == selection)
-                        .onTapGesture { selection = tab }
-                }
-            }
-            .padding(6)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(.ultraThinMaterial)
-                    .shadow(color: Color.black.opacity(0.08), radius: 10, y: 4)
-            )
-        }
-    }
+    var body: some View { EmptyView() }
 }
 
 struct SettingsTabItem: View {
     let tab: SettingsTabs
     let isSelected: Bool
-
-    var body: some View {
-        VStack(spacing: 6) {
-            Image(systemName: tab.icon)
-                .font(.system(size: 18, weight: .semibold))
-                .symbolVariant(isSelected ? .fill : .none)
-            Text(tab.name)
-                .font(.system(size: 12, weight: .medium))
-        }
-        .foregroundStyle(isSelected ? .primary : .secondary)
-        .frame(width: 88, height: 64)
-        .background(
-            ZStack {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(.thinMaterial)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .strokeBorder(Color.primary.opacity(0.08))
-                        )
-                } else {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color(NSColor.controlBackgroundColor).opacity(0.6))
-                }
-            }
-        )
-        .contentShape(RoundedRectangle(cornerRadius: 10))
-        .animation(.snappy, value: isSelected)
-    }
+    var body: some View { EmptyView() }
 }
 
 // MARK: - General Settings
