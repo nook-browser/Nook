@@ -30,14 +30,12 @@ struct PulseApp: App {
             PulseCommands(browserManager: browserManager)
         }
 
-        WindowGroup("Settings", id: "settings") {
+        // Native macOS Settings window
+        Settings {
             SettingsView()
                 .environmentObject(browserManager)
                 .environmentObject(browserManager.gradientColorManager)
         }
-        .windowResizability(.contentSize)
-        .windowStyle(.hiddenTitleBar)
-        .windowToolbarStyle(.unifiedCompact)
     }
 }
 
@@ -104,6 +102,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 struct PulseCommands: Commands {
     let browserManager: BrowserManager
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
 
     init(browserManager: BrowserManager) {
         self.browserManager = browserManager
@@ -112,12 +111,7 @@ struct PulseCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .newItem) {}
         CommandGroup(replacing: .windowList) {}
-        CommandGroup(replacing: .appSettings) {
-            Button("Settings...") {
-                openWindow(id: "settings")
-            }
-            .keyboardShortcut(",", modifiers: .command)
-        }
+        // Use the native Settings menu (no replacement of .appSettings)
         
         // Sidebar commands
         CommandGroup(after: .sidebar) {
@@ -267,8 +261,8 @@ struct PulseCommands: Commands {
             .keyboardShortcut("e", modifiers: [.command, .shift])
             
             Button("Manage Extensions...") {
-                // Open settings to extensions tab
-                openWindow(id: "settings")
+                // Open native Settings to Extensions pane
+                openSettings()
                 browserManager.settingsManager.currentSettingsTab = .extensions
             }
 
