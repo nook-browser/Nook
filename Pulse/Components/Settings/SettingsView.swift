@@ -30,10 +30,7 @@ struct SettingsView: View {
             }
                 .tag(SettingsTabs.profiles)
 
-            SettingsPane {
-                SpacesSettingsView()
-            }
-                .tag(SettingsTabs.spaces)
+            
 
             SettingsPane {
                 ShortcutsSettingsView()
@@ -207,12 +204,6 @@ struct GeneralSettingsView: View {
 }
 
 // MARK: - Placeholder Settings Views
-
-struct SpacesSettingsView: View {
-    var body: some View {
-        SettingsPlaceholderView(title: "Spaces", subtitle: "Customize workspaces and groups", icon: "rectangle.3.group")
-    }
-}
 
 struct ProfilesSettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager
