@@ -14,7 +14,7 @@ struct NewTabButton: View {
     
     var body: some View {
         Button {
-            browserManager.isCommandPaletteVisible = true
+            browserManager.openCommandPalette()
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "plus")

@@ -60,6 +60,7 @@ struct SpacesListItem: View {
         .onHover { hovering in
             isHovering = hovering
         }
+        // Removed profile badge overlay to reduce UI noise
         .overlay(
             // Hidden TextField for capturing emoji selection
             TextField("", text: $selectedEmoji)
@@ -75,6 +76,20 @@ struct SpacesListItem: View {
                 }
         )
         .contextMenu {
+            // Profile assignment
+            let currentName = resolvedProfileName(for: space.profileId) ?? "None"
+            Text("Current Profile: \(currentName)")
+                .foregroundStyle(.secondary)
+            Divider()
+            ProfilePickerView(
+                selectedProfileId: Binding(get: { space.profileId }, set: { assignProfile($0) }),
+                onSelect: { _ in },
+                compact: true,
+                showNoneOption: true
+            )
+            .environmentObject(browserManager)
+
+            Divider()
             Button("Change Icon...") {
                 emojiFieldFocused = true
                 NSApp.orderFrontCharacterPalette(nil)
@@ -96,5 +111,14 @@ struct SpacesListItem: View {
             (scalar.value >= 0x2600 && scalar.value <= 0x26FF) ||
             (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
         }
+    }
+
+    private func assignProfile(_ id: UUID?) {
+        browserManager.tabManager.assign(spaceId: space.id, toProfile: id)
+    }
+
+    private func resolvedProfileName(for id: UUID?) -> String? {
+        guard let id else { return nil }
+        return browserManager.profileManager.profiles.first(where: { $0.id == id })?.name
     }
 }
