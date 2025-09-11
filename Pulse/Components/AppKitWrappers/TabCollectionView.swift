@@ -164,6 +164,7 @@ struct TabCollectionView<DataSource: TabListDataSource & ObservableObject>: NSVi
             let tab = parent.dataSource.tabs[indexPath.item]
             let item = NSPasteboardItem()
             item.setString(tab.id.uuidString, forType: PasteboardType.tab)
+            item.setString(tab.id.uuidString, forType: .string)
 #if DEBUG
             print("[DnD] Collection pasteboardWriterForItemAt item=\(indexPath.item)")
 #endif

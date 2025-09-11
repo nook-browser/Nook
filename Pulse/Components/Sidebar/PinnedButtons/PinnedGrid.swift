@@ -64,7 +64,9 @@ struct PinnedGrid: View {
                                 isActive: isActive,
                                 onActivate: { browserManager.tabManager.setActiveTab(tab) },
                                 onClose: { browserManager.tabManager.removeTab(tab.id) },
-                                onRemovePin: { browserManager.tabManager.unpinTab(tab) }
+                                onRemovePin: { browserManager.tabManager.unpinTab(tab) },
+                                onSplitRight: { browserManager.splitManager.enterSplit(with: tab, placeOn: .right) },
+                                onSplitLeft: { browserManager.splitManager.enterSplit(with: tab, placeOn: .left) }
                             )
                             .onTabDrag(tab.id, draggedItem: $draggedItem)
                             .opacity(draggedItem == tab.id ? 0.0 : 1.0)
@@ -136,6 +138,8 @@ private struct PinnedTile: View {
     let onActivate: () -> Void
     let onClose: () -> Void
     let onRemovePin: () -> Void
+    let onSplitRight: () -> Void
+    let onSplitLeft: () -> Void
 
     var body: some View {
         PinnedTabView(
@@ -147,6 +151,13 @@ private struct PinnedTile: View {
         )
         .frame(maxWidth: .infinity)
         .contextMenu {
+            Button(action: onSplitRight) {
+                Label("Open in Split (Right)", systemImage: "rectangle.split.2x1")
+            }
+            Button(action: onSplitLeft) {
+                Label("Open in Split (Left)", systemImage: "rectangle.split.2x1")
+            }
+            Divider()
             Button(role: .destructive, action: onClose) {
                 Label("Close tab", systemImage: "xmark")
             }
