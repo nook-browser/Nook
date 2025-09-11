@@ -48,18 +48,82 @@ class BrowserConfiguration {
     }()
 
     // MARK: - Cache-Optimized Configuration
-    lazy var cacheOptimizedWebViewConfiguration: WKWebViewConfiguration = {
-        let config = webViewConfiguration
-        
-        // Enable aggressive caching
+    // Returns a fresh configuration each call to avoid cross-tab state sharing
+    func cacheOptimizedWebViewConfiguration() -> WKWebViewConfiguration {
+        let config = WKWebViewConfiguration()
+
+        // Default data store for non-profile-specific usage
+        config.websiteDataStore = WKWebsiteDataStore.default()
+
+        // Configure JavaScript preferences for extension support
+        let preferences = WKWebpagePreferences()
+        preferences.allowsContentJavaScript = true
+        config.defaultWebpagePreferences = preferences
+
+        // Core WebKit preferences for extensions
+        config.preferences.javaScriptEnabled = true
+        config.preferences.javaScriptCanOpenWindowsAutomatically = true
+
+        // Media settings
+        config.mediaTypesRequiringUserActionForPlayback = []
+
+        // Enable Picture-in-Picture for web media
+        config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
+
+        // Enable background media playback
+        config.allowsAirPlayForMediaPlayback = true
+
+        // User agent for better compatibility (mirror default config)
+        config.applicationNameForUserAgent = "Version/17.4.1 Safari/605.1.15"
+
+        // Cache/perf optimizations mirroring profile-scoped variant
         config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
         config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
-        
-        // Set cache policy preferences
-        config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
-        
+
         return config
-    }()
+    }
+
+    // MARK: - Profile-Aware Configurations
+    // Create a fresh configuration using a profile-specific data store
+    func webViewConfiguration(for profile: Profile) -> WKWebViewConfiguration {
+        let config = WKWebViewConfiguration()
+
+        // Use the profile's website data store for isolation
+        config.websiteDataStore = profile.dataStore
+
+        // Configure JavaScript preferences for extension support
+        let preferences = WKWebpagePreferences()
+        preferences.allowsContentJavaScript = true
+        config.defaultWebpagePreferences = preferences
+
+        // Core WebKit preferences for extensions
+        config.preferences.javaScriptEnabled = true
+        config.preferences.javaScriptCanOpenWindowsAutomatically = true
+
+        // Media settings
+        config.mediaTypesRequiringUserActionForPlayback = []
+
+        // Enable Picture-in-Picture for web media
+        config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
+
+        // Enable background media playback
+        config.allowsAirPlayForMediaPlayback = true
+
+        // User agent for better compatibility (mirror default config)
+        config.applicationNameForUserAgent = "Version/17.4.1 Safari/605.1.15"
+
+        return config
+    }
+
+    // Returns a profile-scoped configuration with cache/perf optimizations applied
+    func cacheOptimizedWebViewConfiguration(for profile: Profile) -> WKWebViewConfiguration {
+        let config = webViewConfiguration(for: profile)
+        // Enable aggressive caching and media capabilities (mirror default optimized config)
+        config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
+        config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
+        config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
+        return config
+    }
 
     private init() {}
     

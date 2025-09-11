@@ -11,13 +11,30 @@ import SwiftUI
 
 @MainActor
 class CookieManager: ObservableObject {
-    private let dataStore: WKWebsiteDataStore
+    // Active data store for cookie operations. Switchable per profile.
+    private var dataStore: WKWebsiteDataStore
+    // Optional profile context for diagnostics and profiling
+    var currentProfileId: UUID?
     @Published private(set) var cookies: [CookieInfo] = []
     @Published private(set) var domainGroups: [DomainCookieGroup] = []
     @Published private(set) var isLoading: Bool = false
     
     init(dataStore: WKWebsiteDataStore? = nil) {
         self.dataStore = dataStore ?? WKWebsiteDataStore.default()
+    }
+
+    // MARK: - Profile Switching
+    /// Switch the underlying data store to operate within a different profile boundary.
+    /// Clears in-memory state and optionally reloads cookies from the new store.
+    func switchDataStore(_ newDataStore: WKWebsiteDataStore, profileId: UUID? = nil, eagerLoad: Bool = true) {
+        self.dataStore = newDataStore
+        self.currentProfileId = profileId
+        self.cookies = []
+        self.domainGroups = []
+        print("🔁 [CookieManager] Switched data store -> profile: \(profileId?.uuidString ?? "nil"), persistent: \(newDataStore.isPersistent)")
+        if eagerLoad {
+            Task { await self.loadCookies() }
+        }
     }
     
     // MARK: - Public Methods
@@ -129,21 +146,8 @@ class CookieManager: ObservableObject {
         // Comprehensive privacy-compliant cleanup
         await deleteExpiredCookies()
         await deleteHighRiskCookies()
-        
-        // Delete cookies older than 30 days (data minimization)
-        let httpCookies = await dataStore.httpCookieStore.allCookies()
-        
-        // For persistent cookies, check if they're older than retention period
-        let oldCookies = httpCookies.filter { cookie in
-            guard let expiresDate = cookie.expiresDate else { return false }
-            // If cookie was set more than 30 days ago (estimated)
-            return expiresDate.timeIntervalSinceNow > 2592000
-        }
-        
-        for cookie in oldCookies {
-            dataStore.httpCookieStore.delete(cookie)
-        }
-        
+        // Heuristic removal based on expiresDate has been removed to avoid deleting valid cookies.
+        // If creation/last-access metadata becomes available in future, revisit retention logic.
         await loadCookies()
     }
     
@@ -198,13 +202,16 @@ class CookieManager: ObservableObject {
         }.count
         let totalSize = cookies.reduce(0) { $0 + $1.size }
         
-        return (
+        let stats = (
             total: cookies.count,
             session: sessionCount,
             persistent: persistentCount,
             expired: expiredCount,
             totalSize: totalSize
         )
+        // Debug diagnostics with profile context
+        print("📊 [CookieManager] Stats for profile=\(currentProfileId?.uuidString ?? "nil"): total=\(stats.total), session=\(stats.session), persistent=\(stats.persistent), expired=\(stats.expired), size=\(stats.totalSize)")
+        return stats
     }
     
     // MARK: - Private Methods

@@ -301,6 +301,7 @@ class EssentialTabListAdapter: TabListDataSource, ObservableObject {
     deinit { cancellable?.cancel() }
     
     var tabs: [Tab] {
+        // Profile-aware essentials: returns pinned tabs for current profile only
         tabManager.essentialTabs
     }
     
