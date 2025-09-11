@@ -191,23 +191,26 @@ struct SidebarView: View {
         }
         .onScrollPhaseChange { oldPhase, newPhase in
             if newPhase == .interacting && oldPhase == .idle {
-                // Drag just started - fire haptic after short delay
+                // Drag started: light haptic, keep it simple
                 if !hasTriggeredHaptic {
                     hasTriggeredHaptic = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
-                        let impact = NSHapticFeedbackManager.defaultPerformer
-                        impact.perform(.alignment, performanceTime: .default)
-                        print("🎯 Haptic 0.1s after drag start")
-                    }
+                    let impact = NSHapticFeedbackManager.defaultPerformer
+                    impact.perform(.alignment, performanceTime: .default)
                 }
-            } else if newPhase == .idle && oldPhase != .idle {
-                // Drag just ended - activate the space and update visible window
-                hasTriggeredHaptic = false // Reset haptic flag
-                if let newSpaceIndex = currentScrollID {
-                    let space = browserManager.tabManager.spaces[newSpaceIndex]
-                    print("🎯 Drag ended - Activating space: \(space.name) (index: \(newSpaceIndex))")
+            } else if oldPhase == .interacting && newPhase != .interacting {
+                // User let go: snap to the nearest space immediately (cancel inertia) and activate it
+                hasTriggeredHaptic = false
+                let targetIndex = currentScrollID ?? activeSpaceIndex
+                var t = Transaction()
+                t.disablesAnimations = true
+                withTransaction(t) {
+                    currentScrollID = targetIndex
+                }
+                if browserManager.tabManager.spaces.indices.contains(targetIndex) {
+                    let space = browserManager.tabManager.spaces[targetIndex]
+                    print("🎯 Release - Activating space: \(space.name) (index: \(targetIndex))")
                     browserManager.tabManager.setActiveSpace(space)
-                    activeSpaceIndex = newSpaceIndex  // Update visible window ONLY on drag end
+                    activeSpaceIndex = targetIndex
                 }
             }
         }
