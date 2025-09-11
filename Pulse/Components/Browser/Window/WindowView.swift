@@ -25,7 +25,7 @@ struct WindowView: View {
                 }
 
             HStack(spacing: 0) {
-                DragEnabledSidebarView()
+                SidebarView()
                 if browserManager.isSidebarVisible {
                     SidebarResizeView()
                 }
@@ -46,8 +46,7 @@ struct WindowView: View {
             CommandPaletteView()
             DialogView()
             
-            // Working insertion line overlay
-            InsertionLineView(dragManager: TabDragManager.shared)
+            // (Removed) insertion line overlay; Ora-style DnD uses live reordering
 
             // Profile switch toast overlay (matches WebsitePopup style/presentation)
             VStack {

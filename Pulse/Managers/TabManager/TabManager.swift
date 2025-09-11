@@ -373,6 +373,11 @@ class TabManager: ObservableObject {
     
     var essentialTabs: [Tab] { pinnedTabs }
     
+    func essentialTabs(for profileId: UUID?) -> [Tab] {
+        guard let profileId = profileId else { return [] }
+        return (pinnedByProfile[profileId] ?? []).sorted { $0.index < $1.index }
+    }
+    
     // Flattened pinned across all profiles for internal ops
     private var allPinnedTabsAllProfiles: [Tab] {
         pinnedByProfile.values.flatMap { $0 }
