@@ -15,7 +15,8 @@ struct BlurEffectView: NSViewRepresentable {
         let view = NSVisualEffectView()
         view.material = material
         view.state = .active
-        view.blendingMode = .behindWindow
+        // Use withinWindow so materials blend with in-window content, including our gradients.
+        view.blendingMode = .withinWindow
         return view
     }
 
