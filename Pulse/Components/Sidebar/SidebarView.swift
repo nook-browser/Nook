@@ -12,6 +12,7 @@ struct SidebarView: View {
     @State private var spaceName = ""
     @State private var spaceIcon = ""
     @State private var showHistory = false
+    @State private var sidebarDraggedItem: UUID? = nil
     
     private var targetScrollPosition: Int {
         if let currentSpace = browserManager.tabManager.currentSpace,
@@ -79,6 +80,7 @@ struct SidebarView: View {
                     ZStack {
                         PinnedGrid(width: browserManager.sidebarWidth)
                     }
+                    .modifier(FallbackDropBelowEssentialsModifier())
                     if showHistory {
                         historyView
                     } else {

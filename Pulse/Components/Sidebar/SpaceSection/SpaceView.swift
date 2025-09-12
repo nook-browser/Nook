@@ -104,25 +104,39 @@ struct SpaceView: View {
                 }
 
                 NewTabButton()
+                    .onDrop(
+                        of: [.text],
+                        delegate: SidebarSectionDropDelegateSimple(
+                            itemsCount: { tabs.count },
+                            draggedItem: $draggedItem,
+                            targetSection: .spaceRegular(space.id),
+                            tabManager: browserManager.tabManager
+                        )
+                    )
 
                 // Regular tabs
                 ScrollView {
                     VStack(spacing: 2) {
                         if !tabs.isEmpty {
                             VStack(spacing: 2) {
+                                // Snapshot current regular tabs to keep indices stable during render
+                                let currentTabs = tabs
                                 let split = splitManager
                                 if split.isSplit,
                                    let leftId = split.leftTabId, let rightId = split.rightTabId,
-                                   let leftIdx = tabs.firstIndex(where: { $0.id == leftId }),
-                                   let rightIdx = tabs.firstIndex(where: { $0.id == rightId })
+                                   let leftIdx = currentTabs.firstIndex(where: { $0.id == leftId }),
+                                   let rightIdx = currentTabs.firstIndex(where: { $0.id == rightId }),
+                                   leftIdx >= 0, rightIdx >= 0,
+                                   leftIdx < currentTabs.count, rightIdx < currentTabs.count,
+                                   leftIdx != rightIdx
                                 {
                                     let firstIdx = min(leftIdx, rightIdx)
                                     let secondIdx = max(leftIdx, rightIdx)
-                                    ForEach(Array(tabs.enumerated()), id: \.element.id) { pair in
+                                    ForEach(Array(currentTabs.enumerated()), id: \.element.id) { pair in
                                         let (idx, tab) = pair
                                         if idx == firstIdx {
-                                            let left = tabs[leftIdx]
-                                            let right = tabs[rightIdx]
+                                            let left = currentTabs[leftIdx]
+                                            let right = currentTabs[rightIdx]
                                             SplitTabRow(
                                                 left: left,
                                                 right: right,
@@ -169,7 +183,7 @@ struct SpaceView: View {
                                         }
                                     }
                                 } else {
-                                    ForEach(tabs, id: \.id) { tab in
+                                    ForEach(currentTabs, id: \.id) { tab in
                                         SpaceTab(
                                             tab: tab,
                                             action: { onActivateTab(tab) },
@@ -232,6 +246,17 @@ struct SpaceView: View {
                     }
                     .animation(.easeInOut(duration: 0.15), value: tabs.count)
                 }
+                // Fallback drop target that covers the entire scroll area, including
+                // the large empty region below the last tab. Drops here append to end.
+                .onDrop(
+                    of: [.text],
+                    delegate: SidebarSectionDropDelegateSimple(
+                        itemsCount: { tabs.count },
+                        draggedItem: $draggedItem,
+                        targetSection: .spaceRegular(space.id),
+                        tabManager: browserManager.tabManager
+                    )
+                )
                 .contentShape(Rectangle())
                 Spacer()
             }

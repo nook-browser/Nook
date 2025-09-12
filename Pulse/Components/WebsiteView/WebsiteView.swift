@@ -61,9 +61,11 @@ struct WebsiteView: View {
                             hoveredLink: $hoveredLink,
                             isCommandPressed: $isCommandPressed,
                             splitFraction: splitManager.dividerFraction,
-                            isSplit: splitManager.isSplit
+                            isSplit: splitManager.isSplit,
+                            leftId: splitManager.leftTabId,
+                            rightId: splitManager.rightTabId
                         )
-                        .background(splitManager.isSplit ? Color.clear : Color(nsColor: .windowBackgroundColor))
+                        .background(shouldShowSplit ? Color.clear : Color(nsColor: .windowBackgroundColor))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .clipShape(RoundedRectangle(cornerRadius: {
                             if #available(macOS 26.0, *) {
@@ -74,7 +76,7 @@ struct WebsiteView: View {
                         }(), style: .continuous))
                         // Divider + pane close overlay
                         .overlay(alignment: .top) {
-                            if splitManager.isSplit {
+                            if shouldShowSplit {
                                 SplitControlsOverlay()
                                     .environmentObject(browserManager)
                                     .environmentObject(splitManager)
@@ -122,6 +124,19 @@ struct TabCompositorWrapper: NSViewRepresentable {
     @Binding var isCommandPressed: Bool
     var splitFraction: CGFloat
     var isSplit: Bool
+    var leftId: UUID?
+    var rightId: UUID?
+
+    class Coordinator {
+        var lastIsSplit: Bool = false
+        var lastLeftId: UUID? = nil
+        var lastRightId: UUID? = nil
+        var lastCurrentId: UUID? = nil
+        var lastFraction: CGFloat = -1
+        var lastSize: CGSize = .zero
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeNSView(context: Context) -> NSView {
         let containerView = NSView()
@@ -148,8 +163,26 @@ struct TabCompositorWrapper: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        // Update the compositor when tabs change
-        updateCompositor(nsView)
+        // Only rebuild compositor when meaningful inputs change
+        let size = nsView.bounds.size
+        let currentId = browserManager.tabManager.currentTab?.id
+        let needsRebuild =
+            context.coordinator.lastIsSplit != isSplit ||
+            context.coordinator.lastLeftId != leftId ||
+            context.coordinator.lastRightId != rightId ||
+            context.coordinator.lastCurrentId != currentId ||
+            abs(CGFloat(context.coordinator.lastFraction) - CGFloat(splitFraction)) > 0.0001 ||
+            context.coordinator.lastSize != size
+
+        if needsRebuild {
+            updateCompositor(nsView)
+            context.coordinator.lastIsSplit = isSplit
+            context.coordinator.lastLeftId = leftId
+            context.coordinator.lastRightId = rightId
+            context.coordinator.lastCurrentId = currentId
+            context.coordinator.lastFraction = splitFraction
+            context.coordinator.lastSize = size
+        }
         
         // Mark current tab as accessed (resets unload timer)
         if let currentTab = browserManager.tabManager.currentTab {
@@ -176,7 +209,9 @@ struct TabCompositorWrapper: NSViewRepresentable {
         let allTabs = browserManager.tabManager.essentialTabs + currentSpacePinned + browserManager.tabManager.tabs
         
         let split = browserManager.splitManager
-        if split.isSplit {
+        let currentId = browserManager.tabManager.currentTab?.id
+        let isCurrentPane = (currentId != nil) && (currentId == split.leftTabId || currentId == split.rightTabId)
+        if split.isSplit && isCurrentPane {
             // Auto-heal if one side is missing (tab closed etc.), but not during preview
             if !split.isPreviewActive {
                 let leftResolved = split.resolveTab(split.leftTabId)
@@ -211,8 +246,10 @@ struct TabCompositorWrapper: NSViewRepresentable {
             // Add pane containers with rounded corners and background
             let activeId = browserManager.tabManager.currentTab?.id
             let accent = browserManager.gradientColorManager.displayGradient.primaryNSColor
+            // Resolve pane tabs across ALL tabs (not just current space)
+            let allKnownTabs = browserManager.tabManager.allTabs()
 
-            if let lId = leftId, let leftTab = allTabs.first(where: { $0.id == lId }) {
+            if let lId = leftId, let leftTab = allKnownTabs.first(where: { $0.id == lId }) {
                 // Force-create/ensure loaded when visible in split
                 let lWeb = leftTab.activeWebView
                 let pane = makePaneContainer(frame: leftRect, isActive: (activeId == lId), accent: accent)
@@ -223,7 +260,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
                 pane.addSubview(lWeb)
             }
 
-            if let rId = rightId, let rightTab = allTabs.first(where: { $0.id == rId }) {
+            if let rId = rightId, let rightTab = allKnownTabs.first(where: { $0.id == rId }) {
                 // Force-create/ensure loaded when visible in split
                 let rWeb = rightTab.activeWebView
                 let pane = makePaneContainer(frame: rightRect, isActive: (activeId == rId), accent: accent)
@@ -297,6 +334,14 @@ struct TabCompositorWrapper: NSViewRepresentable {
                 self.isCommandPressed = href != nil
             }
         }
+    }
+}
+
+private extension WebsiteView {
+    var shouldShowSplit: Bool {
+        guard splitManager.isSplit else { return false }
+        guard let current = browserManager.tabManager.currentTab?.id else { return false }
+        return current == splitManager.leftTabId || current == splitManager.rightTabId
     }
 }
 
