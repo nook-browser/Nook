@@ -124,6 +124,14 @@ final class SplitViewManager: ObservableObject {
         rightTabId = l
     }
 
+    func exitSplitCompletely() {
+        isSplit = false
+        leftTabId = nil
+        rightTabId = nil
+        isPreviewActive = false
+        previewSide = nil
+    }
+
     // MARK: - Preview during drag-over
     func beginPreview(side: Side) {
         previewSide = side
