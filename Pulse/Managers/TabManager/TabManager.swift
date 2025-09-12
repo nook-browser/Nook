@@ -735,6 +735,7 @@ class TabManager: ObservableObject {
         }
         let previous = currentTab
         currentTab = tab
+        // Do not auto-exit split when leaving split panes; preserve split state
         
         // Save this tab as the active tab for the appropriate space
         if let sid = tab.spaceId, let space = spaces.first(where: { $0.id == sid }) {

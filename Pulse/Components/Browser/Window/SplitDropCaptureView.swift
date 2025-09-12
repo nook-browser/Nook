@@ -43,6 +43,8 @@ final class SplitDropCaptureView: NSView {
     override func draggingExited(_ sender: NSDraggingInfo?) {
         isDragActive = false
         splitManager?.endPreview(cancel: true)
+        // Signal UI to clear any drag-hiding state even on invalid drops
+        NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
@@ -50,6 +52,8 @@ final class SplitDropCaptureView: NSView {
         sm.endPreview(cancel: false)
         let pb = sender.draggingPasteboard
         guard let idString = pb.string(forType: .string), let id = UUID(uuidString: idString) else {
+            // Invalid payload; clear any lingering drag UI state
+            NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
             return false
         }
         let all = bm.tabManager.allTabs()

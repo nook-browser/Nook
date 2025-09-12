@@ -181,6 +181,7 @@ class TabCompositorManager: ObservableObject {
         let split = browserManager.splitManager
         let leftId = split.leftTabId
         let rightId = split.rightTabId
+        let showSplit = split.isSplit && (currentTabId == leftId || currentTabId == rightId)
 
         func enumerateWebViews(in view: NSView, handler: (WKWebView) -> Void) {
             for s in view.subviews {
@@ -190,13 +191,13 @@ class TabCompositorManager: ObservableObject {
         }
 
         enumerateWebViews(in: containerView) { webView in
-            if let tab = findTabByWebView(webView) {
-                if split.isSplit {
-                    webView.isHidden = !(tab.id == leftId || tab.id == rightId)
-                } else {
-                    webView.isHidden = tab.id != currentTabId
+                if let tab = findTabByWebView(webView) {
+                    if showSplit {
+                        webView.isHidden = !(tab.id == leftId || tab.id == rightId)
+                    } else {
+                        webView.isHidden = tab.id != currentTabId
+                    }
                 }
-            }
         }
     }
     
