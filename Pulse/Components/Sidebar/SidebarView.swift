@@ -62,6 +62,7 @@ struct SidebarView: View {
                     HStack(spacing: 2) {
                         NavButtonsView()
                     }
+                    .padding(.horizontal, 8)
                     .frame(height: 30)
                     .background(
                         Rectangle()
@@ -76,13 +77,16 @@ struct SidebarView: View {
                     .backgroundDraggable()
 
                     URLBarView()
+                        .padding(.horizontal, 8)
                     // Container to support PinnedGrid slide transitions without clipping
                     ZStack {
-                        PinnedGrid(width: browserManager.sidebarWidth)
+                        PinnedGrid(width: max(0, browserManager.sidebarWidth - 16))
                     }
+                    .padding(.horizontal, 8)
                     .modifier(FallbackDropBelowEssentialsModifier())
                     if showHistory {
                         historyView
+                            .padding(.horizontal, 8)
                     } else {
                         spacesScrollView
                     }
@@ -122,6 +126,7 @@ struct SidebarView: View {
                             }
                         }
                     }
+                    .padding(.horizontal, 8)
 
                 }
                 .padding(.top, 8)
@@ -151,6 +156,7 @@ struct SidebarView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             spacesHStack
         }
+        // Match the full sidebar width to avoid early clipping when swiping
         .frame(width: browserManager.sidebarWidth)
         .contentMargins(.horizontal, 0)
         .scrollTargetLayout()
@@ -231,6 +237,7 @@ struct SidebarView: View {
                     onMuteTab: { $0.toggleMute() }
                 )
                 .id(spaceIndex)
+                // Each page is exactly one sidebar-width wide for viewAligned snapping
                 .frame(width: browserManager.sidebarWidth)
             }
         }
