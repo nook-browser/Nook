@@ -164,22 +164,37 @@ struct TabCollectionView<DataSource: TabListDataSource & ObservableObject>: NSVi
             let tab = parent.dataSource.tabs[indexPath.item]
             let item = NSPasteboardItem()
             item.setString(tab.id.uuidString, forType: PasteboardType.tab)
+            item.setString(tab.id.uuidString, forType: .string)
 #if DEBUG
             print("[DnD] Collection pasteboardWriterForItemAt item=\(indexPath.item)")
 #endif
             return item
         }
 
+        private var hiddenDuringDrag: Set<IndexPath> = []
+
         func collectionView(_ collectionView: NSCollectionView, draggingSession session: NSDraggingSession, willBeginAt screenPoint: NSPoint, forItemsAt indexPaths: Set<IndexPath>) {
 #if DEBUG
             print("[DnD] Collection draggingSession willBeginAt items=\(indexPaths.map{ $0.item })")
 #endif
+            hiddenDuringDrag = indexPaths
+            for ip in indexPaths {
+                if let item = collectionView.item(at: ip) {
+                    item.view.isHidden = true
+                }
+            }
         }
 
         func collectionView(_ collectionView: NSCollectionView, draggingSession session: NSDraggingSession, endedAt screenPoint: NSPoint, dragOperation: NSDragOperation) {
 #if DEBUG
             print("[DnD] Collection draggingSession ended op=\(dragOperation.rawValue)")
 #endif
+            for ip in hiddenDuringDrag {
+                if let item = collectionView.item(at: ip) {
+                    item.view.isHidden = false
+                }
+            }
+            hiddenDuringDrag.removeAll()
         }
 
         // MARK: - Drag & Drop

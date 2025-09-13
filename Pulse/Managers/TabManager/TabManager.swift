@@ -448,6 +448,67 @@ class TabManager: ObservableObject {
         return false
     }
 
+    // MARK: - Container Membership Helpers
+    /// True if the tab is globally pinned (Essentials) in any profile.
+    func isGlobalPinned(_ tab: Tab) -> Bool {
+        return allPinnedTabsAllProfiles.contains { $0.id == tab.id }
+    }
+
+    /// True if the tab is pinned at the space level within its space.
+    func isSpacePinned(_ tab: Tab) -> Bool {
+        guard let sid = tab.spaceId, let arr = spacePinnedTabs[sid] else { return false }
+        return arr.contains { $0.id == tab.id }
+    }
+
+    /// True if the tab is a regular (non-pinned) tab in its space.
+    func isRegular(_ tab: Tab) -> Bool {
+        guard let sid = tab.spaceId, let arr = tabsBySpace[sid] else { return false }
+        return arr.contains { $0.id == tab.id }
+    }
+
+    /// Create a new regular tab duplicating the source tab's URL/name and insert near an anchor tab.
+    /// - Parameters:
+    ///   - source: The tab to duplicate (pinned/space-pinned or regular).
+    ///   - anchor: A regular tab used to decide target space and placement. If nil, falls back to currentSpace.
+    ///   - placeAfterAnchor: If true, insert right after the anchor's index; otherwise at the anchor's index.
+    /// - Returns: The newly created regular Tab.
+    @discardableResult
+    func duplicateAsRegularForSplit(from source: Tab, anchor: Tab?, placeAfterAnchor: Bool = true) -> Tab {
+        // Resolve target space: prefer the anchor's space, else currentSpace.
+        let targetSpace: Space = {
+            if let a = anchor, let sid = a.spaceId, let sp = spaces.first(where: { $0.id == sid }) { return sp }
+            return currentSpace ?? ensureDefaultSpaceIfNeeded()
+        }()
+
+        // Build the duplicate with the same URL/name; favicon will refresh from URL.
+        let newTab = Tab(
+            url: source.url,
+            name: source.name,
+            favicon: "globe",
+            spaceId: targetSpace.id,
+            index: 0,
+            browserManager: browserManager
+        )
+        
+        // Add at end first, then reposition next to anchor if provided.
+        addTab(newTab)
+
+        if let a = anchor, let sid = a.spaceId, var arr = tabsBySpace[sid] {
+            // Find indices in current ordering
+            if let anchorIndex = arr.firstIndex(where: { $0.id == a.id }),
+               let newIndex = arr.firstIndex(where: { $0.id == newTab.id })
+            {
+                // Compute desired position relative to anchor
+                let desired = min(max(anchorIndex + (placeAfterAnchor ? 1 : 0), 0), arr.count)
+                if newIndex != desired {
+                    reorderRegularTabs(newTab, in: sid, to: desired)
+                }
+            }
+        }
+
+        return newTab
+    }
+
     // MARK: - Space Management
     @discardableResult
     func createSpace(name: String, icon: String = "square.grid.2x2", gradient: SpaceGradient = .default) -> Space {
@@ -735,6 +796,7 @@ class TabManager: ObservableObject {
         }
         let previous = currentTab
         currentTab = tab
+        // Do not auto-exit split when leaving split panes; preserve split state
         
         // Save this tab as the active tab for the appropriate space
         if let sid = tab.spaceId, let space = spaces.first(where: { $0.id == sid }) {
@@ -932,7 +994,15 @@ class TabManager: ObservableObject {
         case (.none, _), (_, .none):
             print("⚠️ Invalid drag operation: \(operation)")
         }
-        
+        // If the moved tab is currently part of an active split, dissolve the split.
+        // Keep the opposite side focused so the remaining pane stays visible.
+        if let sm = browserManager?.splitManager, sm.isSplit {
+            if sm.leftTabId == tab.id {
+                sm.exitSplit(keep: .right)
+            } else if sm.rightTabId == tab.id {
+                sm.exitSplit(keep: .left)
+            }
+        }
     }
     
     private func reorderGlobalPinnedTabs(_ tab: Tab, to index: Int) {

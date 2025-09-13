@@ -178,15 +178,26 @@ class TabCompositorManager: ObservableObject {
         guard let browserManager = browserManager,
               let containerView = browserManager.compositorContainerView else { return }
         
-        for subview in containerView.subviews {
-            if let webView = subview as? WKWebView {
-                // Find the tab for this webview
-                if let tab = findTabByWebView(webView) {
-                    // Simple visibility: hide inactive tabs for performance
-                    // Media should continue playing even when hidden (no more forced pause)
-                    webView.isHidden = tab.id != currentTabId
-                }
+        let split = browserManager.splitManager
+        let leftId = split.leftTabId
+        let rightId = split.rightTabId
+        let showSplit = split.isSplit && (currentTabId == leftId || currentTabId == rightId)
+
+        func enumerateWebViews(in view: NSView, handler: (WKWebView) -> Void) {
+            for s in view.subviews {
+                if let w = s as? WKWebView { handler(w) }
+                else { enumerateWebViews(in: s, handler: handler) }
             }
+        }
+
+        enumerateWebViews(in: containerView) { webView in
+                if let tab = findTabByWebView(webView) {
+                    if showSplit {
+                        webView.isHidden = !(tab.id == leftId || tab.id == rightId)
+                    } else {
+                        webView.isHidden = tab.id != currentTabId
+                    }
+                }
         }
     }
     
