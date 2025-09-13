@@ -54,32 +54,59 @@ final class SplitViewManager: ObservableObject {
     func enterSplit(with tab: Tab, placeOn side: Side = .right, animate: Bool = true) {
         guard let bm = browserManager else { return }
 
-        // If already split, replace the requested side
-        if isSplit {
-            switch side {
-            case .left: leftTabId = tab.id
-            case .right: rightTabId = tab.id
+        let tm = bm.tabManager
+
+        // Helper to duplicate pinned/space-pinned into a regular tab near an anchor
+        func maybeDuplicateIfPinned(_ candidate: Tab, anchor: Tab?) -> Tab {
+            if tm.isGlobalPinned(candidate) || tm.isSpacePinned(candidate) {
+                // Insert after anchor so combined split row renders at anchor's position
+                return tm.duplicateAsRegularForSplit(from: candidate, anchor: anchor, placeAfterAnchor: true)
             }
-            bm.compositorManager.loadTab(tab)
+            return candidate
+        }
+
+        // If already split, replace the requested side (ensure pinned tabs are duplicated)
+        if isSplit {
+            // Determine the opposite side to use as an anchor for placement
+            let oppositeId = (side == .left) ? rightTabId : leftTabId
+            let opposite = tm.allTabs().first(where: { $0.id == oppositeId })
+            let resolved = maybeDuplicateIfPinned(tab, anchor: opposite)
+
+            switch side {
+            case .left: leftTabId = resolved.id
+            case .right: rightTabId = resolved.id
+            }
+            bm.compositorManager.loadTab(resolved)
             return
         }
 
         // Not split yet: use current tab as the opposite side
-        guard let current = bm.tabManager.currentTab else { return }
+        guard let current = tm.currentTab else { return }
         // Avoid attempting to split the same tab against itself
         if current.id == tab.id { return }
+
+        // Decide sides per request first
+        var leftCandidate: Tab
+        var rightCandidate: Tab
         switch side {
         case .left:
-            leftTabId = tab.id
-            rightTabId = current.id
+            leftCandidate = tab
+            rightCandidate = current
         case .right:
-            leftTabId = current.id
-            rightTabId = tab.id
+            leftCandidate = current
+            rightCandidate = tab
         }
 
+        // Duplicate pinned/space-pinned tabs into regular tabs near the regular anchor (if any)
+        // Prefer the opposite side as an anchor so the row appears near the regular tab.
+        let leftResolved: Tab = maybeDuplicateIfPinned(leftCandidate, anchor: rightCandidate)
+        let rightResolved: Tab = maybeDuplicateIfPinned(rightCandidate, anchor: leftResolved)
+
+        leftTabId = leftResolved.id
+        rightTabId = rightResolved.id
         isSplit = true
-        bm.compositorManager.loadTab(current)
-        bm.compositorManager.loadTab(tab)
+        bm.compositorManager.loadTab(leftResolved)
+        bm.compositorManager.loadTab(rightResolved)
 
         if animate {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {

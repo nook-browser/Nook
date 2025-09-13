@@ -260,6 +260,8 @@ struct SpaceView: View {
                 .contentShape(Rectangle())
                 Spacer()
             }
+            // Keep page width equal to the whole sidebar, but pad items inside
+            .padding(.horizontal, 8)
             .frame(width: width)
             .contentShape(Rectangle())
             // Avoid window-drag gestures in the sidebar content area
