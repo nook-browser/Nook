@@ -149,7 +149,15 @@ private struct SplitHalfTab: View {
                     if side == .right, splitManager.rightTabId == dropped.id { return }
                 }
                 splitManager.enterSplit(with: dropped, placeOn: side)
+                // Ensure any local drag-hide state is cleared after drop
+                self.draggedItem = nil
+                NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
             }
+        }
+        // Also proactively clear drag-hide state in case the drop short-circuits internally
+        DispatchQueue.main.async {
+            self.draggedItem = nil
+            NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
         }
         return true
     }
