@@ -162,6 +162,7 @@ struct TabTableView<DataSource: TabListDataSource & ObservableObject>: NSViewRep
             let tab = parent.dataSource.tabs[row]
             let pasteboardItem = NSPasteboardItem()
             pasteboardItem.setString(tab.id.uuidString, forType: PasteboardType.tab)
+            pasteboardItem.setString(tab.id.uuidString, forType: .string)
 #if DEBUG
             print("[DnD] TabTableView pasteboardWriterForRow row=\(row)")
 #endif

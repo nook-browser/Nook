@@ -24,20 +24,26 @@ struct WindowView: View {
                     .disabled(browserManager.tabManager.currentSpace == nil)
                 }
 
+            // Main content flush: sidebar touches left edge; webview touches sidebar
             HStack(spacing: 0) {
                 SidebarView()
-                if browserManager.isSidebarVisible {
-                    SidebarResizeView()
-                }
+
                 VStack(spacing: 0) {
                     WebsiteLoadingIndicator()
-
                     WebsiteView()
-
+                }
+            }
+            // Overlay the resize handle exactly at the sidebar/webview boundary (no visual gap)
+            .overlay(alignment: .topLeading) {
+                if browserManager.isSidebarVisible {
+                    // Position at current sidebar width (flush boundary)
+                    SidebarResizeView()
+                        .frame(maxHeight: .infinity)
+                        .offset(x: browserManager.sidebarWidth)
+                        .zIndex(1000)
                 }
             }
             // Keep primary content interactive; background menu only triggers on empty areas
-            .padding(.horizontal, 8)
             .padding(.bottom, 8)
 
             // Mini command palette anchored exactly to URL bar's top-left
@@ -70,6 +76,7 @@ struct WindowView: View {
         }
         .environmentObject(browserManager)
         .environmentObject(browserManager.gradientColorManager)
+        .environmentObject(browserManager.splitManager)
     }
 
 }
@@ -121,7 +128,8 @@ private struct MiniCommandPaletteOverlay: View {
                 // Use reported URL bar frame when reliable; otherwise compute manual fallback
                 let barFrame = browserManager.urlBarFrame
                 let hasFrame = barFrame.width > 1 && barFrame.height > 1
-                let fallbackX: CGFloat = 8 // Window horizontal content padding
+                // Match sidebar's internal 8pt padding when geometry is unavailable
+                let fallbackX: CGFloat = 8
                 let fallbackY: CGFloat = 8 /* sidebar top padding */ + 30 /* nav bar */ + 8 /* vstack spacing */
                 let anchorX = hasFrame ? barFrame.minX : fallbackX
                 let anchorY = hasFrame ? barFrame.minY : fallbackY
