@@ -95,12 +95,20 @@ struct SidebarTabDropDelegateSimple: DropDelegate {
         }
     }
 
+    func validateDrop(info: DropInfo) -> Bool { true }
+
     func dropUpdated(info: DropInfo) -> DropProposal? {
         DropProposal(operation: .move)
     }
 
+    func dropExited(info: DropInfo) {
+        draggedItem = nil
+        NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
+    }
+
     func performDrop(info: DropInfo) -> Bool {
         draggedItem = nil
+        NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
         return true
     }
 }
@@ -147,12 +155,20 @@ struct SidebarSectionDropDelegateSimple: DropDelegate {
         }
     }
 
+    func validateDrop(info: DropInfo) -> Bool { true }
+
     func dropUpdated(info: DropInfo) -> DropProposal? {
         DropProposal(operation: .move)
     }
 
+    func dropExited(info: DropInfo) {
+        draggedItem = nil
+        NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
+    }
+
     func performDrop(info: DropInfo) -> Bool {
         draggedItem = nil
+        NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
         return true
     }
 }

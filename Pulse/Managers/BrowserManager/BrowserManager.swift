@@ -316,6 +316,7 @@ class BrowserManager: ObservableObject {
     var cacheManager: CacheManager
     var extensionManager: ExtensionManager?
     var compositorManager: TabCompositorManager
+    var splitManager: SplitViewManager
     var gradientColorManager: GradientColorManager
     var trackingProtectionManager: TrackingProtectionManager
     
@@ -349,12 +350,14 @@ class BrowserManager: ObservableObject {
         self.cookieManager = CookieManager(dataStore: initialProfile?.dataStore)
         self.cacheManager = CacheManager(dataStore: initialProfile?.dataStore)
         self.compositorManager = TabCompositorManager()
+        self.splitManager = SplitViewManager()
         self.gradientColorManager = GradientColorManager()
         self.trackingProtectionManager = TrackingProtectionManager()
         self.compositorContainerView = nil
 
         // Phase 2: wire dependencies and perform side effects (safe to use self)
         self.compositorManager.browserManager = self
+        self.splitManager.browserManager = self
         self.compositorManager.setUnloadTimeout(self.settingsManager.tabUnloadTimeout)
         self.tabManager.browserManager = self
         self.tabManager.reattachBrowserManager(self)

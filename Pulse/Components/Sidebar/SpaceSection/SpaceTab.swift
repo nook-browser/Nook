@@ -92,6 +92,12 @@ struct SpaceTab: View {
             }
         }
         .contextMenu {
+            // Split view
+            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right) } 
+            label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
+            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left) } 
+            label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
+            Divider()
             // Mute/Unmute option (show if tab has audio content OR is muted)
             if tab.hasAudioContent || tab.isAudioMuted {
                 Button(action: onMute) {

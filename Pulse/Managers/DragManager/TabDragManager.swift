@@ -154,6 +154,7 @@ class TabDragManager: ObservableObject {
     
     func cancelDrag() {
         resetDragState()
+        NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
     }
     
     private func triggerHapticFeedback() {
@@ -236,6 +237,10 @@ class TabDragManager: ObservableObject {
             return spaceId ?? containerSpaceId
         }
     }
+}
+
+extension Notification.Name {
+    static let tabDragDidEnd = Notification.Name("TabDragDidEndNotification")
 }
 
 // MARK: - Drag Operation Result
