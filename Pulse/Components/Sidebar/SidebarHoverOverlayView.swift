@@ -33,6 +33,7 @@ struct SidebarHoverOverlayView: View {
                                 hoverManager.isOverlayVisible = true
                             }
                         }
+                        NSCursor.arrow.set()
                     }
                 // Overlay sidebar inside a rounded, translucent container
                 SidebarView(forceVisible: true, forcedWidth: overlayWidth)
@@ -44,6 +45,8 @@ struct SidebarHoverOverlayView: View {
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                             .stroke(.white.opacity(0.12), lineWidth: 1)
                     )
+                    // Force arrow cursor for the entire overlay region
+                    .alwaysArrowCursor()
                     .shadow(color: Color.black.opacity(0.14), radius: 14, x: 0, y: 0)
                     .padding(.leading, horizontalInset)
                     .padding(.vertical, verticalInset)
@@ -52,8 +55,7 @@ struct SidebarHoverOverlayView: View {
                     .allowsHitTesting(true)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            // Only capture input while the overlay is visible
-            .allowsHitTesting(hoverManager.isOverlayVisible)
+            // Container remains passive; only overlay/hotspot intercept
         }
     }
 }
