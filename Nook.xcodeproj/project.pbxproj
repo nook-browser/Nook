@@ -352,7 +352,6 @@
 		2CC067242E789ECB001D37C6 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		2CC067252E789ECB001D37C6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		2CC067262E789ECB001D37C6 /* Nook.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Nook.entitlements; sourceTree = "<group>"; };
-		2CC067272E789ECB001D37C6 /* Nook-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Nook-Bridging-Header.h"; sourceTree = "<group>"; };
 		2CC067282E789ECB001D37C6 /* NookApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NookApp.swift; sourceTree = "<group>"; };
 		7F8340FC2E37F39400674A5D /* Nook.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Nook.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -1031,7 +1030,6 @@
 				2CC067242E789ECB001D37C6 /* ContentView.swift */,
 				2CC067252E789ECB001D37C6 /* Info.plist */,
 				2CC067262E789ECB001D37C6 /* Nook.entitlements */,
-				2CC067272E789ECB001D37C6 /* Nook-Bridging-Header.h */,
 				2CC067282E789ECB001D37C6 /* NookApp.swift */,
 			);
 			path = Nook;
