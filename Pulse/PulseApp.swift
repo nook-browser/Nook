@@ -8,6 +8,8 @@
 import SwiftUI
 import WebKit
 import OSLog
+import AppKit
+import Carbon
 
 @main
 struct PulseApp: App {
@@ -42,6 +44,21 @@ struct PulseApp: App {
 class AppDelegate: NSObject, NSApplicationDelegate {
     private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Pulse", category: "AppTermination")
     weak var browserManager: BrowserManager?
+    private let urlEventClass = AEEventClass(kInternetEventClass)
+    private let urlEventID = AEEventID(kAEGetURL)
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSAppleEventManager.shared().setEventHandler(
+            self,
+            andSelector: #selector(handleGetURLEvent(_:withReplyEvent:)),
+            forEventClass: urlEventClass,
+            andEventID: urlEventID
+        )
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        urls.forEach { handleIncoming(url: $0) }
+    }
     
     // Prefer async termination path to avoid MainActor deadlocks
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -97,6 +114,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Keep minimal to avoid MainActor deadlocks; main work happens in applicationShouldTerminate
         AppDelegate.log.info("applicationWillTerminate called")
     }
+
+    // MARK: - External URL Handling
+    @objc private func handleGetURLEvent(_ event: NSAppleEventDescriptor, withReplyEvent replyEvent: NSAppleEventDescriptor) {
+        guard let stringValue = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue,
+              let url = URL(string: stringValue) else {
+            return
+        }
+        handleIncoming(url: url)
+    }
+
+    private func handleIncoming(url: URL) {
+        guard let manager = browserManager else {
+            return
+        }
+        Task { @MainActor in
+            manager.presentExternalURL(url)
+        }
+    }
 }
 
 struct PulseCommands: Commands {
@@ -119,12 +154,19 @@ struct PulseCommands: Commands {
                 browserManager.toggleSidebar()
             }
             .keyboardShortcut("s", modifiers: .command)
+            Button("Toggle Picture in Picture") {
+                browserManager.tabManager.currentTab?.requestPictureInPicture()
+            }
+            .keyboardShortcut("p", modifiers: [.command, .shift])
+            .disabled(browserManager.tabManager.currentTab == nil ||
+                     !(browserManager.tabManager.currentTab?.hasVideoContent == true ||
+                       browserManager.tabManager.currentTab?.hasPiPActive == true))
         }
 
         // View commands
         CommandGroup(after: .windowSize) {
             Button("New URL / Search") {
-                browserManager.openCommandPalette()
+                browserManager.openCommandPaletteWithCurrentURL()
             }
             .keyboardShortcut("l", modifiers: .command)
             
@@ -142,6 +184,15 @@ struct PulseCommands: Commands {
                 browserManager.showQuitDialog()
             }
             .keyboardShortcut("q", modifiers: .command)
+            
+            Divider()
+            
+            Button(browserManager.tabManager.currentTab?.isAudioMuted == true ? "Unmute Audio" : "Mute Audio") {
+                browserManager.tabManager.currentTab?.toggleMute()
+            }
+            .keyboardShortcut("m", modifiers: .command)
+            .disabled(browserManager.tabManager.currentTab == nil ||
+                     browserManager.tabManager.currentTab?.hasAudioContent != true)
         }
 
         // File Section
@@ -274,26 +325,6 @@ struct PulseCommands: Commands {
             }
         }
         
-        // Window Commands
-        CommandMenu("Window") {
-            Button("Toggle Picture in Picture") {
-                browserManager.tabManager.currentTab?.requestPictureInPicture()
-            }
-            .keyboardShortcut("p", modifiers: [.command, .shift])
-            .disabled(browserManager.tabManager.currentTab == nil || 
-                     !(browserManager.tabManager.currentTab?.hasVideoContent == true || 
-                       browserManager.tabManager.currentTab?.hasPiPActive == true))
-            
-            Divider()
-            
-            Button(browserManager.tabManager.currentTab?.isAudioMuted == true ? "Unmute Audio" : "Mute Audio") {
-                browserManager.tabManager.currentTab?.toggleMute()
-            }
-            .keyboardShortcut("m", modifiers: .command)
-            .disabled(browserManager.tabManager.currentTab == nil || 
-                     browserManager.tabManager.currentTab?.hasAudioContent != true)
-        }
-
         // Appearance Commands
         CommandMenu("Appearance") {
             Button("Customize Space Gradient...") {

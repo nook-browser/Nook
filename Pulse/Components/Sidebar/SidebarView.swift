@@ -201,8 +201,18 @@ struct SidebarView: View {
             let newSpaceIndex = targetScrollPosition
             if newSpaceIndex != activeSpaceIndex {
                 print("🎯 Programmatic space change - snapping to space \(newSpaceIndex)")
+                // Step 1: clear scroll target without animation
+                var t = Transaction()
+                t.disablesAnimations = true
+                withTransaction(t) { currentScrollID = nil }
+                // Step 2: update visible window immediately so target exists
                 activeSpaceIndex = newSpaceIndex
-                currentScrollID = newSpaceIndex
+                // Step 3: set target on next runloop tick
+                DispatchQueue.main.async {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        currentScrollID = newSpaceIndex
+                    }
+                }
             }
         }
         .onScrollPhaseChange { oldPhase, newPhase in
@@ -233,20 +243,23 @@ struct SidebarView: View {
         LazyHStack(spacing: 0) {
             ForEach(visibleSpaceIndices, id: \.self) { spaceIndex in
                 let space = browserManager.tabManager.spaces[spaceIndex]
-                SpaceView(
-                    space: space,
-                    isActive: browserManager.tabManager.currentSpace?.id == space.id,
-                    width: effectiveWidth,
-                    onActivateTab: { browserManager.tabManager.setActiveTab($0) },
-                    onCloseTab: { browserManager.tabManager.removeTab($0.id) },
-                    onPinTab: { browserManager.tabManager.pinTab($0) },
-                    onMoveTabUp: { browserManager.tabManager.moveTabUp($0.id) },
-                    onMoveTabDown: { browserManager.tabManager.moveTabDown($0.id) },
-                    onMuteTab: { $0.toggleMute() }
-                )
+                VStack(spacing: 0) {
+                    SpaceView(
+                        space: space,
+                        isActive: browserManager.tabManager.currentSpace?.id == space.id,
+                        width: effectiveWidth,
+                        onActivateTab: { browserManager.tabManager.setActiveTab($0) },
+                        onCloseTab: { browserManager.tabManager.removeTab($0.id) },
+                        onPinTab: { browserManager.tabManager.pinTab($0) },
+                        onMoveTabUp: { browserManager.tabManager.moveTabUp($0.id) },
+                        onMoveTabDown: { browserManager.tabManager.moveTabDown($0.id) },
+                        onMuteTab: { $0.toggleMute() }
+                    )
+                    .id(space.id)
+                    // Each page is exactly one sidebar-width wide for viewAligned snapping
+                    .frame(width: effectiveWidth)
+                }
                 .id(spaceIndex)
-                // Each page is exactly one sidebar-width wide for viewAligned snapping
-                .frame(width: effectiveWidth)
             }
         }
         .scrollTargetLayout()

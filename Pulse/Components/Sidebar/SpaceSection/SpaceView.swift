@@ -37,9 +37,11 @@ struct SpaceView: View {
     var body: some View {
         return VStack(spacing: 8) {
             SpaceTittle(space: space)
+                .padding(.horizontal, 8)
             
             if !spacePinnedTabs.isEmpty || !tabs.isEmpty {
                 SpaceSeparator()
+                    .padding(.horizontal, 8)
             }
             
             // Unified container around Pinned + New Tab + Regular to bridge gaps
@@ -260,13 +262,13 @@ struct SpaceView: View {
                 .contentShape(Rectangle())
                 Spacer()
             }
-            // Keep page width equal to the whole sidebar, but pad items inside
             .padding(.horizontal, 8)
-            .frame(width: width)
-            .contentShape(Rectangle())
-            // Avoid window-drag gestures in the sidebar content area
-            .scrollTargetLayout()
         }
+        // Keep page width equal to the whole sidebar
+        .frame(width: width)
+        .contentShape(Rectangle())
+        // Avoid window-drag gestures in the sidebar content area
+        .scrollTargetLayout()
         .onReceive(NotificationCenter.default.publisher(for: .tabDragDidEnd)) { _ in
             draggedItem = nil
         }

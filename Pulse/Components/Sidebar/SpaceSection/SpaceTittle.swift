@@ -108,7 +108,9 @@ struct SpaceTittle: View {
                 .buttonStyle(PlainButtonStyle())
             }
         }
-        .padding(.horizontal, 8)
+        // Match tabs' internal left/right padding so text aligns
+        .padding(.horizontal, 10)
+        // Use the sidebar's section padding; avoid double horizontal padding
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
         .background(isHovering ? AppColors.controlBackgroundHover : Color.clear)

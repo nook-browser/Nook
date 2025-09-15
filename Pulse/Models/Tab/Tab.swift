@@ -22,6 +22,8 @@ public class Tab: NSObject, Identifiable, ObservableObject {
     var favicon: SwiftUI.Image
     var spaceId: UUID?
     var index: Int
+    // If true, this tab is created to host a popup window; do not perform initial load.
+    var isPopupHost: Bool = false
 
     // MARK: - Favicon Cache
     // Global favicon cache shared across profiles by design to increase hit rate
@@ -329,7 +331,11 @@ public class Tab: NSObject, Identifiable, ObservableObject {
             ExtensionManager.shared.notifyTabOpened(self)
             didNotifyOpenToExtensions = true
         }
-        loadURL(url)
+        // For popup-hosting tabs, don't trigger an initial navigation. WebKit will
+        // drive the load into this returned webView from createWebViewWith:.
+        if !isPopupHost {
+            loadURL(url)
+        }
     }
 
     // Resolve the Profile for this tab via its space association, or fall back to currentProfile
@@ -1825,6 +1831,10 @@ extension Tab: WKNavigationDelegate {
         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
     ) {
         if let url = navigationAction.request.url {
+            // Heuristic: surface OAuth assist when protection may interfere
+            if navigationAction.targetFrame?.isMainFrame == true {
+                browserManager?.maybeShowOAuthAssist(for: url, in: self)
+            }
             let pathExtension = url.pathExtension.lowercased()
             let downloadExtensions: Set<String> = [
                 "zip", "rar", "7z", "tar", "gz", "bz2", "xz",
@@ -2017,10 +2027,17 @@ extension Tab: WKUIDelegate {
         for navigationAction: WKNavigationAction,
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
-        if navigationAction.targetFrame == nil {
-            webView.load(navigationAction.request)
+        guard let bm = browserManager else { return nil }
+        // Prefer request URL; if absent (e.g., about:blank), create a blank popup tab
+        if let url = navigationAction.request.url, url.scheme != nil, url.absoluteString != "about:blank" {
+            let space = bm.tabManager.currentSpace
+            let newTab = bm.tabManager.createNewTab(url: url.absoluteString, in: space)
+            return newTab.activeWebView
+        } else {
+            let space = bm.tabManager.currentSpace
+            let newTab = bm.tabManager.createPopupTab(in: space)
+            return newTab.activeWebView
         }
-        return nil
     }
 
     public func webView(

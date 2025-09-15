@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct CommandPaletteView: View {
     @EnvironmentObject var browserManager: BrowserManager
@@ -124,6 +125,10 @@ struct CommandPaletteView: View {
                 
                 DispatchQueue.main.async {
                     isSearchFocused = true
+                    // Select all once focused so the URL is highlighted
+                    DispatchQueue.main.async {
+                        NSApplication.shared.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil)
+                    }
                 }
             } else {
                 isSearchFocused = false
