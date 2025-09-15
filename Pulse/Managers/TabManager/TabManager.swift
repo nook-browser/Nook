@@ -861,6 +861,36 @@ class TabManager: ObservableObject {
         return newTab
     }
 
+    // Create a new blank tab intended to host a popup window. The returned tab's
+    // WKWebView is returned to WebKit so it can load popup content. No initial
+    // navigation is performed to preserve window.opener scripting semantics.
+    @discardableResult
+    func createPopupTab(in space: Space? = nil) -> Tab {
+        let targetSpace: Space? = space ?? currentSpace ?? ensureDefaultSpaceIfNeeded()
+        // Ensure target space has a profile assignment
+        if let ts = targetSpace, ts.profileId == nil, let pid = browserManager?.currentProfile?.id {
+            ts.profileId = pid
+            persistSnapshot()
+        }
+        let sid = targetSpace?.id
+        let existingTabs = sid.flatMap { tabsBySpace[$0] } ?? []
+        let nextIndex = (existingTabs.map { $0.index }.max() ?? -1) + 1
+
+        let blankURL = URL(string: "about:blank") ?? URL(string: "https://example.com")!
+        let newTab = Tab(
+            url: blankURL,
+            name: "New Tab",
+            favicon: "globe",
+            spaceId: sid,
+            index: nextIndex,
+            browserManager: browserManager
+        )
+        newTab.isPopupHost = true
+        addTab(newTab)
+        setActiveTab(newTab)
+        return newTab
+    }
+
     // Ensure a default space exists and is active; create a Personal space if needed
     private func ensureDefaultSpaceIfNeeded() -> Space {
         if let cs = currentSpace { return cs }

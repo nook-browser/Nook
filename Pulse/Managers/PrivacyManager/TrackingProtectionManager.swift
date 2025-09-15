@@ -18,11 +18,12 @@ final class TrackingProtectionManager {
     private let ruleListIdentifier = "PulseTrackingBlocker"
     private var installedRuleList: WKContentRuleList?
     private var thirdPartyCookieScript: WKUserScript {
-        // Disable document.cookie in third‑party iframes (based on referrer host)
+        // Disable document.cookie in third‑party iframes only (never main-frame)
         let js = """
         (function() {
           try {
-            // Detect if current document is embedded by a different host
+            // Only act in embedded contexts
+            if (window.top === window) return;
             var ref = document.referrer || "";
             var thirdParty = false;
             try {
@@ -47,6 +48,58 @@ final class TrackingProtectionManager {
         })();
         """
         return WKUserScript(source: js, injectionTime: .atDocumentStart, forMainFrameOnly: false)
+    }
+
+    // MARK: - Exceptions
+    private var temporarilyDisabledTabs: [UUID: Date] = [:]
+    private var allowedDomains: Set<String> = []
+
+    func isTemporarilyDisabled(tabId: UUID) -> Bool {
+        if let until = temporarilyDisabledTabs[tabId] {
+            if until > Date() { return true }
+            temporarilyDisabledTabs.removeValue(forKey: tabId)
+        }
+        return false
+    }
+
+    func disableTemporarily(for tab: Tab, duration: TimeInterval) {
+        let until = Date().addingTimeInterval(duration)
+        temporarilyDisabledTabs[tab.id] = until
+        if let wv = tab.webView {
+            removeTracking(from: wv)
+            wv.reloadFromOrigin()
+        }
+        // Schedule re-apply after expiration
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self, weak tab] in
+            guard let self, let tab else { return }
+            // Cleanup expired entry
+            if let exp = self.temporarilyDisabledTabs[tab.id], exp <= Date() {
+                self.temporarilyDisabledTabs.removeValue(forKey: tab.id)
+                if self.shouldApplyTracking(to: tab), let wv = tab.webView {
+                    self.applyTracking(to: wv)
+                    wv.reloadFromOrigin()
+                }
+            }
+        }
+    }
+
+    func allowDomain(_ host: String, allowed: Bool = true) {
+        let norm = host.lowercased()
+        if allowed { allowedDomains.insert(norm) } else { allowedDomains.remove(norm) }
+        // Update existing views for this host
+        if let bm = browserManager {
+            for tab in bm.tabManager.allTabs() {
+                if tab.webView?.url?.host?.lowercased() == norm, let wv = tab.webView {
+                    if allowed { removeTracking(from: wv) } else { applyTracking(to: wv) }
+                    wv.reloadFromOrigin()
+                }
+            }
+        }
+    }
+
+    func isDomainAllowed(_ host: String?) -> Bool {
+        guard let h = host?.lowercased() else { return false }
+        return allowedDomains.contains(h)
     }
 
     func attach(browserManager: BrowserManager) {
@@ -126,13 +179,10 @@ final class TrackingProtectionManager {
         let allTabs = bm.tabManager.allTabs()
         for tab in allTabs {
             guard let wv = tab.webView else { continue }
-            if let list = installedRuleList {
-                wv.configuration.userContentController.removeAllContentRuleLists()
-                wv.configuration.userContentController.add(list)
-            }
-            let ucc = wv.configuration.userContentController
-            if !ucc.userScripts.contains(where: { $0.source.contains("document.referrer") }) {
-                ucc.addUserScript(thirdPartyCookieScript)
+            if shouldApplyTracking(to: tab) {
+                applyTracking(to: wv)
+            } else {
+                removeTracking(from: wv)
             }
             // Reload to apply rules consistently
             wv.reloadFromOrigin()
@@ -144,13 +194,46 @@ final class TrackingProtectionManager {
         let allTabs = bm.tabManager.allTabs()
         for tab in allTabs {
             guard let wv = tab.webView else { continue }
-            let ucc = wv.configuration.userContentController
-            ucc.removeAllContentRuleLists()
-            let remaining = ucc.userScripts.filter { !$0.source.contains("document.referrer") }
-            ucc.removeAllUserScripts()
-            remaining.forEach { ucc.addUserScript($0) }
+            removeTracking(from: wv)
             wv.reloadFromOrigin()
         }
+    }
+
+    // MARK: - Per-WebView helpers
+    private func shouldApplyTracking(to tab: Tab) -> Bool {
+        if !isEnabled { return false }
+        if isTemporarilyDisabled(tabId: tab.id) { return false }
+        if isDomainAllowed(tab.webView?.url?.host) { return false }
+        return true
+    }
+
+    private func applyTracking(to webView: WKWebView) {
+        guard let list = installedRuleList else { return }
+        let ucc = webView.configuration.userContentController
+        ucc.removeAllContentRuleLists()
+        ucc.add(list)
+        if !ucc.userScripts.contains(where: { $0.source.contains("document.referrer") }) {
+            ucc.addUserScript(thirdPartyCookieScript)
+        }
+    }
+
+    private func removeTracking(from webView: WKWebView) {
+        let ucc = webView.configuration.userContentController
+        ucc.removeAllContentRuleLists()
+        // Remove our specific script (identified by referrer check)
+        let remaining = ucc.userScripts.filter { !$0.source.contains("document.referrer") }
+        ucc.removeAllUserScripts()
+        remaining.forEach { ucc.addUserScript($0) }
+    }
+
+    func refreshFor(tab: Tab) {
+        guard let wv = tab.webView else { return }
+        if shouldApplyTracking(to: tab) {
+            applyTracking(to: wv)
+        } else {
+            removeTracking(from: wv)
+        }
+        wv.reloadFromOrigin()
     }
 
     // MARK: - Rules

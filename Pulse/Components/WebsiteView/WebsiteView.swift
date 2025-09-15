@@ -107,6 +107,13 @@ struct WebsiteView: View {
                             .animation(.spring(response: 0.5, dampingFraction: 0.8), value: browserManager.didCopyURL)
                             .padding(10)
                     }
+                    if let assist = browserManager.oauthAssist,
+                       browserManager.tabManager.currentTab?.id == assist.tabId {
+                        OAuthAssistBanner(host: assist.host)
+                            .environmentObject(browserManager)
+                            .animation(.spring(response: 0.5, dampingFraction: 0.8), value: browserManager.oauthAssist)
+                            .padding(10)
+                    }
                 }
                 Spacer()
 //                HStack {
