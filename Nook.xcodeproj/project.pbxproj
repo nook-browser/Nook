@@ -302,7 +302,6 @@
 		2CC066E62E789ECB001D37C6 /* Tab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tab.swift; sourceTree = "<group>"; };
 		2CC066E72E789ECB001D37C6 /* TabsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabsModel.swift; sourceTree = "<group>"; };
 		2CC066EA2E789ECB001D37C6 /* TabListDataSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabListDataSource.swift; sourceTree = "<group>"; };
-		2CC066EC2E789ECB001D37C6 /* Pulse-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Pulse-Bridging-Header.h"; sourceTree = "<group>"; };
 		2CC066EE2E789ECB001D37C6 /* decode.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = decode.h; sourceTree = "<group>"; };
 		2CC066EF2E789ECB001D37C6 /* decode.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = decode.c; sourceTree = "<group>"; };
 		2CC066F02E789ECB001D37C6 /* extern.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = extern.h; sourceTree = "<group>"; };
@@ -353,6 +352,7 @@
 		2CC067252E789ECB001D37C6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		2CC067262E789ECB001D37C6 /* Nook.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Nook.entitlements; sourceTree = "<group>"; };
 		2CC067282E789ECB001D37C6 /* NookApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NookApp.swift; sourceTree = "<group>"; };
+		2CC067CD2E78A6CF001D37C6 /* Nook-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Nook-Bridging-Header.h"; sourceTree = "<group>"; };
 		7F8340FC2E37F39400674A5D /* Nook.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Nook.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -903,7 +903,7 @@
 		2CC066ED2E789ECB001D37C6 /* Supporting Files */ = {
 			isa = PBXGroup;
 			children = (
-				2CC066EC2E789ECB001D37C6 /* Pulse-Bridging-Header.h */,
+				2CC067CD2E78A6CF001D37C6 /* Nook-Bridging-Header.h */,
 			);
 			path = "Supporting Files";
 			sourceTree = "<group>";
