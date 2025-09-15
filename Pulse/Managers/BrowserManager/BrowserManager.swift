@@ -463,6 +463,12 @@ class BrowserManager: ObservableObject {
         saveSidebarSettings()
     }
 
+    // MARK: - Sidebar width access for overlays
+    /// Returns the last saved sidebar width (used when sidebar is collapsed to size hover overlay)
+    func getSavedSidebarWidth() -> CGFloat {
+        return savedSidebarWidth
+    }
+
     // MARK: - Command Palette
     func openCommandPalette() {
         // Always open; toggling handled by toggleCommandPalette()

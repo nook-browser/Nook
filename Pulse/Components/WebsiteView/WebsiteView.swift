@@ -82,6 +82,11 @@ struct WebsiteView: View {
                                     .environmentObject(splitManager)
                             }
                         }
+                        // Restore visual margins around the web content card
+                        // - Keep leading flush with the sidebar when visible
+                        // - Add a leading margin when the sidebar is hidden
+                        .padding(.trailing, 8)
+                        .padding(.leading, browserManager.isSidebarVisible ? 0 : 8)
                     }
                     .contextMenu {
                         // Divider + close buttons overlay when split is active
@@ -134,6 +139,12 @@ struct TabCompositorWrapper: NSViewRepresentable {
         var lastCurrentId: UUID? = nil
         var lastFraction: CGFloat = -1
         var lastSize: CGSize = .zero
+        var frameObserver: NSObjectProtocol? = nil
+        deinit {
+            if let token = frameObserver {
+                NotificationCenter.default.removeObserver(token)
+            }
+        }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -142,6 +153,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
         let containerView = NSView()
         containerView.wantsLayer = true
         containerView.layer?.backgroundColor = NSColor.clear.cgColor
+        containerView.postsFrameChangedNotifications = true
         
         // Store reference to container view in browser manager
         browserManager.compositorContainerView = containerView
@@ -153,6 +165,19 @@ struct TabCompositorWrapper: NSViewRepresentable {
         overlay.splitManager = browserManager.splitManager
         overlay.layer?.zPosition = 10_000
         containerView.addSubview(overlay)
+
+        // Observe size changes to recompute pane layout when available width changes
+        let coord = context.coordinator
+        coord.frameObserver = NotificationCenter.default.addObserver(
+            forName: NSView.frameDidChangeNotification,
+            object: containerView,
+            queue: .main
+        ) { [weak containerView] _ in
+            guard let cv = containerView else { return }
+            // Rebuild compositor to anchor left/right panes to new bounds
+            updateCompositor(cv)
+            coord.lastSize = cv.bounds.size
+        }
 
         // Set up link hover callbacks for current tab
         if let currentTab = browserManager.tabManager.currentTab {
@@ -313,7 +338,10 @@ struct TabCompositorWrapper: NSViewRepresentable {
             layer.borderWidth = isActive ? 1.0 : 0.0
             layer.borderColor = isActive ? accent.withAlphaComponent(0.9).cgColor : NSColor.clear.cgColor
         }
-        v.autoresizingMask = [.height]
+        // Allow the pane container to grow/shrink with its superview's size changes.
+        // Width is always recomputed on frame changes via our observer above, but this
+        // keeps the panes visually in sync during live resize.
+        v.autoresizingMask = [.width, .height]
         return v
     }
     

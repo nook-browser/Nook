@@ -13,7 +13,15 @@ struct SidebarView: View {
     @State private var spaceIcon = ""
     @State private var showHistory = false
     @State private var sidebarDraggedItem: UUID? = nil
-    
+    // Force rendering even when the real sidebar is collapsed (used by hover overlay)
+    var forceVisible: Bool = false
+    // Override the width for overlay use; falls back to BrowserManager width
+    var forcedWidth: CGFloat? = nil
+
+    private var effectiveWidth: CGFloat {
+        forcedWidth ?? browserManager.sidebarWidth
+    }
+
     private var targetScrollPosition: Int {
         if let currentSpace = browserManager.tabManager.currentSpace,
            let index = browserManager.tabManager.spaces.firstIndex(where: { $0.id == currentSpace.id }) {
@@ -52,7 +60,7 @@ struct SidebarView: View {
     
 
     var body: some View {
-        if browserManager.isSidebarVisible {
+        if browserManager.isSidebarVisible || forceVisible {
             sidebarContent
         }
     }
@@ -80,7 +88,7 @@ struct SidebarView: View {
                         .padding(.horizontal, 8)
                     // Container to support PinnedGrid slide transitions without clipping
                     ZStack {
-                        PinnedGrid(width: max(0, browserManager.sidebarWidth - 16))
+                        PinnedGrid(width: max(0, effectiveWidth - 16))
                     }
                     .padding(.horizontal, 8)
                     .modifier(FallbackDropBelowEssentialsModifier())
@@ -130,8 +138,8 @@ struct SidebarView: View {
 
                 }
                 .padding(.top, 8)
-                .frame(width: browserManager.sidebarWidth)
-            .frame(width: browserManager.sidebarWidth)
+                .frame(width: effectiveWidth)
+            .frame(width: effectiveWidth)
     }
     
     private var historyView: some View {
@@ -157,7 +165,7 @@ struct SidebarView: View {
             spacesHStack
         }
         // Match the full sidebar width to avoid early clipping when swiping
-        .frame(width: browserManager.sidebarWidth)
+        .frame(width: effectiveWidth)
         .contentMargins(.horizontal, 0)
         .scrollTargetLayout()
         .coordinateSpace(name: "SidebarGlobal")
@@ -228,7 +236,7 @@ struct SidebarView: View {
                 SpaceView(
                     space: space,
                     isActive: browserManager.tabManager.currentSpace?.id == space.id,
-                    width: browserManager.sidebarWidth,
+                    width: effectiveWidth,
                     onActivateTab: { browserManager.tabManager.setActiveTab($0) },
                     onCloseTab: { browserManager.tabManager.removeTab($0.id) },
                     onPinTab: { browserManager.tabManager.pinTab($0) },
@@ -238,7 +246,7 @@ struct SidebarView: View {
                 )
                 .id(spaceIndex)
                 // Each page is exactly one sidebar-width wide for viewAligned snapping
-                .frame(width: browserManager.sidebarWidth)
+                .frame(width: effectiveWidth)
             }
         }
         .scrollTargetLayout()
