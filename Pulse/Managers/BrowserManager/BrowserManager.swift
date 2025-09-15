@@ -320,12 +320,24 @@ class BrowserManager: ObservableObject {
     var gradientColorManager: GradientColorManager
     var trackingProtectionManager: TrackingProtectionManager
     
+    var externalMiniWindowManager = ExternalMiniWindowManager()
+    
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
     var isSwitchingProfile: Bool = false
     
     // Compositor container view
     var compositorContainerView: NSView?
+
+    // MARK: - OAuth Assist Banner
+    struct OAuthAssist: Equatable {
+        let host: String
+        let url: URL
+        let tabId: UUID
+        let timestamp: Date
+    }
+    @Published var oauthAssist: OAuthAssist?
+    private var oauthAssistCooldown: [String: Date] = [:]
 
     init() {
         // Phase 1: initialize all stored properties
@@ -375,6 +387,7 @@ class BrowserManager: ObservableObject {
         }
         self.trackingProtectionManager.attach(browserManager: self)
         self.trackingProtectionManager.setEnabled(self.settingsManager.blockCrossSiteTracking)
+        self.externalMiniWindowManager.attach(browserManager: self)
         // Migrate legacy history entries (with nil profile) to default profile to avoid cross-profile leakage
         self.migrateUnassignedDataToDefaultProfile()
         loadSidebarSettings()
@@ -393,6 +406,62 @@ class BrowserManager: ObservableObject {
             guard let enabled = note.userInfo?["enabled"] as? Bool else { return }
             self?.trackingProtectionManager.setEnabled(enabled)
         }
+    }
+
+    // MARK: - OAuth Assist Controls
+    func maybeShowOAuthAssist(for url: URL, in tab: Tab) {
+        // Only when protection is enabled and not already disabled for this tab
+        guard settingsManager.blockCrossSiteTracking, trackingProtectionManager.isEnabled else { return }
+        guard !trackingProtectionManager.isTemporarilyDisabled(tabId: tab.id) else { return }
+        let host = url.host?.lowercased() ?? ""
+        guard !host.isEmpty else { return }
+        // Respect per-domain allow list
+        guard !trackingProtectionManager.isDomainAllowed(host) else { return }
+        // Simple heuristic for OAuth endpoints
+        if isLikelyOAuthURL(url) {
+            let now = Date()
+            if let coolUntil = oauthAssistCooldown[host], coolUntil > now { return }
+            oauthAssist = OAuthAssist(host: host, url: url, tabId: tab.id, timestamp: now)
+            // Cooldown: don't show again for this host for 10 minutes
+            oauthAssistCooldown[host] = now.addingTimeInterval(10 * 60)
+            // Auto-hide after 8 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 8) { [weak self] in
+                if self?.oauthAssist?.host == host { self?.oauthAssist = nil }
+            }
+        }
+    }
+
+    func hideOAuthAssist() { oauthAssist = nil }
+
+    func oauthAssistAllowForThisTab(duration: TimeInterval = 15 * 60) {
+        guard let assist = oauthAssist else { return }
+        guard let tab = tabManager.allTabs().first(where: { $0.id == assist.tabId }) else { return }
+        trackingProtectionManager.disableTemporarily(for: tab, duration: duration)
+        hideOAuthAssist()
+    }
+
+    func oauthAssistAlwaysAllowDomain() {
+        guard let assist = oauthAssist else { return }
+        trackingProtectionManager.allowDomain(assist.host, allowed: true)
+        hideOAuthAssist()
+    }
+
+    private func isLikelyOAuthURL(_ url: URL) -> Bool {
+        let host = (url.host ?? "").lowercased()
+        let path = url.path.lowercased()
+        let query = url.query?.lowercased() ?? ""
+        // Common IdP hosts
+        let hostHints = [
+            "accounts.google.com", "login.microsoftonline.com", "login.live.com",
+            "appleid.apple.com", "github.com", "gitlab.com", "bitbucket.org",
+            "auth0.com", "okta.com", "onelogin.com", "pingidentity.com",
+            "slack.com", "zoom.us", "login.cloudflareaccess.com"
+        ]
+        if hostHints.contains(where: { host.contains($0) }) { return true }
+        // Common OAuth paths and signals
+        if path.contains("/oauth") || path.contains("oauth2") || path.contains("/authorize") || path.contains("/signin") || path.contains("/login") || path.contains("/callback") { return true }
+        if query.contains("client_id=") || query.contains("redirect_uri=") || query.contains("response_type=") { return true }
+        return false
     }
 
     // MARK: - Profile Switching
@@ -474,6 +543,21 @@ class BrowserManager: ObservableObject {
         // Always open; toggling handled by toggleCommandPalette()
         commandPalettePrefilledText = ""
         shouldNavigateCurrentTab = false
+        self.isMiniCommandPaletteVisible = false
+        DispatchQueue.main.async {
+            self.isCommandPaletteVisible = true
+        }
+    }
+
+    /// Opens the full command palette prefilled with the current tab's URL,
+    /// with Return navigating the current tab (not creating a new one).
+    func openCommandPaletteWithCurrentURL() {
+        if let currentURL = tabManager.currentTab?.url {
+            commandPalettePrefilledText = currentURL.absoluteString
+        } else {
+            commandPalettePrefilledText = ""
+        }
+        shouldNavigateCurrentTab = true
         self.isMiniCommandPaletteVisible = false
         DispatchQueue.main.async {
             self.isCommandPaletteVisible = true
@@ -1192,4 +1276,10 @@ class BrowserManager: ObservableObject {
             }
         }
     }
+
+    /// Presents an external URL in a mini window popup (for URL events)
+    func presentExternalURL(_ url: URL) {
+        externalMiniWindowManager.present(url: url)
+    }
 }
+
