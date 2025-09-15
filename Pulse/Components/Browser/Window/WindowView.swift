@@ -9,6 +9,7 @@ import SwiftUI
 
 struct WindowView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @StateObject private var hoverSidebarManager = HoverSidebarManager()
 
     var body: some View {
         ZStack {
@@ -49,6 +50,10 @@ struct WindowView: View {
             // Mini command palette anchored exactly to URL bar's top-left
             MiniCommandPaletteOverlay()
 
+            // Hover-reveal Sidebar overlay (slides in over web content)
+            SidebarHoverOverlayView()
+                .environmentObject(hoverSidebarManager)
+
             CommandPaletteView()
             DialogView()
             
@@ -74,9 +79,18 @@ struct WindowView: View {
         .onPreferenceChange(URLBarFramePreferenceKey.self) { frame in
             browserManager.urlBarFrame = frame
         }
+        // Attach hover sidebar manager lifecycle
+        .onAppear {
+            hoverSidebarManager.attach(browserManager: browserManager)
+            hoverSidebarManager.start()
+        }
+        .onDisappear {
+            hoverSidebarManager.stop()
+        }
         .environmentObject(browserManager)
         .environmentObject(browserManager.gradientColorManager)
         .environmentObject(browserManager.splitManager)
+        .environmentObject(hoverSidebarManager)
     }
 
 }
