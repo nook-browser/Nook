@@ -2,6 +2,8 @@
 *A fast, minimal browser with a sidebar-first design.*
 **A public alpha will be available soon**
 
+![Image from Imgflip](https://github.com/user-attachments/assets/dbfe9e9c-82f5-4f59-a073-b86ea05e5f26)
+
 
 [![Stars](https://img.shields.io/github/stars/nook-browser/Nook?style=social)](https://github.com/nook-browser/Nook/stargazers)
 [![Forks](https://img.shields.io/github/forks/nook-browser/Nook?style=social)](https://github.com/nook-browser/Nook/network/members)
@@ -12,7 +14,7 @@
 
 ---
 
-## ✨ Features  
+## Features  
 
 -  **Sidebar-first navigation** – vertical tabs that feel natural and uncluttered.
 -  **Performance** – optimized with modern macOS APIs for speed and low memory use.  
