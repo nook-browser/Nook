@@ -34,6 +34,7 @@
 git clone https://github.com/nook-browser/Nook.git
 cd Nook
 open Nook.xcodeproj
+```
 
 Some obj-c libraries may not play nice with Intel Macs, though there should technically be full interoperability. You can use any number of resources to debug. You will also need to delete a couple lines of code for *older* versions of macOS than Tahoe (26.0).
 
