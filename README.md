@@ -1,6 +1,7 @@
 # Nook
 *A fast, minimal browser with a sidebar-first design.*
-**A public alpha will be available soon**
+
+**A public alpha will be available soon. For now, you'll have to build from source.**
 
 ![Image from Imgflip](https://github.com/user-attachments/assets/dbfe9e9c-82f5-4f59-a073-b86ea05e5f26)
 
@@ -33,6 +34,8 @@
 git clone https://github.com/nook-browser/Nook.git
 cd Nook
 open Nook.xcodeproj
+
+Some obj-c libraries may not play nice with Intel Macs, though there should technically be full interoperability. You can use any number of resources to debug. You will also need to delete a couple lines of code for *older* versions of macOS than Tahoe (26.0).
 
 You’ll need to set your personal Development Team in Signing to build locally.
 
