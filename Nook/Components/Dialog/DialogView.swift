@@ -56,13 +56,14 @@ struct DialogView: View {
                 }
             }
             .padding(24)
-            .background(.thinMaterial)
+            .background(Color(.windowBackgroundColor))
             .frame(maxWidth: 500)
             .overlay {
                 RoundedRectangle(cornerRadius: 16)
                     .stroke(Color.white.opacity(0.2))
             }
             .clipShape(RoundedRectangle(cornerRadius: 16))
+            .alwaysArrowCursor()
             
             Spacer()
         }
