@@ -16,23 +16,28 @@ final class MiniWindowSession: ObservableObject, Identifiable {
     let originName: String
     private let targetSpaceResolver: () -> String
     private let adoptHandler: (MiniWindowSession) -> Void
+    private let authCompletionHandler: ((Bool, URL?) -> Void)?
 
     @Published var currentURL: URL
     @Published var title: String
     @Published var isLoading: Bool = true
     @Published var estimatedProgress: Double = 0
+    @Published var isAuthComplete: Bool = false
+    @Published var authSuccess: Bool = false
 
     init(
         url: URL,
         profile: Profile?,
         originName: String,
         targetSpaceResolver: @escaping () -> String,
-        adoptHandler: @escaping (MiniWindowSession) -> Void
+        adoptHandler: @escaping (MiniWindowSession) -> Void,
+        authCompletionHandler: ((Bool, URL?) -> Void)? = nil
     ) {
         self.profile = profile
         self.originName = originName
         self.targetSpaceResolver = targetSpaceResolver
         self.adoptHandler = adoptHandler
+        self.authCompletionHandler = authCompletionHandler
         self.currentURL = url
         self.title = url.absoluteString
     }
@@ -55,6 +60,24 @@ final class MiniWindowSession: ObservableObject, Identifiable {
     func updateProgress(_ progress: Double) {
         estimatedProgress = progress
     }
+    
+    func completeAuth(success: Bool, finalURL: URL? = nil) {
+        isAuthComplete = true
+        authSuccess = success
+        if let finalURL = finalURL {
+            currentURL = finalURL
+        }
+        authCompletionHandler?(success, finalURL)
+        
+        // Don't auto-adopt - let the user decide when to adopt the window
+        // The authentication completion is communicated back to the original tab
+        // but the mini window stays open for the user to manually adopt if desired
+    }
+
+    func cancelAuthDueToClose() {
+        guard !isAuthComplete else { return }
+        authCompletionHandler?(false, nil)
+    }
 }
 
 @MainActor
@@ -70,7 +93,7 @@ final class ExternalMiniWindowManager {
         self.browserManager = browserManager
     }
 
-    func present(url: URL) {
+    func present(url: URL, authCompletionHandler: ((Bool, URL?) -> Void)? = nil) {
         guard let browserManager else { return }
         let profile = browserManager.currentProfile
         let session = MiniWindowSession(
@@ -82,13 +105,15 @@ final class ExternalMiniWindowManager {
             },
             adoptHandler: { [weak self] session in
                 self?.adopt(session: session)
-            }
+            },
+            authCompletionHandler: authCompletionHandler
         )
 
         let controller = MiniBrowserWindowController(
             session: session,
             adoptAction: { [weak session] in session?.adopt() },
             onClose: { [weak self] session in
+                session.cancelAuthDueToClose()
                 self?.sessions[session.id] = nil
             }
         )

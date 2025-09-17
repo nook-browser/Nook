@@ -311,6 +311,7 @@ class BrowserManager: ObservableObject {
     var settingsManager: SettingsManager
     var dialogManager: DialogManager
     var downloadManager: DownloadManager
+    var authenticationManager: AuthenticationManager
     var historyManager: HistoryManager
     var cookieManager: CookieManager
     var cacheManager: CacheManager
@@ -319,6 +320,7 @@ class BrowserManager: ObservableObject {
     var splitManager: SplitViewManager
     var gradientColorManager: GradientColorManager
     var trackingProtectionManager: TrackingProtectionManager
+    var findManager: FindManager
     
     var externalMiniWindowManager = ExternalMiniWindowManager()
     
@@ -357,6 +359,7 @@ class BrowserManager: ObservableObject {
         self.settingsManager = SettingsManager()
         self.dialogManager = DialogManager()
         self.downloadManager = DownloadManager.shared
+        self.authenticationManager = AuthenticationManager()
         // Initialize managers with current profile context for isolation
         self.historyManager = HistoryManager(context: modelContext, profileId: initialProfile?.id)
         self.cookieManager = CookieManager(dataStore: initialProfile?.dataStore)
@@ -365,6 +368,7 @@ class BrowserManager: ObservableObject {
         self.splitManager = SplitViewManager()
         self.gradientColorManager = GradientColorManager()
         self.trackingProtectionManager = TrackingProtectionManager()
+        self.findManager = FindManager()
         self.compositorContainerView = nil
 
         // Phase 2: wire dependencies and perform side effects (safe to use self)
@@ -383,11 +387,12 @@ class BrowserManager: ObservableObject {
         if let g = self.tabManager.currentSpace?.gradient {
             self.gradientColorManager.setImmediate(g)
         } else {
-            self.gradientColorManager.setImmediate(.default)
+        self.gradientColorManager.setImmediate(.default)
         }
         self.trackingProtectionManager.attach(browserManager: self)
         self.trackingProtectionManager.setEnabled(self.settingsManager.blockCrossSiteTracking)
         self.externalMiniWindowManager.attach(browserManager: self)
+        self.authenticationManager.attach(browserManager: self)
         // Migrate legacy history entries (with nil profile) to default profile to avoid cross-profile leakage
         self.migrateUnassignedDataToDefaultProfile()
         loadSidebarSettings()
@@ -580,6 +585,19 @@ class BrowserManager: ObservableObject {
         } else {
             openCommandPalette()
         }
+    }
+    
+    func showFindBar() {
+        if findManager.isFindBarVisible {
+            findManager.hideFindBar()
+        } else {
+            findManager.showFindBar(for: tabManager.currentTab)
+        }
+    }
+    
+    func updateFindManagerCurrentTab() {
+        // Update the current tab for find manager
+        findManager.updateCurrentTab(tabManager.currentTab)
     }
 
     // MARK: - Tab Management (delegates to TabManager)
@@ -805,6 +823,16 @@ class BrowserManager: ObservableObject {
         
         Task {
             await cacheManager.clearCacheForDomain(host)
+        }
+    }
+    
+    /// Clears site cache for current page excluding cookies, then reloads from origin.
+    func hardReloadCurrentPage() {
+        guard let currentTab = tabManager.currentTab,
+              let host = currentTab.url.host else { return }
+        Task { @MainActor in
+            await cacheManager.clearCacheForDomainExcludingCookies(host)
+            currentTab.webView?.reloadFromOrigin()
         }
     }
     
@@ -1282,4 +1310,3 @@ class BrowserManager: ObservableObject {
         externalMiniWindowManager.present(url: url)
     }
 }
-

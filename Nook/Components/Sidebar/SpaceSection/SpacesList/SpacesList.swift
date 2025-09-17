@@ -19,13 +19,56 @@ struct SpacesList: View {
         let needed = CGFloat(count) * 32.0
         return needed > available
     }
+    
+    // When sidebar is too small to display all spaces, show only 3 dots with faded sides
+    private var shouldUseMinimal: Bool {
+        let count = browserManager.tabManager.spaces.count
+        guard count > 3 else { return false }
+        let available = max(browserManager.sidebarWidth - 120, 0)
+        let needed = CGFloat(count) * 16.0 // All dots at 16pt each
+        return available < needed
+    }
+    
+    private var visibleSpaces: [Space] {
+        let allSpaces = browserManager.tabManager.spaces
+        guard shouldUseMinimal, let currentSpace = browserManager.tabManager.currentSpace else {
+            return allSpaces
+        }
+        
+        // Find current space index
+        guard let currentIndex = allSpaces.firstIndex(where: { $0.id == currentSpace.id }) else {
+            return Array(allSpaces.prefix(3))
+        }
+        
+        // Smart carousel: show 2-3 spaces depending on position
+        var result: [Space] = []
+        let count = allSpaces.count
+        
+        // Add left space only if not at the beginning
+        if currentIndex > 0 {
+            result.append(allSpaces[currentIndex - 1])
+        }
+        
+        // Center space (current) - always included
+        result.append(allSpaces[currentIndex])
+        
+        // Add right space only if not at the end
+        if currentIndex < count - 1 {
+            result.append(allSpaces[currentIndex + 1])
+        }
+        
+        return result
+    }
 
     var body: some View {
         HStack(spacing: shouldUseCompact ? 4 : 8) {
-            ForEach(browserManager.tabManager.spaces, id: \.id) { space in
+            ForEach(Array(visibleSpaces.enumerated()), id: \.element.id) { index, space in
                 let isActive = browserManager.tabManager.currentSpace?.id == space.id
+                let isFaded = shouldUseMinimal && !isActive
+                
                 SpacesListItem(space: space, isActive: isActive, compact: shouldUseCompact)
                     .id(space.id)
+                    .opacity(isFaded ? 0.3 : 1.0)
             }
         }
     }
