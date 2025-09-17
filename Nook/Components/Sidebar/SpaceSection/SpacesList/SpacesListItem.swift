@@ -77,15 +77,17 @@ struct SpacesListItem: View {
         )
         .contextMenu {
             // Profile assignment
-            let currentName = resolvedProfileName(for: space.profileId) ?? "None"
+            let currentName = resolvedProfileName(for: space.profileId) ?? browserManager.profileManager.profiles.first?.name ?? "Default"
             Text("Current Profile: \(currentName)")
                 .foregroundStyle(.secondary)
             Divider()
             ProfilePickerView(
-                selectedProfileId: Binding(get: { space.profileId }, set: { assignProfile($0) }),
+                selectedProfileId: Binding(
+                    get: { space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID() },
+                    set: { assignProfile($0) }
+                ),
                 onSelect: { _ in },
-                compact: true,
-                showNoneOption: true
+                compact: true
             )
             .environmentObject(browserManager)
 
@@ -113,7 +115,7 @@ struct SpacesListItem: View {
         }
     }
 
-    private func assignProfile(_ id: UUID?) {
+    private func assignProfile(_ id: UUID) {
         browserManager.tabManager.assign(spaceId: space.id, toProfile: id)
     }
 

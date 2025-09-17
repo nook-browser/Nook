@@ -73,15 +73,17 @@ struct SpaceTittle: View {
                     // Profile assignment submenu
                     Menu("Assign to Profile") {
                         // Quick info item
-                        let currentName = resolvedProfileName(for: space.profileId) ?? "None"
+                        let currentName = resolvedProfileName(for: space.profileId) ?? browserManager.profileManager.profiles.first?.name ?? "Default"
                         Text("Current: \(currentName)")
                             .foregroundStyle(.secondary)
                         Divider()
                         ProfilePickerView(
-                            selectedProfileId: Binding(get: { space.profileId }, set: { assignProfile($0) }),
+                            selectedProfileId: Binding(
+                                get: { space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID() },
+                                set: { assignProfile($0) }
+                            ),
                             onSelect: { _ in },
-                            compact: true,
-                            showNoneOption: true
+                            compact: true
                         )
                         .environmentObject(browserManager)
                     }
@@ -131,15 +133,17 @@ struct SpaceTittle: View {
         .contextMenu {
             // Profile assignment submenu
             Menu("Assign to Profile") {
-                let currentName = resolvedProfileName(for: space.profileId) ?? "None"
+                let currentName = resolvedProfileName(for: space.profileId) ?? browserManager.profileManager.profiles.first?.name ?? "Default"
                 Text("Current: \(currentName)")
                     .foregroundStyle(.secondary)
                 Divider()
                 ProfilePickerView(
-                    selectedProfileId: Binding(get: { space.profileId }, set: { assignProfile($0) }),
+                    selectedProfileId: Binding(
+                        get: { space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID() },
+                        set: { assignProfile($0) }
+                    ),
                     onSelect: { _ in },
-                    compact: true,
-                    showNoneOption: true
+                    compact: true
                 )
                 .environmentObject(browserManager)
             }
@@ -192,7 +196,7 @@ struct SpaceTittle: View {
         browserManager.tabManager.removeSpace(space.id)
     }
 
-    private func assignProfile(_ id: UUID?) {
+    private func assignProfile(_ id: UUID) {
         browserManager.tabManager.assign(spaceId: space.id, toProfile: id)
     }
     
