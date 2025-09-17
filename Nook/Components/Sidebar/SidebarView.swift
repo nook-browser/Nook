@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 import UniformTypeIdentifiers
 
 struct SidebarView: View {
@@ -24,19 +24,22 @@ struct SidebarView: View {
 
     private var targetScrollPosition: Int {
         if let currentSpace = browserManager.tabManager.currentSpace,
-           let index = browserManager.tabManager.spaces.firstIndex(where: { $0.id == currentSpace.id }) {
+            let index = browserManager.tabManager.spaces.firstIndex(where: {
+                $0.id == currentSpace.id
+            })
+        {
             return index
         }
         return 0
     }
-    
+
     private var visibleSpaceIndices: [Int] {
         let totalSpaces = browserManager.tabManager.spaces.count
-        
+
         guard totalSpaces > 0 else { return [] }
-        
+
         var indices: [Int] = []
-        
+
         if activeSpaceIndex == 0 {
             // First space: show [0, 1]
             indices.append(0)
@@ -53,20 +56,23 @@ struct SidebarView: View {
             indices.append(activeSpaceIndex)
             indices.append(activeSpaceIndex + 1)
         }
-        
-        print("🔍 visibleSpaceIndices - activeSpaceIndex: \(activeSpaceIndex), result: \(indices)")
+
+        print(
+            "🔍 visibleSpaceIndices - activeSpaceIndex: \(activeSpaceIndex), result: \(indices)"
+        )
         return indices
     }
-    
 
     var body: some View {
         if browserManager.isSidebarVisible || forceVisible {
             sidebarContent
         }
     }
-    
+
     private var sidebarContent: some View {
-        VStack(spacing: 8) {
+        ZStack{
+            if !browserManager.isSidebarMenuVisible {
+                VStack(spacing: 8) {
                     HStack(spacing: 2) {
                         NavButtonsView()
                     }
@@ -101,17 +107,19 @@ struct SidebarView: View {
                     //MARK: - Bottom
                     HStack {
                         NavButton(iconName: "square.and.arrow.down") {
-                            print("Downloads button pressed")
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                browserManager.isSidebarMenuVisible = true
+                            }
                         }
-                        
+
                         NavButton(iconName: "clock") {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 showHistory.toggle()
                             }
                         }
-                        
+
                         Spacer()
-                        
+
                         if !showHistory {
                             SpacesList()
                         } else {
@@ -119,9 +127,9 @@ struct SidebarView: View {
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.secondary)
                         }
-                        
+
                         Spacer()
-                        
+
                         if !showHistory {
                             NavButton(iconName: "plus") {
                                 showSpaceCreationDialog()
@@ -137,29 +145,40 @@ struct SidebarView: View {
                     .padding(.horizontal, 8)
 
                 }
-                .padding(.top, 8)
-                .frame(width: effectiveWidth)
-            .frame(width: effectiveWidth)
+                .padding(.vertical, 8)
+                .transition(.scale.combined(with: .opacity))
+            } else {
+                SidebarMenu()
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+            }
+
+
+        }
+        .frame(width: effectiveWidth)
     }
-    
+
     private var historyView: some View {
         HistoryView()
-            .transition(.asymmetric(
-                insertion: .move(edge: .trailing).combined(with: .opacity),
-                removal: .move(edge: .leading).combined(with: .opacity)
-            ))
+            .transition(
+                .asymmetric(
+                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                    removal: .move(edge: .leading).combined(with: .opacity)
+                )
+            )
     }
-    
+
     private var spacesScrollView: some View {
         ZStack {
             spacesContent
         }
-        .transition(.asymmetric(
-            insertion: .move(edge: .leading).combined(with: .opacity),
-            removal: .move(edge: .trailing).combined(with: .opacity)
-        ))
+        .transition(
+            .asymmetric(
+                insertion: .move(edge: .leading).combined(with: .opacity),
+                removal: .move(edge: .trailing).combined(with: .opacity)
+            )
+        )
     }
-    
+
     private var spacesContent: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             spacesHStack
@@ -194,13 +213,17 @@ struct SidebarView: View {
             // Initialize to current active space
             activeSpaceIndex = targetScrollPosition
             currentScrollID = targetScrollPosition
-            print("🔄 Initialized activeSpaceIndex: \(activeSpaceIndex), currentScrollID: \(targetScrollPosition)")
+            print(
+                "🔄 Initialized activeSpaceIndex: \(activeSpaceIndex), currentScrollID: \(targetScrollPosition)"
+            )
         }
         .onChange(of: browserManager.tabManager.currentSpace?.id) { _, _ in
             // Space was changed programmatically (e.g., clicking bottom icons)
             let newSpaceIndex = targetScrollPosition
             if newSpaceIndex != activeSpaceIndex {
-                print("🎯 Programmatic space change - snapping to space \(newSpaceIndex)")
+                print(
+                    "🎯 Programmatic space change - snapping to space \(newSpaceIndex)"
+                )
                 // Step 1: clear scroll target without animation
                 var t = Transaction()
                 t.disablesAnimations = true
@@ -228,17 +251,19 @@ struct SidebarView: View {
                 }
             } else if newPhase == .idle && oldPhase != .idle {
                 // Drag just ended - activate the space and update visible window
-                hasTriggeredHaptic = false // Reset haptic flag
+                hasTriggeredHaptic = false  // Reset haptic flag
                 if let newSpaceIndex = currentScrollID {
                     let space = browserManager.tabManager.spaces[newSpaceIndex]
-                    print("🎯 Drag ended - Activating space: \(space.name) (index: \(newSpaceIndex))")
+                    print(
+                        "🎯 Drag ended - Activating space: \(space.name) (index: \(newSpaceIndex))"
+                    )
                     browserManager.tabManager.setActiveSpace(space)
                     activeSpaceIndex = newSpaceIndex  // Update visible window ONLY on drag end
                 }
             }
         }
     }
-    
+
     private var spacesHStack: some View {
         LazyHStack(spacing: 0) {
             ForEach(visibleSpaceIndices, id: \.self) { spaceIndex in
@@ -246,13 +271,22 @@ struct SidebarView: View {
                 VStack(spacing: 0) {
                     SpaceView(
                         space: space,
-                        isActive: browserManager.tabManager.currentSpace?.id == space.id,
+                        isActive: browserManager.tabManager.currentSpace?.id
+                            == space.id,
                         width: effectiveWidth,
-                        onActivateTab: { browserManager.tabManager.setActiveTab($0) },
-                        onCloseTab: { browserManager.tabManager.removeTab($0.id) },
+                        onActivateTab: {
+                            browserManager.tabManager.setActiveTab($0)
+                        },
+                        onCloseTab: {
+                            browserManager.tabManager.removeTab($0.id)
+                        },
                         onPinTab: { browserManager.tabManager.pinTab($0) },
-                        onMoveTabUp: { browserManager.tabManager.moveTabUp($0.id) },
-                        onMoveTabDown: { browserManager.tabManager.moveTabDown($0.id) },
+                        onMoveTabUp: {
+                            browserManager.tabManager.moveTabUp($0.id)
+                        },
+                        onMoveTabDown: {
+                            browserManager.tabManager.moveTabDown($0.id)
+                        },
                         onMuteTab: { $0.toggleMute() }
                     )
                     .id(space.id)
@@ -264,15 +298,13 @@ struct SidebarView: View {
         }
         .scrollTargetLayout()
     }
-    
-
 
     func scrollToSpace(_ space: Space, proxy: ScrollViewProxy) {
         withAnimation(.easeInOut(duration: 0.25)) {
             proxy.scrollTo(space.id, anchor: .center)
         }
     }
-    
+
     private func showSpaceCreationDialog() {
         let dialog = SpaceCreationDialog(
             spaceName: $spaceName,
@@ -284,20 +316,20 @@ struct SidebarView: View {
                     icon: spaceIcon.isEmpty ? "✨" : spaceIcon
                 )
                 browserManager.dialogManager.closeDialog()
-                
+
                 // Reset form
                 spaceName = ""
                 spaceIcon = ""
             },
             onCancel: {
                 browserManager.dialogManager.closeDialog()
-                
+
                 // Reset form
                 spaceName = ""
                 spaceIcon = ""
             }
         )
-        
+
         browserManager.dialogManager.showDialog(dialog)
     }
 }

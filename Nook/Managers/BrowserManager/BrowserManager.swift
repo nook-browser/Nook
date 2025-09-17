@@ -288,6 +288,7 @@ class BrowserManager: ObservableObject {
     @Published var sidebarWidth: CGFloat = 250
     @Published var isSidebarVisible: Bool = true
     @Published var isCommandPaletteVisible: Bool = false
+    @Published var isSidebarMenuVisible: Bool = false
     // Mini palette shown when clicking the URL bar
     @Published var isMiniCommandPaletteVisible: Bool = false
     @Published var didCopyURL: Bool = false

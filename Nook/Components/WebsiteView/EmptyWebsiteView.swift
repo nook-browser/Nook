@@ -27,5 +27,6 @@ struct EmptyWebsiteView: View {
                 }()
             )
         )
+        .padding(.horizontal, 8)
     }
 }

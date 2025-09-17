@@ -128,7 +128,6 @@ struct SpaceTab: View {
                 Label("Close Tab", systemImage: "xmark.circle")
             }
         }
-        .shadow(color: tab.isActiveInSpace ? Color.gray : Color.clear, radius: tab.isActiveInSpace ? 1 : 0, y: 1)
     }
 
     private var isCurrentTab: Bool {
@@ -137,7 +136,7 @@ struct SpaceTab: View {
     
     private var backgroundColor: Color {
         if isCurrentTab {
-            return AppColors.activeTab
+            return AppColors.activeTab.opacity(0.4)
         } else if isHovering {
             return AppColors.controlBackgroundHover
         } else {
@@ -146,7 +145,7 @@ struct SpaceTab: View {
     }
     private var textTab: Color {
         if isCurrentTab {
-            return Color.black
+            return Color.white
         } else {
             return AppColors.textSecondary
         }

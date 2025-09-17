@@ -34,7 +34,6 @@ struct PinnedTabView: View {
                 RoundedRectangle(cornerRadius: corner, style: .continuous)
                     .fill(Color.white.opacity(isActive ? 1.0 : isHovered ? 0.6 : 0.4))
                     .animation(.easeInOut(duration: 0.2), value: isHovered)
-                    .shadow(color: isActive ? Color.gray : Color.clear, radius: 1, y: 1)
 
                 tabIcon
                     .resizable()

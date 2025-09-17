@@ -165,10 +165,8 @@
 		2CC067C52E789ECB001D37C6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2CC067232E789ECB001D37C6 /* Assets.xcassets */; };
 		2CC067C62E789ECB001D37C6 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = 2CC066FD2E789ECB001D37C6 /* .gitignore */; };
 		2CC067C82E789ECB001D37C6 /* Rakefile in Resources */ = {isa = PBXBuildFile; fileRef = 2CC067002E789ECB001D37C6 /* Rakefile */; };
-		2CC067C92E789ECB001D37C6 /* README-URLSchemeHandler.md in Resources */ = {isa = PBXBuildFile; fileRef = 2CC066B72E789ECB001D37C6 /* README-URLSchemeHandler.md */; };
 		2CC067CA2E789ECB001D37C6 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 2CC0670A2E789ECB001D37C6 /* Info.plist */; };
 		2CC067CB2E789ECB001D37C6 /* README.markdown in Resources */ = {isa = PBXBuildFile; fileRef = 2CC067012E789ECB001D37C6 /* README.markdown */; };
-		2CC067CC2E789ECB001D37C6 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 2CC067062E789ECB001D37C6 /* README.md */; };
 		7FAFC5DA2E3ADDCD009D7DC4 /* FaviconFinder in Frameworks */ = {isa = PBXBuildFile; productRef = 7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */; };
 /* End PBXBuildFile section */
 
@@ -272,7 +270,6 @@
 		2CC066B32E789ECB001D37C6 /* TabDragManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabDragManager.swift; sourceTree = "<group>"; };
 		2CC066B52E789ECB001D37C6 /* ExtensionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionBridge.swift; sourceTree = "<group>"; };
 		2CC066B62E789ECB001D37C6 /* ExtensionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionManager.swift; sourceTree = "<group>"; };
-		2CC066B72E789ECB001D37C6 /* README-URLSchemeHandler.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "README-URLSchemeHandler.md"; sourceTree = "<group>"; };
 		2CC066B92E789ECB001D37C6 /* ExternalMiniWindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalMiniWindowManager.swift; sourceTree = "<group>"; };
 		2CC066BA2E789ECB001D37C6 /* MiniBrowserWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniBrowserWindowView.swift; sourceTree = "<group>"; };
 		2CC066BC2E789ECB001D37C6 /* GradientColorManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GradientColorManager.swift; sourceTree = "<group>"; };
@@ -324,7 +321,6 @@
 		2CC067022E789ECB001D37C6 /* udis86.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = udis86.h; sourceTree = "<group>"; };
 		2CC067042E789ECB001D37C6 /* HTSymbolHook.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HTSymbolHook.h; sourceTree = "<group>"; };
 		2CC067052E789ECB001D37C6 /* HTSymbolHook.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HTSymbolHook.m; sourceTree = "<group>"; };
-		2CC067062E789ECB001D37C6 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		2CC067082E789ECB001D37C6 /* getPage.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = getPage.h; sourceTree = "<group>"; };
 		2CC067092E789ECB001D37C6 /* getPage.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = getPage.c; sourceTree = "<group>"; };
 		2CC0670A2E789ECB001D37C6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -355,6 +351,14 @@
 		2CC067CD2E78A6CF001D37C6 /* Nook-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Nook-Bridging-Header.h"; sourceTree = "<group>"; };
 		7F8340FC2E37F39400674A5D /* Nook.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Nook.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		7F5E6B182E7B2E2500EB56A7 /* Menu */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Menu;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		7F8340F92E37F39400674A5D /* Frameworks */ = {
@@ -564,6 +568,7 @@
 		2CC066992E789ECB001D37C6 /* Sidebar */ = {
 			isa = PBXGroup;
 			children = (
+				7F5E6B182E7B2E2500EB56A7 /* Menu */,
 				2CC066812E789ECB001D37C6 /* NavButtons */,
 				2CC066862E789ECB001D37C6 /* PinnedButtons */,
 				2CC066902E789ECB001D37C6 /* SpaceSection */,
@@ -686,7 +691,6 @@
 			children = (
 				2CC066B52E789ECB001D37C6 /* ExtensionBridge.swift */,
 				2CC066B62E789ECB001D37C6 /* ExtensionManager.swift */,
-				2CC066B72E789ECB001D37C6 /* README-URLSchemeHandler.md */,
 			);
 			path = ExtensionManager;
 			sourceTree = "<group>";
@@ -949,7 +953,6 @@
 				2CC067032E789ECB001D37C6 /* mach_override */,
 				2CC067042E789ECB001D37C6 /* HTSymbolHook.h */,
 				2CC067052E789ECB001D37C6 /* HTSymbolHook.m */,
-				2CC067062E789ECB001D37C6 /* README.md */,
 			);
 			path = HTSymbolHook;
 			sourceTree = "<group>";
@@ -1066,6 +1069,9 @@
 			);
 			dependencies = (
 			);
+			fileSystemSynchronizedGroups = (
+				7F5E6B182E7B2E2500EB56A7 /* Menu */,
+			);
 			name = Nook;
 			packageProductDependencies = (
 				7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */,
@@ -1119,10 +1125,8 @@
 				2CC067C52E789ECB001D37C6 /* Assets.xcassets in Resources */,
 				2CC067C62E789ECB001D37C6 /* .gitignore in Resources */,
 				2CC067C82E789ECB001D37C6 /* Rakefile in Resources */,
-				2CC067C92E789ECB001D37C6 /* README-URLSchemeHandler.md in Resources */,
 				2CC067CA2E789ECB001D37C6 /* Info.plist in Resources */,
 				2CC067CB2E789ECB001D37C6 /* README.markdown in Resources */,
-				2CC067CC2E789ECB001D37C6 /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1426,7 +1430,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 9DLM793N9T;
+				DEVELOPMENT_TEAM = 96M8ZZRJK6;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
@@ -1480,7 +1484,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 9DLM793N9T;
+				DEVELOPMENT_TEAM = 96M8ZZRJK6;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;

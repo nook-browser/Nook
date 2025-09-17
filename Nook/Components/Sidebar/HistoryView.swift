@@ -160,7 +160,6 @@ struct HistoryView: View {
                                 }
                             }
                         }
-                        
                         // Load more indicator
                         if isLoadingMore {
                             HStack {
