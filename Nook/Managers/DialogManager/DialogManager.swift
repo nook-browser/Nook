@@ -152,18 +152,32 @@ struct DialogHeader: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Image(systemName: icon)
-                .font(.system(size: 24, weight: .bold))
-                .padding(8)
-            Text(title)
-                .font(.system(size: 16, weight: .semibold))
-            if let subtitle = subtitle {
-                Text(subtitle)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.secondary)
+        VStack(spacing: 16) {
+            // Icon with modern styling
+            ZStack {
+                Circle()
+                    .fill(Color.accentColor.opacity(0.1))
+                    .frame(width: 48, height: 48)
+                
+                Image(systemName: icon)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+            }
+            
+            VStack(spacing: 4) {
+                Text(title)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.primary)
+                
+                if let subtitle = subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
             }
         }
+        .padding(.top, 8)
     }
 }
 

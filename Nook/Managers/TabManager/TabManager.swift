@@ -512,15 +512,17 @@ class TabManager: ObservableObject {
     // MARK: - Space Management
     @discardableResult
     func createSpace(name: String, icon: String = "square.grid.2x2", gradient: SpaceGradient = .default) -> Space {
-        // Prefer the active profile; TODO: add ProfileManager.defaultProfile to guarantee fallback.
-        let resolvedProfileId = browserManager?.currentProfile?.id
-        // Assert during development to surface unexpected nils early
-        assert(resolvedProfileId != nil, "TabManager.createSpace expected a currentProfile; consider deferring creation or adding ProfileManager.defaultProfile")
+        // Always assign to a profile - prefer current profile, fallback to default profile
+        let resolvedProfileId = browserManager?.currentProfile?.id ?? browserManager?.profileManager.profiles.first?.id
+        // Ensure we always have a profile to assign
+        guard let profileId = resolvedProfileId else {
+            fatalError("TabManager.createSpace requires at least one profile to exist")
+        }
         let space = Space(
             name: name,
             icon: icon,
             gradient: gradient,
-            profileId: resolvedProfileId
+            profileId: profileId
         )
         spaces.append(space)
         tabsBySpace[space.id] = []
@@ -554,10 +556,11 @@ class TabManager: ObservableObject {
 
         // Edge case: assign space to current profile if missing
         if space.profileId == nil {
-            if let pid = browserManager?.currentProfile?.id {
+            let defaultProfileId = browserManager?.currentProfile?.id ?? browserManager?.profileManager.profiles.first?.id
+            if let pid = defaultProfileId {
                 assign(spaceId: space.id, toProfile: pid)
             } else {
-                print("⚠️ [TabManager] Activating space without profile while currentProfile is nil — deferring assignment")
+                print("⚠️ [TabManager] No profiles available to assign to space")
             }
         }
 
@@ -838,9 +841,12 @@ class TabManager: ObservableObject {
         
         let targetSpace: Space? = space ?? currentSpace ?? ensureDefaultSpaceIfNeeded()
         // Ensure the target space has a profile assignment; backfill from currentProfile if missing
-        if let ts = targetSpace, ts.profileId == nil, let pid = browserManager?.currentProfile?.id {
-            ts.profileId = pid
-            persistSnapshot()
+        if let ts = targetSpace, ts.profileId == nil {
+            let defaultProfileId = browserManager?.currentProfile?.id ?? browserManager?.profileManager.profiles.first?.id
+            if let pid = defaultProfileId {
+                ts.profileId = pid
+                persistSnapshot()
+            }
         }
         let sid = targetSpace?.id
         
@@ -868,9 +874,12 @@ class TabManager: ObservableObject {
     func createPopupTab(in space: Space? = nil) -> Tab {
         let targetSpace: Space? = space ?? currentSpace ?? ensureDefaultSpaceIfNeeded()
         // Ensure target space has a profile assignment
-        if let ts = targetSpace, ts.profileId == nil, let pid = browserManager?.currentProfile?.id {
-            ts.profileId = pid
-            persistSnapshot()
+        if let ts = targetSpace, ts.profileId == nil {
+            let defaultProfileId = browserManager?.currentProfile?.id ?? browserManager?.profileManager.profiles.first?.id
+            if let pid = defaultProfileId {
+                ts.profileId = pid
+                persistSnapshot()
+            }
         }
         let sid = targetSpace?.id
         let existingTabs = sid.flatMap { tabsBySpace[$0] } ?? []
@@ -1390,15 +1399,16 @@ class TabManager: ObservableObject {
             }
 
             // Ensure all spaces have profile assignments
-            if let dp = browserManager?.currentProfile {
+            let defaultProfileId = browserManager?.currentProfile?.id ?? browserManager?.profileManager.profiles.first?.id
+            if let dp = defaultProfileId {
                 var didAssignProfiles = false
                 for space in spaces where space.profileId == nil {
-                    space.profileId = dp.id
+                    space.profileId = dp
                     didAssignProfiles = true
                 }
                 if didAssignProfiles { persistSnapshot() }
             } else {
-                // TODO: Defer profile assignment until currentProfile becomes available (see _reattachBrowserManager)
+                print("⚠️ [TabManager] No profiles available to assign to spaces")
             }
 
             // Tabs
@@ -1734,8 +1744,9 @@ extension TabManager {
 // MARK: - Profile Assignment Helpers
 extension TabManager {
     fileprivate func reconcileSpaceProfilesIfNeeded() {
-        guard let pid = browserManager?.currentProfile?.id else {
-            // TODO: currentProfile not available yet; try again later when it becomes available.
+        let defaultProfileId = browserManager?.currentProfile?.id ?? browserManager?.profileManager.profiles.first?.id
+        guard let pid = defaultProfileId else {
+            print("⚠️ [TabManager] No profiles available for space reconciliation")
             return
         }
         var didAssign = false
@@ -1776,15 +1787,13 @@ extension TabManager {
 // MARK: - Profile Assignment API
 extension TabManager {
     /// Centralized helper to assign a space to a profile and persist.
-    /// Pass `nil` to clear the assignment.
-    func assign(spaceId: UUID, toProfile profileId: UUID?) {
+    /// Always assigns to a valid profile (no nil assignments allowed).
+    func assign(spaceId: UUID, toProfile profileId: UUID) {
         if let idx = spaces.firstIndex(where: { $0.id == spaceId }) {
-            if let pid = profileId {
-                let exists = browserManager?.profileManager.profiles.contains(where: { $0.id == pid }) ?? false
-                if !exists {
-                    print("⚠️ [TabManager] Attempted to assign space to unknown profile: \(pid)")
-                    return
-                }
+            let exists = browserManager?.profileManager.profiles.contains(where: { $0.id == profileId }) ?? false
+            if !exists {
+                print("⚠️ [TabManager] Attempted to assign space to unknown profile: \(profileId)")
+                return
             }
             spaces[idx].profileId = profileId
             if currentSpace?.id == spaceId {
