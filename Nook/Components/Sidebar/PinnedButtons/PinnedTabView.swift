@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct PinnedTabView: View {
     var tabName: String
@@ -30,9 +31,9 @@ struct PinnedTabView: View {
     var body: some View {
         Button(action: action) {
             ZStack {
-                // Background replaced with RoundedRectangle directly
+                // Background replaced with RoundedRectangle directly using AppColors
                 RoundedRectangle(cornerRadius: corner, style: .continuous)
-                    .fill(Color.white.opacity(isActive ? 1.0 : isHovered ? 0.6 : 0.4))
+                    .fill(isActive ? AppColors.activeTab : isHovered ? AppColors.controlBackgroundHover : AppColors.inactiveTab)
                     .animation(.easeInOut(duration: 0.2), value: isHovered)
                     .shadow(color: isActive ? Color.gray : Color.clear, radius: 1, y: 1)
 
@@ -106,4 +107,3 @@ struct PinnedTabView: View {
         }
     }
 }
-
