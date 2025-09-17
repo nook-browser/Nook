@@ -822,6 +822,10 @@ class TabManager: ObservableObject {
         if #available(macOS 15.5, *) {
             ExtensionManager.shared.notifyTabActivated(newTab: tab, previous: previous)
         }
+        
+        // Update find manager with new current tab
+        browserManager?.updateFindManagerCurrentTab()
+        
         persistSnapshot()
     }
     

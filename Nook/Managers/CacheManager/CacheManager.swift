@@ -72,6 +72,23 @@ class CacheManager: ObservableObject {
             await loadCacheData() // Refresh the list
         }
     }
+
+    /// Clears site data for a specific domain, excluding cookies
+    /// to support a "hard refresh" that does not sign the user out.
+    func clearCacheForDomainExcludingCookies(_ domain: String) async {
+        let allTypes = WKWebsiteDataStore.allWebsiteDataTypes()
+        var typesExcludingCookies = allTypes
+        typesExcludingCookies.remove(WKWebsiteDataTypeCookies)
+        let records = await dataStore.dataRecords(ofTypes: allTypes)
+        let domainRecords = records.filter {
+            $0.displayName == domain || $0.displayName == ".\(domain)"
+        }
+
+        if !domainRecords.isEmpty {
+            await dataStore.removeData(ofTypes: typesExcludingCookies, for: domainRecords)
+            await loadCacheData()
+        }
+    }
     
     func clearCacheOfType(_ cacheType: CacheType) async {
         let dataType = cacheType.websiteDataType
