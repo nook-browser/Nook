@@ -60,7 +60,7 @@ struct URLBarView: View {
         .background(
             ZStack {
                 BlurEffectView(material: browserManager.settingsManager.currentMaterial, state: .active)
-                Color.white.opacity(isHovering ? 0.2 : 0.1)
+                (isHovering ? AppColors.controlBackgroundHover : AppColors.inactiveTab)
             }
         )
         .clipShape(RoundedRectangle(cornerRadius: 12))

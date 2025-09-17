@@ -32,14 +32,36 @@ struct MiniWindowToolbar: View {
 
             MiniWindowShareButtonContainer(session: session)
 
-            Button(action: adoptAction) {
-                HStack(spacing: 6) {
-                    Image(systemName: "rectangle.stack.badge.plus")
-                    Text("Open in \(session.targetSpaceName)")
+            if session.isAuthComplete {
+                if session.authSuccess {
+                    Button(action: adoptAction) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.circle.fill")
+                            Text("Authentication Complete")
+                        }
+                    }
+                    .buttonStyle(MiniWindowSuccessButtonStyle())
+                    .keyboardShortcut("o", modifiers: .command)
+                } else {
+                    Button(action: adoptAction) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "xmark.circle.fill")
+                            Text("Authentication Failed")
+                        }
+                    }
+                    .buttonStyle(MiniWindowErrorButtonStyle())
+                    .keyboardShortcut("o", modifiers: .command)
                 }
+            } else {
+                Button(action: adoptAction) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "rectangle.stack.badge.plus")
+                        Text("Open in \(session.targetSpaceName)")
+                    }
+                }
+                .buttonStyle(MiniWindowPrimaryButtonStyle())
+                .keyboardShortcut("o", modifiers: .command)
             }
-            .buttonStyle(MiniWindowPrimaryButtonStyle())
-            .keyboardShortcut("o", modifiers: .command)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)

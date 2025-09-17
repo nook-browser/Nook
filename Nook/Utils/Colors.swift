@@ -14,9 +14,11 @@ struct AppColors {
     static let backgroundSecondary = Color(nsColor: .underPageBackgroundColor)
 
     static let controlBackground = Color(nsColor: .controlBackgroundColor)
-    static let controlBackgroundHover = Color(nsColor: .controlColor)
+    static let controlBackgroundHover = Color.gray.opacity(0.8)
+    static let controlBackgroundHoverLight = Color.gray.opacity(0.2)
     static let controlBackgroundActive = Color.white.opacity(0.3)
     static let activeTab = Color.white.opacity(1.0)
+    static let inactiveTab = Color(nsColor: .controlBackgroundColor).opacity(0.1)
 }
 
 extension Color {
@@ -83,3 +85,5 @@ extension NSColor {
     }
 }
 #endif
+
+

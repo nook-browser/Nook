@@ -17,12 +17,17 @@ struct GradientNode: Identifiable, Codable, Hashable {
     let id: UUID
     var colorHex: String
     var location: Double
+    // Visual positions on the canvas (0.0 to 1.0)
+    var xPosition: Double?
+    var yPosition: Double?
 
-    init(id: UUID = UUID(), colorHex: String, location: Double) {
+    init(id: UUID = UUID(), colorHex: String, location: Double, xPosition: Double? = nil, yPosition: Double? = nil) {
         self.id = id
         self.colorHex = colorHex
         // Clamp location to [0, 1]
         self.location = max(0.0, min(1.0, location))
+        self.xPosition = xPosition
+        self.yPosition = yPosition
     }
 
     init(id: UUID = UUID(), color: Color, location: Double) {

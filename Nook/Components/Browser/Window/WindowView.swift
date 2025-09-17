@@ -57,6 +57,20 @@ struct WindowView: View {
             CommandPaletteView()
             DialogView()
             
+            // Find bar overlay - centered top bar
+            if browserManager.findManager.isFindBarVisible {
+                VStack {
+                    HStack {
+                        Spacer()
+                        FindBarView(findManager: browserManager.findManager)
+                            .frame(maxWidth: 500)
+                        Spacer()
+                    }
+                    .padding(.top, 20)
+                    Spacer()
+                }
+            }
+            
             // (Removed) insertion line overlay; Ora-style DnD uses live reordering
 
             // Profile switch toast overlay (matches WebsitePopup style/presentation)

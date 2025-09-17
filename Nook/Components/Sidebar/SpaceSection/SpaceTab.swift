@@ -14,6 +14,7 @@ struct SpaceTab: View {
     var onMute: () -> Void
     @State private var isHovering: Bool = false
     @State private var isCloseHovering: Bool = false
+    @State private var isSpeakerHovering: Bool = false
     @EnvironmentObject var browserManager: BrowserManager
 
     var body: some View {
@@ -48,16 +49,22 @@ struct SpaceTab: View {
                     Button(action: {
                         onMute()
                     }) {
-                        Image(systemName: tab.isAudioMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(tab.isAudioMuted ? AppColors.textSecondary : textTab)
-                            .padding(4)
-                            .background(AppColors.controlBackgroundHover)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(isSpeakerHovering ? (isCurrentTab ? AppColors.controlBackgroundHoverLight : AppColors.controlBackgroundActive) : AppColors.controlBackgroundHoverLight.opacity(0))
+                                .frame(width: 22, height: 22)
+                                .animation(.easeInOut(duration: 0.05), value: isSpeakerHovering)
+                            Image(systemName: tab.isAudioMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                                .contentTransition(.symbolEffect(.replace))
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(tab.isAudioMuted ? AppColors.textSecondary : textTab)
+                        }
                     }
                     .buttonStyle(PlainButtonStyle())
+                    .onHover { hovering in
+                        isSpeakerHovering = hovering
+                    }
                     .help(tab.isAudioMuted ? "Unmute Audio" : "Mute Audio")
-                    .transition(.scale.combined(with: .opacity))
                 }
 
                 if isHovering {
@@ -66,14 +73,13 @@ struct SpaceTab: View {
                             .font(.system(size: 12, weight: .heavy))
                             .foregroundColor(textTab)
                             .padding(4)
-                            .background(isCloseHovering ? AppColors.controlBackgroundHover : Color.clear)
+                            .background(isCloseHovering ? (isCurrentTab ? AppColors.controlBackgroundHoverLight : AppColors.controlBackgroundActive) : Color.clear)
                             .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
                     .buttonStyle(PlainButtonStyle())
                     .onHover { hovering in
                         isCloseHovering = hovering
                     }
-                    // .transition(.scale.combined(with: .opacity))
                 }
             }
             .padding(.horizontal, 10)
@@ -87,7 +93,7 @@ struct SpaceTab: View {
         .buttonStyle(PlainButtonStyle())
         .contentShape(RoundedRectangle(cornerRadius: 12))
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(.easeInOut(duration: 0.05)) {
                 isHovering = hovering
             }
         }

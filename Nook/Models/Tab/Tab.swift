@@ -15,7 +15,7 @@ import SwiftUI
 import WebKit
 
 @MainActor
-public class Tab: NSObject, Identifiable, ObservableObject {
+public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     public let id: UUID
     var url: URL
     var name: String
@@ -297,6 +297,7 @@ public class Tab: NSObject, Identifiable, ObservableObject {
         _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "commandClick")
         _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "pipStateChange")
         _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "mediaStateChange_\(id.uuidString)")
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "NookIdentity")
         
         // Add handlers
         _webView?.configuration.userContentController.add(self, name: "linkHover")
@@ -305,6 +306,7 @@ public class Tab: NSObject, Identifiable, ObservableObject {
         _webView?.configuration.userContentController.add(self, name: "pipStateChange")
         _webView?.configuration.userContentController.add(self, name: "mediaStateChange_\(id.uuidString)")
         _webView?.configuration.userContentController.add(self, name: "backgroundColor_\(id.uuidString)")
+        _webView?.configuration.userContentController.add(self, name: "NookIdentity")
 
         _webView?.customUserAgent =
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15"
@@ -1828,6 +1830,22 @@ extension Tab: WKNavigationDelegate {
 
     public func webView(
         _ webView: WKWebView,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        if let handled = browserManager?.authenticationManager.handleAuthenticationChallenge(
+            challenge,
+            for: self,
+            completionHandler: completionHandler
+        ), handled {
+            return
+        }
+
+        completionHandler(.performDefaultHandling, nil)
+    }
+
+    public func webView(
+        _ webView: WKWebView,
         decidePolicyFor navigationAction: WKNavigationAction,
         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
     ) {
@@ -1847,6 +1865,7 @@ extension Tab: WKNavigationDelegate {
             ]
             
             if downloadExtensions.contains(pathExtension) {
+                print("🔽 [Tab] Navigation action detected download file: \(pathExtension) for URL: \(url.absoluteString)")
                 decisionHandler(.download)
                 return
             }
@@ -1938,8 +1957,11 @@ extension Tab: WKNavigationDelegate {
         let originalURL = navigationAction.request.url ?? URL(string: "https://example.com")!
         let suggestedFilename = navigationAction.request.url?.lastPathComponent ?? "download"
         
+        print("🔽 [Tab] Download started from navigationAction: \(originalURL.absoluteString)")
+        print("🔽 [Tab] Suggested filename: \(suggestedFilename)")
+        print("🔽 [Tab] BrowserManager available: \(browserManager != nil)")
+        
         _ = browserManager?.downloadManager.addDownload(download, originalURL: originalURL, suggestedFilename: suggestedFilename)
-        print("Download started from navigationAction: \(originalURL.absoluteString)")
     }
 
     public func webView(
@@ -1950,8 +1972,74 @@ extension Tab: WKNavigationDelegate {
         let originalURL = navigationResponse.response.url ?? URL(string: "https://example.com")!
         let suggestedFilename = navigationResponse.response.url?.lastPathComponent ?? "download"
         
+        print("🔽 [Tab] Download started from navigationResponse: \(originalURL.absoluteString)")
+        print("🔽 [Tab] Suggested filename: \(suggestedFilename)")
+        print("🔽 [Tab] BrowserManager available: \(browserManager != nil)")
+        
         _ = browserManager?.downloadManager.addDownload(download, originalURL: originalURL, suggestedFilename: suggestedFilename)
-        print("Download started from navigationResponse: \(originalURL.absoluteString)")
+    }
+    
+    // MARK: - WKDownloadDelegate
+    public func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String, completionHandler: @escaping (URL?) -> Void) {
+        print("🔽 [Tab] WKDownloadDelegate decideDestinationUsing called")
+        // Handle download destination directly
+        guard let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else {
+            completionHandler(nil)
+            return
+        }
+        
+        let defaultName = suggestedFilename.isEmpty ? "download" : suggestedFilename
+        let cleanName = defaultName.replacingOccurrences(of: "/", with: "_")
+        var dest = downloads.appendingPathComponent(cleanName)
+        
+        // Handle duplicate files
+        let ext = dest.pathExtension
+        let base = dest.deletingPathExtension().lastPathComponent
+        var counter = 1
+        while FileManager.default.fileExists(atPath: dest.path) {
+            let newName = "\(base) (\(counter))" + (ext.isEmpty ? "" : ".\(ext)")
+            dest = downloads.appendingPathComponent(newName)
+            counter += 1
+        }
+        
+        print("🔽 [Tab] Download destination set: \(dest.path)")
+        completionHandler(dest)
+    }
+    
+    public func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String, completionHandler: @escaping (URL, Bool) -> Void) {
+        print("🔽 [Tab] WKDownloadDelegate decideDestinationUsing (macOS) called")
+        // Handle download destination directly for macOS
+        guard let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else {
+            completionHandler(FileManager.default.temporaryDirectory.appendingPathComponent("download"), false)
+            return
+        }
+        
+        let defaultName = suggestedFilename.isEmpty ? "download" : suggestedFilename
+        let cleanName = defaultName.replacingOccurrences(of: "/", with: "_")
+        var dest = downloads.appendingPathComponent(cleanName)
+        
+        // Handle duplicate files
+        let ext = dest.pathExtension
+        let base = dest.deletingPathExtension().lastPathComponent
+        var counter = 1
+        while FileManager.default.fileExists(atPath: dest.path) {
+            let newName = "\(base) (\(counter))" + (ext.isEmpty ? "" : ".\(ext)")
+            dest = downloads.appendingPathComponent(newName)
+            counter += 1
+        }
+        
+        print("🔽 [Tab] Download destination set: \(dest.path)")
+        completionHandler(dest, false) // false = don't allow overwrite
+    }
+    
+    public func download(_ download: WKDownload, didFinishDownloadingTo location: URL) {
+        print("🔽 [Tab] Download finished to: \(location.path)")
+        // Download completed successfully
+    }
+    
+    public func download(_ download: WKDownload, didFailWithError error: Error) {
+        print("🔽 [Tab] Download failed: \(error.localizedDescription)")
+        // Download failed
     }
 
 }
@@ -2009,6 +2097,9 @@ extension Tab: WKScriptMessageHandler {
                 }
             }
         
+        case "NookIdentity":
+            handleOAuthRequest(message: message)
+        
         default:
             break
         }
@@ -2018,6 +2109,125 @@ extension Tab: WKScriptMessageHandler {
         // Create a new tab with the URL and focus it
         browserManager?.tabManager.createNewTab(url: url.absoluteString, in: browserManager?.tabManager.currentSpace)
     }
+    
+    private func handleOAuthRequest(message: WKScriptMessage) {
+        guard let dict = message.body as? [String: Any],
+              let urlString = dict["url"] as? String,
+              let url = URL(string: urlString) else {
+            print("❌ [Tab] Invalid OAuth request: missing or invalid URL")
+            return
+        }
+        let interactive = dict["interactive"] as? Bool ?? true
+        let prefersEphemeral = dict["prefersEphemeral"] as? Bool ?? false
+        let providedScheme = (dict["callbackScheme"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let rawRequestId = (dict["requestId"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let requestId = (rawRequestId?.isEmpty == false ? rawRequestId! : UUID().uuidString)
+
+        print("🔐 [Tab] OAuth request received: id=\(requestId) url=\(url.absoluteString) interactive=\(interactive) ephemeral=\(prefersEphemeral) scheme=\(providedScheme ?? "nil")")
+
+        guard let manager = browserManager else {
+            finishIdentityFlow(requestId: requestId, with: .failure(.unableToStart))
+            return
+        }
+
+        let identityRequest = AuthenticationManager.IdentityRequest(
+            requestId: requestId,
+            url: url,
+            interactive: interactive,
+            prefersEphemeralSession: prefersEphemeral,
+            explicitCallbackScheme: providedScheme?.isEmpty == true ? nil : providedScheme
+        )
+
+        manager.authenticationManager.beginIdentityFlow(identityRequest, from: self)
+    }
+
+    func finishIdentityFlow(
+        requestId: String,
+        with result: AuthenticationManager.IdentityFlowResult
+    ) {
+        guard let webView else {
+            print("⚠️ [Tab] Unable to deliver identity result; webView missing")
+            return
+        }
+
+        var payload: [String: Any] = ["requestId": requestId]
+
+        switch result {
+        case .success(let url):
+            payload["status"] = "success"
+            payload["url"] = url.absoluteString
+        case .cancelled:
+            payload["status"] = "cancelled"
+            payload["code"] = "cancelled"
+            payload["message"] = "Authentication cancelled by user."
+        case .failure(let failure):
+            payload["status"] = "failure"
+            payload["code"] = failure.code
+            payload["message"] = failure.message
+        }
+
+        if let status = payload["status"] as? String {
+            let urlDescription = payload["url"] as? String ?? "nil"
+            print("🔐 [Tab] Identity flow completed: id=\(requestId) status=\(status) url=\(urlDescription)")
+        }
+
+        guard let data = try? JSONSerialization.data(withJSONObject: payload, options: []),
+              let jsonString = String(data: data, encoding: .utf8) else {
+            print("❌ [Tab] Failed to serialise identity payload for requestId=\(requestId)")
+            return
+        }
+
+        let script = "window.__nookCompleteIdentityFlow && window.__nookCompleteIdentityFlow(\(jsonString));"
+        webView.evaluateJavaScript(script) { _, error in
+            if let error {
+                print("❌ [Tab] Failed to deliver identity result: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private func isLikelyOAuthOrExternalWindow(url: URL, windowFeatures: WKWindowFeatures) -> Bool {
+        let host = (url.host ?? "").lowercased()
+        let path = url.path.lowercased()
+        let query = url.query?.lowercased() ?? ""
+        
+        // Check for OAuth-related URLs
+        let oauthHosts = [
+            "accounts.google.com", "login.microsoftonline.com", "login.live.com",
+            "appleid.apple.com", "github.com", "gitlab.com", "bitbucket.org",
+            "auth0.com", "okta.com", "onelogin.com", "pingidentity.com",
+            "slack.com", "zoom.us", "login.cloudflareaccess.com",
+            "oauth", "auth", "login", "signin"
+        ]
+        
+        // Check if host contains OAuth-related terms
+        if oauthHosts.contains(where: { host.contains($0) }) {
+            return true
+        }
+        
+        // Check for OAuth paths and query parameters
+        if path.contains("/oauth") || path.contains("oauth2") || path.contains("/authorize") || 
+           path.contains("/signin") || path.contains("/login") || path.contains("/callback") {
+            return true
+        }
+        
+        if query.contains("client_id=") || query.contains("redirect_uri=") || 
+           query.contains("response_type=") || query.contains("scope=") {
+            return true
+        }
+        
+        // Check window features that suggest external/popup behavior
+        if let width = windowFeatures.width, let height = windowFeatures.height,
+           width.doubleValue > 0 && height.doubleValue > 0 {
+            // If specific dimensions are set, it's likely a popup
+            return true
+        }
+        
+        // Note: WKWindowFeatures visibility properties are NSNumber? and don't directly map to enum values
+        // We'll rely on URL patterns and dimensions for popup detection
+        
+        return false
+    }
+
 }
 
 // MARK: - WKUIDelegate
@@ -2029,15 +2239,72 @@ extension Tab: WKUIDelegate {
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
         guard let bm = browserManager else { return nil }
-        // Prefer request URL; if absent (e.g., about:blank), create a blank popup tab
+        
+        // Check if this is likely an OAuth popup or external window
+        if let url = navigationAction.request.url,
+           isLikelyOAuthOrExternalWindow(url: url, windowFeatures: windowFeatures) {
+            print("🪟 [Tab] Popup detected, opening in miniwindow: \(url.absoluteString)")
+            // Present in miniwindow with completion callback
+            bm.externalMiniWindowManager.present(url: url) { [weak self] success, finalURL in
+                self?.handleMiniWindowAuthCompletion(success: success, finalURL: finalURL)
+            }
+            return nil // Don't create a WebView, we're using the miniwindow
+        }
+        
+        // For regular popups, create a new webView with the EXACT configuration that WebKit provided
+        let newWebView = FocusableWKWebView(frame: .zero, configuration: configuration)
+        
+        // Create a new tab to manage this webView
+        let space = bm.tabManager.currentSpace
+        let newTab = bm.tabManager.createPopupTab(in: space)
+        
+        // Set up the new webView with the same delegates and settings as the current tab
+        newWebView.navigationDelegate = newTab
+        newWebView.uiDelegate = newTab
+        newWebView.allowsBackForwardNavigationGestures = true
+        newWebView.allowsMagnification = true
+        
+        // Set the owning tab reference
+        if let fv = newWebView as? FocusableWKWebView {
+            fv.owningTab = newTab
+        }
+        
+        // Store the webView in the new tab
+        newTab._webView = newWebView
+        
+        // Set up message handlers
+        newWebView.configuration.userContentController.add(newTab, name: "linkHover")
+        newWebView.configuration.userContentController.add(newTab, name: "commandHover")
+        newWebView.configuration.userContentController.add(newTab, name: "commandClick")
+        newWebView.configuration.userContentController.add(newTab, name: "pipStateChange")
+        newWebView.configuration.userContentController.add(newTab, name: "mediaStateChange_\(newTab.id.uuidString)")
+        newWebView.configuration.userContentController.add(newTab, name: "backgroundColor_\(newTab.id.uuidString)")
+        newWebView.configuration.userContentController.add(newTab, name: "NookIdentity")
+        
+        // Set custom user agent
+        newWebView.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15"
+        
+        // Configure preferences
+        newWebView.configuration.preferences.isFraudulentWebsiteWarningEnabled = true
+        newWebView.configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
+        
+        // Load the URL if provided
         if let url = navigationAction.request.url, url.scheme != nil, url.absoluteString != "about:blank" {
-            let space = bm.tabManager.currentSpace
-            let newTab = bm.tabManager.createNewTab(url: url.absoluteString, in: space)
-            return newTab.activeWebView
+            newTab.loadURL(url)
+        }
+        
+        return newWebView
+    }
+
+    private func handleMiniWindowAuthCompletion(success: Bool, finalURL: URL?) {
+        print("🪟 [Tab] Popup OAuth flow completed: success=\(success), finalURL=\(finalURL?.absoluteString ?? "nil")")
+
+        if success {
+            DispatchQueue.main.async { [weak self] in
+                self?.activeWebView.reload()
+            }
         } else {
-            let space = bm.tabManager.currentSpace
-            let newTab = bm.tabManager.createPopupTab(in: space)
-            return newTab.activeWebView
+            print("🪟 [Tab] Popup OAuth authentication failed")
         }
     }
 
@@ -2053,6 +2320,274 @@ extension Tab: WKUIDelegate {
         alert.addButton(withTitle: "OK")
         alert.runModal()
         completionHandler()
+    }
+}
+
+// MARK: - Find in Page
+extension Tab {
+    typealias FindResult = Result<(matchCount: Int, currentIndex: Int), Error>
+    typealias FindCompletion = @Sendable (FindResult) -> Void
+    
+    func findInPage(_ text: String, completion: @escaping FindCompletion) {
+        guard let webView = _webView else {
+            completion(.failure(NSError(domain: "Tab", code: -1, userInfo: [NSLocalizedDescriptionKey: "WebView not available"])))
+            return
+        }
+        
+        // First clear any existing highlights
+        clearFindInPage()
+        
+        // If text is empty, return no matches
+        guard !text.isEmpty else {
+            completion(.success((matchCount: 0, currentIndex: 0)))
+            return
+        }
+        
+        // Use JavaScript to search and highlight text
+        let escapedText = text.replacingOccurrences(of: "'", with: "\\'")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
+        
+        let script = """
+        (function() {
+            // Check if document is ready
+            if (!document.body) {
+                return { matchCount: 0, currentIndex: 0, error: 'Document not ready' };
+            }
+            
+            // Remove existing highlights
+            var existingHighlights = document.querySelectorAll('.nook-find-highlight');
+            existingHighlights.forEach(function(el) {
+                var parent = el.parentNode;
+                parent.replaceChild(document.createTextNode(el.textContent), el);
+                parent.normalize();
+            });
+            
+            if ('\(escapedText)' === '') {
+                return { matchCount: 0, currentIndex: 0 };
+            }
+            
+            var searchText = '\(escapedText)';
+            var matchCount = 0;
+            var currentIndex = 0;
+            
+            // Create a tree walker to find text nodes
+            var walker = document.createTreeWalker(
+                document.body,
+                NodeFilter.SHOW_TEXT,
+                {
+                    acceptNode: function(node) {
+                        // Skip script and style elements
+                        var parent = node.parentElement;
+                        if (parent && (parent.tagName === 'SCRIPT' || parent.tagName === 'STYLE')) {
+                            return NodeFilter.FILTER_REJECT;
+                        }
+                        return NodeFilter.FILTER_ACCEPT;
+                    }
+                }
+            );
+            
+            var textNodes = [];
+            var node;
+            while (node = walker.nextNode()) {
+                textNodes.push(node);
+            }
+            
+            // Search and highlight
+            textNodes.forEach(function(textNode) {
+                var text = textNode.textContent;
+                if (text && text.length > 0) {
+                    var regex = new RegExp('(' + searchText.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&') + ')', 'gi');
+                    var matches = text.match(regex);
+                    
+                    if (matches && matches.length > 0) {
+                        matchCount += matches.length;
+                        var highlightedHTML = text.replace(regex, '<span class="nook-find-highlight" style="background-color: yellow; color: black;">$1</span>');
+                        
+                        var wrapper = document.createElement('div');
+                        wrapper.innerHTML = highlightedHTML;
+                        
+                        var parent = textNode.parentNode;
+                        while (wrapper.firstChild) {
+                            parent.insertBefore(wrapper.firstChild, textNode);
+                        }
+                        parent.removeChild(textNode);
+                    }
+                }
+            });
+            
+            // Scroll to first match
+            var firstHighlight = document.querySelector('.nook-find-highlight');
+            if (firstHighlight) {
+                firstHighlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                firstHighlight.style.backgroundColor = 'orange';
+            }
+            
+            return { matchCount: matchCount, currentIndex: matchCount > 0 ? 1 : 0 };
+        })();
+        """
+        
+        webView.evaluateJavaScript(script) { result, error in
+            if let error = error {
+                print("Find JavaScript error: \(error.localizedDescription)")
+                completion(.failure(error))
+                return
+            }
+            
+            print("Find JavaScript result: \(String(describing: result))")
+            
+            if let dict = result as? [String: Any],
+               let matchCount = dict["matchCount"] as? Int,
+               let currentIndex = dict["currentIndex"] as? Int {
+                print("Find found \(matchCount) matches, current index: \(currentIndex)")
+                completion(.success((matchCount: matchCount, currentIndex: currentIndex)))
+            } else {
+                print("Find result parsing failed, returning 0 matches")
+                completion(.success((matchCount: 0, currentIndex: 0)))
+            }
+        }
+    }
+    
+    func findNextInPage(completion: @escaping FindCompletion) {
+        guard let webView = _webView else {
+            completion(.failure(NSError(domain: "Tab", code: -1, userInfo: [NSLocalizedDescriptionKey: "WebView not available"])))
+            return
+        }
+        
+        let script = """
+        (function() {
+            var highlights = document.querySelectorAll('.nook-find-highlight');
+            if (highlights.length === 0) {
+                return { matchCount: 0, currentIndex: 0 };
+            }
+            
+            // Find current active highlight
+            var currentActive = document.querySelector('.nook-find-highlight.active');
+            var currentIndex = 0;
+            
+            if (currentActive) {
+                // Remove active class from current
+                currentActive.classList.remove('active');
+                currentActive.style.backgroundColor = 'yellow';
+                
+                // Find next highlight
+                var nextIndex = Array.from(highlights).indexOf(currentActive) + 1;
+                if (nextIndex >= highlights.length) {
+                    nextIndex = 0; // Wrap to beginning
+                }
+                currentIndex = nextIndex + 1;
+            } else {
+                // No active highlight, make first one active
+                currentIndex = 1;
+            }
+            
+            // Set new active highlight
+            var activeIndex = currentIndex - 1;
+            if (activeIndex >= 0 && activeIndex < highlights.length) {
+                var activeHighlight = highlights[activeIndex];
+                activeHighlight.classList.add('active');
+                activeHighlight.style.backgroundColor = 'orange';
+                activeHighlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            
+            return { matchCount: highlights.length, currentIndex: currentIndex };
+        })();
+        """
+        
+        webView.evaluateJavaScript(script) { result, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+            
+            if let dict = result as? [String: Any],
+               let matchCount = dict["matchCount"] as? Int,
+               let currentIndex = dict["currentIndex"] as? Int {
+                completion(.success((matchCount: matchCount, currentIndex: currentIndex)))
+            } else {
+                completion(.success((matchCount: 0, currentIndex: 0)))
+            }
+        }
+    }
+    
+    func findPreviousInPage(completion: @escaping FindCompletion) {
+        guard let webView = _webView else {
+            completion(.failure(NSError(domain: "Tab", code: -1, userInfo: [NSLocalizedDescriptionKey: "WebView not available"])))
+            return
+        }
+        
+        let script = """
+        (function() {
+            var highlights = document.querySelectorAll('.nook-find-highlight');
+            if (highlights.length === 0) {
+                return { matchCount: 0, currentIndex: 0 };
+            }
+            
+            // Find current active highlight
+            var currentActive = document.querySelector('.nook-find-highlight.active');
+            var currentIndex = 0;
+            
+            if (currentActive) {
+                // Remove active class from current
+                currentActive.classList.remove('active');
+                currentActive.style.backgroundColor = 'yellow';
+                
+                // Find previous highlight
+                var prevIndex = Array.from(highlights).indexOf(currentActive) - 1;
+                if (prevIndex < 0) {
+                    prevIndex = highlights.length - 1; // Wrap to end
+                }
+                currentIndex = prevIndex + 1;
+            } else {
+                // No active highlight, make last one active
+                currentIndex = highlights.length;
+            }
+            
+            // Set new active highlight
+            var activeIndex = currentIndex - 1;
+            if (activeIndex >= 0 && activeIndex < highlights.length) {
+                var activeHighlight = highlights[activeIndex];
+                activeHighlight.classList.add('active');
+                activeHighlight.style.backgroundColor = 'orange';
+                activeHighlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            
+            return { matchCount: highlights.length, currentIndex: currentIndex };
+        })();
+        """
+        
+        webView.evaluateJavaScript(script) { result, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+            
+            if let dict = result as? [String: Any],
+               let matchCount = dict["matchCount"] as? Int,
+               let currentIndex = dict["currentIndex"] as? Int {
+                completion(.success((matchCount: matchCount, currentIndex: currentIndex)))
+            } else {
+                completion(.success((matchCount: 0, currentIndex: 0)))
+            }
+        }
+    }
+    
+    func clearFindInPage() {
+        guard let webView = _webView else { return }
+        
+        let script = """
+        (function() {
+            var highlights = document.querySelectorAll('.nook-find-highlight');
+            highlights.forEach(function(el) {
+                var parent = el.parentNode;
+                parent.replaceChild(document.createTextNode(el.textContent), el);
+                parent.normalize();
+            });
+        })();
+        """
+        
+        webView.evaluateJavaScript(script) { _, _ in }
     }
 }
 

@@ -12,6 +12,7 @@ struct SpaceTittle: View {
     @State private var selectedEmoji: String = ""
     @FocusState private var nameFieldFocused: Bool
     @FocusState private var emojiFieldFocused: Bool
+    @State private var isEllipsisHovering: Bool = false
 
     var body: some View {
         HStack(spacing: 6) {
@@ -68,52 +69,60 @@ struct SpaceTittle: View {
                     }
                 }
 
-            if isHovering {
-                Menu {
-                    // Profile assignment submenu
-                    Menu("Assign to Profile") {
-                        // Quick info item
-                        let currentName = resolvedProfileName(for: space.profileId) ?? browserManager.profileManager.profiles.first?.name ?? "Default"
-                        Text("Current: \(currentName)")
-                            .foregroundStyle(.secondary)
-                        Divider()
-                        ProfilePickerView(
-                            selectedProfileId: Binding(
-                                get: { space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID() },
-                                set: { assignProfile($0) }
-                            ),
-                            onSelect: { _ in },
-                            compact: true
-                        )
-                        .environmentObject(browserManager)
-                    }
+            Menu {
+                // Profile assignment submenu
+                Menu("Assign to Profile") {
+                    // Quick info item
+                    let currentName = resolvedProfileName(for: space.profileId) ?? browserManager.profileManager.profiles.first?.name ?? "Default"
+                    Text("Current: \(currentName)")
+                        .foregroundStyle(.secondary)
                     Divider()
-                    Button {
-                        startRenaming()
-                    } label: {
-                        Label("Rename Space", systemImage: "pencil")
-                    }
-                    Button {
-                        emojiFieldFocused = true
-                        NSApp.orderFrontCharacterPalette(nil)
-                    } label: {
-                        Label("Change Icon", systemImage: "face.smiling")
-                    }
-                    Button(role: .destructive) {
-                        deleteSpace()
-                    } label: {
-                        Label("Delete Space", systemImage: "trash")
-                    }
-                } label: {
-                    NavButton(iconName: "ellipsis")
+                    ProfilePickerView(
+                        selectedProfileId: Binding(
+                            get: { space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID() },
+                            set: { assignProfile($0) }
+                        ),
+                        onSelect: { _ in },
+                        compact: true
+                    )
+                    .environmentObject(browserManager)
                 }
-                .buttonStyle(PlainButtonStyle())
+                Divider()
+                Button {
+                    startRenaming()
+                } label: {
+                    Label("Rename Space", systemImage: "pencil")
+                }
+                Button {
+                    emojiFieldFocused = true
+                    NSApp.orderFrontCharacterPalette(nil)
+                } label: {
+                    Label("Change Icon", systemImage: "face.smiling")
+                }
+                Button(role: .destructive) {
+                    deleteSpace()
+                } label: {
+                    Label("Delete Space", systemImage: "trash")
+                }
+            } label: {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(isEllipsisHovering ? (isHovering ? AppColors.controlBackgroundActive : AppColors.controlBackgroundHoverLight) : Color.clear)
+                        .frame(width: 24, height: 24)
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 16))
+                        .foregroundStyle(AppColors.textSecondary)
+                        .opacity(isHovering ? 1.0 : 0.0)
+                }
+                .onHover { hovering in
+                    isEllipsisHovering = hovering
+                }
             }
+            .buttonStyle(PlainButtonStyle())
         }
         // Match tabs' internal left/right padding so text aligns
         .padding(.horizontal, 10)
-        // Use the sidebar's section padding; avoid double horizontal padding
-        .padding(.vertical, 12)
+        .frame(height: 40)
         .frame(maxWidth: .infinity)
         .background(isHovering ? AppColors.controlBackgroundHover : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 12))

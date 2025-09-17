@@ -1034,30 +1034,96 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             let polyfillScript = """
             (function(){
               try {
-                // Ensure chrome namespace exists
                 window.chrome = window.chrome || {};
+                var chromeNS = window.chrome;
+                chromeNS.identity = chromeNS.identity || {};
 
-                // identity: Safari doesn't support it; recommend opening OAuth in a new tab.
-                if (typeof window.chrome.identity === 'undefined') {
-                  window.chrome.identity = {
-                    launchWebAuthFlow: function(details, callback){
-                      try {
-                        var url = details && details.url ? details.url : null;
-                        var interactive = !!(details && details.interactive);
-                        if (url && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.NookIdentity) {
-                          window.webkit.messageHandlers.NookIdentity.postMessage({ url: url, interactive: interactive });
-                        }
-                      } catch(_){}
-                      // Resolve immediately with null to unblock code paths that only check for existence
-                      try { if (typeof callback === 'function') callback(null); } catch(_){}
-                      return Promise.resolve(null);
+                var pendingIdentityRequests = Object.create(null);
+                var identityCounter = 0;
+
+                chromeNS.identity.launchWebAuthFlow = function(details, callback){
+                  var url = details && details.url ? String(details.url) : null;
+                  if (!url) {
+                    var missingUrlError = new Error('launchWebAuthFlow requires a url');
+                    if (typeof callback === 'function') {
+                      try { callback(null); } catch (_) {}
+                    }
+                    return Promise.reject(missingUrlError);
+                  }
+
+                  var interactive = !!(details && details.interactive);
+                  var prefersEphemeral = !!(details && details.useEphemeralSession);
+                  var callbackScheme = null;
+                  if (details && typeof details.callbackURLScheme === 'string' && details.callbackURLScheme.length > 0) {
+                    callbackScheme = details.callbackURLScheme;
+                  }
+
+                  var requestId = 'nook-auth-' + (++identityCounter);
+                  var entry = {
+                    resolve: null,
+                    reject: null,
+                    callback: (typeof callback === 'function') ? callback : null
+                  };
+
+                  var promise = new Promise(function(resolve, reject){
+                    entry.resolve = resolve;
+                    entry.reject = reject;
+                  });
+
+                  pendingIdentityRequests[requestId] = entry;
+
+                  try {
+                    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.NookIdentity) {
+                      window.webkit.messageHandlers.NookIdentity.postMessage({
+                        requestId: requestId,
+                        url: url,
+                        interactive: interactive,
+                        prefersEphemeral: prefersEphemeral,
+                        callbackScheme: callbackScheme
+                      });
+                    } else {
+                      throw new Error('Native identity bridge unavailable');
+                    }
+                  } catch (error) {
+                    delete pendingIdentityRequests[requestId];
+                    if (entry.reject) { entry.reject(error); }
+                    if (entry.callback) {
+                      try { entry.callback(null); } catch (_) {}
+                    }
+                    return Promise.reject(error);
+                  }
+
+                  return promise;
+                };
+
+                if (typeof window.__nookCompleteIdentityFlow !== 'function') {
+                  window.__nookCompleteIdentityFlow = function(result) {
+                    if (!result || !result.requestId) { return; }
+                    var entry = pendingIdentityRequests[result.requestId];
+                    if (!entry) { return; }
+                    delete pendingIdentityRequests[result.requestId];
+
+                    var status = result.status || 'failure';
+                    if (status === 'success') {
+                      var payload = result.url || null;
+                      if (entry.resolve) { entry.resolve(payload); }
+                      if (entry.callback) {
+                        try { entry.callback(payload); } catch (_) {}
+                      }
+                    } else {
+                      var errMessage = result.message || 'Authentication failed';
+                      var error = new Error(errMessage);
+                      if (result.code) { error.code = result.code; }
+                      if (entry.reject) { entry.reject(error); }
+                      if (entry.callback) {
+                        try { entry.callback(null); } catch (_) {}
+                      }
                     }
                   };
                 }
 
-                // webRequestAuthProvider: Chromium-only, define no-op to satisfy feature checks
-                if (typeof window.chrome.webRequestAuthProvider === 'undefined') {
-                  window.chrome.webRequestAuthProvider = {
+                if (typeof chromeNS.webRequestAuthProvider === 'undefined') {
+                  chromeNS.webRequestAuthProvider = {
                     addListener: function(){},
                     removeListener: function(){}
                   };
@@ -1511,7 +1577,24 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             return 
         }
         
-        // Create a new space to emulate a separate window in our UI
+        // Check if this is likely an OAuth flow
+        if let firstURL = configuration.tabURLs.first,
+           isLikelyOAuthURL(firstURL) {
+            print("🔐 [DELEGATE] OAuth window detected, opening in miniwindow: \(firstURL.absoluteString)")
+            bm.externalMiniWindowManager.present(url: firstURL) { success, finalURL in
+                print("🔐 [DELEGATE] Extension OAuth flow completed: success=\(success), finalURL=\(finalURL?.absoluteString ?? "nil")")
+                // Note: Extension OAuth flows are handled differently, no need to reload original tab
+            }
+
+            // Return a dummy window adapter for OAuth flows
+            if windowAdapter == nil {
+                windowAdapter = ExtensionWindowAdapter(browserManager: bm)
+            }
+            completionHandler(windowAdapter, nil)
+            return
+        }
+        
+        // For regular extension windows, create a new space to emulate a separate window in our UI
         let newSpace = bm.tabManager.createSpace(name: "Window")
         if let firstURL = configuration.tabURLs.first {
             _ = bm.tabManager.createNewTab(url: firstURL.absoluteString, in: newSpace)
@@ -1526,6 +1609,39 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         }
         print("✅ Created new window (space): \(newSpace.name)")
         completionHandler(windowAdapter, nil)
+    }
+    
+    private func isLikelyOAuthURL(_ url: URL) -> Bool {
+        let host = (url.host ?? "").lowercased()
+        let path = url.path.lowercased()
+        let query = url.query?.lowercased() ?? ""
+        
+        // Check for OAuth-related URLs
+        let oauthHosts = [
+            "accounts.google.com", "login.microsoftonline.com", "login.live.com",
+            "appleid.apple.com", "github.com", "gitlab.com", "bitbucket.org",
+            "auth0.com", "okta.com", "onelogin.com", "pingidentity.com",
+            "slack.com", "zoom.us", "login.cloudflareaccess.com",
+            "oauth", "auth", "login", "signin"
+        ]
+        
+        // Check if host contains OAuth-related terms
+        if oauthHosts.contains(where: { host.contains($0) }) {
+            return true
+        }
+        
+        // Check for OAuth paths and query parameters
+        if path.contains("/oauth") || path.contains("oauth2") || path.contains("/authorize") || 
+           path.contains("/signin") || path.contains("/login") || path.contains("/callback") {
+            return true
+        }
+        
+        if query.contains("client_id=") || query.contains("redirect_uri=") || 
+           query.contains("response_type=") || query.contains("scope=") {
+            return true
+        }
+        
+        return false
     }
 
     // Open the extension's options page (inside a browser tab)
