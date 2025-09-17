@@ -122,8 +122,7 @@ struct SpaceTittle: View {
         }
         // Match tabs' internal left/right padding so text aligns
         .padding(.horizontal, 10)
-        // Use the sidebar's section padding; avoid double horizontal padding
-        .padding(.vertical, 10)
+        .frame(height: 40)
         .frame(maxWidth: .infinity)
         .background(isHovering ? AppColors.controlBackgroundHover : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 12))

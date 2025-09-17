@@ -110,19 +110,23 @@ struct SidebarView: View {
                         spacesScrollView
                     }
                     //MARK: - Bottom
-                    HStack {
-                        NavButton(iconName: "square.and.arrow.down") {
-                            print("Downloads button pressed")
-                        }
-                        
-                        NavButton(iconName: "clock") {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                showHistory.toggle()
+                    ZStack {
+                        // Left side icons - anchored to left
+                        HStack {
+                            NavButton(iconName: "square.and.arrow.down") {
+                                print("Downloads button pressed")
                             }
+                            
+                            NavButton(iconName: "clock") {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    showHistory.toggle()
+                                }
+                            }
+                            
+                            Spacer()
                         }
                         
-                        Spacer()
-                        
+                        // Center content - space indicators or history text
                         if !showHistory {
                             SpacesList()
                         } else {
@@ -131,16 +135,19 @@ struct SidebarView: View {
                                 .foregroundColor(.secondary)
                         }
                         
-                        Spacer()
-                        
-                        if !showHistory {
-                            NavButton(iconName: "plus") {
-                                showSpaceCreationDialog()
-                            }
-                        } else {
-                            NavButton(iconName: "arrow.left") {
-                                withAnimation(.easeInOut(duration: 0.3)) {
-                                    showHistory = false
+                        // Right side icons - anchored to right
+                        HStack {
+                            Spacer()
+                            
+                            if !showHistory {
+                                NavButton(iconName: "plus") {
+                                    showSpaceCreationDialog()
+                                }
+                            } else {
+                                NavButton(iconName: "arrow.left") {
+                                    withAnimation(.easeInOut(duration: 0.3)) {
+                                        showHistory = false
+                                    }
                                 }
                             }
                         }
