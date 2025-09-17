@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2C0516602E7B447E0038ADBE /* FindManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C05165E2E7B447E0038ADBE /* FindManager.swift */; };
+		2C0516632E7B44990038ADBE /* FindBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C0516612E7B44990038ADBE /* FindBarView.swift */; };
+		2C0516652E7B6C510038ADBE /* BasicAuthCredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C0516642E7B6C510038ADBE /* BasicAuthCredentialStore.swift */; };
+		2C0516672E7B6C750038ADBE /* BasicAuthDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C0516662E7B6C750038ADBE /* BasicAuthDialog.swift */; };
 		2CC0672B2E789ECB001D37C6 /* TabDragContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066622E789ECB001D37C6 /* TabDragContainerView.swift */; };
 		2CC0672C2E789ECB001D37C6 /* InsertionLineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC0665E2E789ECB001D37C6 /* InsertionLineView.swift */; };
 		2CC0672D2E789ECB001D37C6 /* URLBarFramePreferenceKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066972E789ECB001D37C6 /* URLBarFramePreferenceKey.swift */; };
@@ -168,10 +172,15 @@
 		2CC067CA2E789ECB001D37C6 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 2CC0670A2E789ECB001D37C6 /* Info.plist */; };
 		2CC067CB2E789ECB001D37C6 /* README.markdown in Resources */ = {isa = PBXBuildFile; fileRef = 2CC067012E789ECB001D37C6 /* README.markdown */; };
 		2CC067CC2E789ECB001D37C6 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 2CC067062E789ECB001D37C6 /* README.md */; };
+		552E742C758115FEBA7189D8 /* AuthenticationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA35A0AE48F7A45FAD44575D /* AuthenticationManager.swift */; };
 		7FAFC5DA2E3ADDCD009D7DC4 /* FaviconFinder in Frameworks */ = {isa = PBXBuildFile; productRef = 7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		2C05165E2E7B447E0038ADBE /* FindManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FindManager.swift; sourceTree = "<group>"; };
+		2C0516612E7B44990038ADBE /* FindBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FindBarView.swift; sourceTree = "<group>"; };
+		2C0516642E7B6C510038ADBE /* BasicAuthCredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BasicAuthCredentialStore.swift; sourceTree = "<group>"; };
+		2C0516662E7B6C750038ADBE /* BasicAuthDialog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BasicAuthDialog.swift; sourceTree = "<group>"; };
 		2CC066382E789ECB001D37C6 /* TabListAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabListAdapter.swift; sourceTree = "<group>"; };
 		2CC0663A2E789ECB001D37C6 /* TabCollectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabCollectionView.swift; sourceTree = "<group>"; };
 		2CC0663B2E789ECB001D37C6 /* TabCollectionView_Previews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabCollectionView_Previews.swift; sourceTree = "<group>"; };
@@ -352,6 +361,7 @@
 		2CC067282E789ECB001D37C6 /* NookApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NookApp.swift; sourceTree = "<group>"; };
 		2CC067CD2E78A6CF001D37C6 /* Nook-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Nook-Bridging-Header.h"; sourceTree = "<group>"; };
 		7F8340FC2E37F39400674A5D /* Nook.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Nook.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		EA35A0AE48F7A45FAD44575D /* AuthenticationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -366,6 +376,22 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		2C05165F2E7B447E0038ADBE /* FindManager */ = {
+			isa = PBXGroup;
+			children = (
+				2C05165E2E7B447E0038ADBE /* FindManager.swift */,
+			);
+			path = FindManager;
+			sourceTree = "<group>";
+		};
+		2C0516622E7B44990038ADBE /* FindBar */ = {
+			isa = PBXGroup;
+			children = (
+				2C0516612E7B44990038ADBE /* FindBarView.swift */,
+			);
+			path = FindBar;
+			sourceTree = "<group>";
+		};
 		2CC066392E789ECB001D37C6 /* Adapters */ = {
 			isa = PBXGroup;
 			children = (
@@ -599,6 +625,7 @@
 		2CC066A22E789ECB001D37C6 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				2C0516622E7B44990038ADBE /* FindBar */,
 				2CC0663F2E789ECB001D37C6 /* AppKitWrappers */,
 				2CC066462E789ECB001D37C6 /* Browser */,
 				2CC066512E789ECB001D37C6 /* ColorPicker */,
@@ -644,6 +671,7 @@
 		2CC066AE2E789ECB001D37C6 /* Dialogs */ = {
 			isa = PBXGroup;
 			children = (
+				2C0516662E7B6C750038ADBE /* BasicAuthDialog.swift */,
 				2CC066A92E789ECB001D37C6 /* ProfileCreationDialog.swift */,
 				2CC066AA2E789ECB001D37C6 /* ProfileDeleteConfirmationDialog.swift */,
 				2CC066AB2E789ECB001D37C6 /* ProfileRenameDialog.swift */,
@@ -774,6 +802,8 @@
 		2CC066D12E789ECB001D37C6 /* Managers */ = {
 			isa = PBXGroup;
 			children = (
+				ABEA23CF0A4FC830442A31E3 /* AuthenticationManager */,
+				2C05165F2E7B447E0038ADBE /* FindManager */,
 				2CC066A42E789ECB001D37C6 /* BrowserManager */,
 				2CC066A62E789ECB001D37C6 /* CacheManager */,
 				2CC066A82E789ECB001D37C6 /* CookieManager */,
@@ -1048,6 +1078,15 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		ABEA23CF0A4FC830442A31E3 /* AuthenticationManager */ = {
+			isa = PBXGroup;
+			children = (
+				2C0516642E7B6C510038ADBE /* BasicAuthCredentialStore.swift */,
+				EA35A0AE48F7A45FAD44575D /* AuthenticationManager.swift */,
+			);
+			path = AuthenticationManager;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -1191,10 +1230,13 @@
 				2CC067652E789ECB001D37C6 /* mach_override.c in Sources */,
 				2CC067662E789ECB001D37C6 /* SidebarResizeView.swift in Sources */,
 				2CC067672E789ECB001D37C6 /* SpaceSeparator.swift in Sources */,
+				2C0516652E7B6C510038ADBE /* BasicAuthCredentialStore.swift in Sources */,
 				2CC067682E789ECB001D37C6 /* WebsiteView.swift in Sources */,
 				2CC067692E789ECB001D37C6 /* TabCollectionView_Previews.swift in Sources */,
 				2CC0676A2E789ECB001D37C6 /* TabListAdapter.swift in Sources */,
 				2CC0676B2E789ECB001D37C6 /* NewDocumentTarget.swift in Sources */,
+				2C0516632E7B44990038ADBE /* FindBarView.swift in Sources */,
+				552E742C758115FEBA7189D8 /* AuthenticationManager.swift in Sources */,
 				2CC0676C2E789ECB001D37C6 /* MiniBrowserWindowView.swift in Sources */,
 				2CC0676D2E789ECB001D37C6 /* PiPManager.swift in Sources */,
 				2CC0676E2E789ECB001D37C6 /* WindowBackgroundView.swift in Sources */,
@@ -1213,6 +1255,7 @@
 				2CC0677B2E789ECB001D37C6 /* MiniCommandPaletteView.swift in Sources */,
 				2CC0677C2E789ECB001D37C6 /* RefreshButton.swift in Sources */,
 				2CC0677D2E789ECB001D37C6 /* GradientInterpolation.swift in Sources */,
+				2C0516602E7B447E0038ADBE /* FindManager.swift in Sources */,
 				2CC0677E2E789ECB001D37C6 /* SearchSymbol.m in Sources */,
 				2CC0677F2E789ECB001D37C6 /* ProfileEntity.swift in Sources */,
 				2CC067802E789ECB001D37C6 /* ForceArrowCursorView.swift in Sources */,
@@ -1238,6 +1281,7 @@
 				2CC067942E789ECB001D37C6 /* ExtensionActionView.swift in Sources */,
 				2CC067952E789ECB001D37C6 /* MuteableWKWebView.m in Sources */,
 				2CC067962E789ECB001D37C6 /* NavButtonsView.swift in Sources */,
+				2C0516672E7B6C750038ADBE /* BasicAuthDialog.swift in Sources */,
 				2CC067972E789ECB001D37C6 /* HTSymbolHook.m in Sources */,
 				2CC067982E789ECB001D37C6 /* TabManager.swift in Sources */,
 				2CC067992E789ECB001D37C6 /* ProfileDeleteConfirmationDialog.swift in Sources */,
