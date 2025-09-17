@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2CC0672A2E789ECB001D37C6 /* IconPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066752E789ECB001D37C6 /* IconPickerView.swift */; };
 		2CC0672B2E789ECB001D37C6 /* TabDragContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066622E789ECB001D37C6 /* TabDragContainerView.swift */; };
 		2CC0672C2E789ECB001D37C6 /* InsertionLineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC0665E2E789ECB001D37C6 /* InsertionLineView.swift */; };
 		2CC0672D2E789ECB001D37C6 /* URLBarFramePreferenceKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066972E789ECB001D37C6 /* URLBarFramePreferenceKey.swift */; };
@@ -222,7 +221,6 @@
 		2CC066722E789ECB001D37C6 /* CacheManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheManagementView.swift; sourceTree = "<group>"; };
 		2CC066732E789ECB001D37C6 /* CookieDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookieDetailsView.swift; sourceTree = "<group>"; };
 		2CC066742E789ECB001D37C6 /* CookieManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookieManagementView.swift; sourceTree = "<group>"; };
-		2CC066752E789ECB001D37C6 /* IconPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconPickerView.swift; sourceTree = "<group>"; };
 		2CC066762E789ECB001D37C6 /* PrivacySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsView.swift; sourceTree = "<group>"; };
 		2CC066772E789ECB001D37C6 /* ProfilePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilePickerView.swift; sourceTree = "<group>"; };
 		2CC066782E789ECB001D37C6 /* ProfileRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileRowView.swift; sourceTree = "<group>"; };
@@ -505,7 +503,6 @@
 				2CC066722E789ECB001D37C6 /* CacheManagementView.swift */,
 				2CC066732E789ECB001D37C6 /* CookieDetailsView.swift */,
 				2CC066742E789ECB001D37C6 /* CookieManagementView.swift */,
-				2CC066752E789ECB001D37C6 /* IconPickerView.swift */,
 				2CC066762E789ECB001D37C6 /* PrivacySettingsView.swift */,
 				2CC066772E789ECB001D37C6 /* ProfilePickerView.swift */,
 				2CC066782E789ECB001D37C6 /* ProfileRowView.swift */,
@@ -1133,7 +1130,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2CC0672A2E789ECB001D37C6 /* IconPickerView.swift in Sources */,
 				2CC0672B2E789ECB001D37C6 /* TabDragContainerView.swift in Sources */,
 				2CC0672C2E789ECB001D37C6 /* InsertionLineView.swift in Sources */,
 				2CC0672D2E789ECB001D37C6 /* URLBarFramePreferenceKey.swift in Sources */,

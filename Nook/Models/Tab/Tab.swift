@@ -338,7 +338,7 @@ public class Tab: NSObject, Identifiable, ObservableObject {
         }
     }
 
-    // Resolve the Profile for this tab via its space association, or fall back to currentProfile
+    // Resolve the Profile for this tab via its space association, or fall back to currentProfile, then default profile
     private func resolveProfile() -> Profile? {
         // Attempt to resolve via associated space
         if let sid = spaceId,
@@ -350,7 +350,8 @@ public class Tab: NSObject, Identifiable, ObservableObject {
         }
         // Fallback to the current profile
         if let cp = browserManager?.currentProfile { return cp }
-        return nil
+        // Final fallback to the default profile
+        return browserManager?.profileManager.profiles.first
     }
 
     // Minimal hook to satisfy ExtensionManager: update extension controller on existing webView.

@@ -10,15 +10,14 @@ import SwiftUI
 struct ProfilePickerView: View {
     @EnvironmentObject var browserManager: BrowserManager
 
-    // Binding to the selected profile id (nil = unassigned/default)
-    @Binding var selectedProfileId: UUID?
+    // Binding to the selected profile id (must always have a profile)
+    @Binding var selectedProfileId: UUID
 
     // Optional callback when a selection is made
-    var onSelect: ((UUID?) -> Void)? = nil
+    var onSelect: ((UUID) -> Void)? = nil
 
     // Visual style variants
     var compact: Bool = true
-    var showNoneOption: Bool = true
 
     var body: some View {
         let profiles = browserManager.profileManager.profiles
@@ -28,14 +27,12 @@ struct ProfilePickerView: View {
         } else if compact {
             CompactListView(
                 profiles: profiles,
-                showNoneOption: showNoneOption,
                 selectedProfileId: $selectedProfileId,
                 onSelect: onSelect
             )
         } else {
             FullListView(
                 profiles: profiles,
-                showNoneOption: showNoneOption,
                 selectedProfileId: $selectedProfileId,
                 onSelect: onSelect
             )
@@ -64,27 +61,7 @@ struct ProfilePickerView: View {
         }
     }
 
-    @ViewBuilder
-    private func noneRow() -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "person.crop.circle.badge.questionmark")
-                .font(.system(size: 14, weight: .semibold))
-            Text("No Profile")
-            Spacer()
-            if selectedProfileId == nil {
-                Image(systemName: "checkmark")
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .contentShape(Rectangle())
-        .accessibilityLabel("No Profile")
-        .accessibilityHint(selectedProfileId == nil ? "Selected" : "Not selected")
-        .onTapGesture {
-            select(nil)
-        }
-    }
-
-    private func select(_ id: UUID?) {
+    private func select(_ id: UUID) {
         selectedProfileId = id
         onSelect?(id)
     }
@@ -92,25 +69,11 @@ struct ProfilePickerView: View {
     // Compact vertical list – suitable for menus/context menus
     private struct CompactListView: View {
         let profiles: [Profile]
-        let showNoneOption: Bool
-        @Binding var selectedProfileId: UUID?
-        var onSelect: ((UUID?) -> Void)?
+        @Binding var selectedProfileId: UUID
+        var onSelect: ((UUID) -> Void)?
 
         var body: some View {
             VStack(alignment: .leading, spacing: 6) {
-                if showNoneOption {
-                    Button(action: { select(nil) }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "person.crop.circle.badge.questionmark")
-                                .font(.system(size: 13))
-                            Text("No Profile")
-                                .font(.system(size: 13))
-                            Spacer()
-                            if selectedProfileId == nil { Image(systemName: "checkmark").foregroundStyle(.secondary) }
-                        }
-                    }
-                    .buttonStyle(.plain)
-                }
                 ForEach(profiles, id: \.id) { p in
                     Button(action: { select(p.id) }) {
                         HStack(spacing: 8) {
@@ -125,7 +88,7 @@ struct ProfilePickerView: View {
             }
         }
 
-        private func select(_ id: UUID?) {
+        private func select(_ id: UUID) {
             selectedProfileId = id
             onSelect?(id)
         }
@@ -134,30 +97,11 @@ struct ProfilePickerView: View {
     // Full list with dividers and clearer spacing – for settings
     private struct FullListView: View {
         let profiles: [Profile]
-        let showNoneOption: Bool
-        @Binding var selectedProfileId: UUID?
-        var onSelect: ((UUID?) -> Void)?
+        @Binding var selectedProfileId: UUID
+        var onSelect: ((UUID) -> Void)?
 
         var body: some View {
             VStack(alignment: .leading, spacing: 4) {
-                if showNoneOption {
-                    Button(action: { select(nil) }) {
-                        HStack(spacing: 10) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color(.controlBackgroundColor))
-                                Image(systemName: "person.crop.circle.badge.questionmark")
-                                    .font(.system(size: 16))
-                            }
-                            .frame(width: 24, height: 24)
-                            Text("No Profile").lineLimit(1)
-                            Spacer()
-                            if selectedProfileId == nil { Image(systemName: "checkmark").foregroundStyle(.secondary) }
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.vertical, 2)
-                }
                 ForEach(profiles, id: \.id) { p in
                     Button(action: { select(p.id) }) {
                         HStack(spacing: 10) {
@@ -178,7 +122,7 @@ struct ProfilePickerView: View {
             }
         }
 
-        private func select(_ id: UUID?) {
+        private func select(_ id: UUID) {
             selectedProfileId = id
             onSelect?(id)
         }

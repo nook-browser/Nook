@@ -74,6 +74,7 @@ struct WebsiteView: View {
                                 return 6
                             }
                         }(), style: .continuous))
+                        .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 0)
                         // Divider + pane close overlay
                         .overlay(alignment: .top) {
                             if shouldShowSplit {
