@@ -16,8 +16,12 @@ struct SpaceProfileBadge: View {
     enum Size { case compact, normal }
 
     private var assignedProfile: Profile? {
-        guard let id = space.profileId else { return nil }
-        return browserManager.profileManager.profiles.first(where: { $0.id == id })
+        if let id = space.profileId {
+            return browserManager.profileManager.profiles.first(where: { $0.id == id })
+        } else {
+            // If no profile assigned, show the default profile
+            return browserManager.profileManager.profiles.first
+        }
     }
 
     private var isCurrentProfile: Bool {
@@ -39,16 +43,17 @@ struct SpaceProfileBadge: View {
                 .help("Profile: \(p.name)")
                 .accessibilityLabel("Profile \(p.name)")
             } else {
+                // This should never happen now since we always show the default profile
                 ZStack {
                     RoundedRectangle(cornerRadius: cornerRadius)
                         .fill(Color(.controlBackgroundColor))
-                    Image(systemName: "person.crop.circle.badge.questionmark")
+                    Image(systemName: "person.crop.circle")
                         .font(.system(size: iconSize, weight: .regular))
                         .foregroundStyle(.tertiary)
                 }
                 .frame(width: badgeSide, height: badgeSide)
-                .help("No profile assigned")
-                .accessibilityLabel("No profile assigned")
+                .help("Default profile")
+                .accessibilityLabel("Default profile")
             }
         }
     }
