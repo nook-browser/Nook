@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct PinnedTabView: View {
     var tabName: String
@@ -23,16 +24,16 @@ struct PinnedTabView: View {
     private let innerPadding: CGFloat = 16
 
     // Stroke overlay tunables
-    private let strokeThickness: CGFloat = 2.0   // ring thickness
+    private let strokeThickness: CGFloat = 2.5   // ring thickness
     private let faviconScale: CGFloat = 9.0      // favicon scale to fit the ring
-    private let faviconBlur: CGFloat = 70.0      // blur applied to favicon
+    private let faviconBlur: CGFloat = 80.0      // blur applied to favicon
 
     var body: some View {
         Button(action: action) {
             ZStack {
-                // Background replaced with RoundedRectangle directly
+                // Background replaced with RoundedRectangle directly using AppColors
                 RoundedRectangle(cornerRadius: corner, style: .continuous)
-                    .fill(Color.white.opacity(isActive ? 1.0 : isHovered ? 0.6 : 0.4))
+                    .fill(isActive ? AppColors.activeTab : isHovered ? AppColors.controlBackgroundHover : AppColors.inactiveTab)
                     .animation(.easeInOut(duration: 0.2), value: isHovered)
                     .shadow(color: isActive ? Color.gray : Color.clear, radius: 1, y: 1)
 
@@ -74,8 +75,8 @@ struct PinnedTabView: View {
     ) -> some View {
         GeometryReader { proxy in
             let size = proxy.size
-            let outerRect = RoundedRectangle(cornerRadius: corner, style: .continuous)
-            let innerRect = RoundedRectangle(cornerRadius: max(0, corner + 1), style: .continuous)
+            let outerRect = RoundedRectangle(cornerRadius: corner - (thickness), style: .continuous)
+            let innerRect = RoundedRectangle(cornerRadius: max(0, corner - (thickness)), style: .continuous)
 
             ZStack {
                 let ringMask = ZStack {
@@ -106,4 +107,3 @@ struct PinnedTabView: View {
         }
     }
 }
-
