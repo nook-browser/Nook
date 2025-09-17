@@ -35,26 +35,37 @@ struct SidebarView: View {
         
         guard totalSpaces > 0 else { return [] }
         
+        // Ensure activeSpaceIndex is within bounds
+        let safeActiveIndex = min(max(activeSpaceIndex, 0), totalSpaces - 1)
+        
+        // If the activeSpaceIndex is out of bounds, update it
+        if activeSpaceIndex != safeActiveIndex {
+            print("⚠️ activeSpaceIndex out of bounds: \(activeSpaceIndex), correcting to: \(safeActiveIndex)")
+            DispatchQueue.main.async {
+                self.activeSpaceIndex = safeActiveIndex
+            }
+        }
+        
         var indices: [Int] = []
         
-        if activeSpaceIndex == 0 {
+        if safeActiveIndex == 0 {
             // First space: show [0, 1]
             indices.append(0)
             if totalSpaces > 1 {
                 indices.append(1)
             }
-        } else if activeSpaceIndex == totalSpaces - 1 {
+        } else if safeActiveIndex == totalSpaces - 1 {
             // Last space: show [last-1, last]
-            indices.append(activeSpaceIndex - 1)
-            indices.append(activeSpaceIndex)
+            indices.append(safeActiveIndex - 1)
+            indices.append(safeActiveIndex)
         } else {
             // Middle space: show [current-1, current, current+1]
-            indices.append(activeSpaceIndex - 1)
-            indices.append(activeSpaceIndex)
-            indices.append(activeSpaceIndex + 1)
+            indices.append(safeActiveIndex - 1)
+            indices.append(safeActiveIndex)
+            indices.append(safeActiveIndex + 1)
         }
         
-        print("🔍 visibleSpaceIndices - activeSpaceIndex: \(activeSpaceIndex), result: \(indices)")
+        print("🔍 visibleSpaceIndices - activeSpaceIndex: \(activeSpaceIndex), safeIndex: \(safeActiveIndex), totalSpaces: \(totalSpaces), result: \(indices)")
         return indices
     }
     
@@ -215,6 +226,15 @@ struct SidebarView: View {
                 }
             }
         }
+        .onChange(of: browserManager.tabManager.spaces.count) { _, newCount in
+            // Spaces were added or deleted - ensure activeSpaceIndex is valid
+            let newSpaceIndex = targetScrollPosition
+            if newSpaceIndex != activeSpaceIndex {
+                print("🔄 Spaces count changed to \(newCount) - updating activeSpaceIndex from \(activeSpaceIndex) to \(newSpaceIndex)")
+                activeSpaceIndex = newSpaceIndex
+                currentScrollID = newSpaceIndex
+            }
+        }
         .onScrollPhaseChange { oldPhase, newPhase in
             if newPhase == .interacting && oldPhase == .idle {
                 // Drag just started - fire haptic after short delay
@@ -283,7 +303,6 @@ struct SidebarView: View {
                     name: spaceName.isEmpty ? "New Space" : spaceName,
                     icon: spaceIcon.isEmpty ? "✨" : spaceIcon
                 )
-                browserManager.dialogManager.closeDialog()
                 
                 // Reset form
                 spaceName = ""
@@ -295,6 +314,9 @@ struct SidebarView: View {
                 // Reset form
                 spaceName = ""
                 spaceIcon = ""
+            },
+            onClose: {
+                browserManager.dialogManager.closeDialog()
             }
         )
         
