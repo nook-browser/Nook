@@ -63,7 +63,7 @@ struct ProfileRenameDialog: DialogProtocol {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Profile Icon")
                         .font(.system(size: 14, weight: .medium))
-                    IconPickerView(selectedIcon: $profileIcon)
+                    SimpleIconPicker(selectedIcon: $profileIcon)
                         .frame(maxHeight: 200)
                 }
             }
