@@ -170,6 +170,18 @@ struct NookCommands: Commands {
             }
             .keyboardShortcut("l", modifiers: .command)
             
+            Button("Reload Page") {
+                browserManager.tabManager.currentTab?.refresh()
+            }
+            .keyboardShortcut("r", modifiers: .command)
+            .disabled(browserManager.tabManager.currentTab == nil)
+
+            Button("Hard Reload (Ignore Cache)") {
+                browserManager.hardReloadCurrentPage()
+            }
+            .keyboardShortcut("R", modifiers: [.command, .shift])
+            .disabled(browserManager.tabManager.currentTab == nil)
+
             Divider()
             
             Button("Web Inspector") {

@@ -808,6 +808,16 @@ class BrowserManager: ObservableObject {
         }
     }
     
+    /// Clears site cache for current page excluding cookies, then reloads from origin.
+    func hardReloadCurrentPage() {
+        guard let currentTab = tabManager.currentTab,
+              let host = currentTab.url.host else { return }
+        Task { @MainActor in
+            await cacheManager.clearCacheForDomainExcludingCookies(host)
+            currentTab.webView?.reloadFromOrigin()
+        }
+    }
+    
     func clearStaleCache() {
         Task {
             await cacheManager.clearStaleCache()
