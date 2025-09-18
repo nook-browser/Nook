@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct SidebarView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     @Environment(\.tabDragManager) private var dragManager
     @State private var scrollPosition = ScrollPosition(edge: .leading)
     @State private var currentScrollID: Int? = nil
@@ -19,12 +20,12 @@ struct SidebarView: View {
     var forcedWidth: CGFloat? = nil
 
     private var effectiveWidth: CGFloat {
-        forcedWidth ?? browserManager.sidebarWidth
+        forcedWidth ?? windowState.sidebarWidth
     }
 
     private var targetScrollPosition: Int {
-        if let currentSpace = browserManager.tabManager.currentSpace,
-           let index = browserManager.tabManager.spaces.firstIndex(where: { $0.id == currentSpace.id }) {
+        if let currentSpaceId = windowState.currentSpaceId,
+           let index = browserManager.tabManager.spaces.firstIndex(where: { $0.id == currentSpaceId }) {
             return index
         }
         return 0
@@ -71,7 +72,7 @@ struct SidebarView: View {
     
 
     var body: some View {
-        if browserManager.isSidebarVisible || forceVisible {
+        if windowState.isSidebarVisible || forceVisible {
             sidebarContent
         }
     }
@@ -100,6 +101,7 @@ struct SidebarView: View {
                     // Container to support PinnedGrid slide transitions without clipping
                     ZStack {
                         PinnedGrid(width: max(0, effectiveWidth - 16))
+                            .environmentObject(windowState)
                     }
                     .padding(.horizontal, 8)
                     .modifier(FallbackDropBelowEssentialsModifier())
@@ -129,6 +131,7 @@ struct SidebarView: View {
                         // Center content - space indicators or history text
                         if !showHistory {
                             SpacesList()
+                                .environmentObject(windowState)
                         } else {
                             Text("History")
                                 .font(.system(size: 12, weight: .medium))
@@ -191,7 +194,7 @@ struct SidebarView: View {
         .scrollIndicators(.hidden)
         .scrollPosition(id: $currentScrollID, anchor: .topLeading)
         // Keep the active space locked to the leading edge when resizing
-        .onChange(of: browserManager.sidebarWidth) { _, _ in
+        .onChange(of: windowState.sidebarWidth) { _, _ in
             // Force a re-snap by clearing then restoring the target id without animation.
             // Some SwiftUI versions ignore setting the same id; this guarantees an update.
             let target = activeSpaceIndex
@@ -214,7 +217,7 @@ struct SidebarView: View {
             currentScrollID = targetScrollPosition
             print("🔄 Initialized activeSpaceIndex: \(activeSpaceIndex), currentScrollID: \(targetScrollPosition)")
         }
-        .onChange(of: browserManager.tabManager.currentSpace?.id) { _, _ in
+        .onChange(of: windowState.currentSpaceId) { _, _ in
             // Space was changed programmatically (e.g., clicking bottom icons)
             let newSpaceIndex = targetScrollPosition
             if newSpaceIndex != activeSpaceIndex {
@@ -259,7 +262,7 @@ struct SidebarView: View {
                 if let newSpaceIndex = currentScrollID {
                     let space = browserManager.tabManager.spaces[newSpaceIndex]
                     print("🎯 Drag ended - Activating space: \(space.name) (index: \(newSpaceIndex))")
-                    browserManager.tabManager.setActiveSpace(space)
+                    browserManager.setActiveSpace(space, in: windowState)
                     activeSpaceIndex = newSpaceIndex  // Update visible window ONLY on drag end
                 }
             }
@@ -273,9 +276,9 @@ struct SidebarView: View {
                 VStack(spacing: 0) {
                     SpaceView(
                         space: space,
-                        isActive: browserManager.tabManager.currentSpace?.id == space.id,
+                        isActive: windowState.currentSpaceId == space.id,
                         width: effectiveWidth,
-                        onActivateTab: { browserManager.tabManager.setActiveTab($0) },
+                        onActivateTab: { browserManager.selectTab($0, in: windowState) },
                         onCloseTab: { browserManager.tabManager.removeTab($0.id) },
                         onPinTab: { browserManager.tabManager.pinTab($0) },
                         onMoveTabUp: { browserManager.tabManager.moveTabUp($0.id) },

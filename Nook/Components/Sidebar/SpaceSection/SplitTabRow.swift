@@ -10,6 +10,7 @@ struct SplitTabRow: View {
     let onClose: (Tab) -> Void
     
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     
     var body: some View {
         VStack(spacing: 0) {
@@ -80,6 +81,7 @@ private struct SplitHalfTab: View {
     @State private var isHovering: Bool = false
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var splitManager: SplitViewManager
+    @EnvironmentObject var windowState: BrowserWindowState
     
     var body: some View {
         ZStack {
@@ -126,7 +128,7 @@ private struct SplitHalfTab: View {
     }
     
     private var isActive: Bool {
-        browserManager.tabManager.currentTab?.id == tab.id
+        browserManager.currentTab(for: windowState)?.id == tab.id
     }
     
     private var background: some View {
@@ -144,11 +146,12 @@ private struct SplitHalfTab: View {
             DispatchQueue.main.async {
                 let all = browserManager.tabManager.allTabs()
                 guard let dropped = all.first(where: { $0.id == id }) else { return }
-                if splitManager.isSplit {
-                    if side == .left, splitManager.leftTabId == dropped.id { return }
-                    if side == .right, splitManager.rightTabId == dropped.id { return }
+                let windowId = windowState.id
+                if splitManager.isSplit(for: windowId) {
+                    if side == .left, splitManager.leftTabId(for: windowId) == dropped.id { return }
+                    if side == .right, splitManager.rightTabId(for: windowId) == dropped.id { return }
                 }
-                splitManager.enterSplit(with: dropped, placeOn: side)
+                splitManager.enterSplit(with: dropped, placeOn: side, in: windowState)
                 // Ensure any local drag-hide state is cleared after drop
                 self.draggedItem = nil
                 NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)

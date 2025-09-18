@@ -39,7 +39,7 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
             lastActiveTabCall = now
         }
         
-        if let t = browserManager.tabManager.currentTab,
+        if let t = browserManager.currentTabForActiveWindow(),
            let a = ExtensionManager.shared.stableAdapter(for: t) {
             return a
         }
@@ -58,7 +58,7 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
         let now = Date()
         let shouldLog = now.timeIntervalSince(lastTabsCall) > 2.0
         if shouldLog {
-            let currentTabName = browserManager.tabManager.currentTab?.name ?? "nil"
+            let currentTabName = browserManager.currentTabForActiveWindow()?.name ?? "nil"
             print("[ExtensionWindowAdapter] tabs() called - Current tab: '\(currentTabName)'")
             lastTabsCall = now
         }
@@ -152,7 +152,7 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
     }
 
     func isSelected(for extensionContext: WKWebExtensionContext) -> Bool {
-        let isActive = browserManager.tabManager.currentTab?.id == tab.id
+        let isActive = browserManager.currentTabForActiveWindow()?.id == tab.id
         return isActive
     }
 

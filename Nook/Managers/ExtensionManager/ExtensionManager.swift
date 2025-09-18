@@ -869,7 +869,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             }
             
             // Notify about current active tab
-            if let currentTab = browserManager.tabManager.currentTab {
+            if let currentTab = browserManager.currentTabForActiveWindow() {
                 let tabAdapter = self.adapter(for: currentTab, browserManager: browserManager)
                 controller.didActivateTab(tabAdapter, previousActiveTab: nil)
                 controller.didSelectTabs([tabAdapter])
