@@ -8,6 +8,7 @@ import SwiftUI
 
 struct SpacesListItem: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     var space: Space
     var isActive: Bool
     var compact: Bool
@@ -16,7 +17,7 @@ struct SpacesListItem: View {
     @FocusState private var emojiFieldFocused: Bool
 
     private var currentSpaceID: UUID? {
-        browserManager.tabManager.currentSpace?.id
+        windowState.currentSpaceId
     }
     
     private var cellSize: CGFloat { compact && !isActive ? 16 : 24 }
@@ -25,7 +26,7 @@ struct SpacesListItem: View {
     
     var body: some View {
         Button {
-            browserManager.tabManager.setActiveSpace(space)
+            browserManager.setActiveSpace(space, in: windowState)
         } label: {
             ZStack {
                 if compact && !isActive {

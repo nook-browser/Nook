@@ -9,6 +9,7 @@ import SwiftUI
 
 struct SidebarResizeView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     @State private var isResizing = false
     @State private var isHovering = false
     @State private var startingWidth: CGFloat = 0
@@ -20,7 +21,7 @@ struct SidebarResizeView: View {
             .frame(width: 8)
             .contentShape(Rectangle())
             .onHover { hovering in
-                guard browserManager.isSidebarVisible else { return }
+                guard windowState.isSidebarVisible else { return }
                 
                 isHovering = hovering
                 
@@ -33,10 +34,10 @@ struct SidebarResizeView: View {
             .gesture(
                 DragGesture(minimumDistance: 0, coordinateSpace: .global)
                     .onChanged { value in
-                        guard browserManager.isSidebarVisible else { return }
+                        guard windowState.isSidebarVisible else { return }
                         
                         if !isResizing {
-                            startingWidth = browserManager.sidebarWidth
+                            startingWidth = windowState.sidebarWidth
                             startingMouseX = value.startLocation.x
                             isResizing = true
                             NSCursor.resizeLeftRight.set()
@@ -48,7 +49,7 @@ struct SidebarResizeView: View {
                         let newWidth = startingWidth + mouseMovement
                         let clampedWidth = max(170, min(400, newWidth))
                         
-                        browserManager.updateSidebarWidth(clampedWidth)
+                        browserManager.updateSidebarWidth(clampedWidth, for: windowState)
                     }
                     .onEnded { _ in
                         isResizing = false

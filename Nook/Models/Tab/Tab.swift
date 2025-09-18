@@ -135,6 +135,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     var onCommandHover: ((String?) -> Void)? = nil
 
     var isCurrentTab: Bool {
+        // This property is used in contexts where we don't have window state
+        // For now, we'll keep it using the global current tab for backward compatibility
         return browserManager?.tabManager.currentTab?.id == id
     }
     
@@ -211,6 +213,9 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     func refresh() {
         loadingState = .didStartProvisionalNavigation
         _webView?.reload()
+        
+        // Synchronize refresh across all windows that are displaying this tab
+        browserManager?.reloadTabAcrossWindows(self.id)
     }
 
     func stop() {
@@ -297,6 +302,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "commandClick")
         _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "pipStateChange")
         _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "mediaStateChange_\(id.uuidString)")
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "backgroundColor_\(id.uuidString)")
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "historyStateDidChange")
         _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "NookIdentity")
         
         // Add handlers
@@ -306,6 +313,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         _webView?.configuration.userContentController.add(self, name: "pipStateChange")
         _webView?.configuration.userContentController.add(self, name: "mediaStateChange_\(id.uuidString)")
         _webView?.configuration.userContentController.add(self, name: "backgroundColor_\(id.uuidString)")
+        _webView?.configuration.userContentController.add(self, name: "historyStateDidChange")
         _webView?.configuration.userContentController.add(self, name: "NookIdentity")
 
         _webView?.customUserAgent =
@@ -341,7 +349,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
 
     // Resolve the Profile for this tab via its space association, or fall back to currentProfile, then default profile
-    private func resolveProfile() -> Profile? {
+    func resolveProfile() -> Profile? {
         // Attempt to resolve via associated space
         if let sid = spaceId,
            let space = browserManager?.tabManager.spaces.first(where: { $0.id == sid }) {
@@ -457,14 +465,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             webView.removeFromSuperview()
             
             // 7. FORCE REMOVE FROM COMPOSITOR
-            if let containerView = browserManager?.compositorContainerView {
-                for subview in containerView.subviews {
-                    if subview === webView {
-                        subview.removeFromSuperview()
-                        print("Tab removed from compositor: \(name)")
-                    }
-                }
-            }
+            browserManager?.removeWebViewFromContainers(webView)
             
             // 8. FORCE TERMINATE WEB CONTENT PROCESS
             webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { _ in }
@@ -490,6 +491,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         loadingState = .idle
 
         // 12. FORCE COMPOSITOR UPDATE
+        // Note: This is called during tab loading, so we use the global current tab
+        // The compositor will handle window-specific visibility in its update methods
         browserManager?.compositorManager.updateTabVisibility(currentTabId: browserManager?.tabManager.currentTab?.id)
 
         // 13. STOP NATIVE AUDIO MONITORING
@@ -540,6 +543,9 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             print("🚀 [Tab] Loading URL with cache policy: \(request.cachePolicy.rawValue)")
             activeWebView.load(request)
         }
+        
+        // Synchronize navigation across all windows that are displaying this tab
+        browserManager?.syncTabAcrossWindows(self.id)
 
         Task { @MainActor in
             await fetchAndSetFavicon(for: newURL)
@@ -1062,18 +1068,15 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
     
     func setMuted(_ muted: Bool) {
-        guard let webView = _webView else {
-            // Store the desired state even if webView isn't loaded yet
-            DispatchQueue.main.async { [weak self] in
-                self?.isAudioMuted = muted
-                print("🔇 [Tab] Mute state set to \(muted) (webView not loaded yet)")
-            }
-            return
+        if let webView = _webView {
+            // Set the mute state using MuteableWKWebView's muted property
+            webView.isMuted = muted
+        } else {
+            print("🔇 [Tab] Mute state queued at \(muted); base webView not loaded yet")
         }
-        
-        // Set the mute state using MuteableWKWebView's muted property
-        webView.isMuted = muted
-        
+
+        browserManager?.setMuteState(muted, for: id)
+
         // Update our internal state
         DispatchQueue.main.async { [weak self] in
             self?.isAudioMuted = muted
@@ -1448,66 +1451,47 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         }
     }
     
-    private func injectDownloadJavaScript(to webView: WKWebView) {
-        let downloadScript = """
+    private func injectHistoryStateObserver(into webView: WKWebView) {
+        let historyScript = """
         (function() {
-            // Override click handlers for download links
-            document.addEventListener('click', function(e) {
-                var target = e.target;
-                while (target && target !== document) {
-                    if (target.tagName === 'A' && target.href) {
-                        var href = target.href.toLowerCase();
-                        var downloadExtensions = ['zip', 'rar', '7z', 'tar', 'gz', 'pdf', 'doc', 'docx', 'mp4', 'mp3', 'exe', 'dmg'];
-                        
-                        for (var i = 0; i < downloadExtensions.length; i++) {
-                            if (href.indexOf('.' + downloadExtensions[i]) !== -1) {
-                                // Force download by creating a new link
-                                var link = document.createElement('a');
-                                link.href = target.href;
-                                link.download = target.download || target.href.split('/').pop();
-                                link.style.display = 'none';
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                                e.preventDefault();
-                                e.stopPropagation();
-                                return false;
-                            }
-                        }
+            if (window.__nookHistorySyncInstalled) { return; }
+            window.__nookHistorySyncInstalled = true;
+
+            function notify() {
+                try {
+                    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.historyStateDidChange) {
+                        window.webkit.messageHandlers.historyStateDidChange.postMessage(window.location.href);
                     }
-                    target = target.parentElement;
+                } catch (err) {
+                    console.error('historyStateDidChange failed', err);
                 }
-            }, true);
-            
-            // Override window.open for download links
-            var originalOpen = window.open;
-            window.open = function(url, name, features) {
-                if (url && typeof url === 'string') {
-                    var lowerUrl = url.toLowerCase();
-                    var downloadExtensions = ['zip', 'rar', '7z', 'tar', 'gz', 'pdf', 'doc', 'docx', 'mp4', 'mp3', 'exe', 'dmg'];
-                    
-                    for (var i = 0; i < downloadExtensions.length; i++) {
-                        if (lowerUrl.indexOf('.' + downloadExtensions[i]) !== -1) {
-                            // Force download instead of opening in new window
-                            var link = document.createElement('a');
-                            link.href = url;
-                            link.download = url.split('/').pop();
-                            link.style.display = 'none';
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            return null;
-                        }
-                    }
-                }
-                return originalOpen.apply(this, arguments);
+            }
+
+            var originalPushState = history.pushState;
+            history.pushState = function() {
+                var result = originalPushState.apply(this, arguments);
+                setTimeout(notify, 0);
+                return result;
             };
+
+            var originalReplaceState = history.replaceState;
+            history.replaceState = function() {
+                var result = originalReplaceState.apply(this, arguments);
+                setTimeout(notify, 0);
+                return result;
+            };
+
+            window.addEventListener('popstate', notify);
+            window.addEventListener('hashchange', notify);
+            document.addEventListener('yt-navigate-finish', notify);
+
+            notify();
         })();
         """
-        
-        webView.evaluateJavaScript(downloadScript) { result, error in
+
+        webView.evaluateJavaScript(historyScript) { _, error in
             if let error = error {
-                print("Error injecting download JavaScript: \(error.localizedDescription)")
+                print("[Tab] Error injecting history observer JavaScript: \(error.localizedDescription)")
             }
         }
     }
@@ -1722,6 +1706,7 @@ extension Tab: WKNavigationDelegate {
 
         if let newURL = webView.url {
             self.url = newURL
+            browserManager?.syncTabAcrossWindows(self.id)
             if #available(macOS 15.5, *) {
                 ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
             }
@@ -1744,6 +1729,7 @@ extension Tab: WKNavigationDelegate {
             if #available(macOS 15.5, *) {
                 ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
             }
+            browserManager?.syncTabAcrossWindows(self.id)
         }
 
         webView.evaluateJavaScript("document.title") {
@@ -1777,10 +1763,10 @@ extension Tab: WKNavigationDelegate {
             }
         }
         
-        injectDownloadJavaScript(to: webView)
         injectLinkHoverJavaScript(to: webView)
         injectPiPStateListener(to: webView)
         injectMediaDetection(to: webView)
+        injectHistoryStateObserver(into: webView)
         updateNavigationState()
         
         // Trigger background color extraction
@@ -1849,28 +1835,16 @@ extension Tab: WKNavigationDelegate {
         decidePolicyFor navigationAction: WKNavigationAction,
         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
     ) {
-        if let url = navigationAction.request.url {
-            // Heuristic: surface OAuth assist when protection may interfere
-            if navigationAction.targetFrame?.isMainFrame == true {
-                browserManager?.maybeShowOAuthAssist(for: url, in: self)
-            }
-            let pathExtension = url.pathExtension.lowercased()
-            let downloadExtensions: Set<String> = [
-                "zip", "rar", "7z", "tar", "gz", "bz2", "xz",
-                "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
-                "mp4", "avi", "mov", "wmv", "flv", "mkv",
-                "mp3", "wav", "aac", "flac",
-                "exe", "dmg", "pkg", "deb", "rpm",
-                "jpg", "jpeg", "png", "gif", "bmp", "tiff", "webp"
-            ]
-            
-            if downloadExtensions.contains(pathExtension) {
-                print("🔽 [Tab] Navigation action detected download file: \(pathExtension) for URL: \(url.absoluteString)")
-                decisionHandler(.download)
-                return
-            }
+        if let url = navigationAction.request.url,
+           navigationAction.targetFrame?.isMainFrame == true {
+            browserManager?.maybeShowOAuthAssist(for: url, in: self)
         }
-        
+
+        if #available(macOS 12.3, *), navigationAction.shouldPerformDownload {
+            decisionHandler(.download)
+            return
+        }
+
         decisionHandler(.allow)
     }
 
@@ -1879,72 +1853,18 @@ extension Tab: WKNavigationDelegate {
         decidePolicyFor navigationResponse: WKNavigationResponse,
         decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
     ) {
-        if let mime = navigationResponse.response.mimeType?.lowercased() {
-            let forceDownloadMIMEs: Set<String> = [
-                // Images
-                "image/jpeg",
-                "image/png",
-                "image/gif",
-                "image/bmp",
-                "image/tiff",
-                "image/webp",
-                // Archives
-                "application/zip",
-                "application/x-zip-compressed",
-                "application/x-rar-compressed",
-                "application/x-7z-compressed",
-                "application/x-tar",
-                "application/gzip",
-                "application/x-gzip",
-                // Documents
-                "application/pdf",
-                "application/msword",
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                "application/vnd.ms-excel",
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                "application/vnd.ms-powerpoint",
-                "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                // Media
-                "video/mp4",
-                "video/avi",
-                "video/quicktime",
-                "video/x-msvideo",
-                "audio/mpeg",
-                "audio/wav",
-                "audio/aac",
-                // Executables
-                "application/x-executable",
-                "application/x-dosexec",
-                "application/x-msdownload",
-                // Generic binary
-                "application/octet-stream",
-                "application/binary",
-            ]
-            
-            if forceDownloadMIMEs.contains(mime) {
-                decisionHandler(.download)
-                return
-            }
+        if let response = navigationResponse.response as? HTTPURLResponse,
+           let disposition = response.allHeaderFields["Content-Disposition"] as? String,
+           disposition.lowercased().contains("attachment") {
+            decisionHandler(.download)
+            return
         }
-        
-        // Also check URL path for common file extensions
-        if let url = navigationResponse.response.url {
-            let pathExtension = url.pathExtension.lowercased()
-            let downloadExtensions: Set<String> = [
-                "zip", "rar", "7z", "tar", "gz", "bz2", "xz",
-                "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
-                "mp4", "avi", "mov", "wmv", "flv", "mkv",
-                "mp3", "wav", "aac", "flac",
-                "exe", "dmg", "pkg", "deb", "rpm",
-                "jpg", "jpeg", "png", "gif", "bmp", "tiff", "webp"
-            ]
-            
-            if downloadExtensions.contains(pathExtension) {
-                decisionHandler(.download)
-                return
-            }
+
+        if navigationResponse.isForMainFrame && !navigationResponse.canShowMIMEType {
+            decisionHandler(.download)
+            return
         }
-        
+
         decisionHandler(.allow)
     }
 
@@ -2097,9 +2017,19 @@ extension Tab: WKScriptMessageHandler {
                 }
             }
         
+        case "historyStateDidChange":
+            if let href = message.body as? String, let url = URL(string: href) {
+                DispatchQueue.main.async {
+                    if self.url.absoluteString != url.absoluteString {
+                        self.url = url
+                        self.browserManager?.syncTabAcrossWindows(self.id)
+                    }
+                }
+            }
+
         case "NookIdentity":
             handleOAuthRequest(message: message)
-        
+
         default:
             break
         }
@@ -2273,12 +2203,24 @@ extension Tab: WKUIDelegate {
         newTab._webView = newWebView
         
         // Set up message handlers
+        // Remove any existing handlers first to avoid duplicates
+        newWebView.configuration.userContentController.removeScriptMessageHandler(forName: "linkHover")
+        newWebView.configuration.userContentController.removeScriptMessageHandler(forName: "commandHover")
+        newWebView.configuration.userContentController.removeScriptMessageHandler(forName: "commandClick")
+        newWebView.configuration.userContentController.removeScriptMessageHandler(forName: "pipStateChange")
+        newWebView.configuration.userContentController.removeScriptMessageHandler(forName: "mediaStateChange_\(newTab.id.uuidString)")
+        newWebView.configuration.userContentController.removeScriptMessageHandler(forName: "backgroundColor_\(newTab.id.uuidString)")
+        newWebView.configuration.userContentController.removeScriptMessageHandler(forName: "historyStateDidChange")
+        newWebView.configuration.userContentController.removeScriptMessageHandler(forName: "NookIdentity")
+        
+        // Now add the handlers
         newWebView.configuration.userContentController.add(newTab, name: "linkHover")
         newWebView.configuration.userContentController.add(newTab, name: "commandHover")
         newWebView.configuration.userContentController.add(newTab, name: "commandClick")
         newWebView.configuration.userContentController.add(newTab, name: "pipStateChange")
         newWebView.configuration.userContentController.add(newTab, name: "mediaStateChange_\(newTab.id.uuidString)")
         newWebView.configuration.userContentController.add(newTab, name: "backgroundColor_\(newTab.id.uuidString)")
+        newWebView.configuration.userContentController.add(newTab, name: "historyStateDidChange")
         newWebView.configuration.userContentController.add(newTab, name: "NookIdentity")
         
         // Set custom user agent

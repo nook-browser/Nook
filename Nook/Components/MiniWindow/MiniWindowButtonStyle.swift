@@ -2,7 +2,7 @@
 //  MiniWindowButtonStyle.swift
 //  Nook
 //
-//  Created by Codex on 26/08/2025.
+//  Created by Jonathan Caudill on 26/08/2025.
 //
 
 import SwiftUI

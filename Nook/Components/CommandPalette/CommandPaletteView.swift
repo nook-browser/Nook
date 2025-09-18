@@ -10,6 +10,7 @@ import AppKit
 
 struct CommandPaletteView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     @EnvironmentObject var gradientColorManager: GradientColorManager
     @State private var searchManager = SearchManager()
     @Environment(\.colorScheme) var colorScheme
@@ -232,28 +233,30 @@ struct CommandPaletteView: View {
     private func selectSuggestion(_ suggestion: SearchManager.SearchSuggestion) {
         switch suggestion.type {
         case .tab(let existingTab):
-            // Switch to existing tab
-            browserManager.tabManager.setActiveTab(existingTab)
+            // Switch to existing tab in this window
+            browserManager.selectTab(existingTab, in: windowState)
             print("Switched to existing tab: \(existingTab.name)")
         case .history(let historyEntry):
-            if browserManager.shouldNavigateCurrentTab && browserManager.tabManager.currentTab != nil {
+            if browserManager.shouldNavigateCurrentTab && browserManager.currentTab(for: windowState) != nil {
                 // Navigate current tab to history URL
-                browserManager.tabManager.currentTab?.loadURL(historyEntry.url.absoluteString)
+                browserManager.currentTab(for: windowState)?.loadURL(historyEntry.url.absoluteString)
                 print("Navigated current tab to history URL: \(historyEntry.url)")
             } else {
                 // Create new tab from history entry
-                let tab = browserManager.tabManager.createNewTab(url: historyEntry.url.absoluteString, in: browserManager.tabManager.currentSpace)
-                print("Created tab \(tab.name) from history in \(String(describing: browserManager.tabManager.currentSpace?.name))")
+                browserManager.createNewTab(in: windowState)
+                browserManager.currentTab(for: windowState)?.loadURL(historyEntry.url.absoluteString)
+                print("Created new tab from history in window \(windowState.id)")
             }
         case .url, .search:
-            if browserManager.shouldNavigateCurrentTab && browserManager.tabManager.currentTab != nil {
+            if browserManager.shouldNavigateCurrentTab && browserManager.currentTab(for: windowState) != nil {
                 // Navigate current tab to new URL with proper normalization
-                browserManager.tabManager.currentTab?.navigateToURL(suggestion.text)
+                browserManager.currentTab(for: windowState)?.navigateToURL(suggestion.text)
                 print("Navigated current tab to: \(suggestion.text)")
             } else {
                 // Create new tab
-                let tab = browserManager.tabManager.createNewTab(url: suggestion.text, in: browserManager.tabManager.currentSpace)
-                print("Created tab \(tab.name) in \(String(describing: browserManager.tabManager.currentSpace?.name))")
+                browserManager.createNewTab(in: windowState)
+                browserManager.currentTab(for: windowState)?.navigateToURL(suggestion.text)
+                print("Created new tab in window \(windowState.id)")
             }
         }
         
