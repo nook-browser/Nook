@@ -23,20 +23,60 @@ final class FocusableWKWebView: WKWebView {
         evaluateJavaScript("""
             (function() {
                 var element = document.elementFromPoint(\(point.x), \(point.y));
-                if (element && element.tagName === 'IMG') {
-                    return element.src;
+                var imageSrc = null;
+                var linkHref = null;
+
+                if (element) {
+                    if (element.tagName === 'IMG' && element.src) {
+                        imageSrc = element.src;
+                    }
+
+                    var anchor = element.closest ? element.closest('a') : null;
+                    if (anchor && anchor.href) {
+                        linkHref = anchor.href;
+                    }
                 }
-                return null;
+
+                return {
+                    image: imageSrc,
+                    href: linkHref
+                };
             })();
         """) { [weak self] result, error in
             DispatchQueue.main.async {
-                if let imageURL = result as? String, !imageURL.isEmpty {
-                    // Add "Save Image As..." menu item
-                    let saveImageItem = NSMenuItem(title: "Save Image As...", action: #selector(self?.saveImageAs(_:)), keyEquivalent: "")
+                guard let self, let info = result as? [String: Any] else { return }
+
+                var customItems: [NSMenuItem] = []
+
+#if DEBUG
+                if let href = info["href"] as? String, !href.isEmpty, let url = URL(string: href) {
+                    let openMiniWindowItem = NSMenuItem(
+                        title: "Open Link in Mini Window",
+                        action: #selector(self.openLinkInMiniWindow(_:)),
+                        keyEquivalent: ""
+                    )
+                    openMiniWindowItem.target = self
+                    openMiniWindowItem.representedObject = url
+                    customItems.append(openMiniWindowItem)
+                }
+#endif
+
+                if let imageURL = info["image"] as? String, !imageURL.isEmpty {
+                    let saveImageItem = NSMenuItem(
+                        title: "Save Image As...",
+                        action: #selector(self.saveImageAs(_:)),
+                        keyEquivalent: ""
+                    )
                     saveImageItem.target = self
                     saveImageItem.representedObject = imageURL
-                    menu.insertItem(saveImageItem, at: 0)
-                    menu.insertItem(NSMenuItem.separator(), at: 1)
+                    customItems.append(saveImageItem)
+                }
+
+                if !customItems.isEmpty {
+                    customItems.append(NSMenuItem.separator())
+                    for (index, item) in customItems.enumerated() {
+                        menu.insertItem(item, at: index)
+                    }
                 }
             }
         }
@@ -117,7 +157,7 @@ final class FocusableWKWebView: WKWebView {
         
         NSUserNotificationCenter.default.deliver(notification)
     }
-    
+
     private func showSaveErrorNotification(error: Error) {
         let notification = NSUserNotification()
         notification.title = "Save Failed"
@@ -126,5 +166,14 @@ final class FocusableWKWebView: WKWebView {
         
         NSUserNotificationCenter.default.deliver(notification)
     }
-}
 
+#if DEBUG
+    @objc private func openLinkInMiniWindow(_ sender: NSMenuItem) {
+        guard let url = sender.representedObject as? URL else { return }
+        Task { @MainActor [weak self] in
+            guard let tab = self?.owningTab else { return }
+            tab.browserManager?.presentExternalURL(url)
+        }
+    }
+#endif
+}

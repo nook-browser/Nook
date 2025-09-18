@@ -83,7 +83,24 @@ extension NSColor {
             return String(format: "#%02X%02X%02X", ri, gi, bi)
         }
     }
+
+    var perceivedBrightness: CGFloat {
+        guard let rgb = usingColorSpace(.sRGB) else { return 0.5 }
+        var r: CGFloat = 0
+        var g: CGFloat = 0
+        var b: CGFloat = 0
+        var a: CGFloat = 0
+        rgb.getRed(&r, green: &g, blue: &b, alpha: &a)
+
+        if a <= 0.01 { return 1.0 }
+
+        let brightness = (0.299 * r + 0.587 * g + 0.114 * b)
+        return brightness * a + (1 - a)
+    }
+
+    var isPerceivedDark: Bool {
+        perceivedBrightness < 0.6
+    }
 }
 #endif
-
 

@@ -2,7 +2,7 @@
 //  ExternalMiniWindowManager.swift
 //  Nook
 //
-//  Created by Codex on 26/08/2025.
+//  Created by Jonathan Caudill on 26/08/2025.
 //
 
 import SwiftUI
@@ -24,6 +24,7 @@ final class MiniWindowSession: ObservableObject, Identifiable {
     @Published var estimatedProgress: Double = 0
     @Published var isAuthComplete: Bool = false
     @Published var authSuccess: Bool = false
+    @Published var toolbarColor: NSColor?
 
     init(
         url: URL,
@@ -59,6 +60,20 @@ final class MiniWindowSession: ObservableObject, Identifiable {
 
     func updateProgress(_ progress: Double) {
         estimatedProgress = progress
+    }
+    
+    func updateToolbarColor(hexString: String?) {
+        guard let trimmed = hexString?.trimmingCharacters(in: .whitespacesAndNewlines),
+              trimmed.isEmpty == false else {
+            toolbarColor = nil
+            return
+        }
+
+        if let color = NSColor(hex: trimmed) {
+            toolbarColor = color.usingColorSpace(.sRGB)
+        } else {
+            toolbarColor = nil
+        }
     }
     
     func completeAuth(success: Bool, finalURL: URL? = nil) {

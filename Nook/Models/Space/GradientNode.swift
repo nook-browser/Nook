@@ -2,7 +2,7 @@
 //  GradientNode.swift
 //  Nook
 //
-//  Created by Codex on 28/08/2025.
+//  Created by Jonathan Caudill on 28/08/2025.
 //
 
 import Foundation

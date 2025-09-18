@@ -10,6 +10,7 @@ import FaviconFinder
 
 struct HistoryView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     @State private var historyEntries: [HistoryEntry] = []
     @State private var searchText: String = ""
     @State private var selectedTimeRange: TimeRange = .week
@@ -272,7 +273,7 @@ struct HistoryView: View {
     }
     
     private func openInCurrentTab(_ url: URL) {
-        if let currentTab = browserManager.tabManager.currentTab {
+        if let currentTab = browserManager.currentTab(for: windowState) {
             currentTab.loadURL(url)
         } else {
             _ = browserManager.tabManager.createNewTab(url: url.absoluteString)

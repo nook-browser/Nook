@@ -18,6 +18,7 @@ import SwiftUI
 
 struct MiniCommandPaletteView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     @EnvironmentObject var gradientColorManager: GradientColorManager
     @State private var searchManager = SearchManager()
     @Environment(\.colorScheme) var colorScheme
@@ -163,18 +164,20 @@ struct MiniCommandPaletteView: View {
     private func selectSuggestion(_ suggestion: SearchManager.SearchSuggestion) {
         switch suggestion.type {
         case .tab(let existingTab):
-            browserManager.tabManager.setActiveTab(existingTab)
+            browserManager.selectTab(existingTab, in: windowState)
         case .history(let historyEntry):
-            if browserManager.shouldNavigateCurrentTab && browserManager.tabManager.currentTab != nil {
-                browserManager.tabManager.currentTab?.loadURL(historyEntry.url.absoluteString)
+            if browserManager.shouldNavigateCurrentTab && browserManager.currentTab(for: windowState) != nil {
+                browserManager.currentTab(for: windowState)?.loadURL(historyEntry.url.absoluteString)
             } else {
-                _ = browserManager.tabManager.createNewTab(url: historyEntry.url.absoluteString, in: browserManager.tabManager.currentSpace)
+                browserManager.createNewTab(in: windowState)
+                browserManager.currentTab(for: windowState)?.loadURL(historyEntry.url.absoluteString)
             }
         case .url, .search:
-            if browserManager.shouldNavigateCurrentTab && browserManager.tabManager.currentTab != nil {
-                browserManager.tabManager.currentTab?.navigateToURL(suggestion.text)
+            if browserManager.shouldNavigateCurrentTab && browserManager.currentTab(for: windowState) != nil {
+                browserManager.currentTab(for: windowState)?.navigateToURL(suggestion.text)
             } else {
-                _ = browserManager.tabManager.createNewTab(url: suggestion.text, in: browserManager.tabManager.currentSpace)
+                browserManager.createNewTab(in: windowState)
+                browserManager.currentTab(for: windowState)?.navigateToURL(suggestion.text)
             }
         }
 
