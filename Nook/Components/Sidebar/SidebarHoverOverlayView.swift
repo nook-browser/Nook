@@ -11,9 +11,10 @@ import AppKit
 struct SidebarHoverOverlayView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var hoverManager: HoverSidebarManager
+    @EnvironmentObject var windowState: BrowserWindowState
 
     private var overlayWidth: CGFloat {
-        browserManager.isSidebarVisible ? browserManager.sidebarWidth : browserManager.getSavedSidebarWidth()
+        windowState.isSidebarVisible ? windowState.sidebarWidth : browserManager.getSavedSidebarWidth(for: windowState)
     }
     private let cornerRadius: CGFloat = 12
     private let horizontalInset: CGFloat = 8
@@ -21,14 +22,14 @@ struct SidebarHoverOverlayView: View {
 
     var body: some View {
         // Only render overlay plumbing when the real sidebar is collapsed
-        if !browserManager.isSidebarVisible {
+        if !windowState.isSidebarVisible {
             ZStack(alignment: .leading) {
                 // Edge hover hotspot
                 Color.clear
                     .frame(width: hoverManager.triggerWidth)
                     .contentShape(Rectangle())
                     .onHover { isIn in
-                        if isIn && !browserManager.isSidebarVisible {
+                        if isIn && !windowState.isSidebarVisible {
                             withAnimation(.easeInOut(duration: 0.12)) {
                                 hoverManager.isOverlayVisible = true
                             }
@@ -37,6 +38,7 @@ struct SidebarHoverOverlayView: View {
                     }
                 // Overlay sidebar inside a rounded, translucent container
                 SidebarView(forceVisible: true, forcedWidth: overlayWidth)
+                    .environmentObject(windowState)
                     .frame(width: overlayWidth)
                     .frame(maxHeight: .infinity)
                     .background(BlurEffectView(material: browserManager.settingsManager.currentMaterial, state: .active))

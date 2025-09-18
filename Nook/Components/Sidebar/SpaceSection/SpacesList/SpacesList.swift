@@ -8,6 +8,7 @@ import SwiftUI
 
 struct SpacesList: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     @State private var isHovering: Bool = false
 
     // Approximate layout math for compacting: each full icon needs ~32pt (24 cell + ~8 spacing)
@@ -31,12 +32,12 @@ struct SpacesList: View {
     
     private var visibleSpaces: [Space] {
         let allSpaces = browserManager.tabManager.spaces
-        guard shouldUseMinimal, let currentSpace = browserManager.tabManager.currentSpace else {
+        guard shouldUseMinimal, let currentSpaceId = windowState.currentSpaceId else {
             return allSpaces
         }
         
         // Find current space index
-        guard let currentIndex = allSpaces.firstIndex(where: { $0.id == currentSpace.id }) else {
+        guard let currentIndex = allSpaces.firstIndex(where: { $0.id == currentSpaceId }) else {
             return Array(allSpaces.prefix(3))
         }
         
@@ -63,10 +64,11 @@ struct SpacesList: View {
     var body: some View {
         HStack(spacing: shouldUseCompact ? 4 : 8) {
             ForEach(Array(visibleSpaces.enumerated()), id: \.element.id) { index, space in
-                let isActive = browserManager.tabManager.currentSpace?.id == space.id
+                let isActive = windowState.currentSpaceId == space.id
                 let isFaded = shouldUseMinimal && !isActive
                 
                 SpacesListItem(space: space, isActive: isActive, compact: shouldUseCompact)
+                    .environmentObject(windowState)
                     .id(space.id)
                     .opacity(isFaded ? 0.3 : 1.0)
             }
