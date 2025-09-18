@@ -16,6 +16,7 @@ struct PinnedGrid: View {
     let maxColumns: Int = 3
 
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     @State private var draggedItem: UUID? = nil
     
     init(width: CGFloat, profileId: UUID? = nil) {
@@ -54,7 +55,7 @@ struct PinnedGrid: View {
                 ZStack(alignment: .top) {
                     LazyVGrid(columns: columns, alignment: .center, spacing: rowSpacing) {
                         ForEach(Array(items.enumerated()), id: \.element.id) { index, tab in
-                            let isActive: Bool = (browserManager.tabManager.currentTab?.id == tab.id)
+                            let isActive: Bool = (browserManager.currentTab(for: windowState)?.id == tab.id)
                             let title: String = safeTitle(tab)
 
                             PinnedTile(
@@ -62,11 +63,11 @@ struct PinnedGrid: View {
                                 urlString: tab.url.absoluteString,
                                 icon: tab.favicon,
                                 isActive: isActive,
-                                onActivate: { browserManager.tabManager.setActiveTab(tab) },
+                                onActivate: { browserManager.selectTab(tab, in: windowState) },
                                 onClose: { browserManager.tabManager.removeTab(tab.id) },
                                 onRemovePin: { browserManager.tabManager.unpinTab(tab) },
-                                onSplitRight: { browserManager.splitManager.enterSplit(with: tab, placeOn: .right) },
-                                onSplitLeft: { browserManager.splitManager.enterSplit(with: tab, placeOn: .left) }
+                                onSplitRight: { browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState) },
+                                onSplitLeft: { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) }
                             )
                             .onTabDrag(tab.id, draggedItem: $draggedItem)
                             .opacity(draggedItem == tab.id ? 0.0 : 1.0)

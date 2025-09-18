@@ -9,6 +9,7 @@ import SwiftUI
 
 struct WindowView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     @StateObject private var hoverSidebarManager = HoverSidebarManager()
 
     var body: some View {
@@ -28,6 +29,7 @@ struct WindowView: View {
             // Main content flush: sidebar touches left edge; webview touches sidebar
             HStack(spacing: 0) {
                 SidebarView()
+                    .environmentObject(windowState)
 
                 VStack(spacing: 0) {
                     WebsiteLoadingIndicator()
@@ -36,12 +38,13 @@ struct WindowView: View {
             }
             // Overlay the resize handle exactly at the sidebar/webview boundary (no visual gap)
             .overlay(alignment: .topLeading) {
-                if browserManager.isSidebarVisible {
+                if windowState.isSidebarVisible {
                     // Position at current sidebar width (flush boundary)
                     SidebarResizeView()
                         .frame(maxHeight: .infinity)
-                        .offset(x: browserManager.sidebarWidth)
+                        .offset(x: windowState.sidebarWidth)
                         .zIndex(1000)
+                        .environmentObject(windowState)
                 }
             }
             // Keep primary content interactive; background menu only triggers on empty areas
@@ -53,6 +56,7 @@ struct WindowView: View {
             // Hover-reveal Sidebar overlay (slides in over web content)
             SidebarHoverOverlayView()
                 .environmentObject(hoverSidebarManager)
+                .environmentObject(windowState)
 
             CommandPaletteView()
             DialogView()
