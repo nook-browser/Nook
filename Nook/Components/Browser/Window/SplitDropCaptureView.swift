@@ -3,6 +3,7 @@ import AppKit
 final class SplitDropCaptureView: NSView {
     weak var browserManager: BrowserManager?
     weak var splitManager: SplitViewManager?
+    var windowId: UUID?
     private var isDragActive: Bool = false
 
     override init(frame frameRect: NSRect) {
@@ -42,14 +43,14 @@ final class SplitDropCaptureView: NSView {
 
     override func draggingExited(_ sender: NSDraggingInfo?) {
         isDragActive = false
-        splitManager?.endPreview(cancel: true)
+        if let windowId { splitManager?.endPreview(cancel: true, for: windowId) }
         // Signal UI to clear any drag-hiding state even on invalid drops
         NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        guard let bm = browserManager, let sm = splitManager else { return false }
-        sm.endPreview(cancel: false)
+        guard let bm = browserManager, let sm = splitManager, let windowId else { return false }
+        sm.endPreview(cancel: false, for: windowId)
         let pb = sender.draggingPasteboard
         guard let idString = pb.string(forType: .string), let id = UUID(uuidString: idString) else {
             // Invalid payload; clear any lingering drag UI state
@@ -60,12 +61,16 @@ final class SplitDropCaptureView: NSView {
         guard let tab = all.first(where: { $0.id == id }) else { return false }
         let side = sideForDrag(sender)
         // Redundant replace guard
-        if sm.isSplit {
-            if (side == .left && sm.leftTabId == tab.id) || (side == .right && sm.rightTabId == tab.id) {
+        if sm.isSplit(for: windowId) {
+            let leftId = sm.leftTabId(for: windowId)
+            let rightId = sm.rightTabId(for: windowId)
+            if (side == .left && leftId == tab.id) || (side == .right && rightId == tab.id) {
                 return true
             }
         }
-        sm.enterSplit(with: tab, placeOn: side)
+        if let windowState = bm.windowStates[windowId] {
+            sm.enterSplit(with: tab, placeOn: side, in: windowState)
+        }
         // Cancel any in-progress sidebar/tab drag to prevent unintended reorder/removal
         DispatchQueue.main.async {
             TabDragManager.shared.cancelDrag()
@@ -77,7 +82,7 @@ final class SplitDropCaptureView: NSView {
     // MARK: - Helpers
     private func updatePreview(_ sender: NSDraggingInfo) {
         let side = sideForDrag(sender)
-        splitManager?.beginPreview(side: side)
+        if let windowId { splitManager?.beginPreview(side: side, for: windowId) }
     }
 
     private func sideForDrag(_ sender: NSDraggingInfo) -> SplitViewManager.Side {

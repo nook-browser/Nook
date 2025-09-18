@@ -2,7 +2,7 @@
 //  HoverSidebarManager.swift
 //  Nook
 //
-//  Created by Codex on 2025-09-13.
+//  Created by Jonathan Caudill on 2025-09-13.
 //
 
 import SwiftUI
@@ -73,10 +73,10 @@ final class HoverSidebarManager: ObservableObject {
 
     @MainActor
     private func handleMouseMovementOnMain() {
-        guard let bm = browserManager else { return }
+        guard let bm = browserManager, let activeState = bm.activeWindowState else { return }
 
         // Never show overlay while the real sidebar is visible
-        if bm.isSidebarVisible {
+        if activeState.isSidebarVisible {
             if isOverlayVisible {
                 isOverlayVisible = false
             }
@@ -104,7 +104,7 @@ final class HoverSidebarManager: ObservableObject {
         }
 
         // Use saved width when sidebar is collapsed to size the overlay and sticky zone
-        let overlayWidth = max(bm.sidebarWidth, bm.getSavedSidebarWidth())
+        let overlayWidth = max(activeState.sidebarWidth, activeState.savedSidebarWidth)
 
         // Edge zones in screen space
         let inTriggerZone = (mouse.x >= frame.minX - overshootSlack) && (mouse.x <= frame.minX + triggerWidth)

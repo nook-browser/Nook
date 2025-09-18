@@ -11,6 +11,7 @@
 		2C0516632E7B44990038ADBE /* FindBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C0516612E7B44990038ADBE /* FindBarView.swift */; };
 		2C0516652E7B6C510038ADBE /* BasicAuthCredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C0516642E7B6C510038ADBE /* BasicAuthCredentialStore.swift */; };
 		2C0516672E7B6C750038ADBE /* BasicAuthDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C0516662E7B6C750038ADBE /* BasicAuthDialog.swift */; };
+		2C0516692E7C85C10038ADBE /* BrowserWindowState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C0516682E7C85C10038ADBE /* BrowserWindowState.swift */; };
 		2CC0672B2E789ECB001D37C6 /* TabDragContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066622E789ECB001D37C6 /* TabDragContainerView.swift */; };
 		2CC0672C2E789ECB001D37C6 /* InsertionLineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC0665E2E789ECB001D37C6 /* InsertionLineView.swift */; };
 		2CC0672D2E789ECB001D37C6 /* URLBarFramePreferenceKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066972E789ECB001D37C6 /* URLBarFramePreferenceKey.swift */; };
@@ -181,6 +182,7 @@
 		2C0516612E7B44990038ADBE /* FindBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FindBarView.swift; sourceTree = "<group>"; };
 		2C0516642E7B6C510038ADBE /* BasicAuthCredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BasicAuthCredentialStore.swift; sourceTree = "<group>"; };
 		2C0516662E7B6C750038ADBE /* BasicAuthDialog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BasicAuthDialog.swift; sourceTree = "<group>"; };
+		2C0516682E7C85C10038ADBE /* BrowserWindowState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserWindowState.swift; sourceTree = "<group>"; };
 		2CC066382E789ECB001D37C6 /* TabListAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabListAdapter.swift; sourceTree = "<group>"; };
 		2CC0663A2E789ECB001D37C6 /* TabCollectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabCollectionView.swift; sourceTree = "<group>"; };
 		2CC0663B2E789ECB001D37C6 /* TabCollectionView_Previews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabCollectionView_Previews.swift; sourceTree = "<group>"; };
@@ -906,6 +908,7 @@
 		2CC066E92E789ECB001D37C6 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				2C0516682E7C85C10038ADBE /* BrowserWindowState.swift */,
 				2CC066D32E789ECB001D37C6 /* BrowserConfig */,
 				2CC066D52E789ECB001D37C6 /* Cache */,
 				2CC066D72E789ECB001D37C6 /* Cookie */,
@@ -1313,6 +1316,7 @@
 				2CC067B32E789ECB001D37C6 /* SidebarDropSupport.swift in Sources */,
 				2CC067B42E789ECB001D37C6 /* MiniWindowToolbar.swift in Sources */,
 				2CC067B52E789ECB001D37C6 /* CacheDetailsView.swift in Sources */,
+				2C0516692E7C85C10038ADBE /* BrowserWindowState.swift in Sources */,
 				2CC067B62E789ECB001D37C6 /* HistorySuggestionItem.swift in Sources */,
 				2CC067B72E789ECB001D37C6 /* TabSuggestionItem.swift in Sources */,
 				2CC067B82E789ECB001D37C6 /* SearchManager.swift in Sources */,

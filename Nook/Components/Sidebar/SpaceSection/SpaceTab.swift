@@ -16,6 +16,7 @@ struct SpaceTab: View {
     @State private var isCloseHovering: Bool = false
     @State private var isSpeakerHovering: Bool = false
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
 
     var body: some View {
         Button(action: action) {
@@ -99,9 +100,9 @@ struct SpaceTab: View {
         }
         .contextMenu {
             // Split view
-            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right) } 
+            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState) } 
             label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
-            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left) } 
+            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) } 
             label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
             Divider()
             // Mute/Unmute option (show if tab has audio content OR is muted)
@@ -134,11 +135,15 @@ struct SpaceTab: View {
                 Label("Close Tab", systemImage: "xmark.circle")
             }
         }
-        .shadow(color: tab.isActiveInSpace ? Color.gray : Color.clear, radius: tab.isActiveInSpace ? 1 : 0, y: 1)
+        .shadow(color: isActive ? Color.gray : Color.clear, radius: isActive ? 1 : 0, y: 1)
     }
 
+    private var isActive: Bool {
+        return browserManager.currentTab(for: windowState)?.id == tab.id
+    }
+    
     private var isCurrentTab: Bool {
-        return browserManager.tabManager.currentTab?.id == tab.id
+        return browserManager.currentTab(for: windowState)?.id == tab.id
     }
     
     private var backgroundColor: Color {

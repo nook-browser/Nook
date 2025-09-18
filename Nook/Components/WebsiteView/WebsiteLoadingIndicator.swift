@@ -9,6 +9,7 @@ import SwiftUI
 
 struct WebsiteLoadingIndicator: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     
     var body: some View {
         HStack {
@@ -34,7 +35,7 @@ struct WebsiteLoadingIndicator: View {
     }
     
     private var indicatorWidth: CGFloat {
-        switch browserManager.tabManager.currentTab?.loadingState {
+        switch browserManager.currentTab(for: windowState)?.loadingState {
         case .idle:
             return 50
         case .didStartProvisionalNavigation:

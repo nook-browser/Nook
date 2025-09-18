@@ -155,12 +155,12 @@ struct NookCommands: Commands {
             }
             .keyboardShortcut("s", modifiers: .command)
             Button("Toggle Picture in Picture") {
-                browserManager.tabManager.currentTab?.requestPictureInPicture()
+                browserManager.requestPiPForCurrentTabInActiveWindow()
             }
             .keyboardShortcut("p", modifiers: [.command, .shift])
-            .disabled(browserManager.tabManager.currentTab == nil ||
-                     !(browserManager.tabManager.currentTab?.hasVideoContent == true ||
-                       browserManager.tabManager.currentTab?.hasPiPActive == true))
+            .disabled(browserManager.currentTabForActiveWindow() == nil ||
+                     !(browserManager.currentTabHasVideoContent() ||
+                       browserManager.currentTabHasPiPActive()))
         }
 
         // View commands
@@ -174,19 +174,19 @@ struct NookCommands: Commands {
                 browserManager.showFindBar()
             }
             .keyboardShortcut("f", modifiers: .command)
-            .disabled(browserManager.tabManager.currentTab == nil)
+            .disabled(browserManager.currentTabForActiveWindow() == nil)
             
             Button("Reload Page") {
-                browserManager.tabManager.currentTab?.refresh()
+                browserManager.refreshCurrentTabInActiveWindow()
             }
             .keyboardShortcut("r", modifiers: .command)
-            .disabled(browserManager.tabManager.currentTab == nil)
+            .disabled(browserManager.currentTabForActiveWindow() == nil)
 
             Button("Hard Reload (Ignore Cache)") {
                 browserManager.hardReloadCurrentPage()
             }
             .keyboardShortcut("R", modifiers: [.command, .shift])
-            .disabled(browserManager.tabManager.currentTab == nil)
+            .disabled(browserManager.currentTabForActiveWindow() == nil)
 
             Divider()
             
@@ -194,7 +194,7 @@ struct NookCommands: Commands {
                 browserManager.openWebInspector()
             }
             .keyboardShortcut("i", modifiers: [.command, .option])
-            .disabled(browserManager.tabManager.currentTab == nil)
+            .disabled(browserManager.currentTabForActiveWindow() == nil)
             
             Divider()
             
@@ -205,12 +205,12 @@ struct NookCommands: Commands {
             
             Divider()
             
-            Button(browserManager.tabManager.currentTab?.isAudioMuted == true ? "Unmute Audio" : "Mute Audio") {
-                browserManager.tabManager.currentTab?.toggleMute()
+            Button(browserManager.currentTabIsMuted() ? "Unmute Audio" : "Mute Audio") {
+                browserManager.toggleMuteCurrentTabInActiveWindow()
             }
             .keyboardShortcut("m", modifiers: .command)
-            .disabled(browserManager.tabManager.currentTab == nil ||
-                     browserManager.tabManager.currentTab?.hasAudioContent != true)
+            .disabled(browserManager.currentTabForActiveWindow() == nil ||
+                     !browserManager.currentTabHasAudioContent())
         }
 
         // File Section
@@ -221,7 +221,20 @@ struct NookCommands: Commands {
             }
             .keyboardShortcut("t", modifiers: .command)
             Button("New Window") {
-                browserManager.openCommandPalette()
+                // Create a new window using SwiftUI's WindowGroup
+                let newWindow = NSWindow(
+                    contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800),
+                    styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                    backing: .buffered,
+                    defer: false
+                )
+                newWindow.contentView = NSHostingView(rootView: ContentView()
+                    .background(BackgroundWindowModifier())
+                    .ignoresSafeArea(.all)
+                    .environmentObject(browserManager))
+                newWindow.title = "Nook"
+                newWindow.center()
+                newWindow.makeKeyAndOrderFront(nil)
             }
             .keyboardShortcut("n", modifiers: .command)
 
@@ -239,7 +252,7 @@ struct NookCommands: Commands {
                 browserManager.copyCurrentURL()
             }
             .keyboardShortcut("c", modifiers: [.command, .shift])
-            .disabled(browserManager.tabManager.currentTab != nil ? false : true)
+            .disabled(browserManager.currentTabForActiveWindow() == nil)
 
         }
         
@@ -249,7 +262,7 @@ struct NookCommands: Commands {
                 Button("Clear Cookies for Current Site") {
                     browserManager.clearCurrentPageCookies()
                 }
-                .disabled(browserManager.tabManager.currentTab?.url.host == nil)
+                .disabled(browserManager.currentTabForActiveWindow()?.url.host == nil)
                 
                 Button("Clear Expired Cookies") {
                     browserManager.clearExpiredCookies()
@@ -276,7 +289,7 @@ struct NookCommands: Commands {
                 Button("Clear Cache for Current Site") {
                     browserManager.clearCurrentPageCache()
                 }
-                .disabled(browserManager.tabManager.currentTab?.url.host == nil)
+                .disabled(browserManager.currentTabForActiveWindow()?.url.host == nil)
                 
                 Button("Clear Stale Cache") {
                     browserManager.clearStaleCache()

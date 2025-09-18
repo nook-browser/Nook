@@ -8,19 +8,20 @@ import SwiftUI
 
 struct NavButtonsView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     var sidebarThreshold: CGFloat = 210
     var body: some View {
         HStack(spacing: 2) {
             MacButtonsView()
                 .frame(width: 70)
                 NavButton(iconName: "sidebar.left") {
-                    browserManager.toggleSidebar()
+                    browserManager.toggleSidebar(for: windowState)
                 }
             }
             
             Spacer()
             
-            if browserManager.sidebarWidth < sidebarThreshold {
+            if windowState.sidebarWidth < sidebarThreshold {
                 Menu {
                     Label("Reload", systemImage: "arrow.clockwise")
                     Label("Go Back", systemImage: "arrow.backward")
@@ -32,21 +33,20 @@ struct NavButtonsView: View {
 
             } else {
                 HStack(alignment: .center, spacing: 8) {
-                    NavButton(iconName: "arrow.backward", disabled: browserManager.tabManager.currentTab?.canGoBack ?? true) {
-                        browserManager.tabManager.currentTab?.goBack()
+                    NavButton(iconName: "arrow.backward", disabled: browserManager.currentTab(for: windowState)?.canGoBack ?? true) {
+                        browserManager.currentTab(for: windowState)?.goBack()
                         print("back")
                     }
-                    NavButton(iconName: "arrow.forward", disabled: browserManager.tabManager.currentTab?.canGoForward ?? true) {
-                        browserManager.tabManager.currentTab?.goForward()
+                    NavButton(iconName: "arrow.forward", disabled: browserManager.currentTab(for: windowState)?.canGoForward ?? true) {
+                        browserManager.currentTab(for: windowState)?.goForward()
                         print("forward")
 
                     }
                     RefreshButton() {
-                        browserManager.tabManager.currentTab?.refresh()
+                        browserManager.currentTab(for: windowState)?.refresh()
                     }
                 }
             }
 
         }
     }
-
