@@ -2,7 +2,7 @@
 //  BasicAuthDialog.swift
 //  Nook
 //
-//  Created by Codex on 2025-09-06.
+//  Created by Jonathan Caudill on 2025-09-06.
 //
 
 import SwiftUI

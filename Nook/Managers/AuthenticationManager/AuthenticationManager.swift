@@ -2,7 +2,7 @@
 //  AuthenticationManager.swift
 //  Nook
 //
-//  Created by Codex on 01/09/2025.
+//  Created by Jonathan Caudill on 01/09/2025.
 //
 
 import AppKit

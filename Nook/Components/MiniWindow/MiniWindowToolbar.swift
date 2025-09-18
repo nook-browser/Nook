@@ -2,7 +2,7 @@
 //  MiniWindowToolbar.swift
 //  Nook
 //
-//  Created by Codex on 26/08/2025.
+//  Created by Jonathan Caudill on 26/08/2025.
 //
 
 import SwiftUI
@@ -10,11 +10,49 @@ import AppKit
 
 struct MiniWindowToolbar: View {
     @Environment(\.colorScheme) private var colorScheme
-    private var textColor: Color {
-        colorScheme == .dark ? .white : .black
+    private var fallbackBackgroundNSColor: NSColor {
+        NSColor(hex: colorScheme == .dark ? "#242424" : "#EDEDED") ?? (colorScheme == .dark ? .black : .white)
     }
-    private var backgroundColor: Color {
-        colorScheme == .dark ? .black : .white
+    private var resolvedBackgroundNSColor: NSColor {
+        session.toolbarColor ?? fallbackBackgroundNSColor
+    }
+    private var toolbarBackgroundColor: Color {
+        Color(nsColor: resolvedBackgroundNSColor)
+    }
+    private var isDarkBackground: Bool {
+        resolvedBackgroundNSColor.isPerceivedDark
+    }
+    private var primaryTextNSColor: NSColor {
+        isDarkBackground ? .white : .black
+    }
+    private var primaryTextColor: Color {
+        Color(nsColor: primaryTextNSColor)
+    }
+    private var subduedTextColor: Color {
+        primaryTextColor.opacity(isDarkBackground ? 0.85 : 0.8)
+    }
+    private var subtleTextColor: Color {
+        primaryTextColor.opacity(isDarkBackground ? 0.55 : 0.6)
+    }
+    private var controlBackgroundNSColor: NSColor {
+        let mixTarget: NSColor = isDarkBackground ? .white : .black
+        let fraction: CGFloat = isDarkBackground ? 0.14 : 0.08
+        return resolvedBackgroundNSColor.blended(withFraction: fraction, of: mixTarget) ?? resolvedBackgroundNSColor
+    }
+    private var controlBackgroundColor: Color {
+        Color(nsColor: controlBackgroundNSColor)
+    }
+    private var controlBorderColor: Color {
+        Color(nsColor: primaryTextNSColor.withAlphaComponent(isDarkBackground ? 0.25 : 0.18))
+    }
+    private var avatarBackgroundColor: Color {
+        Color(nsColor: primaryTextNSColor.withAlphaComponent(isDarkBackground ? 0.28 : 0.18))
+    }
+    private var separatorColor: Color {
+        isDarkBackground ? Color.white.opacity(0.22) : Color.black.opacity(0.1)
+    }
+    private var shareButtonTintColor: NSColor {
+        primaryTextNSColor
     }
     @ObservedObject var session: MiniWindowSession
     let adoptAction: () -> Void
@@ -32,23 +70,28 @@ struct MiniWindowToolbar: View {
             VStack(spacing: 2) {
                 Text(hostLabel)
                     .font(.system(size: 15, weight: .regular))
-                    .foregroundStyle(textColor)
+                    .foregroundStyle(primaryTextColor)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
             Spacer(minLength: 12)
 
-            MiniWindowShareButtonContainer(session: session, colorScheme: colorScheme)
+            MiniWindowShareButtonContainer(
+                session: session,
+                backgroundColor: controlBackgroundColor,
+                borderColor: controlBorderColor,
+                tintColor: shareButtonTintColor
+            )
             
             Button(action: adoptAction) {
                     HStack(spacing: 5) {
                         Text("\u{2318} O") // ⌘O as symbols
                             .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(textColor.opacity(0.53))
+                            .foregroundStyle(subtleTextColor)
                         HStack(spacing: 0) {
                             Text("move into ")
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(textColor.opacity(0.9))
+                                .foregroundStyle(subduedTextColor)
                             Text("\(cleanedTargetSpaceName)")
                                 .font(.system(size: 12, weight: .bold))
                                 .foregroundStyle(Color.accentColor.opacity(0.8))
@@ -59,12 +102,12 @@ struct MiniWindowToolbar: View {
                     .padding(.vertical, 6)
                     .background(
                         RoundedRectangle(cornerRadius: 7, style: .continuous)
-                            .fill(backgroundColor.opacity(1))
+                            .fill(controlBackgroundColor)
                             .shadow(radius: 1, x: 1, y: 1)
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .stroke(textColor.opacity(0.22), lineWidth: 1)
+                            .stroke(controlBorderColor, lineWidth: 1)
                     )
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -72,14 +115,15 @@ struct MiniWindowToolbar: View {
             }
         .padding(.horizontal, 20)
         .padding(.vertical, 7)
-        .background(toolbarBackground)
+        .background(toolbarBackgroundColor)
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(Color.white.opacity(0.18))
+                .fill(separatorColor)
                 .frame(height: 1)
                 .blur(radius: 0.8)
         }
         .contentShape(Rectangle())
+        .animation(.easeInOut(duration: 0.25), value: session.toolbarColor)
     }
 
     private var hostLabel: String {
@@ -89,36 +133,28 @@ struct MiniWindowToolbar: View {
     private var profilePill: some View {
         HStack(spacing: 8) {
             Circle()
-                .fill(Color.white.opacity(0.25))
+                .fill(avatarBackgroundColor)
                 .frame(width: 20, height: 20)
                 .overlay(
                     Image(systemName: "person.fill")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(textColor)
+                        .foregroundStyle(primaryTextColor)
                 )
             Text(session.originName)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(textColor.opacity(0.9))
+                .foregroundStyle(subduedTextColor)
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
         .background(
             RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(backgroundColor.opacity(1))
+                .fill(controlBackgroundColor)
                 .shadow(radius: 1, x: 1, y: 1)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 5, style: .continuous)
-                .stroke(textColor.opacity(0.22), lineWidth: 1)
+                .stroke(controlBorderColor, lineWidth: 1)
         )
-    }
-
-    private var toolbarBackground: some View {
-        if colorScheme == .dark {
-            return AnyView(Color(hex: "#242424"))
-        } else {
-            return AnyView(Color(hex: "#EDEDED"))
-        }
     }
 }
 
@@ -235,36 +271,28 @@ private struct MiniWindowTrafficLights: NSViewRepresentable {
 
 private struct MiniWindowShareButtonContainer: View {
     @ObservedObject var session: MiniWindowSession
-    let colorScheme: ColorScheme
-    private var textColor: Color {
-        colorScheme == .dark ? .white : .black
-    }
-    private var backgroundColor: Color {
-        colorScheme == .dark ? .black : .white
-    }
+    let backgroundColor: Color
+    let borderColor: Color
+    let tintColor: NSColor
 
     var body: some View {
-        MiniWindowShareButton(session: session, colorScheme: colorScheme)
+        MiniWindowShareButton(session: session, tintColor: tintColor)
             .frame(width: 26, height: 29)
             .background(
                 RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .fill(backgroundColor.opacity(1))
+                    .fill(backgroundColor)
                     .shadow(radius: 1, x: 1, y: 1)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .stroke(textColor.opacity(0.25), lineWidth: 1)
+                    .stroke(borderColor, lineWidth: 1)
             )
     }
 }
 
 private struct MiniWindowShareButton: NSViewRepresentable {
     var session: MiniWindowSession
-    let colorScheme: ColorScheme
-
-    private var tintColor: NSColor {
-        colorScheme == .dark ? .white : .black
-    }
+    let tintColor: NSColor
 
     func makeCoordinator() -> Coordinator {
         Coordinator(session: session)
@@ -302,4 +330,3 @@ private struct MiniWindowShareButton: NSViewRepresentable {
         }
     }
 }
-
