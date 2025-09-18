@@ -267,3 +267,6 @@ extension MiniWindowWebView.Coordinator: WKUIDelegate {
         return nil
     }
 }
+
+// Note: We intentionally avoid previewing the live WKWebView here to keep Previews
+// fast and stable. Use the preview on MiniBrowserWindowView instead.
