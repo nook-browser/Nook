@@ -2,7 +2,7 @@
 //  BrowserWindowState.swift
 //  Nook
 //
-//  Created by AI Assistant on 31/12/2024.
+//  Created by Jonathan Caudill on 12/09/2024.
 //
 
 import SwiftUI

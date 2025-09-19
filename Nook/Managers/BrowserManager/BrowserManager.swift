@@ -331,6 +331,7 @@ class BrowserManager: ObservableObject {
     
     /// Window-specific web views: tabId -> windowId -> WKWebView
     private var webViewsByTabAndWindow: [UUID: [UUID: WKWebView]] = [:]
+    private var isSyncingTab: Set<UUID> = [] // Prevent recursive sync calls
     
     /// Weak wrapper for NSView references stored per window
     private struct WeakNSView { weak var view: NSView? }
@@ -1129,10 +1130,17 @@ class BrowserManager: ObservableObject {
     /// Clears site cache for current page excluding cookies, then reloads from origin.
     func hardReloadCurrentPage() {
         guard let currentTab = currentTabForActiveWindow(),
-              let host = currentTab.url.host else { return }
+              let host = currentTab.url.host,
+              let activeWindowId = activeWindowState?.id else { return }
         Task { @MainActor in
             await cacheManager.clearCacheForDomainExcludingCookies(host)
-            currentTab.webView?.reloadFromOrigin()
+            // Use the WebView that's actually visible in the current window
+            if let webView = getWebView(for: currentTab.id, in: activeWindowId) {
+                webView.reloadFromOrigin()
+            } else {
+                // Fallback to the tab's default webView
+                currentTab.webView?.reloadFromOrigin()
+            }
         }
     }
     
@@ -1363,13 +1371,21 @@ class BrowserManager: ObservableObject {
     
     // MARK: - Web Inspector
     func openWebInspector() {
-        guard let currentTab = currentTabForActiveWindow() else { 
+        guard let currentTab = currentTabForActiveWindow(),
+              let activeWindowId = activeWindowState?.id else { 
             print("No current tab to inspect")
             return 
         }
         
         if #available(macOS 13.3, *) {
-            let webView = currentTab.activeWebView
+            // Use the WebView that's actually visible in the current window
+            let webView: WKWebView
+            if let windowWebView = getWebView(for: currentTab.id, in: activeWindowId) {
+                webView = windowWebView
+            } else {
+                webView = currentTab.activeWebView
+            }
+            
             if webView.isInspectable {
                 DispatchQueue.main.async {
                     // Focus the webview and trigger context menu programmatically
@@ -1696,26 +1712,16 @@ class BrowserManager: ObservableObject {
         print("🪟 [BrowserManager] Registered window state: \(windowState.id)")
     }
     
-    /// Unregister a window state
+    /// MEMORY LEAK FIX: Comprehensive cleanup for a specific window
     func unregisterWindowState(_ windowId: UUID) {
         guard let windowState = windowStates[windowId] else { return }
 
+        print("🧹 [BrowserManager] Starting comprehensive cleanup for window: \(windowId)")
+
         closeCommandPalette(for: windowState)
 
-        // Clean up window-specific web views
-        for tabId in Array(webViewsByTabAndWindow.keys) {
-            if let webView = webViewsByTabAndWindow[tabId]?[windowId] {
-                if let tab = tabManager.allTabs().first(where: { $0.id == tabId }) {
-                    tab.cleanupCloneWebView(webView)
-                }
-                removeWebViewFromContainers(webView)
-                webViewsByTabAndWindow[tabId]?.removeValue(forKey: windowId)
-                if webViewsByTabAndWindow[tabId]?.isEmpty == true {
-                    webViewsByTabAndWindow.removeValue(forKey: tabId)
-                }
-                print("🪟 [BrowserManager] Cleaned up web view for tab \(tabId) in window \(windowId)")
-            }
-        }
+        // MEMORY LEAK FIX: Enhanced cleanup for window-specific web views
+        cleanupWebViewsForWindow(windowId)
         
         // Clean up split state for this window
         splitManager.cleanupWindow(windowId)
@@ -1737,7 +1743,104 @@ class BrowserManager: ObservableObject {
             }
         }
 
-        print("🪟 [BrowserManager] Unregistered window state: \(windowId)")
+        print("✅ [BrowserManager] Completed comprehensive cleanup for window: \(windowId)")
+    }
+    
+    /// MEMORY LEAK FIX: Comprehensive cleanup for all WebViews in a specific window
+    private func cleanupWebViewsForWindow(_ windowId: UUID) {
+        let webViewsToCleanup = webViewsByTabAndWindow.compactMap { (tabId, windowWebViews) -> (UUID, WKWebView)? in
+            guard let webView = windowWebViews[windowId] else { return nil }
+            return (tabId, webView)
+        }
+        
+        print("🧹 [BrowserManager] Cleaning up \(webViewsToCleanup.count) WebViews for window \(windowId)")
+        
+        for (tabId, webView) in webViewsToCleanup {
+            // Use comprehensive cleanup from Tab class
+            if let tab = tabManager.allTabs().first(where: { $0.id == tabId }) {
+                tab.cleanupCloneWebView(webView)
+            } else {
+                // Fallback cleanup if tab is not found
+                performFallbackWebViewCleanup(webView, tabId: tabId)
+            }
+            
+            // Remove from containers
+            removeWebViewFromContainers(webView)
+            
+            // Remove from tracking
+            webViewsByTabAndWindow[tabId]?.removeValue(forKey: windowId)
+            if webViewsByTabAndWindow[tabId]?.isEmpty == true {
+                webViewsByTabAndWindow.removeValue(forKey: tabId)
+            }
+            
+            print("✅ [BrowserManager] Cleaned up WebView for tab \(tabId) in window \(windowId)")
+        }
+    }
+    
+    /// MEMORY LEAK FIX: Fallback cleanup for WebViews when tab is not available
+    private func performFallbackWebViewCleanup(_ webView: WKWebView, tabId: UUID) {
+        print("🧹 [BrowserManager] Performing fallback WebView cleanup for tab: \(tabId)")
+        
+        // Stop loading
+        webView.stopLoading()
+        
+        // Remove all message handlers
+        let controller = webView.configuration.userContentController
+        let allMessageHandlers = [
+            "linkHover",
+            "commandHover", 
+            "commandClick",
+            "pipStateChange",
+            "mediaStateChange_\(tabId.uuidString)",
+            "backgroundColor_\(tabId.uuidString)",
+            "historyStateDidChange",
+            "NookIdentity"
+        ]
+        
+        for handlerName in allMessageHandlers {
+            controller.removeScriptMessageHandler(forName: handlerName)
+        }
+        
+        // Clear delegates
+        webView.navigationDelegate = nil
+        webView.uiDelegate = nil
+        
+        // Remove from view hierarchy
+        webView.removeFromSuperview()
+        
+        print("✅ [BrowserManager] Fallback WebView cleanup completed for tab: \(tabId)")
+    }
+    
+    /// MEMORY LEAK FIX: Comprehensive cleanup for all WebViews across all windows
+    func cleanupAllWebViews() {
+        print("🧹 [BrowserManager] Starting comprehensive cleanup for ALL WebViews")
+        
+        let totalWebViews = webViewsByTabAndWindow.values.flatMap { $0.values }.count
+        print("🧹 [BrowserManager] Cleaning up \(totalWebViews) WebViews across all windows")
+        
+        // Clean up all WebViews for all tabs in all windows
+        for (tabId, windowWebViews) in webViewsByTabAndWindow {
+            for (windowId, webView) in windowWebViews {
+                // Use comprehensive cleanup from Tab class
+                if let tab = tabManager.allTabs().first(where: { $0.id == tabId }) {
+                    tab.cleanupCloneWebView(webView)
+                } else {
+                    // Fallback cleanup if tab is not found
+                    performFallbackWebViewCleanup(webView, tabId: tabId)
+                }
+                
+                // Remove from containers
+                removeWebViewFromContainers(webView)
+                
+                print("✅ [BrowserManager] Cleaned up WebView for tab \(tabId) in window \(windowId)")
+            }
+        }
+        
+        // Clear all tracking
+        webViewsByTabAndWindow.removeAll()
+        compositorContainerViews.removeAll()
+        
+        print("✅ [BrowserManager] Completed comprehensive cleanup for ALL WebViews")
     }
 
     /// Set the active window state (called when a window gains focus)
@@ -1771,6 +1874,15 @@ class BrowserManager: ObservableObject {
         return tabManager.allTabs().first { $0.id == tabId }
     }
     
+    /// Select a tab in the active window (convenience method for sidebar clicks)
+    func selectTab(_ tab: Tab) {
+        guard let activeWindow = activeWindowState else {
+            print("⚠️ [BrowserManager] No active window for tab selection")
+            return
+        }
+        selectTab(tab, in: activeWindow)
+    }
+    
     /// Select a tab in a specific window
     func selectTab(_ tab: Tab, in windowState: BrowserWindowState) {
         windowState.currentTabId = tab.id
@@ -1799,7 +1911,8 @@ class BrowserManager: ObservableObject {
         // Load the tab in compositor if needed (reloads unloaded tabs)
         compositorManager.loadTab(tab)
         
-        // Note: Tab visibility is now handled directly by TabCompositorView.updateCompositor
+        // Update tab visibility in compositor
+        compositorManager.updateTabVisibility(currentTabId: tab.id)
         
         // Check media state using native WebKit API
         tab.checkMediaState()
@@ -1819,8 +1932,10 @@ class BrowserManager: ObservableObject {
 
         print("🪟 [BrowserManager] Selected tab \(tab.name) in window \(windowState.id)")
 
+        // Update global tab state for the active window
         if activeWindowState?.id == windowState.id {
-            tabManager.setActiveTab(tab)
+            // Only update the global state, don't trigger UI operations again
+            tabManager.updateActiveTabState(tab)
         }
     }
     
@@ -1855,6 +1970,11 @@ class BrowserManager: ObservableObject {
         return webViewsByTabAndWindow[tabId]?[windowId]
     }
     
+    /// Get all web views for a specific tab across all windows
+    func getAllWebViews(for tabId: UUID) -> [WKWebView] {
+        return webViewsByTabAndWindow[tabId]?.values.map { $0 } ?? []
+    }
+    
     /// Create a new web view for a specific tab in a specific window
     func createWebView(for tabId: UUID, in windowId: UUID) -> WKWebView {
         // Get the tab
@@ -1869,13 +1989,33 @@ class BrowserManager: ObservableObject {
         if let originalWebView = tab.webView {
             configuration.websiteDataStore = originalWebView.configuration.websiteDataStore
             configuration.processPool = originalWebView.configuration.processPool
+            // CRITICAL: Copy all preferences including PiP settings
+            configuration.preferences = originalWebView.configuration.preferences
+            configuration.defaultWebpagePreferences = originalWebView.configuration.defaultWebpagePreferences
+            configuration.mediaTypesRequiringUserActionForPlayback = originalWebView.configuration.mediaTypesRequiringUserActionForPlayback
+            configuration.allowsAirPlayForMediaPlayback = originalWebView.configuration.allowsAirPlayForMediaPlayback
+            configuration.applicationNameForUserAgent = originalWebView.configuration.applicationNameForUserAgent
             if #available(macOS 15.5, *) {
                 configuration.webExtensionController = originalWebView.configuration.webExtensionController
             }
         } else {
-            // Use the tab's resolved profile data store
+            // Use the tab's resolved profile data store and apply proper configuration
             let resolvedProfile = tab.resolveProfile()
             configuration.websiteDataStore = resolvedProfile?.dataStore ?? WKWebsiteDataStore.default()
+            
+            // Apply the same configuration as BrowserConfiguration
+            let preferences = WKWebpagePreferences()
+            preferences.allowsContentJavaScript = true
+            configuration.defaultWebpagePreferences = preferences
+            
+            configuration.preferences.javaScriptEnabled = true
+            configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
+            configuration.mediaTypesRequiringUserActionForPlayback = []
+            configuration.allowsAirPlayForMediaPlayback = true
+            configuration.applicationNameForUserAgent = "Version/17.4.1 Safari/605.1.15"
+            
+            // CRITICAL: Enable Picture-in-Picture
+            configuration.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
         }
         
         // Create the new web view
@@ -1922,7 +2062,16 @@ class BrowserManager: ObservableObject {
     
     /// Synchronize a tab's state across all windows that are displaying it
     func syncTabAcrossWindows(_ tabId: UUID) {
+        // Prevent recursive sync calls
+        guard !isSyncingTab.contains(tabId) else {
+            print("🪟 [BrowserManager] Skipping recursive sync for tab \(tabId)")
+            return
+        }
+        
         guard let tab = tabManager.allTabs().first(where: { $0.id == tabId }) else { return }
+        
+        isSyncingTab.insert(tabId)
+        defer { isSyncingTab.remove(tabId) }
         
         // Get all web views for this tab across all windows
         let allWebViews: [WKWebView]

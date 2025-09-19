@@ -95,6 +95,10 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
     @Published var pageBackgroundColor: NSColor? = nil
     
+    // MARK: - Rename State
+    @Published var isRenaming: Bool = false
+    @Published var editingName: String = ""
+    
     // MARK: - Native Audio Monitoring
     private var audioDeviceListenerProc: AudioObjectPropertyListenerProc?
     private var isMonitoringNativeAudio = false
@@ -383,105 +387,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         // IMMEDIATELY RESET PiP STATE to prevent any further PiP operations
         hasPiPActive = false
 
-        // KILL TAB: Complete destruction of WKWebView and all associated processes
-        if let webView = _webView {
-            // 1. STOP EVERYTHING IMMEDIATELY
-            webView.stopLoading()
-            
-            // 2. KILL ALL MEDIA AND PiP VIA JAVASCRIPT (including PiP destruction)
-            let killScript = """
-            (() => {
-                // FORCE KILL ALL PiP SESSIONS FIRST
-                try {
-                    // Exit any active PiP sessions
-                    if (document.pictureInPictureElement) {
-                        document.exitPictureInPicture();
-                    }
-                    
-                    // Force exit WebKit PiP for all videos
-                    document.querySelectorAll('video').forEach(video => {
-                        if (video.webkitSupportsPresentationMode && video.webkitPresentationMode === 'picture-in-picture') {
-                            video.webkitSetPresentationMode('inline');
-                        }
-                    });
-                    
-                    // Disable PiP on all videos permanently
-                    document.querySelectorAll('video').forEach(video => {
-                        video.disablePictureInPicture = true;
-                        video.webkitSupportsPresentationMode = false;
-                    });
-                } catch (e) {
-                    console.log('PiP destruction error:', e);
-                }
-                
-                // Kill all media
-                document.querySelectorAll('video, audio').forEach(el => {
-                    el.pause();
-                    el.currentTime = 0;
-                    el.src = '';
-                    el.load();
-                    el.remove();
-                });
-                
-                // Kill all WebAudio
-                if (window.AudioContext || window.webkitAudioContext) {
-                    if (window.__NookAudioContexts) {
-                        window.__NookAudioContexts.forEach(ctx => ctx.close());
-                        delete window.__NookAudioContexts;
-                    }
-                }
-                
-                // Kill all timers
-                const maxId = setTimeout(() => {}, 0);
-                for (let i = 0; i < maxId; i++) {
-                    clearTimeout(i);
-                    clearInterval(i);
-                }
-                
-                // Force garbage collection if available
-                if (window.gc) {
-                    window.gc();
-                }
-            })();
-            """
-            webView.evaluateJavaScript(killScript) { _, error in
-                if let error = error {
-                    print("[Tab] Error during media/PiP kill: \(error.localizedDescription)")
-                } else {
-                    print("[Tab] Media and PiP successfully killed for: \(self.name)")
-                }
-            }
-            
-            // 4. REMOVE ALL MESSAGE HANDLERS
-            webView.configuration.userContentController.removeScriptMessageHandler(forName: "linkHover")
-            webView.configuration.userContentController.removeScriptMessageHandler(forName: "commandHover")
-            webView.configuration.userContentController.removeScriptMessageHandler(forName: "commandClick")
-            webView.configuration.userContentController.removeScriptMessageHandler(forName: "pipStateChange")
-            webView.configuration.userContentController.removeScriptMessageHandler(forName: "mediaStateChange_\(id.uuidString)")
-            
-            // 5. CLEAR ALL DELEGATES
-            webView.navigationDelegate = nil
-            webView.uiDelegate = nil
-            
-            // 6. REMOVE FROM ALL VIEW HIERARCHIES
-            webView.removeFromSuperview()
-            
-            // 7. FORCE REMOVE FROM COMPOSITOR
-            browserManager?.removeWebViewFromContainers(webView)
-            
-            // 8. FORCE TERMINATE WEB CONTENT PROCESS
-            webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { _ in }
-            webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { _ in }
-            webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { _ in }
-            webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { _ in }
-            webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { _ in }
-            
-            // 9. ACCESS PROCESS POOL TO FORCE TERMINATION
-            _ = webView.configuration.processPool
-            
-            // 10. CLEAR THE REFERENCE
-            _webView = nil
-        }
+        // MEMORY LEAK FIX: Use comprehensive cleanup instead of scattered cleanup
+        performComprehensiveWebViewCleanup()
 
         // 11. RESET ALL STATE
         hasPlayingVideo = false
@@ -518,9 +425,21 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     
     deinit {
-        // Ensure cleanup when tab is deallocated
-        // Note: We can't access main actor-isolated properties in deinit
-        // The cleanup will happen in closeTab() method instead
+        // MEMORY LEAK FIX: Ensure cleanup when tab is deallocated
+        // Note: We can't access main actor-isolated properties in deinit,
+        // but we can still clean up non-actor properties
+        
+        // Cancel any pending profile observation
+        profileAwaitCancellable?.cancel()
+        profileAwaitCancellable = nil
+        
+        // Clear theme color observers
+        themeColorObservedWebViews.removeAllObjects()
+        
+        // Note: stopNativeAudioMonitoring() is main actor-isolated and cannot be called from deinit
+        // The cleanup will be handled by the closeTab() method which is called before deinit
+        
+        print("🧹 [Tab] deinit cleanup completed for: \(name)")
     }
 
     func loadURL(_ newURL: URL) {
@@ -579,12 +498,50 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     
     func requestPictureInPicture() {
-        PiPManager.shared.requestPiP(for: self)
+        // In multi-window setup, we need to work with the WebView that's actually visible
+        // in the current window, not just the first WebView created
+        if let browserManager = browserManager,
+           let activeWindowId = browserManager.activeWindowState?.id,
+           let activeWebView = browserManager.getWebView(for: self.id, in: activeWindowId) {
+            // Use the WebView that's actually visible in the current window
+            PiPManager.shared.requestPiP(for: self, webView: activeWebView)
+        } else {
+            // Fallback to the original behavior for backward compatibility
+            PiPManager.shared.requestPiP(for: self)
+        }
+    }
+    
+    // MARK: - Rename Methods
+    func startRenaming() {
+        isRenaming = true
+        editingName = name
+    }
+    
+    func saveRename() {
+        if !editingName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            name = editingName.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        isRenaming = false
+        editingName = ""
+    }
+    
+    func cancelRename() {
+        isRenaming = false
+        editingName = ""
     }
     
     // MARK: - Simple Media Detection (mainly for manual checks)
     func checkMediaState() {
-        guard let webView = _webView else { return }
+        // Get all web views for this tab across all windows
+        let allWebViews: [WKWebView]
+        if let browserManager = browserManager {
+            allWebViews = browserManager.getAllWebViews(for: id)
+        } else if let webView = _webView {
+            // Fallback to original web view for backward compatibility
+            allWebViews = [webView]
+        } else {
+            return
+        }
         
         // Simple state check - optimized single-pass version
         let mediaCheckScript = """
@@ -622,20 +579,43 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         })();
         """
         
-        webView.evaluateJavaScript(mediaCheckScript) { [weak self] result, error in
-            if let error = error {
-                print("[Media Check] Error: \(error.localizedDescription)")
-                return
-            }
-            
-            if let state = result as? [String: Bool] {
-                DispatchQueue.main.async {
-                    self?.hasAudioContent = state["hasAudioContent"] ?? false
-                    self?.hasPlayingAudio = state["hasPlayingAudio"] ?? false
-                    self?.hasVideoContent = state["hasVideoContent"] ?? false
-                    self?.hasPlayingVideo = state["hasPlayingVideo"] ?? false
+        // Check media state across all web views and aggregate results
+        var aggregatedResults: [String: Bool] = [
+            "hasAudioContent": false,
+            "hasPlayingAudio": false,
+            "hasVideoContent": false,
+            "hasPlayingVideo": false
+        ]
+        
+        let group = DispatchGroup()
+        
+        for webView in allWebViews {
+            group.enter()
+            webView.evaluateJavaScript(mediaCheckScript) { result, error in
+                defer { group.leave() }
+                
+                if let error = error {
+                    print("[Media Check] Error: \(error.localizedDescription)")
+                    return
+                }
+                
+                if let state = result as? [String: Bool] {
+                    // Aggregate results - if any web view has media, the tab has media
+                    aggregatedResults["hasAudioContent"] = (aggregatedResults["hasAudioContent"] ?? false) || (state["hasAudioContent"] ?? false)
+                    aggregatedResults["hasPlayingAudio"] = (aggregatedResults["hasPlayingAudio"] ?? false) || (state["hasPlayingAudio"] ?? false)
+                    aggregatedResults["hasVideoContent"] = (aggregatedResults["hasVideoContent"] ?? false) || (state["hasVideoContent"] ?? false)
+                    aggregatedResults["hasPlayingVideo"] = (aggregatedResults["hasPlayingVideo"] ?? false) || (state["hasPlayingVideo"] ?? false)
                 }
             }
+        }
+        
+        // Update tab state after all web views have been checked
+        group.notify(queue: .main) { [weak self] in
+            guard let self = self else { return }
+            self.hasAudioContent = aggregatedResults["hasAudioContent"] ?? false
+            self.hasPlayingAudio = aggregatedResults["hasPlayingAudio"] ?? false
+            self.hasVideoContent = aggregatedResults["hasVideoContent"] ?? false
+            self.hasPlayingVideo = aggregatedResults["hasPlayingVideo"] ?? false
         }
     }
     
@@ -1021,12 +1001,22 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             }
         }
         
-        // Clean up message handlers
-        webView.configuration.userContentController.removeScriptMessageHandler(forName: "linkHover")
-        webView.configuration.userContentController.removeScriptMessageHandler(forName: "commandHover")
-        webView.configuration.userContentController.removeScriptMessageHandler(forName: "commandClick")
-        webView.configuration.userContentController.removeScriptMessageHandler(forName: "pipStateChange")
-        webView.configuration.userContentController.removeScriptMessageHandler(forName: "mediaStateChange_\(id.uuidString)")
+        // Clean up message handlers - use comprehensive cleanup
+        let controller = webView.configuration.userContentController
+        let allMessageHandlers = [
+            "linkHover",
+            "commandHover", 
+            "commandClick",
+            "pipStateChange",
+            "mediaStateChange_\(id.uuidString)",
+            "backgroundColor_\(id.uuidString)",
+            "historyStateDidChange",
+            "NookIdentity"
+        ]
+        
+        for handlerName in allMessageHandlers {
+            controller.removeScriptMessageHandler(forName: handlerName)
+        }
         
         // Remove from view hierarchy and clear delegates
         webView.removeFromSuperview()
@@ -1238,21 +1228,96 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         }
     }
     
+    /// MEMORY LEAK FIX: Comprehensive WebView cleanup to prevent memory leaks
     func cleanupCloneWebView(_ webView: WKWebView) {
-        removeThemeColorObserver(from: webView)
+        print("🧹 [Tab] Starting comprehensive WebView cleanup for: \(name)")
+        
+        // 1. Stop all loading and media
+        webView.stopLoading()
+        
+        // 2. Kill all media and JavaScript execution
+        let killScript = """
+        (() => {
+            try {
+                // Kill all media
+                document.querySelectorAll('video, audio').forEach(el => {
+                    el.pause();
+                    el.currentTime = 0;
+                    el.src = '';
+                    el.load();
+                });
+                
+                // Kill all WebAudio contexts
+                if (window.AudioContext || window.webkitAudioContext) {
+                    if (window.__NookAudioContexts) {
+                        window.__NookAudioContexts.forEach(ctx => ctx.close());
+                        delete window.__NookAudioContexts;
+                    }
+                }
+                
+                // Kill all timers
+                const maxId = setTimeout(() => {}, 0);
+                for (let i = 0; i < maxId; i++) {
+                    clearTimeout(i);
+                    clearInterval(i);
+                }
+            } catch (e) {
+                console.log('Cleanup script error:', e);
+            }
+        })();
+        """
+        webView.evaluateJavaScript(killScript) { _, error in
+            if let error = error {
+                print("⚠️ [Tab] Cleanup script error: \(error.localizedDescription)")
+            }
+        }
+        
+        // 3. Remove ALL message handlers comprehensively
         let controller = webView.configuration.userContentController
-        controller.removeScriptMessageHandler(forName: "linkHover")
-        controller.removeScriptMessageHandler(forName: "commandHover")
-        controller.removeScriptMessageHandler(forName: "commandClick")
-        controller.removeScriptMessageHandler(forName: "pipStateChange")
-        controller.removeScriptMessageHandler(forName: "mediaStateChange_\(id.uuidString)")
-        controller.removeScriptMessageHandler(forName: "backgroundColor_\(id.uuidString)")
-        controller.removeScriptMessageHandler(forName: "historyStateDidChange")
-        controller.removeScriptMessageHandler(forName: "NookIdentity")
+        let allMessageHandlers = [
+            "linkHover",
+            "commandHover", 
+            "commandClick",
+            "pipStateChange",
+            "mediaStateChange_\(id.uuidString)",
+            "backgroundColor_\(id.uuidString)",
+            "historyStateDidChange",
+            "NookIdentity"
+        ]
+        
+        for handlerName in allMessageHandlers {
+            controller.removeScriptMessageHandler(forName: handlerName)
+        }
+        
+        // 4. Remove theme color observer
+        removeThemeColorObserver(from: webView)
+        
+        // 5. Clear all delegates
         webView.navigationDelegate = nil
         webView.uiDelegate = nil
-        webView.stopLoading()
+        
+        // 6. Remove from view hierarchy
         webView.removeFromSuperview()
+        
+        // 7. Force remove from compositor
+        browserManager?.removeWebViewFromContainers(webView)
+        
+        print("✅ [Tab] WebView cleanup completed for: \(name)")
+    }
+    
+    /// MEMORY LEAK FIX: Comprehensive cleanup for the main tab WebView
+    private func performComprehensiveWebViewCleanup() {
+        guard let webView = _webView else { return }
+        
+        print("🧹 [Tab] Performing comprehensive cleanup for main WebView: \(name)")
+        
+        // Use the same comprehensive cleanup as clone WebViews
+        cleanupCloneWebView(webView)
+        
+        // Additional cleanup for main WebView
+        _webView = nil
+        
+        print("✅ [Tab] Main WebView cleanup completed for: \(name)")
     }
     
     public override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
@@ -1711,8 +1776,11 @@ extension Tab: WKNavigationDelegate {
                 hasPlayingAudio = false
                 // Note: isAudioMuted is preserved to maintain user's mute preference
                 print("🔄 [Tab] Swift reset audio tracking for navigation to: \(newURL.absoluteString)")
+                // Update URL but don't persist yet - wait for navigation to complete
+                self.url = newURL
+            } else {
+                self.url = newURL
             }
-            self.url = newURL
         }
     }
 
@@ -1733,6 +1801,7 @@ extension Tab: WKNavigationDelegate {
             if #available(macOS 15.5, *) {
                 ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
             }
+            // Don't persist here - wait for navigation to complete
         }
     }
 
@@ -1773,9 +1842,16 @@ extension Tab: WKNavigationDelegate {
                             profileId: profileId
                         )
                     }
+                    
+                    // Persist tab changes after navigation completes (only once)
+                    self?.browserManager?.tabManager.persistSnapshot()
                 }
             } else if let jsError = error {
                 print("⚠️ [Tab] Failed to get document.title: \(jsError.localizedDescription)")
+                // Still persist even if title fetch failed, since URL was updated
+                DispatchQueue.main.async {
+                    self?.browserManager?.tabManager.persistSnapshot()
+                }
             }
         }
 
@@ -2294,7 +2370,16 @@ extension Tab {
     typealias FindCompletion = @Sendable (FindResult) -> Void
     
     func findInPage(_ text: String, completion: @escaping FindCompletion) {
-        guard let webView = _webView else {
+        // Use the WebView that's actually visible in the current window
+        let targetWebView: WKWebView?
+        if let browserManager = browserManager,
+           let activeWindowId = browserManager.activeWindowState?.id {
+            targetWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
+        } else {
+            targetWebView = _webView
+        }
+        
+        guard let webView = targetWebView else {
             completion(.failure(NSError(domain: "Tab", code: -1, userInfo: [NSLocalizedDescriptionKey: "WebView not available"])))
             return
         }
@@ -2415,7 +2500,16 @@ extension Tab {
     }
     
     func findNextInPage(completion: @escaping FindCompletion) {
-        guard let webView = _webView else {
+        // Use the WebView that's actually visible in the current window
+        let targetWebView: WKWebView?
+        if let browserManager = browserManager,
+           let activeWindowId = browserManager.activeWindowState?.id {
+            targetWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
+        } else {
+            targetWebView = _webView
+        }
+        
+        guard let webView = targetWebView else {
             completion(.failure(NSError(domain: "Tab", code: -1, userInfo: [NSLocalizedDescriptionKey: "WebView not available"])))
             return
         }
@@ -2477,7 +2571,16 @@ extension Tab {
     }
     
     func findPreviousInPage(completion: @escaping FindCompletion) {
-        guard let webView = _webView else {
+        // Use the WebView that's actually visible in the current window
+        let targetWebView: WKWebView?
+        if let browserManager = browserManager,
+           let activeWindowId = browserManager.activeWindowState?.id {
+            targetWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
+        } else {
+            targetWebView = _webView
+        }
+        
+        guard let webView = targetWebView else {
             completion(.failure(NSError(domain: "Tab", code: -1, userInfo: [NSLocalizedDescriptionKey: "WebView not available"])))
             return
         }
@@ -2539,7 +2642,16 @@ extension Tab {
     }
     
     func clearFindInPage() {
-        guard let webView = _webView else { return }
+        // Use the WebView that's actually visible in the current window
+        let targetWebView: WKWebView?
+        if let browserManager = browserManager,
+           let activeWindowId = browserManager.activeWindowState?.id {
+            targetWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
+        } else {
+            targetWebView = _webView
+        }
+        
+        guard let webView = targetWebView else { return }
         
         let script = """
         (function() {
