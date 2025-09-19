@@ -381,8 +381,8 @@ struct BackgroundWindowModifier: NSViewRepresentable {
                 window.backgroundColor = .clear
                 window.titleVisibility = .hidden
                 window.isReleasedWhenClosed = false
-                window.isMovableByWindowBackground = false
-                window.isMovable = false
+                window.isMovableByWindowBackground = true
+                window.isMovable = true
                 window.styleMask = [
                     .titled, .closable, .miniaturizable, .resizable,
                     .fullSizeContentView,
