@@ -95,6 +95,10 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
     @Published var pageBackgroundColor: NSColor? = nil
     
+    // MARK: - Rename State
+    @Published var isRenaming: Bool = false
+    @Published var editingName: String = ""
+    
     // MARK: - Native Audio Monitoring
     private var audioDeviceListenerProc: AudioObjectPropertyListenerProc?
     private var isMonitoringNativeAudio = false
@@ -580,6 +584,25 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     
     func requestPictureInPicture() {
         PiPManager.shared.requestPiP(for: self)
+    }
+    
+    // MARK: - Rename Methods
+    func startRenaming() {
+        isRenaming = true
+        editingName = name
+    }
+    
+    func saveRename() {
+        if !editingName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            name = editingName.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        isRenaming = false
+        editingName = ""
+    }
+    
+    func cancelRename() {
+        isRenaming = false
+        editingName = ""
     }
     
     // MARK: - Simple Media Detection (mainly for manual checks)
