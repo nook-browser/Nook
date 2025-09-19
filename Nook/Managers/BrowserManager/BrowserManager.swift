@@ -1129,10 +1129,17 @@ class BrowserManager: ObservableObject {
     /// Clears site cache for current page excluding cookies, then reloads from origin.
     func hardReloadCurrentPage() {
         guard let currentTab = currentTabForActiveWindow(),
-              let host = currentTab.url.host else { return }
+              let host = currentTab.url.host,
+              let activeWindowId = activeWindowState?.id else { return }
         Task { @MainActor in
             await cacheManager.clearCacheForDomainExcludingCookies(host)
-            currentTab.webView?.reloadFromOrigin()
+            // Use the WebView that's actually visible in the current window
+            if let webView = getWebView(for: currentTab.id, in: activeWindowId) {
+                webView.reloadFromOrigin()
+            } else {
+                // Fallback to the tab's default webView
+                currentTab.webView?.reloadFromOrigin()
+            }
         }
     }
     
@@ -1363,13 +1370,21 @@ class BrowserManager: ObservableObject {
     
     // MARK: - Web Inspector
     func openWebInspector() {
-        guard let currentTab = currentTabForActiveWindow() else { 
+        guard let currentTab = currentTabForActiveWindow(),
+              let activeWindowId = activeWindowState?.id else { 
             print("No current tab to inspect")
             return 
         }
         
         if #available(macOS 13.3, *) {
-            let webView = currentTab.activeWebView
+            // Use the WebView that's actually visible in the current window
+            let webView: WKWebView
+            if let windowWebView = getWebView(for: currentTab.id, in: activeWindowId) {
+                webView = windowWebView
+            } else {
+                webView = currentTab.activeWebView
+            }
+            
             if webView.isInspectable {
                 DispatchQueue.main.async {
                     // Focus the webview and trigger context menu programmatically
@@ -1869,13 +1884,33 @@ class BrowserManager: ObservableObject {
         if let originalWebView = tab.webView {
             configuration.websiteDataStore = originalWebView.configuration.websiteDataStore
             configuration.processPool = originalWebView.configuration.processPool
+            // CRITICAL: Copy all preferences including PiP settings
+            configuration.preferences = originalWebView.configuration.preferences
+            configuration.defaultWebpagePreferences = originalWebView.configuration.defaultWebpagePreferences
+            configuration.mediaTypesRequiringUserActionForPlayback = originalWebView.configuration.mediaTypesRequiringUserActionForPlayback
+            configuration.allowsAirPlayForMediaPlayback = originalWebView.configuration.allowsAirPlayForMediaPlayback
+            configuration.applicationNameForUserAgent = originalWebView.configuration.applicationNameForUserAgent
             if #available(macOS 15.5, *) {
                 configuration.webExtensionController = originalWebView.configuration.webExtensionController
             }
         } else {
-            // Use the tab's resolved profile data store
+            // Use the tab's resolved profile data store and apply proper configuration
             let resolvedProfile = tab.resolveProfile()
             configuration.websiteDataStore = resolvedProfile?.dataStore ?? WKWebsiteDataStore.default()
+            
+            // Apply the same configuration as BrowserConfiguration
+            let preferences = WKWebpagePreferences()
+            preferences.allowsContentJavaScript = true
+            configuration.defaultWebpagePreferences = preferences
+            
+            configuration.preferences.javaScriptEnabled = true
+            configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
+            configuration.mediaTypesRequiringUserActionForPlayback = []
+            configuration.allowsAirPlayForMediaPlayback = true
+            configuration.applicationNameForUserAgent = "Version/17.4.1 Safari/605.1.15"
+            
+            // CRITICAL: Enable Picture-in-Picture
+            configuration.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
         }
         
         // Create the new web view
