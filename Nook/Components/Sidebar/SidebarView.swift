@@ -78,89 +78,99 @@ struct SidebarView: View {
     }
     
     private var sidebarContent: some View {
-        VStack(spacing: 8) {
-                    HStack(spacing: 2) {
-                        NavButtonsView()
-                    }
-                    .padding(.horizontal, 8)
-                    .frame(height: 30)
-                    .background(
-                        Rectangle()
-                            .fill(Color.clear)
-                            .contentShape(Rectangle())
-                            .onTapGesture(count: 2) {
-                                DispatchQueue.main.async {
-                                    zoomCurrentWindow()
-                                }
-                            }
-                    )
-                    .backgroundDraggable()
+        let effectiveProfileId = windowState.currentProfileId ?? browserManager.currentProfile?.id
+        let essentialsCount = effectiveProfileId.map { browserManager.tabManager.essentialTabs(for: $0).count } ?? 0
 
-                    URLBarView()
-                        .padding(.horizontal, 8)
-                    // Container to support PinnedGrid slide transitions without clipping
-                    ZStack {
-                        PinnedGrid(width: max(0, effectiveWidth - 16))
-                            .environmentObject(windowState)
-                    }
-                    .padding(.horizontal, 8)
-                    .modifier(FallbackDropBelowEssentialsModifier())
-                    if showHistory {
-                        historyView
-                            .padding(.horizontal, 8)
-                    } else {
-                        spacesScrollView
-                    }
-                    //MARK: - Bottom
-                    ZStack {
-                        // Left side icons - anchored to left
-                        HStack {
-                            NavButton(iconName: "square.and.arrow.down") {
-                                print("Downloads button pressed")
-                            }
-                            
-                            NavButton(iconName: "clock") {
-                                withAnimation(.easeInOut(duration: 0.3)) {
-                                    showHistory.toggle()
-                                }
-                            }
-                            
-                            Spacer()
-                        }
-                        
-                        // Center content - space indicators or history text
-                        if !showHistory {
-                            SpacesList()
-                                .environmentObject(windowState)
-                        } else {
-                            Text("History")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        // Right side icons - anchored to right
-                        HStack {
-                            Spacer()
-                            
-                            if !showHistory {
-                                NavButton(iconName: "plus") {
-                                    showSpaceCreationDialog()
-                                }
-                            } else {
-                                NavButton(iconName: "arrow.left") {
-                                    withAnimation(.easeInOut(duration: 0.3)) {
-                                        showHistory = false
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 8)
+        let shouldAnimate = (browserManager.activeWindowState?.id == windowState.id) && !browserManager.isTransitioningProfile
 
+        let content = VStack(spacing: 8) {
+            HStack(spacing: 2) {
+                NavButtonsView()
+            }
+            .padding(.horizontal, 8)
+            .frame(height: 30)
+            .background(
+                Rectangle()
+                    .fill(Color.clear)
+                    .contentShape(Rectangle())
+                    .onTapGesture(count: 2) {
+                        DispatchQueue.main.async {
+                            zoomCurrentWindow()
+                        }
+                    }
+            )
+            .backgroundDraggable()
+
+            URLBarView()
+                .padding(.horizontal, 8)
+            // Container to support PinnedGrid slide transitions without clipping
+            ZStack {
+                PinnedGrid(
+                    width: max(0, effectiveWidth - 16),
+                    profileId: effectiveProfileId
+                )
+                    .environmentObject(windowState)
+            }
+            .padding(.horizontal, 8)
+            .modifier(FallbackDropBelowEssentialsModifier())
+
+            if showHistory {
+                historyView
+                    .padding(.horizontal, 8)
+            } else {
+                spacesScrollView
+            }
+
+            // MARK: - Bottom
+            ZStack {
+                // Left side icons - anchored to left
+                HStack {
+                    NavButton(iconName: "square.and.arrow.down") {
+                        print("Downloads button pressed")
+                    }
+
+                    NavButton(iconName: "clock") {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showHistory.toggle()
+                        }
+                    }
+
+                    Spacer()
                 }
-                .padding(.top, 8)
-                .frame(width: effectiveWidth)
-            .frame(width: effectiveWidth)
+
+                // Center content - space indicators or history text
+                if !showHistory {
+                    SpacesList()
+                        .environmentObject(windowState)
+                } else {
+                    Text("History")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+
+                // Right side icons - anchored to right
+                HStack {
+                    Spacer()
+
+                    if !showHistory {
+                        NavButton(iconName: "plus") {
+                            showSpaceCreationDialog()
+                        }
+                    } else {
+                        NavButton(iconName: "arrow.left") {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                showHistory = false
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 8)
+        }
+        .padding(.top, 8)
+        .frame(width: effectiveWidth)
+        
+        return content.animation(shouldAnimate ? .easeInOut(duration: 0.18) : nil, value: essentialsCount)
     }
     
     private var historyView: some View {

@@ -239,8 +239,8 @@ struct NookCommands: Commands {
             .keyboardShortcut("n", modifiers: .command)
 
             Button("Close Tab") {
-                if browserManager.isCommandPaletteVisible {
-                    browserManager.closeCommandPalette()
+                if browserManager.activeWindowState?.isCommandPaletteVisible == true {
+                    browserManager.closeCommandPalette(for: browserManager.activeWindowState)
                 } else {
                     browserManager.closeCurrentTab()
                 }
