@@ -34,6 +34,22 @@ class BrowserConfiguration {
         // Enable Picture-in-Picture for web media
         config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
         
+        // Enable full-screen API support
+        config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
+        config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
+        
+        // CRITICAL: Enable HTML5 Fullscreen API
+        config.preferences.isElementFullscreenEnabled = true
+        
+        
+        // Enable full-screen API support
+        config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
+        config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
+        
+        // CRITICAL: Enable HTML5 Fullscreen API
+        config.preferences.isElementFullscreenEnabled = true
+        
+        
         // Enable background media playback
         config.allowsAirPlayForMediaPlayback = true
         
@@ -69,6 +85,15 @@ class BrowserConfiguration {
 
         // Enable Picture-in-Picture for web media
         config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
+        
+        // Enable full-screen API support
+        config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
+        config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
+        
+        // CRITICAL: Enable HTML5 Fullscreen API
+        config.preferences.isElementFullscreenEnabled = true
+        
+        
 
         // Enable background media playback
         config.allowsAirPlayForMediaPlayback = true
@@ -105,6 +130,15 @@ class BrowserConfiguration {
 
         // Enable Picture-in-Picture for web media
         config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
+        
+        // Enable full-screen API support
+        config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
+        config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
+        
+        // CRITICAL: Enable HTML5 Fullscreen API
+        config.preferences.isElementFullscreenEnabled = true
+        
+        
 
         // Enable background media playback
         config.allowsAirPlayForMediaPlayback = true
