@@ -22,16 +22,24 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     var favicon: SwiftUI.Image
     var spaceId: UUID?
     var index: Int
+    var profileId: UUID?
     // If true, this tab is created to host a popup window; do not perform initial load.
     var isPopupHost: Bool = false
 
     // MARK: - Favicon Cache
     // Global favicon cache shared across profiles by design to increase hit rate
-    // and reduce duplicate downloads. If per-profile isolation is required later,
-    // this can be namespaced by profileId in the cache key.
+    // and reduce duplicate downloads. Favicons are cached persistently to survive app restarts.
     private static var faviconCache: [String: SwiftUI.Image] = [:]
     private static let faviconCacheQueue = DispatchQueue(label: "favicon.cache", attributes: .concurrent)
     private static let faviconCacheLock = NSLock()
+    
+    // Persistent cache storage
+    private static let faviconCacheDirectory: URL = {
+        let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        let faviconDir = cacheDir.appendingPathComponent("FaviconCache")
+        try? FileManager.default.createDirectory(at: faviconDir, withIntermediateDirectories: true)
+        return faviconDir
+    }()
 
     // MARK: - Loading State
     enum LoadingState {
@@ -1696,8 +1704,9 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
                 let nsImage = faviconImage.image
                 let swiftUIImage = SwiftUI.Image(nsImage: nsImage)
 
-                // Cache the favicon
+                // Cache the favicon (both in memory and on disk)
                 Self.cacheFavicon(swiftUIImage, for: cacheKey)
+                Self.saveFaviconToDisk(nsImage, for: cacheKey)
                 print("💾 [Favicon] Cached favicon for: \(cacheKey)")
 
                 await MainActor.run {
@@ -1722,7 +1731,20 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     static func getCachedFavicon(for key: String) -> SwiftUI.Image? {
         faviconCacheLock.lock()
         defer { faviconCacheLock.unlock() }
-        return faviconCache[key]
+        
+        // Check memory cache first
+        if let cachedFavicon = faviconCache[key] {
+            return cachedFavicon
+        }
+        
+        // Check persistent cache
+        if let persistentFavicon = loadFaviconFromDisk(for: key) {
+            // Load into memory cache for faster access
+            faviconCache[key] = persistentFavicon
+            return persistentFavicon
+        }
+        
+        return nil
     }
 
     static func cacheFavicon(_ favicon: SwiftUI.Image, for key: String) {
@@ -1735,8 +1757,9 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         if faviconCache.count > 100 {
             // Remove oldest entries (simple FIFO)
             let keysToRemove = Array(faviconCache.keys.prefix(20))
-            for key in keysToRemove {
-                faviconCache.removeValue(forKey: key)
+            for keyToRemove in keysToRemove {
+                faviconCache.removeValue(forKey: keyToRemove)
+                removeFaviconFromDisk(for: keyToRemove)
             }
         }
     }
@@ -1746,6 +1769,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         faviconCacheLock.lock()
         defer { faviconCacheLock.unlock() }
         faviconCache.removeAll()
+        clearAllFaviconCacheFromDisk()
     }
     
     static func getFaviconCacheStats() -> (count: Int, domains: [String]) {
@@ -1753,7 +1777,41 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         defer { faviconCacheLock.unlock() }
         return (faviconCache.count, Array(faviconCache.keys))
     }
+    
+    // MARK: - Persistent Storage Helpers
+    private static func saveFaviconToDisk(_ nsImage: NSImage, for key: String) {
+        let fileURL = faviconCacheDirectory.appendingPathComponent("\(key).png")
+        
+        // Convert NSImage to PNG data and save
+        if let tiffData = nsImage.tiffRepresentation,
+           let bitmapRep = NSBitmapImageRep(data: tiffData),
+           let pngData = bitmapRep.representation(using: .png, properties: [:]) {
+            try? pngData.write(to: fileURL)
+        }
+    }
+    
+    private static func loadFaviconFromDisk(for key: String) -> SwiftUI.Image? {
+        let fileURL = faviconCacheDirectory.appendingPathComponent("\(key).png")
+        
+        guard let imageData = try? Data(contentsOf: fileURL),
+              let nsImage = NSImage(data: imageData) else {
+            return nil
+        }
+        
+        return SwiftUI.Image(nsImage: nsImage)
+    }
+    
+    private static func removeFaviconFromDisk(for key: String) {
+        let fileURL = faviconCacheDirectory.appendingPathComponent("\(key).png")
+        try? FileManager.default.removeItem(at: fileURL)
+    }
+    
+    private static func clearAllFaviconCacheFromDisk() {
+        try? FileManager.default.removeItem(at: faviconCacheDirectory)
+        try? FileManager.default.createDirectory(at: faviconCacheDirectory, withIntermediateDirectories: true)
+    }
 }
+
 
 // MARK: - WKNavigationDelegate
 extension Tab: WKNavigationDelegate {
