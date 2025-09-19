@@ -783,24 +783,30 @@ class TabManager: ObservableObject {
             cs.activeTabId = tab.id
         }
         
-        // Load the tab in compositor if needed
-        browserManager?.compositorManager.loadTab(tab)
-        
-        // Update tab visibility in compositor
-        browserManager?.compositorManager.updateTabVisibility(currentTabId: tab.id)
-        
-        // Check media state using native WebKit API
-        tab.checkMediaState()
-        if #available(macOS 15.5, *) {
-            ExtensionManager.shared.notifyTabActivated(newTab: tab, previous: previous)
-        }
-        
-        // Update find manager with new current tab
-        browserManager?.updateFindManagerCurrentTab()
-        
         persistSnapshot()
     }
     
+    /// Update only the global tab state without triggering UI operations
+    /// Used when BrowserManager.selectTab() has already handled all UI concerns
+    func updateActiveTabState(_ tab: Tab) {
+        guard contains(tab) else {
+            return
+        }
+        currentTab = tab
+        
+        // Save this tab as the active tab for the appropriate space
+        if let sid = tab.spaceId, let space = spaces.first(where: { $0.id == sid }) {
+            // Tab belongs to a specific space (regular or space-pinned)
+            space.activeTabId = tab.id
+            currentSpace = space
+        } else if let cs = currentSpace {
+            // Tab is globally pinned; remember it for the current space too
+            cs.activeTabId = tab.id
+        }
+        
+        // Persist the change
+        persistSnapshot()
+    }
 
     @discardableResult
     func createNewTab(
@@ -1488,6 +1494,13 @@ class TabManager: ObservableObject {
                 self.currentTab = match
             } else {
                 self.currentTab = allForSelection.first
+            }
+            
+            // If no tabs exist, create a default tab with Google.com
+            if self.currentTab == nil {
+                print("🆕 [TabManager] No tabs found, creating default Google tab")
+                let defaultTab = createNewTab(url: "https://www.google.com", in: currentSpace)
+                self.currentTab = defaultTab
             }
 
             if let ct = self.currentTab { _ = ct.webView }

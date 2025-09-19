@@ -2,7 +2,7 @@
 //  EssentialTabsScrollView.swift
 //  Nook
 //
-//  Created by Claude on 04/09/2025.
+//  Created by Jonathan Caudill on 04/09/2025.
 //
 
 import SwiftUI
