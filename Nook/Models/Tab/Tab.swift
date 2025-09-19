@@ -583,7 +583,17 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     
     func requestPictureInPicture() {
-        PiPManager.shared.requestPiP(for: self)
+        // In multi-window setup, we need to work with the WebView that's actually visible
+        // in the current window, not just the first WebView created
+        if let browserManager = browserManager,
+           let activeWindowId = browserManager.activeWindowState?.id,
+           let activeWebView = browserManager.getWebView(for: self.id, in: activeWindowId) {
+            // Use the WebView that's actually visible in the current window
+            PiPManager.shared.requestPiP(for: self, webView: activeWebView)
+        } else {
+            // Fallback to the original behavior for backward compatibility
+            PiPManager.shared.requestPiP(for: self)
+        }
     }
     
     // MARK: - Rename Methods
@@ -1734,8 +1744,12 @@ extension Tab: WKNavigationDelegate {
                 hasPlayingAudio = false
                 // Note: isAudioMuted is preserved to maintain user's mute preference
                 print("🔄 [Tab] Swift reset audio tracking for navigation to: \(newURL.absoluteString)")
+                // Persist URL changes when navigation starts to a different URL
+                self.url = newURL
+                browserManager?.tabManager.persistSnapshot()
+            } else {
+                self.url = newURL
             }
-            self.url = newURL
         }
     }
 
@@ -1756,6 +1770,8 @@ extension Tab: WKNavigationDelegate {
             if #available(macOS 15.5, *) {
                 ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
             }
+            // Persist URL changes immediately when navigation commits
+            browserManager?.tabManager.persistSnapshot()
         }
     }
 
@@ -1796,9 +1812,16 @@ extension Tab: WKNavigationDelegate {
                             profileId: profileId
                         )
                     }
+                    
+                    // Persist tab changes after navigation completes
+                    self?.browserManager?.tabManager.persistSnapshot()
                 }
             } else if let jsError = error {
                 print("⚠️ [Tab] Failed to get document.title: \(jsError.localizedDescription)")
+                // Still persist even if title fetch failed, since URL was updated
+                DispatchQueue.main.async {
+                    self?.browserManager?.tabManager.persistSnapshot()
+                }
             }
         }
 
@@ -2317,7 +2340,16 @@ extension Tab {
     typealias FindCompletion = @Sendable (FindResult) -> Void
     
     func findInPage(_ text: String, completion: @escaping FindCompletion) {
-        guard let webView = _webView else {
+        // Use the WebView that's actually visible in the current window
+        let targetWebView: WKWebView?
+        if let browserManager = browserManager,
+           let activeWindowId = browserManager.activeWindowState?.id {
+            targetWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
+        } else {
+            targetWebView = _webView
+        }
+        
+        guard let webView = targetWebView else {
             completion(.failure(NSError(domain: "Tab", code: -1, userInfo: [NSLocalizedDescriptionKey: "WebView not available"])))
             return
         }
@@ -2438,7 +2470,16 @@ extension Tab {
     }
     
     func findNextInPage(completion: @escaping FindCompletion) {
-        guard let webView = _webView else {
+        // Use the WebView that's actually visible in the current window
+        let targetWebView: WKWebView?
+        if let browserManager = browserManager,
+           let activeWindowId = browserManager.activeWindowState?.id {
+            targetWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
+        } else {
+            targetWebView = _webView
+        }
+        
+        guard let webView = targetWebView else {
             completion(.failure(NSError(domain: "Tab", code: -1, userInfo: [NSLocalizedDescriptionKey: "WebView not available"])))
             return
         }
@@ -2500,7 +2541,16 @@ extension Tab {
     }
     
     func findPreviousInPage(completion: @escaping FindCompletion) {
-        guard let webView = _webView else {
+        // Use the WebView that's actually visible in the current window
+        let targetWebView: WKWebView?
+        if let browserManager = browserManager,
+           let activeWindowId = browserManager.activeWindowState?.id {
+            targetWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
+        } else {
+            targetWebView = _webView
+        }
+        
+        guard let webView = targetWebView else {
             completion(.failure(NSError(domain: "Tab", code: -1, userInfo: [NSLocalizedDescriptionKey: "WebView not available"])))
             return
         }
@@ -2562,7 +2612,16 @@ extension Tab {
     }
     
     func clearFindInPage() {
-        guard let webView = _webView else { return }
+        // Use the WebView that's actually visible in the current window
+        let targetWebView: WKWebView?
+        if let browserManager = browserManager,
+           let activeWindowId = browserManager.activeWindowState?.id {
+            targetWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
+        } else {
+            targetWebView = _webView
+        }
+        
+        guard let webView = targetWebView else { return }
         
         let script = """
         (function() {
