@@ -15,11 +15,25 @@ struct SpaceTab: View {
     @State private var isHovering: Bool = false
     @State private var isCloseHovering: Bool = false
     @State private var isSpeakerHovering: Bool = false
+    @FocusState private var isTextFieldFocused: Bool
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var windowState: BrowserWindowState
 
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            if isCurrentTab {
+                // Only allow renaming if this tab is the current tab in THIS window
+                print("🔄 [SpaceTab] Starting rename for tab '\(tab.name)' in window \(windowState.id)")
+                tab.startRenaming()
+                isTextFieldFocused = true
+            } else {
+                // For inactive tabs, end any active renaming and switch
+                if tab.isRenaming {
+                    tab.saveRename()
+                }
+                action()
+            }
+        }) {
             HStack(spacing: 8) {
                 ZStack {
                     tab.favicon
@@ -51,24 +65,21 @@ struct SpaceTab: View {
                         }
                         .onAppear {
                             // Select all text when editing starts
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                // Use a more reliable approach to select all text
                                 if let textField = NSApp.keyWindow?.firstResponder as? NSTextView {
                                     textField.selectAll(nil)
                                 }
                             }
                         }
+                        .focused($isTextFieldFocused)
                 } else {
                     Text(tab.name)
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(tab.isUnloaded ? AppColors.textSecondary : textTab)
                         .lineLimit(1)
                         .truncationMode(.tail)
-                        .onTapGesture(count: 2) {
-                            // Only allow renaming active tabs
-                            if isCurrentTab {
-                                tab.startRenaming()
-                            }
-                        }
+                        .textSelection(.disabled) // Make text non-selectable
                 }
                 Spacer()
 
@@ -79,10 +90,10 @@ struct SpaceTab: View {
                     }) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 6)
-                                .fill(isSpeakerHovering ? (isCurrentTab ? AppColors.controlBackgroundHoverLight : AppColors.controlBackgroundActive) : AppColors.controlBackgroundHoverLight.opacity(0))
+                                .fill(isSpeakerHovering ? (isCurrentTab ? AppColors.controlBackgroundHoverLight : AppColors.controlBackgroundActive) : AppColors.controlBackgroundHoverLight.opacity(0))              
                                 .frame(width: 22, height: 22)
                                 .animation(.easeInOut(duration: 0.05), value: isSpeakerHovering)
-                            Image(systemName: tab.isAudioMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                            Image(systemName: tab.isAudioMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")                                                                                                        
                                 .contentTransition(.symbolEffect(.replace))
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(tab.isAudioMuted ? AppColors.textSecondary : textTab)
@@ -101,7 +112,7 @@ struct SpaceTab: View {
                             .font(.system(size: 12, weight: .heavy))
                             .foregroundColor(textTab)
                             .padding(4)
-                            .background(isCloseHovering ? (isCurrentTab ? AppColors.controlBackgroundHoverLight : AppColors.controlBackgroundActive) : Color.clear)
+                            .background(isCloseHovering ? (isCurrentTab ? AppColors.controlBackgroundHoverLight : AppColors.controlBackgroundActive) : Color.clear)                                                   
                             .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
                     .buttonStyle(PlainButtonStyle())

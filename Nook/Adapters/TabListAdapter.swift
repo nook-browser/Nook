@@ -33,7 +33,7 @@ class SpaceRegularTabListAdapter: TabListDataSource, ObservableObject {
     
     func selectTab(at index: Int) {
         guard index < tabs.count else { return }
-        tabManager.setActiveTab(tabs[index])
+        tabManager.browserManager?.selectTab(tabs[index])
     }
     
     func closeTab(at index: Int) {
@@ -187,7 +187,7 @@ class SpacePinnedTabListAdapter: TabListDataSource, ObservableObject {
     
     func selectTab(at index: Int) {
         guard index < tabs.count else { return }
-        tabManager.setActiveTab(tabs[index])
+        tabManager.browserManager?.selectTab(tabs[index])
     }
     
     func closeTab(at index: Int) {
@@ -314,7 +314,7 @@ class EssentialTabListAdapter: TabListDataSource, ObservableObject {
     
     func selectTab(at index: Int) {
         guard index < tabs.count else { return }
-        tabManager.setActiveTab(tabs[index])
+        tabManager.browserManager?.selectTab(tabs[index])
     }
     
     func closeTab(at index: Int) {
