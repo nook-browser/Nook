@@ -9,6 +9,7 @@ import SwiftUI
 
 struct NewTabButton: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     @State private var isHovering: Bool = false
     
     
@@ -44,7 +45,7 @@ struct NewTabButton: View {
     }
     
     private var backgroundColor: Color {
-        if browserManager.isCommandPaletteVisible {
+        if windowState.isCommandPaletteVisible {
             return AppColors.controlBackgroundActive
         } else if isHovering {
             return AppColors.controlBackgroundHover

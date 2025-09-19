@@ -567,29 +567,6 @@ class TabManager: ObservableObject {
             }
         }
 
-        // Auto-switch profile if the target space belongs to a different profile
-        if let targetProfileId = space.profileId, let bm = browserManager {
-            // Skip scheduling if a switch or transition is already in progress
-            if bm.isTransitioningProfile == true || bm.isSwitchingProfile == true {
-                // Avoid concurrent or nested profile switches
-            } else {
-                let currentProfileId = bm.currentProfile?.id
-                if currentProfileId == nil || currentProfileId != targetProfileId {
-                    if let targetProfile = bm.profileManager.profiles.first(where: { $0.id == targetProfileId }) {
-                        // Remember target space and switch profiles asynchronously
-                        pendingSpaceActivation = space.id
-                        Task { [weak bm] in
-                            await bm?.switchToProfile(targetProfile)
-                        }
-                        // Return early; profile switch will resume activation via handleProfileSwitch
-                        return
-                    } else {
-                        print("⚠️ [TabManager] Target profile not found for space \(space.name)")
-                    }
-                }
-            }
-        }
-
         // Capture the previous state before switching
         let previousTab = currentTab
         let previousSpace = currentSpace
@@ -600,20 +577,8 @@ class TabManager: ObservableObject {
             prevSpace.activeTabId = prevTab.id
         }
 
-        // Trigger gradient transition before switching space (so we still know previous)
-        if let bm = browserManager {
-            let oldGradient = previousSpace?.gradient
-            let newGradient = space.gradient
-            if let og = oldGradient {
-                if og.visuallyEquals(newGradient) {
-                    bm.gradientColorManager.setImmediate(newGradient)
-                } else {
-                    bm.gradientColorManager.transition(from: og, to: newGradient)
-                }
-            } else {
-                bm.gradientColorManager.setImmediate(newGradient)
-            }
-        }
+        // Trigger gradient transition aware of window contexts
+        browserManager?.refreshGradientsForSpace(space, animate: true)
 
         // Switch to the new space
         currentSpace = space
@@ -751,7 +716,7 @@ class TabManager: ObservableObject {
 
         // Force unload the tab from compositor before removing
         browserManager?.compositorManager.unloadTab(tab)
-        browserManager?.removeAllWebViews(for: tab.id)
+        browserManager?.removeAllWebViews(for: tab)
 
         if #available(macOS 15.5, *) {
             ExtensionManager.shared.notifyTabClosed(tab)
@@ -1532,8 +1497,8 @@ class TabManager: ObservableObject {
 
             // Ensure the window background uses the startup space's gradient.
             // Use an immediate set to avoid an initial animation.
-            if let bm = self.browserManager, let g = self.currentSpace?.gradient {
-                bm.gradientColorManager.setImmediate(g)
+            if let bm = self.browserManager, let space = self.currentSpace {
+                bm.refreshGradientsForSpace(space, animate: false)
             }
             // If we assigned default profile to legacy pinned tabs, persist to capture migrations
             if __didAssignDefaultProfile { persistSnapshot() }
@@ -1686,8 +1651,8 @@ extension TabManager {
         }
 
         // After reattaching, ensure gradient matches the restored current space.
-        if let g = self.currentSpace?.gradient {
-            bm.gradientColorManager.setImmediate(g)
+        if let space = self.currentSpace {
+            bm.refreshGradientsForSpace(space, animate: false)
         }
 
         // After reattaching BrowserManager, backfill any missing space.profileId
