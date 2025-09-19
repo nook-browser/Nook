@@ -149,7 +149,6 @@ private struct MiniCommandPaletteOverlay: View {
                 // let width = hasFrame ? barFrame.width : browserManager.sidebarWidth
 
                 MiniCommandPaletteView(
-                    forcedWidth: 400,
                     forcedCornerRadius: 12
                 )
                 .offset(x: anchorX, y: anchorY)

@@ -12,6 +12,7 @@ struct SpaceView: View {
     let space: Space
     let isActive: Bool
     let width: CGFloat
+    let isSidebarHovered: Bool
     @EnvironmentObject var browserManager: BrowserManager
     @State private var draggedItem: UUID? = nil
     
@@ -40,7 +41,7 @@ struct SpaceView: View {
                 .padding(.horizontal, 8)
             
             if !spacePinnedTabs.isEmpty || !tabs.isEmpty {
-                SpaceSeparator()
+                SpaceSeparator(isHovering: isSidebarHovered)
                     .padding(.horizontal, 8)
             }
             
@@ -120,7 +121,7 @@ struct SpaceView: View {
                 ScrollView {
                     VStack(spacing: 2) {
                         if !tabs.isEmpty {
-                            VStack(spacing: 2) {
+                            VStack(spacing: 5) {
                                 // Snapshot current regular tabs to keep indices stable during render
                                 let currentTabs = tabs
                                 let split = splitManager

@@ -11,8 +11,19 @@ struct SidebarView: View {
     @State private var hasTriggeredHaptic = false
     @State private var spaceName = ""
     @State private var spaceIcon = ""
-    @State private var showHistory = false
     @State private var sidebarDraggedItem: UUID? = nil
+    @State private var isSidebarHovered: Bool = false
+
+    // Downloads Menu Hover
+    @State private var isMenuButtonHovered = false
+    @State private var isDownloadsHovered = false
+    @State private var showDownloadsMenu = false
+    @State private var animateDownloadsMenu: Bool = false
+
+    private var shouldShowDownloads: Bool {
+        isMenuButtonHovered || isDownloadsHovered
+    }
+
     // Force rendering even when the real sidebar is collapsed (used by hover overlay)
     var forceVisible: Bool = false
     // Override the width for overlay use; falls back to BrowserManager width
@@ -62,6 +73,17 @@ struct SidebarView: View {
         )
         return indices
     }
+    
+    private func hideMenuAfterDelay() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            if !isMenuButtonHovered && !isDownloadsHovered {
+                animateDownloadsMenu = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    showDownloadsMenu = false
+                }
+            }
+        }
+    }
 
     var body: some View {
         if browserManager.isSidebarVisible || forceVisible {
@@ -70,7 +92,7 @@ struct SidebarView: View {
     }
 
     private var sidebarContent: some View {
-        ZStack{
+        ZStack {
             if !browserManager.isSidebarMenuVisible {
                 VStack(spacing: 8) {
                     HStack(spacing: 2) {
@@ -98,73 +120,77 @@ struct SidebarView: View {
                     }
                     .padding(.horizontal, 8)
                     .modifier(FallbackDropBelowEssentialsModifier())
-                    if showHistory {
-                        historyView
-                            .padding(.horizontal, 8)
-                    } else {
-                        spacesScrollView
+                    spacesScrollView
+                    if showDownloadsMenu {
+                        SidebarMenuHoverDownloads(
+                            isVisible: animateDownloadsMenu
+                        ) { completed in
+                            if !completed {
+                                print(completed)
+                            }
+                        }
+                        .onHover { isHovered in
+                            isDownloadsHovered = isHovered
+                            if isHovered {
+                                showDownloadsMenu = true
+                                animateDownloadsMenu = true
+                            } else {
+                                hideMenuAfterDelay()
+                            }
+                        }
                     }
+
                     //MARK: - Bottom
                     HStack {
-                        NavButton(iconName: "square.and.arrow.down") {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                browserManager.isSidebarMenuVisible = true
+                        ZStack {
+                            NavButton(iconName: "archivebox") {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    browserManager.isSidebarMenuVisible = true
+                                }
+
                             }
-                        }
-
-                        NavButton(iconName: "clock") {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                showHistory.toggle()
-                            }
-                        }
-
-                        Spacer()
-
-                        if !showHistory {
-                            SpacesList()
-                        } else {
-                            Text("History")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.secondary)
-                        }
-
-                        Spacer()
-
-                        if !showHistory {
-                            NavButton(iconName: "plus") {
-                                showSpaceCreationDialog()
-                            }
-                        } else {
-                            NavButton(iconName: "arrow.left") {
-                                withAnimation(.easeInOut(duration: 0.3)) {
-                                    showHistory = false
+                            .onHover { isHovered in
+                                isMenuButtonHovered = isHovered
+                                if isHovered {
+                                    showDownloadsMenu = true
+                                    animateDownloadsMenu = true
+                                } else {
+                                    hideMenuAfterDelay()
                                 }
                             }
+                            
+                            DownloadIndicator()
+                                .offset(x: 12, y: -12)
                         }
+
+
+                        Spacer()
+
+                        SpacesList()
+
+                        Spacer()
+
+                        NavButton(iconName: "plus") {
+                            showSpaceCreationDialog()
+                        }
+
                     }
                     .padding(.horizontal, 8)
 
                 }
                 .padding(.vertical, 8)
                 .transition(.scale.combined(with: .opacity))
+                .onHover { state in
+                    isSidebarHovered = state
+                    
+                }
             } else {
                 SidebarMenu()
                     .transition(.move(edge: .leading).combined(with: .opacity))
             }
 
-
         }
         .frame(width: effectiveWidth)
-    }
-
-    private var historyView: some View {
-        HistoryView()
-            .transition(
-                .asymmetric(
-                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                    removal: .move(edge: .leading).combined(with: .opacity)
-                )
-            )
     }
 
     private var spacesScrollView: some View {
@@ -274,6 +300,7 @@ struct SidebarView: View {
                         isActive: browserManager.tabManager.currentSpace?.id
                             == space.id,
                         width: effectiveWidth,
+                        isSidebarHovered: isSidebarHovered,
                         onActivateTab: {
                             browserManager.tabManager.setActiveTab($0)
                         },

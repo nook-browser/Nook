@@ -64,7 +64,6 @@
 		2CC067602E789ECB001D37C6 /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066C72E789ECB001D37C6 /* Utils.swift */; };
 		2CC067612E789ECB001D37C6 /* syn-att.c in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066F72E789ECB001D37C6 /* syn-att.c */; };
 		2CC067622E789ECB001D37C6 /* HistoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066BE2E789ECB001D37C6 /* HistoryManager.swift */; };
-		2CC067632E789ECB001D37C6 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066922E789ECB001D37C6 /* HistoryView.swift */; };
 		2CC067642E789ECB001D37C6 /* WindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066442E789ECB001D37C6 /* WindowView.swift */; };
 		2CC067652E789ECB001D37C6 /* mach_override.c in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066FF2E789ECB001D37C6 /* mach_override.c */; };
 		2CC067662E789ECB001D37C6 /* SidebarResizeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066952E789ECB001D37C6 /* SidebarResizeView.swift */; };
@@ -244,7 +243,6 @@
 		2CC0668E2E789ECB001D37C6 /* SpaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceView.swift; sourceTree = "<group>"; };
 		2CC0668F2E789ECB001D37C6 /* SplitTabRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitTabRow.swift; sourceTree = "<group>"; };
 		2CC066912E789ECB001D37C6 /* FallbackDropBelowEssentialsModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FallbackDropBelowEssentialsModifier.swift; sourceTree = "<group>"; };
-		2CC066922E789ECB001D37C6 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
 		2CC066932E789ECB001D37C6 /* NewTabButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewTabButton.swift; sourceTree = "<group>"; };
 		2CC066942E789ECB001D37C6 /* SidebarHoverOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarHoverOverlayView.swift; sourceTree = "<group>"; };
 		2CC066952E789ECB001D37C6 /* SidebarResizeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarResizeView.swift; sourceTree = "<group>"; };
@@ -573,7 +571,6 @@
 				2CC066862E789ECB001D37C6 /* PinnedButtons */,
 				2CC066902E789ECB001D37C6 /* SpaceSection */,
 				2CC066912E789ECB001D37C6 /* FallbackDropBelowEssentialsModifier.swift */,
-				2CC066922E789ECB001D37C6 /* HistoryView.swift */,
 				2CC066932E789ECB001D37C6 /* NewTabButton.swift */,
 				2CC066942E789ECB001D37C6 /* SidebarHoverOverlayView.swift */,
 				2CC066952E789ECB001D37C6 /* SidebarResizeView.swift */,
@@ -1194,7 +1191,6 @@
 				2CC067602E789ECB001D37C6 /* Utils.swift in Sources */,
 				2CC067612E789ECB001D37C6 /* syn-att.c in Sources */,
 				2CC067622E789ECB001D37C6 /* HistoryManager.swift in Sources */,
-				2CC067632E789ECB001D37C6 /* HistoryView.swift in Sources */,
 				2CC067642E789ECB001D37C6 /* WindowView.swift in Sources */,
 				2CC067652E789ECB001D37C6 /* mach_override.c in Sources */,
 				2CC067662E789ECB001D37C6 /* SidebarResizeView.swift in Sources */,
@@ -1432,6 +1428,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 96M8ZZRJK6;
 				ENABLE_APP_SANDBOX = YES;
+				ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER = readwrite;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = NO;
@@ -1486,6 +1483,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 96M8ZZRJK6;
 				ENABLE_APP_SANDBOX = YES;
+				ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER = readwrite;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = NO;

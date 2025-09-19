@@ -12,7 +12,6 @@ struct HistorySuggestionItem: View {
     let entry: HistoryEntry
     var isSelected: Bool = false
     
-    @State private var isHovered: Bool = false
     @State private var resolvedFavicon: SwiftUI.Image? = nil
     
     var body: some View {
@@ -20,8 +19,11 @@ struct HistorySuggestionItem: View {
             (resolvedFavicon ?? Image(systemName: "globe"))
                 .resizable()
                 .scaledToFit()
-                .frame(width: 14, height: 14)
+                .frame(width: 16, height: 16)
                 .foregroundStyle(.white.opacity(0.2))
+                .padding(6)
+                .background(isSelected ? .white : .clear)
+                .clipShape(RoundedRectangle(cornerRadius: 5))
             HStack(spacing: 6) {
                 Text(entry.displayTitle)
                     .font(.system(size: 14, weight: .medium))
@@ -38,14 +40,9 @@ struct HistorySuggestionItem: View {
             }
             Spacer()
         }
-        .padding(.horizontal, 5)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
         .frame(maxWidth: .infinity)
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                isHovered = hovering
-            }
-        }
         .onAppear {
             Task { await fetchFavicon(for: entry.url) }
         }

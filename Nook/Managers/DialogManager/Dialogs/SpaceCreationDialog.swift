@@ -49,7 +49,6 @@ struct SpaceCreationDialog: DialogProtocol {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Space Icon")
                         .font(.system(size: 14, weight: .medium))
-
                     EmojiTextField(text: $spaceIcon)
                 }
             }

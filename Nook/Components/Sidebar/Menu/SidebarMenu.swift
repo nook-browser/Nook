@@ -27,22 +27,27 @@ struct SidebarMenu: View {
                 }
 
                 Spacer()
-                SidebarMenuTab(
-                    image: "clock",
-                    title: "History",
-                    isActive: selectedTab == .history,
-                    action: {
-                        selectedTab = .history
-                    }
-                )
-                SidebarMenuTab(
-                    image: "arrow.down.circle",
-                    title: "Downloads",
-                    isActive: selectedTab == .downloads,
-                    action: {
-                        selectedTab = .downloads
-                    }
-                )
+                VStack(spacing: 20) {
+                    SidebarMenuTab(
+                        image: "clock",
+                        activeImage: "clock.fill",
+                        title: "History",
+                        isActive: selectedTab == .history,
+                        action: {
+                            selectedTab = .history
+                        }
+                    )
+                    SidebarMenuTab(
+                        image: "arrow.down.circle",
+                        activeImage: "arrow.down.circle.fill",
+                        title: "Downloads",
+                        isActive: selectedTab == .downloads,
+                        action: {
+                            selectedTab = .downloads
+                        }
+                    )
+                }
+
                 Spacer()
                 HStack {
                     NavButton(iconName: "arrow.backward") {
@@ -55,12 +60,13 @@ struct SidebarMenu: View {
 
             }
             .padding(8)
-            .frame(maxWidth: 100, maxHeight: .infinity)
+            .frame(width: 110)
+            .frame(maxHeight: .infinity)
             .background(.black.opacity(0.4))
             VStack {
                 switch selectedTab {
                 case .history:
-                    EmptyView()
+                    SidebarMenuHistoryTab()
                 case .downloads:
                     SidebarMenuDownloadsTab()
                 }

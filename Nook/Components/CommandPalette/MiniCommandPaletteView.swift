@@ -25,25 +25,27 @@ struct MiniCommandPaletteView: View {
     @FocusState private var isSearchFocused: Bool
     @State private var text: String = ""
     @State private var selectedSuggestionIndex: Int = -1
+    @State private var hoveredIndex: Int? = nil
 
     // Will be overridden by overlay to match URL bar width
     var forcedWidth: CGFloat? = nil
     var forcedCornerRadius: CGFloat? = nil
 
     var body: some View {
-        let isDark = colorScheme == .dark
-
         VStack(spacing: 0) {
             // Input
-            HStack(spacing: 10) {
-                Image(systemName: isLikelyURL(text) ? "globe" : "magnifyingglass")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(AppColors.textPrimary)
+            HStack(spacing: 12) {
+                Image(
+                    systemName: isLikelyURL(text)
+                        ? "globe" : "magnifyingglass"
+                )
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white)
 
                 TextField("Search or enter address", text: $text)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 15, weight: .regular))
-                    .foregroundStyle(AppColors.textPrimary)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.white)
                     .focused($isSearchFocused)
                     .onKeyPress(.return) {
                         handleReturn()
@@ -59,20 +61,22 @@ struct MiniCommandPaletteView: View {
                     }
                     .onChange(of: text) { _, newValue in
                         selectedSuggestionIndex = -1
-                        searchManager.searchSuggestions(for: newValue)
+                        searchManager.searchSuggestions(
+                            for: newValue
+                        )
                     }
             }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 12)
+            .padding(.vertical, 20)
+            .padding(.horizontal, 16)
 
             // Separator
             if !searchManager.suggestions.isEmpty {
                 RoundedRectangle(cornerRadius: 100)
-                    .fill(Color.white.opacity(0.35))
+                    .fill(Color.white.opacity(0.4))
                     .frame(height: 1)
                     .frame(maxWidth: .infinity)
                     .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 5)
             }
 
             // Suggestions
@@ -82,18 +86,15 @@ struct MiniCommandPaletteView: View {
                     ForEach(suggestions.indices, id: \.self) { index in
                         let suggestion = suggestions[index]
                         suggestionRow(for: suggestion, isSelected: selectedSuggestionIndex == index)
-                            .padding(6)
-                            .background(selectedSuggestionIndex == index ? gradientColorManager.primaryColor : Color.clear)
-                            .cornerRadius(8)
-                            .font(.system(size: 15, weight: .regular))
-                            .foregroundStyle(AppColors.textPrimary)
-                            .contentShape(Rectangle())
+                            .background(selectedSuggestionIndex == index ? gradientColorManager.primaryColor : hoveredIndex == index ? .white.opacity(0.05) : .clear)
+                            .cornerRadius(6)
+                            .contentShape(RoundedRectangle(cornerRadius: 6))
                             .onHover { hovering in
                                 withAnimation(.easeInOut(duration: 0.12)) {
                                     if hovering {
-                                        selectedSuggestionIndex = index
-                                    } else if selectedSuggestionIndex == index {
-                                        selectedSuggestionIndex = -1
+                                        hoveredIndex = index
+                                    } else {
+                                        hoveredIndex = nil
                                     }
                                 }
                             }
@@ -102,16 +103,14 @@ struct MiniCommandPaletteView: View {
                 }
                 .padding(.horizontal, 4)
                 .padding(.vertical, 4)
-                .frame(maxHeight: 240)
             }
         }
-        .frame(width: forcedWidth ?? 460)
-        .background(isDark ? Color.white.opacity(0.28) : Color.white.opacity(0.85))
-        .background(.thinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: forcedCornerRadius ?? 12))
+        .frame(maxWidth: forcedWidth ?? 720)
+        .background(BlurEffectView(material: .hudWindow, state: .inactive))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(
-            RoundedRectangle(cornerRadius: forcedCornerRadius ?? 12)
-                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.white.opacity(0.2), lineWidth: 1.5)
         )
         .shadow(color: .black.opacity(0.12), radius: 18, x: 0, y: 12)
         .onAppear {

@@ -30,9 +30,8 @@ struct PinnedTabView: View {
     var body: some View {
         Button(action: action) {
             ZStack {
-                // Background replaced with RoundedRectangle directly
                 RoundedRectangle(cornerRadius: corner, style: .continuous)
-                    .fill(Color.white.opacity(isActive ? 1.0 : isHovered ? 0.6 : 0.4))
+                    .fill(Color.white.opacity(isActive ? 0.5 : isHovered ? 0.15 : 0.1))
                     .animation(.easeInOut(duration: 0.2), value: isHovered)
 
                 tabIcon

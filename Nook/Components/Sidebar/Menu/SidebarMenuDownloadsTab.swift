@@ -7,6 +7,7 @@
 
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SidebarMenuDownloadsTab: View {
     @EnvironmentObject var browserManager: BrowserManager
@@ -29,15 +30,19 @@ struct SidebarMenuDownloadsTab: View {
         VStack {
             HStack {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 12, weight: .medium))
-                TextField("Search downloads", text: $text)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.3))
+                    .frame(width: 16, height: 16)
+                TextField("Search downloads...", text: $text)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundColor(AppColors.textPrimary)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.3))
                     .focused($isSearchFocused)
                 
                 if !text.isEmpty {
-                    Button(action: { text = "" }) {
+                    Button(action: {
+                        text = ""
+                    }) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 12))
                             .foregroundColor(.secondary)
@@ -45,9 +50,11 @@ struct SidebarMenuDownloadsTab: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(isHovering ? .white.opacity(0.3) : .white.opacity(0.2))
+            .frame(height: 38)
+            .frame(maxWidth: .infinity)
+            .background(isHovering ? .white.opacity(0.08) : .white.opacity(0.05))
             .animation(.easeInOut(duration: 0.1), value: isHovering)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .onHover { state in
@@ -58,7 +65,7 @@ struct SidebarMenuDownloadsTab: View {
             }
             
             ScrollView {
-                LazyVStack(spacing: 8) {
+                VStack(spacing: 8) {
                     if filteredDownloads.isEmpty && !text.isEmpty {
                         VStack(spacing: 8) {
                             Image(systemName: "magnifyingglass")
@@ -87,36 +94,76 @@ struct SidebarMenuDownloadsTab: View {
 
 struct DownloadItem: View {
     @State private var isHovering: Bool = false
+    @State private var isIconHovered: Bool = false
     var download: Download
+    
+    private var canDrag: Bool {
+        guard download.state == .completed,
+            let destinationURL = download.destinationURL
+        else {
+            return false
+        }
+        return FileManager.default.fileExists(atPath: destinationURL.path)
+    }
+    
 
     var body: some View {
-        HStack {
-            Image(nsImage: download.icon!)
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 8) {
+            Image(nsImage: download.downloadThumbnail ?? download.icon!)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 24, height: 24)
+            VStack(alignment: .leading, spacing: 1) {
                 Text(download.suggestedFilename)
                     .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
                 Text(download.originalURL.absoluteString)
-                    .font(.system(size: 10, weight: .regular))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.55))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             Spacer()
-            Menu {
-                Button(action: openFile) {
-                    Label("Open", systemImage: "doc")
+            
+            if isHovering {
+                Menu {
+                    Button(action: openFile) {
+                        Label("Open", systemImage: "doc")
+                    }
+                    Button(action: copyFile) {
+                        Label("Copy", systemImage: "doc.on.doc")
+                    }
+                    Button(action: showInFinder) {
+                        Label("Show in Finder", systemImage: "folder")
+                    }
+                    Divider()
+                    Button(action: showInFinder) {
+                        Label("Move to Trash", systemImage: "trash")
+                    }
+                } label: {
+                    Button{
+                        
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.6))
+                            .frame(width: 16, height: 16)
+                    }
+                    .padding(8)
+                    .background(isIconHovered ? .white.opacity(0.1) : .clear)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .buttonStyle(PlainButtonStyle())
                 }
-                Button(action: copyFile) {
-                    Label("Copy", systemImage: "doc.on.doc")
+                .buttonStyle(.plain)
+                .transition(.scale.combined(with: .opacity))
+                .onHover { state in
+                    isIconHovered = state
                 }
-                Button(action: showInFinder) {
-                    Label("Show in Finder", systemImage: "folder")
-                }
-            } label: {
-                NavButton(iconName: "ellipsis")
             }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
+
 
         }
         .padding(.horizontal, 12)
@@ -128,7 +175,33 @@ struct DownloadItem: View {
             isHovering = state
         }
         .onTapGesture {
-            showInFinder()
+            openFile()
+        }
+        .onDrag {
+            guard canDrag,
+                let destinationURL = download.destinationURL,
+                FileManager.default.fileExists(atPath: destinationURL.path)
+            else {
+                return NSItemProvider()
+            }
+
+            let provider = NSItemProvider(contentsOf: destinationURL)
+
+            if let fileData = try? Data(contentsOf: destinationURL) {
+                let fileExtension = destinationURL.pathExtension.lowercased()
+
+                if let utType = UTType(filenameExtension: fileExtension) {
+                    provider?.registerDataRepresentation(
+                        forTypeIdentifier: utType.identifier,
+                        visibility: .all
+                    ) { completion in
+                        completion(fileData, nil)
+                        return nil
+                    }
+                }
+            }
+
+            return provider ?? NSItemProvider()
         }
     }
 

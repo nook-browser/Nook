@@ -19,10 +19,9 @@ struct CommandPaletteView: View {
     @State private var selectedSuggestionIndex: Int = -1
 
     var body: some View {
-        let isDark = colorScheme == .dark
         
         ZStack {
-            Color.black.opacity(0.2)
+            Color(.black.opacity(0.2))
                 .ignoresSafeArea()
                 .onTapGesture {
                     browserManager.closeCommandPalette()
@@ -41,13 +40,13 @@ struct CommandPaletteView: View {
                                 systemName: isLikelyURL(text)
                                     ? "globe" : "magnifyingglass"
                             )
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(AppColors.textPrimary)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.white)
 
                             TextField("Search or enter address", text: $text)
                                 .textFieldStyle(.plain)
-                                .font(.system(size: 16, weight: .regular))
-                                .foregroundColor(AppColors.textPrimary)
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.white)
                                 .focused($isSearchFocused)
                                 .onKeyPress(.return) {
                                     handleReturn()
@@ -68,7 +67,7 @@ struct CommandPaletteView: View {
                                     )
                                 }
                         }
-                        .padding(.vertical, 16)
+                        .padding(.vertical, 20)
                         .padding(.horizontal, 16)
 
                         // Separator
@@ -91,17 +90,16 @@ struct CommandPaletteView: View {
                                     selectSuggestion(suggestion)
                                 }
                             )
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 4)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 8)
                         }
                     }
-                    .frame(width: 600)
-                    .background(isDark ? Color.white.opacity(0.3) : Color.white.opacity(0.8))
-                    .background(.thinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .frame(width: 765)
+                    .background(BlurEffectView(material: .hudWindow, state: .inactive))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.white.opacity(0.2), lineWidth: 1.5)
                     )
                     .animation(.easeInOut(duration: 0.15), value: searchManager.suggestions.count)
                     .alignmentGuide(.top) { _ in -geometry.size.height / 2 }
@@ -175,22 +173,23 @@ struct CommandPaletteView: View {
         let suggestions: [SearchManager.SearchSuggestion]
         @Binding var selectedIndex: Int
         let onSelect: (SearchManager.SearchSuggestion) -> Void
+        @State private var hoveredIndex: Int? = nil
 
         var body: some View {
             LazyVStack(spacing: 2) {
                 ForEach(suggestions.indices, id: \.self) { index in
                     let suggestion = suggestions[index]
                     row(for: suggestion, isSelected: selectedIndex == index)
-                        .padding(8)
-                        .background(selectedIndex == index ? gradientColorManager.primaryColor : Color.clear)
-                        .cornerRadius(10)
-                        .font(.system(size: 16, weight: .regular))
-                        .foregroundStyle(AppColors.textPrimary)
-                        .contentShape(Rectangle())
+                        .background(selectedIndex == index ? gradientColorManager.primaryColor : hoveredIndex == index ? .white.opacity(0.05) : .clear)
+                        .cornerRadius(6)
+                        .contentShape(RoundedRectangle(cornerRadius: 6))
                         .onHover { hovering in
                             withAnimation(.easeInOut(duration: 0.12)) {
-                                if hovering { selectedIndex = index }
-                                else if selectedIndex == index { selectedIndex = -1 }
+                                if hovering {
+                                    hoveredIndex = index
+                                } else {
+                                    hoveredIndex = nil
+                                }
                             }
                         }
                         .onTapGesture { onSelect(suggestion) }
