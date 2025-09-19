@@ -38,11 +38,38 @@ struct SpaceTab: View {
                             .offset(x: 6, y: -6)
                     }
                 }
-                Text(tab.name)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(tab.isUnloaded ? AppColors.textSecondary : textTab)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                if tab.isRenaming {
+                    TextField("", text: $tab.editingName)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(tab.isUnloaded ? AppColors.textSecondary : textTab)
+                        .textFieldStyle(.plain)
+                        .onSubmit {
+                            tab.saveRename()
+                        }
+                        .onExitCommand {
+                            tab.cancelRename()
+                        }
+                        .onAppear {
+                            // Select all text when editing starts
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                if let textField = NSApp.keyWindow?.firstResponder as? NSTextView {
+                                    textField.selectAll(nil)
+                                }
+                            }
+                        }
+                } else {
+                    Text(tab.name)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(tab.isUnloaded ? AppColors.textSecondary : textTab)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .onTapGesture(count: 2) {
+                            // Only allow renaming active tabs
+                            if isCurrentTab {
+                                tab.startRenaming()
+                            }
+                        }
+                }
                 Spacer()
 
                 // Mute button (show when tab has audio content OR is muted)
@@ -98,6 +125,18 @@ struct SpaceTab: View {
                 isHovering = hovering
             }
         }
+        .background(
+            // Invisible overlay to capture clicks outside when renaming
+            Group {
+                if tab.isRenaming {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            tab.saveRename()
+                        }
+                }
+            }
+        )
         .contextMenu {
             // Split view
             Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState) } 
