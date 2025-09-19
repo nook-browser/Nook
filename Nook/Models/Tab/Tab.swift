@@ -134,6 +134,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     var onLinkHover: ((String?) -> Void)? = nil
     var onCommandHover: ((String?) -> Void)? = nil
 
+    private let themeColorObservedWebViews = NSHashTable<AnyObject>.weakObjects()
+
     var isCurrentTab: Bool {
         // This property is used in contexts where we don't have window state
         // For now, we'll keep it using the global current tab for backward compatibility
@@ -1075,7 +1077,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             print("🔇 [Tab] Mute state queued at \(muted); base webView not loaded yet")
         }
 
-        browserManager?.setMuteState(muted, for: id)
+        browserManager?.setMuteState(muted, for: id, originatingWindowId: browserManager?.activeWindowState?.id)
 
         // Update our internal state
         DispatchQueue.main.async { [weak self] in
@@ -1220,16 +1222,37 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
     
     // MARK: - Background Color Management
-    private func setupThemeColorObserver(for webView: WKWebView) {
-        if #available(macOS 12.0, *) {
+    func setupThemeColorObserver(for webView: WKWebView) {
+        guard #available(macOS 12.0, *) else { return }
+        if !themeColorObservedWebViews.contains(webView) {
             webView.addObserver(self, forKeyPath: "themeColor", options: [.new, .initial], context: nil)
+            themeColorObservedWebViews.add(webView)
         }
     }
     
-    private func removeThemeColorObserver(from webView: WKWebView) {
-        if #available(macOS 12.0, *) {
+    func removeThemeColorObserver(from webView: WKWebView) {
+        guard #available(macOS 12.0, *) else { return }
+        if themeColorObservedWebViews.contains(webView) {
             webView.removeObserver(self, forKeyPath: "themeColor")
+            themeColorObservedWebViews.remove(webView)
         }
+    }
+    
+    func cleanupCloneWebView(_ webView: WKWebView) {
+        removeThemeColorObserver(from: webView)
+        let controller = webView.configuration.userContentController
+        controller.removeScriptMessageHandler(forName: "linkHover")
+        controller.removeScriptMessageHandler(forName: "commandHover")
+        controller.removeScriptMessageHandler(forName: "commandClick")
+        controller.removeScriptMessageHandler(forName: "pipStateChange")
+        controller.removeScriptMessageHandler(forName: "mediaStateChange_\(id.uuidString)")
+        controller.removeScriptMessageHandler(forName: "backgroundColor_\(id.uuidString)")
+        controller.removeScriptMessageHandler(forName: "historyStateDidChange")
+        controller.removeScriptMessageHandler(forName: "NookIdentity")
+        webView.navigationDelegate = nil
+        webView.uiDelegate = nil
+        webView.stopLoading()
+        webView.removeFromSuperview()
     }
     
     public override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {

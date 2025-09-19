@@ -33,78 +33,14 @@ struct MiniCommandPaletteView: View {
 
     var body: some View {
         let isDark = colorScheme == .dark
+        let symbolName = isLikelyURL(text) ? "globe" : "magnifyingglass"
+        let isActiveWindow = browserManager.activeWindowState?.id == windowState.id
+        let suggestions = searchManager.suggestions
 
         VStack(spacing: 0) {
-            // Input
-            HStack(spacing: 10) {
-                Image(systemName: isLikelyURL(text) ? "globe" : "magnifyingglass")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(AppColors.textPrimary)
-
-                TextField("Search or enter address", text: $text)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 15, weight: .regular))
-                    .foregroundStyle(AppColors.textPrimary)
-                    .focused($isSearchFocused)
-                    .onKeyPress(.return) {
-                        handleReturn()
-                        return .handled
-                    }
-                    .onKeyPress(.upArrow) {
-                        navigateSuggestions(direction: -1)
-                        return .handled
-                    }
-                    .onKeyPress(.downArrow) {
-                        navigateSuggestions(direction: 1)
-                        return .handled
-                    }
-                    .onChange(of: text) { _, newValue in
-                        selectedSuggestionIndex = -1
-                        searchManager.searchSuggestions(for: newValue)
-                    }
-            }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 12)
-
-            // Separator
-            if !searchManager.suggestions.isEmpty {
-                RoundedRectangle(cornerRadius: 100)
-                    .fill(Color.white.opacity(0.35))
-                    .frame(height: 1)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-            }
-
-            // Suggestions
-            if !searchManager.suggestions.isEmpty {
-                let suggestions = searchManager.suggestions
-                LazyVStack(spacing: 2) {
-                    ForEach(suggestions.indices, id: \.self) { index in
-                        let suggestion = suggestions[index]
-                        suggestionRow(for: suggestion, isSelected: selectedSuggestionIndex == index)
-                            .padding(6)
-                            .background(selectedSuggestionIndex == index ? gradientColorManager.primaryColor : Color.clear)
-                            .cornerRadius(8)
-                            .font(.system(size: 15, weight: .regular))
-                            .foregroundStyle(AppColors.textPrimary)
-                            .contentShape(Rectangle())
-                            .onHover { hovering in
-                                withAnimation(.easeInOut(duration: 0.12)) {
-                                    if hovering {
-                                        selectedSuggestionIndex = index
-                                    } else if selectedSuggestionIndex == index {
-                                        selectedSuggestionIndex = -1
-                                    }
-                                }
-                            }
-                            .onTapGesture { selectSuggestion(suggestion) }
-                    }
-                }
-                .padding(.horizontal, 4)
-                .padding(.vertical, 4)
-                .frame(maxHeight: 240)
-            }
+            inputRow(symbolName: symbolName)
+            separatorIfNeeded(hasSuggestions: !suggestions.isEmpty)
+            suggestionsListView(suggestions: suggestions)
         }
         .frame(width: forcedWidth ?? 460)
         .background(isDark ? Color.white.opacity(0.28) : Color.white.opacity(0.85))
@@ -119,15 +55,19 @@ struct MiniCommandPaletteView: View {
             // Wire managers
             searchManager.setTabManager(browserManager.tabManager)
             searchManager.setHistoryManager(browserManager.historyManager)
+            searchManager.updateProfileContext()
 
             // Ensure prefill and focus when the mini palette is presented
-            text = browserManager.commandPalettePrefilledText
+            text = windowState.commandPalettePrefilledText
             DispatchQueue.main.async { isSearchFocused = true }
         }
-        .onChange(of: browserManager.isMiniCommandPaletteVisible) { _, newVisible in
-            if newVisible {
+        .onChange(of: windowState.isMiniCommandPaletteVisible) { _, newVisible in
+            if newVisible && isActiveWindow {
+                searchManager.setTabManager(browserManager.tabManager)
+                searchManager.setHistoryManager(browserManager.historyManager)
+                searchManager.updateProfileContext()
                 // Pre-fill and focus
-                text = browserManager.commandPalettePrefilledText
+                text = windowState.commandPalettePrefilledText
                 DispatchQueue.main.async { isSearchFocused = true }
             } else {
                 isSearchFocused = false
@@ -137,7 +77,7 @@ struct MiniCommandPaletteView: View {
             }
         }
         .onKeyPress(.escape) {
-            DispatchQueue.main.async { browserManager.isMiniCommandPaletteVisible = false }
+            DispatchQueue.main.async { browserManager.hideMiniCommandPalette(for: windowState) }
             return .handled
         }
         .onChange(of: searchManager.suggestions.count) { _, newCount in
@@ -146,6 +86,97 @@ struct MiniCommandPaletteView: View {
             } else if selectedSuggestionIndex >= newCount {
                 selectedSuggestionIndex = -1
             }
+        }
+        .onChange(of: windowState.commandPalettePrefilledText) { _, newValue in
+            if isActiveWindow && windowState.isMiniCommandPaletteVisible {
+                text = newValue
+            }
+        }
+        .onChange(of: browserManager.currentProfile?.id) { _, _ in
+            if isActiveWindow && windowState.isMiniCommandPaletteVisible {
+                searchManager.updateProfileContext()
+                searchManager.clearSuggestions()
+            }
+        }
+    }
+
+    private func inputRow(symbolName: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: symbolName)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(AppColors.textPrimary)
+
+            TextField("Search or enter address", text: $text)
+                .textFieldStyle(.plain)
+                .font(.system(size: 15, weight: .regular))
+                .foregroundStyle(AppColors.textPrimary)
+                .focused($isSearchFocused)
+                .onKeyPress(.return) {
+                    handleReturn()
+                    return .handled
+                }
+                .onKeyPress(.upArrow) {
+                    navigateSuggestions(direction: -1)
+                    return .handled
+                }
+                .onKeyPress(.downArrow) {
+                    navigateSuggestions(direction: 1)
+                    return .handled
+                }
+                .onChange(of: text) { _, newValue in
+                    selectedSuggestionIndex = -1
+                    searchManager.searchSuggestions(for: newValue)
+                    if windowState.commandPalettePrefilledText != newValue {
+                        windowState.commandPalettePrefilledText = newValue
+                    }
+                }
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 12)
+    }
+
+    @ViewBuilder
+    private func separatorIfNeeded(hasSuggestions: Bool) -> some View {
+        if hasSuggestions {
+            RoundedRectangle(cornerRadius: 100)
+                .fill(Color.white.opacity(0.35))
+                .frame(height: 1)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+        }
+    }
+
+    @ViewBuilder
+    private func suggestionsListView(suggestions: [SearchManager.SearchSuggestion]) -> some View {
+        if suggestions.isEmpty {
+            EmptyView()
+        } else {
+            LazyVStack(spacing: 2) {
+                ForEach(suggestions.indices, id: \.self) { index in
+                    let suggestion = suggestions[index]
+                    suggestionRow(for: suggestion, isSelected: selectedSuggestionIndex == index)
+                        .padding(6)
+                        .background(selectedSuggestionIndex == index ? gradientColorManager.primaryColor : Color.clear)
+                        .cornerRadius(8)
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundStyle(AppColors.textPrimary)
+                        .contentShape(Rectangle())
+                        .onHover { hovering in
+                            withAnimation(.easeInOut(duration: 0.12)) {
+                                if hovering {
+                                    selectedSuggestionIndex = index
+                                } else if selectedSuggestionIndex == index {
+                                    selectedSuggestionIndex = -1
+                                }
+                            }
+                        }
+                        .onTapGesture { selectSuggestion(suggestion) }
+                }
+            }
+            .padding(.horizontal, 4)
+            .padding(.vertical, 4)
+            .frame(maxHeight: 240)
         }
     }
 
@@ -166,14 +197,14 @@ struct MiniCommandPaletteView: View {
         case .tab(let existingTab):
             browserManager.selectTab(existingTab, in: windowState)
         case .history(let historyEntry):
-            if browserManager.shouldNavigateCurrentTab && browserManager.currentTab(for: windowState) != nil {
+            if windowState.shouldNavigateCurrentTab && browserManager.currentTab(for: windowState) != nil {
                 browserManager.currentTab(for: windowState)?.loadURL(historyEntry.url.absoluteString)
             } else {
                 browserManager.createNewTab(in: windowState)
                 browserManager.currentTab(for: windowState)?.loadURL(historyEntry.url.absoluteString)
             }
         case .url, .search:
-            if browserManager.shouldNavigateCurrentTab && browserManager.currentTab(for: windowState) != nil {
+            if windowState.shouldNavigateCurrentTab && browserManager.currentTab(for: windowState) != nil {
                 browserManager.currentTab(for: windowState)?.navigateToURL(suggestion.text)
             } else {
                 browserManager.createNewTab(in: windowState)
@@ -183,7 +214,7 @@ struct MiniCommandPaletteView: View {
 
         text = ""
         selectedSuggestionIndex = -1
-        browserManager.isMiniCommandPaletteVisible = false
+        browserManager.hideMiniCommandPalette(for: windowState)
     }
 
     private func navigateSuggestions(direction: Int) {

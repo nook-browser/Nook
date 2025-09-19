@@ -26,13 +26,16 @@ struct PinnedGrid: View {
 
     var body: some View {
         // Use profile-filtered essentials
-        let items: [Tab] = profileId != nil 
-            ? browserManager.tabManager.essentialTabs(for: profileId)
-            : browserManager.tabManager.essentialTabs
+        let effectiveProfileId = profileId ?? windowState.currentProfileId ?? browserManager.currentProfile?.id
+        let items: [Tab] = effectiveProfileId != nil
+            ? browserManager.tabManager.essentialTabs(for: effectiveProfileId)
+            : []
         let colsCount: Int = columnCount(for: width, itemCount: items.count)
         let columns: [GridItem] = makeColumns(count: colsCount)
         // Ora-style DnD: no geometry/boundary computation
         
+        let shouldAnimate = (browserManager.activeWindowState?.id == windowState.id) && !browserManager.isTransitioningProfile
+
         // For embedded use, return proper sized container even when empty to support transitions
         if items.isEmpty {
             return AnyView(
@@ -98,7 +101,11 @@ struct PinnedGrid: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
             // Natural updates; avoid cross-profile transition artifacts
-        })
+        }
+        .animation(shouldAnimate ? .easeInOut(duration: 0.18) : nil, value: colsCount)
+        .animation(shouldAnimate ? .easeInOut(duration: 0.18) : nil, value: items.count)
+        .allowsHitTesting(!browserManager.isTransitioningProfile)
+        )
     }
     
     private func safeTitle(_ tab: Tab) -> String {

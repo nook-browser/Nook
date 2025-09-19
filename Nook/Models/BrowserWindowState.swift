@@ -22,6 +22,9 @@ class BrowserWindowState: ObservableObject {
     /// Currently active space in this window
     var currentSpaceId: UUID?
     
+    /// Currently active profile in this window
+    var currentProfileId: UUID?
+    
     /// Active tab for each space in this window (spaceId -> tabId)
     var activeTabForSpace: [UUID: UUID] = [:]
     
@@ -54,9 +57,18 @@ class BrowserWindowState: ObservableObject {
     
     /// Toast info for this window
     var toastInfo: WindowToastInfo?
+
+    /// Profile switch toast payload for this window
+    var profileSwitchToast: BrowserManager.ProfileSwitchToast?
+
+    /// Presentation flag for the profile switch toast
+    var isShowingProfileSwitchToast: Bool = false
     
     /// Compositor version counter for this window (incremented when tab ownership changes)
     var compositorVersion: Int = 0
+
+    /// Gradient currently displayed for this window's active space
+    var activeGradient: SpaceGradient = .default
     
     init(id: UUID = UUID()) {
         self.id = id
