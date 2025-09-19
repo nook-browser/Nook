@@ -2420,6 +2420,59 @@ extension Tab: WKUIDelegate {
         alert.runModal()
         completionHandler()
     }
+    
+    // MARK: - Full-Screen Video Support
+    @available(macOS 10.15, *)
+    public func webView(
+        _ webView: WKWebView,
+        enterFullScreenForVideoWith completionHandler: @escaping (Bool, Error?) -> Void
+    ) {
+        print("🎬 [Tab] Entering full-screen for video - delegate method called!")
+        
+        // Get the window containing this webView
+        guard let window = webView.window else {
+            print("❌ [Tab] No window found for full-screen")
+            completionHandler(false, NSError(domain: "Tab", code: -1, userInfo: [NSLocalizedDescriptionKey: "No window available for full-screen"]))
+            return
+        }
+        
+        print("🎬 [Tab] Found window: \(window), entering full-screen...")
+        
+        // Enter full-screen mode
+        DispatchQueue.main.async {
+            window.toggleFullScreen(nil)
+            print("🎬 [Tab] Full-screen toggle called")
+        }
+        
+        // Call completion handler immediately - WebKit will handle the actual full-screen transition
+        completionHandler(true, nil)
+    }
+    
+    @available(macOS 10.15, *)
+    public func webView(
+        _ webView: WKWebView,
+        exitFullScreenWith completionHandler: @escaping (Bool, Error?) -> Void
+    ) {
+        print("🎬 [Tab] Exiting full-screen for video - delegate method called!")
+        
+        // Get the window containing this webView
+        guard let window = webView.window else {
+            print("❌ [Tab] No window found for exiting full-screen")
+            completionHandler(false, NSError(domain: "Tab", code: -1, userInfo: [NSLocalizedDescriptionKey: "No window available for exiting full-screen"]))
+            return
+        }
+        
+        print("🎬 [Tab] Found window: \(window), exiting full-screen...")
+        
+        // Exit full-screen mode
+        DispatchQueue.main.async {
+            window.toggleFullScreen(nil)
+            print("🎬 [Tab] Full-screen exit toggle called")
+        }
+        
+        // Call completion handler immediately - WebKit will handle the actual full-screen transition
+        completionHandler(true, nil)
+    }
 }
 
 // MARK: - Find in Page
