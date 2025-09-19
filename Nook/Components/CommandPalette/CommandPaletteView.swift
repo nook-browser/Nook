@@ -21,12 +21,14 @@ struct CommandPaletteView: View {
 
     var body: some View {
         let isDark = colorScheme == .dark
+        let isActiveWindow = browserManager.activeWindowState?.id == windowState.id
+        let isVisible = isActiveWindow && windowState.isCommandPaletteVisible
         
         ZStack {
             Color.black.opacity(0.2)
                 .ignoresSafeArea()
                 .onTapGesture {
-                    browserManager.closeCommandPalette()
+                    browserManager.closeCommandPalette(for: windowState)
                 }
                 .gesture(WindowDragGesture())
 
@@ -67,6 +69,9 @@ struct CommandPaletteView: View {
                                     searchManager.searchSuggestions(
                                         for: newValue
                                     )
+                                    if windowState.commandPalettePrefilledText != newValue {
+                                        windowState.commandPalettePrefilledText = newValue
+                                    }
                                 }
                         }
                         .padding(.vertical, 16)
@@ -113,16 +118,16 @@ struct CommandPaletteView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .allowsHitTesting(browserManager.isCommandPaletteVisible)
-        .opacity(browserManager.isCommandPaletteVisible ? 1.0 : 0.0)
-        .onChange(of: browserManager.isCommandPaletteVisible) { _, newVisible in
-            if newVisible {
+        .allowsHitTesting(isVisible)
+        .opacity(isVisible ? 1.0 : 0.0)
+        .onChange(of: windowState.isCommandPaletteVisible) { _, newVisible in
+            if newVisible && isActiveWindow {
                 searchManager.setTabManager(browserManager.tabManager)
                 searchManager.setHistoryManager(browserManager.historyManager)
                 searchManager.updateProfileContext()
                 
                 // Pre-fill text if provided and select all for easy replacement
-                text = browserManager.commandPalettePrefilledText
+                text = windowState.commandPalettePrefilledText
                 
                 DispatchQueue.main.async {
                     isSearchFocused = true
@@ -140,7 +145,7 @@ struct CommandPaletteView: View {
         }
         // Keep search profile context updated while palette is open
         .onChange(of: browserManager.currentProfile?.id) { _, _ in
-            if browserManager.isCommandPaletteVisible {
+            if windowState.isCommandPaletteVisible {
                 searchManager.updateProfileContext()
                 // Clear suggestions to avoid cross-profile residue
                 searchManager.clearSuggestions()
@@ -148,7 +153,7 @@ struct CommandPaletteView: View {
         }
         .onKeyPress(.escape) {
             DispatchQueue.main.async {
-                browserManager.closeCommandPalette()
+                browserManager.closeCommandPalette(for: windowState)
             }
             return .handled
         }
@@ -160,6 +165,14 @@ struct CommandPaletteView: View {
             }
         }
         .animation(.easeInOut(duration: 0.15), value: selectedSuggestionIndex)
+        .onChange(of: windowState.commandPalettePrefilledText) { _, newValue in
+            if isVisible {
+                text = newValue
+                DispatchQueue.main.async {
+                    isSearchFocused = true
+                }
+            }
+        }
     }
 
     private func isEmoji(_ string: String) -> Bool {
@@ -237,7 +250,7 @@ struct CommandPaletteView: View {
             browserManager.selectTab(existingTab, in: windowState)
             print("Switched to existing tab: \(existingTab.name)")
         case .history(let historyEntry):
-            if browserManager.shouldNavigateCurrentTab && browserManager.currentTab(for: windowState) != nil {
+            if windowState.shouldNavigateCurrentTab && browserManager.currentTab(for: windowState) != nil {
                 // Navigate current tab to history URL
                 browserManager.currentTab(for: windowState)?.loadURL(historyEntry.url.absoluteString)
                 print("Navigated current tab to history URL: \(historyEntry.url)")
@@ -248,7 +261,7 @@ struct CommandPaletteView: View {
                 print("Created new tab from history in window \(windowState.id)")
             }
         case .url, .search:
-            if browserManager.shouldNavigateCurrentTab && browserManager.currentTab(for: windowState) != nil {
+            if windowState.shouldNavigateCurrentTab && browserManager.currentTab(for: windowState) != nil {
                 // Navigate current tab to new URL with proper normalization
                 browserManager.currentTab(for: windowState)?.navigateToURL(suggestion.text)
                 print("Navigated current tab to: \(suggestion.text)")
@@ -259,10 +272,10 @@ struct CommandPaletteView: View {
                 print("Created new tab in window \(windowState.id)")
             }
         }
-        
+
         text = ""
         selectedSuggestionIndex = -1
-        browserManager.closeCommandPalette()
+        browserManager.closeCommandPalette(for: windowState)
     }
 
     private func navigateSuggestions(direction: Int) {

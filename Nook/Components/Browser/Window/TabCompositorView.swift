@@ -157,24 +157,12 @@ class TabCompositorManager: ObservableObject {
     
     private func findTab(by id: UUID) -> Tab? {
         guard let browserManager = browserManager else { return nil }
-        let currentSpacePinned: [Tab] = {
-            if let space = browserManager.tabManager.currentSpace {
-                return browserManager.tabManager.spacePinnedTabs(for: space.id)
-            } else { return [] }
-        }()
-        let allTabs = browserManager.tabManager.essentialTabs + currentSpacePinned + browserManager.tabManager.tabs
-        return allTabs.first { $0.id == id }
+        return browserManager.tabManager.allTabs().first { $0.id == id }
     }
-    
+
     private func findTabByWebView(_ webView: WKWebView) -> Tab? {
         guard let browserManager = browserManager else { return nil }
-        let currentSpacePinned: [Tab] = {
-            if let space = browserManager.tabManager.currentSpace {
-                return browserManager.tabManager.spacePinnedTabs(for: space.id)
-            } else { return [] }
-        }()
-        let allTabs = browserManager.tabManager.essentialTabs + currentSpacePinned + browserManager.tabManager.tabs
-        return allTabs.first { $0.webView === webView }
+        return browserManager.tabManager.allTabs().first { $0.webView === webView }
     }
     
     // MARK: - Public Interface

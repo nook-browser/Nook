@@ -7,14 +7,24 @@ import CoreGraphics
 struct SpaceGradientBackgroundView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var gradientColorManager: GradientColorManager
+    @EnvironmentObject var windowState: BrowserWindowState
+
+    private var isActiveWindow: Bool {
+        browserManager.activeWindowState?.id == windowState.id
+    }
 
     private var gradient: SpaceGradient {
-        gradientColorManager.displayGradient
+        isActiveWindow ? gradientColorManager.displayGradient : windowState.activeGradient
     }
 
     var body: some View {
         ZStack {
-            let useShader: Bool = gradientColorManager.isAnimating ? gradientColorManager.preferBarycentricDuringAnimation : (gradient.nodes.count <= 3)
+            let useShader: Bool = {
+                if isActiveWindow {
+                    return gradientColorManager.isAnimating ? gradientColorManager.preferBarycentricDuringAnimation : (gradient.nodes.count <= 3)
+                }
+                return gradient.nodes.count <= 3
+            }()
             if useShader {
                 // GPU barycentric blend for 1–3 color gradients with smooth transitions
                 BarycentricGradientView(gradient: gradient)
