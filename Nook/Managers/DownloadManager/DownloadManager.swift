@@ -9,6 +9,9 @@ import AppKit
 import Foundation
 import SwiftUI
 import WebKit
+import QuickLook
+import QuickLookThumbnailing
+import UniformTypeIdentifiers
 
 // MARK: - Download Model
 @Observable
@@ -19,13 +22,22 @@ public class Download: Identifiable {
     let suggestedFilename: String
     var destinationURL: URL?
     var progress: Double
-    var state: DownloadState
+    var state: DownloadState {
+        didSet {
+            if state == .completed && oldValue != .completed {
+                Task {
+                    await loadThumbnail()
+                }
+            }
+        }
+    }
     var error: Error?
     var fileSize: Int64?
     var downloadedBytes: Int64
     var icon: NSImage?
     var startDate: Date
     var estimatedTimeRemaining: TimeInterval?
+    var downloadThumbnail: NSImage?
     
     enum DownloadState {
         case pending
@@ -79,32 +91,87 @@ public class Download: Identifiable {
         self.icon = getIconForFile(suggestedFilename)
     }
     
+    @MainActor
+    func loadThumbnail(size: CGSize = CGSize(width: 80, height: 80)) async {
+        guard let destinationURL = destinationURL,
+              FileManager.default.fileExists(atPath: destinationURL.path),
+              downloadThumbnail == nil else {
+            return
+        }
+        
+        print("Loading thumbnail for: \(destinationURL.lastPathComponent)")
+        
+        if shouldGenerateThumbnail(for: destinationURL) {
+            if let thumbnail = await getQuickLookThumbnail(for: destinationURL, size: size) {
+                self.downloadThumbnail = thumbnail
+                print("QuickLook thumbnail loaded for: \(destinationURL.lastPathComponent)")
+                return
+            }
+            print("QuickLook thumbnail failed, falling back to Finder icon for: \(destinationURL.lastPathComponent)")
+        }
+        
+        let finderIcon = NSWorkspace.shared.icon(forFile: destinationURL.path)
+        
+        let targetSize = NSSize(width: size.width, height: size.height)
+        let highResIcon = NSImage(size: targetSize)
+        
+        highResIcon.lockFocus()
+        finderIcon.draw(in: NSRect(origin: .zero, size: targetSize),
+                       from: NSRect(origin: .zero, size: finderIcon.size),
+                       operation: .copy,
+                       fraction: 1.0)
+        highResIcon.unlockFocus()
+        
+        self.downloadThumbnail = highResIcon
+        print("Finder icon loaded for: \(destinationURL.lastPathComponent)")
+    }
+    
+    private func shouldGenerateThumbnail(for fileURL: URL) -> Bool {
+        let fileExtension = fileURL.pathExtension.lowercased()
+        
+        let supportedExtensions: Set<String> = [
+            // Images
+            "jpg", "jpeg", "png", "gif", "bmp", "tiff", "tif", "heic", "webp", "ico", "svg",
+            // Videos
+            "mp4", "mov", "avi", "mkv", "wmv", "flv", "webm", "m4v",
+            // Documents
+            "pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "pages", "numbers", "keynote",
+            // Text files
+            "txt", "rtf", "html", "htm", "md", "swift", "js", "css", "json", "xml",
+            // Audio files
+            "mp3", "m4a", "flac", "aac"
+        ]
+        
+        return supportedExtensions.contains(fileExtension)
+    }
+    
+    private func getQuickLookThumbnail(for fileURL: URL, size: CGSize) async -> NSImage? {
+        let request = QLThumbnailGenerator.Request(
+            fileAt: fileURL,
+            size: size,
+            scale: NSScreen.main?.backingScaleFactor ?? 1.0,
+            representationTypes: .thumbnail
+        )
+        
+        do {
+            let thumbnail = try await QLThumbnailGenerator.shared.generateBestRepresentation(for: request)
+            return thumbnail.nsImage
+        } catch {
+            return nil
+        }
+    }
+    
     private func getIconForFile(_ filename: String) -> NSImage {
         let fileExtension = (filename as NSString).pathExtension.lowercased()
         
-        switch fileExtension {
-        case "pdf":
-            return NSImage(systemSymbolName: "doc.text", accessibilityDescription: nil) ?? NSImage()
-        case "doc", "docx":
-            return NSImage(systemSymbolName: "doc", accessibilityDescription: nil) ?? NSImage()
-        case "xls", "xlsx":
-            return NSImage(systemSymbolName: "tablecells", accessibilityDescription: nil) ?? NSImage()
-        case "ppt", "pptx":
-            return NSImage(systemSymbolName: "chart.bar", accessibilityDescription: nil) ?? NSImage()
-        case "jpg", "jpeg", "png", "gif", "bmp", "tiff":
-            return NSImage(systemSymbolName: "photo", accessibilityDescription: nil) ?? NSImage()
-        case "mp4", "avi", "mov", "wmv", "flv":
-            return NSImage(systemSymbolName: "video", accessibilityDescription: nil) ?? NSImage()
-        case "mp3", "wav", "aac", "flac":
-            return NSImage(systemSymbolName: "music.note", accessibilityDescription: nil) ?? NSImage()
-        case "zip", "rar", "7z", "tar", "gz":
-            return NSImage(systemSymbolName: "archivebox", accessibilityDescription: nil) ?? NSImage()
-        case "txt", "rtf":
-            return NSImage(systemSymbolName: "doc.text", accessibilityDescription: nil) ?? NSImage()
-        case "html", "htm":
-            return NSImage(systemSymbolName: "globe", accessibilityDescription: nil) ?? NSImage()
-        default:
-            return NSImage(systemSymbolName: "doc", accessibilityDescription: nil) ?? NSImage()
+        let possibleTypes = UTType.types(tag: fileExtension,
+                                       tagClass: .filenameExtension,
+                                       conformingTo: nil)
+        
+        if let utType = possibleTypes.first {
+            return NSWorkspace.shared.icon(for: utType)
+        } else {
+            return NSWorkspace.shared.icon(for: .item)
         }
     }
     

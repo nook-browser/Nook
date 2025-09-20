@@ -19,12 +19,12 @@ struct NewTabButton: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "plus")
-                        .font(.system(size: 14))
-                        .frame(width: 20, height: 20)
-                        .foregroundStyle(AppColors.textSecondary)
+                        .font(.system(size: 12))
+                        .frame(width: 12, height: 12)
+                        .foregroundStyle(.white.opacity(0.45))
                     Text("New Tab")
-                        .font(.system(size: 14, weight: .regular))
-                        .foregroundStyle(AppColors.textSecondary)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.45))
                     Spacer()
             }
             .padding(.horizontal, 10)
@@ -46,9 +46,9 @@ struct NewTabButton: View {
     
     private var backgroundColor: Color {
         if windowState.isCommandPaletteVisible {
-            return AppColors.controlBackgroundActive
+            return .white.opacity(0.2)
         } else if isHovering {
-            return AppColors.controlBackgroundHover
+            return .white.opacity(0.1)
         } else {
             return Color.clear
         }

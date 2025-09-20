@@ -20,16 +20,16 @@ struct URLBarView: View {
                             displayURL
                         )
                         .font(.system(size: 12, weight: .medium, design: .default))
-                        .foregroundStyle(AppColors.textPrimary.opacity(0.5))
+                        .foregroundStyle(AppColors.textPrimary.opacity(0.6))
                         .lineLimit(1)
                         .truncationMode(.tail)
                     } else {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 12))
-                            .foregroundStyle(AppColors.textPrimary.opacity(0.5))
+                            .foregroundStyle(AppColors.textPrimary.opacity(0.6))
                         Text("Search or Enter URL...")
                             .font(.system(size: 12, weight: .medium, design: .default))
-                            .foregroundStyle(AppColors.textPrimary.opacity(0.5))
+                            .foregroundStyle(AppColors.textPrimary.opacity(0.6))
                     }
                     
                     Spacer()
@@ -60,8 +60,7 @@ struct URLBarView: View {
         .frame(maxWidth: .infinity, minHeight: 36, maxHeight: 36)
         .background(
             ZStack {
-                BlurEffectView(material: browserManager.settingsManager.currentMaterial, state: .active)
-                (isHovering ? AppColors.controlBackgroundHover : AppColors.inactiveTab)
+                Color.white.opacity(isHovering ? 0.15 : 0.1)
             }
         )
         .clipShape(RoundedRectangle(cornerRadius: 12))

@@ -68,7 +68,6 @@
 		2CC067602E789ECB001D37C6 /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066C72E789ECB001D37C6 /* Utils.swift */; };
 		2CC067612E789ECB001D37C6 /* syn-att.c in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066F72E789ECB001D37C6 /* syn-att.c */; };
 		2CC067622E789ECB001D37C6 /* HistoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066BE2E789ECB001D37C6 /* HistoryManager.swift */; };
-		2CC067632E789ECB001D37C6 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066922E789ECB001D37C6 /* HistoryView.swift */; };
 		2CC067642E789ECB001D37C6 /* WindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066442E789ECB001D37C6 /* WindowView.swift */; };
 		2CC067652E789ECB001D37C6 /* mach_override.c in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066FF2E789ECB001D37C6 /* mach_override.c */; };
 		2CC067662E789ECB001D37C6 /* SidebarResizeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066952E789ECB001D37C6 /* SidebarResizeView.swift */; };
@@ -169,7 +168,6 @@
 		2CC067C52E789ECB001D37C6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2CC067232E789ECB001D37C6 /* Assets.xcassets */; };
 		2CC067C62E789ECB001D37C6 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = 2CC066FD2E789ECB001D37C6 /* .gitignore */; };
 		2CC067C82E789ECB001D37C6 /* Rakefile in Resources */ = {isa = PBXBuildFile; fileRef = 2CC067002E789ECB001D37C6 /* Rakefile */; };
-		2CC067C92E789ECB001D37C6 /* README-URLSchemeHandler.md in Resources */ = {isa = PBXBuildFile; fileRef = 2CC066B72E789ECB001D37C6 /* README-URLSchemeHandler.md */; };
 		2CC067CA2E789ECB001D37C6 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 2CC0670A2E789ECB001D37C6 /* Info.plist */; };
 		2CC067CB2E789ECB001D37C6 /* README.markdown in Resources */ = {isa = PBXBuildFile; fileRef = 2CC067012E789ECB001D37C6 /* README.markdown */; };
 		2CC067CC2E789ECB001D37C6 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 2CC067062E789ECB001D37C6 /* README.md */; };
@@ -255,7 +253,6 @@
 		2CC0668E2E789ECB001D37C6 /* SpaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceView.swift; sourceTree = "<group>"; };
 		2CC0668F2E789ECB001D37C6 /* SplitTabRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitTabRow.swift; sourceTree = "<group>"; };
 		2CC066912E789ECB001D37C6 /* FallbackDropBelowEssentialsModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FallbackDropBelowEssentialsModifier.swift; sourceTree = "<group>"; };
-		2CC066922E789ECB001D37C6 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
 		2CC066932E789ECB001D37C6 /* NewTabButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewTabButton.swift; sourceTree = "<group>"; };
 		2CC066942E789ECB001D37C6 /* SidebarHoverOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarHoverOverlayView.swift; sourceTree = "<group>"; };
 		2CC066952E789ECB001D37C6 /* SidebarResizeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarResizeView.swift; sourceTree = "<group>"; };
@@ -281,7 +278,6 @@
 		2CC066B32E789ECB001D37C6 /* TabDragManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabDragManager.swift; sourceTree = "<group>"; };
 		2CC066B52E789ECB001D37C6 /* ExtensionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionBridge.swift; sourceTree = "<group>"; };
 		2CC066B62E789ECB001D37C6 /* ExtensionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionManager.swift; sourceTree = "<group>"; };
-		2CC066B72E789ECB001D37C6 /* README-URLSchemeHandler.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "README-URLSchemeHandler.md"; sourceTree = "<group>"; };
 		2CC066B92E789ECB001D37C6 /* ExternalMiniWindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalMiniWindowManager.swift; sourceTree = "<group>"; };
 		2CC066BA2E789ECB001D37C6 /* MiniBrowserWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniBrowserWindowView.swift; sourceTree = "<group>"; };
 		2CC066BC2E789ECB001D37C6 /* GradientColorManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GradientColorManager.swift; sourceTree = "<group>"; };
@@ -333,7 +329,6 @@
 		2CC067022E789ECB001D37C6 /* udis86.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = udis86.h; sourceTree = "<group>"; };
 		2CC067042E789ECB001D37C6 /* HTSymbolHook.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HTSymbolHook.h; sourceTree = "<group>"; };
 		2CC067052E789ECB001D37C6 /* HTSymbolHook.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HTSymbolHook.m; sourceTree = "<group>"; };
-		2CC067062E789ECB001D37C6 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		2CC067082E789ECB001D37C6 /* getPage.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = getPage.h; sourceTree = "<group>"; };
 		2CC067092E789ECB001D37C6 /* getPage.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = getPage.c; sourceTree = "<group>"; };
 		2CC0670A2E789ECB001D37C6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -365,6 +360,14 @@
 		7F8340FC2E37F39400674A5D /* Nook.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Nook.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EA35A0AE48F7A45FAD44575D /* AuthenticationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		7F5E6B182E7B2E2500EB56A7 /* Menu */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Menu;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		7F8340F92E37F39400674A5D /* Frameworks */ = {
@@ -589,11 +592,11 @@
 		2CC066992E789ECB001D37C6 /* Sidebar */ = {
 			isa = PBXGroup;
 			children = (
+				7F5E6B182E7B2E2500EB56A7 /* Menu */,
 				2CC066812E789ECB001D37C6 /* NavButtons */,
 				2CC066862E789ECB001D37C6 /* PinnedButtons */,
 				2CC066902E789ECB001D37C6 /* SpaceSection */,
 				2CC066912E789ECB001D37C6 /* FallbackDropBelowEssentialsModifier.swift */,
-				2CC066922E789ECB001D37C6 /* HistoryView.swift */,
 				2CC066932E789ECB001D37C6 /* NewTabButton.swift */,
 				2CC066942E789ECB001D37C6 /* SidebarHoverOverlayView.swift */,
 				2CC066952E789ECB001D37C6 /* SidebarResizeView.swift */,
@@ -713,7 +716,6 @@
 			children = (
 				2CC066B52E789ECB001D37C6 /* ExtensionBridge.swift */,
 				2CC066B62E789ECB001D37C6 /* ExtensionManager.swift */,
-				2CC066B72E789ECB001D37C6 /* README-URLSchemeHandler.md */,
 			);
 			path = ExtensionManager;
 			sourceTree = "<group>";
@@ -979,7 +981,6 @@
 				2CC067032E789ECB001D37C6 /* mach_override */,
 				2CC067042E789ECB001D37C6 /* HTSymbolHook.h */,
 				2CC067052E789ECB001D37C6 /* HTSymbolHook.m */,
-				2CC067062E789ECB001D37C6 /* README.md */,
 			);
 			path = HTSymbolHook;
 			sourceTree = "<group>";
@@ -1105,6 +1106,9 @@
 			);
 			dependencies = (
 			);
+			fileSystemSynchronizedGroups = (
+				7F5E6B182E7B2E2500EB56A7 /* Menu */,
+			);
 			name = Nook;
 			packageProductDependencies = (
 				7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */,
@@ -1158,10 +1162,8 @@
 				2CC067C52E789ECB001D37C6 /* Assets.xcassets in Resources */,
 				2CC067C62E789ECB001D37C6 /* .gitignore in Resources */,
 				2CC067C82E789ECB001D37C6 /* Rakefile in Resources */,
-				2CC067C92E789ECB001D37C6 /* README-URLSchemeHandler.md in Resources */,
 				2CC067CA2E789ECB001D37C6 /* Info.plist in Resources */,
 				2CC067CB2E789ECB001D37C6 /* README.markdown in Resources */,
-				2CC067CC2E789ECB001D37C6 /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1228,7 +1230,6 @@
 				2CC067602E789ECB001D37C6 /* Utils.swift in Sources */,
 				2CC067612E789ECB001D37C6 /* syn-att.c in Sources */,
 				2CC067622E789ECB001D37C6 /* HistoryManager.swift in Sources */,
-				2CC067632E789ECB001D37C6 /* HistoryView.swift in Sources */,
 				2CC067642E789ECB001D37C6 /* WindowView.swift in Sources */,
 				2CC067652E789ECB001D37C6 /* mach_override.c in Sources */,
 				2CC067662E789ECB001D37C6 /* SidebarResizeView.swift in Sources */,
@@ -1470,9 +1471,11 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 9DLM793N9T;
-				ENABLE_APP_SANDBOX = NO;
+				DEVELOPMENT_TEAM = 96M8ZZRJK6;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER = readwrite;
 				ENABLE_HARDENED_RUNTIME = YES;
+        ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER = readwrite;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1514,8 +1517,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 9DLM793N9T;
+				DEVELOPMENT_TEAM = 96M8ZZRJK6;
 				ENABLE_APP_SANDBOX = YES;
+				ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER = readwrite;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = NO;

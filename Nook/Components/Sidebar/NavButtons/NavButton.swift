@@ -34,7 +34,7 @@ struct NavButton: View {
         .background(
             RoundedRectangle(cornerRadius: 6)
                 .fill(isHovering && !disabled ? AppColors.controlBackgroundHover : Color.clear)
-                .frame(width: 24, height: 24) // Fixed 20x20 square
+                .frame(width: 32, height: 32) // Fixed 20x20 square
                 .animation(.easeInOut(duration: 0.15), value: isHovering)
         )
         .onHover { hovering in

@@ -39,7 +39,7 @@ struct SpaceTab: View {
                     tab.favicon
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 20, height: 20)
+                        .frame(width: 16, height: 16)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                         .opacity(tab.isUnloaded ? 0.5 : 1.0)
                     
@@ -54,7 +54,7 @@ struct SpaceTab: View {
                 }
                 if tab.isRenaming {
                     TextField("", text: $tab.editingName)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(tab.isUnloaded ? AppColors.textSecondary : textTab)
                         .textFieldStyle(.plain)
                         .onSubmit {
@@ -75,7 +75,7 @@ struct SpaceTab: View {
                         .focused($isTextFieldFocused)
                 } else {
                     Text(tab.name)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(tab.isUnloaded ? AppColors.textSecondary : textTab)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -110,9 +110,10 @@ struct SpaceTab: View {
                     Button(action: onClose) {
                         Image(systemName: "xmark")
                             .font(.system(size: 12, weight: .heavy))
-                            .foregroundColor(textTab)
-                            .padding(4)
-                            .background(isCloseHovering ? (isCurrentTab ? AppColors.controlBackgroundHoverLight : AppColors.controlBackgroundActive) : Color.clear)                                                   
+                            .foregroundColor(.white.opacity(0.6))
+                            .frame(width: 12, height: 12)
+                            .padding(6)
+                            .background(isCloseHovering ? .white.opacity(0.08) : Color.clear)
                             .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -185,7 +186,6 @@ struct SpaceTab: View {
                 Label("Close Tab", systemImage: "xmark.circle")
             }
         }
-        .shadow(color: isActive ? Color.gray : Color.clear, radius: isActive ? 1 : 0, y: 1)
     }
 
     private var isActive: Bool {
@@ -198,18 +198,18 @@ struct SpaceTab: View {
     
     private var backgroundColor: Color {
         if isCurrentTab {
-            return AppColors.activeTab
+            return AppColors.activeTab.opacity(0.2)
         } else if isHovering {
-            return AppColors.controlBackgroundHover
+            return AppColors.activeTab.opacity(0.1)
         } else {
             return Color.clear
         }
     }
     private var textTab: Color {
         if isCurrentTab {
-            return Color.black
+            return Color.white
         } else {
-            return AppColors.textSecondary
+            return Color.white
         }
     }
 

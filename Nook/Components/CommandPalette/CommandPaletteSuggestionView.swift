@@ -23,8 +23,11 @@ struct CommandPaletteSuggestionView: View {
             (resolvedFavicon ?? favicon)
                 .resizable()
                 .scaledToFit()
-                .frame(width: 14, height: 14)
+                .frame(width: 16, height: 16)
                 .foregroundStyle(.white.opacity(0.2))
+                .padding(6)
+                .background(isSelected ? .white : .clear)
+                .clipShape(RoundedRectangle(cornerRadius: 5))
             if let secondary = secondaryText, !secondary.isEmpty {
                 HStack(spacing: 6) {
                     Text(text)
@@ -48,43 +51,14 @@ struct CommandPaletteSuggestionView: View {
             }
             
             Spacer()
-            
-            if isTabSuggestion {
-                HStack(spacing: 6) {
-                    Text("Switch to Tab")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
-                    
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 8, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
-                }
-            }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
         .frame(maxWidth: .infinity)
-        .background(backgroundColor)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-            
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                isHovered = hovering
-            }
-        }
+        .background(isSelected ? Color(hex: "4148D7") : .clear)
         .onAppear {
             guard let url = historyURL else { return }
             Task { await fetchFavicon(for: url) }
-        }
-    }
-    
-    private var backgroundColor: Color {
-        if isSelected {
-            return Color.white.opacity(0.25)
-        } else if isHovered {
-            return Color.white.opacity(0.15)
-        } else {
-            return Color.clear
         }
     }
     

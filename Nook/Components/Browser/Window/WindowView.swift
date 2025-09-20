@@ -36,6 +36,8 @@ struct WindowView: View {
                     WebsiteLoadingIndicator()
                     WebsiteView()
                 }
+                .padding(.bottom, 8)
+
             }
             // Overlay the resize handle exactly at the sidebar/webview boundary (no visual gap)
             .overlay(alignment: .topLeading) {
@@ -48,9 +50,6 @@ struct WindowView: View {
                         .environmentObject(windowState)
                 }
             }
-            // Keep primary content interactive; background menu only triggers on empty areas
-            .padding(.bottom, 8)
-
             // Mini command palette anchored exactly to URL bar's top-left
             MiniCommandPaletteOverlay()
                 .environmentObject(windowState)
@@ -175,7 +174,6 @@ private struct MiniCommandPaletteOverlay: View {
                 // let width = hasFrame ? barFrame.width : browserManager.sidebarWidth
 
                 MiniCommandPaletteView(
-                    forcedWidth: 400,
                     forcedCornerRadius: 12
                 )
                 .offset(x: anchorX, y: anchorY)

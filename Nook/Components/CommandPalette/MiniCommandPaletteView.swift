@@ -26,6 +26,7 @@ struct MiniCommandPaletteView: View {
     @FocusState private var isSearchFocused: Bool
     @State private var text: String = ""
     @State private var selectedSuggestionIndex: Int = -1
+    @State private var hoveredIndex: Int? = nil
 
     // Will be overridden by overlay to match URL bar width
     var forcedWidth: CGFloat? = nil
@@ -42,13 +43,12 @@ struct MiniCommandPaletteView: View {
             separatorIfNeeded(hasSuggestions: !suggestions.isEmpty)
             suggestionsListView(suggestions: suggestions)
         }
-        .frame(width: forcedWidth ?? 460)
-        .background(isDark ? Color.white.opacity(0.28) : Color.white.opacity(0.85))
-        .background(.thinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: forcedCornerRadius ?? 12))
+        .frame(maxWidth: forcedWidth ?? 720)
+        .background(BlurEffectView(material: .hudWindow, state: .inactive))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(
-            RoundedRectangle(cornerRadius: forcedCornerRadius ?? 12)
-                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.white.opacity(0.2), lineWidth: 1.5)
         )
         .shadow(color: .black.opacity(0.12), radius: 18, x: 0, y: 12)
         .onAppear {
