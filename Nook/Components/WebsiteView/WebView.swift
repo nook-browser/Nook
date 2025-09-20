@@ -199,4 +199,47 @@ extension WebView.Coordinator: WKUIDelegate {
             completionHandler(nil)
         }
     }
+    
+    // MARK: - Full-Screen Video Support
+    @available(macOS 10.15, *)
+    func webView(
+        _ webView: WKWebView,
+        enterFullScreenForVideoWith completionHandler: @escaping (Bool, Error?) -> Void
+    ) {
+        print("🎬 [WebView] Entering full-screen for video")
+        
+        // Get the window containing this webView
+        guard let window = webView.window else {
+            print("❌ [WebView] No window found for full-screen")
+            completionHandler(false, NSError(domain: "WebView", code: -1, userInfo: [NSLocalizedDescriptionKey: "No window available for full-screen"]))
+            return
+        }
+        
+        // Enter full-screen mode
+        window.toggleFullScreen(nil)
+        
+        // For now, assume success - the actual full-screen state will be handled by the window
+        completionHandler(true, nil)
+    }
+    
+    @available(macOS 10.15, *)
+    func webView(
+        _ webView: WKWebView,
+        exitFullScreenWith completionHandler: @escaping (Bool, Error?) -> Void
+    ) {
+        print("🎬 [WebView] Exiting full-screen for video")
+        
+        // Get the window containing this webView
+        guard let window = webView.window else {
+            print("❌ [WebView] No window found for exiting full-screen")
+            completionHandler(false, NSError(domain: "WebView", code: -1, userInfo: [NSLocalizedDescriptionKey: "No window available for exiting full-screen"]))
+            return
+        }
+        
+        // Exit full-screen mode
+        window.toggleFullScreen(nil)
+        
+        // For now, assume success - the actual full-screen state will be handled by the window
+        completionHandler(true, nil)
+    }
 }

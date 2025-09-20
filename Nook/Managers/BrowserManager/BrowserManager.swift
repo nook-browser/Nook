@@ -2017,6 +2017,14 @@ class BrowserManager: ObservableObject {
             
             // CRITICAL: Enable Picture-in-Picture
             configuration.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
+            
+            // CRITICAL: Enable full-screen API support
+            configuration.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
+            configuration.preferences.setValue(true, forKey: "mediaDevicesEnabled")
+            
+            // CRITICAL: Enable HTML5 Fullscreen API
+            configuration.preferences.isElementFullscreenEnabled = true
+            
         }
         
         // Create the new web view
