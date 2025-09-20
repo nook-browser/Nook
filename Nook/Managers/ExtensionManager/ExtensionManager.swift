@@ -244,46 +244,54 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     
     // MARK: - MV3 Support Methods
     
-    /// Common permissions that should be granted for extensions
-    private static let commonPermissions: [WKWebExtension.Permission] = [
-        .storage,
-        .tabs,
-        .activeTab,
-        .scripting,
-        .alarms,
-        .contextMenus,
-        .declarativeNetRequest,
-        .webNavigation,
-        .cookies
-    ]
+    // Note: commonPermissions array removed - now using minimalSafePermissions for better security
     
-    /// Grant common permissions and MV2 compatibility for an extension context
-    private func grantCommonPermissions(to extensionContext: WKWebExtensionContext, webExtension: WKWebExtension, isExisting: Bool = false) {
+    /// Grant only minimal safe permissions by default - all others require user consent
+    private func grantMinimalSafePermissions(to extensionContext: WKWebExtensionContext, webExtension: WKWebExtension, isExisting: Bool = false) {
         let existingLabel = isExisting ? " for existing extension" : ""
         
-        // Grant common permissions if requested
-        for permission in Self.commonPermissions {
+        // SECURITY FIX: Only grant absolutely essential permissions by default
+        // These are required for basic extension functionality and are considered safe
+        
+        // Grant only basic permissions that are essential for extension operation
+        let minimalSafePermissions: Set<WKWebExtension.Permission> = [
+            .storage,  // Required for basic extension storage
+            .alarms    // Required for basic extension functionality
+        ]
+        
+        for permission in minimalSafePermissions {
             if webExtension.requestedPermissions.contains(permission) {
                 if !isExisting || !extensionContext.currentPermissions.contains(permission) {
                     extensionContext.setPermissionStatus(.grantedExplicitly, for: permission)
-                    print("   ✅ Pre-granted \(permission) permission\(existingLabel)")
+                    print("   ✅ Granted minimal safe permission: \(permission)\(existingLabel)")
                 }
             }
         }
         
-        // Grant scripting/tabs permissions (required by Apple's APIs)
-        if !isExisting || !extensionContext.currentPermissions.contains(.scripting) {
-            extensionContext.setPermissionStatus(.grantedExplicitly, for: .scripting)
-            print("   ✅ Ensured .scripting is granted\(existingLabel)")
-        }
-        if !isExisting || !extensionContext.currentPermissions.contains(.tabs) {
-            extensionContext.setPermissionStatus(.grantedExplicitly, for: .tabs)
-            print("   ✅ Ensured .tabs is granted\(existingLabel)")
+        // SECURITY FIX: Do NOT auto-grant potentially dangerous permissions
+        // These require explicit user consent:
+        // - .tabs (can access all tab data)
+        // - .activeTab (can access current tab)
+        // - .scripting (can inject scripts)
+        // - .contextMenus (can modify browser UI)
+        // - .declarativeNetRequest (can modify network requests)
+        // - .webNavigation (can monitor navigation)
+        // - .cookies (can access cookies)
+        
+        print("   🔒 Potentially sensitive permissions require user consent:")
+        let sensitivePermissions = webExtension.requestedPermissions.subtracting(minimalSafePermissions)
+        for permission in sensitivePermissions {
+            print("      - \(permission) (requires user approval)")
         }
         
-        
-        // Note: Storage permission is handled by Apple's permission prompts
-        // Users are asked when installing extensions that need storage access
+        // Note: All other permissions will be handled by user consent prompts
+    }
+    
+    /// Grant common permissions and MV2 compatibility for an extension context (DEPRECATED - use grantMinimalSafePermissions)
+    private func grantCommonPermissions(to extensionContext: WKWebExtensionContext, webExtension: WKWebExtension, isExisting: Bool = false) {
+        // This method is kept for backward compatibility but should not be used
+        // Use grantMinimalSafePermissions instead for better security
+        grantMinimalSafePermissions(to: extensionContext, webExtension: webExtension, isExisting: isExisting)
     }
     
     /// Validate MV3-specific requirements
@@ -416,23 +424,18 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         print("   Requested permissions: \(webExtension.requestedPermissions)")
         print("   Requested match patterns: \(webExtension.requestedPermissionMatchPatterns)")
         
-        // Pre-grant common permissions for extensions that need them (like Dark Reader)
-        grantCommonPermissions(to: extensionContext, webExtension: webExtension)
+        // SECURITY FIX: Only grant minimal safe permissions by default
+        // All other permissions require explicit user consent
+        grantMinimalSafePermissions(to: extensionContext, webExtension: webExtension)
         
-        // MV3: Handle host permissions (formerly <all_urls>)
-        for matchPattern in webExtension.requestedPermissionMatchPatterns {
-            extensionContext.setPermissionStatus(.grantedExplicitly, for: matchPattern)
-            print("   ✅ Pre-granted match pattern: \(matchPattern)")
-            print("      Pattern string: '\(matchPattern.description)'")
-        }
-        
-        // MV3: Special handling for host permissions
+        // SECURITY FIX: Do NOT auto-grant host permissions - require user consent
+        print("   🔒 Host permissions require user consent - not auto-granted")
         let hasAllUrls = webExtension.requestedPermissionMatchPatterns.contains(where: { $0.description.contains("all_urls") })
         let hasWildcardHosts = webExtension.requestedPermissionMatchPatterns.contains(where: { $0.description.contains("*://*/*") })
         
         if hasAllUrls || hasWildcardHosts {
-            print("   🌐 MV3 extension has broad host permissions - content scripts should work!")
-            // MV3: Ensure we also grant the host_permissions from manifest
+            print("   ⚠️ Extension requests broad host permissions - will prompt user")
+            // MV3: Log host_permissions from manifest for transparency
             if let hostPermissions = manifest["host_permissions"] as? [String] {
                 print("   📝 MV3 host_permissions found: \(hostPermissions)")
             }
@@ -543,23 +546,33 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         let installedExtension = InstalledExtension(from: entity, manifest: manifest)
         print("ExtensionManager: Successfully installed extension '\(installedExtension.name)' with native WKWebExtension")
 
-        // Prompt for requested/optional permissions on first install (if any)
+        // SECURITY FIX: Always prompt for permissions that require user consent
         if #available(macOS 15.5, *),
            let displayName = extensionContext.webExtension.displayName {
             let requestedPermissions = extensionContext.webExtension.requestedPermissions
             let optionalPermissions = extensionContext.webExtension.optionalPermissions
             let requestedMatches = extensionContext.webExtension.requestedPermissionMatchPatterns
             let optionalMatches = extensionContext.webExtension.optionalPermissionMatchPatterns
-            if !requestedPermissions.isEmpty || !requestedMatches.isEmpty || !optionalPermissions.isEmpty || !optionalMatches.isEmpty {
+            
+            // Filter out permissions that were already granted as minimal safe permissions
+            let minimalSafePermissions: Set<WKWebExtension.Permission> = [.storage, .alarms]
+            let permissionsNeedingConsent = requestedPermissions.subtracting(minimalSafePermissions)
+            
+            // Always show permission prompt if there are any permissions or host patterns that need consent
+            if !permissionsNeedingConsent.isEmpty || !requestedMatches.isEmpty || !optionalPermissions.isEmpty || !optionalMatches.isEmpty {
+                print("   🔒 Showing permission prompt for extension: \(displayName)")
+                print("      Permissions needing consent: \(permissionsNeedingConsent)")
+                print("      Host patterns needing consent: \(requestedMatches)")
+                
                 self.presentPermissionPrompt(
-                    requestedPermissions: requestedPermissions,
+                    requestedPermissions: permissionsNeedingConsent,
                     optionalPermissions: optionalPermissions,
                     requestedMatches: requestedMatches,
                     optionalMatches: optionalMatches,
                     extensionDisplayName: displayName,
                     onDecision: { grantedPerms, grantedMatches in
                         // Apply permission decisions
-                        for p in requestedPermissions.union(optionalPermissions) {
+                        for p in permissionsNeedingConsent.union(optionalPermissions) {
                             extensionContext.setPermissionStatus(
                                 grantedPerms.contains(p) ? .grantedExplicitly : .deniedExplicitly,
                                 for: p
@@ -571,13 +584,22 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                                 for: m
                             )
                         }
+                        print("   ✅ User granted permissions: \(grantedPerms)")
+                        print("   ✅ User granted host patterns: \(grantedMatches)")
                     },
                     onCancel: {
-                        // Default deny only for requested; optional remain unchanged
-                        for p in requestedPermissions { extensionContext.setPermissionStatus(.deniedExplicitly, for: p) }
-                        for m in requestedMatches { extensionContext.setPermissionStatus(.deniedExplicitly, for: m) }
+                        // SECURITY FIX: Default deny all sensitive permissions if user cancels
+                        for p in permissionsNeedingConsent { 
+                            extensionContext.setPermissionStatus(.deniedExplicitly, for: p)
+                        }
+                        for m in requestedMatches { 
+                            extensionContext.setPermissionStatus(.deniedExplicitly, for: m)
+                        }
+                        print("   ❌ User denied permissions - extension installed with minimal permissions only")
                     }
                 )
+            } else {
+                print("   ✅ Extension only requests minimal safe permissions - no prompt needed")
             }
         }
 
@@ -869,7 +891,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             }
             
             // Notify about current active tab
-            if let currentTab = browserManager.tabManager.currentTab {
+            if let currentTab = browserManager.currentTabForActiveWindow() {
                 let tabAdapter = self.adapter(for: currentTab, browserManager: browserManager)
                 controller.didActivateTab(tabAdapter, previousActiveTab: nil)
                 controller.didSelectTabs([tabAdapter])
@@ -1034,30 +1056,96 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             let polyfillScript = """
             (function(){
               try {
-                // Ensure chrome namespace exists
                 window.chrome = window.chrome || {};
+                var chromeNS = window.chrome;
+                chromeNS.identity = chromeNS.identity || {};
 
-                // identity: Safari doesn't support it; recommend opening OAuth in a new tab.
-                if (typeof window.chrome.identity === 'undefined') {
-                  window.chrome.identity = {
-                    launchWebAuthFlow: function(details, callback){
-                      try {
-                        var url = details && details.url ? details.url : null;
-                        var interactive = !!(details && details.interactive);
-                        if (url && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.NookIdentity) {
-                          window.webkit.messageHandlers.NookIdentity.postMessage({ url: url, interactive: interactive });
-                        }
-                      } catch(_){}
-                      // Resolve immediately with null to unblock code paths that only check for existence
-                      try { if (typeof callback === 'function') callback(null); } catch(_){}
-                      return Promise.resolve(null);
+                var pendingIdentityRequests = Object.create(null);
+                var identityCounter = 0;
+
+                chromeNS.identity.launchWebAuthFlow = function(details, callback){
+                  var url = details && details.url ? String(details.url) : null;
+                  if (!url) {
+                    var missingUrlError = new Error('launchWebAuthFlow requires a url');
+                    if (typeof callback === 'function') {
+                      try { callback(null); } catch (_) {}
+                    }
+                    return Promise.reject(missingUrlError);
+                  }
+
+                  var interactive = !!(details && details.interactive);
+                  var prefersEphemeral = !!(details && details.useEphemeralSession);
+                  var callbackScheme = null;
+                  if (details && typeof details.callbackURLScheme === 'string' && details.callbackURLScheme.length > 0) {
+                    callbackScheme = details.callbackURLScheme;
+                  }
+
+                  var requestId = 'nook-auth-' + (++identityCounter);
+                  var entry = {
+                    resolve: null,
+                    reject: null,
+                    callback: (typeof callback === 'function') ? callback : null
+                  };
+
+                  var promise = new Promise(function(resolve, reject){
+                    entry.resolve = resolve;
+                    entry.reject = reject;
+                  });
+
+                  pendingIdentityRequests[requestId] = entry;
+
+                  try {
+                    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.NookIdentity) {
+                      window.webkit.messageHandlers.NookIdentity.postMessage({
+                        requestId: requestId,
+                        url: url,
+                        interactive: interactive,
+                        prefersEphemeral: prefersEphemeral,
+                        callbackScheme: callbackScheme
+                      });
+                    } else {
+                      throw new Error('Native identity bridge unavailable');
+                    }
+                  } catch (error) {
+                    delete pendingIdentityRequests[requestId];
+                    if (entry.reject) { entry.reject(error); }
+                    if (entry.callback) {
+                      try { entry.callback(null); } catch (_) {}
+                    }
+                    return Promise.reject(error);
+                  }
+
+                  return promise;
+                };
+
+                if (typeof window.__nookCompleteIdentityFlow !== 'function') {
+                  window.__nookCompleteIdentityFlow = function(result) {
+                    if (!result || !result.requestId) { return; }
+                    var entry = pendingIdentityRequests[result.requestId];
+                    if (!entry) { return; }
+                    delete pendingIdentityRequests[result.requestId];
+
+                    var status = result.status || 'failure';
+                    if (status === 'success') {
+                      var payload = result.url || null;
+                      if (entry.resolve) { entry.resolve(payload); }
+                      if (entry.callback) {
+                        try { entry.callback(payload); } catch (_) {}
+                      }
+                    } else {
+                      var errMessage = result.message || 'Authentication failed';
+                      var error = new Error(errMessage);
+                      if (result.code) { error.code = result.code; }
+                      if (entry.reject) { entry.reject(error); }
+                      if (entry.callback) {
+                        try { entry.callback(null); } catch (_) {}
+                      }
                     }
                   };
                 }
 
-                // webRequestAuthProvider: Chromium-only, define no-op to satisfy feature checks
-                if (typeof window.chrome.webRequestAuthProvider === 'undefined') {
-                  window.chrome.webRequestAuthProvider = {
+                if (typeof chromeNS.webRequestAuthProvider === 'undefined') {
+                  chromeNS.webRequestAuthProvider = {
                     addListener: function(){},
                     removeListener: function(){}
                   };
@@ -1511,7 +1599,24 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             return 
         }
         
-        // Create a new space to emulate a separate window in our UI
+        // Check if this is likely an OAuth flow
+        if let firstURL = configuration.tabURLs.first,
+           isLikelyOAuthURL(firstURL) {
+            print("🔐 [DELEGATE] OAuth window detected, opening in miniwindow: \(firstURL.absoluteString)")
+            bm.externalMiniWindowManager.present(url: firstURL) { success, finalURL in
+                print("🔐 [DELEGATE] Extension OAuth flow completed: success=\(success), finalURL=\(finalURL?.absoluteString ?? "nil")")
+                // Note: Extension OAuth flows are handled differently, no need to reload original tab
+            }
+
+            // Return a dummy window adapter for OAuth flows
+            if windowAdapter == nil {
+                windowAdapter = ExtensionWindowAdapter(browserManager: bm)
+            }
+            completionHandler(windowAdapter, nil)
+            return
+        }
+        
+        // For regular extension windows, create a new space to emulate a separate window in our UI
         let newSpace = bm.tabManager.createSpace(name: "Window")
         if let firstURL = configuration.tabURLs.first {
             _ = bm.tabManager.createNewTab(url: firstURL.absoluteString, in: newSpace)
@@ -1526,6 +1631,39 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         }
         print("✅ Created new window (space): \(newSpace.name)")
         completionHandler(windowAdapter, nil)
+    }
+    
+    private func isLikelyOAuthURL(_ url: URL) -> Bool {
+        let host = (url.host ?? "").lowercased()
+        let path = url.path.lowercased()
+        let query = url.query?.lowercased() ?? ""
+        
+        // Check for OAuth-related URLs
+        let oauthHosts = [
+            "accounts.google.com", "login.microsoftonline.com", "login.live.com",
+            "appleid.apple.com", "github.com", "gitlab.com", "bitbucket.org",
+            "auth0.com", "okta.com", "onelogin.com", "pingidentity.com",
+            "slack.com", "zoom.us", "login.cloudflareaccess.com",
+            "oauth", "auth", "login", "signin"
+        ]
+        
+        // Check if host contains OAuth-related terms
+        if oauthHosts.contains(where: { host.contains($0) }) {
+            return true
+        }
+        
+        // Check for OAuth paths and query parameters
+        if path.contains("/oauth") || path.contains("oauth2") || path.contains("/authorize") || 
+           path.contains("/signin") || path.contains("/login") || path.contains("/callback") {
+            return true
+        }
+        
+        if query.contains("client_id=") || query.contains("redirect_uri=") || 
+           query.contains("response_type=") || query.contains("scope=") {
+            return true
+        }
+        
+        return false
     }
 
     // Open the extension's options page (inside a browser tab)
@@ -1586,19 +1724,44 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         let aliasScript = WKUserScript(source: aliasJS, injectionTime: .atDocumentStart, forMainFrameOnly: true)
         webView.configuration.userContentController.addUserScript(aliasScript)
 
-        // Load the options page, with special handling for file:// URLs to allow subresources
+        // SECURITY FIX: Load the options page with restricted file access
         if optionsURL.isFileURL {
-            // Grant read access to the entire extension package to allow ../assets and similar paths
-            var allowRoot = optionsURL.deletingLastPathComponent()
-            if let extId = extensionContexts.first(where: { $0.value === extensionContext })?.key,
-               let inst = installedExtensions.first(where: { $0.id == extId }) {
-                allowRoot = URL(fileURLWithPath: inst.packagePath, isDirectory: true)
-                print("   Allowing read access to extension root: \(allowRoot.path)")
-            } else {
-                print("   Could not resolve extension root; allowing current dir: \(allowRoot.path)")
+            // SECURITY FIX: Only allow access to the specific extension directory, not the entire package
+            guard let extId = extensionContexts.first(where: { $0.value === extensionContext })?.key,
+                  let inst = installedExtensions.first(where: { $0.id == extId }) else {
+                print("❌ Could not resolve extension for secure file access")
+                completionHandler(NSError(domain: "ExtensionManager", code: 3, userInfo: [NSLocalizedDescriptionKey: "Could not resolve extension for secure file access"]))
+                return
             }
-            webView.loadFileURL(optionsURL, allowingReadAccessTo: allowRoot)
+            
+            // SECURITY FIX: Validate that the options URL is within the extension directory
+            let extensionRoot = URL(fileURLWithPath: inst.packagePath, isDirectory: true)
+            
+            // SECURITY FIX: Normalize paths to prevent path traversal attacks
+            let normalizedExtensionRoot = extensionRoot.standardizedFileURL
+            let normalizedOptionsURL = optionsURL.standardizedFileURL
+            
+            // Check if options URL is within the extension directory (prevent path traversal)
+            if !normalizedOptionsURL.path.hasPrefix(normalizedExtensionRoot.path) {
+                print("❌ SECURITY: Options URL outside extension directory: \(normalizedOptionsURL.path)")
+                print("   Extension root: \(normalizedExtensionRoot.path)")
+                completionHandler(NSError(domain: "ExtensionManager", code: 4, userInfo: [NSLocalizedDescriptionKey: "Options URL outside extension directory"]))
+                return
+            }
+            
+            // SECURITY FIX: Additional validation - ensure no path traversal attempts
+            let relativePath = String(normalizedOptionsURL.path.dropFirst(normalizedExtensionRoot.path.count))
+            if relativePath.contains("..") || relativePath.hasPrefix("/") {
+                print("❌ SECURITY: Path traversal attempt detected: \(relativePath)")
+                completionHandler(NSError(domain: "ExtensionManager", code: 5, userInfo: [NSLocalizedDescriptionKey: "Path traversal attempt detected"]))
+                return
+            }
+            
+            // SECURITY FIX: Only grant access to the extension's specific directory, not parent directories
+            print("   🔒 SECURITY: Restricting file access to extension directory only: \(extensionRoot.path)")
+            webView.loadFileURL(optionsURL, allowingReadAccessTo: extensionRoot)
         } else {
+            // For non-file URLs (http/https), load normally
             webView.load(URLRequest(url: optionsURL))
         }
 

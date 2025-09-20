@@ -20,8 +20,9 @@ final class PiPManager: NSObject {
     
     // MARK: - Web Video PiP
     
-    func requestPiP(for tab: Tab) {
-        guard let webView = tab.webView else {
+    func requestPiP(for tab: Tab, webView: WKWebView? = nil) {
+        let targetWebView = webView ?? tab.webView
+        guard let webView = targetWebView else {
             print("[PiP] No webView available")
             return
         }
@@ -80,8 +81,9 @@ final class PiPManager: NSObject {
         }
     }
     
-    func stopPiP(for tab: Tab) {
-        guard let webView = tab.webView else { 
+    func stopPiP(for tab: Tab, webView: WKWebView? = nil) {
+        let targetWebView = webView ?? tab.webView
+        guard let webView = targetWebView else { 
             print("[PiP] No webView available for stopping PiP")
             tab.hasPiPActive = false
             return 

@@ -8,6 +8,7 @@ import SwiftUI
 
 struct SpacesListItem: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     var space: Space
     var isActive: Bool
     var compact: Bool
@@ -16,7 +17,7 @@ struct SpacesListItem: View {
     @FocusState private var emojiFieldFocused: Bool
 
     private var currentSpaceID: UUID? {
-        browserManager.tabManager.currentSpace?.id
+        windowState.currentSpaceId
     }
     
     private var cellSize: CGFloat { compact && !isActive ? 16 : 24 }
@@ -25,7 +26,7 @@ struct SpacesListItem: View {
     
     var body: some View {
         Button {
-            browserManager.tabManager.setActiveSpace(space)
+            browserManager.setActiveSpace(space, in: windowState)
         } label: {
             ZStack {
                 if compact && !isActive {
@@ -77,15 +78,17 @@ struct SpacesListItem: View {
         )
         .contextMenu {
             // Profile assignment
-            let currentName = resolvedProfileName(for: space.profileId) ?? "None"
+            let currentName = resolvedProfileName(for: space.profileId) ?? browserManager.profileManager.profiles.first?.name ?? "Default"
             Text("Current Profile: \(currentName)")
                 .foregroundStyle(.secondary)
             Divider()
             ProfilePickerView(
-                selectedProfileId: Binding(get: { space.profileId }, set: { assignProfile($0) }),
+                selectedProfileId: Binding(
+                    get: { space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID() },
+                    set: { assignProfile($0) }
+                ),
                 onSelect: { _ in },
-                compact: true,
-                showNoneOption: true
+                compact: true
             )
             .environmentObject(browserManager)
 
@@ -113,7 +116,7 @@ struct SpacesListItem: View {
         }
     }
 
-    private func assignProfile(_ id: UUID?) {
+    private func assignProfile(_ id: UUID) {
         browserManager.tabManager.assign(spaceId: space.id, toProfile: id)
     }
 

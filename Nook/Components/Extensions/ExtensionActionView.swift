@@ -28,6 +28,7 @@ struct ExtensionActionView: View {
 struct ExtensionActionButton: View {
     let ext: InstalledExtension
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     
     var body: some View {
         Button(action: {
@@ -59,7 +60,7 @@ struct ExtensionActionButton: View {
         }
         
         print("✅ Calling performAction() - this should trigger the delegate")
-        if let current = browserManager.tabManager.currentTab {
+        if let current = browserManager.currentTab(for: windowState) {
             if let adapter = ExtensionManager.shared.stableAdapter(for: current) {
                 extensionContext.performAction(for: adapter)
             } else {

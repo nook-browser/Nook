@@ -16,6 +16,7 @@ struct PinnedGrid: View {
     let maxColumns: Int = 3
 
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     @State private var draggedItem: UUID? = nil
     
     init(width: CGFloat, profileId: UUID? = nil) {
@@ -25,13 +26,16 @@ struct PinnedGrid: View {
 
     var body: some View {
         // Use profile-filtered essentials
-        let items: [Tab] = profileId != nil 
-            ? browserManager.tabManager.essentialTabs(for: profileId)
-            : browserManager.tabManager.essentialTabs
+        let effectiveProfileId = profileId ?? windowState.currentProfileId ?? browserManager.currentProfile?.id
+        let items: [Tab] = effectiveProfileId != nil
+            ? browserManager.tabManager.essentialTabs(for: effectiveProfileId)
+            : []
         let colsCount: Int = columnCount(for: width, itemCount: items.count)
         let columns: [GridItem] = makeColumns(count: colsCount)
         // Ora-style DnD: no geometry/boundary computation
         
+        let shouldAnimate = (browserManager.activeWindowState?.id == windowState.id) && !browserManager.isTransitioningProfile
+
         // For embedded use, return proper sized container even when empty to support transitions
         if items.isEmpty {
             return AnyView(
@@ -54,7 +58,7 @@ struct PinnedGrid: View {
                 ZStack(alignment: .top) {
                     LazyVGrid(columns: columns, alignment: .center, spacing: rowSpacing) {
                         ForEach(Array(items.enumerated()), id: \.element.id) { index, tab in
-                            let isActive: Bool = (browserManager.tabManager.currentTab?.id == tab.id)
+                            let isActive: Bool = (browserManager.currentTab(for: windowState)?.id == tab.id)
                             let title: String = safeTitle(tab)
 
                             PinnedTile(
@@ -62,11 +66,11 @@ struct PinnedGrid: View {
                                 urlString: tab.url.absoluteString,
                                 icon: tab.favicon,
                                 isActive: isActive,
-                                onActivate: { browserManager.tabManager.setActiveTab(tab) },
+                                onActivate: { browserManager.selectTab(tab, in: windowState) },
                                 onClose: { browserManager.tabManager.removeTab(tab.id) },
                                 onRemovePin: { browserManager.tabManager.unpinTab(tab) },
-                                onSplitRight: { browserManager.splitManager.enterSplit(with: tab, placeOn: .right) },
-                                onSplitLeft: { browserManager.splitManager.enterSplit(with: tab, placeOn: .left) }
+                                onSplitRight: { browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState) },
+                                onSplitLeft: { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) }
                             )
                             .onTabDrag(tab.id, draggedItem: $draggedItem)
                             .opacity(draggedItem == tab.id ? 0.0 : 1.0)
@@ -97,7 +101,11 @@ struct PinnedGrid: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
             // Natural updates; avoid cross-profile transition artifacts
-        })
+        }
+        .animation(shouldAnimate ? .easeInOut(duration: 0.18) : nil, value: colsCount)
+        .animation(shouldAnimate ? .easeInOut(duration: 0.18) : nil, value: items.count)
+        .allowsHitTesting(!browserManager.isTransitioningProfile)
+        )
     }
     
     private func safeTitle(_ tab: Tab) -> String {

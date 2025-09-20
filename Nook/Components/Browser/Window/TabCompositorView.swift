@@ -4,6 +4,7 @@ import WebKit
 
 struct TabCompositorView: NSViewRepresentable {
     let browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
@@ -13,7 +14,7 @@ struct TabCompositorView: NSViewRepresentable {
     }
     
     func updateNSView(_ nsView: NSView, context: Context) {
-        // Update the compositor when tabs change
+        // Update the compositor when tabs change or compositor version changes
         updateCompositor(nsView)
     }
     
@@ -21,26 +22,29 @@ struct TabCompositorView: NSViewRepresentable {
         // Remove all existing webview subviews
         containerView.subviews.forEach { $0.removeFromSuperview() }
         
-        // Add all loaded tabs to the compositor
-        // Include: global pinned, space-pinned for current space, and regular tabs in current space
-        let currentSpacePinned: [Tab] = {
-            if let space = browserManager.tabManager.currentSpace {
-                return browserManager.tabManager.spacePinnedTabs(for: space.id)
-            } else { return [] }
-        }()
-        let allTabs = browserManager.tabManager.essentialTabs + currentSpacePinned + browserManager.tabManager.tabs
-        
-        for tab in allTabs {
-            if let webView = tab.webView {
-                // Only add webviews that are actually loaded
-                webView.frame = containerView.bounds
-                webView.autoresizingMask = [.width, .height]
-                containerView.addSubview(webView)
-                
-                // Hide all webviews except the current one
-                webView.isHidden = tab.id != browserManager.tabManager.currentTab?.id
-            }
+        // Only add the current tab's webView to avoid WKWebView conflicts
+        guard let currentTabId = windowState.currentTabId,
+              let currentTab = browserManager.tabsForDisplay(in: windowState).first(where: { $0.id == currentTabId }),
+              !currentTab.isUnloaded else {
+            return
         }
+        
+        // Create a window-specific web view for this tab
+        let webView = getOrCreateWebView(for: currentTab, in: windowState.id)
+        webView.frame = containerView.bounds
+        webView.autoresizingMask = [.width, .height]
+        containerView.addSubview(webView)
+        webView.isHidden = false
+    }
+    
+    private func getOrCreateWebView(for tab: Tab, in windowId: UUID) -> WKWebView {
+        // Check if we already have a web view for this tab in this window
+        if let existingWebView = browserManager.getWebView(for: tab.id, in: windowId) {
+            return existingWebView
+        }
+        
+        // Create a new web view for this tab in this window
+        return browserManager.createWebView(for: tab.id, in: windowId)
     }
 }
 
@@ -153,52 +157,26 @@ class TabCompositorManager: ObservableObject {
     
     private func findTab(by id: UUID) -> Tab? {
         guard let browserManager = browserManager else { return nil }
-        let currentSpacePinned: [Tab] = {
-            if let space = browserManager.tabManager.currentSpace {
-                return browserManager.tabManager.spacePinnedTabs(for: space.id)
-            } else { return [] }
-        }()
-        let allTabs = browserManager.tabManager.essentialTabs + currentSpacePinned + browserManager.tabManager.tabs
-        return allTabs.first { $0.id == id }
+        return browserManager.tabManager.allTabs().first { $0.id == id }
     }
-    
+
     private func findTabByWebView(_ webView: WKWebView) -> Tab? {
         guard let browserManager = browserManager else { return nil }
-        let currentSpacePinned: [Tab] = {
-            if let space = browserManager.tabManager.currentSpace {
-                return browserManager.tabManager.spacePinnedTabs(for: space.id)
-            } else { return [] }
-        }()
-        let allTabs = browserManager.tabManager.essentialTabs + currentSpacePinned + browserManager.tabManager.tabs
-        return allTabs.first { $0.webView === webView }
+        return browserManager.tabManager.allTabs().first { $0.webView === webView }
     }
     
     // MARK: - Public Interface
     func updateTabVisibility(currentTabId: UUID?) {
-        guard let browserManager = browserManager,
-              let containerView = browserManager.compositorContainerView else { return }
-        
-        let split = browserManager.splitManager
-        let leftId = split.leftTabId
-        let rightId = split.rightTabId
-        let showSplit = split.isSplit && (currentTabId == leftId || currentTabId == rightId)
-
-        func enumerateWebViews(in view: NSView, handler: (WKWebView) -> Void) {
-            for s in view.subviews {
-                if let w = s as? WKWebView { handler(w) }
-                else { enumerateWebViews(in: s, handler: handler) }
-            }
+        guard let browserManager = browserManager else { return }
+        for (windowId, _) in browserManager.compositorContainers() {
+            guard let windowState = browserManager.windowStates[windowId] else { continue }
+            browserManager.refreshCompositor(for: windowState)
         }
-
-        enumerateWebViews(in: containerView) { webView in
-                if let tab = findTabByWebView(webView) {
-                    if showSplit {
-                        webView.isHidden = !(tab.id == leftId || tab.id == rightId)
-                    } else {
-                        webView.isHidden = tab.id != currentTabId
-                    }
-                }
-        }
+    }
+    
+    /// Update tab visibility for a specific window
+    func updateTabVisibility(for windowState: BrowserWindowState) {
+        browserManager?.refreshCompositor(for: windowState)
     }
     
     // MARK: - Dependencies

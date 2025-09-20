@@ -57,6 +57,7 @@ struct SidebarMenu: View {
                     }
                     Spacer()
                 }
+                .padding(.bottom, 8)
 
             }
             .padding(8)

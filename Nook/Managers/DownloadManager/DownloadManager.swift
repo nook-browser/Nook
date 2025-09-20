@@ -350,7 +350,8 @@ private class DownloadDelegate: NSObject, WKDownloadDelegate {
         super.init()
     }
     
-    func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String, completionHandler: @escaping (URL?) -> Void) {
+    // iOS-style API (older) – keep for compatibility where this signature exists
+    public func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String, completionHandler: @escaping (URL?) -> Void) {
         guard let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else {
             completionHandler(nil)
             return
@@ -378,6 +379,68 @@ private class DownloadDelegate: NSObject, WKDownloadDelegate {
         startFileSizeMonitoring()
         
         completionHandler(dest)
+    }
+
+    // macOS 12+/15+ API – WebKit on macOS expects the (URL, Bool) completion to grant a sandbox extension
+    public func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String, completionHandler: @escaping (URL, Bool) -> Void) {
+        let defaultName = suggestedFilename.isEmpty ? "download" : suggestedFilename
+        let cleanName = defaultName.replacingOccurrences(of: "/", with: "_")
+        
+        // Try Downloads folder first
+        if let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first {
+            var dest = downloads.appendingPathComponent(cleanName)
+            let ext = dest.pathExtension
+            let base = dest.deletingPathExtension().lastPathComponent
+            var counter = 1
+            while FileManager.default.fileExists(atPath: dest.path) {
+                let newName = "\(base) (\(counter))" + (ext.isEmpty ? "" : ".\(ext)")
+                dest = downloads.appendingPathComponent(newName)
+                counter += 1
+            }
+            
+            let fileSize = response.expectedContentLength
+            print("Download destination set: \(dest.path) with file size: \(fileSize) bytes")
+            downloadManager?.updateDownloadProgress(self.download.id, progress: 0.0, downloadedBytes: 0, fileSize: fileSize)
+            downloadManager?.updateDownloadState(self.download.id, state: .downloading)
+            downloadManager?.setDownloadDestination(self.download.id, destination: dest)
+            
+            startFileSizeMonitoring()
+            
+            // Do not allow overwrite; we already de-duped above
+            completionHandler(dest, false)
+        } else {
+            // Fallback: use NSSavePanel if Downloads access fails
+            print("Downloads folder access failed, using NSSavePanel fallback")
+            DispatchQueue.main.async {
+                self.showSavePanel(for: download, response: response, suggestedFilename: cleanName, completionHandler: completionHandler)
+            }
+        }
+    }
+    
+    private func showSavePanel(for download: WKDownload, response: URLResponse, suggestedFilename: String, completionHandler: @escaping (URL, Bool) -> Void) {
+        let savePanel = NSSavePanel()
+        savePanel.nameFieldStringValue = suggestedFilename
+        savePanel.allowedContentTypes = [.data] // Allow any file type
+        savePanel.canCreateDirectories = true
+        savePanel.isExtensionHidden = false
+        
+        savePanel.begin { result in
+            if result == .OK, let url = savePanel.url {
+                let fileSize = response.expectedContentLength
+                print("Download destination set via save panel: \(url.path) with file size: \(fileSize) bytes")
+                self.downloadManager?.updateDownloadProgress(self.download.id, progress: 0.0, downloadedBytes: 0, fileSize: fileSize)
+                self.downloadManager?.updateDownloadState(self.download.id, state: .downloading)
+                self.downloadManager?.setDownloadDestination(self.download.id, destination: url)
+                
+                self.startFileSizeMonitoring()
+                
+                completionHandler(url, false)
+            } else {
+                print("Download cancelled by user")
+                self.downloadManager?.updateDownloadState(self.download.id, state: .cancelled)
+                completionHandler(URL(fileURLWithPath: "/tmp/cancelled"), false)
+            }
+        }
     }
     
     private func startProgressSimulation() {
@@ -481,6 +544,16 @@ private class DownloadDelegate: NSObject, WKDownloadDelegate {
     func download(_ download: WKDownload, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
         print("Download received authentication challenge")
         completionHandler(.performDefaultHandling, nil)
+    }
+    
+    public func download(_ download: WKDownload, didFinishDownloadingTo location: URL) {
+        print("🔽 [DownloadManager] Download finished to: \(location.path)")
+        // The download is already handled by downloadDidFinish, but we can add additional logic here if needed
+    }
+    
+    public func download(_ download: WKDownload, didFailWithError error: Error) {
+        print("🔽 [DownloadManager] Download failed: \(error.localizedDescription)")
+        // The download is already handled by the existing didFailWithError method, but we can add additional logic here if needed
     }
 }
 

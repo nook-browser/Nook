@@ -9,12 +9,13 @@ import SwiftUI
 
 struct URLBarView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     @State private var isHovering: Bool = false
 
     var body: some View {
         ZStack {
             HStack(spacing: 8) {
-                    if(browserManager.tabManager.currentTab != nil) {
+                    if let currentTab = browserManager.currentTab(for: windowState) {
                         Text(
                             displayURL
                         )
@@ -34,7 +35,7 @@ struct URLBarView: View {
                     Spacer()
                     
                     // PiP button (show when video content is available or PiP is active)
-                    if let currentTab = browserManager.tabManager.currentTab,
+                    if let currentTab = browserManager.currentTab(for: windowState),
                        (currentTab.hasVideoContent || currentTab.hasPiPActive) {
                         Button(action: {
                             currentTab.requestPictureInPicture()
@@ -86,10 +87,10 @@ struct URLBarView: View {
     }
     
     private var displayURL: String {
-            guard let url = browserManager.tabManager.currentTab?.url else {
+            guard let currentTab = browserManager.currentTab(for: windowState) else {
                 return ""
             }
-            return formatURL(url)
+            return formatURL(currentTab.url)
         }
         
         private func formatURL(_ url: URL) -> String {

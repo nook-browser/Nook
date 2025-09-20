@@ -512,15 +512,17 @@ class TabManager: ObservableObject {
     // MARK: - Space Management
     @discardableResult
     func createSpace(name: String, icon: String = "square.grid.2x2", gradient: SpaceGradient = .default) -> Space {
-        // Prefer the active profile; TODO: add ProfileManager.defaultProfile to guarantee fallback.
-        let resolvedProfileId = browserManager?.currentProfile?.id
-        // Assert during development to surface unexpected nils early
-        assert(resolvedProfileId != nil, "TabManager.createSpace expected a currentProfile; consider deferring creation or adding ProfileManager.defaultProfile")
+        // Always assign to a profile - prefer current profile, fallback to default profile
+        let resolvedProfileId = browserManager?.currentProfile?.id ?? browserManager?.profileManager.profiles.first?.id
+        // Ensure we always have a profile to assign
+        guard let profileId = resolvedProfileId else {
+            fatalError("TabManager.createSpace requires at least one profile to exist")
+        }
         let space = Space(
             name: name,
             icon: icon,
             gradient: gradient,
-            profileId: resolvedProfileId
+            profileId: profileId
         )
         spaces.append(space)
         tabsBySpace[space.id] = []
@@ -547,6 +549,9 @@ class TabManager: ObservableObject {
             currentSpace = spaces.first
         }
         persistSnapshot()
+        
+        // Validate window states after space removal
+        browserManager?.validateWindowStates()
     }
 
     func setActiveSpace(_ space: Space) {
@@ -554,33 +559,11 @@ class TabManager: ObservableObject {
 
         // Edge case: assign space to current profile if missing
         if space.profileId == nil {
-            if let pid = browserManager?.currentProfile?.id {
+            let defaultProfileId = browserManager?.currentProfile?.id ?? browserManager?.profileManager.profiles.first?.id
+            if let pid = defaultProfileId {
                 assign(spaceId: space.id, toProfile: pid)
             } else {
-                print("⚠️ [TabManager] Activating space without profile while currentProfile is nil — deferring assignment")
-            }
-        }
-
-        // Auto-switch profile if the target space belongs to a different profile
-        if let targetProfileId = space.profileId, let bm = browserManager {
-            // Skip scheduling if a switch or transition is already in progress
-            if bm.isTransitioningProfile == true || bm.isSwitchingProfile == true {
-                // Avoid concurrent or nested profile switches
-            } else {
-                let currentProfileId = bm.currentProfile?.id
-                if currentProfileId == nil || currentProfileId != targetProfileId {
-                    if let targetProfile = bm.profileManager.profiles.first(where: { $0.id == targetProfileId }) {
-                        // Remember target space and switch profiles asynchronously
-                        pendingSpaceActivation = space.id
-                        Task { [weak bm] in
-                            await bm?.switchToProfile(targetProfile)
-                        }
-                        // Return early; profile switch will resume activation via handleProfileSwitch
-                        return
-                    } else {
-                        print("⚠️ [TabManager] Target profile not found for space \(space.name)")
-                    }
-                }
+                print("⚠️ [TabManager] No profiles available to assign to space")
             }
         }
 
@@ -594,20 +577,8 @@ class TabManager: ObservableObject {
             prevSpace.activeTabId = prevTab.id
         }
 
-        // Trigger gradient transition before switching space (so we still know previous)
-        if let bm = browserManager {
-            let oldGradient = previousSpace?.gradient
-            let newGradient = space.gradient
-            if let og = oldGradient {
-                if og.visuallyEquals(newGradient) {
-                    bm.gradientColorManager.setImmediate(newGradient)
-                } else {
-                    bm.gradientColorManager.transition(from: og, to: newGradient)
-                }
-            } else {
-                bm.gradientColorManager.setImmediate(newGradient)
-            }
-        }
+        // Trigger gradient transition aware of window contexts
+        browserManager?.refreshGradientsForSpace(space, animate: true)
 
         // Switch to the new space
         currentSpace = space
@@ -745,6 +716,7 @@ class TabManager: ObservableObject {
 
         // Force unload the tab from compositor before removing
         browserManager?.compositorManager.unloadTab(tab)
+        browserManager?.removeAllWebViews(for: tab)
 
         if #available(macOS 15.5, *) {
             ExtensionManager.shared.notifyTabClosed(tab)
@@ -788,6 +760,9 @@ class TabManager: ObservableObject {
         }
 
         persistSnapshot()
+        
+        // Validate window states after tab removal
+        browserManager?.validateWindowStates()
     }
 
     func setActiveTab(_ tab: Tab) {
@@ -808,20 +783,30 @@ class TabManager: ObservableObject {
             cs.activeTabId = tab.id
         }
         
-        // Load the tab in compositor if needed
-        browserManager?.compositorManager.loadTab(tab)
-        
-        // Update tab visibility in compositor
-        browserManager?.compositorManager.updateTabVisibility(currentTabId: tab.id)
-        
-        // Check media state using native WebKit API
-        tab.checkMediaState()
-        if #available(macOS 15.5, *) {
-            ExtensionManager.shared.notifyTabActivated(newTab: tab, previous: previous)
-        }
         persistSnapshot()
     }
     
+    /// Update only the global tab state without triggering UI operations
+    /// Used when BrowserManager.selectTab() has already handled all UI concerns
+    func updateActiveTabState(_ tab: Tab) {
+        guard contains(tab) else {
+            return
+        }
+        currentTab = tab
+        
+        // Save this tab as the active tab for the appropriate space
+        if let sid = tab.spaceId, let space = spaces.first(where: { $0.id == sid }) {
+            // Tab belongs to a specific space (regular or space-pinned)
+            space.activeTabId = tab.id
+            currentSpace = space
+        } else if let cs = currentSpace {
+            // Tab is globally pinned; remember it for the current space too
+            cs.activeTabId = tab.id
+        }
+        
+        // Persist the change
+        persistSnapshot()
+    }
 
     @discardableResult
     func createNewTab(
@@ -838,9 +823,12 @@ class TabManager: ObservableObject {
         
         let targetSpace: Space? = space ?? currentSpace ?? ensureDefaultSpaceIfNeeded()
         // Ensure the target space has a profile assignment; backfill from currentProfile if missing
-        if let ts = targetSpace, ts.profileId == nil, let pid = browserManager?.currentProfile?.id {
-            ts.profileId = pid
-            persistSnapshot()
+        if let ts = targetSpace, ts.profileId == nil {
+            let defaultProfileId = browserManager?.currentProfile?.id ?? browserManager?.profileManager.profiles.first?.id
+            if let pid = defaultProfileId {
+                ts.profileId = pid
+                persistSnapshot()
+            }
         }
         let sid = targetSpace?.id
         
@@ -868,9 +856,12 @@ class TabManager: ObservableObject {
     func createPopupTab(in space: Space? = nil) -> Tab {
         let targetSpace: Space? = space ?? currentSpace ?? ensureDefaultSpaceIfNeeded()
         // Ensure target space has a profile assignment
-        if let ts = targetSpace, ts.profileId == nil, let pid = browserManager?.currentProfile?.id {
-            ts.profileId = pid
-            persistSnapshot()
+        if let ts = targetSpace, ts.profileId == nil {
+            let defaultProfileId = browserManager?.currentProfile?.id ?? browserManager?.profileManager.profiles.first?.id
+            if let pid = defaultProfileId {
+                ts.profileId = pid
+                persistSnapshot()
+            }
         }
         let sid = targetSpace?.id
         let existingTabs = sid.flatMap { tabsBySpace[$0] } ?? []
@@ -1026,11 +1017,16 @@ class TabManager: ObservableObject {
         }
         // If the moved tab is currently part of an active split, dissolve the split.
         // Keep the opposite side focused so the remaining pane stays visible.
-        if let sm = browserManager?.splitManager, sm.isSplit {
-            if sm.leftTabId == tab.id {
-                sm.exitSplit(keep: .right)
-            } else if sm.rightTabId == tab.id {
-                sm.exitSplit(keep: .left)
+        if let sm = browserManager?.splitManager, let bm = browserManager {
+            // Check all windows for split state
+            for (windowId, _) in bm.windowStates {
+                if sm.isSplit(for: windowId) {
+                    if sm.leftTabId(for: windowId) == tab.id {
+                        sm.exitSplit(keep: .right, for: windowId)
+                    } else if sm.rightTabId(for: windowId) == tab.id {
+                        sm.exitSplit(keep: .left, for: windowId)
+                    }
+                }
             }
         }
     }
@@ -1390,15 +1386,16 @@ class TabManager: ObservableObject {
             }
 
             // Ensure all spaces have profile assignments
-            if let dp = browserManager?.currentProfile {
+            let defaultProfileId = browserManager?.currentProfile?.id ?? browserManager?.profileManager.profiles.first?.id
+            if let dp = defaultProfileId {
                 var didAssignProfiles = false
                 for space in spaces where space.profileId == nil {
-                    space.profileId = dp.id
+                    space.profileId = dp
                     didAssignProfiles = true
                 }
                 if didAssignProfiles { persistSnapshot() }
             } else {
-                // TODO: Defer profile assignment until currentProfile becomes available (see _reattachBrowserManager)
+                print("⚠️ [TabManager] No profiles available to assign to spaces")
             }
 
             // Tabs
@@ -1498,6 +1495,13 @@ class TabManager: ObservableObject {
             } else {
                 self.currentTab = allForSelection.first
             }
+            
+            // If no tabs exist, create a default tab with Google.com
+            if self.currentTab == nil {
+                print("🆕 [TabManager] No tabs found, creating default Google tab")
+                let defaultTab = createNewTab(url: "https://www.google.com", in: currentSpace)
+                self.currentTab = defaultTab
+            }
 
             if let ct = self.currentTab { _ = ct.webView }
             print(
@@ -1506,8 +1510,8 @@ class TabManager: ObservableObject {
 
             // Ensure the window background uses the startup space's gradient.
             // Use an immediate set to avoid an initial animation.
-            if let bm = self.browserManager, let g = self.currentSpace?.gradient {
-                bm.gradientColorManager.setImmediate(g)
+            if let bm = self.browserManager, let space = self.currentSpace {
+                bm.refreshGradientsForSpace(space, animate: false)
             }
             // If we assigned default profile to legacy pinned tabs, persist to capture migrations
             if __didAssignDefaultProfile { persistSnapshot() }
@@ -1660,8 +1664,8 @@ extension TabManager {
         }
 
         // After reattaching, ensure gradient matches the restored current space.
-        if let g = self.currentSpace?.gradient {
-            bm.gradientColorManager.setImmediate(g)
+        if let space = self.currentSpace {
+            bm.refreshGradientsForSpace(space, animate: false)
         }
 
         // After reattaching BrowserManager, backfill any missing space.profileId
@@ -1734,8 +1738,9 @@ extension TabManager {
 // MARK: - Profile Assignment Helpers
 extension TabManager {
     fileprivate func reconcileSpaceProfilesIfNeeded() {
-        guard let pid = browserManager?.currentProfile?.id else {
-            // TODO: currentProfile not available yet; try again later when it becomes available.
+        let defaultProfileId = browserManager?.currentProfile?.id ?? browserManager?.profileManager.profiles.first?.id
+        guard let pid = defaultProfileId else {
+            print("⚠️ [TabManager] No profiles available for space reconciliation")
             return
         }
         var didAssign = false
@@ -1776,15 +1781,13 @@ extension TabManager {
 // MARK: - Profile Assignment API
 extension TabManager {
     /// Centralized helper to assign a space to a profile and persist.
-    /// Pass `nil` to clear the assignment.
-    func assign(spaceId: UUID, toProfile profileId: UUID?) {
+    /// Always assigns to a valid profile (no nil assignments allowed).
+    func assign(spaceId: UUID, toProfile profileId: UUID) {
         if let idx = spaces.firstIndex(where: { $0.id == spaceId }) {
-            if let pid = profileId {
-                let exists = browserManager?.profileManager.profiles.contains(where: { $0.id == pid }) ?? false
-                if !exists {
-                    print("⚠️ [TabManager] Attempted to assign space to unknown profile: \(pid)")
-                    return
-                }
+            let exists = browserManager?.profileManager.profiles.contains(where: { $0.id == profileId }) ?? false
+            if !exists {
+                print("⚠️ [TabManager] Attempted to assign space to unknown profile: \(profileId)")
+                return
             }
             spaces[idx].profileId = profileId
             if currentSpace?.id == spaceId {

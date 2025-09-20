@@ -268,13 +268,10 @@ struct ProfilesSettingsView: View {
             ) {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        NookButton(
-                            text: "Create Profile",
-                            iconName: "plus",
-                            variant: .primary
-                        ) {
-                            showCreateDialog()
+                        Button(action: showCreateDialog) {
+                            Label("Create Profile", systemImage: "plus")
                         }
+                        .buttonStyle(.borderedProminent)
                         .accessibilityLabel("Create Profile")
                         .accessibilityHint(
                             "Open dialog to create a new profile"
@@ -341,20 +338,16 @@ struct ProfilesSettingsView: View {
 
                 // Export / Import actions (placeholders)
                 HStack(spacing: 8) {
-                    NookButton(
-                        text: "Export Current Profile",
-                        iconName: "square.and.arrow.up"
-                    ) {
-                        showExportPlaceholder()
+                    Button(action: showExportPlaceholder) {
+                        Label("Export Current Profile", systemImage: "square.and.arrow.up")
                     }
+                    .buttonStyle(.bordered)
                     .accessibilityLabel("Export current profile")
-
-                    NookButton(
-                        text: "Import Profile",
-                        iconName: "square.and.arrow.down"
-                    ) {
-                        showImportPlaceholder()
+                    
+                    Button(action: showImportPlaceholder) {
+                        Label("Import Profile", systemImage: "square.and.arrow.down")
                     }
+                    .buttonStyle(.bordered)
                     .accessibilityLabel("Import profile")
 
                     Spacer()
@@ -369,33 +362,23 @@ struct ProfilesSettingsView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     // Bulk actions
                     HStack(spacing: 8) {
-                        NookButton(
-                            text: "Assign All to Current Profile",
-                            iconName: "checkmark.circle"
-                        ) {
-                            assignAllSpacesToCurrentProfile()
+                        Button(action: assignAllSpacesToCurrentProfile) {
+                            Label("Assign All to Current Profile", systemImage: "checkmark.circle")
                         }
-                        .accessibilityLabel(
-                            "Assign all spaces to current profile"
-                        )
+                        .buttonStyle(.bordered)
+                        .accessibilityLabel("Assign all spaces to current profile")
 
-                        NookButton(
-                            text: "Reset to Default Profile",
-                            iconName: "arrow.uturn.backward"
-                        ) {
-                            resetAllSpaceAssignments()
+                        Button(action: resetAllSpaceAssignments) {
+                            Label("Reset to Default Profile", systemImage: "arrow.uturn.backward")
                         }
+                        .buttonStyle(.bordered)
                         .accessibilityLabel("Reset space assignments to none")
 
-                        NookButton(
-                            text: "Auto-assign by Usage",
-                            iconName: "sparkles"
-                        ) {
-                            showAutoAssignPlaceholder()
+                        Button(action: showAutoAssignPlaceholder) {
+                            Label("Auto-assign by Usage", systemImage: "sparkles")
                         }
-                        .accessibilityLabel(
-                            "Auto assign by usage (placeholder)"
-                        )
+                        .buttonStyle(.bordered)
+                        .accessibilityLabel("Auto assign by usage (placeholder)")
 
                         Spacer()
                     }
@@ -486,9 +469,9 @@ struct ProfilesSettingsView: View {
                     icon: safeIcon
                 )
                 Task { await browserManager.switchToProfile(created) }
-                browserManager.dialogManager.closeDialog()
             },
-            onCancel: { browserManager.dialogManager.closeDialog() }
+            onCancel: { browserManager.dialogManager.closeDialog() },
+            onClose: { browserManager.dialogManager.closeDialog() }
         )
         browserManager.dialogManager.showDialog(dialog)
     }
@@ -626,7 +609,7 @@ struct ProfilesSettingsView: View {
     }
 
     // MARK: - Space assignment helpers and views
-    private func assign(space: Space, to id: UUID?) {
+    private func assign(space: Space, to id: UUID) {
         browserManager.tabManager.assign(spaceId: space.id, toProfile: id)
     }
 
@@ -638,8 +621,9 @@ struct ProfilesSettingsView: View {
     }
 
     private func resetAllSpaceAssignments() {
+        guard let defaultProfileId = browserManager.profileManager.profiles.first?.id else { return }
         for sp in browserManager.tabManager.spaces {
-            browserManager.tabManager.assign(spaceId: sp.id, toProfile: nil)
+            browserManager.tabManager.assign(spaceId: sp.id, toProfile: defaultProfileId)
         }
     }
 
@@ -730,20 +714,15 @@ struct ProfilesSettingsView: View {
                 // Profile picker menu
                 Menu {
                     // Use compact picker inside menu
-                    let binding = Binding<UUID?>(
-                        get: { space.profileId },
+                    let binding = Binding<UUID>(
+                        get: { space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID() },
                         set: { newId in assign(space: space, to: newId) }
                     )
                     Text("Current: \(currentProfileName)")
                         .foregroundStyle(.secondary)
                     Divider()
-                    ProfilePickerView(
-                        selectedProfileId: binding,
-                        onSelect: { _ in },
-                        compact: true,
-                        showNoneOption: true
-                    )
-                    .environmentObject(browserManager)
+                    ProfilePickerView(selectedProfileId: binding, onSelect: { _ in }, compact: true)
+                        .environmentObject(browserManager)
                 } label: {
                     Label("Change", systemImage: "person.crop.circle")
                         .labelStyle(.titleAndIcon)
@@ -763,10 +742,11 @@ struct ProfilesSettingsView: View {
             {
                 return p.name
             }
-            return "No Profile"
+            // If no profile assigned, show the default profile name
+            return browserManager.profileManager.profiles.first?.name ?? "Default"
         }
 
-        private func assign(space: Space, to id: UUID?) {
+        private func assign(space: Space, to id: UUID) {
             browserManager.tabManager.assign(spaceId: space.id, toProfile: id)
         }
 
@@ -794,34 +774,37 @@ private struct MigrationControls: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                NookButton(
-                    text: "Detect Legacy Data",
-                    iconName: "magnifyingglass"
-                ) {
+                Button(action: {
                     Task { @MainActor in
                         let summary =
                             await browserManager.detectLegacySharedData()
                         legacySummary = summary
                         lastDetectionDate = Date()
                     }
+                }) {
+                    Label("Detect Legacy Data", systemImage: "magnifyingglass")
                 }
+                .buttonStyle(.bordered)
                 .accessibilityLabel("Detect Legacy Data")
 
-                NookButton(
-                    text: "Migrate to Current Profile",
-                    iconName: "arrow.down.to.line"
-                ) {
+                Button(action: {
                     browserManager.startMigrationToCurrentProfile()
+                }) {
+                    Label("Migrate to Current Profile", systemImage: "arrow.down.to.line")
                 }
+                .buttonStyle(.bordered)
                 .disabled(browserManager.isMigrationInProgress == true)
                 .accessibilityLabel("Migrate shared data to current profile")
 
-                NookButton(text: "Start Fresh", iconName: "trash") {
+                Button(action: {
                     Task { @MainActor in
                         await browserManager.clearSharedDataAfterMigration()
                         legacySummary = nil
                     }
+                }) {
+                    Label("Start Fresh", systemImage: "trash")
                 }
+                .buttonStyle(.bordered)
                 .tint(.red)
                 .accessibilityLabel(
                     "Clear shared website data without migration"
@@ -903,64 +886,30 @@ private struct MigrationControls: View {
 
             // Export/Import placeholders with profile context
             HStack(spacing: 8) {
-                NookButton(
-                    text: "Export Current Profile",
-                    iconName: "square.and.arrow.up"
-                ) {
+                Button(action: {
                     // Placeholder; future: export WK data + SwiftData snapshot
                     // Reuse existing placeholders for now
                     // showExportPlaceholder() is defined in parent view; keep UI consistent
                     // For now, present a minimal dialog here
-                    let header = AnyView(
-                        DialogHeader(
-                            icon: "square.and.arrow.up",
-                            title: "Export Profile",
-                            subtitle: browserManager.currentProfile?.name ?? ""
-                        )
-                    )
-                    let body = AnyView(
-                        Text("Export is not implemented yet.").font(.body)
-                    )
-                    let footer = AnyView(
-                        DialogFooter(rightButtons: [
-                            DialogButton(text: "OK", variant: .primary) {
-                                browserManager.dialogManager.closeDialog()
-                            }
-                        ])
-                    )
-                    browserManager.dialogManager.showCustomContentDialog(
-                        header: header,
-                        content: body,
-                        footer: footer
-                    )
+                    let header = AnyView(DialogHeader(icon: "square.and.arrow.up", title: "Export Profile", subtitle: browserManager.currentProfile?.name ?? ""))
+                    let body = AnyView(Text("Export is not implemented yet.").font(.body))
+                    let footer = AnyView(DialogFooter(rightButtons: [DialogButton(text: "OK", variant: .primary) { browserManager.dialogManager.closeDialog() }]))
+                    browserManager.dialogManager.showCustomContentDialog(header: header, content: body, footer: footer)
+                }) {
+                    Label("Export Current Profile", systemImage: "square.and.arrow.up")
                 }
-                NookButton(
-                    text: "Import Into Current",
-                    iconName: "square.and.arrow.down"
-                ) {
-                    let header = AnyView(
-                        DialogHeader(
-                            icon: "square.and.arrow.down",
-                            title: "Import Profile",
-                            subtitle: browserManager.currentProfile?.name ?? ""
-                        )
-                    )
-                    let body = AnyView(
-                        Text("Import is not implemented yet.").font(.body)
-                    )
-                    let footer = AnyView(
-                        DialogFooter(rightButtons: [
-                            DialogButton(text: "OK", variant: .primary) {
-                                browserManager.dialogManager.closeDialog()
-                            }
-                        ])
-                    )
-                    browserManager.dialogManager.showCustomContentDialog(
-                        header: header,
-                        content: body,
-                        footer: footer
-                    )
+                .buttonStyle(.bordered)
+                
+                Button(action: {
+                    let header = AnyView(DialogHeader(icon: "square.and.arrow.down", title: "Import Profile", subtitle: browserManager.currentProfile?.name ?? ""))
+                    let body = AnyView(Text("Import is not implemented yet.").font(.body))
+                    let footer = AnyView(DialogFooter(rightButtons: [DialogButton(text: "OK", variant: .primary) { browserManager.dialogManager.closeDialog() }]))
+                    browserManager.dialogManager.showCustomContentDialog(header: header, content: body, footer: footer)
+                }) {
+                    Label("Import Into Current", systemImage: "square.and.arrow.down")
                 }
+                .buttonStyle(.bordered)
+                
                 Spacer()
             }
         }

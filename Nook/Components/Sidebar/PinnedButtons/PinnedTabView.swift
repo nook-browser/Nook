@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct PinnedTabView: View {
     var tabName: String
@@ -23,9 +24,9 @@ struct PinnedTabView: View {
     private let innerPadding: CGFloat = 16
 
     // Stroke overlay tunables
-    private let strokeThickness: CGFloat = 2.0   // ring thickness
+    private let strokeThickness: CGFloat = 2.5   // ring thickness
     private let faviconScale: CGFloat = 9.0      // favicon scale to fit the ring
-    private let faviconBlur: CGFloat = 70.0      // blur applied to favicon
+    private let faviconBlur: CGFloat = 80.0      // blur applied to favicon
 
     var body: some View {
         Button(action: action) {
@@ -72,8 +73,8 @@ struct PinnedTabView: View {
     ) -> some View {
         GeometryReader { proxy in
             let size = proxy.size
-            let outerRect = RoundedRectangle(cornerRadius: corner, style: .continuous)
-            let innerRect = RoundedRectangle(cornerRadius: max(0, corner + 1), style: .continuous)
+            let outerRect = RoundedRectangle(cornerRadius: corner - (thickness), style: .continuous)
+            let innerRect = RoundedRectangle(cornerRadius: max(0, corner - (thickness)), style: .continuous)
 
             ZStack {
                 let ringMask = ZStack {
@@ -104,4 +105,3 @@ struct PinnedTabView: View {
         }
     }
 }
-

@@ -13,68 +13,186 @@ struct SpaceCreationDialog: DialogProtocol {
     @Binding var spaceIcon: String
     let onSave: () -> Void
     let onCancel: () -> Void
+    let onClose: () -> Void
+    
+    @State private var isCreating: Bool = false {
+        didSet {
+            print("📊 SpaceCreationDialog isCreating changed to: \(isCreating)")
+        }
+    }
     
     
     init(
         spaceName: Binding<String>,
         spaceIcon: Binding<String>,
         onSave: @escaping () -> Void,
-        onCancel: @escaping () -> Void
+        onCancel: @escaping () -> Void,
+        onClose: @escaping () -> Void = {}
     ) {
         self._spaceName = spaceName
         self._spaceIcon = spaceIcon
         self.onSave = onSave
         self.onCancel = onCancel
+        self.onClose = onClose
     }
     
     var header: AnyView {
         AnyView(
-            DialogHeader(
-                icon: "folder.badge.plus",
-                title: "Create New Space",
-                subtitle: "Organize your tabs into a new space"
-            )
+            VStack(spacing: 16) {
+                // Icon with modern styling
+                ZStack {
+                    Circle()
+                        .fill(Color.accentColor.opacity(0.1))
+                        .frame(width: 48, height: 48)
+                    
+                    Image(systemName: "folder.badge.plus")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
+                }
+                
+                VStack(spacing: 4) {
+                    Text("Create New Space")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    
+                    Text("Organize your tabs into a new space")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .padding(.top, 8)
         )
     }
     
     var content: AnyView {
         AnyView(
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 20) {
+                // Space Name Section
+                VStack(alignment: .leading, spacing: 10) {
                     Text("Space Name")
-                        .font(.system(size: 14, weight: .medium))
-                    NookTextField(text: $spaceName, placeholder: "Enter space name", variant: .default)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    
+                    NookTextField(
+                        text: $spaceName, 
+                        placeholder: "Enter space name", 
+                        variant: .default,
+                        iconName: "textformat"
+                    )
                 }
                 
-                VStack(alignment: .leading, spacing: 8) {
+                // Space Icon Section
+                VStack(alignment: .leading, spacing: 10) {
                     Text("Space Icon")
-                        .font(.system(size: 14, weight: .medium))
-                    EmojiTextField(text: $spaceIcon)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    
+                    HStack(spacing: 12) {
+                        // Simple emoji picker
+                        SimpleEmojiPicker(text: $spaceIcon)
+                        
+                        Text("Choose an emoji to represent this space")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
                 }
             }
+            .padding(.horizontal, 4)
         )
     }
     
     var footer: AnyView {
         AnyView(
-            DialogFooter(
-                rightButtons: [
-                    DialogButton(
+            HStack(spacing: 12) {
+                Spacer()
+                
+                HStack(spacing: 8) {
+                    NookButton.createButton(
                         text: "Cancel",
                         variant: .secondary,
-                        action: onCancel
-                    ),
-                    DialogButton(
+                        action: onCancel,
+                        keyboardShortcut: .escape
+                    )
+                    
+                    NookButton.animatedCreateButton(
                         text: "Create Space",
                         iconName: "plus",
                         variant: .primary,
-                        action: onSave
+                        action: {
+                            print("🔘 Dialog Create button onSave called")
+                            handleSave()
+                        },
+                        keyboardShortcut: .return
                     )
-                ]
-            )
+                }
+            }
+            .padding(.top, 8)
         )
     }
+    
+    private func handleSave() {
+        print("🚀 SpaceCreationDialog handleSave called")
+        
+        // Call the original onSave immediately
+        print("📞 Calling onSave")
+        onSave()
+        
+        // Wait for 1 second then close the dialog
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            print("🚪 Closing dialog")
+            onClose()
+        }
+    }
 }
+
+// MARK: - Simple Emoji Picker
+
+struct SimpleEmojiPicker: View {
+    @Binding var text: String
+    @State private var isHovered = false
+    
+    private let defaultEmoji = "✨"
+    
+    var body: some View {
+        Button(action: showEmojiPicker) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(isHovered ? Color.accentColor.opacity(0.1) : Color.primary.opacity(0.05))
+                    .frame(width: 44, height: 44)
+                
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(
+                        isHovered ? Color.accentColor.opacity(0.3) : Color.primary.opacity(0.1), 
+                        lineWidth: 1
+                    )
+                    .frame(width: 44, height: 44)
+                
+                Text(text.isEmpty ? defaultEmoji : text)
+                    .font(.system(size: 18))
+            }
+        }
+        .buttonStyle(.plain)
+        .alwaysArrowCursor()
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovered = hovering
+            }
+        }
+    }
+    
+    private func showEmojiPicker() {
+        // This would ideally show a native emoji picker
+        // For now, we'll use the character palette
+        if let window = NSApp.keyWindow {
+            window.makeFirstResponder(nil)
+            NSApp.orderFrontCharacterPalette(nil)
+        }
+    }
+}
+
+// MARK: - Legacy EmojiTextField (kept for compatibility)
 
 struct EmojiTextField: NSViewRepresentable {
     @Binding var text: String
@@ -150,3 +268,4 @@ struct EmojiTextField: NSViewRepresentable {
         }
     }
 }
+

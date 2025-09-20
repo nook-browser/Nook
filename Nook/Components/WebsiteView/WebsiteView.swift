@@ -46,6 +46,7 @@ struct LinkStatusBar: View {
 
 struct WebsiteView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     @EnvironmentObject var splitManager: SplitViewManager
     @State private var hoveredLink: String?
     @State private var isCommandPressed: Bool = false
@@ -54,16 +55,17 @@ struct WebsiteView: View {
     var body: some View {
         ZStack() {
             Group {
-                if let currentTab = browserManager.tabManager.currentTab {
+                if let currentTab = browserManager.currentTab(for: windowState) {
                     GeometryReader { proxy in
                         TabCompositorWrapper(
                             browserManager: browserManager,
                             hoveredLink: $hoveredLink,
                             isCommandPressed: $isCommandPressed,
-                            splitFraction: splitManager.dividerFraction,
-                            isSplit: splitManager.isSplit,
-                            leftId: splitManager.leftTabId,
-                            rightId: splitManager.rightTabId
+                            splitFraction: splitManager.dividerFraction(for: windowState.id),
+                            isSplit: splitManager.isSplit(for: windowState.id),
+                            leftId: splitManager.leftTabId(for: windowState.id),
+                            rightId: splitManager.rightTabId(for: windowState.id),
+                            windowState: windowState
                         )
                         .background(shouldShowSplit ? Color.clear : Color(nsColor: .windowBackgroundColor))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -74,25 +76,27 @@ struct WebsiteView: View {
                                 return 6
                             }
                         }(), style: .continuous))
+                        .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 0)
                         // Divider + pane close overlay
                         .overlay(alignment: .top) {
                             if shouldShowSplit {
                                 SplitControlsOverlay()
                                     .environmentObject(browserManager)
                                     .environmentObject(splitManager)
+                                    .environmentObject(windowState)
                             }
                         }
                         // Restore visual margins around the web content card
                         // - Keep leading flush with the sidebar when visible
                         // - Add a leading margin when the sidebar is hidden
                         .padding(.trailing, 8)
-                        .padding(.leading, browserManager.isSidebarVisible ? 0 : 8)
+                        .padding(.leading, windowState.isSidebarVisible ? 0 : 8)
                     }
                     .contextMenu {
                         // Divider + close buttons overlay when split is active
-                        if splitManager.isSplit {
-                            Button("Exit Split View") { splitManager.exitSplit(keep: .left) }
-                            Button("Swap Sides") { splitManager.swapSides() }
+                        if splitManager.isSplit(for: windowState.id) {
+                            Button("Exit Split View") { splitManager.exitSplit(keep: .left, for: windowState.id) }
+                            Button("Swap Sides") { splitManager.swapSides(for: windowState.id) }
                         }
                     }
                 } else {
@@ -108,7 +112,7 @@ struct WebsiteView: View {
                             .padding(10)
                     }
                     if let assist = browserManager.oauthAssist,
-                       browserManager.tabManager.currentTab?.id == assist.tabId {
+                       browserManager.currentTab(for: windowState)?.id == assist.tabId {
                         OAuthAssistBanner(host: assist.host)
                             .environmentObject(browserManager)
                             .animation(.spring(response: 0.5, dampingFraction: 0.8), value: browserManager.oauthAssist)
@@ -138,15 +142,23 @@ struct TabCompositorWrapper: NSViewRepresentable {
     var isSplit: Bool
     var leftId: UUID?
     var rightId: UUID?
+    let windowState: BrowserWindowState
 
     class Coordinator {
+        weak var browserManager: BrowserManager?
+        let windowState: BrowserWindowState
         var lastIsSplit: Bool = false
         var lastLeftId: UUID? = nil
         var lastRightId: UUID? = nil
         var lastCurrentId: UUID? = nil
         var lastFraction: CGFloat = -1
         var lastSize: CGSize = .zero
+        var lastVersion: Int = -1
         var frameObserver: NSObjectProtocol? = nil
+        init(browserManager: BrowserManager?, windowState: BrowserWindowState) {
+            self.browserManager = browserManager
+            self.windowState = windowState
+        }
         deinit {
             if let token = frameObserver {
                 NotificationCenter.default.removeObserver(token)
@@ -154,7 +166,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
         }
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeCoordinator() -> Coordinator { Coordinator(browserManager: browserManager, windowState: windowState) }
 
     func makeNSView(context: Context) -> NSView {
         let containerView = NSView()
@@ -163,11 +175,11 @@ struct TabCompositorWrapper: NSViewRepresentable {
         containerView.postsFrameChangedNotifications = true
         
         // Store reference to container view in browser manager
-        browserManager.compositorContainerView = containerView
+        browserManager.setCompositorContainerView(containerView, for: windowState.id)
         
         // Install AppKit drag-capture overlay above all webviews
         let overlay = SplitDropCaptureView(frame: containerView.bounds)
-        overlay.autoresizingMask = [.width, .height]
+        overlay.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
         overlay.browserManager = browserManager
         overlay.splitManager = browserManager.splitManager
         overlay.layer?.zPosition = 10_000
@@ -187,7 +199,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
         }
 
         // Set up link hover callbacks for current tab
-        if let currentTab = browserManager.tabManager.currentTab {
+        if let currentTab = browserManager.currentTab(for: windowState) {
             setupHoverCallbacks(for: currentTab)
         }
         
@@ -197,14 +209,16 @@ struct TabCompositorWrapper: NSViewRepresentable {
     func updateNSView(_ nsView: NSView, context: Context) {
         // Only rebuild compositor when meaningful inputs change
         let size = nsView.bounds.size
-        let currentId = browserManager.tabManager.currentTab?.id
+        let currentId = browserManager.currentTab(for: windowState)?.id
+        let compositorVersion = windowState.compositorVersion
         let needsRebuild =
             context.coordinator.lastIsSplit != isSplit ||
             context.coordinator.lastLeftId != leftId ||
             context.coordinator.lastRightId != rightId ||
             context.coordinator.lastCurrentId != currentId ||
             abs(CGFloat(context.coordinator.lastFraction) - CGFloat(splitFraction)) > 0.0001 ||
-            context.coordinator.lastSize != size
+            context.coordinator.lastSize != size ||
+            context.coordinator.lastVersion != compositorVersion
 
         if needsRebuild {
             updateCompositor(nsView)
@@ -214,52 +228,53 @@ struct TabCompositorWrapper: NSViewRepresentable {
             context.coordinator.lastCurrentId = currentId
             context.coordinator.lastFraction = splitFraction
             context.coordinator.lastSize = size
+            context.coordinator.lastVersion = compositorVersion
         }
         
         // Mark current tab as accessed (resets unload timer)
-        if let currentTab = browserManager.tabManager.currentTab {
+        if let currentTab = browserManager.currentTab(for: windowState) {
             browserManager.compositorManager.markTabAccessed(currentTab.id)
             setupHoverCallbacks(for: currentTab)
         }
     }
-    
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.browserManager?.removeCompositorContainerView(for: coordinator.windowState.id)
+    }
+
     private func updateCompositor(_ containerView: NSView) {
         // Remove all existing webview subviews
         // Preserve the last overlay subview if present, then re-add
         let overlay = containerView.subviews.compactMap { $0 as? SplitDropCaptureView }.first
         containerView.subviews.forEach { $0.removeFromSuperview() }
         
-        // Add all loaded tabs to the compositor. If split view is active, show two panes;
+        // Add tabs that should be displayed in this window. If split view is active, show two panes;
         // otherwise show only the current tab.
-        let currentSpacePinned: [Tab] = {
-            if let space = browserManager.tabManager.currentSpace {
-                return browserManager.tabManager.spacePinnedTabs(for: space.id)
-            } else {
-                return []
-            }
-        }()
-        let allTabs = browserManager.tabManager.essentialTabs + currentSpacePinned + browserManager.tabManager.tabs
+        let allTabs = browserManager.tabsForDisplay(in: windowState)
         
         let split = browserManager.splitManager
-        let currentId = browserManager.tabManager.currentTab?.id
-        let isCurrentPane = (currentId != nil) && (currentId == split.leftTabId || currentId == split.rightTabId)
-        if split.isSplit && isCurrentPane {
+        let currentId = browserManager.currentTab(for: windowState)?.id
+        let leftId = split.leftTabId(for: windowState.id)
+        let rightId = split.rightTabId(for: windowState.id)
+        let isCurrentPane = (currentId != nil) && (currentId == leftId || currentId == rightId)
+        if split.isSplit(for: windowState.id) && isCurrentPane {
             // Auto-heal if one side is missing (tab closed etc.), but not during preview
-            if !split.isPreviewActive {
-                let leftResolved = split.resolveTab(split.leftTabId)
-                let rightResolved = split.resolveTab(split.rightTabId)
+            let splitState = split.getSplitState(for: windowState.id)
+            if !splitState.isPreviewActive {
+                let leftResolved = split.resolveTab(leftId)
+                let rightResolved = split.resolveTab(rightId)
                 if leftResolved == nil && rightResolved == nil {
-                    browserManager.splitManager.exitSplit(keep: .left)
+                    browserManager.splitManager.exitSplit(keep: .left, for: windowState.id)
                 } else if leftResolved == nil, let _ = rightResolved {
-                    browserManager.splitManager.exitSplit(keep: .right)
+                    browserManager.splitManager.exitSplit(keep: .right, for: windowState.id)
                 } else if rightResolved == nil, let _ = leftResolved {
-                    browserManager.splitManager.exitSplit(keep: .left)
+                    browserManager.splitManager.exitSplit(keep: .left, for: windowState.id)
                 }
             }
 
             // Compute pane rects with a visible gap
             let gap: CGFloat = 8
-            let fraction = max(split.minFraction, min(split.maxFraction, split.dividerFraction))
+            let fraction = max(split.minFraction, min(split.maxFraction, split.dividerFraction(for: windowState.id)))
             let total = containerView.bounds
             let leftWidthRaw = floor(total.width * fraction)
             let rightWidthRaw = max(0, total.width - leftWidthRaw)
@@ -272,44 +287,45 @@ struct TabCompositorWrapper: NSViewRepresentable {
                                    width: max(1, rightWidthRaw - gap/2),
                                    height: total.height)
 
-            let leftId = split.leftTabId
-            let rightId = split.rightTabId
+            let leftId = split.leftTabId(for: windowState.id)
+            let rightId = split.rightTabId(for: windowState.id)
 
             // Add pane containers with rounded corners and background
-            let activeId = browserManager.tabManager.currentTab?.id
+            let activeId = browserManager.currentTab(for: windowState)?.id
             let accent = browserManager.gradientColorManager.displayGradient.primaryNSColor
             // Resolve pane tabs across ALL tabs (not just current space)
             let allKnownTabs = browserManager.tabManager.allTabs()
 
             if let lId = leftId, let leftTab = allKnownTabs.first(where: { $0.id == lId }) {
                 // Force-create/ensure loaded when visible in split
-                let lWeb = leftTab.activeWebView
+                let lWeb = webView(for: leftTab, windowId: windowState.id)
                 let pane = makePaneContainer(frame: leftRect, isActive: (activeId == lId), accent: accent)
                 containerView.addSubview(pane)
                 lWeb.frame = pane.bounds
-                lWeb.autoresizingMask = [.width, .height]
+                lWeb.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
                 lWeb.isHidden = false
                 pane.addSubview(lWeb)
             }
 
             if let rId = rightId, let rightTab = allKnownTabs.first(where: { $0.id == rId }) {
                 // Force-create/ensure loaded when visible in split
-                let rWeb = rightTab.activeWebView
+                let rWeb = webView(for: rightTab, windowId: windowState.id)
                 let pane = makePaneContainer(frame: rightRect, isActive: (activeId == rId), accent: accent)
                 containerView.addSubview(pane)
                 rWeb.frame = pane.bounds
-                rWeb.autoresizingMask = [.width, .height]
+                rWeb.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
                 rWeb.isHidden = false
                 pane.addSubview(rWeb)
             }
         } else {
             for tab in allTabs {
                 // Only add tabs that are still in the tab manager (not closed)
-                if !tab.isUnloaded, let webView = tab.webView {
+                if !tab.isUnloaded {
+                    let webView = webView(for: tab, windowId: windowState.id)
                     webView.frame = containerView.bounds
-                    webView.autoresizingMask = [.width, .height]
+                    webView.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
                     containerView.addSubview(webView)
-                    webView.isHidden = tab.id != browserManager.tabManager.currentTab?.id
+                    webView.isHidden = tab.id != browserManager.currentTab(for: windowState)?.id
                 }
             }
         }
@@ -317,16 +333,18 @@ struct TabCompositorWrapper: NSViewRepresentable {
         // Re-add overlay on top
         if let overlay = overlay {
             overlay.frame = containerView.bounds
-            overlay.autoresizingMask = [.width, .height]
+            overlay.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
             containerView.addSubview(overlay)
             overlay.layer?.zPosition = 10_000
             overlay.browserManager = browserManager
             overlay.splitManager = browserManager.splitManager
+            overlay.windowId = windowState.id
         } else {
             let newOverlay = SplitDropCaptureView(frame: containerView.bounds)
-            newOverlay.autoresizingMask = [.width, .height]
+            newOverlay.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
             newOverlay.browserManager = browserManager
             newOverlay.splitManager = browserManager.splitManager
+            newOverlay.windowId = windowState.id
             newOverlay.layer?.zPosition = 10_000
             containerView.addSubview(newOverlay)
         }
@@ -348,7 +366,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
         // Allow the pane container to grow/shrink with its superview's size changes.
         // Width is always recomputed on frame changes via our observer above, but this
         // keeps the panes visually in sync during live resize.
-        v.autoresizingMask = [.width, .height]
+        v.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
         return v
     }
     
@@ -370,13 +388,20 @@ struct TabCompositorWrapper: NSViewRepresentable {
             }
         }
     }
+
+    private func webView(for tab: Tab, windowId: UUID) -> WKWebView {
+        if let existing = browserManager.getWebView(for: tab.id, in: windowId) {
+            return existing
+        }
+        return browserManager.createWebView(for: tab.id, in: windowId)
+    }
 }
 
 private extension WebsiteView {
     var shouldShowSplit: Bool {
-        guard splitManager.isSplit else { return false }
-        guard let current = browserManager.tabManager.currentTab?.id else { return false }
-        return current == splitManager.leftTabId || current == splitManager.rightTabId
+        guard splitManager.isSplit(for: windowState.id) else { return false }
+        guard let current = browserManager.currentTab(for: windowState)?.id else { return false }
+        return current == splitManager.leftTabId(for: windowState.id) || current == splitManager.rightTabId(for: windowState.id)
     }
 }
 
@@ -384,6 +409,7 @@ private extension WebsiteView {
 private struct SplitControlsOverlay: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var splitManager: SplitViewManager
+    @EnvironmentObject var windowState: BrowserWindowState
 
     @State private var dragOffset: CGFloat = 0
 
@@ -392,7 +418,7 @@ private struct SplitControlsOverlay: View {
             let totalWidth = geo.size.width
             let totalHeight = geo.size.height
 
-            let x = CGFloat(splitManager.dividerFraction) * max(totalWidth, 1)
+            let x = CGFloat(splitManager.dividerFraction(for: windowState.id)) * max(totalWidth, 1)
             // Divider bar
             ZStack {
                 // Close buttons (small, top corners)
@@ -447,7 +473,7 @@ private struct SplitControlsOverlay: View {
                             .onChanged { value in
                                 let width = max(totalWidth, 1)
                                 let newX = min(max(value.location.x, splitManager.minFraction * width), splitManager.maxFraction * width)
-                                splitManager.setDividerFraction(newX / width)
+                                splitManager.setDividerFraction(newX / width, for: windowState.id)
                             }
                     )
                     .zIndex(1000)
@@ -457,12 +483,12 @@ private struct SplitControlsOverlay: View {
     }
 
     private func closeSide(_ side: SplitViewManager.Side) {
-        let id: UUID? = (side == .left) ? splitManager.leftTabId : splitManager.rightTabId
+        let id: UUID? = (side == .left) ? splitManager.leftTabId(for: windowState.id) : splitManager.rightTabId(for: windowState.id)
         if let id = id {
             browserManager.tabManager.removeTab(id)
         } else {
             // Fallback: just exit split
-            splitManager.exitSplit(keep: side == .left ? .right : .left)
+            splitManager.exitSplit(keep: side == .left ? .right : .left, for: windowState.id)
         }
     }
 }

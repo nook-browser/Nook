@@ -14,6 +14,7 @@ struct SpaceView: View {
     let width: CGFloat
     let isSidebarHovered: Bool
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     @State private var draggedItem: UUID? = nil
     
     let onActivateTab: (Tab) -> Void
@@ -59,8 +60,8 @@ struct SpaceView: View {
                             )
                             .transition(.move(edge: .top).combined(with: .opacity))
                             .contextMenu {
-                                Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right) } label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
-                                Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left) } label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
+                                Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState) } label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
+                                Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) } label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
                                 Divider()
                                 Button { browserManager.tabManager.unpinTabFromSpace(tab) } label: { Label("Unpin from Space", systemImage: "pin.slash") }
                                 Button { onPinTab(tab) } label: { Label("Pin Globally", systemImage: "pin.circle") }
@@ -160,8 +161,8 @@ struct SpaceView: View {
                                             )
                                             .transition(.move(edge: .top).combined(with: .opacity))
                                             .contextMenu {
-                                                Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right) } label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
-                                                Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left) } label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
+                                                Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState) } label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
+                                                Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) } label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
                                                 Divider()
                                                 Button { onMoveTabUp(tab) } label: { Label("Move Up", systemImage: "arrow.up") }
                                                 .disabled(isFirstTab(tab))
@@ -195,8 +196,8 @@ struct SpaceView: View {
                                         )
                                         .transition(.move(edge: .top).combined(with: .opacity))
                                         .contextMenu {
-                                            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right) } label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
-                                            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left) } label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
+                                            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState) } label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
+                                            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) } label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
                                             Divider()
                                             Button { onMoveTabUp(tab) } label: { Label("Move Up", systemImage: "arrow.up") }
                                             .disabled(isFirstTab(tab))

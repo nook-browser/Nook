@@ -9,12 +9,14 @@ import SwiftUI
 
 struct WindowView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     @StateObject private var hoverSidebarManager = HoverSidebarManager()
 
     var body: some View {
         ZStack {
             // Gradient background for the current space (bottom-most layer)
             SpaceGradientBackgroundView()
+                .environmentObject(windowState)
 
             // Attach background context menu to the window background layer
             WindowBackgroundView()
@@ -28,6 +30,7 @@ struct WindowView: View {
             // Main content flush: sidebar touches left edge; webview touches sidebar
             HStack(spacing: 0) {
                 SidebarView()
+                    .environmentObject(windowState)
 
                 VStack(spacing: 0) {
                     WebsiteLoadingIndicator()
@@ -38,23 +41,40 @@ struct WindowView: View {
             }
             // Overlay the resize handle exactly at the sidebar/webview boundary (no visual gap)
             .overlay(alignment: .topLeading) {
-                if browserManager.isSidebarVisible {
+                if windowState.isSidebarVisible {
                     // Position at current sidebar width (flush boundary)
                     SidebarResizeView()
                         .frame(maxHeight: .infinity)
-                        .offset(x: browserManager.sidebarWidth)
+                        .offset(x: windowState.sidebarWidth)
                         .zIndex(1000)
+                        .environmentObject(windowState)
                 }
             }
             // Mini command palette anchored exactly to URL bar's top-left
             MiniCommandPaletteOverlay()
+                .environmentObject(windowState)
 
             // Hover-reveal Sidebar overlay (slides in over web content)
             SidebarHoverOverlayView()
                 .environmentObject(hoverSidebarManager)
+                .environmentObject(windowState)
 
             CommandPaletteView()
             DialogView()
+            
+            // Find bar overlay - centered top bar
+            if browserManager.findManager.isFindBarVisible {
+                VStack {
+                    HStack {
+                        Spacer()
+                        FindBarView(findManager: browserManager.findManager)
+                            .frame(maxWidth: 500)
+                        Spacer()
+                    }
+                    .padding(.top, 20)
+                    Spacer()
+                }
+            }
             
             // (Removed) insertion line overlay; Ora-style DnD uses live reordering
 
@@ -62,11 +82,11 @@ struct WindowView: View {
             VStack {
                 HStack {
                     Spacer()
-                    if browserManager.isShowingProfileSwitchToast, let toast = browserManager.profileSwitchToast {
+                    if windowState.isShowingProfileSwitchToast, let toast = windowState.profileSwitchToast {
                         ProfileSwitchToastView(toast: toast)
-                            .animation(.spring(response: 0.5, dampingFraction: 0.8), value: browserManager.isShowingProfileSwitchToast)
+                            .animation(.spring(response: 0.5, dampingFraction: 0.8), value: windowState.isShowingProfileSwitchToast)
                             .padding(10)
-                            .onTapGesture { browserManager.hideProfileSwitchToast() }
+                            .onTapGesture { browserManager.hideProfileSwitchToast(for: windowState) }
                     }
                 }
                 Spacer()
@@ -77,6 +97,7 @@ struct WindowView: View {
         // Keep BrowserManager aware of URL bar frame in window space
         .onPreferenceChange(URLBarFramePreferenceKey.self) { frame in
             browserManager.urlBarFrame = frame
+            windowState.urlBarFrame = frame
         }
         // Attach hover sidebar manager lifecycle
         .onAppear {
@@ -128,18 +149,22 @@ private struct ProfileSwitchToastView: View {
 // MARK: - Mini Command Palette Overlay (above sidebar and webview)
 private struct MiniCommandPaletteOverlay: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
 
     var body: some View {
+        let isActiveWindow = browserManager.activeWindowState?.id == windowState.id
+        let isVisible = isActiveWindow && windowState.isMiniCommandPaletteVisible && !windowState.isCommandPaletteVisible
+
         ZStack(alignment: .topLeading) {
-            if browserManager.isMiniCommandPaletteVisible && !browserManager.isCommandPaletteVisible {
+            if isVisible {
                 // Click-away hit target
                 Color.clear
                     .contentShape(Rectangle())
                     .ignoresSafeArea()
-                    .onTapGesture { browserManager.isMiniCommandPaletteVisible = false }
+                    .onTapGesture { browserManager.hideMiniCommandPalette(for: windowState) }
 
                 // Use reported URL bar frame when reliable; otherwise compute manual fallback
-                let barFrame = browserManager.urlBarFrame
+                let barFrame = windowState.urlBarFrame
                 let hasFrame = barFrame.width > 1 && barFrame.height > 1
                 // Match sidebar's internal 8pt padding when geometry is unavailable
                 let fallbackX: CGFloat = 8
@@ -155,7 +180,7 @@ private struct MiniCommandPaletteOverlay: View {
                     .zIndex(1)
             }
         }
-        .allowsHitTesting(browserManager.isMiniCommandPaletteVisible)
+        .allowsHitTesting(isVisible)
         .zIndex(999) // ensure above web content
     }
 }
