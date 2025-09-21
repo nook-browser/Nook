@@ -480,6 +480,7 @@ class BrowserManager: ObservableObject {
     var gradientColorManager: GradientColorManager
     var trackingProtectionManager: TrackingProtectionManager
     var findManager: FindManager
+    var themeManager: ThemeManager
 
     var externalMiniWindowManager = ExternalMiniWindowManager()
 
@@ -674,6 +675,7 @@ class BrowserManager: ObservableObject {
         gradientColorManager = GradientColorManager()
         trackingProtectionManager = TrackingProtectionManager()
         findManager = FindManager()
+        themeManager = ThemeManager()
 
         // Phase 2: wire dependencies and perform side effects (safe to use self)
         compositorManager.browserManager = self
