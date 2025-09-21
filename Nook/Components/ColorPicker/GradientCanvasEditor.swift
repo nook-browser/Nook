@@ -11,6 +11,7 @@ struct GradientCanvasEditor: View {
     @Binding var selectedNodeID: UUID?
     var showDitherOverlay: Bool = true
     @EnvironmentObject var gradientColorManager: GradientColorManager
+    @EnvironmentObject var browserManager: BrowserManager
 
     // ephemeral Y-positions (0...1) for visual placement only
     @State private var yPositions: [UUID: CGFloat] = [:]
@@ -56,7 +57,7 @@ struct GradientCanvasEditor: View {
                 // Top mode toggles
                 HStack(spacing: 12) {
                     Button {
-                        NSApp.appearance = NSAppearance(named: .aqua)
+                        browserManager.themeManager.theme = .system
                         selectedMode = 0
 
                     } label: {
@@ -64,7 +65,7 @@ struct GradientCanvasEditor: View {
                     }
                     .buttonStyle(.plain)
                     Button {
-                        NSApp.appearance = NSAppearance(named: .aqua)
+                        browserManager.themeManager.theme = .light
                         selectedMode = 1
                     } label: {
                         modeButton(symbol: "sun.max", idx: 1)
@@ -72,7 +73,7 @@ struct GradientCanvasEditor: View {
                     .buttonStyle(.plain)
                     Button {
                         print("Switched to dark")
-                        NSApp.appearance = NSAppearance(named: .darkAqua)
+                        browserManager.themeManager.theme = .dark
                         selectedMode = 2
                     } label: {
                         modeButton(symbol: "moon.stars", idx: 2)
