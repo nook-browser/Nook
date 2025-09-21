@@ -55,9 +55,30 @@ struct GradientCanvasEditor: View {
 
                 // Top mode toggles
                 HStack(spacing: 12) {
-                    modeButton(symbol: "sparkles", idx: 0)
-                    modeButton(symbol: "sun.max", idx: 1)
-                    modeButton(symbol: "moon.stars", idx: 2)
+                    Button {
+                        NSApp.appearance = NSAppearance(named: .aqua)
+                        selectedMode = 0
+
+                    } label: {
+                        modeButton(symbol: "sparkles", idx: 0)
+                    }
+                    .buttonStyle(.plain)
+                    Button {
+                        NSApp.appearance = NSAppearance(named: .aqua)
+                        selectedMode = 1
+                    } label: {
+                        modeButton(symbol: "sun.max", idx: 1)
+                    }
+                    .buttonStyle(.plain)
+                    Button {
+                        print("Switched to dark")
+                        NSApp.appearance = NSAppearance(named: .darkAqua)
+                        selectedMode = 2
+                    } label: {
+                        modeButton(symbol: "moon.stars", idx: 2)
+                    }
+                    .buttonStyle(.plain)
+
                     Spacer()
                 }
                 .padding(12)
@@ -127,15 +148,6 @@ struct GradientCanvasEditor: View {
                     .fill(selectedMode == idx ? AnyShapeStyle(.thinMaterial) : AnyShapeStyle(Color.clear))
             )
             .foregroundStyle(selectedMode == idx ? .primary : .secondary)
-            .onTapGesture {
-                selectedMode = idx
-                switch idx {
-                case 0: lightness = 0.6 // sparkle
-                case 1: lightness = 0.7 // sun
-                case 2: lightness = 0.45 // moon
-                default: lightness = 0.6
-                }
-            }
     }
 
     private func defaultY(for node: GradientNode) -> CGFloat {
