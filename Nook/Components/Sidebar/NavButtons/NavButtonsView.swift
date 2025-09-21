@@ -17,6 +17,16 @@ struct NavButtonsView: View {
                 NavButton(iconName: "sidebar.left") {
                     browserManager.toggleSidebar(for: windowState)
                 }
+                .helpTooltip {
+                    HStack(spacing: 5) {
+                        Text(windowState.isSidebarVisible ? "Hide Sidebar" : "Lock Sidebar")
+                        HStack(spacing: 2) {
+                            KeyIcon(iconName: "command", type: .symbol)
+                            KeyIcon(iconName: "S", type: .letter)
+                        }
+
+                    }
+                }
             }
             
             Spacer()
@@ -37,13 +47,43 @@ struct NavButtonsView: View {
                         browserManager.currentTab(for: windowState)?.goBack()
                         print("back")
                     }
+                    .helpTooltip {
+                        HStack(spacing: 5) {
+                            Text("Go back")
+                            HStack(spacing: 2) {
+                                KeyIcon(iconName: "command", type: .symbol)
+                                KeyIcon(iconName: "[", type: .letter)
+                            }
+
+                        }
+                    }
                     NavButton(iconName: "arrow.forward", disabled: browserManager.currentTab(for: windowState)?.canGoForward ?? true) {
                         browserManager.currentTab(for: windowState)?.goForward()
                         print("forward")
 
                     }
+                    .helpTooltip {
+                        HStack(spacing: 5) {
+                            Text("Go forward")
+                            HStack(spacing: 2) {
+                                KeyIcon(iconName: "command", type: .symbol)
+                                KeyIcon(iconName: "]", type: .letter)
+                            }
+
+                        }
+                    }
                     RefreshButton() {
                         browserManager.currentTab(for: windowState)?.refresh()
+                    }
+                    .helpTooltip {
+                        HStack(spacing: 5) {
+                            Text("Reload this page")
+                            HStack(spacing: 2) {
+                                KeyIcon(iconName: "command", type: .symbol)
+                                KeyIcon(iconName: "R", type: .letter)
+                            }
+
+                        }
                     }
                 }
             }

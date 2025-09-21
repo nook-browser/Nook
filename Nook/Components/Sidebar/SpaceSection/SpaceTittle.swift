@@ -99,6 +99,11 @@ struct SpaceTittle: View {
                 } label: {
                     Label("Change Icon", systemImage: "face.smiling")
                 }
+                Button {
+                    browserManager.showGradientEditor()
+                } label: {
+                    Label("Edit theme color", systemImage: "paintbrush.pointed")
+                }
                 Button(role: .destructive) {
                     deleteSpace()
                 } label: {
