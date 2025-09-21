@@ -108,7 +108,12 @@ struct WebsiteView: View {
                 HStack {
                     Spacer()
                     if browserManager.didCopyURL {
-                        WebsitePopup()
+                        WebsitePopup(type: .copyCurrentURL)
+                            .animation(.spring(response: 0.5, dampingFraction: 0.8), value: browserManager.didCopyURL)
+                            .padding(10)
+                    }
+                    if browserManager.didCleanUpTabs {
+                        WebsitePopup(type: .cleanUpTabs)
                             .animation(.spring(response: 0.5, dampingFraction: 0.8), value: browserManager.didCopyURL)
                             .padding(10)
                     }

@@ -222,6 +222,9 @@ struct SidebarView: View {
             shouldAnimate ? .easeInOut(duration: 0.18) : nil,
             value: essentialsCount
         )
+        .onHover { state in
+            isSidebarHovered = state
+        }
 
         let finalContent = ZStack {
             if !browserManager.isSidebarMenuVisible {
