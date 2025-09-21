@@ -14,7 +14,7 @@ struct ProfileCreationDialog: DialogProtocol {
     let onSave: () -> Void
     let onCancel: () -> Void
     let onClose: () -> Void
-    
+
     @State private var isCreating: Bool = false {
         didSet {
             print("📊 ProfileCreationDialog isCreating changed to: \(isCreating)")
@@ -29,8 +29,8 @@ struct ProfileCreationDialog: DialogProtocol {
         onCancel: @escaping () -> Void,
         onClose: @escaping () -> Void = {}
     ) {
-        self._profileName = profileName
-        self._profileIcon = profileIcon
+        _profileName = profileName
+        _profileIcon = profileIcon
         self.isNameAvailable = isNameAvailable
         self.onSave = onSave
         self.onCancel = onCancel
@@ -46,17 +46,17 @@ struct ProfileCreationDialog: DialogProtocol {
                         Circle()
                             .fill(Color.accentColor.opacity(0.1))
                             .frame(width: 48, height: 48)
-                        
+
                         Image(systemName: "person.crop.circle.badge.plus")
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(Color.accentColor)
                     }
-                    
+
                     VStack(spacing: 4) {
                         Text("Create New Profile")
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(.primary)
-                        
+
                         Text("Switch between different browsing personas")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.secondary)
@@ -75,26 +75,26 @@ struct ProfileCreationDialog: DialogProtocol {
                     Text("Profile Name")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.primary)
-                    
+
                     NookTextField(
-                        text: $profileName, 
-                        placeholder: "Enter profile name", 
-                        variant: .default, 
+                        text: $profileName,
+                        placeholder: "Enter profile name",
+                        variant: .default,
                         iconName: "person"
                     )
                 }
-                
+
                 // Profile Icon Section
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Profile Icon")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.primary)
-                    
+
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Choose an icon to represent this profile")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(.secondary)
-                        
+
                         SimpleIconPicker(selectedIcon: $profileIcon)
                     }
                 }
@@ -107,7 +107,7 @@ struct ProfileCreationDialog: DialogProtocol {
         AnyView(
             HStack(spacing: 12) {
                 Spacer()
-                
+
                 HStack(spacing: 8) {
                     NookButton.createButton(
                         text: "Cancel",
@@ -115,7 +115,7 @@ struct ProfileCreationDialog: DialogProtocol {
                         action: onCancel,
                         keyboardShortcut: .escape
                     )
-                    
+
                     NookButton(
                         text: "Create Profile  ",
                         iconName: "plus",
@@ -134,14 +134,14 @@ struct ProfileCreationDialog: DialogProtocol {
             .padding(.top, 8)
         )
     }
-    
+
     private func handleSave() {
         print("🚀 ProfileCreationDialog handleSave called")
-        
+
         // Call the original onSave immediately
         print("📞 Calling onSave")
         onSave()
-        
+
         // Wait for 1 second then close the dialog
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             print("🚪 Closing dialog")
@@ -154,39 +154,39 @@ struct ProfileCreationDialog: DialogProtocol {
 
 struct SimpleIconPicker: View {
     @Binding var selectedIcon: String
-    
+
     // 8 key icons for profiles
     private let keyIcons = [
         "person.crop.circle",
-        "person.crop.circle.fill", 
+        "person.crop.circle.fill",
         "person.2.circle",
         "briefcase",
         "house",
-        "sparkles"
+        "sparkles",
     ]
-    
+
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 6)
-    
+
     var body: some View {
         LazyVGrid(columns: columns, spacing: 8) {
             ForEach(keyIcons, id: \.self) { icon in
-                Button(action: { 
+                Button(action: {
                     withAnimation(.easeInOut(duration: 0.15)) {
-                        selectedIcon = icon 
+                        selectedIcon = icon
                     }
                 }) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 10)
                             .fill(selectedIcon == icon ? Color.accentColor.opacity(0.15) : Color.primary.opacity(0.05))
                             .frame(width: 48, height: 48)
-                        
+
                         RoundedRectangle(cornerRadius: 10)
                             .stroke(
-                                selectedIcon == icon ? Color.accentColor : Color.primary.opacity(0.1), 
+                                selectedIcon == icon ? Color.accentColor : Color.primary.opacity(0.1),
                                 lineWidth: selectedIcon == icon ? 2 : 1
                             )
                             .frame(width: 48, height: 48)
-                        
+
                         Image(systemName: icon)
                             .font(.system(size: 18, weight: .medium))
                             .foregroundStyle(selectedIcon == icon ? Color.accentColor : Color.primary)
@@ -259,7 +259,7 @@ struct DialogPreviewContainer: View {
                         print("Create button tapped")
                     }
                 )
-                
+
                 NookButton.createButton(
                     text: "Cancel",
                     variant: .secondary,
@@ -267,7 +267,7 @@ struct DialogPreviewContainer: View {
                         print("Cancel button tapped")
                     }
                 )
-                
+
                 NookButton(
                     text: "Custom Animation",
                     iconName: "star",
@@ -282,6 +282,6 @@ struct DialogPreviewContainer: View {
             .padding()
         }
     }
-    
+
     return ButtonPreview()
 }

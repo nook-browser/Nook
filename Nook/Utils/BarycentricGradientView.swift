@@ -1,9 +1,10 @@
 import SwiftUI
 #if canImport(AppKit)
-import AppKit
+    import AppKit
 #endif
 
 // MARK: - BarycentricGradientView
+
 // GPU shader-based gradient using barycentric interpolation across up to 3 colors.
 // - Supports 1, 2, and 3 color schemes.
 // - Smoothly animates activation between counts (1<->2<->3) in Metal.
@@ -59,7 +60,8 @@ struct BarycentricGradientView: View, Animatable {
                                    size: CGSize,
                                    pA: SIMD2<Double>, pB: SIMD2<Double>, pC: SIMD2<Double>,
                                    previousCount: Int, currentCount: Int, t: Double,
-                                   primaryID: UUID?) -> Shader {
+                                   primaryID: UUID?) -> Shader
+    {
         // Start from location-sorted nodes, then move the active primary to the front
         var nodes = gradient.sortedNodes
         if let pid = primaryID, let idx = nodes.firstIndex(where: { $0.id == pid }) {
@@ -71,13 +73,13 @@ struct BarycentricGradientView: View, Animatable {
         let nB = nodes.count > 1 ? nodes[1] : nA
         let nC = nodes.count > 2 ? nodes[2] : nB
         #if canImport(AppKit)
-        let cA = Color(nsColor: NSColor(Color(hex: nA.colorHex)).usingColorSpace(.sRGB) ?? .black)
-        let cB = Color(nsColor: NSColor(Color(hex: nB.colorHex)).usingColorSpace(.sRGB) ?? .black)
-        let cC = Color(nsColor: NSColor(Color(hex: nC.colorHex)).usingColorSpace(.sRGB) ?? .black)
+            let cA = Color(nsColor: NSColor(Color(hex: nA.colorHex)).usingColorSpace(.sRGB) ?? .black)
+            let cB = Color(nsColor: NSColor(Color(hex: nB.colorHex)).usingColorSpace(.sRGB) ?? .black)
+            let cC = Color(nsColor: NSColor(Color(hex: nC.colorHex)).usingColorSpace(.sRGB) ?? .black)
         #else
-        let cA = Color(hex: nA.colorHex)
-        let cB = Color(hex: nB.colorHex)
-        let cC = Color(hex: nC.colorHex)
+            let cA = Color(hex: nA.colorHex)
+            let cB = Color(hex: nB.colorHex)
+            let cC = Color(hex: nC.colorHex)
         #endif
 
         // Activation profiles for counts 1,2,3 respectively
@@ -102,16 +104,16 @@ struct BarycentricGradientView: View, Animatable {
             .float2(CGSize(width: pA.x, height: pA.y)),
             .float2(CGSize(width: pB.x, height: pB.y)),
             .float2(CGSize(width: pC.x, height: pC.y)),
-            .float(sA), .float(sB), .float(sC)
+            .float(sA), .float(sB), .float(sC),
         ])
     }
 
     private static func stops(_ g: SpaceGradient) -> [Gradient.Stop] {
         var mapped: [Gradient.Stop] = g.sortedNodes.map { node in
             #if canImport(AppKit)
-            let c = Color(nsColor: NSColor(Color(hex: node.colorHex)).usingColorSpace(.sRGB) ?? .black)
+                let c = Color(nsColor: NSColor(Color(hex: node.colorHex)).usingColorSpace(.sRGB) ?? .black)
             #else
-            let c = Color(hex: node.colorHex)
+                let c = Color(hex: node.colorHex)
             #endif
             return Gradient.Stop(color: c, location: CGFloat(node.location))
         }
@@ -119,9 +121,9 @@ struct BarycentricGradientView: View, Animatable {
             let def = SpaceGradient.default
             mapped = def.sortedNodes.map {
                 #if canImport(AppKit)
-                Gradient.Stop(color: Color(nsColor: NSColor(Color(hex: $0.colorHex)).usingColorSpace(.sRGB) ?? .black), location: CGFloat($0.location))
+                    Gradient.Stop(color: Color(nsColor: NSColor(Color(hex: $0.colorHex)).usingColorSpace(.sRGB) ?? .black), location: CGFloat($0.location))
                 #else
-                Gradient.Stop(color: Color(hex: $0.colorHex), location: CGFloat($0.location))
+                    Gradient.Stop(color: Color(hex: $0.colorHex), location: CGFloat($0.location))
                 #endif
             }
         } else if mapped.count == 1 {

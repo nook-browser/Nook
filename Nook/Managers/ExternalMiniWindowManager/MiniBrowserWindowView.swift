@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 struct MiniBrowserWindowView: View {
     let session: MiniWindowSession
@@ -58,7 +58,7 @@ struct MiniBrowserWindowView: View {
 private struct WindowAccessor: NSViewRepresentable {
     let callback: (NSWindow?) -> Void
 
-    func makeNSView(context: Context) -> NSView {
+    func makeNSView(context _: Context) -> NSView {
         let view = NSView()
         view.translatesAutoresizingMaskIntoConstraints = false
         DispatchQueue.main.async {
@@ -67,7 +67,7 @@ private struct WindowAccessor: NSViewRepresentable {
         return view
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {
+    func updateNSView(_ nsView: NSView, context _: Context) {
         DispatchQueue.main.async {
             callback(nsView.window)
         }
@@ -75,15 +75,15 @@ private struct WindowAccessor: NSViewRepresentable {
 }
 
 #if DEBUG
-#Preview {
-    // Provide a mock session for preview
-    let session = MiniWindowSession(
-        url: URL(string: "https://apple.com")!,
-        profile: nil,
-        originName: "Preview",
-        targetSpaceResolver: { "Preview Space" },
-        adoptHandler: { _ in }
-    )
-    MiniBrowserWindowView(session: session, adoptAction: {}, dismissAction: {})
-}
+    #Preview {
+        // Provide a mock session for preview
+        let session = MiniWindowSession(
+            url: URL(string: "https://apple.com")!,
+            profile: nil,
+            originName: "Preview",
+            targetSpaceResolver: { "Preview Space" },
+            adoptHandler: { _ in }
+        )
+        MiniBrowserWindowView(session: session, adoptAction: {}, dismissAction: {})
+    }
 #endif

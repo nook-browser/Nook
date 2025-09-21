@@ -6,8 +6,8 @@
 //
 
 import Foundation
-import WebKit
 import SwiftUI
+import WebKit
 
 @MainActor
 class CookieManager: ObservableObject {
@@ -18,130 +18,131 @@ class CookieManager: ObservableObject {
     @Published private(set) var cookies: [CookieInfo] = []
     @Published private(set) var domainGroups: [DomainCookieGroup] = []
     @Published private(set) var isLoading: Bool = false
-    
+
     init(dataStore: WKWebsiteDataStore? = nil) {
         self.dataStore = dataStore ?? WKWebsiteDataStore.default()
     }
 
     // MARK: - Profile Switching
+
     /// Switch the underlying data store to operate within a different profile boundary.
     /// Clears in-memory state and optionally reloads cookies from the new store.
     func switchDataStore(_ newDataStore: WKWebsiteDataStore, profileId: UUID? = nil, eagerLoad: Bool = true) {
-        self.dataStore = newDataStore
-        self.currentProfileId = profileId
-        self.cookies = []
-        self.domainGroups = []
+        dataStore = newDataStore
+        currentProfileId = profileId
+        cookies = []
+        domainGroups = []
         print("🔁 [CookieManager] Switched data store -> profile: \(profileId?.uuidString ?? "nil"), persistent: \(newDataStore.isPersistent)")
         if eagerLoad {
             Task { await self.loadCookies() }
         }
     }
-    
+
     // MARK: - Public Methods
-    
+
     func loadCookies() async {
         isLoading = true
-        
+
         let httpCookies = await dataStore.httpCookieStore.allCookies()
         let cookieInfos = httpCookies.map { CookieInfo(from: $0) }
-        
-        self.cookies = cookieInfos
-        self.domainGroups = self.groupCookiesByDomain(cookieInfos)
-        self.isLoading = false
+
+        cookies = cookieInfos
+        domainGroups = groupCookiesByDomain(cookieInfos)
+        isLoading = false
     }
-    
+
     func deleteCookie(_ cookie: CookieInfo) async {
         // Find the original HTTPCookie
         let httpCookies = await dataStore.httpCookieStore.allCookies()
-        
-        if let httpCookie = httpCookies.first(where: { 
-            $0.name == cookie.name && $0.domain == cookie.domain && $0.path == cookie.path 
+
+        if let httpCookie = httpCookies.first(where: {
+            $0.name == cookie.name && $0.domain == cookie.domain && $0.path == cookie.path
         }) {
             dataStore.httpCookieStore.delete(httpCookie)
         }
         await loadCookies() // Refresh the list
     }
-    
+
     func deleteCookiesForDomain(_ domain: String) async {
         let httpCookies = await dataStore.httpCookieStore.allCookies()
         let domainCookies = httpCookies.filter { $0.domain == domain || $0.domain == ".\(domain)" }
-        
+
         for cookie in domainCookies {
             dataStore.httpCookieStore.delete(cookie)
         }
-        
+
         await loadCookies() // Refresh the list
     }
-    
+
     func deleteAllCookies() async {
         let httpCookies = await dataStore.httpCookieStore.allCookies()
-        
+
         for cookie in httpCookies {
             dataStore.httpCookieStore.delete(cookie)
         }
-        
+
         await loadCookies() // Refresh the list
     }
-    
+
     func deleteExpiredCookies() async {
         let httpCookies = await dataStore.httpCookieStore.allCookies()
         let expiredCookies = httpCookies.filter { cookie in
             guard let expiresDate = cookie.expiresDate else { return false }
             return expiresDate < Date()
         }
-        
+
         for cookie in expiredCookies {
             dataStore.httpCookieStore.delete(cookie)
         }
-        
+
         await loadCookies() // Refresh the list
     }
-    
+
     // MARK: - Privacy-Compliant Cookie Management
-    
+
     func deleteHighRiskCookies() async {
         let httpCookies = await dataStore.httpCookieStore.allCookies()
         let cookieInfos = httpCookies.map { CookieInfo(from: $0) }
         let highRiskCookies = cookieInfos.filter { $0.privacyRisk == .high }
-        
+
         for cookieInfo in highRiskCookies {
-            if let httpCookie = httpCookies.first(where: { 
-                $0.name == cookieInfo.name && $0.domain == cookieInfo.domain && $0.path == cookieInfo.path 
+            if let httpCookie = httpCookies.first(where: {
+                $0.name == cookieInfo.name && $0.domain == cookieInfo.domain && $0.path == cookieInfo.path
             }) {
                 dataStore.httpCookieStore.delete(httpCookie)
             }
         }
-        
+
         await loadCookies()
     }
-    
+
     func deleteNonCompliantCookies() async {
         let httpCookies = await dataStore.httpCookieStore.allCookies()
         let cookieInfos = httpCookies.map { CookieInfo(from: $0) }
         let nonCompliantCookies = cookieInfos.filter { !$0.complianceIssues.isEmpty }
-        
+
         for cookieInfo in nonCompliantCookies {
-            if let httpCookie = httpCookies.first(where: { 
-                $0.name == cookieInfo.name && $0.domain == cookieInfo.domain && $0.path == cookieInfo.path 
+            if let httpCookie = httpCookies.first(where: {
+                $0.name == cookieInfo.name && $0.domain == cookieInfo.domain && $0.path == cookieInfo.path
             }) {
                 dataStore.httpCookieStore.delete(httpCookie)
             }
         }
-        
+
         await loadCookies()
     }
-    
+
     func deleteThirdPartyCookies() async {
         let httpCookies = await dataStore.httpCookieStore.allCookies()
         let thirdPartyCookies = httpCookies.filter { $0.domain.hasPrefix(".") }
-        
+
         for cookie in thirdPartyCookies {
             dataStore.httpCookieStore.delete(cookie)
         }
-        
+
         await loadCookies()
     }
-    
+
     func performPrivacyCleanup() async {
         // Comprehensive privacy-compliant cleanup
         await deleteExpiredCookies()
@@ -150,22 +151,22 @@ class CookieManager: ObservableObject {
         // If creation/last-access metadata becomes available in future, revisit retention logic.
         await loadCookies()
     }
-    
+
     func searchCookies(_ query: String) -> [CookieInfo] {
         guard !query.isEmpty else { return cookies }
-        
+
         let lowercaseQuery = query.lowercased()
         return cookies.filter { cookie in
             cookie.name.lowercased().contains(lowercaseQuery) ||
-            cookie.domain.lowercased().contains(lowercaseQuery) ||
-            cookie.value.lowercased().contains(lowercaseQuery)
+                cookie.domain.lowercased().contains(lowercaseQuery) ||
+                cookie.value.lowercased().contains(lowercaseQuery)
         }
     }
-    
+
     func filterCookies(_ filter: CookieFilter) -> [CookieInfo] {
         return cookies.filter { filter.matches($0) }
     }
-    
+
     func sortCookies(_ cookies: [CookieInfo], by sortOption: CookieSortOption, ascending: Bool = true) -> [CookieInfo] {
         let sorted = cookies.sorted { lhs, rhs in
             switch sortOption {
@@ -184,15 +185,15 @@ class CookieManager: ObservableObject {
                     return true // Session cookies first
                 case (_, nil):
                     return false // Session cookies first
-                case (let lhsDate?, let rhsDate?):
+                case let (lhsDate?, rhsDate?):
                     return lhsDate < rhsDate
                 }
             }
         }
-        
+
         return ascending ? sorted : sorted.reversed()
     }
-    
+
     func getCookieStats() -> (total: Int, session: Int, persistent: Int, expired: Int, totalSize: Int) {
         let sessionCount = cookies.filter { $0.isSessionCookie }.count
         let persistentCount = cookies.count - sessionCount
@@ -201,7 +202,7 @@ class CookieManager: ObservableObject {
             return expiresDate < Date()
         }.count
         let totalSize = cookies.reduce(0) { $0 + $1.size }
-        
+
         let stats = (
             total: cookies.count,
             session: sessionCount,
@@ -213,15 +214,15 @@ class CookieManager: ObservableObject {
         print("📊 [CookieManager] Stats for profile=\(currentProfileId?.uuidString ?? "nil"): total=\(stats.total), session=\(stats.session), persistent=\(stats.persistent), expired=\(stats.expired), size=\(stats.totalSize)")
         return stats
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func groupCookiesByDomain(_ cookies: [CookieInfo]) -> [DomainCookieGroup] {
         let grouped = Dictionary(grouping: cookies) { cookie in
             // Normalize domain for grouping
             cookie.domain.hasPrefix(".") ? String(cookie.domain.dropFirst()) : cookie.domain
         }
-        
+
         return grouped.map { domain, cookies in
             DomainCookieGroup(id: UUID(), domain: domain, cookies: cookies.sorted { $0.name < $1.name })
         }.sorted { $0.displayDomain < $1.displayDomain }
@@ -235,7 +236,7 @@ extension CookieManager {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = .prettyPrinted
-        
+
         do {
             let data = try encoder.encode(cookies)
             return String(data: data, encoding: .utf8) ?? ""
@@ -244,10 +245,10 @@ extension CookieManager {
             return ""
         }
     }
-    
+
     func getCookieDetails(_ cookie: CookieInfo) -> [String: String] {
         var details: [String: String] = [:]
-        
+
         details["Name"] = cookie.name
         details["Value"] = cookie.value.count > 100 ? String(cookie.value.prefix(100)) + "..." : cookie.value
         details["Domain"] = cookie.domain
@@ -257,7 +258,7 @@ extension CookieManager {
         details["HTTP Only"] = cookie.isHTTPOnly ? "Yes" : "No"
         details["Same Site"] = cookie.sameSitePolicy
         details["Expires"] = cookie.expirationStatus
-        
+
         return details
     }
 }

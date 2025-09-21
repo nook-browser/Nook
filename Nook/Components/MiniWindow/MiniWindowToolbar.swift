@@ -5,59 +5,73 @@
 //  Created by Jonathan Caudill on 26/08/2025.
 //
 
-import SwiftUI
 import AppKit
+import SwiftUI
 
 struct MiniWindowToolbar: View {
     @Environment(\.colorScheme) private var colorScheme
     private var fallbackBackgroundNSColor: NSColor {
         NSColor(hex: colorScheme == .dark ? "#242424" : "#EDEDED") ?? (colorScheme == .dark ? .black : .white)
     }
+
     private var resolvedBackgroundNSColor: NSColor {
         session.toolbarColor ?? fallbackBackgroundNSColor
     }
+
     private var toolbarBackgroundColor: Color {
         Color(nsColor: resolvedBackgroundNSColor)
     }
+
     private var isDarkBackground: Bool {
         resolvedBackgroundNSColor.isPerceivedDark
     }
+
     private var primaryTextNSColor: NSColor {
         isDarkBackground ? .white : .black
     }
+
     private var primaryTextColor: Color {
         Color(nsColor: primaryTextNSColor)
     }
+
     private var subduedTextColor: Color {
         primaryTextColor.opacity(isDarkBackground ? 0.85 : 0.8)
     }
+
     private var subtleTextColor: Color {
         primaryTextColor.opacity(isDarkBackground ? 0.55 : 0.6)
     }
+
     private var controlBackgroundNSColor: NSColor {
         let mixTarget: NSColor = isDarkBackground ? .white : .black
         let fraction: CGFloat = isDarkBackground ? 0.14 : 0.08
         return resolvedBackgroundNSColor.blended(withFraction: fraction, of: mixTarget) ?? resolvedBackgroundNSColor
     }
+
     private var controlBackgroundColor: Color {
         Color(nsColor: controlBackgroundNSColor)
     }
+
     private var controlBorderColor: Color {
         Color(nsColor: primaryTextNSColor.withAlphaComponent(isDarkBackground ? 0.25 : 0.18))
     }
+
     private var avatarBackgroundColor: Color {
         Color(nsColor: primaryTextNSColor.withAlphaComponent(isDarkBackground ? 0.28 : 0.18))
     }
+
     private var separatorColor: Color {
         isDarkBackground ? Color.white.opacity(0.22) : Color.black.opacity(0.1)
     }
+
     private var shareButtonTintColor: NSColor {
         primaryTextNSColor
     }
+
     @ObservedObject var session: MiniWindowSession
     let adoptAction: () -> Void
     var window: NSWindow?
-    
+
     private var cleanedTargetSpaceName: String {
         session.targetSpaceName.replacingOccurrences(of: "space", with: "", options: .caseInsensitive).trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -82,37 +96,37 @@ struct MiniWindowToolbar: View {
                 borderColor: controlBorderColor,
                 tintColor: shareButtonTintColor
             )
-            
+
             Button(action: adoptAction) {
-                    HStack(spacing: 5) {
-                        Text("\u{2318} O") // ⌘O as symbols
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(subtleTextColor)
-                        HStack(spacing: 0) {
-                            Text("move into ")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(subduedTextColor)
-                            Text("\(cleanedTargetSpaceName)")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(Color.accentColor.opacity(0.8))
-                        }
-                        .padding(.vertical, 0)
+                HStack(spacing: 5) {
+                    Text("\u{2318} O") // ⌘O as symbols
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(subtleTextColor)
+                    HStack(spacing: 0) {
+                        Text("move into ")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(subduedTextColor)
+                        Text("\(cleanedTargetSpaceName)")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(Color.accentColor.opacity(0.8))
                     }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 6)
-                    .background(
-                        RoundedRectangle(cornerRadius: 7, style: .continuous)
-                            .fill(controlBackgroundColor)
-                            .shadow(radius: 1, x: 1, y: 1)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .stroke(controlBorderColor, lineWidth: 1)
-                    )
+                    .padding(.vertical, 0)
                 }
-                .buttonStyle(PlainButtonStyle())
-                .keyboardShortcut("o", modifiers: .command)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(controlBackgroundColor)
+                        .shadow(radius: 1, x: 1, y: 1)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .stroke(controlBorderColor, lineWidth: 1)
+                )
             }
+            .buttonStyle(PlainButtonStyle())
+            .keyboardShortcut("o", modifiers: .command)
+        }
         .padding(.horizontal, 20)
         .padding(.vertical, 7)
         .background(toolbarBackgroundColor)
@@ -176,13 +190,13 @@ private extension MiniWindowToolbar {
 private struct MiniWindowTrafficLights: NSViewRepresentable {
     var window: NSWindow?
 
-    func makeNSView(context: Context) -> TrafficLightsContainerView {
+    func makeNSView(context _: Context) -> TrafficLightsContainerView {
         let view = TrafficLightsContainerView()
         view.windowReference = window
         return view
     }
 
-    func updateNSView(_ nsView: TrafficLightsContainerView, context: Context) {
+    func updateNSView(_ nsView: TrafficLightsContainerView, context _: Context) {
         nsView.windowReference = window
     }
 
@@ -204,7 +218,7 @@ private struct MiniWindowTrafficLights: NSViewRepresentable {
             translatesAutoresizingMaskIntoConstraints = false
         }
 
-        required init?(coder: NSCoder) {
+        required init?(coder _: NSCoder) {
             nil
         }
 

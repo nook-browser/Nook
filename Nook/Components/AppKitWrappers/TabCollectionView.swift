@@ -1,10 +1,11 @@
-import SwiftUI
 import AppKit
 import Combine
+import SwiftUI
 
 /// NSViewRepresentable wrapper for NSCollectionView with native AppKit drag & drop
 struct TabCollectionView<DataSource: TabListDataSource & ObservableObject>: NSViewRepresentable {
     // MARK: - Layout constants (use shared helper)
+
     private let minButtonWidth: CGFloat = EssentialsGridLayout.minButtonWidth
     private let itemSpacing: CGFloat = EssentialsGridLayout.itemSpacing
     private let lineSpacing: CGFloat = EssentialsGridLayout.lineSpacing
@@ -17,6 +18,7 @@ struct TabCollectionView<DataSource: TabListDataSource & ObservableObject>: NSVi
     @EnvironmentObject var browserManager: BrowserManager
 
     // MARK: - NSViewRepresentable
+
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSScrollView()
         scrollView.drawsBackground = false
@@ -64,14 +66,14 @@ struct TabCollectionView<DataSource: TabListDataSource & ObservableObject>: NSVi
             collectionView.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
             collectionView.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
             collectionView.bottomAnchor.constraint(equalTo: scrollView.contentView.bottomAnchor),
-            collectionView.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor)
+            collectionView.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor),
         ])
 
         // Coordinator hooks
         context.coordinator.parent = self
         context.coordinator.collectionView = collectionView
         // External width changes will cause SwiftUI to call updateNSView
-        
+
         return scrollView
     }
 
@@ -107,6 +109,7 @@ struct TabCollectionView<DataSource: TabListDataSource & ObservableObject>: NSVi
     }
 
     // MARK: - Layout helpers
+
     private func columnCount(for width: CGFloat, itemCount: Int) -> Int {
         EssentialsGridLayout.columnCount(for: width, itemCount: itemCount)
     }
@@ -122,6 +125,7 @@ struct TabCollectionView<DataSource: TabListDataSource & ObservableObject>: NSVi
     }
 
     // MARK: - Coordinator
+
     class CollectionCoordinator: NSObject, NSCollectionViewDataSource, NSCollectionViewDelegate {
         var parent: TabCollectionView<DataSource>
         weak var collectionView: NSCollectionView?
@@ -133,7 +137,7 @@ struct TabCollectionView<DataSource: TabListDataSource & ObservableObject>: NSVi
             super.init()
 
             // Initial subscription
-            self.resubscribeIfNeeded(to: parent.dataSource)
+            resubscribeIfNeeded(to: parent.dataSource)
         }
 
         deinit { cancellable?.cancel() }
@@ -141,9 +145,10 @@ struct TabCollectionView<DataSource: TabListDataSource & ObservableObject>: NSVi
         // No width observer; SwiftUI passes width via `availableWidth` and triggers updateNSView
 
         // MARK: - Data Source
-        func numberOfSections(in collectionView: NSCollectionView) -> Int { 1 }
 
-        func collectionView(_ collectionView: NSCollectionView, numberOfItemsInSection section: Int) -> Int {
+        func numberOfSections(in _: NSCollectionView) -> Int { 1 }
+
+        func collectionView(_: NSCollectionView, numberOfItemsInSection _: Int) -> Int {
             parent.dataSource.tabs.count
         }
 
@@ -159,24 +164,24 @@ struct TabCollectionView<DataSource: TabListDataSource & ObservableObject>: NSVi
         }
 
         // Prefer pasteboardWriterForItemAt to ensure drag begins even if subviews handle mouse
-        func collectionView(_ collectionView: NSCollectionView, pasteboardWriterForItemAt indexPath: IndexPath) -> NSPasteboardWriting? {
+        func collectionView(_: NSCollectionView, pasteboardWriterForItemAt indexPath: IndexPath) -> NSPasteboardWriting? {
             guard indexPath.item < parent.dataSource.tabs.count else { return nil }
             let tab = parent.dataSource.tabs[indexPath.item]
             let item = NSPasteboardItem()
             item.setString(tab.id.uuidString, forType: PasteboardType.tab)
             item.setString(tab.id.uuidString, forType: .string)
-#if DEBUG
-            print("[DnD] Collection pasteboardWriterForItemAt item=\(indexPath.item)")
-#endif
+            #if DEBUG
+                print("[DnD] Collection pasteboardWriterForItemAt item=\(indexPath.item)")
+            #endif
             return item
         }
 
         private var hiddenDuringDrag: Set<IndexPath> = []
 
-        func collectionView(_ collectionView: NSCollectionView, draggingSession session: NSDraggingSession, willBeginAt screenPoint: NSPoint, forItemsAt indexPaths: Set<IndexPath>) {
-#if DEBUG
-            print("[DnD] Collection draggingSession willBeginAt items=\(indexPaths.map{ $0.item })")
-#endif
+        func collectionView(_ collectionView: NSCollectionView, draggingSession _: NSDraggingSession, willBeginAt _: NSPoint, forItemsAt indexPaths: Set<IndexPath>) {
+            #if DEBUG
+                print("[DnD] Collection draggingSession willBeginAt items=\(indexPaths.map { $0.item })")
+            #endif
             hiddenDuringDrag = indexPaths
             for ip in indexPaths {
                 if let item = collectionView.item(at: ip) {
@@ -185,10 +190,10 @@ struct TabCollectionView<DataSource: TabListDataSource & ObservableObject>: NSVi
             }
         }
 
-        func collectionView(_ collectionView: NSCollectionView, draggingSession session: NSDraggingSession, endedAt screenPoint: NSPoint, dragOperation: NSDragOperation) {
-#if DEBUG
-            print("[DnD] Collection draggingSession ended op=\(dragOperation.rawValue)")
-#endif
+        func collectionView(_ collectionView: NSCollectionView, draggingSession _: NSDraggingSession, endedAt _: NSPoint, dragOperation: NSDragOperation) {
+            #if DEBUG
+                print("[DnD] Collection draggingSession ended op=\(dragOperation.rawValue)")
+            #endif
             for ip in hiddenDuringDrag {
                 if let item = collectionView.item(at: ip) {
                     item.view.isHidden = false
@@ -198,46 +203,48 @@ struct TabCollectionView<DataSource: TabListDataSource & ObservableObject>: NSVi
         }
 
         // MARK: - Drag & Drop
-        func collectionView(_ collectionView: NSCollectionView, canDragItemsAt indexPaths: Set<IndexPath>, with event: NSEvent) -> Bool { true }
+
+        func collectionView(_: NSCollectionView, canDragItemsAt _: Set<IndexPath>, with _: NSEvent) -> Bool { true }
 
         // Prefer pasteboardWriterForItemAt for initiating drags
 
-        func collectionView(_ collectionView: NSCollectionView, validateDrop draggingInfo: NSDraggingInfo, proposedIndexPath: AutoreleasingUnsafeMutablePointer<IndexPath>, dropOperation: UnsafeMutablePointer<NSCollectionView.DropOperation>) -> NSDragOperation {
+        func collectionView(_: NSCollectionView, validateDrop draggingInfo: NSDraggingInfo, proposedIndexPath: AutoreleasingUnsafeMutablePointer<IndexPath>, dropOperation: UnsafeMutablePointer<NSCollectionView.DropOperation>) -> NSDragOperation {
             // Allow cross-container when pasteboard has tab id
             let pasteboardTypes = draggingInfo.draggingPasteboard.types ?? []
             let hasTab = pasteboardTypes.contains(PasteboardType.tab)
-#if DEBUG
-            print("[DnD] Collection validateDrop - pasteboard types: \(pasteboardTypes), hasTab: \(hasTab)")
-#endif
-            guard hasTab else { 
-#if DEBUG
-                print("[DnD] Collection validateDrop - NO TAB TYPE FOUND, returning []")
-#endif
-                return [] 
+            #if DEBUG
+                print("[DnD] Collection validateDrop - pasteboard types: \(pasteboardTypes), hasTab: \(hasTab)")
+            #endif
+            guard hasTab else {
+                #if DEBUG
+                    print("[DnD] Collection validateDrop - NO TAB TYPE FOUND, returning []")
+                #endif
+                return []
             }
             dropOperation.pointee = .before
             let maxIndex = max(0, parent.dataSource.tabs.count)
             if proposedIndexPath.pointee.item > maxIndex {
                 proposedIndexPath.pointee = IndexPath(item: maxIndex, section: 0)
             }
-#if DEBUG
-            print("[DnD] Collection validateDrop -> op=move index=\(proposedIndexPath.pointee.item) count=\(parent.dataSource.tabs.count)")
-#endif
+            #if DEBUG
+                print("[DnD] Collection validateDrop -> op=move index=\(proposedIndexPath.pointee.item) count=\(parent.dataSource.tabs.count)")
+            #endif
             return .move
         }
 
-        func collectionView(_ collectionView: NSCollectionView, acceptDrop draggingInfo: NSDraggingInfo, indexPath: IndexPath, dropOperation: NSCollectionView.DropOperation) -> Bool {
-#if DEBUG
-            print("[DnD] Collection acceptDrop called at index=\(indexPath.item)")
-#endif
+        func collectionView(_ collectionView: NSCollectionView, acceptDrop draggingInfo: NSDraggingInfo, indexPath: IndexPath, dropOperation _: NSCollectionView.DropOperation) -> Bool {
+            #if DEBUG
+                print("[DnD] Collection acceptDrop called at index=\(indexPath.item)")
+            #endif
             guard let items = draggingInfo.draggingPasteboard.pasteboardItems,
                   let first = items.first,
                   let idString = first.string(forType: PasteboardType.tab),
-                  let id = UUID(uuidString: idString) else { 
-#if DEBUG
-                print("[DnD] Collection acceptDrop - failed to extract tab ID")
-#endif
-                return false 
+                  let id = UUID(uuidString: idString)
+            else {
+                #if DEBUG
+                    print("[DnD] Collection acceptDrop - failed to extract tab ID")
+                #endif
+                return false
             }
 
             if let sourceIndex = parent.dataSource.tabs.firstIndex(where: { $0.id == id }) {
@@ -248,9 +255,9 @@ struct TabCollectionView<DataSource: TabListDataSource & ObservableObject>: NSVi
                 targetIndex = max(0, min(targetIndex, maxIndex))
                 let fromPath = IndexPath(item: sourceIndex, section: 0)
                 let toPath = IndexPath(item: targetIndex, section: 0)
-#if DEBUG
-                print("[DnD] Collection acceptDrop local from=\(sourceIndex) to=\(targetIndex)")
-#endif
+                #if DEBUG
+                    print("[DnD] Collection acceptDrop local from=\(sourceIndex) to=\(targetIndex)")
+                #endif
                 collectionView.performBatchUpdates({ [weak self] in
                     guard let self = self else { return }
                     self.parent.dataSource.moveTab(from: sourceIndex, to: targetIndex)
@@ -269,14 +276,15 @@ struct TabCollectionView<DataSource: TabListDataSource & ObservableObject>: NSVi
             let allEssentials = tm.essentialTabs
             guard let tab = (allEssentials + allSpacePinned + allRegular).first(where: { $0.id == id }) else { return false }
 
-#if DEBUG
-            print("[DnD] Collection acceptDrop cross to=\(indexPath.item) from external")
-#endif
+            #if DEBUG
+                print("[DnD] Collection acceptDrop cross to=\(indexPath.item) from external")
+            #endif
             tm.addToEssentials(tab)
             tm.reorderEssential(tab, to: indexPath.item)
             DispatchQueue.main.async { collectionView.reloadData() }
             return true
         }
+
         private var subscribedDataSourceId: ObjectIdentifier?
 
         func resubscribeIfNeeded(to dataSource: DataSource) {
@@ -292,7 +300,8 @@ struct TabCollectionView<DataSource: TabListDataSource & ObservableObject>: NSVi
         }
 
         // MARK: - Selection
-        func collectionView(_ collectionView: NSCollectionView, didSelectItemsAt indexPaths: Set<IndexPath>) {
+
+        func collectionView(_: NSCollectionView, didSelectItemsAt indexPaths: Set<IndexPath>) {
             guard let idx = indexPaths.first?.item, idx < parent.dataSource.tabs.count else { return }
             parent.dataSource.selectTab(at: idx)
         }

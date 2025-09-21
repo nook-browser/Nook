@@ -27,4 +27,3 @@ final class ProfileEntity {
         self.index = index
     }
 }
-

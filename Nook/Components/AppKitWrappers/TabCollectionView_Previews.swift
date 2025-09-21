@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 @MainActor
 final class MockEssentialTabListDataSource: TabListDataSource, ObservableObject {
@@ -15,9 +15,9 @@ final class MockEssentialTabListDataSource: TabListDataSource, ObservableObject 
             "https://developer.apple.com",
             "https://news.ycombinator.com",
             "http://localhost:3000",
-            "file:///Users/me/Documents/readme.html"
+            "file:///Users/me/Documents/readme.html",
         ]
-        for i in 0..<sampleCount {
+        for i in 0 ..< sampleCount {
             let urlStr = urls[i % urls.count]
             let nameVariants = [
                 "Docs",
@@ -27,7 +27,7 @@ final class MockEssentialTabListDataSource: TabListDataSource, ObservableObject 
                 "Localhost",
                 "GitHub",
                 "Stack Overflow",
-                "Preview"
+                "Preview",
             ]
             let t = Tab(
                 url: URL(string: urlStr)!,
@@ -44,7 +44,7 @@ final class MockEssentialTabListDataSource: TabListDataSource, ObservableObject 
     }
 
     func moveTab(from sourceIndex: Int, to targetIndex: Int) {
-        guard sourceIndex < tabs.count && targetIndex <= tabs.count else { return }
+        guard sourceIndex < tabs.count, targetIndex <= tabs.count else { return }
         objectWillChange.send()
         let tab = tabs.remove(at: sourceIndex)
         tabs.insert(tab, at: targetIndex)
@@ -97,7 +97,7 @@ struct TabCollectionViewPreviewContainer: View {
             ZStack {
                 Color(NSColor.windowBackgroundColor).opacity(0.6)
                 TabCollectionView(dataSource: ds, availableWidth: width)
-                .environmentObject(browserManager)
+                    .environmentObject(browserManager)
             }
             .frame(width: width, height: height)
             .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -105,7 +105,7 @@ struct TabCollectionViewPreviewContainer: View {
 
             HStack {
                 Text("Width: \(Int(width))")
-                Slider(value: $width, in: 180...320)
+                Slider(value: $width, in: 180 ... 320)
             }
         }
         .padding()
@@ -118,6 +118,7 @@ struct TabCollectionViewPreviewContainer: View {
 }
 
 // MARK: - Real data preview using EssentialTabListAdapter
+
 struct TabCollectionView_RealDataPreviewContainer: View {
     @StateObject private var adapter: EssentialTabListAdapter
     private let browserManager: BrowserManager
@@ -133,9 +134,9 @@ struct TabCollectionView_RealDataPreviewContainer: View {
             ("GitHub", "https://github.com"),
             ("Stack Overflow", "https://stackoverflow.com"),
             ("Hacker News", "https://news.ycombinator.com"),
-            ("Developer", "https://developer.apple.com")
+            ("Developer", "https://developer.apple.com"),
         ]
-        urls.forEach { name, link in
+        for (name, link) in urls {
             if let url = URL(string: link) {
                 let t = Tab(url: url, name: name)
                 bm.tabManager.addTab(t)
@@ -145,7 +146,7 @@ struct TabCollectionView_RealDataPreviewContainer: View {
         if let first = bm.tabManager.pinnedTabs.first {
             bm.tabManager.setActiveTab(first)
         }
-        self.browserManager = bm
+        browserManager = bm
         _adapter = StateObject(wrappedValue: EssentialTabListAdapter(tabManager: bm.tabManager))
     }
 
@@ -155,7 +156,7 @@ struct TabCollectionView_RealDataPreviewContainer: View {
             ZStack {
                 Color(NSColor.windowBackgroundColor).opacity(0.6)
                 TabCollectionView(dataSource: adapter, availableWidth: width)
-                .environmentObject(browserManager)
+                    .environmentObject(browserManager)
             }
             .frame(width: width, height: height)
             .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -163,7 +164,7 @@ struct TabCollectionView_RealDataPreviewContainer: View {
 
             HStack {
                 Text("Width: \(Int(width))")
-                Slider(value: $width, in: 180...320)
+                Slider(value: $width, in: 180 ... 320)
             }
         }
         .padding()

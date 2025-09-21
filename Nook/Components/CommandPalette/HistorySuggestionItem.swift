@@ -5,15 +5,15 @@
 //  Created by Maciek Bagiński on 18/08/2025.
 //
 
-import SwiftUI
 import FaviconFinder
+import SwiftUI
 
 struct HistorySuggestionItem: View {
     let entry: HistoryEntry
     var isSelected: Bool = false
-    
+
     @State private var resolvedFavicon: SwiftUI.Image? = nil
-    
+
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
             (resolvedFavicon ?? Image(systemName: "globe"))
@@ -47,21 +47,21 @@ struct HistorySuggestionItem: View {
             Task { await fetchFavicon(for: entry.url) }
         }
     }
-    
+
     private func fetchFavicon(for url: URL) async {
         let defaultFavicon = SwiftUI.Image(systemName: "globe")
         guard url.scheme == "http" || url.scheme == "https", url.host != nil else {
             await MainActor.run { self.resolvedFavicon = defaultFavicon }
             return
         }
-        
+
         // Check cache first
         let cacheKey = url.host ?? url.absoluteString
         if let cachedFavicon = Tab.getCachedFavicon(for: cacheKey) {
             await MainActor.run { self.resolvedFavicon = cachedFavicon }
             return
         }
-        
+
         do {
             let favicon = try await FaviconFinder(url: url)
                 .fetchFaviconURLs()
@@ -70,10 +70,10 @@ struct HistorySuggestionItem: View {
             if let faviconImage = favicon.image {
                 let nsImage = faviconImage.image
                 let swiftUIImage = SwiftUI.Image(nsImage: nsImage)
-                
+
                 // Cache the favicon
                 Tab.cacheFavicon(swiftUIImage, for: cacheKey)
-                
+
                 await MainActor.run { self.resolvedFavicon = swiftUIImage }
             } else {
                 await MainActor.run { self.resolvedFavicon = defaultFavicon }
@@ -83,4 +83,3 @@ struct HistorySuggestionItem: View {
         }
     }
 }
-

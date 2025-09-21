@@ -1,6 +1,7 @@
 import SwiftUI
 
 // MARK: - AngleDial
+
 // Dedicated dial for gradient angle with tick marks
 struct AngleDial: View {
     @Binding var angle: Double // degrees 0...360
@@ -13,33 +14,33 @@ struct AngleDial: View {
                 Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
 
                 // tick marks
-                ForEach(0..<24, id: \.self) { i in
+                ForEach(0 ..< 24, id: \.self) { i in
                     let a = Double(i) / 24.0 * 2 * .pi
                     Capsule()
                         .fill(Color.primary.opacity(i % 6 == 0 ? 0.35 : 0.18))
                         .frame(width: CGFloat(i % 6 == 0 ? 3 : 2), height: CGFloat(i % 6 == 0 ? 10 : 6))
-                        .offset(y: -size/2 + 10.0)
+                        .offset(y: -size / 2 + 10.0)
                         .rotationEffect(.radians(a))
                 }
 
                 // needle and handle
                 let a = Angle(degrees: angle)
-                let handle = CGPoint(x: cos(a.radians) * (size/2 - 12.0), y: sin(a.radians) * (size/2 - 12.0))
+                let handle = CGPoint(x: cos(a.radians) * (size / 2 - 12.0), y: sin(a.radians) * (size / 2 - 12.0))
                 Path { p in
-                    p.move(to: CGPoint(x: size/2, y: size/2))
-                    p.addLine(to: CGPoint(x: size/2 + handle.x, y: size/2 + handle.y))
+                    p.move(to: CGPoint(x: size / 2, y: size / 2))
+                    p.addLine(to: CGPoint(x: size / 2 + handle.x, y: size / 2 + handle.y))
                 }
                 .stroke(Color.accentColor.opacity(0.8), lineWidth: 2)
 
                 Circle()
                     .fill(Color.accentColor)
                     .frame(width: 12, height: 12)
-                    .position(x: size/2 + handle.x, y: size/2 + handle.y)
+                    .position(x: size / 2 + handle.x, y: size / 2 + handle.y)
             }
             .frame(width: size, height: size)
             .contentShape(Circle())
             .gesture(DragGesture(minimumDistance: 0).onChanged { value in
-                let center = CGPoint(x: size/2, y: size/2)
+                let center = CGPoint(x: size / 2, y: size / 2)
                 let dx = value.location.x - center.x
                 let dy = value.location.y - center.y
                 var deg = atan2(dy, dx) * 180 / .pi

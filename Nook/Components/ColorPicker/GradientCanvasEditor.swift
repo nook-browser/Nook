@@ -1,9 +1,10 @@
 import SwiftUI
 #if canImport(AppKit)
-import AppKit
+    import AppKit
 #endif
 
 // MARK: - GradientCanvasEditor
+
 // Large canvas with dot grid background and draggable color stops
 struct GradientCanvasEditor: View {
     @Binding var gradient: SpaceGradient
@@ -18,7 +19,7 @@ struct GradientCanvasEditor: View {
     @State private var lightness: Double = 0.6 // HSL L component
     // Lock a primary node identity when in 3-node mode
     @State private var lockedPrimaryID: UUID?
-    
+
     // Haptic feedback state
     @State private var lastHapticSpoke: String? = nil
     @State private var lastHapticRadial: String? = nil
@@ -30,8 +31,8 @@ struct GradientCanvasEditor: View {
             let width = proxy.size.width
             let height = proxy.size.height
             let padding: CGFloat = 24
-            let center = CGPoint(x: width/2, y: height/2)
-            let radius = min(width, height)/2 - padding
+            let center = CGPoint(x: width / 2, y: height / 2)
+            let radius = min(width, height) / 2 - padding
 
             ZStack {
                 // No gradient preview in the editor canvas; focus on dot grid + handles
@@ -94,13 +95,13 @@ struct GradientCanvasEditor: View {
                             .font(.title3.weight(.medium))
                             .foregroundStyle(.secondary)
                     }.buttonStyle(.plain)
-                     .disabled(gradient.nodes.count <= 1)
+                        .disabled(gradient.nodes.count <= 1)
                     Button(action: addNode) {
                         Image(systemName: "plus")
                             .font(.title3.weight(.medium))
                             .foregroundStyle(.secondary)
                     }.buttonStyle(.plain)
-                     .disabled(gradient.nodes.count >= 3)
+                        .disabled(gradient.nodes.count >= 3)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                 .padding(.bottom, 10)
@@ -117,6 +118,7 @@ struct GradientCanvasEditor: View {
     }
 
     // MARK: - Helpers
+
     private func modeButton(symbol: String, idx: Int) -> some View {
         Image(systemName: symbol)
             .padding(6)
@@ -162,7 +164,8 @@ struct GradientCanvasEditor: View {
             // No locked primary in 2-node mode; keep or choose a stable preferred primary
             lockedPrimaryID = nil
             if let pid = gradientColorManager.preferredPrimaryNodeID,
-               gradient.nodes.contains(where: { $0.id == pid }) {
+               gradient.nodes.contains(where: { $0.id == pid })
+            {
                 // keep existing preferred - don't change it!
             } else {
                 // Only reassign if the current preferred doesn't exist
@@ -191,7 +194,7 @@ struct GradientCanvasEditor: View {
                 }
                 // Companions: [top-right, bottom-center]
                 let rComp = radius * 0.9
-                let companionAngles: [CGFloat] = [(.pi / 4.0), (-.pi / 2.0)] // 45°, -90°
+                let companionAngles: [CGFloat] = [(.pi / 4.0), -.pi / 2.0] // 45°, -90°
                 let companions = gradient.nodes.filter { $0.id != primaryID }
                 for (i, node) in companions.enumerated() where i < 2 {
                     let ang = companionAngles[i]
@@ -213,27 +216,27 @@ struct GradientCanvasEditor: View {
                 // Use defaults if no saved positions
                 if yPositions[n.id] == nil { yPositions[n.id] = defaultY(for: n) }
                 if xPositions[n.id] == nil { xPositions[n.id] = CGFloat(n.location) }
-                
+
                 // Save the default positions to the model
                 if let idx = gradient.nodes.firstIndex(where: { $0.id == n.id }) {
                     gradient.nodes[idx].xPosition = Double(xPositions[n.id] ?? CGFloat(n.location))
                     gradient.nodes[idx].yPosition = Double(yPositions[n.id] ?? defaultY(for: n))
                 }
             }
-            
+
             // keep points within circle
             let pt = CGPoint(x: (xPositions[n.id] ?? CGFloat(n.location)) * width,
                              y: (yPositions[n.id] ?? defaultY(for: n)) * height)
             let clamped = clampToCircle(point: pt, center: center, radius: radius)
             xPositions[n.id] = clamped.x / width
             yPositions[n.id] = clamped.y / height
-            
+
             // Update the model with the clamped positions
             if let idx = gradient.nodes.firstIndex(where: { $0.id == n.id }) {
                 gradient.nodes[idx].xPosition = Double(xPositions[n.id] ?? CGFloat(n.location))
                 gradient.nodes[idx].yPosition = Double(yPositions[n.id] ?? defaultY(for: n))
             }
-            
+
             // Update color based on position to ensure consistency
             updateNodeColorFromPosition(n, width: width, height: height, center: center, radius: radius)
         }
@@ -244,22 +247,22 @@ struct GradientCanvasEditor: View {
 
     private func updateNodeFromCanvasDrag(_ node: GradientNode, newX: CGFloat, newY: CGFloat, absolute: CGPoint, center: CGPoint, radius: CGFloat) {
         guard let idx = gradient.nodes.firstIndex(where: { $0.id == node.id }) else { return }
-        
+
         // Check for haptic feedback triggers on invisible gridlines
         checkHapticFeedback(newX: newX, newY: newY)
-        
+
         // Save visual positions in both the dictionaries (for immediate UI updates) and the model (for persistence)
         xPositions[node.id] = newX
         yPositions[node.id] = newY
         gradient.nodes[idx].xPosition = Double(newX)
         gradient.nodes[idx].yPosition = Double(newY)
-        
+
         // DON'T update the persistent location - keep the node's role in the gradient fixed!
         // The location property determines the node's position in the gradient (primary, secondary, etc.)
         // and should NOT change when dragging on the canvas
-        
+
         selectedNodeID = node.id
-        
+
         // Mark the currently dragged node as the active primary for background rendering
         let designatedPrimary = primaryNodeID()
         if node.id == designatedPrimary {
@@ -285,46 +288,46 @@ struct GradientCanvasEditor: View {
 
     private func checkHapticFeedback(newX: CGFloat, newY: CGFloat) {
         #if canImport(AppKit)
-        // Simple gridlines that trigger haptic feedback
-        let gridLines: [CGFloat] = [0.0, 0.25, 0.5, 0.75, 1.0] // Major gridlines
-        let tolerance: CGFloat = 0.02 // How close you need to be to trigger
-        
-        // Check X-axis gridlines
-        for line in gridLines {
-            if abs(newX - line) < tolerance {
-                if lastHapticSpoke != "x_\(line)" {
-                    NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .default)
-                    lastHapticSpoke = "x_\(line)"
+            // Simple gridlines that trigger haptic feedback
+            let gridLines: [CGFloat] = [0.0, 0.25, 0.5, 0.75, 1.0] // Major gridlines
+            let tolerance: CGFloat = 0.02 // How close you need to be to trigger
+
+            // Check X-axis gridlines
+            for line in gridLines {
+                if abs(newX - line) < tolerance {
+                    if lastHapticSpoke != "x_\(line)" {
+                        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .default)
+                        lastHapticSpoke = "x_\(line)"
+                    }
+                    break
                 }
-                break
             }
-        }
-        
-        // Check Y-axis gridlines
-        for line in gridLines {
-            if abs(newY - line) < tolerance {
-                if lastHapticRadial != "y_\(line)" {
-                    NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .default)
-                    lastHapticRadial = "y_\(line)"
+
+            // Check Y-axis gridlines
+            for line in gridLines {
+                if abs(newY - line) < tolerance {
+                    if lastHapticRadial != "y_\(line)" {
+                        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .default)
+                        lastHapticRadial = "y_\(line)"
+                    }
+                    break
                 }
-                break
             }
-        }
-        
-        // Reset haptic state when moving away from gridlines
-        if lastHapticSpoke != nil && !gridLines.contains(where: { abs(newX - $0) < tolerance }) {
-            lastHapticSpoke = nil
-        }
-        if lastHapticRadial != nil && !gridLines.contains(where: { abs(newY - $0) < tolerance }) {
-            lastHapticRadial = nil
-        }
+
+            // Reset haptic state when moving away from gridlines
+            if lastHapticSpoke != nil, !gridLines.contains(where: { abs(newX - $0) < tolerance }) {
+                lastHapticSpoke = nil
+            }
+            if lastHapticRadial != nil, !gridLines.contains(where: { abs(newY - $0) < tolerance }) {
+                lastHapticRadial = nil
+            }
         #endif
     }
 
     private func clampToCircle(point: CGPoint, center: CGPoint, radius: CGFloat) -> CGPoint {
         let dx = point.x - center.x
         let dy = point.y - center.y
-        let dist = sqrt(dx*dx + dy*dy)
+        let dist = sqrt(dx * dx + dy * dy)
         if dist <= radius { return point }
         let angle = atan2(dy, dx)
         return CGPoint(x: center.x + cos(angle) * radius, y: center.y + sin(angle) * radius)
@@ -339,7 +342,7 @@ struct GradientCanvasEditor: View {
             let dx = pX - centerNorm.x
             let dy = pY - centerNorm.y
             let baseAngle = atan2(dy, dx)
-            let r = min(0.49, sqrt(dx*dx + dy*dy)) // same normalized radius
+            let r = min(0.49, sqrt(dx * dx + dy * dy)) // same normalized radius
             let opposite = baseAngle + .pi
             let spread: CGFloat = 0.6 // ~34°
             let angles = [opposite - spread, opposite + spread]
@@ -350,13 +353,13 @@ struct GradientCanvasEditor: View {
                 xPositions[other.id] = pos.x
                 yPositions[other.id] = pos.y
                 // DON'T update gradient.nodes[idx].location - keep their 1st, 2nd, 3rd roles fixed!
-                
+
                 // Update the companion's color to match its new position
                 if let idx = gradient.nodes.firstIndex(where: { $0.id == other.id }) {
                     // Save positions to the model
                     gradient.nodes[idx].xPosition = Double(pos.x)
                     gradient.nodes[idx].yPosition = Double(pos.y)
-                    
+
                     let absolute = CGPoint(x: pos.x * (center.x * 2), y: pos.y * (center.y * 2))
                     let hsla = colorFromCircle(point: absolute, center: center, radius: radius, lightness: lightness)
                     let updated = colorWithPreservedAlpha(oldHex: gradient.nodes[idx].colorHex, newColor: hsla)
@@ -375,13 +378,13 @@ struct GradientCanvasEditor: View {
                 xPositions[other.id] = pos.x
                 yPositions[other.id] = pos.y
                 // DON'T update gradient.nodes[idx].location - keep their 1st, 2nd roles fixed!
-                
+
                 // Update the companion's color to match its new position
                 if let idx = gradient.nodes.firstIndex(where: { $0.id == other.id }) {
                     // Save positions to the model
                     gradient.nodes[idx].xPosition = Double(pos.x)
                     gradient.nodes[idx].yPosition = Double(pos.y)
-                    
+
                     let absolute = CGPoint(x: pos.x * (center.x * 2), y: pos.y * (center.y * 2))
                     let hsla = colorFromCircle(point: absolute, center: center, radius: radius, lightness: lightness)
                     let updated = colorWithPreservedAlpha(oldHex: gradient.nodes[idx].colorHex, newColor: hsla)
@@ -401,27 +404,27 @@ struct GradientCanvasEditor: View {
 
     private func colorFromCircle(point: CGPoint, center: CGPoint, radius: CGFloat, lightness: Double) -> String {
         #if canImport(AppKit)
-        let dx = point.x - center.x
-        let dy = point.y - center.y
-        var angle = atan2(dy, dx)
-        if angle < 0 { angle += 2 * .pi }
-        
-        // Map angle to hue (0-360 degrees)
-        let hue = Double(angle / (2 * .pi))
-        
-        // Calculate distance from center (0 = center, 1 = edge)
-        let dist = min(1.0, Double(sqrt(dx*dx + dy*dy) / radius))
-        
-        // More intuitive color mapping:
-        // - Saturation: High at center (vivid colors), very low at edges (pastels)
-        // - Brightness: Much higher at edges for light pastel effect
-        let saturation = max(0.1, min(1.0, 1.0 - 0.8 * dist))  // 0.1-1.0 range (very low saturation at edges)
-        let brightness = max(0.3, min(1.0, lightness + 0.4 * dist))  // Much brighter at edges for pastels
-        
-        let ns = NSColor(hue: CGFloat(hue), saturation: CGFloat(saturation), brightness: CGFloat(brightness), alpha: 1)
-        return ns.toHexString(includeAlpha: true) ?? "#FFFFFFFF"
+            let dx = point.x - center.x
+            let dy = point.y - center.y
+            var angle = atan2(dy, dx)
+            if angle < 0 { angle += 2 * .pi }
+
+            // Map angle to hue (0-360 degrees)
+            let hue = Double(angle / (2 * .pi))
+
+            // Calculate distance from center (0 = center, 1 = edge)
+            let dist = min(1.0, Double(sqrt(dx * dx + dy * dy) / radius))
+
+            // More intuitive color mapping:
+            // - Saturation: High at center (vivid colors), very low at edges (pastels)
+            // - Brightness: Much higher at edges for light pastel effect
+            let saturation = max(0.1, min(1.0, 1.0 - 0.8 * dist)) // 0.1-1.0 range (very low saturation at edges)
+            let brightness = max(0.3, min(1.0, lightness + 0.4 * dist)) // Much brighter at edges for pastels
+
+            let ns = NSColor(hue: CGFloat(hue), saturation: CGFloat(saturation), brightness: CGFloat(brightness), alpha: 1)
+            return ns.toHexString(includeAlpha: true) ?? "#FFFFFFFF"
         #else
-        return "#FFFFFFFF"
+            return "#FFFFFFFF"
         #endif
     }
 
@@ -429,7 +432,7 @@ struct GradientCanvasEditor: View {
         guard let idx = gradient.nodes.firstIndex(where: { $0.id == node.id }),
               let xPos = xPositions[node.id],
               let yPos = yPositions[node.id] else { return }
-        
+
         let absolute = CGPoint(x: xPos * width, y: yPos * height)
         let hsla = colorFromCircle(point: absolute, center: center, radius: radius, lightness: lightness)
         let updated = colorWithPreservedAlpha(oldHex: gradient.nodes[idx].colorHex, newColor: hsla)
@@ -439,15 +442,15 @@ struct GradientCanvasEditor: View {
     private func colorWithPreservedAlpha(oldHex: String, newColor: String) -> String {
         let aOld = Color(hex: oldHex)
         #if canImport(AppKit)
-        var oa: CGFloat = 1
-        var orv: CGFloat = 0, ogv: CGFloat = 0, obv: CGFloat = 0
-        NSColor(aOld).usingColorSpace(.sRGB)?.getRed(&orv, green: &ogv, blue: &obv, alpha: &oa)
-        var nr: CGFloat = 1, ng: CGFloat = 1, nb: CGFloat = 1, na: CGFloat = 1
-        NSColor(Color(hex: newColor)).usingColorSpace(.sRGB)?.getRed(&nr, green: &ng, blue: &nb, alpha: &na)
-        let combined = NSColor(srgbRed: nr, green: ng, blue: nb, alpha: oa)
-        return combined.toHexString(includeAlpha: true) ?? newColor
+            var oa: CGFloat = 1
+            var orv: CGFloat = 0, ogv: CGFloat = 0, obv: CGFloat = 0
+            NSColor(aOld).usingColorSpace(.sRGB)?.getRed(&orv, green: &ogv, blue: &obv, alpha: &oa)
+            var nr: CGFloat = 1, ng: CGFloat = 1, nb: CGFloat = 1, na: CGFloat = 1
+            NSColor(Color(hex: newColor)).usingColorSpace(.sRGB)?.getRed(&nr, green: &ng, blue: &nb, alpha: &na)
+            let combined = NSColor(srgbRed: nr, green: ng, blue: nb, alpha: oa)
+            return combined.toHexString(includeAlpha: true) ?? newColor
         #else
-        return newColor
+            return newColor
         #endif
     }
 
@@ -455,30 +458,30 @@ struct GradientCanvasEditor: View {
         guard gradient.nodes.count < 3 else { return }
         let source = selectedNodeID.flatMap { id in gradient.nodes.first(where: { $0.id == id }) }
         let color = source?.colorHex ?? gradient.nodes.first?.colorHex ?? "#FFFFFFFF"
-        
+
         // Assign gradient positions based on current count to maintain order
         let gradientPosition: Double
         if gradient.nodes.count == 0 {
-            gradientPosition = 0.0  // First node is primary (0.0)
+            gradientPosition = 0.0 // First node is primary (0.0)
         } else if gradient.nodes.count == 1 {
-            gradientPosition = 1.0  // Second node is secondary (1.0)
+            gradientPosition = 1.0 // Second node is secondary (1.0)
         } else {
-            gradientPosition = 0.5  // Third node goes in the middle (0.5)
+            gradientPosition = 0.5 // Third node goes in the middle (0.5)
         }
-        
+
         let new = GradientNode(id: UUID(), colorHex: color, location: gradientPosition, xPosition: 0.5, yPosition: 0.5)
         gradient.nodes.append(new)
         gradient.nodes.sort { $0.location < $1.location }
         selectedNodeID = new.id
         xPositions[new.id] = 0.5
         yPositions[new.id] = 0.5
-        
+
         // Update color based on position after a brief delay to ensure layout is complete
         DispatchQueue.main.async {
             // We'll update the color in the next layout cycle when positions are properly set
             self.gradientColorManager.setImmediate(self.gradient)
         }
-        
+
         gradientColorManager.setImmediate(gradient)
         // Update preferred primary mapping based on new count
         if gradient.nodes.count == 3 {
@@ -531,6 +534,7 @@ struct GradientCanvasEditor: View {
 }
 
 // MARK: - Handle
+
 private struct Handle: View {
     let colorHex: String
     let selected: Bool
@@ -552,6 +556,7 @@ private struct Handle: View {
 }
 
 // MARK: - DotGrid
+
 private struct DotGrid: View {
     var body: some View {
         GeometryReader { proxy in
@@ -562,8 +567,8 @@ private struct DotGrid: View {
                 let cols = Int(w / spacing)
                 let rows = Int(h / spacing)
                 let dot = Path(ellipseIn: CGRect(x: 0, y: 0, width: 1.5, height: 1.5))
-                for r in 0...rows {
-                    for c in 0...cols {
+                for r in 0 ... rows {
+                    for c in 0 ... cols {
                         let x = CGFloat(c) * spacing + 2
                         let y = CGFloat(r) * spacing + 2
                         ctx.translateBy(x: x, y: y)

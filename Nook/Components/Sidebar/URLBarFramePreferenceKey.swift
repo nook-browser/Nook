@@ -6,4 +6,3 @@ struct URLBarFramePreferenceKey: PreferenceKey {
         value = nextValue()
     }
 }
-

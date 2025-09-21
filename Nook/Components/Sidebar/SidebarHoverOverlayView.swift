@@ -5,8 +5,8 @@
 //  Created by Jonathan Caudill on 2025-09-13.
 //
 
-import SwiftUI
 import AppKit
+import SwiftUI
 
 struct SidebarHoverOverlayView: View {
     @EnvironmentObject var browserManager: BrowserManager
@@ -16,6 +16,7 @@ struct SidebarHoverOverlayView: View {
     private var overlayWidth: CGFloat {
         windowState.isSidebarVisible ? windowState.sidebarWidth : browserManager.getSavedSidebarWidth(for: windowState)
     }
+
     private let cornerRadius: CGFloat = 12
     private let horizontalInset: CGFloat = 8
     private let verticalInset: CGFloat = 10

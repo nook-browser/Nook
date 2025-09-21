@@ -5,17 +5,19 @@
 //  Created by Jonathan Caudill on 2025-09-13.
 //
 
-import SwiftUI
 import AppKit
+import SwiftUI
 
 /// Manages reveal/hide of the overlay sidebar when the real sidebar is collapsed.
 /// Uses a global mouse-move monitor to handle edge hover, including slight overshoot
 /// beyond the window's left boundary.
 final class HoverSidebarManager: ObservableObject {
     // MARK: - Published State
+
     @Published var isOverlayVisible: Bool = false
 
     // MARK: - Configuration
+
     /// Width inside the window that triggers reveal when hovered.
     var triggerWidth: CGFloat = 6
     /// Horizontal slack to the left of the window to catch slight overshoot.
@@ -26,14 +28,17 @@ final class HoverSidebarManager: ObservableObject {
     var verticalSlack: CGFloat = 24
 
     // MARK: - Dependencies
+
     weak var browserManager: BrowserManager?
 
     // MARK: - Monitors
+
     private var globalMonitor: Any?
     private var localMonitor: Any?
     private var isActive: Bool = false
 
     // MARK: - Lifecycle
+
     func attach(browserManager: BrowserManager) {
         self.browserManager = browserManager
     }
@@ -64,6 +69,7 @@ final class HoverSidebarManager: ObservableObject {
     deinit { stop() }
 
     // MARK: - Mouse Logic
+
     private func scheduleHandleMouseMovement() {
         // Ensure main-actor work since we touch NSApp/window and main-actor BrowserManager
         DispatchQueue.main.async { [weak self] in

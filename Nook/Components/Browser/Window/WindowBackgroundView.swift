@@ -34,7 +34,7 @@ struct WindowBackgroundView: View {
                 if browserManager.settingsManager.isLiquidGlassEnabled {
                     Rectangle()
                         .fill(.clear)
-                        .background(.thinMaterial)  // Use thinMaterial for liquid glass effect for better compatability
+                        .background(.thinMaterial) // Use thinMaterial for liquid glass effect for better compatability
                         .blur(radius: 40)
                         .clipped()
                 } else {
@@ -48,8 +48,8 @@ struct WindowBackgroundView: View {
                             .blendMode(.darken)
                     )
                 }
-            }        }
+            }
+        }
         .backgroundDraggable()
     }
 }
-

@@ -51,6 +51,7 @@ final class TrackingProtectionManager {
     }
 
     // MARK: - Exceptions
+
     private var temporarilyDisabledTabs: [UUID: Date] = [:]
     private var allowedDomains: Set<String> = []
 
@@ -122,13 +123,14 @@ final class TrackingProtectionManager {
     }
 
     // MARK: - Installation
+
     private func installRuleListIfNeeded() async {
         // Try to fetch a cached compiled list first
         guard let store = WKContentRuleListStore.default() else { return }
         if let existing = await withCheckedContinuation({ (cont: CheckedContinuation<WKContentRuleList?, Never>) in
             store.lookUpContentRuleList(forIdentifier: ruleListIdentifier) { list, _ in cont.resume(returning: list) }
         }) {
-            self.installedRuleList = existing
+            installedRuleList = existing
             return
         }
 
@@ -149,7 +151,7 @@ final class TrackingProtectionManager {
                 }
             }
         }
-        if let compiled { self.installedRuleList = compiled }
+        if let compiled { installedRuleList = compiled }
     }
 
     private func applyToSharedConfiguration() {
@@ -200,6 +202,7 @@ final class TrackingProtectionManager {
     }
 
     // MARK: - Per-WebView helpers
+
     private func shouldApplyTracking(to tab: Tab) -> Bool {
         if !isEnabled { return false }
         if isTemporarilyDisabled(tabId: tab.id) { return false }
@@ -237,6 +240,7 @@ final class TrackingProtectionManager {
     }
 
     // MARK: - Rules
+
     private static func makeRuleJSON(blockCookies: Bool = true) -> String {
         // Small built-in list of common tracking hosts and a generic third‑party cookie block.
         // If the 'block-cookies' action is unsupported, compile will fail; rule list store
@@ -268,22 +272,23 @@ final class TrackingProtectionManager {
             rules.append([
                 "trigger": [
                     "url-filter": ".*",
-                    "load-type": ["third-party"]
+                    "load-type": ["third-party"],
                 ],
-                "action": ["type": "block-cookies"]
+                "action": ["type": "block-cookies"],
             ])
         }
 
         for host in trackers {
             rules.append([
                 "trigger": ["url-filter": host],
-                "action": ["type": "block"]
+                "action": ["type": "block"],
             ])
         }
 
         // Encode to JSON
         if let data = try? JSONSerialization.data(withJSONObject: rules, options: []),
-           let json = String(data: data, encoding: .utf8) {
+           let json = String(data: data, encoding: .utf8)
+        {
             return json
         }
         return "[]"

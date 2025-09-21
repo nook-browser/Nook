@@ -15,55 +15,55 @@ struct PrivacySettingsView: View {
     @State private var showingCookieManager = false
     @State private var showingCacheManager = false
     @State private var isClearing = false
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             // Cookie Management Section
             VStack(alignment: .leading, spacing: 12) {
                 Text("Cookie Management")
                     .font(.headline)
-                
+
                 VStack(alignment: .leading, spacing: 8) {
                     cookieStatsView
-                    
+
                     HStack {
                         Button("Manage Cookies") {
                             showingCookieManager = true
                         }
                         .buttonStyle(.bordered)
-                        
+
                         Menu("Clear Data") {
                             Button("Clear Expired Cookies") {
                                 clearExpiredCookies()
                             }
-                            
+
                             Button("Clear Third-Party Cookies") {
                                 clearThirdPartyCookies()
                             }
-                            
+
                             Button("Clear High-Risk Cookies") {
                                 clearHighRiskCookies()
                             }
-                            
+
                             Divider()
-                            
+
                             Button("Clear All Cookies") {
                                 clearAllCookies()
                             }
-                            
+
                             Button("Privacy Cleanup") {
                                 performCookiePrivacyCleanup()
                             }
-                            
+
                             Divider()
-                            
+
                             Button("Clear All Website Data", role: .destructive) {
                                 clearAllWebsiteData()
                             }
                         }
                         .buttonStyle(.bordered)
                         .disabled(isClearing)
-                        
+
                         if isClearing {
                             ProgressView()
                                 .scaleEffect(0.8)
@@ -74,55 +74,55 @@ struct PrivacySettingsView: View {
                 .background(Color(NSColor.controlBackgroundColor))
                 .cornerRadius(8)
             }
-            
+
             Divider()
-            
+
             // Cache Management Section
             VStack(alignment: .leading, spacing: 12) {
                 Text("Cache Management")
                     .font(.headline)
-                
+
                 VStack(alignment: .leading, spacing: 8) {
                     cacheStatsView
-                    
+
                     HStack {
                         Button("Manage Cache") {
                             showingCacheManager = true
                         }
                         .buttonStyle(.bordered)
-                        
+
                         Menu("Clear Cache") {
                             Button("Clear Stale Cache") {
                                 clearStaleCache()
                             }
-                            
+
                             Button("Clear Personal Data Cache") {
                                 clearPersonalDataCache()
                             }
-                            
+
                             Button("Clear Disk Cache") {
                                 clearDiskCache()
                             }
-                            
+
                             Button("Clear Memory Cache") {
                                 clearMemoryCache()
                             }
-                            
+
                             Divider()
-                            
+
                             Button("Privacy Cleanup") {
                                 performCachePrivacyCleanup()
                             }
-                            
+
                             Divider()
-                            
+
                             Button("Clear All Cache", role: .destructive) {
                                 clearAllCache()
                             }
                         }
                         .buttonStyle(.bordered)
                         .disabled(isClearing)
-                        
+
                         if isClearing {
                             ProgressView()
                                 .scaleEffect(0.8)
@@ -133,9 +133,9 @@ struct PrivacySettingsView: View {
                 .background(Color(NSColor.controlBackgroundColor))
                 .cornerRadius(8)
             }
-            
+
             Divider()
-            
+
             // Privacy Controls Section
             VStack(alignment: .leading, spacing: 12) {
                 Text("Privacy Controls")
@@ -158,25 +158,25 @@ struct PrivacySettingsView: View {
                 .background(Color(NSColor.controlBackgroundColor))
                 .cornerRadius(8)
             }
-            
+
             Divider()
-            
+
             // Website Data Section
             VStack(alignment: .leading, spacing: 12) {
                 Text("Website Data")
                     .font(.headline)
-                
+
                 VStack(alignment: .leading, spacing: 8) {
                     Button("Clear Browsing History") {
                         clearBrowsingHistory()
                     }
                     .buttonStyle(.bordered)
-                    
+
                     Button("Clear Cache") {
                         clearCache()
                     }
                     .buttonStyle(.bordered)
-                    
+
                     Button("Clear Downloads List") {
                         clearDownloads()
                     }
@@ -186,7 +186,7 @@ struct PrivacySettingsView: View {
                 .background(Color(NSColor.controlBackgroundColor))
                 .cornerRadius(8)
             }
-            
+
             Spacer()
         }
         .padding()
@@ -204,12 +204,12 @@ struct PrivacySettingsView: View {
             CacheManagementView()
         }
     }
-    
+
     // MARK: - Cache Stats View
-    
+
     private var cacheStatsView: some View {
         let stats = cacheManager.getCacheStats()
-        
+
         return VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Image(systemName: "internaldrive")
@@ -220,7 +220,7 @@ struct PrivacySettingsView: View {
                 Text("\(stats.total)")
                     .foregroundColor(.secondary)
             }
-            
+
             if stats.total > 0 {
                 HStack {
                     Spacer().frame(width: 20)
@@ -237,7 +237,7 @@ struct PrivacySettingsView: View {
                         }
                         .font(.caption)
                         .foregroundColor(.secondary)
-                        
+
                         Text("Total size: \(formatSize(stats.totalSize))")
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -247,12 +247,12 @@ struct PrivacySettingsView: View {
             }
         }
     }
-    
+
     // MARK: - Cookie Stats View
-    
+
     private var cookieStatsView: some View {
         let stats = cookieManager.getCookieStats()
-        
+
         return VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Image(systemName: "doc.on.doc")
@@ -263,7 +263,7 @@ struct PrivacySettingsView: View {
                 Text("\(stats.total)")
                     .foregroundColor(.secondary)
             }
-            
+
             if stats.total > 0 {
                 HStack {
                     Spacer().frame(width: 20)
@@ -280,7 +280,7 @@ struct PrivacySettingsView: View {
                         }
                         .font(.caption)
                         .foregroundColor(.secondary)
-                        
+
                         Text("Total size: \(formatSize(stats.totalSize))")
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -290,9 +290,9 @@ struct PrivacySettingsView: View {
             }
         }
     }
-    
+
     // MARK: - Actions
-    
+
     private func clearExpiredCookies() {
         isClearing = true
         Task {
@@ -302,7 +302,7 @@ struct PrivacySettingsView: View {
             }
         }
     }
-    
+
     private func clearAllCookies() {
         isClearing = true
         Task {
@@ -312,7 +312,7 @@ struct PrivacySettingsView: View {
             }
         }
     }
-    
+
     private func clearAllWebsiteData() {
         isClearing = true
         Task {
@@ -326,27 +326,27 @@ struct PrivacySettingsView: View {
             }
         }
     }
-    
+
     private func clearBrowsingHistory() {
         browserManager.historyManager.clearHistory()
     }
-    
+
     private func clearCache() {
         Task {
             let dataStore = WKWebsiteDataStore.default()
             await dataStore.removeData(ofTypes: [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache], modifiedSince: Date.distantPast)
         }
     }
-    
+
     private func clearDownloads() {
         // TODO: Implement download manager clearing
         print("Clear downloads - not implemented yet")
     }
-    
+
     // MARK: - Helper Methods
-    
+
     // MARK: - Cache Action Methods
-    
+
     private func clearStaleCache() {
         isClearing = true
         Task {
@@ -356,7 +356,7 @@ struct PrivacySettingsView: View {
             }
         }
     }
-    
+
     private func clearDiskCache() {
         isClearing = true
         Task {
@@ -366,7 +366,7 @@ struct PrivacySettingsView: View {
             }
         }
     }
-    
+
     private func clearMemoryCache() {
         isClearing = true
         Task {
@@ -376,7 +376,7 @@ struct PrivacySettingsView: View {
             }
         }
     }
-    
+
     private func clearAllCache() {
         isClearing = true
         Task {
@@ -386,9 +386,9 @@ struct PrivacySettingsView: View {
             }
         }
     }
-    
+
     // MARK: - Privacy-Compliant Actions
-    
+
     private func clearThirdPartyCookies() {
         isClearing = true
         Task {
@@ -398,7 +398,7 @@ struct PrivacySettingsView: View {
             }
         }
     }
-    
+
     private func clearHighRiskCookies() {
         isClearing = true
         Task {
@@ -408,7 +408,7 @@ struct PrivacySettingsView: View {
             }
         }
     }
-    
+
     private func performCookiePrivacyCleanup() {
         isClearing = true
         Task {
@@ -418,7 +418,7 @@ struct PrivacySettingsView: View {
             }
         }
     }
-    
+
     private func clearPersonalDataCache() {
         isClearing = true
         Task {
@@ -428,7 +428,7 @@ struct PrivacySettingsView: View {
             }
         }
     }
-    
+
     private func performCachePrivacyCleanup() {
         isClearing = true
         Task {
@@ -438,7 +438,7 @@ struct PrivacySettingsView: View {
             }
         }
     }
-    
+
     private func formatSize(_ bytes: Int) -> String {
         if bytes < 1024 {
             return "\(bytes) bytes"
@@ -448,7 +448,7 @@ struct PrivacySettingsView: View {
             return String(format: "%.1f MB", Double(bytes) / (1024.0 * 1024.0))
         }
     }
-    
+
     private func formatSize(_ bytes: Int64) -> String {
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useAll]

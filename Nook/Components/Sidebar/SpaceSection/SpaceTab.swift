@@ -42,7 +42,7 @@ struct SpaceTab: View {
                         .frame(width: 16, height: 16)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                         .opacity(tab.isUnloaded ? 0.5 : 1.0)
-                    
+
                     if tab.isUnloaded {
                         Image(systemName: "arrow.down.circle.fill")
                             .font(.system(size: 8))
@@ -90,10 +90,10 @@ struct SpaceTab: View {
                     }) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 6)
-                                .fill(isSpeakerHovering ? (isCurrentTab ? AppColors.controlBackgroundHoverLight : AppColors.controlBackgroundActive) : AppColors.controlBackgroundHoverLight.opacity(0))              
+                                .fill(isSpeakerHovering ? (isCurrentTab ? AppColors.controlBackgroundHoverLight : AppColors.controlBackgroundActive) : AppColors.controlBackgroundHoverLight.opacity(0))
                                 .frame(width: 22, height: 22)
                                 .animation(.easeInOut(duration: 0.05), value: isSpeakerHovering)
-                            Image(systemName: tab.isAudioMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")                                                                                                        
+                            Image(systemName: tab.isAudioMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                                 .contentTransition(.symbolEffect(.replace))
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(tab.isAudioMuted ? AppColors.textSecondary : textTab)
@@ -151,21 +151,21 @@ struct SpaceTab: View {
         )
         .contextMenu {
             // Split view
-            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState) } 
-            label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
-            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) } 
-            label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
+            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState) }
+                label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
+            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) }
+                label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
             Divider()
             // Mute/Unmute option (show if tab has audio content OR is muted)
             if tab.hasAudioContent || tab.isAudioMuted {
                 Button(action: onMute) {
-                    Label(tab.isAudioMuted ? "Unmute Audio" : "Mute Audio", 
+                    Label(tab.isAudioMuted ? "Unmute Audio" : "Mute Audio",
                           systemImage: tab.isAudioMuted ? "speaker.wave.2" : "speaker.slash")
                 }
-                
+
                 Divider()
             }
-            
+
             // Unload options
             Button(action: {
                 browserManager.tabManager.unloadTab(tab)
@@ -173,15 +173,15 @@ struct SpaceTab: View {
                 Label("Unload Tab", systemImage: "arrow.down.circle")
             }
             .disabled(tab.isUnloaded)
-            
+
             Button(action: {
                 browserManager.tabManager.unloadAllInactiveTabs()
             }) {
                 Label("Unload All Inactive Tabs", systemImage: "arrow.down.circle.fill")
             }
-            
+
             Divider()
-            
+
             Button(action: onClose) {
                 Label("Close Tab", systemImage: "xmark.circle")
             }
@@ -191,11 +191,11 @@ struct SpaceTab: View {
     private var isActive: Bool {
         return browserManager.currentTab(for: windowState)?.id == tab.id
     }
-    
+
     private var isCurrentTab: Bool {
         return browserManager.currentTab(for: windowState)?.id == tab.id
     }
-    
+
     private var backgroundColor: Color {
         if isCurrentTab {
             return AppColors.activeTab.opacity(0.2)
@@ -205,6 +205,7 @@ struct SpaceTab: View {
             return Color.clear
         }
     }
+
     private var textTab: Color {
         if isCurrentTab {
             return Color.white
@@ -212,5 +213,4 @@ struct SpaceTab: View {
             return Color.white
         }
     }
-
 }

@@ -181,7 +181,7 @@ struct MiniCommandPaletteView: View {
     }
 
     private func handleReturn() {
-        if selectedSuggestionIndex >= 0 && selectedSuggestionIndex < searchManager.suggestions.count {
+        if selectedSuggestionIndex >= 0, selectedSuggestionIndex < searchManager.suggestions.count {
             selectSuggestion(searchManager.suggestions[selectedSuggestionIndex])
         } else {
             let newSuggestion = SearchManager.SearchSuggestion(
@@ -194,17 +194,17 @@ struct MiniCommandPaletteView: View {
 
     private func selectSuggestion(_ suggestion: SearchManager.SearchSuggestion) {
         switch suggestion.type {
-        case .tab(let existingTab):
+        case let .tab(existingTab):
             browserManager.selectTab(existingTab, in: windowState)
-        case .history(let historyEntry):
-            if windowState.shouldNavigateCurrentTab && browserManager.currentTab(for: windowState) != nil {
+        case let .history(historyEntry):
+            if windowState.shouldNavigateCurrentTab, browserManager.currentTab(for: windowState) != nil {
                 browserManager.currentTab(for: windowState)?.loadURL(historyEntry.url.absoluteString)
             } else {
                 browserManager.createNewTab(in: windowState)
                 browserManager.currentTab(for: windowState)?.loadURL(historyEntry.url.absoluteString)
             }
         case .url, .search:
-            if windowState.shouldNavigateCurrentTab && browserManager.currentTab(for: windowState) != nil {
+            if windowState.shouldNavigateCurrentTab, browserManager.currentTab(for: windowState) != nil {
                 browserManager.currentTab(for: windowState)?.navigateToURL(suggestion.text)
             } else {
                 browserManager.createNewTab(in: windowState)
@@ -229,10 +229,10 @@ struct MiniCommandPaletteView: View {
     @ViewBuilder
     private func suggestionRow(for suggestion: SearchManager.SearchSuggestion, isSelected: Bool) -> some View {
         switch suggestion.type {
-        case .tab(let tab):
+        case let .tab(tab):
             TabSuggestionItem(tab: tab, isSelected: isSelected)
                 .foregroundStyle(AppColors.textPrimary)
-        case .history(let entry):
+        case let .history(entry):
             HistorySuggestionItem(entry: entry, isSelected: isSelected)
                 .foregroundStyle(AppColors.textPrimary)
         case .url:

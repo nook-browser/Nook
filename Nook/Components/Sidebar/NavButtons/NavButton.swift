@@ -12,13 +12,13 @@ struct NavButton: View {
     var disabled: Bool
     var action: (() -> Void)?
     @State private var isHovering: Bool = false
-    
+
     init(iconName: String, disabled: Bool = false, action: (() -> Void)? = nil) {
         self.iconName = iconName
         self.action = action
         self.disabled = disabled
     }
-    
+
     var body: some View {
         Button {
             action?()

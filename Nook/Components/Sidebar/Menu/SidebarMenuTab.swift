@@ -15,7 +15,7 @@ struct SidebarMenuTab: View {
     let action: () -> Void
     @State private var isHovering: Bool = false
     @State private var shouldWiggle: Bool = false
-    
+
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: isActive ? activeImage : image)
@@ -24,7 +24,7 @@ struct SidebarMenuTab: View {
                 .symbolRenderingMode(.hierarchical)
                 .symbolEffect(.wiggle, value: shouldWiggle)
                 .contentTransition(.symbolEffect(.replace.magic(fallback: .downUp.byLayer), options: .nonRepeating))
-            
+
             Text(title)
                 .font(.system(size: 12, weight: .semibold))
         }
@@ -39,7 +39,7 @@ struct SidebarMenuTab: View {
         }
         .onTapGesture {
             action()
-                shouldWiggle.toggle()
+            shouldWiggle.toggle()
         }
     }
 }

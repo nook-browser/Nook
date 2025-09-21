@@ -121,7 +121,6 @@ struct SidebarMenuHistoryTab: View {
                         value: isShowingFilters
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 12))
-
                 }
                 .buttonStyle(PlainButtonStyle())
             }
@@ -196,7 +195,7 @@ struct SidebarMenuHistoryTab: View {
                                         if section.id
                                             == groupedHistoryEntries.last?.id
                                             && index == section.entries.count
-                                                - 5
+                                            - 5
                                             && hasMoreResults && !isLoadingMore
                                         {
                                             loadMoreHistory()
@@ -228,7 +227,8 @@ struct SidebarMenuHistoryTab: View {
         }
     }
 
-    //MARK: Functions
+    // MARK: Functions
+
     private func loadHistory() {
         isLoading = true
         currentPage = 0
@@ -250,7 +250,7 @@ struct SidebarMenuHistoryTab: View {
     }
 
     private func loadMoreHistory() {
-        guard hasMoreResults && !isLoadingMore else { return }
+        guard hasMoreResults, !isLoadingMore else { return }
 
         isLoadingMore = true
         currentPage += 1
@@ -474,7 +474,6 @@ struct HistoryRowView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .minimumScaleFactor(0.8)
-
             }
 
             Spacer(minLength: 0)
@@ -517,7 +516,6 @@ struct HistoryRowView: View {
                         isArrowIconHovered = state
                     }
                 }
-
             }
         }
         .padding(.horizontal, 14)
@@ -555,7 +553,7 @@ struct HistoryRowView: View {
         let defaultFavicon = SwiftUI.Image(systemName: "globe")
 
         guard entry.url.scheme == "http" || entry.url.scheme == "https",
-            entry.url.host != nil
+              entry.url.host != nil
         else {
             await MainActor.run {
                 self.favicon = defaultFavicon
@@ -644,7 +642,6 @@ struct FiltersSelectView: View {
                     Spacer()
                 }
             }
-
         }
         .frame(maxWidth: .infinity)
     }
@@ -673,7 +670,7 @@ struct FiltersSelectButton: View {
                     isActive
                         ? .white.opacity(0.6)
                         : isHovering
-                            ? .white.opacity(0.08) : .white.opacity(0.05)
+                        ? .white.opacity(0.08) : .white.opacity(0.05)
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 12))
         }

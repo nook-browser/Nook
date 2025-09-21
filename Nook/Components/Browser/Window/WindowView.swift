@@ -37,7 +37,6 @@ struct WindowView: View {
                     WebsiteView()
                 }
                 .padding(.bottom, 8)
-
             }
             // Overlay the resize handle exactly at the sidebar/webview boundary (no visual gap)
             .overlay(alignment: .topLeading) {
@@ -61,7 +60,7 @@ struct WindowView: View {
 
             CommandPaletteView()
             DialogView()
-            
+
             // Find bar overlay - centered top bar
             if browserManager.findManager.isFindBarVisible {
                 VStack {
@@ -75,7 +74,7 @@ struct WindowView: View {
                     Spacer()
                 }
             }
-            
+
             // (Removed) insertion line overlay; Ora-style DnD uses live reordering
 
             // Profile switch toast overlay (matches WebsitePopup style/presentation)
@@ -112,10 +111,10 @@ struct WindowView: View {
         .environmentObject(browserManager.splitManager)
         .environmentObject(hoverSidebarManager)
     }
-
 }
 
 // MARK: - Profile Switch Toast View
+
 private struct ProfileSwitchToastView: View {
     let toast: BrowserManager.ProfileSwitchToast
 
@@ -147,6 +146,7 @@ private struct ProfileSwitchToastView: View {
 }
 
 // MARK: - Mini Command Palette Overlay (above sidebar and webview)
+
 private struct MiniCommandPaletteOverlay: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var windowState: BrowserWindowState
@@ -177,7 +177,7 @@ private struct MiniCommandPaletteOverlay: View {
                     forcedCornerRadius: 12
                 )
                 .offset(x: anchorX, y: anchorY)
-                    .zIndex(1)
+                .zIndex(1)
             }
         }
         .allowsHitTesting(isVisible)

@@ -7,7 +7,7 @@
 
 import Foundation
 #if canImport(AppKit)
-import AppKit
+    import AppKit
 #endif
 import SwiftUI
 
@@ -57,6 +57,7 @@ struct SpaceGradient: Codable, Hashable {
     }
 
     // MARK: - Primary Color
+
     // Defines a "primary" color for a space derived from the gradient.
     // Rule: pick the node with the lowest location (leading stop). If no nodes
     // are defined, fall back to the system accent-derived default.
@@ -66,37 +67,38 @@ struct SpaceGradient: Codable, Hashable {
     }
 
     #if canImport(SwiftUI)
-    var primaryColor: Color {
-        Color(hex: primaryColorHex)
-    }
+        var primaryColor: Color {
+            Color(hex: primaryColorHex)
+        }
     #endif
 
     #if canImport(AppKit)
-    var primaryNSColor: NSColor {
-        cachedNSColor(for: primaryColorHex)
-    }
+        var primaryNSColor: NSColor {
+            cachedNSColor(for: primaryColorHex)
+        }
     #endif
 
     private static func accentHex() -> String {
         #if canImport(AppKit)
-        let accent = NSColor.controlAccentColor
-        guard let rgb = accent.usingColorSpace(.sRGB) else { return "#007AFF" }
-        var r: CGFloat = 0
-        var g: CGFloat = 0
-        var b: CGFloat = 0
-        var a: CGFloat = 0
-        rgb.getRed(&r, green: &g, blue: &b, alpha: &a)
-        let ri = Int(round(r * 255))
-        let gi = Int(round(g * 255))
-        let bi = Int(round(b * 255))
-        return String(format: "#%02X%02X%02X", ri, gi, bi)
+            let accent = NSColor.controlAccentColor
+            guard let rgb = accent.usingColorSpace(.sRGB) else { return "#007AFF" }
+            var r: CGFloat = 0
+            var g: CGFloat = 0
+            var b: CGFloat = 0
+            var a: CGFloat = 0
+            rgb.getRed(&r, green: &g, blue: &b, alpha: &a)
+            let ri = Int(round(r * 255))
+            let gi = Int(round(g * 255))
+            let bi = Int(round(b * 255))
+            return String(format: "#%02X%02X%02X", ri, gi, bi)
         #else
-        return "#007AFF"
+            return "#007AFF"
         #endif
     }
 }
 
 // MARK: - Codable (custom decode for normalization)
+
 extension SpaceGradient {
     enum CodingKeys: String, CodingKey { case angle, nodes, grain, opacity }
 
@@ -111,19 +113,20 @@ extension SpaceGradient {
 }
 
 // MARK: - Visual Equality
+
 extension SpaceGradient {
     func visuallyEquals(_ other: SpaceGradient, epsilon: Double = 0.5, grainEpsilon: Double = 0.01, opacityEpsilon: Double = 0.01) -> Bool {
         // Compare angle and grain with tolerances
-        let angleDiff = abs(self.angle - other.angle).truncatingRemainder(dividingBy: 360)
+        let angleDiff = abs(angle - other.angle).truncatingRemainder(dividingBy: 360)
         let angleEqual: Bool = angleDiff < epsilon || abs(angleDiff - 360) < epsilon
-        let grainEqual = abs(self.grain - other.grain) <= grainEpsilon
-        let opacityEqual = abs(self.opacity - other.opacity) <= opacityEpsilon
+        let grainEqual = abs(grain - other.grain) <= grainEpsilon
+        let opacityEqual = abs(opacity - other.opacity) <= opacityEpsilon
 
         // Compare nodes ignoring IDs; order by location
-        let aNodes = self.sortedNodes
+        let aNodes = sortedNodes
         let bNodes = other.sortedNodes
         if aNodes.count != bNodes.count { return false }
-        for i in 0..<aNodes.count {
+        for i in 0 ..< aNodes.count {
             let a = aNodes[i]
             let b = bNodes[i]
             if a.colorHex.caseInsensitiveCompare(b.colorHex) != .orderedSame { return false }
@@ -134,6 +137,7 @@ extension SpaceGradient {
 }
 
 // MARK: - Animatable Conformance
+
 // Provide an animatable representation so SwiftUI can smoothly interpolate gradients.
 // We flatten angle, grain and up to maxStops nodes (RGBA + location) into a VectorArithmetic.
 extension SpaceGradient: Animatable {
@@ -147,24 +151,34 @@ extension SpaceGradient: Animatable {
         static var zero: AnimVector { AnimVector() }
         static func + (lhs: AnimVector, rhs: AnimVector) -> AnimVector {
             var out = AnimVector()
-            for i in 0..<width { out.scalars[i] = lhs.scalars[i] + rhs.scalars[i] }
+            for i in 0 ..< width {
+                out.scalars[i] = lhs.scalars[i] + rhs.scalars[i]
+            }
             return out
         }
+
         static func - (lhs: AnimVector, rhs: AnimVector) -> AnimVector {
             var out = AnimVector()
-            for i in 0..<width { out.scalars[i] = lhs.scalars[i] - rhs.scalars[i] }
+            for i in 0 ..< width {
+                out.scalars[i] = lhs.scalars[i] - rhs.scalars[i]
+            }
             return out
         }
+
         mutating func scale(by rhs: Double) {
-            for i in 0..<Self.width { scalars[i] *= rhs }
+            for i in 0 ..< Self.width {
+                scalars[i] *= rhs
+            }
         }
+
         var magnitudeSquared: Double {
-            scalars.reduce(0) { $0 + $1*$1 }
+            scalars.reduce(0) { $0 + $1 * $1 }
         }
+
         static func == (lhs: AnimVector, rhs: AnimVector) -> Bool {
             // Not strictly required for VectorArithmetic but handy for stability
             guard lhs.scalars.count == rhs.scalars.count else { return false }
-            for i in 0..<lhs.scalars.count {
+            for i in 0 ..< lhs.scalars.count {
                 if lhs.scalars[i] != rhs.scalars[i] { return false }
             }
             return true
@@ -206,18 +220,18 @@ extension SpaceGradient: Animatable {
         var idx = 3
         for n in nodes {
             #if canImport(AppKit)
-            let ns = cachedNSColor(for: n.colorHex)
-            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-            ns.getRed(&r, green: &g, blue: &b, alpha: &a)
-            out.scalars[idx + 0] = Double(r)
-            out.scalars[idx + 1] = Double(g)
-            out.scalars[idx + 2] = Double(b)
-            out.scalars[idx + 3] = Double(a)
+                let ns = cachedNSColor(for: n.colorHex)
+                var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+                ns.getRed(&r, green: &g, blue: &b, alpha: &a)
+                out.scalars[idx + 0] = Double(r)
+                out.scalars[idx + 1] = Double(g)
+                out.scalars[idx + 2] = Double(b)
+                out.scalars[idx + 3] = Double(a)
             #else
-            out.scalars[idx + 0] = 1
-            out.scalars[idx + 1] = 1
-            out.scalars[idx + 2] = 1
-            out.scalars[idx + 3] = 1
+                out.scalars[idx + 0] = 1
+                out.scalars[idx + 1] = 1
+                out.scalars[idx + 2] = 1
+                out.scalars[idx + 3] = 1
             #endif
             out.scalars[idx + 4] = min(1, max(0, n.location))
             idx += 5
@@ -226,7 +240,7 @@ extension SpaceGradient: Animatable {
         return out
     }
 
-    private static func decodeFromAnimVector(_ v: AnimVector, fallback: SpaceGradient) -> SpaceGradient {
+    private static func decodeFromAnimVector(_ v: AnimVector, fallback _: SpaceGradient) -> SpaceGradient {
         let cosT = v.scalars[0]
         let sinT = v.scalars[1]
         // Recover angle from cos/sin
@@ -237,25 +251,25 @@ extension SpaceGradient: Animatable {
         var nodes: [GradientNode] = []
         nodes.reserveCapacity(maxStopsForAnimation)
         var idx = 3
-        for _ in 0..<maxStopsForAnimation {
+        for _ in 0 ..< maxStopsForAnimation {
             let r = min(1, max(0, v.scalars[idx + 0]))
             let g = min(1, max(0, v.scalars[idx + 1]))
             let b = min(1, max(0, v.scalars[idx + 2]))
             let a = min(1, max(0, v.scalars[idx + 3]))
             let loc = min(1, max(0, v.scalars[idx + 4]))
             #if canImport(AppKit)
-            let ns = NSColor(srgbRed: CGFloat(r), green: CGFloat(g), blue: CGFloat(b), alpha: CGFloat(a))
-            let hex = ns.toHexString(includeAlpha: true) ?? "#FFFFFFFF"
+                let ns = NSColor(srgbRed: CGFloat(r), green: CGFloat(g), blue: CGFloat(b), alpha: CGFloat(a))
+                let hex = ns.toHexString(includeAlpha: true) ?? "#FFFFFFFF"
             #else
-            let hex = "#FFFFFFFF"
+                let hex = "#FFFFFFFF"
             #endif
             nodes.append(GradientNode(colorHex: hex, location: loc))
             idx += 5
         }
 
         // Ensure monotonic locations to avoid visual artifacts
-        var last: Double = 0.0
-        for i in 0..<nodes.count {
+        var last = 0.0
+        for i in 0 ..< nodes.count {
             if nodes[i].location < last { nodes[i].location = last }
             last = nodes[i].location
         }
@@ -266,12 +280,14 @@ extension SpaceGradient: Animatable {
 }
 
 #if canImport(AppKit)
-// MARK: - Cached NSColor for hex strings (to reduce per-frame parsing)
-private let _SpaceGradientColorCache = NSCache<NSString, NSColor>()
-private func cachedNSColor(for hex: String) -> NSColor {
-    if let c = _SpaceGradientColorCache.object(forKey: hex as NSString) { return c }
-    let ns = NSColor(Color(hex: hex)).usingColorSpace(.sRGB) ?? .black
-    _SpaceGradientColorCache.setObject(ns, forKey: hex as NSString)
-    return ns
-}
+
+    // MARK: - Cached NSColor for hex strings (to reduce per-frame parsing)
+
+    private let _SpaceGradientColorCache = NSCache<NSString, NSColor>()
+    private func cachedNSColor(for hex: String) -> NSColor {
+        if let c = _SpaceGradientColorCache.object(forKey: hex as NSString) { return c }
+        let ns = NSColor(Color(hex: hex)).usingColorSpace(.sRGB) ?? .black
+        _SpaceGradientColorCache.setObject(ns, forKey: hex as NSString)
+        return ns
+    }
 #endif

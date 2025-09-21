@@ -19,11 +19,11 @@ struct SpacesListItem: View {
     private var currentSpaceID: UUID? {
         windowState.currentSpaceId
     }
-    
+
     private var cellSize: CGFloat { compact && !isActive ? 16 : 24 }
     private let dotVisualSize: CGFloat = 6
     private let cornerRadius: CGFloat = 6
-    
+
     var body: some View {
         Button {
             browserManager.setActiveSpace(space, in: windowState)
@@ -99,20 +99,20 @@ struct SpacesListItem: View {
             }
         }
     }
-    
+
     private func changeIcon() {
         let emojis = ["🚀", "💡", "🎯", "⚡️", "🔥", "🌟", "💼", "🏠", "🎨", "📱"]
         let randomEmoji = emojis.randomElement() ?? "🚀"
-        
+
         space.icon = randomEmoji
         browserManager.tabManager.persistSnapshot()
     }
-    
+
     private func isEmoji(_ string: String) -> Bool {
         return string.unicodeScalars.contains { scalar in
             (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF) ||
-            (scalar.value >= 0x2600 && scalar.value <= 0x26FF) ||
-            (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
+                (scalar.value >= 0x2600 && scalar.value <= 0x26FF) ||
+                (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
         }
     }
 

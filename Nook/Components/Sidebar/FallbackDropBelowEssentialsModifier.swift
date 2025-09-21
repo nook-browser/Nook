@@ -34,4 +34,3 @@ struct FallbackDropBelowEssentialsModifier: ViewModifier {
         return browserManager.tabManager.spacePinnedTabs(for: sid).count
     }
 }
-

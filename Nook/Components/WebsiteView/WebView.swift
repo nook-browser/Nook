@@ -16,7 +16,7 @@ struct WebView: NSViewRepresentable {
 
         webView.allowsBackForwardNavigationGestures = true
         webView.allowsMagnification = true
-        
+
         // Enable web inspector for debugging
         if #available(macOS 13.3, *) {
             webView.isInspectable = true
@@ -57,6 +57,7 @@ struct WebView: NSViewRepresentable {
 }
 
 // MARK: - Coordinator
+
 extension WebView {
     class Coordinator: NSObject {
         var onTitleChange: ((String) -> Void)?
@@ -65,10 +66,11 @@ extension WebView {
 }
 
 // MARK: - WKNavigationDelegate
+
 extension WebView.Coordinator: WKNavigationDelegate {
     func webView(
         _ webView: WKWebView,
-        didStartProvisionalNavigation navigation: WKNavigation!
+        didStartProvisionalNavigation _: WKNavigation!
     ) {
         print("Started loading: \(webView.url?.absoluteString ?? "")")
         if let url = webView.url?.absoluteString {
@@ -76,15 +78,15 @@ extension WebView.Coordinator: WKNavigationDelegate {
         }
     }
 
-    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+    func webView(_ webView: WKWebView, didCommit _: WKNavigation!) {
         print("Content started loading: \(webView.url?.absoluteString ?? "")")
     }
 
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+    func webView(_ webView: WKWebView, didFinish _: WKNavigation!) {
         print("Finished loading: \(webView.url?.absoluteString ?? "")")
 
         webView.evaluateJavaScript("document.title") {
-            [weak self] result, error in
+            [weak self] result, _ in
             if let title = result as? String, !title.isEmpty {
                 DispatchQueue.main.async {
                     self?.onTitleChange?(title)
@@ -98,32 +100,32 @@ extension WebView.Coordinator: WKNavigationDelegate {
     }
 
     func webView(
-        _ webView: WKWebView,
-        didFail navigation: WKNavigation!,
+        _: WKWebView,
+        didFail _: WKNavigation!,
         withError error: Error
     ) {
         print("Navigation failed: \(error.localizedDescription)")
     }
 
     func webView(
-        _ webView: WKWebView,
-        didFailProvisionalNavigation navigation: WKNavigation!,
+        _: WKWebView,
+        didFailProvisionalNavigation _: WKNavigation!,
         withError error: Error
     ) {
         print("Provisional navigation failed: \(error.localizedDescription)")
     }
 
     func webView(
-        _ webView: WKWebView,
-        decidePolicyFor navigationAction: WKNavigationAction,
+        _: WKWebView,
+        decidePolicyFor _: WKNavigationAction,
         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
     ) {
         decisionHandler(.allow)
     }
 
     func webView(
-        _ webView: WKWebView,
-        decidePolicyFor navigationResponse: WKNavigationResponse,
+        _: WKWebView,
+        decidePolicyFor _: WKNavigationResponse,
         decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
     ) {
         decisionHandler(.allow)
@@ -131,12 +133,13 @@ extension WebView.Coordinator: WKNavigationDelegate {
 }
 
 // MARK: - WKUIDelegate
+
 extension WebView.Coordinator: WKUIDelegate {
     func webView(
         _ webView: WKWebView,
-        createWebViewWith configuration: WKWebViewConfiguration,
+        createWebViewWith _: WKWebViewConfiguration,
         for navigationAction: WKNavigationAction,
-        windowFeatures: WKWindowFeatures
+        windowFeatures _: WKWindowFeatures
     ) -> WKWebView? {
         if navigationAction.targetFrame == nil {
             webView.load(navigationAction.request)
@@ -145,9 +148,9 @@ extension WebView.Coordinator: WKUIDelegate {
     }
 
     func webView(
-        _ webView: WKWebView,
+        _: WKWebView,
         runJavaScriptAlertPanelWithMessage message: String,
-        initiatedByFrame frame: WKFrameInfo,
+        initiatedByFrame _: WKFrameInfo,
         completionHandler: @escaping () -> Void
     ) {
         let alert = NSAlert()
@@ -159,9 +162,9 @@ extension WebView.Coordinator: WKUIDelegate {
     }
 
     func webView(
-        _ webView: WKWebView,
+        _: WKWebView,
         runJavaScriptConfirmPanelWithMessage message: String,
-        initiatedByFrame frame: WKFrameInfo,
+        initiatedByFrame _: WKFrameInfo,
         completionHandler: @escaping (Bool) -> Void
     ) {
         let alert = NSAlert()
@@ -174,10 +177,10 @@ extension WebView.Coordinator: WKUIDelegate {
     }
 
     func webView(
-        _ webView: WKWebView,
+        _: WKWebView,
         runJavaScriptTextInputPanelWithPrompt prompt: String,
         defaultText: String?,
-        initiatedByFrame frame: WKFrameInfo,
+        initiatedByFrame _: WKFrameInfo,
         completionHandler: @escaping (String?) -> Void
     ) {
         let alert = NSAlert()
@@ -199,46 +202,47 @@ extension WebView.Coordinator: WKUIDelegate {
             completionHandler(nil)
         }
     }
-    
+
     // MARK: - Full-Screen Video Support
+
     @available(macOS 10.15, *)
     func webView(
         _ webView: WKWebView,
         enterFullScreenForVideoWith completionHandler: @escaping (Bool, Error?) -> Void
     ) {
         print("🎬 [WebView] Entering full-screen for video")
-        
+
         // Get the window containing this webView
         guard let window = webView.window else {
             print("❌ [WebView] No window found for full-screen")
             completionHandler(false, NSError(domain: "WebView", code: -1, userInfo: [NSLocalizedDescriptionKey: "No window available for full-screen"]))
             return
         }
-        
+
         // Enter full-screen mode
         window.toggleFullScreen(nil)
-        
+
         // For now, assume success - the actual full-screen state will be handled by the window
         completionHandler(true, nil)
     }
-    
+
     @available(macOS 10.15, *)
     func webView(
         _ webView: WKWebView,
         exitFullScreenWith completionHandler: @escaping (Bool, Error?) -> Void
     ) {
         print("🎬 [WebView] Exiting full-screen for video")
-        
+
         // Get the window containing this webView
         guard let window = webView.window else {
             print("❌ [WebView] No window found for exiting full-screen")
             completionHandler(false, NSError(domain: "WebView", code: -1, userInfo: [NSLocalizedDescriptionKey: "No window available for exiting full-screen"]))
             return
         }
-        
+
         // Exit full-screen mode
         window.toggleFullScreen(nil)
-        
+
         // For now, assume success - the actual full-screen state will be handled by the window
         completionHandler(true, nil)
     }

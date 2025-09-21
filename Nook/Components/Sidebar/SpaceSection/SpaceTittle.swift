@@ -55,7 +55,7 @@ struct SpaceTittle: View {
             }
 
             Spacer()
-            
+
             // Hidden TextField for capturing emoji selection
             TextField("", text: $selectedEmoji)
                 .frame(width: 0, height: 0)
@@ -213,17 +213,17 @@ struct SpaceTittle: View {
     private func assignProfile(_ id: UUID) {
         browserManager.tabManager.assign(spaceId: space.id, toProfile: id)
     }
-    
+
     private func resolvedProfileName(for id: UUID?) -> String? {
         guard let id else { return nil }
         return browserManager.profileManager.profiles.first(where: { $0.id == id })?.name
     }
-    
+
     private func isEmoji(_ string: String) -> Bool {
         return string.unicodeScalars.contains { scalar in
             (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF) ||
-            (scalar.value >= 0x2600 && scalar.value <= 0x26FF) ||
-            (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
+                (scalar.value >= 0x2600 && scalar.value <= 0x26FF) ||
+                (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
         }
     }
 }

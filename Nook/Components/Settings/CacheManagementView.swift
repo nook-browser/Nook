@@ -18,11 +18,11 @@ struct CacheManagementView: View {
     @State private var showingCacheDetails: Bool = false
     @State private var viewMode: ViewMode = .domain
     @Environment(\.dismiss) private var dismiss
-    
+
     enum ViewMode: String, CaseIterable {
         case domain = "By Domain"
         case list = "All Cache"
-        
+
         var icon: String {
             switch self {
             case .domain: return "folder"
@@ -30,19 +30,19 @@ struct CacheManagementView: View {
             }
         }
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Header with stats and controls
             headerView
-            
+
             Divider()
-            
+
             // Search and filter controls
             controlsView
-            
+
             Divider()
-            
+
             // Main content
             if cacheManager.isLoading {
                 loadingView
@@ -62,25 +62,25 @@ struct CacheManagementView: View {
             }
         }
     }
-    
+
     // MARK: - Header View
-    
+
     private var headerView: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Cache Management")
                     .font(.title2)
                     .fontWeight(.semibold)
-                
+
                 let stats = cacheManager.getCacheStats()
                 let faviconStats = cacheManager.getFaviconCacheStats()
                 Text("\(stats.total) cache entries • \(formatSize(stats.totalSize)) total • \(stats.staleCount) stale • \(faviconStats.count) favicons cached")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            
+
             Spacer()
-            
+
             // Action buttons
             HStack(spacing: 12) {
                 Button("Refresh") {
@@ -89,34 +89,34 @@ struct CacheManagementView: View {
                     }
                 }
                 .buttonStyle(.bordered)
-                
+
                 Menu("Clear Cache") {
                     Button("Clear Stale Cache") {
                         Task {
                             await cacheManager.clearStaleCache()
                         }
                     }
-                    
+
                     Button("Clear Disk Cache") {
                         Task {
                             await cacheManager.clearDiskCache()
                         }
                     }
-                    
+
                     Button("Clear Memory Cache") {
                         Task {
                             await cacheManager.clearMemoryCache()
                         }
                     }
-                    
+
                     Button("Clear Favicon Cache") {
                         Task {
                             cacheManager.clearFaviconCache()
                         }
                     }
-                    
+
                     Divider()
-                    
+
                     Button("Clear All Cache", role: .destructive) {
                         Task {
                             await cacheManager.clearAllCache()
@@ -124,7 +124,7 @@ struct CacheManagementView: View {
                     }
                 }
                 .buttonStyle(.bordered)
-                
+
                 Button("Close") {
                     dismiss()
                 }
@@ -134,9 +134,9 @@ struct CacheManagementView: View {
         }
         .padding()
     }
-    
+
     // MARK: - Controls View
-    
+
     private var controlsView: some View {
         HStack {
             // Search
@@ -151,9 +151,9 @@ struct CacheManagementView: View {
             .background(Color(NSColor.controlBackgroundColor))
             .cornerRadius(6)
             .frame(maxWidth: 300)
-            
+
             Spacer()
-            
+
             // View mode toggle
             Picker("View Mode", selection: $viewMode) {
                 ForEach(ViewMode.allCases, id: \.self) { mode in
@@ -163,7 +163,7 @@ struct CacheManagementView: View {
             }
             .pickerStyle(.segmented)
             .frame(width: 200)
-            
+
             // Filter
             Picker("Filter", selection: $selectedFilter) {
                 ForEach(CacheFilter.allCases, id: \.self) { filter in
@@ -172,7 +172,7 @@ struct CacheManagementView: View {
             }
             .pickerStyle(.menu)
             .frame(width: 140)
-            
+
             // Sort
             HStack(spacing: 4) {
                 Picker("Sort", selection: $selectedSort) {
@@ -182,7 +182,7 @@ struct CacheManagementView: View {
                 }
                 .pickerStyle(.menu)
                 .frame(width: 120)
-                
+
                 Button(action: { sortAscending.toggle() }) {
                     Image(systemName: sortAscending ? "arrow.up" : "arrow.down")
                         .font(.caption)
@@ -192,9 +192,9 @@ struct CacheManagementView: View {
         }
         .padding()
     }
-    
+
     // MARK: - Content Views
-    
+
     private var loadingView: some View {
         VStack {
             ProgressView()
@@ -204,7 +204,7 @@ struct CacheManagementView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-    
+
     @ViewBuilder
     private var contentView: some View {
         switch viewMode {
@@ -214,9 +214,9 @@ struct CacheManagementView: View {
             listView
         }
     }
-    
+
     // MARK: - Domain View
-    
+
     private var domainView: some View {
         List {
             ForEach(filteredDomainGroups) { group in
@@ -242,9 +242,9 @@ struct CacheManagementView: View {
         }
         .listStyle(.sidebar)
     }
-    
+
     // MARK: - List View
-    
+
     private var listView: some View {
         Table(filteredAndSortedCache) {
             TableColumn("Domain") { cache in
@@ -256,28 +256,28 @@ struct CacheManagementView: View {
                 }
             }
             .width(min: 120, ideal: 200, max: 300)
-            
+
             TableColumn("Type") { cache in
                 Text(cache.primaryCacheType.rawValue)
                     .foregroundColor(.secondary)
                     .font(.caption)
             }
             .width(min: 80, ideal: 100)
-            
+
             TableColumn("Size") { cache in
                 Text(cache.sizeDescription)
                     .foregroundColor(.secondary)
                     .font(.caption)
             }
             .width(min: 60, ideal: 80)
-            
+
             TableColumn("Last Modified") { cache in
                 Text(cache.lastModifiedDescription)
                     .foregroundColor(cache.isStale ? .orange : .secondary)
                     .font(.caption)
             }
             .width(min: 100, ideal: 150)
-            
+
             TableColumn("Status") { cache in
                 HStack {
                     Circle()
@@ -289,7 +289,7 @@ struct CacheManagementView: View {
                 }
             }
             .width(60)
-            
+
             TableColumn("Actions") { cache in
                 HStack {
                     Button("Details") {
@@ -298,7 +298,7 @@ struct CacheManagementView: View {
                     }
                     .buttonStyle(.borderless)
                     .controlSize(.small)
-                    
+
                     Button("Clear") {
                         Task {
                             await cacheManager.clearSpecificCache(cache)
@@ -313,26 +313,26 @@ struct CacheManagementView: View {
         }
         .tableStyle(.bordered(alternatesRowBackgrounds: true))
     }
-    
+
     // MARK: - Computed Properties
-    
+
     private var filteredDomainGroups: [DomainCacheGroup] {
         let searchFiltered = searchText.isEmpty ? cacheManager.domainGroups :
             cacheManager.domainGroups.filter { group in
                 group.displayDomain.localizedCaseInsensitiveContains(searchText) ||
-                group.cacheEntries.contains { cache in
-                    cache.domain.localizedCaseInsensitiveContains(searchText)
-                }
+                    group.cacheEntries.contains { cache in
+                        cache.domain.localizedCaseInsensitiveContains(searchText)
+                    }
             }
-        
+
         return searchFiltered
     }
-    
+
     private func filteredCacheForGroup(_ group: DomainCacheGroup) -> [CacheInfo] {
         let filtered = group.cacheEntries.filter { selectedFilter.matches($0) }
         return cacheManager.sortCache(filtered, by: selectedSort, ascending: sortAscending)
     }
-    
+
     private var filteredAndSortedCache: [CacheInfo] {
         let searchFiltered = searchText.isEmpty ? cacheManager.cacheEntries : cacheManager.searchCache(searchText)
         let filtered = cacheManager.filterCache(selectedFilter).filter { cache in
@@ -340,9 +340,9 @@ struct CacheManagementView: View {
         }
         return cacheManager.sortCache(filtered, by: selectedSort, ascending: sortAscending)
     }
-    
+
     // MARK: - Helper Methods
-    
+
     private func formatSize(_ bytes: Int64) -> String {
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useAll]
@@ -356,21 +356,21 @@ struct CacheManagementView: View {
 struct DomainCacheRowView: View {
     let group: DomainCacheGroup
     let onDelete: () -> Void
-    
+
     var body: some View {
         HStack {
             Image(systemName: "internaldrive")
                 .foregroundColor(.blue)
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(group.displayDomain)
                     .font(.headline)
-                
+
                 HStack {
                     Text("\(group.entryCount) entries")
                     Text("•")
                     Text(group.totalSizeDescription)
-                    
+
                     if group.hasStaleCache {
                         Text("• Contains stale cache")
                             .foregroundColor(.orange)
@@ -379,20 +379,20 @@ struct DomainCacheRowView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
             }
-            
+
             Spacer()
-            
+
             // Cache efficiency indicator
             VStack(alignment: .trailing, spacing: 2) {
                 Text("\(Int(group.cacheEfficiency * 100))% fresh")
                     .font(.caption)
                     .foregroundColor(group.cacheEfficiency > 0.7 ? .green : .orange)
-                
+
                 ProgressView(value: group.cacheEfficiency)
                     .progressViewStyle(.linear)
                     .frame(width: 60)
             }
-            
+
             Button("Clear All") {
                 onDelete()
             }
@@ -408,21 +408,21 @@ struct CacheRowView: View {
     let cache: CacheInfo
     let onTap: () -> Void
     let onDelete: () -> Void
-    
+
     var body: some View {
         HStack {
             Image(systemName: cache.primaryCacheType.icon)
                 .foregroundColor(Color(cache.primaryCacheType.color))
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(cache.primaryCacheType.rawValue)
                     .font(.system(.body, design: .default))
-                
+
                 HStack {
                     Text(cache.sizeDescription)
                     Text("•")
                     Text(cache.lastModifiedDescription)
-                    
+
                     if cache.isStale {
                         Text("• Stale")
                             .foregroundColor(.orange)
@@ -431,16 +431,16 @@ struct CacheRowView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
             }
-            
+
             Spacer()
-            
+
             HStack {
                 Button("Details") {
                     onTap()
                 }
                 .buttonStyle(.borderless)
                 .controlSize(.small)
-                
+
                 Button("Clear") {
                     onDelete()
                 }

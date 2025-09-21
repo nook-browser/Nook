@@ -16,7 +16,7 @@ struct SpaceView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var windowState: BrowserWindowState
     @State private var draggedItem: UUID? = nil
-    
+
     let onActivateTab: (Tab) -> Void
     let onCloseTab: (Tab) -> Void
     let onPinTab: (Tab) -> Void
@@ -24,28 +24,28 @@ struct SpaceView: View {
     let onMoveTabDown: (Tab) -> Void
     let onMuteTab: (Tab) -> Void
     @EnvironmentObject var splitManager: SplitViewManager
-    
+
     // Get tabs directly from TabManager to ensure proper observation
     private var tabs: [Tab] {
         browserManager.tabManager.tabs(in: space)
     }
-    
+
     private var spacePinnedTabs: [Tab] {
         browserManager.tabManager.spacePinnedTabs(for: space.id)
     }
-    
+
     // (no coordinate spaces needed for simple DnD)
-    
+
     var body: some View {
         return VStack(spacing: 8) {
             SpaceTittle(space: space)
                 .padding(.horizontal, 8)
-            
+
             if !spacePinnedTabs.isEmpty || !tabs.isEmpty {
                 SpaceSeparator(isHovering: isSidebarHovered)
                     .padding(.horizontal, 8)
             }
-            
+
             // Unified container around Pinned + New Tab + Regular to bridge gaps
             VStack(spacing: 0) {
                 // Space-level pinned tabs FIRST
@@ -165,9 +165,9 @@ struct SpaceView: View {
                                                 Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) } label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
                                                 Divider()
                                                 Button { onMoveTabUp(tab) } label: { Label("Move Up", systemImage: "arrow.up") }
-                                                .disabled(isFirstTab(tab))
+                                                    .disabled(isFirstTab(tab))
                                                 Button { onMoveTabDown(tab) } label: { Label("Move Down", systemImage: "arrow.down") }
-                                                .disabled(isLastTab(tab))
+                                                    .disabled(isLastTab(tab))
                                                 Divider()
                                                 Button { browserManager.tabManager.pinTabToSpace(tab, spaceId: space.id) } label: { Label("Pin to Space", systemImage: "pin") }
                                                 Button { onPinTab(tab) } label: { Label("Pin Globally", systemImage: "pin.circle") }
@@ -200,9 +200,9 @@ struct SpaceView: View {
                                             Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) } label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
                                             Divider()
                                             Button { onMoveTabUp(tab) } label: { Label("Move Up", systemImage: "arrow.up") }
-                                            .disabled(isFirstTab(tab))
+                                                .disabled(isFirstTab(tab))
                                             Button { onMoveTabDown(tab) } label: { Label("Move Down", systemImage: "arrow.down") }
-                                            .disabled(isLastTab(tab))
+                                                .disabled(isLastTab(tab))
                                             Divider()
                                             Button { browserManager.tabManager.pinTabToSpace(tab, spaceId: space.id) } label: { Label("Pin to Space", systemImage: "pin") }
                                             Button { onPinTab(tab) } label: { Label("Pin Globally", systemImage: "pin.circle") }
@@ -274,15 +274,15 @@ struct SpaceView: View {
         .onReceive(NotificationCenter.default.publisher(for: .tabDragDidEnd)) { _ in
             draggedItem = nil
         }
-        
+
         func isFirstTab(_ tab: Tab) -> Bool {
             return tabs.first?.id == tab.id
         }
-        
+
         func isLastTab(_ tab: Tab) -> Bool {
             return tabs.last?.id == tab.id
         }
     }
-    
+
     // Removed insertion overlays and geometry preference keys (simplified DnD)
 }

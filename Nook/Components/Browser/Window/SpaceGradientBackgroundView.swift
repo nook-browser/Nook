@@ -55,7 +55,7 @@ struct SpaceGradientBackgroundView: View {
             let single = mapped[0]
             mapped = [
                 Gradient.Stop(color: single.color, location: 0.0),
-                Gradient.Stop(color: single.color, location: 1.0)
+                Gradient.Stop(color: single.color, location: 1.0),
             ]
         }
         return mapped

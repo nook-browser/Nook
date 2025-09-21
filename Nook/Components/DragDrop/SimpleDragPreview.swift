@@ -5,19 +5,18 @@
 //  Simple working drag & drop preview
 //
 
+import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
-import Foundation
 #if canImport(AppKit)
-import AppKit
+    import AppKit
 #endif
-
 
 struct SimpleDragPreview: View {
     @State private var essentialTabs = ["GitHub", "Gmail", "Calendar"]
     @State private var spacePinnedTabs = ["Stack Overflow", "Docs"]
     @State private var regularTabs = ["Claude", "OpenAI", "Anthropic", "YouTube", "Netflix"]
-    
+
     @State private var draggedItem: String?
     @State private var dragSourceSection: DragSection?
     @State private var targetedSection: DragSection?
@@ -35,7 +34,7 @@ struct SimpleDragPreview: View {
     @State private var essentialTopY: CGFloat = 0
     @State private var spacePinnedTopY: CGFloat = 0
     @State private var regularTopY: CGFloat = 0
-    
+
     // Simulated width for preview; in the app this will be driven by `BrowserManager.sidebarWidth`.
     @State private var simulatedSidebarWidth: CGFloat = 250
     @Namespace private var reorderNS
@@ -56,19 +55,19 @@ struct SimpleDragPreview: View {
         let cols = Int(floor((usable + gap) / (item + gap)))
         return min(max(cols, 1), 4)
     }
-    
+
     var body: some View {
         VStack(spacing: 20) {
             Text("🧛 Simple Drag Test")
                 .font(.title2)
                 .fontWeight(.bold)
-            
+
             // Essential Tabs (Pinned) as a responsive grid
             VStack(alignment: .leading, spacing: 8) {
                 Text("Essential Tabs")
                     .font(.headline)
                     .foregroundColor(.secondary)
-                
+
                 // Responsive grid sized by sidebar width and item size
                 let cols = essentialColumnCount(for: simulatedSidebarWidth, item: tileSize, gap: gridGap)
                 LazyVGrid(columns: Array(repeating: GridItem(.fixed(tileSize), spacing: gridGap, alignment: .center), count: cols), alignment: .leading, spacing: gridGap) {
@@ -79,9 +78,9 @@ struct SimpleDragPreview: View {
                             .matchedGeometryEffect(id: "ess_\(tab)", in: reorderNS)
                             .contentShape(RoundedRectangle(cornerRadius: 12))
                             .onDrag {
-#if DEBUG
-                                print("🚀 Starting drag: \(tab) from Essential")
-#endif
+                                #if DEBUG
+                                    print("🚀 Starting drag: \(tab) from Essential")
+                                #endif
                                 targetedSection = nil
                                 targetedIndex = nil
                                 draggedItem = tab
@@ -102,7 +101,7 @@ struct SimpleDragPreview: View {
                 .coordinateSpace(name: "EssentialGridSpace")
                 .onPreferenceChange(EssentialRowCentersKey.self) { dict in
                     // Back-compat for any logic still using row centers
-                    essentialCenters = (0..<essentialTabs.count).compactMap { dict[$0] }
+                    essentialCenters = (0 ..< essentialTabs.count).compactMap { dict[$0] }
                 }
                 .onPreferenceChange(EssentialCellFramesKey.self) { frames in
                     essentialCellFrames = frames
@@ -131,14 +130,14 @@ struct SimpleDragPreview: View {
             .padding()
             .background(Color.gray.opacity(0.1))
             .cornerRadius(12)
-            
+
             Divider()
-            
+
             // Space Section
             VStack(alignment: .leading, spacing: 12) {
                 Text("Development Space")
                     .font(.headline)
-                
+
                 // Space Pinned
                 if !spacePinnedTabs.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
@@ -147,36 +146,35 @@ struct SimpleDragPreview: View {
                             .foregroundColor(.secondary)
 
                         VStack(spacing: 2) {
-
                             ForEach(spacePinnedTabs.indices, id: \.self) { tabIndex in
                                 let tab = spacePinnedTabs[tabIndex]
 
-                            TabRowView(name: tab, isDragged: draggedItem == tab)
-                                .matchedGeometryEffect(id: "sp_\(tab)", in: reorderNS)
-                                .onDrag {
-#if DEBUG
-                                    print("🚀 Starting drag: \(tab) from Space Pinned")
-#endif
-                                    targetedSection = nil
-                                    targetedIndex = nil
-                                    draggedItem = tab
-                                    dragSourceSection = .spacePinned
-                                    isDragging = true
-                                    return NSItemProvider(object: tab as NSString)
-                                }
-                        .background(GeometryReader { proxy in
-                            let local = proxy.frame(in: .named("SpacePinnedSection"))
-                            Color.clear
-                                .preference(key: SpacePinnedRowCentersKey.self, value: [tabIndex: proxy.frame(in: .global).midY])
-                                .preference(key: SpacePinnedRowFramesKey.self, value: [tabIndex: local])
-                        })
+                                TabRowView(name: tab, isDragged: draggedItem == tab)
+                                    .matchedGeometryEffect(id: "sp_\(tab)", in: reorderNS)
+                                    .onDrag {
+                                        #if DEBUG
+                                            print("🚀 Starting drag: \(tab) from Space Pinned")
+                                        #endif
+                                        targetedSection = nil
+                                        targetedIndex = nil
+                                        draggedItem = tab
+                                        dragSourceSection = .spacePinned
+                                        isDragging = true
+                                        return NSItemProvider(object: tab as NSString)
+                                    }
+                                    .background(GeometryReader { proxy in
+                                        let local = proxy.frame(in: .named("SpacePinnedSection"))
+                                        Color.clear
+                                            .preference(key: SpacePinnedRowCentersKey.self, value: [tabIndex: proxy.frame(in: .global).midY])
+                                            .preference(key: SpacePinnedRowFramesKey.self, value: [tabIndex: local])
+                                    })
 
                                 // connected drop handled by section drop delegate
                             }
                         }
                         .coordinateSpace(name: "SpacePinnedSection")
                         .onPreferenceChange(SpacePinnedRowCentersKey.self) { dict in
-                            spacePinnedCenters = (0..<spacePinnedTabs.count).compactMap { dict[$0] }
+                            spacePinnedCenters = (0 ..< spacePinnedTabs.count).compactMap { dict[$0] }
                         }
                         .background(GeometryReader { proxy in
                             Color.clear.preference(key: SpacePinnedContainerTopKey.self, value: proxy.frame(in: .global).minY)
@@ -206,7 +204,7 @@ struct SimpleDragPreview: View {
                     Divider()
                         .padding(.vertical, 4)
                 }
-                
+
                 // Regular Tabs
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Regular Tabs")
@@ -214,16 +212,15 @@ struct SimpleDragPreview: View {
                         .foregroundColor(.secondary)
 
                     VStack(spacing: 2) {
-
                         ForEach(regularTabs.indices, id: \.self) { tabIndex in
                             let tab = regularTabs[tabIndex]
 
                             TabRowView(name: tab, isDragged: draggedItem == tab)
                                 .matchedGeometryEffect(id: "reg_\(tab)", in: reorderNS)
                                 .onDrag {
-#if DEBUG
-                                    print("🚀 Starting drag: \(tab) from Regular")
-#endif
+                                    #if DEBUG
+                                        print("🚀 Starting drag: \(tab) from Regular")
+                                    #endif
                                     targetedSection = nil
                                     targetedIndex = nil
                                     draggedItem = tab
@@ -243,7 +240,7 @@ struct SimpleDragPreview: View {
                     }
                     .coordinateSpace(name: "RegularSection")
                     .onPreferenceChange(RegularRowCentersKey.self) { dict in
-                        regularCenters = (0..<regularTabs.count).compactMap { dict[$0] }
+                        regularCenters = (0 ..< regularTabs.count).compactMap { dict[$0] }
                     }
                     .background(GeometryReader { proxy in
                         Color.clear.preference(key: RegularContainerTopKey.self, value: proxy.frame(in: .global).minY)
@@ -275,9 +272,9 @@ struct SimpleDragPreview: View {
             .padding()
             .background(Color.blue.opacity(0.1))
             .cornerRadius(12)
-            
+
             Spacer()
-            
+
             // Debug Info
             VStack(alignment: .leading, spacing: 4) {
                 Text("Debug Info:")
@@ -301,14 +298,15 @@ struct SimpleDragPreview: View {
                 Text("Sidebar Width: \(Int(simulatedSidebarWidth))px")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                Slider(value: $simulatedSidebarWidth, in: 180...360)
+                Slider(value: $simulatedSidebarWidth, in: 180 ... 360)
                     .padding(.horizontal)
             }
             .padding(.top, 6)
         }
     }
-    
+
     // MARK: - Connected drop overlay (midpoint boundaries)
+
     private func dropTargetOverlay(section: DragSection, boundaries: [CGFloat]) -> some View {
         GeometryReader { proxy in
             ZStack {
@@ -358,14 +356,14 @@ struct SimpleDragPreview: View {
     private func computeGridBoundaries(frames: [Int: CGRect], columns: Int, containerWidth: CGFloat) -> [GridBoundary] {
         let count = frames.count
         guard count > 0 else { return [] }
-        let sorted = (0..<count).compactMap { frames[$0] }
+        let sorted = (0 ..< count).compactMap { frames[$0] }
         guard sorted.count == count else { return [] }
         var boundaries: [GridBoundary] = []
 
         func rowRange(forRow row: Int) -> Range<Int> {
             let start = row * columns
             let end = min(start + columns, count)
-            return start..<end
+            return start ..< end
         }
 
         func rowOf(index: Int) -> Int { max(0, index / columns) }
@@ -374,7 +372,7 @@ struct SimpleDragPreview: View {
         let totalRows = Int(ceil(Double(count) / Double(columns)))
         var rowMinY: [CGFloat] = []
         var rowMaxY: [CGFloat] = []
-        for r in 0..<totalRows {
+        for r in 0 ..< totalRows {
             let rr = rowRange(forRow: r)
             let minY = rr.compactMap { frames[$0]?.minY }.min() ?? 0
             let maxY = rr.compactMap { frames[$0]?.maxY }.max() ?? 0
@@ -382,7 +380,7 @@ struct SimpleDragPreview: View {
             rowMaxY.append(maxY)
         }
 
-        for i in 0...count {
+        for i in 0 ... count {
             if i == 0 {
                 // Before first tile → vertical line at left edge of first column
                 if let first = frames[0] {
@@ -390,7 +388,7 @@ struct SimpleDragPreview: View {
                     let x = first.minX - (gridGap / 2)
                     let yMid = (rowMinY[r] + rowMaxY[r]) / 2
                     let h = rowMaxY[r] - rowMinY[r]
-                    let f = CGRect(x: x - 1.5, y: yMid - h/2, width: 3, height: h)
+                    let f = CGRect(x: x - 1.5, y: yMid - h / 2, width: 3, height: h)
                     boundaries.append(GridBoundary(index: 0, orientation: .vertical, frame: f))
                 }
             } else if i == count {
@@ -404,7 +402,7 @@ struct SimpleDragPreview: View {
                     let x = prev.maxX + (gridGap / 2)
                     let yMid = (rowMinY[lastRow] + rowMaxY[lastRow]) / 2
                     let h = rowMaxY[lastRow] - rowMinY[lastRow]
-                    let f = CGRect(x: x - 1.5, y: yMid - h/2, width: 3, height: h)
+                    let f = CGRect(x: x - 1.5, y: yMid - h / 2, width: 3, height: h)
                     boundaries.append(GridBoundary(index: i, orientation: .vertical, frame: f))
                 } else {
                     // Horizontal below last row across container width
@@ -428,7 +426,7 @@ struct SimpleDragPreview: View {
                     let r = rowOf(index: i)
                     let yMid = (rowMinY[r] + rowMaxY[r]) / 2
                     let h = rowMaxY[r] - rowMinY[r]
-                    let f = CGRect(x: x - 1.5, y: yMid - h/2, width: 3, height: h)
+                    let f = CGRect(x: x - 1.5, y: yMid - h / 2, width: 3, height: h)
                     boundaries.append(GridBoundary(index: i, orientation: .vertical, frame: f))
                 }
             }
@@ -457,7 +455,7 @@ struct SimpleDragPreview: View {
         }
         // Middles
         if centers.count >= 2 {
-            for i in 0..<(centers.count - 1) {
+            for i in 0 ..< (centers.count - 1) {
                 boundaries.append((centers[i] + centers[i + 1]) / 2)
             }
         }
@@ -477,7 +475,7 @@ struct SimpleDragPreview: View {
     private func computeListBoundaries(frames: [Int: CGRect]) -> [CGFloat] {
         let count = frames.count
         guard count > 0 else { return [] }
-        let ordered = (0..<count).compactMap { frames[$0] }
+        let ordered = (0 ..< count).compactMap { frames[$0] }
         guard ordered.count == count else { return [] }
 
         var boundaries: [CGFloat] = []
@@ -492,7 +490,7 @@ struct SimpleDragPreview: View {
         }
         // Middles between each consecutive row
         if count >= 2 {
-            for i in 0..<(count - 1) {
+            for i in 0 ..< (count - 1) {
                 let y = (ordered[i].maxY + ordered[i + 1].minY) / 2
                 boundaries.append(y)
             }
@@ -508,25 +506,26 @@ struct SimpleDragPreview: View {
         }
         return boundaries
     }
-    
-    private func handleDrop(providers: [NSItemProvider], to section: DragSection, atIndex: Int) -> Bool {
-#if DEBUG
-        print("🎯 Drop attempted - Item: \(draggedItem ?? "nil"), From: \(dragSourceSection?.description ?? "nil"), To: \(section.description) at index \(atIndex)")
-#endif
-        
+
+    private func handleDrop(providers _: [NSItemProvider], to section: DragSection, atIndex: Int) -> Bool {
+        #if DEBUG
+            print("🎯 Drop attempted - Item: \(draggedItem ?? "nil"), From: \(dragSourceSection?.description ?? "nil"), To: \(section.description) at index \(atIndex)")
+        #endif
+
         guard let draggedItem = draggedItem,
-              let dragSourceSection = dragSourceSection else { 
-#if DEBUG
-            print("❌ Drop failed - missing drag state")
-#endif
+              let dragSourceSection = dragSourceSection
+        else {
+            #if DEBUG
+                print("❌ Drop failed - missing drag state")
+            #endif
             resetDragState()
-            return false 
+            return false
         }
-        
-#if DEBUG
-        print("✅ Moving \(draggedItem) from \(dragSourceSection.description) to \(section.description) at index \(atIndex)")
-#endif
-        
+
+        #if DEBUG
+            print("✅ Moving \(draggedItem) from \(dragSourceSection.description) to \(section.description) at index \(atIndex)")
+        #endif
+
         // Perform move immediately with tighter spring for crisper reorder
         withAnimation(.spring(response: 0.20, dampingFraction: 0.90, blendDuration: 0.1)) {
             // Remove from source first
@@ -538,7 +537,7 @@ struct SimpleDragPreview: View {
             case .regular:
                 regularTabs.removeAll { $0 == draggedItem }
             }
-            
+
             // Insert at destination with proper index
             switch section {
             case .essential:
@@ -552,15 +551,15 @@ struct SimpleDragPreview: View {
                 regularTabs.insert(draggedItem, at: clampedIndex)
             }
         }
-        
+
         resetDragState()
         return true
     }
-    
+
     private func resetDragState() {
-#if DEBUG
-        print("🔄 Resetting drag state")
-#endif
+        #if DEBUG
+            print("🔄 Resetting drag state")
+        #endif
         draggedItem = nil
         dragSourceSection = nil
         targetedSection = nil
@@ -571,18 +570,18 @@ struct SimpleDragPreview: View {
 struct TabSquareView: View {
     let name: String
     let isDragged: Bool
-    
+
     var body: some View {
-        Button(action: { 
-#if DEBUG
-print("Activated: \(name)")
-#endif
- }) {
+        Button(action: {
+            #if DEBUG
+                print("Activated: \(name)")
+            #endif
+        }) {
             ZStack {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color.gray.opacity(0.2))
                     .frame(width: 44, height: 44)
-                
+
                 Text(String(name.prefix(2)))
                     .font(.caption)
                     .fontWeight(.medium)
@@ -600,33 +599,33 @@ struct TabRowView: View {
     let name: String
     let isDragged: Bool
     @State private var isHovering = false
-    
+
     var body: some View {
-        Button(action: { 
-#if DEBUG
-print("Activated: \(name)")
-#endif
- }) {
+        Button(action: {
+            #if DEBUG
+                print("Activated: \(name)")
+            #endif
+        }) {
             HStack(spacing: 8) {
                 Text(String(name.prefix(1)))
                     .font(.caption)
                     .fontWeight(.medium)
                     .foregroundColor(.secondary)
                     .frame(width: 16, height: 16)
-                
+
                 Text(name)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.primary)
                     .lineLimit(1)
-                
+
                 Spacer()
-                
+
                 if isHovering {
-                    Button(action: { 
-#if DEBUG
-print("Close \(name)")
-#endif
- }) {
+                    Button(action: {
+                        #if DEBUG
+                            print("Close \(name)")
+                        #endif
+                    }) {
                         Image(systemName: "xmark")
                             .font(.system(size: 8, weight: .medium))
                             .foregroundColor(.primary)
@@ -659,6 +658,7 @@ print("Close \(name)")
 }
 
 // MARK: - Row center PreferenceKeys
+
 private struct EssentialRowCentersKey: PreferenceKey {
     static var defaultValue: [Int: CGFloat] = [:]
     static func reduce(value: inout [Int: CGFloat], nextValue: () -> [Int: CGFloat]) {
@@ -705,6 +705,7 @@ private struct RegularRowFramesKey: PreferenceKey {
 }
 
 // MARK: - Drop Delegate
+
 struct SectionBoundedDropDelegate: DropDelegate {
     @Binding var targetedSection: SimpleDragPreview.DragSection?
     @Binding var targetedIndex: Int?
@@ -713,7 +714,7 @@ struct SectionBoundedDropDelegate: DropDelegate {
     let boundariesProvider: () -> [CGFloat]
     let onPerform: (Int) -> Bool
 
-    func validateDrop(info: DropInfo) -> Bool { true }
+    func validateDrop(info _: DropInfo) -> Bool { true }
 
     func dropEntered(info: DropInfo) {
         updateTarget(with: info)
@@ -742,7 +743,7 @@ struct SectionBoundedDropDelegate: DropDelegate {
         return result
     }
 
-    func dropExited(info: DropInfo) {
+    func dropExited(info _: DropInfo) {
         // Intentionally keep current highlight while dragging across gaps/sections.
         // We only clear on successful drop.
     }
@@ -775,6 +776,7 @@ struct SectionBoundedDropDelegate: DropDelegate {
 }
 
 // MARK: - Grid Drop Delegate (Essentials)
+
 // Grid boundary model for essentials grid
 enum GridBoundaryOrientation { case horizontal, vertical }
 struct GridBoundary {
@@ -791,7 +793,7 @@ struct GridBoundedDropDelegate: DropDelegate {
     let boundariesProvider: () -> [GridBoundary]
     let onPerform: (Int) -> Bool
 
-    func validateDrop(info: DropInfo) -> Bool { true }
+    func validateDrop(info _: DropInfo) -> Bool { true }
 
     func dropEntered(info: DropInfo) { updateTarget(with: info) }
 
@@ -815,7 +817,7 @@ struct GridBoundedDropDelegate: DropDelegate {
         return result
     }
 
-    func dropExited(info: DropInfo) {
+    func dropExited(info _: DropInfo) {
         // Keep highlight persistent during drag across sections.
     }
 
@@ -870,17 +872,19 @@ struct GridBoundedDropDelegate: DropDelegate {
 }
 
 // MARK: - Haptics
+
 @inline(__always)
 private func performMoveHaptic() {
-#if canImport(AppKit)
-    NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
-#endif
+    #if canImport(AppKit)
+        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+    #endif
 }
 
 // (Removed explicit labeled cross-category zones; boundaries already handle
 // bottom-of-essentials and top-of-regular as distinct targets.)
 
 // MARK: - Container top PreferenceKeys
+
 private struct EssentialContainerTopKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }

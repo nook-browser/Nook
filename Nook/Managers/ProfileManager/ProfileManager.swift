@@ -6,8 +6,8 @@
 //
 
 import Foundation
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 @MainActor
 final class ProfileManager: ObservableObject {
@@ -20,26 +20,28 @@ final class ProfileManager: ObservableObject {
     }
 
     // MARK: - Loading
+
     func loadProfiles() {
         do {
             var descriptor = FetchDescriptor<ProfileEntity>(
                 sortBy: [SortDescriptor(\.index, order: .forward)]
             )
             let entities = try context.fetch(descriptor)
-            self.profiles = entities.map { e in
+            profiles = entities.map { e in
                 Profile(id: e.id, name: e.name, icon: e.icon)
             }
             // Normalize indices if not sequential 0..n-1
-            let expected = Array(0..<entities.count)
+            let expected = Array(0 ..< entities.count)
             let actual = entities.map { $0.index }
             if actual != expected { persistProfiles() }
         } catch {
             print("[ProfileManager] Failed to load profiles: \(error)")
-            self.profiles = []
+            profiles = []
         }
     }
 
     // MARK: - CRUD
+
     @discardableResult
     func createProfile(name: String, icon: String = "person.crop.circle") -> Profile {
         // Next index is current count (append to end)
@@ -94,7 +96,9 @@ final class ProfileManager: ObservableObject {
             }
             // Optionally, remove entities not present in runtime array
             let keep = Set(profiles.map { $0.id })
-            for (id, e) in byId where !keep.contains(id) { context.delete(e) }
+            for (id, e) in byId where !keep.contains(id) {
+                context.delete(e)
+            }
             try context.save()
         } catch {
             print("[ProfileManager] Persist failed: \(error)")

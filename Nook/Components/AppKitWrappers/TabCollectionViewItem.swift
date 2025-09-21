@@ -11,10 +11,10 @@ final class TabCollectionViewItem: NSCollectionViewItem {
     private var hostingView: NSHostingView<AnyView>?
 
     override func loadView() {
-        self.view = NSView()
-        self.view.translatesAutoresizingMaskIntoConstraints = false
-        self.view.wantsLayer = true
-        self.view.layer?.backgroundColor = NSColor.clear.cgColor
+        view = NSView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.wantsLayer = true
+        view.layer?.backgroundColor = NSColor.clear.cgColor
     }
 
     override func prepareForReuse() {
@@ -24,7 +24,7 @@ final class TabCollectionViewItem: NSCollectionViewItem {
         tab = nil
         dataSource = nil
         browserManager = nil
-        self.view.menu = nil
+        view.menu = nil
     }
 
     func configure(with tab: Tab, dataSource: TabListDataSource, browserManager: BrowserManager) {
@@ -57,14 +57,14 @@ final class TabCollectionViewItem: NSCollectionViewItem {
             hv.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             hv.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             hv.topAnchor.constraint(equalTo: view.topAnchor),
-            hv.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            hv.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
 
         // Attach context menu from data source
         if let idx = dataSource.tabs.firstIndex(where: { $0.id == tab.id }) {
-            self.view.menu = dataSource.contextMenuForTab(at: idx)
+            view.menu = dataSource.contextMenuForTab(at: idx)
         } else {
-            self.view.menu = nil
+            view.menu = nil
         }
     }
 
@@ -80,6 +80,7 @@ private extension View {
 }
 
 // MARK: - SwiftUI host for pinned tile with reactive active state
+
 private struct PinnedTileHost: View {
     @EnvironmentObject var browserManager: BrowserManager
     let tab: Tab

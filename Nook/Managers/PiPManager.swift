@@ -6,32 +6,32 @@
 //  Supports web video PiP via standard WebKit presentation mode APIs.
 //
 
-import Foundation
 import AppKit
+import Foundation
 import WebKit
 
 @MainActor
 final class PiPManager: NSObject {
     static let shared = PiPManager()
-    
-    private override init() {
+
+    override private init() {
         super.init()
     }
-    
+
     // MARK: - Web Video PiP
-    
+
     func requestPiP(for tab: Tab, webView: WKWebView? = nil) {
         let targetWebView = webView ?? tab.webView
         guard let webView = targetWebView else {
             print("[PiP] No webView available")
             return
         }
-        
+
         let pipToggleScript = """
         (function() {
             const video = document.querySelector('video');
             if (!video) return { success: false, error: 'No video found' };
-            
+
             try {
                 // WebKit presentation mode (Safari/macOS)
                 if (video.webkitSupportsPresentationMode && typeof video.webkitSetPresentationMode === 'function') {
@@ -40,7 +40,7 @@ final class PiPManager: NSObject {
                     video.webkitSetPresentationMode(newMode);
                     return { success: true, mode: newMode };
                 }
-                
+
                 // Standard PiP API fallback
                 if (document.pictureInPictureEnabled && video.requestPictureInPicture) {
                     if (document.pictureInPictureElement) {
@@ -53,20 +53,20 @@ final class PiPManager: NSObject {
                         return { success: true, mode: 'picture-in-picture' };
                     }
                 }
-                
+
                 return { success: false, error: 'PiP not supported on this page' };
             } catch (error) {
                 return { success: false, error: error.message };
             }
         })();
         """
-        
+
         webView.evaluateJavaScript(pipToggleScript) { result, error in
             if let error = error {
                 print("[PiP] JavaScript error: \(error.localizedDescription)")
                 return
             }
-            
+
             if let resultDict = result as? [String: Any] {
                 if let success = resultDict["success"] as? Bool, success {
                     if let mode = resultDict["mode"] as? String {
@@ -80,22 +80,22 @@ final class PiPManager: NSObject {
             }
         }
     }
-    
+
     func stopPiP(for tab: Tab, webView: WKWebView? = nil) {
         let targetWebView = webView ?? tab.webView
-        guard let webView = targetWebView else { 
+        guard let webView = targetWebView else {
             print("[PiP] No webView available for stopping PiP")
             tab.hasPiPActive = false
-            return 
+            return
         }
-        
+
         // Check if webView is still valid and can execute JavaScript
         guard webView.navigationDelegate != nil else {
             print("[PiP] WebView delegate is nil, skipping PiP stop")
             tab.hasPiPActive = false
             return
         }
-        
+
         let stopWebPiPScript = """
         (function() {
             try {
@@ -113,7 +113,7 @@ final class PiPManager: NSObject {
             }
         })();
         """
-        
+
         webView.evaluateJavaScript(stopWebPiPScript) { result, error in
             if let error = error {
                 print("[PiP] Error stopping web PiP: \(error.localizedDescription)")
@@ -125,10 +125,10 @@ final class PiPManager: NSObject {
                 }
             }
         }
-        
+
         tab.hasPiPActive = false
     }
-    
+
     func isPiPActive(for tab: Tab) -> Bool {
         return tab.hasPiPActive
     }

@@ -9,26 +9,26 @@ import SwiftUI
 
 struct InsertionLineView: View {
     @ObservedObject var dragManager: TabDragManager
-    
+
     init(dragManager: TabDragManager) {
         self.dragManager = dragManager
     }
-    
+
     var body: some View {
         let shouldShow = dragManager.showInsertionLine && dragManager.insertionLineFrame != .zero
-        
+
         return GeometryReader { _ in
             ZStack {
                 if shouldShow {
                     let frame = dragManager.insertionLineFrame
-                    
+
                     RoundedRectangle(cornerRadius: 2)
                         .fill(
                             LinearGradient(
                                 colors: [
                                     Color.red.opacity(0.9),
                                     Color.red,
-                                    Color.red.opacity(0.9)
+                                    Color.red.opacity(0.9),
                                 ],
                                 startPoint: .leading,
                                 endPoint: .trailing
@@ -50,11 +50,11 @@ struct InsertionLineView: View {
 
 struct InsertionLineModifier: ViewModifier {
     let dragManager: TabDragManager
-    
+
     func body(content: Content) -> some View {
         ZStack {
             content
-            
+
             // Separate layer for insertion line with high z-index
             InsertionLineView(dragManager: dragManager)
                 .animation(.easeInOut(duration: 0.15), value: dragManager.showInsertionLine)

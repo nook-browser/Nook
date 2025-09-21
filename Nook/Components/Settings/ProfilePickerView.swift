@@ -40,6 +40,7 @@ struct ProfilePickerView: View {
     }
 
     // MARK: - Subviews
+
     @ViewBuilder
     private func row(for profile: Profile) -> some View {
         HStack(spacing: 8) {

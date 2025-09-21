@@ -23,7 +23,7 @@ private final class ForceArrowCursorNSView: NSView {
             .activeAlways,
             .mouseEnteredAndExited,
             .mouseMoved,
-            .inVisibleRect
+            .inVisibleRect,
         ]
         trackingArea = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
         addTrackingArea(trackingArea!)
@@ -52,18 +52,19 @@ private final class ForceArrowCursorNSView: NSView {
 }
 
 struct ForceArrowCursorView: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView {
+    func makeNSView(context _: Context) -> NSView {
         let v = ForceArrowCursorNSView(frame: .zero)
         v.wantsLayer = true
         v.layer?.backgroundColor = NSColor.clear.cgColor
         return v
     }
-    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    func updateNSView(_: NSView, context _: Context) {}
 }
 
 extension View {
     /// Ensures the arrow cursor while hovering this view's visual bounds without affecting hit testing.
     func alwaysArrowCursor() -> some View {
-        self.overlay(ForceArrowCursorView().allowsHitTesting(false))
+        overlay(ForceArrowCursorView().allowsHitTesting(false))
     }
 }

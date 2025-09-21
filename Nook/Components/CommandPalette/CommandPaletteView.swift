@@ -5,8 +5,8 @@
 //  Created by Maciek Bagiński on 28/07/2025.
 //
 
-import SwiftUI
 import AppKit
+import SwiftUI
 
 struct CommandPaletteView: View {
     @EnvironmentObject var browserManager: BrowserManager
@@ -23,7 +23,7 @@ struct CommandPaletteView: View {
         let isDark = colorScheme == .dark
         let isActiveWindow = browserManager.activeWindowState?.id == windowState.id
         let isVisible = isActiveWindow && windowState.isCommandPaletteVisible
-        
+
         ZStack {
             Color(.black.opacity(0.2))
                 .ignoresSafeArea()
@@ -35,7 +35,7 @@ struct CommandPaletteView: View {
             GeometryReader { geometry in
                 HStack {
                     Spacer()
-                    
+
                     // Single box that expands/contracts but stays anchored at top
                     VStack(spacing: 0) {
                         // Input field - fixed at top of box
@@ -111,7 +111,7 @@ struct CommandPaletteView: View {
                     .animation(.easeInOut(duration: 0.15), value: searchManager.suggestions.count)
                     .alignmentGuide(.top) { _ in -geometry.size.height / 2 }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    
+
                     Spacer()
                 }
             }
@@ -124,10 +124,10 @@ struct CommandPaletteView: View {
                 searchManager.setTabManager(browserManager.tabManager)
                 searchManager.setHistoryManager(browserManager.historyManager)
                 searchManager.updateProfileContext()
-                
+
                 // Pre-fill text if provided and select all for easy replacement
                 text = windowState.commandPalettePrefilledText
-                
+
                 DispatchQueue.main.async {
                     isSearchFocused = true
                     // Select all once focused so the URL is highlighted
@@ -177,12 +177,13 @@ struct CommandPaletteView: View {
     private func isEmoji(_ string: String) -> Bool {
         return string.unicodeScalars.contains { scalar in
             (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF) ||
-            (scalar.value >= 0x2600 && scalar.value <= 0x26FF) ||
-            (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
+                (scalar.value >= 0x2600 && scalar.value <= 0x26FF) ||
+                (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
         }
     }
 
     // MARK: - Suggestions List Subview
+
     private struct CommandPaletteSuggestionsListView: View {
         @EnvironmentObject var gradientColorManager: GradientColorManager
         let suggestions: [SearchManager.SearchSuggestion]
@@ -215,9 +216,9 @@ struct CommandPaletteView: View {
         @ViewBuilder
         private func row(for suggestion: SearchManager.SearchSuggestion, isSelected: Bool) -> some View {
             switch suggestion.type {
-            case .tab(let tab):
+            case let .tab(tab):
                 TabSuggestionItem(tab: tab, isSelected: isSelected)
-            case .history(let entry):
+            case let .history(entry):
                 HistorySuggestionItem(entry: entry, isSelected: isSelected)
             case .url:
                 GenericSuggestionItem(icon: Image(systemName: "link"), text: suggestion.text, isSelected: isSelected)
@@ -228,8 +229,8 @@ struct CommandPaletteView: View {
     }
 
     private func handleReturn() {
-        if selectedSuggestionIndex >= 0
-            && selectedSuggestionIndex < searchManager.suggestions.count
+        if selectedSuggestionIndex >= 0,
+           selectedSuggestionIndex < searchManager.suggestions.count
         {
             let suggestion = searchManager.suggestions[selectedSuggestionIndex]
             selectSuggestion(suggestion)
@@ -245,12 +246,12 @@ struct CommandPaletteView: View {
 
     private func selectSuggestion(_ suggestion: SearchManager.SearchSuggestion) {
         switch suggestion.type {
-        case .tab(let existingTab):
+        case let .tab(existingTab):
             // Switch to existing tab in this window
             browserManager.selectTab(existingTab, in: windowState)
             print("Switched to existing tab: \(existingTab.name)")
-        case .history(let historyEntry):
-            if windowState.shouldNavigateCurrentTab && browserManager.currentTab(for: windowState) != nil {
+        case let .history(historyEntry):
+            if windowState.shouldNavigateCurrentTab, browserManager.currentTab(for: windowState) != nil {
                 // Navigate current tab to history URL
                 browserManager.currentTab(for: windowState)?.loadURL(historyEntry.url.absoluteString)
                 print("Navigated current tab to history URL: \(historyEntry.url)")
@@ -261,7 +262,7 @@ struct CommandPaletteView: View {
                 print("Created new tab from history in window \(windowState.id)")
             }
         case .url, .search:
-            if windowState.shouldNavigateCurrentTab && browserManager.currentTab(for: windowState) != nil {
+            if windowState.shouldNavigateCurrentTab, browserManager.currentTab(for: windowState) != nil {
                 // Navigate current tab to new URL with proper normalization
                 browserManager.currentTab(for: windowState)?.navigateToURL(suggestion.text)
                 print("Navigated current tab to: \(suggestion.text)")
@@ -287,10 +288,10 @@ struct CommandPaletteView: View {
             selectedSuggestionIndex = max(selectedSuggestionIndex - 1, -1)
         }
     }
-    
+
     private func iconForSuggestion(_ suggestion: SearchManager.SearchSuggestion) -> Image {
         switch suggestion.type {
-        case .tab(let tab):
+        case let .tab(tab):
             return tab.favicon
         case .history:
             return Image(systemName: "globe")
@@ -300,14 +301,14 @@ struct CommandPaletteView: View {
             return Image(systemName: "magnifyingglass")
         }
     }
-    
+
     @ViewBuilder
     private func suggestionRow(for suggestion: SearchManager.SearchSuggestion, isSelected: Bool) -> some View {
         switch suggestion.type {
-        case .tab(let tab):
+        case let .tab(tab):
             TabSuggestionItem(tab: tab, isSelected: isSelected)
                 .foregroundStyle(AppColors.textPrimary)
-        case .history(let entry):
+        case let .history(entry):
             HistorySuggestionItem(entry: entry, isSelected: isSelected)
                 .foregroundStyle(AppColors.textPrimary)
         case .url:
@@ -318,16 +319,16 @@ struct CommandPaletteView: View {
                 .foregroundStyle(AppColors.textPrimary)
         }
     }
-    
+
     private func urlForSuggestion(_ suggestion: SearchManager.SearchSuggestion) -> URL? {
         switch suggestion.type {
-        case .history(let entry):
+        case let .history(entry):
             return entry.url
         default:
             return nil
         }
     }
-    
+
     private func isTabSuggestion(_ suggestion: SearchManager.SearchSuggestion) -> Bool {
         switch suggestion.type {
         case .tab:

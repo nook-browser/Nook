@@ -1,10 +1,10 @@
-import SwiftUI
 import Foundation
+import SwiftUI
 #if canImport(AppKit)
-import AppKit
+    import AppKit
 #endif
 
-struct AppColors {
+enum AppColors {
     static let textPrimary = Color(nsColor: .labelColor)
     static let textSecondary = Color(nsColor: .secondaryLabelColor)
     static let textTertiary = Color(nsColor: .tertiaryLabelColor)
@@ -55,52 +55,51 @@ extension Color {
             opacity: Double(a) / 255
         )
     }
-    
+
     #if canImport(AppKit)
-    func toHexString(includeAlpha: Bool = false) -> String? {
-        let ns = NSColor(self)
-        return ns.toHexString(includeAlpha: includeAlpha)
-    }
+        func toHexString(includeAlpha: Bool = false) -> String? {
+            let ns = NSColor(self)
+            return ns.toHexString(includeAlpha: includeAlpha)
+        }
     #endif
 }
 
 #if canImport(AppKit)
-extension NSColor {
-    func toHexString(includeAlpha: Bool = false) -> String? {
-        guard let rgb = usingColorSpace(.sRGB) else { return nil }
-        var r: CGFloat = 0
-        var g: CGFloat = 0
-        var b: CGFloat = 0
-        var a: CGFloat = 0
-        rgb.getRed(&r, green: &g, blue: &b, alpha: &a)
-        let ri = Int(round(r * 255))
-        let gi = Int(round(g * 255))
-        let bi = Int(round(b * 255))
-        if includeAlpha {
-            let ai = Int(round(a * 255))
-            return String(format: "#%02X%02X%02X%02X", ai, ri, gi, bi)
-        } else {
-            return String(format: "#%02X%02X%02X", ri, gi, bi)
+    extension NSColor {
+        func toHexString(includeAlpha: Bool = false) -> String? {
+            guard let rgb = usingColorSpace(.sRGB) else { return nil }
+            var r: CGFloat = 0
+            var g: CGFloat = 0
+            var b: CGFloat = 0
+            var a: CGFloat = 0
+            rgb.getRed(&r, green: &g, blue: &b, alpha: &a)
+            let ri = Int(round(r * 255))
+            let gi = Int(round(g * 255))
+            let bi = Int(round(b * 255))
+            if includeAlpha {
+                let ai = Int(round(a * 255))
+                return String(format: "#%02X%02X%02X%02X", ai, ri, gi, bi)
+            } else {
+                return String(format: "#%02X%02X%02X", ri, gi, bi)
+            }
+        }
+
+        var perceivedBrightness: CGFloat {
+            guard let rgb = usingColorSpace(.sRGB) else { return 0.5 }
+            var r: CGFloat = 0
+            var g: CGFloat = 0
+            var b: CGFloat = 0
+            var a: CGFloat = 0
+            rgb.getRed(&r, green: &g, blue: &b, alpha: &a)
+
+            if a <= 0.01 { return 1.0 }
+
+            let brightness = (0.299 * r + 0.587 * g + 0.114 * b)
+            return brightness * a + (1 - a)
+        }
+
+        var isPerceivedDark: Bool {
+            perceivedBrightness < 0.6
         }
     }
-
-    var perceivedBrightness: CGFloat {
-        guard let rgb = usingColorSpace(.sRGB) else { return 0.5 }
-        var r: CGFloat = 0
-        var g: CGFloat = 0
-        var b: CGFloat = 0
-        var a: CGFloat = 0
-        rgb.getRed(&r, green: &g, blue: &b, alpha: &a)
-
-        if a <= 0.01 { return 1.0 }
-
-        let brightness = (0.299 * r + 0.587 * g + 0.114 * b)
-        return brightness * a + (1 - a)
-    }
-
-    var isPerceivedDark: Bool {
-        perceivedBrightness < 0.6
-    }
-}
 #endif
-

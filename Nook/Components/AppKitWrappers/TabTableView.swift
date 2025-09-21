@@ -1,6 +1,6 @@
-import SwiftUI
 import AppKit
 import Combine // Added for Combine
+import SwiftUI
 
 enum TabRowMetrics {
     static let rowHeight: CGFloat = 40
@@ -10,11 +10,11 @@ enum TabRowMetrics {
 struct TabTableView<DataSource: TabListDataSource & ObservableObject>: NSViewRepresentable {
     @ObservedObject var dataSource: DataSource
     @EnvironmentObject var browserManager: BrowserManager
-    
+
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSScrollView()
         let tableView = NSTableView()
-        
+
         // Configure table view
         tableView.delegate = context.coordinator
         tableView.dataSource = context.coordinator
@@ -23,7 +23,7 @@ struct TabTableView<DataSource: TabListDataSource & ObservableObject>: NSViewRep
         tableView.backgroundColor = NSColor.clear
         tableView.headerView = nil
         tableView.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
-        
+
         // Configure column
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("TabColumn"))
         column.width = 200
@@ -31,13 +31,13 @@ struct TabTableView<DataSource: TabListDataSource & ObservableObject>: NSViewRep
         column.maxWidth = .greatestFiniteMagnitude
         column.resizingMask = .autoresizingMask
         tableView.addTableColumn(column)
-        
+
         // Configure drag & drop
         tableView.registerForDraggedTypes([PasteboardType.tab])
         tableView.setDraggingSourceOperationMask(.move, forLocal: true)
         tableView.setDraggingSourceOperationMask(.move, forLocal: false)
         tableView.draggingDestinationFeedbackStyle = .gap
-        
+
         // Hook coordinator to table view for change notifications
         context.coordinator.tableView = tableView
 
@@ -49,13 +49,13 @@ struct TabTableView<DataSource: TabListDataSource & ObservableObject>: NSViewRep
             tableView.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
             tableView.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
             tableView.bottomAnchor.constraint(equalTo: scrollView.contentView.bottomAnchor),
-            tableView.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor)
+            tableView.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor),
         ])
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
         scrollView.drawsBackground = false
-        
+
         // Debug visuals to confirm sizing/hit-testing
         scrollView.wantsLayer = true
         scrollView.layer?.backgroundColor = NSColor.systemRed.withAlphaComponent(0.12).cgColor
@@ -63,15 +63,15 @@ struct TabTableView<DataSource: TabListDataSource & ObservableObject>: NSViewRep
 
         return scrollView
     }
-    
+
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let tableView = scrollView.documentView as? NSTableView else { return }
-        
+
         // Update coordinator with new data source
         context.coordinator.parent = self
         context.coordinator.tableView = tableView
         context.coordinator.resubscribeIfNeeded(to: dataSource)
-        
+
         // Reload table data when tabs change
         tableView.reloadData()
 
@@ -81,33 +81,33 @@ struct TabTableView<DataSource: TabListDataSource & ObservableObject>: NSViewRep
             tableView.layoutSubtreeIfNeeded()
         }
     }
-    
+
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
-    
+
     class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         var parent: TabTableView<DataSource>
         private var cancellable: AnyCancellable?
         private var dataSourceSubscription: AnyCancellable?
         private var subscribedDataSourceID: ObjectIdentifier?
         weak var tableView: NSTableView?
-        
+
         init(_ parent: TabTableView<DataSource>) {
             self.parent = parent
             super.init()
-            
+
             // Initial subscription to parent data source
             resubscribeIfNeeded(to: parent.dataSource)
         }
-        
+
         // MARK: - NSTableViewDataSource
-        
-        func numberOfRows(in tableView: NSTableView) -> Int {
+
+        func numberOfRows(in _: NSTableView) -> Int {
             return parent.dataSource.tabs.count
         }
-        
-        func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+
+        func tableView(_: NSTableView, viewFor _: NSTableColumn?, row: Int) -> NSView? {
             guard row < parent.dataSource.tabs.count else { return nil }
 
             let tab = parent.dataSource.tabs[row]
@@ -145,7 +145,7 @@ struct TabTableView<DataSource: TabListDataSource & ObservableObject>: NSViewRep
                 hostingView.leadingAnchor.constraint(equalTo: cellView.leadingAnchor),
                 hostingView.trailingAnchor.constraint(equalTo: cellView.trailingAnchor),
                 hostingView.topAnchor.constraint(equalTo: cellView.topAnchor),
-                hostingView.bottomAnchor.constraint(equalTo: cellView.bottomAnchor)
+                hostingView.bottomAnchor.constraint(equalTo: cellView.bottomAnchor),
             ])
 
             // Attach context menu provided by data source
@@ -153,37 +153,38 @@ struct TabTableView<DataSource: TabListDataSource & ObservableObject>: NSViewRep
 
             return cellView
         }
-        
+
         // MARK: - Drag & Drop
-        
-        func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
+
+        func tableView(_: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
             guard row < parent.dataSource.tabs.count else { return nil }
-            
+
             let tab = parent.dataSource.tabs[row]
             let pasteboardItem = NSPasteboardItem()
             pasteboardItem.setString(tab.id.uuidString, forType: PasteboardType.tab)
             pasteboardItem.setString(tab.id.uuidString, forType: .string)
-#if DEBUG
-            print("[DnD] TabTableView pasteboardWriterForRow row=\(row)")
-#endif
+            #if DEBUG
+                print("[DnD] TabTableView pasteboardWriterForRow row=\(row)")
+            #endif
             return pasteboardItem
         }
-        
-        func tableView(_ tableView: NSTableView, validateDrop info: NSDraggingInfo, proposedRow row: Int, proposedDropOperation dropOperation: NSTableView.DropOperation) -> NSDragOperation {
+
+        func tableView(_: NSTableView, validateDrop info: NSDraggingInfo, proposedRow _: Int, proposedDropOperation dropOperation: NSTableView.DropOperation) -> NSDragOperation {
             // Allow drops between rows when the pasteboard contains a tab id, regardless of source
             guard dropOperation == .above else { return [] }
             let hasTab = info.draggingPasteboard.types?.contains(PasteboardType.tab) ?? false
             return hasTab ? .move : []
         }
-        
-        func tableView(_ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row: Int, dropOperation: NSTableView.DropOperation) -> Bool {
+
+        func tableView(_ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row: Int, dropOperation _: NSTableView.DropOperation) -> Bool {
             guard let pasteboardItems = info.draggingPasteboard.pasteboardItems,
                   let firstItem = pasteboardItems.first,
                   let tabIdString = firstItem.string(forType: PasteboardType.tab),
-                  let tabId = UUID(uuidString: tabIdString) else {
+                  let tabId = UUID(uuidString: tabIdString)
+            else {
                 return false
             }
-            
+
             // Find source index
             if let sourceIndex = parent.dataSource.tabs.firstIndex(where: { $0.id == tabId }) {
                 // Local reorder
@@ -224,19 +225,20 @@ struct TabTableView<DataSource: TabListDataSource & ObservableObject>: NSViewRep
             DispatchQueue.main.async { tableView.reloadData() }
             return true
         }
-        
+
         // MARK: - Selection
-        
+
         func tableViewSelectionDidChange(_ notification: Notification) {
             guard let tableView = notification.object as? NSTableView else { return }
-            
+
             let selectedRow = tableView.selectedRow
-            if selectedRow >= 0 && selectedRow < parent.dataSource.tabs.count {
+            if selectedRow >= 0, selectedRow < parent.dataSource.tabs.count {
                 parent.dataSource.selectTab(at: selectedRow)
             }
         }
-        
+
         // MARK: - Subscription management
+
         func resubscribeIfNeeded(to dataSource: DataSource) {
             let newID = ObjectIdentifier(dataSource)
             guard newID != subscribedDataSourceID else { return }
@@ -249,9 +251,9 @@ struct TabTableView<DataSource: TabListDataSource & ObservableObject>: NSViewRep
                 }
         }
     }
-    
+
     // Mouse-transparent cell so NSTableView receives mouse for drag/selection
     private final class MouseTransparentTableCellView: NSTableCellView {
-        override func hitTest(_ point: NSPoint) -> NSView? { return nil }
+        override func hitTest(_: NSPoint) -> NSView? { return nil }
     }
 }

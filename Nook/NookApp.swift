@@ -5,11 +5,11 @@
 //  Created by Maciek Bagiński on 28/07/2025.
 //
 
-import SwiftUI
-import WebKit
-import OSLog
 import AppKit
 import Carbon
+import OSLog
+import SwiftUI
+import WebKit
 
 @main
 struct NookApp: App {
@@ -47,7 +47,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let urlEventClass = AEEventClass(kInternetEventClass)
     private let urlEventID = AEEventID(kAEGetURL)
 
-    func applicationDidFinishLaunching(_ notification: Notification) {
+    func applicationDidFinishLaunching(_: Notification) {
         NSAppleEventManager.shared().setEventHandler(
             self,
             andSelector: #selector(handleGetURLEvent(_:withReplyEvent:)),
@@ -56,10 +56,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }
 
-    func application(_ application: NSApplication, open urls: [URL]) {
+    func application(_: NSApplication, open urls: [URL]) {
         urls.forEach { handleIncoming(url: $0) }
     }
-    
+
     // Prefer async termination path to avoid MainActor deadlocks
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         AppDelegate.log.info("applicationShouldTerminate: returning terminateLater and starting async persistence")
@@ -110,15 +110,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return .terminateLater
     }
 
-    func applicationWillTerminate(_ notification: Notification) {
+    func applicationWillTerminate(_: Notification) {
         // Keep minimal to avoid MainActor deadlocks; main work happens in applicationShouldTerminate
         AppDelegate.log.info("applicationWillTerminate called")
     }
 
     // MARK: - External URL Handling
-    @objc private func handleGetURLEvent(_ event: NSAppleEventDescriptor, withReplyEvent replyEvent: NSAppleEventDescriptor) {
+
+    @objc private func handleGetURLEvent(_ event: NSAppleEventDescriptor, withReplyEvent _: NSAppleEventDescriptor) {
         guard let stringValue = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue,
-              let url = URL(string: stringValue) else {
+              let url = URL(string: stringValue)
+        else {
             return
         }
         handleIncoming(url: url)
@@ -147,7 +149,7 @@ struct NookCommands: Commands {
         CommandGroup(replacing: .newItem) {}
         CommandGroup(replacing: .windowList) {}
         // Use the native Settings menu (no replacement of .appSettings)
-        
+
         // Sidebar commands
         CommandGroup(after: .sidebar) {
             Button("Toggle Sidebar") {
@@ -159,8 +161,8 @@ struct NookCommands: Commands {
             }
             .keyboardShortcut("p", modifiers: [.command, .shift])
             .disabled(browserManager.currentTabForActiveWindow() == nil ||
-                     !(browserManager.currentTabHasVideoContent() ||
-                       browserManager.currentTabHasPiPActive()))
+                !(browserManager.currentTabHasVideoContent() ||
+                    browserManager.currentTabHasPiPActive()))
         }
 
         // View commands
@@ -169,13 +171,13 @@ struct NookCommands: Commands {
                 browserManager.openCommandPaletteWithCurrentURL()
             }
             .keyboardShortcut("l", modifiers: .command)
-            
+
             Button("Find in Page") {
                 browserManager.showFindBar()
             }
             .keyboardShortcut("f", modifiers: .command)
             .disabled(browserManager.currentTabForActiveWindow() == nil)
-            
+
             Button("Reload Page") {
                 browserManager.refreshCurrentTabInActiveWindow()
             }
@@ -189,33 +191,32 @@ struct NookCommands: Commands {
             .disabled(browserManager.currentTabForActiveWindow() == nil)
 
             Divider()
-            
+
             Button("Web Inspector") {
                 browserManager.openWebInspector()
             }
             .keyboardShortcut("i", modifiers: [.command, .option])
             .disabled(browserManager.currentTabForActiveWindow() == nil)
-            
+
             Divider()
-            
+
             Button("Force Quit App") {
                 browserManager.showQuitDialog()
             }
             .keyboardShortcut("q", modifiers: .command)
-            
+
             Divider()
-            
+
             Button(browserManager.currentTabIsMuted() ? "Unmute Audio" : "Mute Audio") {
                 browserManager.toggleMuteCurrentTabInActiveWindow()
             }
             .keyboardShortcut("m", modifiers: .command)
             .disabled(browserManager.currentTabForActiveWindow() == nil ||
-                     !browserManager.currentTabHasAudioContent())
+                !browserManager.currentTabHasAudioContent())
         }
 
         // File Section
         CommandMenu("File") {
-            
             Button("New Tab") {
                 browserManager.openCommandPalette()
             }
@@ -247,15 +248,14 @@ struct NookCommands: Commands {
             }
             .keyboardShortcut("w", modifiers: .command)
             .disabled(browserManager.tabManager.tabs.isEmpty)
-            
+
             Button("Copy Current URL") {
                 browserManager.copyCurrentURL()
             }
             .keyboardShortcut("c", modifiers: [.command, .shift])
             .disabled(browserManager.currentTabForActiveWindow() == nil)
-
         }
-        
+
         // Privacy/Cookie Commands
         CommandMenu("Privacy") {
             Menu("Clear Cookies") {
@@ -263,73 +263,73 @@ struct NookCommands: Commands {
                     browserManager.clearCurrentPageCookies()
                 }
                 .disabled(browserManager.currentTabForActiveWindow()?.url.host == nil)
-                
+
                 Button("Clear Expired Cookies") {
                     browserManager.clearExpiredCookies()
                 }
-                
+
                 Divider()
-                
+
                 Button("Clear All Cookies") {
                     browserManager.clearAllCookies()
                 }
-                
+
                 Divider()
-                
+
                 Button("Clear Third-Party Cookies") {
                     browserManager.clearThirdPartyCookies()
                 }
-                
+
                 Button("Clear High-Risk Cookies") {
                     browserManager.clearHighRiskCookies()
                 }
             }
-            
+
             Menu("Clear Cache") {
                 Button("Clear Cache for Current Site") {
                     browserManager.clearCurrentPageCache()
                 }
                 .disabled(browserManager.currentTabForActiveWindow()?.url.host == nil)
-                
+
                 Button("Clear Stale Cache") {
                     browserManager.clearStaleCache()
                 }
-                
+
                 Button("Clear Disk Cache") {
                     browserManager.clearDiskCache()
                 }
-                
+
                 Button("Clear Memory Cache") {
                     browserManager.clearMemoryCache()
                 }
-                
+
                 Divider()
-                
+
                 Button("Clear All Cache") {
                     browserManager.clearAllCache()
                 }
-                
+
                 Divider()
-                
+
                 Button("Clear Personal Data Cache") {
                     browserManager.clearPersonalDataCache()
                 }
-                
+
                 Button("Clear Favicon Cache") {
                     browserManager.clearFaviconCache()
                 }
             }
-            
+
             Divider()
-            
+
             Button("Privacy Cleanup") {
                 browserManager.performPrivacyCleanup()
             }
-            
+
             Button("Clear Browsing History") {
                 browserManager.historyManager.clearHistory()
             }
-            
+
             Button("Clear All Website Data") {
                 Task {
                     let dataStore = WKWebsiteDataStore.default()
@@ -338,14 +338,14 @@ struct NookCommands: Commands {
                 }
             }
         }
-        
+
         // Extensions Commands
         CommandMenu("Extensions") {
             Button("Install Extension...") {
                 browserManager.showExtensionInstallDialog()
             }
             .keyboardShortcut("e", modifiers: [.command, .shift])
-            
+
             Button("Manage Extensions...") {
                 // Open native Settings to Extensions pane
                 openSettings()
@@ -359,7 +359,7 @@ struct NookCommands: Commands {
                 }
             }
         }
-        
+
         // Appearance Commands
         CommandMenu("Appearance") {
             Button("Customize Space Gradient...") {
@@ -372,7 +372,7 @@ struct NookCommands: Commands {
 }
 
 struct BackgroundWindowModifier: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView {
+    func makeNSView(context _: Context) -> NSView {
         let view = NSView()
         DispatchQueue.main.async {
             if let window = view.window {
@@ -395,7 +395,6 @@ struct BackgroundWindowModifier: NSViewRepresentable {
         }
         return view
     }
-    func updateNSView(_ nsView: NSView, context: Context) {
 
-    }
+    func updateNSView(_: NSView, context _: Context) {}
 }

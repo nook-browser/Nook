@@ -15,47 +15,49 @@ struct URLBarView: View {
     var body: some View {
         ZStack {
             HStack(spacing: 8) {
-                    if let currentTab = browserManager.currentTab(for: windowState) {
-                        Text(
-                            displayURL
-                        )
+                if let currentTab = browserManager.currentTab(for: windowState) {
+                    Text(
+                        displayURL
+                    )
+                    .font(.system(size: 12, weight: .medium, design: .default))
+                    .foregroundStyle(AppColors.textPrimary.opacity(0.6))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                } else {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 12))
+                        .foregroundStyle(AppColors.textPrimary.opacity(0.6))
+                    Text("Search or Enter URL...")
                         .font(.system(size: 12, weight: .medium, design: .default))
                         .foregroundStyle(AppColors.textPrimary.opacity(0.6))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    } else {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 12))
-                            .foregroundStyle(AppColors.textPrimary.opacity(0.6))
-                        Text("Search or Enter URL...")
-                            .font(.system(size: 12, weight: .medium, design: .default))
-                            .foregroundStyle(AppColors.textPrimary.opacity(0.6))
-                    }
-                    
-                    Spacer()
-                    
-                    // PiP button (show when video content is available or PiP is active)
-                    if let currentTab = browserManager.currentTab(for: windowState),
-                       (currentTab.hasVideoContent || currentTab.hasPiPActive) {
-                        Button(action: {
-                            currentTab.requestPictureInPicture()
-                        }) {
-                            Image(systemName: currentTab.hasPiPActive ? "pip.exit" : "pip.enter")
-                                .font(.system(size: 12))
-                                .foregroundStyle(AppColors.textPrimary.opacity(currentTab.hasPiPActive ? 1.0 : 0.7))
-                        }
-                        .buttonStyle(.plain)
-                        .help(currentTab.hasPiPActive ? "Exit Picture in Picture" : "Enter Picture in Picture")
-                    }
-                    
-                    // Extension action buttons
-                    if #available(macOS 15.5, *),
-                       let extensionManager = browserManager.extensionManager {
-                        ExtensionActionView(extensions: extensionManager.installedExtensions)
-                            .environmentObject(browserManager)
-                    }
                 }
-                .padding(.horizontal, 12)
+
+                Spacer()
+
+                // PiP button (show when video content is available or PiP is active)
+                if let currentTab = browserManager.currentTab(for: windowState),
+                   currentTab.hasVideoContent || currentTab.hasPiPActive
+                {
+                    Button(action: {
+                        currentTab.requestPictureInPicture()
+                    }) {
+                        Image(systemName: currentTab.hasPiPActive ? "pip.exit" : "pip.enter")
+                            .font(.system(size: 12))
+                            .foregroundStyle(AppColors.textPrimary.opacity(currentTab.hasPiPActive ? 1.0 : 0.7))
+                    }
+                    .buttonStyle(.plain)
+                    .help(currentTab.hasPiPActive ? "Exit Picture in Picture" : "Enter Picture in Picture")
+                }
+
+                // Extension action buttons
+                if #available(macOS 15.5, *),
+                   let extensionManager = browserManager.extensionManager
+                {
+                    ExtensionActionView(extensions: extensionManager.installedExtensions)
+                        .environmentObject(browserManager)
+                }
+            }
+            .padding(.horizontal, 12)
         }
         .frame(maxWidth: .infinity, minHeight: 36, maxHeight: 36)
         .background(
@@ -83,23 +85,22 @@ struct URLBarView: View {
         .onTapGesture {
             browserManager.focusURLBar()
         }
-        
     }
-    
+
     private var displayURL: String {
-            guard let currentTab = browserManager.currentTab(for: windowState) else {
-                return ""
-            }
-            return formatURL(currentTab.url)
+        guard let currentTab = browserManager.currentTab(for: windowState) else {
+            return ""
         }
-        
-        private func formatURL(_ url: URL) -> String {
-            guard let host = url.host else {
-                return url.absoluteString
-            }
-            
-            let cleanHost = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
-            
-            return cleanHost
+        return formatURL(currentTab.url)
+    }
+
+    private func formatURL(_ url: URL) -> String {
+        guard let host = url.host else {
+            return url.absoluteString
         }
+
+        let cleanHost = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+
+        return cleanHost
+    }
 }

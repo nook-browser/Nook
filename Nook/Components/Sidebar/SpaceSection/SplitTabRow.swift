@@ -5,13 +5,13 @@ struct SplitTabRow: View {
     let right: Tab
     let spaceId: UUID
     @Binding var draggedItem: UUID?
-    
+
     let onActivate: (Tab) -> Void
     let onClose: (Tab) -> Void
-    
+
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var windowState: BrowserWindowState
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Drop zone above the combined row → targets left tab index
@@ -27,7 +27,7 @@ struct SplitTabRow: View {
                         tabManager: browserManager.tabManager
                     )
                 )
-            
+
             HStack(spacing: 1) {
                 SplitHalfTab(
                     tab: left,
@@ -50,7 +50,7 @@ struct SplitTabRow: View {
             }
             .frame(height: 34)
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            
+
             // Drop zone below the combined row → targets right tab index
             Color.clear
                 .frame(height: 6)
@@ -77,12 +77,12 @@ private struct SplitHalfTab: View {
     @Binding var draggedItem: UUID?
     let onActivate: () -> Void
     let onClose: () -> Void
-    
+
     @State private var isHovering: Bool = false
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var splitManager: SplitViewManager
     @EnvironmentObject var windowState: BrowserWindowState
-    
+
     var body: some View {
         ZStack {
             Button(action: onActivate) {
@@ -126,11 +126,11 @@ private struct SplitHalfTab: View {
         .background(background)
         .onDrop(of: [.text], isTargeted: nil, perform: handleDrop)
     }
-    
+
     private var isActive: Bool {
         browserManager.currentTab(for: windowState)?.id == tab.id
     }
-    
+
     private var background: some View {
         Group {
             if isActive { AppColors.activeTab }
@@ -138,7 +138,7 @@ private struct SplitHalfTab: View {
             else { Color.clear }
         }
     }
-    
+
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
         guard let provider = providers.first else { return false }
         provider.loadObject(ofClass: NSString.self) { obj, _ in

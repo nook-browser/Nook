@@ -10,7 +10,7 @@ import SwiftUI
 struct FindBarView: View {
     @ObservedObject var findManager: FindManager
     @FocusState private var isTextFieldFocused: Bool
-    
+
     var body: some View {
         HStack(spacing: 12) {
             // Search text field
@@ -18,7 +18,7 @@ struct FindBarView: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.secondary)
                     .font(.system(size: 13))
-                
+
                 TextField("Find in page", text: $findManager.searchText)
                     .textFieldStyle(.plain)
                     .focused($isTextFieldFocused)
@@ -35,7 +35,7 @@ struct FindBarView: View {
             .background(Color(NSColor.controlBackgroundColor))
             .cornerRadius(6)
             .frame(minWidth: 200)
-            
+
             // Match count
             if findManager.matchCount > 0 {
                 Text("\(findManager.currentMatchIndex) of \(findManager.matchCount)")
@@ -48,7 +48,7 @@ struct FindBarView: View {
                     .foregroundColor(.secondary)
                     .frame(minWidth: 50)
             }
-            
+
             // Navigation buttons
             HStack(spacing: 2) {
                 Button(action: {
@@ -60,7 +60,7 @@ struct FindBarView: View {
                 .buttonStyle(.plain)
                 .disabled(findManager.searchText.isEmpty)
                 .frame(width: 24, height: 24)
-                
+
                 Button(action: {
                     findManager.findNext()
                 }) {
@@ -75,7 +75,7 @@ struct FindBarView: View {
             .padding(.vertical, 6)
             .background(Color(NSColor.controlBackgroundColor))
             .cornerRadius(6)
-            
+
             // Close button
             Button(action: {
                 findManager.hideFindBar()

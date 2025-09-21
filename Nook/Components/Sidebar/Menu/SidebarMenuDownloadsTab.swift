@@ -14,14 +14,14 @@ struct SidebarMenuDownloadsTab: View {
     @State private var isHovering: Bool = false
     @State private var text: String = ""
     @FocusState private var isSearchFocused: Bool
-    
+
     private var filteredDownloads: [Download] {
         if text.isEmpty {
             return browserManager.downloadManager.allDownloads
         } else {
             return browserManager.downloadManager.allDownloads.filter { download in
                 download.suggestedFilename.localizedCaseInsensitiveContains(text) ||
-                download.originalURL.absoluteString.localizedCaseInsensitiveContains(text)
+                    download.originalURL.absoluteString.localizedCaseInsensitiveContains(text)
             }
         }
     }
@@ -38,7 +38,7 @@ struct SidebarMenuDownloadsTab: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.white.opacity(0.3))
                     .focused($isSearchFocused)
-                
+
                 if !text.isEmpty {
                     Button(action: {
                         text = ""
@@ -63,7 +63,7 @@ struct SidebarMenuDownloadsTab: View {
             .onTapGesture {
                 isSearchFocused = true
             }
-            
+
             ScrollView {
                 VStack(spacing: 8) {
                     if filteredDownloads.isEmpty && !text.isEmpty {
@@ -96,16 +96,15 @@ struct DownloadItem: View {
     @State private var isHovering: Bool = false
     @State private var isIconHovered: Bool = false
     var download: Download
-    
+
     private var canDrag: Bool {
         guard download.state == .completed,
-            let destinationURL = download.destinationURL
+              let destinationURL = download.destinationURL
         else {
             return false
         }
         return FileManager.default.fileExists(atPath: destinationURL.path)
     }
-    
 
     var body: some View {
         HStack(spacing: 8) {
@@ -127,7 +126,7 @@ struct DownloadItem: View {
                     .truncationMode(.tail)
             }
             Spacer()
-            
+
             if isHovering {
                 Menu {
                     Button(action: openFile) {
@@ -144,9 +143,7 @@ struct DownloadItem: View {
                         Label("Move to Trash", systemImage: "trash")
                     }
                 } label: {
-                    Button{
-                        
-                    } label: {
+                    Button {} label: {
                         Image(systemName: "ellipsis")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(.white.opacity(0.6))
@@ -163,8 +160,6 @@ struct DownloadItem: View {
                     isIconHovered = state
                 }
             }
-
-
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
@@ -179,8 +174,8 @@ struct DownloadItem: View {
         }
         .onDrag {
             guard canDrag,
-                let destinationURL = download.destinationURL,
-                FileManager.default.fileExists(atPath: destinationURL.path)
+                  let destinationURL = download.destinationURL,
+                  FileManager.default.fileExists(atPath: destinationURL.path)
             else {
                 return NSItemProvider()
             }

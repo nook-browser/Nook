@@ -5,13 +5,13 @@
 //  Created by Maciek Bagiński on 28/07/2025.
 //
 
-import SwiftUI
 import AppKit
+import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @StateObject private var windowState = BrowserWindowState()
-    
+
     var body: some View {
         WindowView()
             .environmentObject(windowState)
@@ -30,11 +30,11 @@ struct ContentView: View {
 private struct WindowFocusBridge: NSViewRepresentable {
     let windowState: BrowserWindowState
     unowned let browserManager: BrowserManager
-    
+
     func makeCoordinator() -> Coordinator {
         Coordinator(windowState: windowState, browserManager: browserManager)
     }
-    
+
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         DispatchQueue.main.async {
@@ -42,14 +42,14 @@ private struct WindowFocusBridge: NSViewRepresentable {
         }
         return view
     }
-    
+
     func updateNSView(_ nsView: NSView, context: Context) {
         DispatchQueue.main.async {
             context.coordinator.attach(to: nsView.window)
         }
     }
-    
-    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+
+    static func dismantleNSView(_: NSView, coordinator: Coordinator) {
         coordinator.detach()
     }
 

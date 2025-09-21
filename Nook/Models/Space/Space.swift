@@ -7,7 +7,7 @@
 
 import AppKit
 import SwiftUI
- 
+
 // Gradient configuration for spaces
 // See: SpaceGradient.swift
 
@@ -35,7 +35,7 @@ public class Space: NSObject, Identifiable {
         self.icon = icon
         self.color = color
         self.gradient = gradient
-        self.activeTabId = nil
+        activeTabId = nil
         self.profileId = profileId
         super.init()
     }

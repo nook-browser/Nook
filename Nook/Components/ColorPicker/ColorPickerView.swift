@@ -1,9 +1,10 @@
 import SwiftUI
 #if canImport(AppKit)
-import AppKit
+    import AppKit
 #endif
 
 // MARK: - ColorPickerView
+
 // Quadrant-based color grid with 3x3 tones per quadrant
 struct ColorPickerView: View {
     // Current selection used to render selection border
@@ -32,7 +33,7 @@ struct ColorPickerView: View {
             ("Blue", 0.60),
             ("Red", 0.00),
             ("Green", 0.33),
-            ("Yellow", 0.15)
+            ("Yellow", 0.15),
         ]
     }
 
@@ -49,7 +50,8 @@ struct ColorPickerView: View {
                             ColorCell(color: color,
                                       isSelected: selectedColor.map { approxEqual($0, color) } ?? false,
                                       size: cellSize,
-                                      cornerRadius: cornerRadius) {
+                                      cornerRadius: cornerRadius)
+                            {
                                 onColorSelected(color)
                             }
                         }
@@ -64,20 +66,21 @@ struct ColorPickerView: View {
     // Loosely compare two colors in HSB space
     private func approxEqual(_ a: Color, _ b: Color) -> Bool {
         #if canImport(AppKit)
-        let nsA = NSColor(a)
-        let nsB = NSColor(b)
-        var (ha, sa, ba): (CGFloat, CGFloat, CGFloat) = (0,0,0)
-        var (hb, sb, bb): (CGFloat, CGFloat, CGFloat) = (0,0,0)
-        nsA.usingColorSpace(.deviceRGB)?.getHue(&ha, saturation: &sa, brightness: &ba, alpha: nil)
-        nsB.usingColorSpace(.deviceRGB)?.getHue(&hb, saturation: &sb, brightness: &bb, alpha: nil)
-        return abs(ha - hb) < 0.03 && abs(sa - sb) < 0.08 && abs(ba - bb) < 0.08
+            let nsA = NSColor(a)
+            let nsB = NSColor(b)
+            var (ha, sa, ba): (CGFloat, CGFloat, CGFloat) = (0, 0, 0)
+            var (hb, sb, bb): (CGFloat, CGFloat, CGFloat) = (0, 0, 0)
+            nsA.usingColorSpace(.deviceRGB)?.getHue(&ha, saturation: &sa, brightness: &ba, alpha: nil)
+            nsB.usingColorSpace(.deviceRGB)?.getHue(&hb, saturation: &sb, brightness: &bb, alpha: nil)
+            return abs(ha - hb) < 0.03 && abs(sa - sb) < 0.08 && abs(ba - bb) < 0.08
         #else
-        return false
+            return false
         #endif
     }
 }
 
 // MARK: - Cell
+
 private struct ColorCell: View {
     let color: Color
     let isSelected: Bool

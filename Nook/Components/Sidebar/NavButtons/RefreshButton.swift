@@ -12,12 +12,12 @@ struct RefreshButton: View {
     var action: (() -> Void)?
     @State private var isHovering: Bool = false
     @State private var animateFlag = false
-    
+
     init(disabled: Bool = false, action: (() -> Void)? = nil) {
         self.action = action
         self.disabled = disabled
     }
-    
+
     var body: some View {
         Button {
             action?()

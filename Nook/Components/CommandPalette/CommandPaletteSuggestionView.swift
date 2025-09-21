@@ -5,8 +5,8 @@
 //  Created by Maciek Bagiński on 31/07/2025.
 //
 
-import SwiftUI
 import FaviconFinder
+import SwiftUI
 
 struct CommandPaletteSuggestionView: View {
     var favicon: SwiftUI.Image
@@ -17,9 +17,9 @@ struct CommandPaletteSuggestionView: View {
     var historyURL: URL? = nil
     @State private var isHovered: Bool = false
     @State private var resolvedFavicon: SwiftUI.Image? = nil
-    
+
     var body: some View {
-        HStack(alignment: .center,spacing: 12) {
+        HStack(alignment: .center, spacing: 12) {
             (resolvedFavicon ?? favicon)
                 .resizable()
                 .scaledToFit()
@@ -49,7 +49,7 @@ struct CommandPaletteSuggestionView: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
-            
+
             Spacer()
         }
         .padding(.horizontal, 12)
@@ -61,8 +61,9 @@ struct CommandPaletteSuggestionView: View {
             Task { await fetchFavicon(for: url) }
         }
     }
-    
+
     // MARK: - Favicon Fetching (for history items)
+
     private func fetchFavicon(for url: URL) async {
         let defaultFavicon = SwiftUI.Image(systemName: "globe")
         // Skip favicon fetching for non-web schemes
@@ -70,14 +71,14 @@ struct CommandPaletteSuggestionView: View {
             await MainActor.run { self.resolvedFavicon = defaultFavicon }
             return
         }
-        
+
         // Check cache first
         let cacheKey = url.host ?? url.absoluteString
         if let cachedFavicon = Tab.getCachedFavicon(for: cacheKey) {
             await MainActor.run { self.resolvedFavicon = cachedFavicon }
             return
         }
-        
+
         do {
             let favicon = try await FaviconFinder(url: url)
                 .fetchFaviconURLs()
@@ -86,10 +87,10 @@ struct CommandPaletteSuggestionView: View {
             if let faviconImage = favicon.image {
                 let nsImage = faviconImage.image
                 let swiftUIImage = SwiftUI.Image(nsImage: nsImage)
-                
+
                 // Cache the favicon
                 Tab.cacheFavicon(swiftUIImage, for: cacheKey)
-                
+
                 await MainActor.run { self.resolvedFavicon = swiftUIImage }
             } else {
                 await MainActor.run { self.resolvedFavicon = defaultFavicon }
@@ -98,5 +99,4 @@ struct CommandPaletteSuggestionView: View {
             await MainActor.run { self.resolvedFavicon = defaultFavicon }
         }
     }
-    
 }

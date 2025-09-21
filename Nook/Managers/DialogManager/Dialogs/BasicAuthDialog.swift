@@ -5,8 +5,8 @@
 //  Created by Jonathan Caudill on 2025-09-06.
 //
 
-import SwiftUI
 import Observation
+import SwiftUI
 
 @Observable
 final class BasicAuthDialogModel {

@@ -11,7 +11,7 @@ struct GenericSuggestionItem: View {
     let icon: Image
     let text: String
     var isSelected: Bool = false
-        
+
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
             icon

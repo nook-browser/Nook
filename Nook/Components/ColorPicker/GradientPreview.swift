@@ -1,6 +1,7 @@
 import SwiftUI
 
 // MARK: - GradientPreview
+
 // Live preview for SpaceGradient with grain overlay
 struct GradientPreview: View {
     @Binding var gradient: SpaceGradient

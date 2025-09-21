@@ -23,7 +23,6 @@ struct SettingsTabBar: View {
                     .font(.headline)
                 Spacer()
             }
-
         }
         .backgroundDraggable()
     }

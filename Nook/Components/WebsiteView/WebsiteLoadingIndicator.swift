@@ -10,7 +10,7 @@ import SwiftUI
 struct WebsiteLoadingIndicator: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var windowState: BrowserWindowState
-    
+
     var body: some View {
         HStack {
             Spacer()
@@ -30,10 +30,8 @@ struct WebsiteLoadingIndicator: View {
                     zoomCurrentWindow()
                 }
         )
-        
-        
     }
-    
+
     private var indicatorWidth: CGFloat {
         switch browserManager.currentTab(for: windowState)?.loadingState {
         case .idle:

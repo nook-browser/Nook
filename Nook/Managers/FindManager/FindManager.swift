@@ -16,9 +16,9 @@ class FindManager: ObservableObject {
     @Published var matchCount: Int = 0
     @Published var currentMatchIndex: Int = 0
     @Published var isSearching: Bool = false
-    
+
     var currentTab: Tab?
-    
+
     func showFindBar(for tab: Tab? = nil) {
         currentTab = tab
         isFindBarVisible = true
@@ -26,39 +26,39 @@ class FindManager: ObservableObject {
         matchCount = 0
         currentMatchIndex = 0
     }
-    
+
     func hideFindBar() {
         // Clear highlights from current tab before hiding
         if let tab = currentTab {
             tab.clearFindInPage()
         }
-        
+
         isFindBarVisible = false
         searchText = ""
         matchCount = 0
         currentMatchIndex = 0
         currentTab = nil
     }
-    
+
     func search(for text: String, in tab: Tab?) {
         print("FindManager.search called with text: '\(text)', tab: \(String(describing: tab))")
-        
+
         guard let tab = tab else {
             print("FindManager: No tab provided, clearing search")
             clearSearch()
             return
         }
-        
+
         currentTab = tab
         searchText = text
         isSearching = true
-        
+
         if text.isEmpty {
             print("FindManager: Empty text, clearing search")
             clearSearch()
             return
         }
-        
+
         print("FindManager: Calling tab.findInPage with text: '\(text)'")
         // Use JavaScript-based find functionality
         tab.findInPage(text) { [weak self] result in
@@ -69,7 +69,7 @@ class FindManager: ObservableObject {
                     print("FindManager: Search successful - \(matchCount) matches, current: \(currentIndex)")
                     self?.matchCount = matchCount
                     self?.currentMatchIndex = currentIndex
-                case .failure(let error):
+                case let .failure(error):
                     print("FindManager: Find error: \(error.localizedDescription)")
                     self?.matchCount = 0
                     self?.currentMatchIndex = 0
@@ -77,7 +77,7 @@ class FindManager: ObservableObject {
             }
         }
     }
-    
+
     func findNext() {
         guard let tab = currentTab, !searchText.isEmpty else { return }
         tab.findNextInPage { [weak self] result in
@@ -86,13 +86,13 @@ class FindManager: ObservableObject {
                 case .success(let (matchCount, currentIndex)):
                     self?.matchCount = matchCount
                     self?.currentMatchIndex = currentIndex
-                case .failure(let error):
+                case let .failure(error):
                     print("Find next error: \(error.localizedDescription)")
                 }
             }
         }
     }
-    
+
     func findPrevious() {
         guard let tab = currentTab, !searchText.isEmpty else { return }
         tab.findPreviousInPage { [weak self] result in
@@ -101,13 +101,13 @@ class FindManager: ObservableObject {
                 case .success(let (matchCount, currentIndex)):
                     self?.matchCount = matchCount
                     self?.currentMatchIndex = currentIndex
-                case .failure(let error):
+                case let .failure(error):
                     print("Find previous error: \(error.localizedDescription)")
                 }
             }
         }
     }
-    
+
     func clearSearch() {
         guard let tab = currentTab else { return }
         tab.clearFindInPage()
@@ -115,10 +115,10 @@ class FindManager: ObservableObject {
         matchCount = 0
         currentMatchIndex = 0
     }
-    
+
     func updateCurrentTab(_ tab: Tab?) {
         currentTab = tab
-        if isFindBarVisible && !searchText.isEmpty {
+        if isFindBarVisible, !searchText.isEmpty {
             // Re-search in the new tab
             search(for: searchText, in: tab)
         }

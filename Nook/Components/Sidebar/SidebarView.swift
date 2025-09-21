@@ -36,9 +36,9 @@ struct SidebarView: View {
 
     private var targetScrollPosition: Int {
         if let currentSpaceId = windowState.currentSpaceId,
-            let index = browserManager.tabManager.spaces.firstIndex(where: {
-                $0.id == currentSpaceId
-            })
+           let index = browserManager.tabManager.spaces.firstIndex(where: {
+               $0.id == currentSpaceId
+           })
         {
             return index
         }
@@ -90,7 +90,7 @@ struct SidebarView: View {
 
     private func hideMenuAfterDelay() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            if !isMenuButtonHovered && !isDownloadsHovered {
+            if !isMenuButtonHovered, !isDownloadsHovered {
                 animateDownloadsMenu = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     showDownloadsMenu = false
@@ -115,7 +115,7 @@ struct SidebarView: View {
 
         let shouldAnimate =
             (browserManager.activeWindowState?.id == windowState.id)
-            && !browserManager.isTransitioningProfile
+                && !browserManager.isTransitioningProfile
 
         let content = VStack(spacing: 8) {
             HStack(spacing: 2) {
@@ -168,6 +168,7 @@ struct SidebarView: View {
             }
 
             // MARK: - Bottom
+
             HStack {
                 ZStack {
                     NavButton(iconName: "archivebox") {
@@ -192,13 +193,11 @@ struct SidebarView: View {
                                 KeyIcon(iconName: "command", type: .symbol)
                                 KeyIcon(iconName: "L", type: .letter)
                             }
-
                         }
                     }
-                    
+
                     DownloadIndicator()
                         .offset(x: 12, y: -12)
-
                 }
 
                 Spacer()
@@ -212,7 +211,6 @@ struct SidebarView: View {
                     showSpaceCreationDialog()
                 }
                 .helpTooltip("Create a new space")
-
             }
             .frame(height: 32)
             .padding(.horizontal, 8)
@@ -334,14 +332,14 @@ struct SidebarView: View {
                 }
             } else if newPhase == .idle && oldPhase != .idle {
                 // Drag just ended - activate the space and update visible window
-                hasTriggeredHaptic = false  // Reset haptic flag
+                hasTriggeredHaptic = false // Reset haptic flag
                 if let newSpaceIndex = currentScrollID {
                     let space = browserManager.tabManager.spaces[newSpaceIndex]
                     print(
                         "🎯 Drag ended - Activating space: \(space.name) (index: \(newSpaceIndex))"
                     )
                     browserManager.setActiveSpace(space, in: windowState)
-                    activeSpaceIndex = newSpaceIndex  // Update visible window ONLY on drag end
+                    activeSpaceIndex = newSpaceIndex // Update visible window ONLY on drag end
                 }
             }
         }

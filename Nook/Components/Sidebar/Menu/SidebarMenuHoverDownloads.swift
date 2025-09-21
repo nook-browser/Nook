@@ -41,8 +41,7 @@ struct SidebarMenuHoverDownloads: View {
 
     var body: some View {
         VStack(spacing: 4) {
-            ForEach(Array(prioritizedDownloads.enumerated()), id: \.element.id)
-            { index, download in
+            ForEach(Array(prioritizedDownloads.enumerated()), id: \.element.id) { index, download in
                 SidebarMenuHoverDownloadItem(download: download, index: index)
                     .offset(
                         y: (index < itemsVisible.count && itemsVisible[index])
@@ -101,7 +100,7 @@ struct SidebarMenuHoverDownloads: View {
     }
 
     func show() {
-        for index in 0..<itemsVisible.count {
+        for index in 0 ..< itemsVisible.count {
             DispatchQueue.main.asyncAfter(
                 deadline: .now() + Double(itemsVisible.count - index) * 0.01
             ) {
@@ -113,7 +112,7 @@ struct SidebarMenuHoverDownloads: View {
     }
 
     func hide() {
-        for index in 0..<itemsVisible.count {
+        for index in 0 ..< itemsVisible.count {
             DispatchQueue.main.asyncAfter(
                 deadline: .now() + Double(index) * 0.01
             ) {
@@ -172,7 +171,7 @@ struct SidebarMenuHoverDownloadItem: View {
 
     private var canDrag: Bool {
         guard download.state == .completed,
-            let destinationURL = download.destinationURL
+              let destinationURL = download.destinationURL
         else {
             return false
         }
@@ -230,7 +229,6 @@ struct SidebarMenuHoverDownloadItem: View {
             }
 
             Spacer(minLength: 0)
-
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 8)
@@ -243,16 +241,16 @@ struct SidebarMenuHoverDownloadItem: View {
         }
         .onTapGesture {
             if let destinationURL = download.destinationURL,
-                download.state == .completed,
-                FileManager.default.fileExists(atPath: destinationURL.path)
+               download.state == .completed,
+               FileManager.default.fileExists(atPath: destinationURL.path)
             {
                 NSWorkspace.shared.activateFileViewerSelecting([destinationURL])
             }
         }
         .onDrag {
             guard canDrag,
-                let destinationURL = download.destinationURL,
-                FileManager.default.fileExists(atPath: destinationURL.path)
+                  let destinationURL = download.destinationURL,
+                  FileManager.default.fileExists(atPath: destinationURL.path)
             else {
                 return NSItemProvider()
             }

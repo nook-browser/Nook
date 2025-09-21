@@ -11,7 +11,7 @@ struct BlurEffectView: NSViewRepresentable {
     var material: NSVisualEffectView.Material
     var state: NSVisualEffectView.State
 
-    func makeNSView(context: Context) -> NSVisualEffectView {
+    func makeNSView(context _: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
         view.material = material
         view.state = .active
@@ -20,7 +20,7 @@ struct BlurEffectView: NSViewRepresentable {
         return view
     }
 
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+    func updateNSView(_ nsView: NSVisualEffectView, context _: Context) {
         nsView.material = material
         nsView.state = state
     }

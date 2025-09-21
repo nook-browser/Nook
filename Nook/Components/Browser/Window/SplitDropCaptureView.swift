@@ -26,9 +26,10 @@ final class SplitDropCaptureView: NSView {
     }
 
     // Only intercept events during an active drag; otherwise pass through
-    override func hitTest(_ point: NSPoint) -> NSView? { isDragActive ? self : nil }
+    override func hitTest(_: NSPoint) -> NSView? { isDragActive ? self : nil }
 
     // MARK: - Dragging
+
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
         isDragActive = true
         updatePreview(sender)
@@ -41,7 +42,7 @@ final class SplitDropCaptureView: NSView {
         return .copy
     }
 
-    override func draggingExited(_ sender: NSDraggingInfo?) {
+    override func draggingExited(_: NSDraggingInfo?) {
         isDragActive = false
         if let windowId { splitManager?.endPreview(cancel: true, for: windowId) }
         // Signal UI to clear any drag-hiding state even on invalid drops
@@ -80,6 +81,7 @@ final class SplitDropCaptureView: NSView {
     }
 
     // MARK: - Helpers
+
     private func updatePreview(_ sender: NSDraggingInfo) {
         let side = sideForDrag(sender)
         if let windowId { splitManager?.beginPreview(side: side, for: windowId) }

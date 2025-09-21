@@ -5,7 +5,6 @@
 //  Created by Maciek Bagiński on 30/07/2025.
 //
 
-
 import SwiftUI
 
 // MARK: - MacButtonsViewNew
@@ -25,7 +24,7 @@ import AppKit
 struct NSMacButtons: NSViewRepresentable {
     var btnTypes: [NSWindow.ButtonType] = [.closeButton, .miniaturizeButton, .zoomButton]
 
-    func makeNSView(context: Context) -> NSView {
+    func makeNSView(context _: Context) -> NSView {
         let stack = NSStackView()
         let viewButtons: [NSButton?]
         stack.spacing = 6
@@ -41,7 +40,7 @@ struct NSMacButtons: NSViewRepresentable {
         return stack
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {}
+    func updateNSView(_: NSView, context _: Context) {}
 }
 
 // MARK: - MacButtonsViewModel
@@ -90,7 +89,7 @@ class MacButtonsViewModel {
         }
     }
 
-    func getButtonAction(buttonType: ButtonType) -> () -> () {
+    func getButtonAction(buttonType: ButtonType) -> () -> Void {
         switch buttonType {
         case .close: { NSApp.keyWindow?.close() }
         case .minimize: { NSApp.keyWindow?.miniaturize(nil) }

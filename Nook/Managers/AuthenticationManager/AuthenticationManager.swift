@@ -116,7 +116,8 @@ final class AuthenticationManager: NSObject {
 
             if !host.isEmpty,
                challenge.previousFailureCount == 0,
-               let stored = credentialStore.credential(for: host) {
+               let stored = credentialStore.credential(for: host)
+            {
                 completionHandler(.useCredential, stored.asURLCredential)
                 return true
             }

@@ -1,9 +1,10 @@
 import SwiftUI
 #if canImport(AppKit)
-import AppKit
+    import AppKit
 #endif
 
 // MARK: - GradientEditorView
+
 // Composes preview, node/angle controls, color grid, and transparency/grain
 struct GradientEditorView: View {
     @Binding var gradient: SpaceGradient
@@ -40,6 +41,7 @@ struct GradientEditorView: View {
     }
 
     // MARK: - Selection Helpers
+
     private func selectedNodeIndex() -> Int? {
         if let id = selectedNodeID { return gradient.nodes.firstIndex(where: { $0.id == id }) }
         return gradient.nodes.indices.first
@@ -66,19 +68,19 @@ struct GradientEditorView: View {
     private func applyColorSelection(_ color: Color) {
         guard let idx = selectedNodeIndex() else { return }
         #if canImport(AppKit)
-        // Preserve existing alpha from current node
-        let currentNS = NSColor(Color(hex: gradient.nodes[idx].colorHex)).usingColorSpace(.sRGB)
-        var oldA: CGFloat = 1.0
-        var cr: CGFloat = 1, cg: CGFloat = 1, cb: CGFloat = 1
-        currentNS?.getRed(&cr, green: &cg, blue: &cb, alpha: &oldA)
+            // Preserve existing alpha from current node
+            let currentNS = NSColor(Color(hex: gradient.nodes[idx].colorHex)).usingColorSpace(.sRGB)
+            var oldA: CGFloat = 1.0
+            var cr: CGFloat = 1, cg: CGFloat = 1, cb: CGFloat = 1
+            currentNS?.getRed(&cr, green: &cg, blue: &cb, alpha: &oldA)
 
-        // Extract new RGB from selected Color
-        let newNS = NSColor(color).usingColorSpace(.sRGB)
-        var nr: CGFloat = 1, ng: CGFloat = 1, nb: CGFloat = 1, na: CGFloat = 1
-        newNS?.getRed(&nr, green: &ng, blue: &nb, alpha: &na)
+            // Extract new RGB from selected Color
+            let newNS = NSColor(color).usingColorSpace(.sRGB)
+            var nr: CGFloat = 1, ng: CGFloat = 1, nb: CGFloat = 1, na: CGFloat = 1
+            newNS?.getRed(&nr, green: &ng, blue: &nb, alpha: &na)
 
-        let combined = NSColor(srgbRed: nr, green: ng, blue: nb, alpha: oldA)
-        gradient.nodes[idx].colorHex = combined.toHexString(includeAlpha: true) ?? gradient.nodes[idx].colorHex
+            let combined = NSColor(srgbRed: nr, green: ng, blue: nb, alpha: oldA)
+            gradient.nodes[idx].colorHex = combined.toHexString(includeAlpha: true) ?? gradient.nodes[idx].colorHex
         #endif
     }
 

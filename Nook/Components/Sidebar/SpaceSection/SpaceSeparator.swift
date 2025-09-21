@@ -14,9 +14,8 @@ struct SpaceSeparator: View {
             RoundedRectangle(cornerRadius: 100)
                 .fill(Color.white.opacity(0.15))
                 .frame(height: 1)
-            if(isHovering) {
-                Button {
-                } label: {
+            if isHovering {
+                Button {} label: {
                     Text("􀄩 Clear")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(isClearHovered ? .white : Color.white.opacity(0.3))

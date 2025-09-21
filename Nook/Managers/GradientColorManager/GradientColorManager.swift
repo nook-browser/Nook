@@ -17,6 +17,7 @@ final class GradientColorManager: ObservableObject {
     private var animationToken: UUID?
 
     // MARK: - Immediate update (no animation)
+
     func setImmediate(_ gradient: SpaceGradient) {
         var tx = Transaction()
         tx.disablesAnimations = true
@@ -26,6 +27,7 @@ final class GradientColorManager: ObservableObject {
     }
 
     // MARK: - Editing lifecycle (no longer blocks transitions)
+
     func beginInteractivePreview() {
         isEditing = true
     }
@@ -37,10 +39,12 @@ final class GradientColorManager: ObservableObject {
     }
 
     // MARK: - SwiftUI-driven transition
+
     func transition(from: SpaceGradient? = nil,
                     to: SpaceGradient,
                     duration: TimeInterval = 0.45,
-                    animation: Animation = .easeInOut) {
+                    animation: Animation = .easeInOut)
+    {
         // If duration is zero (or negative), jump immediately
         guard duration > 0 else { setImmediate(to); return }
 
@@ -49,9 +53,9 @@ final class GradientColorManager: ObservableObject {
 
         // Prefer barycentric shader during animation if both ends are 1–3 colors
         if let from {
-            self.preferBarycentricDuringAnimation = (from.nodes.count <= 3 && to.nodes.count <= 3)
+            preferBarycentricDuringAnimation = (from.nodes.count <= 3 && to.nodes.count <= 3)
         } else {
-            self.preferBarycentricDuringAnimation = (to.nodes.count <= 3)
+            preferBarycentricDuringAnimation = (to.nodes.count <= 3)
         }
 
         // If a specific starting gradient is provided, snap to it without animation first
@@ -68,7 +72,7 @@ final class GradientColorManager: ObservableObject {
 
         // Tokenize this transition to avoid races on overlapping transitions
         let token = UUID()
-        self.animationToken = token
+        animationToken = token
 
         withAnimation(anim) {
             self.displayGradient = to
@@ -94,7 +98,8 @@ extension GradientColorManager {
     // Views can access this via `@EnvironmentObject var gradientColorManager`.
     var primaryColor: Color {
         if let pid = activePrimaryNodeID ?? preferredPrimaryNodeID,
-           let node = displayGradient.nodes.first(where: { $0.id == pid }) {
+           let node = displayGradient.nodes.first(where: { $0.id == pid })
+        {
             return Color(hex: node.colorHex)
         }
         return displayGradient.primaryColor

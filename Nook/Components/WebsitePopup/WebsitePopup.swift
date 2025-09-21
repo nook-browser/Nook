@@ -23,8 +23,6 @@ struct WebsitePopup: View {
                     RoundedRectangle(cornerRadius: 6)
                         .stroke(.white.opacity(0.4), lineWidth: 1)
                 }
-            
-            
         }
         .padding(12)
         .background(Color(hex: "3E4D2E"))
@@ -36,4 +34,3 @@ struct WebsitePopup: View {
         .transition(.scale(scale: 0.0, anchor: .top))
     }
 }
-

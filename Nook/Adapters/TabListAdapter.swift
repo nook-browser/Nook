@@ -1,7 +1,7 @@
-import Foundation
-import SwiftUI
 import AppKit
 import Combine
+import Foundation
+import SwiftUI
 
 /// Adapter for regular tabs in a space
 @MainActor
@@ -9,39 +9,39 @@ class SpaceRegularTabListAdapter: TabListDataSource, ObservableObject {
     private let tabManager: TabManager
     let spaceId: UUID
     private var cancellable: AnyCancellable?
-    
+
     init(tabManager: TabManager, spaceId: UUID) {
         self.tabManager = tabManager
         self.spaceId = spaceId
         // Relay TabManager changes to table consumers
-        self.cancellable = tabManager.objectWillChange
+        cancellable = tabManager.objectWillChange
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.objectWillChange.send() }
     }
-    
+
     var tabs: [Tab] {
         guard let space = tabManager.spaces.first(where: { $0.id == spaceId }) else { return [] }
         return tabManager.tabs(in: space)
     }
-    
+
     func moveTab(from sourceIndex: Int, to targetIndex: Int) {
         objectWillChange.send()
         guard sourceIndex < tabs.count else { return }
         let tab = tabs[sourceIndex]
         tabManager.reorderRegular(tab, in: spaceId, to: targetIndex)
     }
-    
+
     func selectTab(at index: Int) {
         guard index < tabs.count else { return }
         tabManager.browserManager?.selectTab(tabs[index])
     }
-    
+
     func closeTab(at index: Int) {
         objectWillChange.send()
         guard index < tabs.count else { return }
         tabManager.removeTab(tabs[index].id)
     }
-    
+
     func toggleMuteTab(at index: Int) {
         objectWillChange.send()
         guard index < tabs.count else { return }
@@ -50,7 +50,7 @@ class SpaceRegularTabListAdapter: TabListDataSource, ObservableObject {
             tab.toggleMute()
         }
     }
-    
+
     func contextMenuForTab(at index: Int) -> NSMenu? {
         guard index < tabs.count else { return nil }
         let tab = tabs[index]
@@ -115,7 +115,7 @@ class SpaceRegularTabListAdapter: TabListDataSource, ObservableObject {
 
         return menu
     }
-    
+
     @objc private func moveTabUp(_ sender: NSMenuItem) {
         guard let tab = sender.representedObject as? Tab else { return }
         tabManager.moveTabUp(tab.id)
@@ -146,7 +146,7 @@ class SpaceRegularTabListAdapter: TabListDataSource, ObservableObject {
         tabManager.unloadTab(tab)
     }
 
-    @objc private func unloadAllInactive(_ sender: NSMenuItem) {
+    @objc private func unloadAllInactive(_: NSMenuItem) {
         tabManager.unloadAllInactiveTabs()
     }
 
@@ -165,37 +165,37 @@ class SpacePinnedTabListAdapter: TabListDataSource, ObservableObject {
     private let tabManager: TabManager
     let spaceId: UUID
     private var cancellable: AnyCancellable?
-    
+
     init(tabManager: TabManager, spaceId: UUID) {
         self.tabManager = tabManager
         self.spaceId = spaceId
-        self.cancellable = tabManager.objectWillChange
+        cancellable = tabManager.objectWillChange
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.objectWillChange.send() }
     }
-    
-        var tabs: [Tab] {
+
+    var tabs: [Tab] {
         tabManager.spacePinnedTabs(for: spaceId)
     }
-    
+
     func moveTab(from sourceIndex: Int, to targetIndex: Int) {
         objectWillChange.send()
         guard sourceIndex < tabs.count else { return }
         let tab = tabs[sourceIndex]
         tabManager.reorderSpacePinned(tab, in: spaceId, to: targetIndex)
     }
-    
+
     func selectTab(at index: Int) {
         guard index < tabs.count else { return }
         tabManager.browserManager?.selectTab(tabs[index])
     }
-    
+
     func closeTab(at index: Int) {
         objectWillChange.send()
         guard index < tabs.count else { return }
         tabManager.removeTab(tabs[index].id)
     }
-    
+
     func toggleMuteTab(at index: Int) {
         objectWillChange.send()
         guard index < tabs.count else { return }
@@ -204,7 +204,7 @@ class SpacePinnedTabListAdapter: TabListDataSource, ObservableObject {
             tab.toggleMute()
         }
     }
-    
+
     func contextMenuForTab(at index: Int) -> NSMenu? {
         guard index < tabs.count else { return nil }
         let tab = tabs[index]
@@ -253,7 +253,7 @@ class SpacePinnedTabListAdapter: TabListDataSource, ObservableObject {
 
         return menu
     }
-    
+
     @objc private func unpinFromSpace(_ sender: NSMenuItem) {
         guard let tab = sender.representedObject as? Tab else { return }
         tabManager.unpinTabFromSpace(tab)
@@ -274,7 +274,7 @@ class SpacePinnedTabListAdapter: TabListDataSource, ObservableObject {
         tabManager.unloadTab(tab)
     }
 
-    @objc private func unloadAllInactive(_ sender: NSMenuItem) {
+    @objc private func unloadAllInactive(_: NSMenuItem) {
         tabManager.unloadAllInactiveTabs()
     }
 
@@ -289,39 +289,39 @@ class SpacePinnedTabListAdapter: TabListDataSource, ObservableObject {
 class EssentialTabListAdapter: TabListDataSource, ObservableObject {
     private let tabManager: TabManager
     private var cancellable: AnyCancellable?
-    
+
     init(tabManager: TabManager) {
         self.tabManager = tabManager
         // Observe TabManager and relay to collection view
-        self.cancellable = tabManager.objectWillChange
+        cancellable = tabManager.objectWillChange
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.objectWillChange.send() }
     }
-    
+
     deinit { cancellable?.cancel() }
-    
+
     var tabs: [Tab] {
         // Profile-aware essentials: returns pinned tabs for current profile only
         tabManager.essentialTabs
     }
-    
+
     func moveTab(from sourceIndex: Int, to targetIndex: Int) {
         objectWillChange.send()
         guard sourceIndex < tabs.count else { return }
         let tab = tabs[sourceIndex]
         tabManager.reorderEssential(tab, to: targetIndex)
     }
-    
+
     func selectTab(at index: Int) {
         guard index < tabs.count else { return }
         tabManager.browserManager?.selectTab(tabs[index])
     }
-    
+
     func closeTab(at index: Int) {
         guard index < tabs.count else { return }
         tabManager.removeTab(tabs[index].id)
     }
-    
+
     func toggleMuteTab(at index: Int) {
         guard index < tabs.count else { return }
         let tab = tabs[index]
@@ -329,7 +329,7 @@ class EssentialTabListAdapter: TabListDataSource, ObservableObject {
             tab.toggleMute()
         }
     }
-    
+
     func contextMenuForTab(at index: Int) -> NSMenu? {
         guard index < tabs.count else { return nil }
         let tab = tabs[index]
@@ -381,12 +381,12 @@ class EssentialTabListAdapter: TabListDataSource, ObservableObject {
 
         return menu
     }
-    
+
     @objc private func reloadTab(_ sender: NSMenuItem) {
         guard let tab = sender.representedObject as? Tab else { return }
         tab.refresh()
     }
-    
+
     @objc private func removeFromEssentials(_ sender: NSMenuItem) {
         guard let tab = sender.representedObject as? Tab else { return }
         tabManager.removeFromEssentials(tab)
@@ -402,7 +402,7 @@ class EssentialTabListAdapter: TabListDataSource, ObservableObject {
         tabManager.unloadTab(tab)
     }
 
-    @objc private func unloadAllInactive(_ sender: NSMenuItem) {
+    @objc private func unloadAllInactive(_: NSMenuItem) {
         tabManager.unloadAllInactiveTabs()
     }
 
