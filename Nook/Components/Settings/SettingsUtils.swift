@@ -13,12 +13,12 @@ enum SettingsTabs: Hashable, CaseIterable {
     case shortcuts
     case extensions
     case advanced
-    
+
     // Ordered list for horizontal tab bar
     static var ordered: [SettingsTabs] {
         return [.general, .privacy, .profiles, .shortcuts, .extensions, .advanced]
     }
-    
+
     var name: String {
         switch self {
         case .general: return "General"
@@ -29,7 +29,7 @@ enum SettingsTabs: Hashable, CaseIterable {
         case .advanced: return "Advanced"
         }
     }
-    
+
     var icon: String {
         switch self {
         case .general: return "gearshape"

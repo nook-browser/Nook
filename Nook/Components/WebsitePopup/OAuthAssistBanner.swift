@@ -54,4 +54,3 @@ struct OAuthAssistBanner: View {
         .transition(.scale(scale: 0.0, anchor: .top))
     }
 }
-

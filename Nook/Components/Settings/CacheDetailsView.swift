@@ -11,22 +11,22 @@ struct CacheDetailsView: View {
     let cache: CacheInfo
     let cacheManager: CacheManager
     @Environment(\.dismiss) private var dismiss
-    
+
     private let details: [String: String]
-    
+
     init(cache: CacheInfo, cacheManager: CacheManager) {
         self.cache = cache
         self.cacheManager = cacheManager
-        self.details = cacheManager.getCacheDetails(cache)
+        details = cacheManager.getCacheDetails(cache)
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
             headerView
-            
+
             Divider()
-            
+
             // Content
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
@@ -35,22 +35,22 @@ struct CacheDetailsView: View {
                         detailRow("Domain", cache.displayDomain)
                         detailRow("Total Size", cache.sizeDescription)
                         detailRow("Primary Type", cache.primaryCacheType.rawValue)
-                        detailRow("Status", cache.isStale ? "Stale" : "Fresh", 
-                                color: cache.isStale ? .orange : .green)
+                        detailRow("Status", cache.isStale ? "Stale" : "Fresh",
+                                  color: cache.isStale ? .orange : .green)
                     }
-                    
+
                     // Storage Breakdown Section
                     sectionView(title: "Storage Breakdown") {
                         detailRow("Disk Usage", cache.diskUsageDescription)
                         detailRow("Memory Usage", cache.memoryUsageDescription)
                         detailRow("Last Modified", cache.lastModifiedDescription)
-                        
+
                         // Storage visualization
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Storage Distribution:")
                                 .font(.caption)
                                 .fontWeight(.medium)
-                            
+
                             HStack {
                                 // Disk usage bar
                                 VStack(alignment: .leading) {
@@ -60,7 +60,7 @@ struct CacheDetailsView: View {
                                         .progressViewStyle(.linear)
                                         .tint(.blue)
                                 }
-                                
+
                                 // Memory usage bar
                                 VStack(alignment: .leading) {
                                     Text("Memory")
@@ -72,12 +72,12 @@ struct CacheDetailsView: View {
                             }
                         }
                     }
-                    
+
                     // Cache Types Section
                     sectionView(title: "Cache Types") {
                         LazyVGrid(columns: [
                             GridItem(.flexible()),
-                            GridItem(.flexible())
+                            GridItem(.flexible()),
                         ], spacing: 8) {
                             ForEach(cache.cacheTypes, id: \.self) { type in
                                 HStack {
@@ -94,7 +94,7 @@ struct CacheDetailsView: View {
                             }
                         }
                     }
-                    
+
                     // Recommendations Section
                     if !cacheManager.getCacheEfficiencyRecommendations().isEmpty {
                         sectionView(title: "Recommendations") {
@@ -114,34 +114,34 @@ struct CacheDetailsView: View {
                 }
                 .padding()
             }
-            
+
             // Footer
             footerView
         }
         .frame(width: 600, height: 500)
     }
-    
+
     // MARK: - Header View
-    
+
     private var headerView: some View {
         HStack {
             HStack {
                 Image(systemName: cache.primaryCacheType.icon)
                     .foregroundColor(Color(cache.primaryCacheType.color))
-                
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Cache Details")
                         .font(.title2)
                         .fontWeight(.semibold)
-                    
+
                     Text(cache.displayDomain)
                         .font(.headline)
                         .foregroundColor(.secondary)
                 }
             }
-            
+
             Spacer()
-            
+
             Button("Close") {
                 dismiss()
             }
@@ -149,9 +149,9 @@ struct CacheDetailsView: View {
         }
         .padding()
     }
-    
+
     // MARK: - Footer View
-    
+
     private var footerView: some View {
         HStack {
             Button("Copy Details") {
@@ -160,16 +160,16 @@ struct CacheDetailsView: View {
                 NSPasteboard.general.setString(detailsText, forType: .string)
             }
             .buttonStyle(.bordered)
-            
+
             Button("Export Cache Data") {
                 let cacheData = cacheManager.exportCacheData()
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(cacheData, forType: .string)
             }
             .buttonStyle(.bordered)
-            
+
             Spacer()
-            
+
             Button("Clear This Cache", role: .destructive) {
                 Task {
                     await cacheManager.clearSpecificCache(cache)
@@ -180,15 +180,15 @@ struct CacheDetailsView: View {
         }
         .padding()
     }
-    
+
     // MARK: - Section View
-    
+
     private func sectionView<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.headline)
                 .foregroundColor(.primary)
-            
+
             VStack(alignment: .leading, spacing: 6) {
                 content()
             }
@@ -197,38 +197,38 @@ struct CacheDetailsView: View {
             .cornerRadius(8)
         }
     }
-    
+
     // MARK: - Detail Row
-    
+
     private func detailRow(_ label: String, _ value: String, color: Color? = nil) -> some View {
         HStack {
             Text(label + ":")
                 .fontWeight(.medium)
                 .frame(width: 120, alignment: .leading)
-            
+
             Text(value)
                 .foregroundColor(color ?? .primary)
                 .textSelection(.enabled)
-            
+
             Spacer()
         }
     }
-    
+
     // MARK: - Helper Methods
-    
+
     private func formatDetailsForClipboard() -> String {
         var text = "Cache Details for \(cache.displayDomain)\n"
         text += String(repeating: "=", count: 40) + "\n\n"
-        
+
         for (key, value) in details.sorted(by: { $0.key < $1.key }) {
             text += "\(key): \(value)\n"
         }
-        
+
         text += "\nCache Types:\n"
         for type in cache.cacheTypes {
             text += "- \(type.rawValue)\n"
         }
-        
+
         return text
     }
 }
@@ -239,11 +239,11 @@ struct CacheDetailsView: View {
         id: UUID(),
         domain: "example.com",
         dataTypes: ["WKWebsiteDataTypeDiskCache", "WKWebsiteDataTypeMemoryCache"],
-        size: 1048576, // 1MB
+        size: 1_048_576, // 1MB
         lastModified: Date().addingTimeInterval(-86400), // 1 day ago
-        diskUsage: 786432, // 768KB
-        memoryUsage: 262144 // 256KB
+        diskUsage: 786_432, // 768KB
+        memoryUsage: 262_144 // 256KB
     )
-    
+
     CacheDetailsView(cache: sampleCache, cacheManager: CacheManager())
 }

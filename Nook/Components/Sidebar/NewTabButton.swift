@@ -11,21 +11,20 @@ struct NewTabButton: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var windowState: BrowserWindowState
     @State private var isHovering: Bool = false
-    
-    
+
     var body: some View {
         Button {
             browserManager.openCommandPalette()
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 12))
-                        .frame(width: 12, height: 12)
-                        .foregroundStyle(.white.opacity(0.45))
-                    Text("New Tab")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.45))
-                    Spacer()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "plus")
+                    .font(.system(size: 12))
+                    .frame(width: 12, height: 12)
+                    .foregroundStyle(.white.opacity(0.45))
+                Text("New Tab")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.45))
+                Spacer()
             }
             .padding(.horizontal, 10)
             .frame(height: 40)
@@ -41,9 +40,8 @@ struct NewTabButton: View {
                 isHovering = hovering
             }
         }
-        
     }
-    
+
     private var backgroundColor: Color {
         if windowState.isCommandPaletteVisible {
             return .white.opacity(0.2)

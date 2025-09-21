@@ -7,15 +7,15 @@
 //  to reorder/move tabs by calling TabManager directly.
 //
 
-import SwiftUI
 import AppKit
+import SwiftUI
 
 // MARK: - Target Section
 
 enum SidebarTargetSection: Equatable {
     case essentials
-    case spacePinned(UUID)    // spaceId
-    case spaceRegular(UUID)   // spaceId
+    case spacePinned(UUID) // spaceId
+    case spaceRegular(UUID) // spaceId
 }
 
 // MARK: - Helpers
@@ -45,9 +45,9 @@ private func targetContainer(from section: SidebarTargetSection) -> (TabDragMana
     switch section {
     case .essentials:
         return (.essentials, nil)
-    case .spacePinned(let sid):
+    case let .spacePinned(sid):
         return (.spacePinned(sid), sid)
-    case .spaceRegular(let sid):
+    case let .spaceRegular(sid):
         return (.spaceRegular(sid), sid)
     }
 }
@@ -56,7 +56,7 @@ private func targetContainer(from section: SidebarTargetSection) -> (TabDragMana
 
 @MainActor
 struct SidebarTabDropDelegateSimple: DropDelegate {
-    let item: Tab                          // target tab (to)
+    let item: Tab // target tab (to)
     @Binding var draggedItem: UUID?
     let targetSection: SidebarTargetSection
     let tabManager: TabManager
@@ -95,18 +95,18 @@ struct SidebarTabDropDelegateSimple: DropDelegate {
         }
     }
 
-    func validateDrop(info: DropInfo) -> Bool { true }
+    func validateDrop(info _: DropInfo) -> Bool { true }
 
-    func dropUpdated(info: DropInfo) -> DropProposal? {
+    func dropUpdated(info _: DropInfo) -> DropProposal? {
         DropProposal(operation: .move)
     }
 
-    func dropExited(info: DropInfo) {
+    func dropExited(info _: DropInfo) {
         draggedItem = nil
         NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
     }
 
-    func performDrop(info: DropInfo) -> Bool {
+    func performDrop(info _: DropInfo) -> Bool {
         draggedItem = nil
         NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
         return true
@@ -117,7 +117,7 @@ struct SidebarTabDropDelegateSimple: DropDelegate {
 
 @MainActor
 struct SidebarSectionDropDelegateSimple: DropDelegate {
-    let itemsCount: () -> Int               // current count to append at end
+    let itemsCount: () -> Int // current count to append at end
     @Binding var draggedItem: UUID?
     let targetSection: SidebarTargetSection
     let tabManager: TabManager
@@ -155,18 +155,18 @@ struct SidebarSectionDropDelegateSimple: DropDelegate {
         }
     }
 
-    func validateDrop(info: DropInfo) -> Bool { true }
+    func validateDrop(info _: DropInfo) -> Bool { true }
 
-    func dropUpdated(info: DropInfo) -> DropProposal? {
+    func dropUpdated(info _: DropInfo) -> DropProposal? {
         DropProposal(operation: .move)
     }
 
-    func dropExited(info: DropInfo) {
+    func dropExited(info _: DropInfo) {
         draggedItem = nil
         NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
     }
 
-    func performDrop(info: DropInfo) -> Bool {
+    func performDrop(info _: DropInfo) -> Bool {
         draggedItem = nil
         NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
         return true

@@ -44,7 +44,7 @@ class SettingsManager {
             userDefaults.set(searchEngine.rawValue, forKey: searchEngineKey)
         }
     }
-    
+
     var tabUnloadTimeout: TimeInterval {
         didSet {
             userDefaults.set(tabUnloadTimeout, forKey: tabUnloadTimeoutKey)
@@ -68,30 +68,31 @@ class SettingsManager {
             searchEngineKey: SearchProvider.google.rawValue,
             // Default tab unload timeout: 60 minutes
             tabUnloadTimeoutKey: 3600.0,
-            blockXSTKey: false
+            blockXSTKey: false,
         ])
 
         // Initialize properties from UserDefaults
         // This will use the registered defaults if no value is set
-        self.currentMaterialRaw = userDefaults.integer(forKey: materialKey)
-        self.isLiquidGlassEnabled = userDefaults.bool(forKey: liquidGlassKey)
+        currentMaterialRaw = userDefaults.integer(forKey: materialKey)
+        isLiquidGlassEnabled = userDefaults.bool(forKey: liquidGlassKey)
 
         if let rawEngine = userDefaults.string(forKey: searchEngineKey),
            let provider = SearchProvider(rawValue: rawEngine)
         {
-            self.searchEngine = provider
+            searchEngine = provider
         } else {
             // Fallback to google if the stored value is somehow invalid
-            self.searchEngine = .google
+            searchEngine = .google
         }
-        
+
         // Initialize tab unload timeout
-        self.tabUnloadTimeout = userDefaults.double(forKey: tabUnloadTimeoutKey)
-        self.blockCrossSiteTracking = userDefaults.bool(forKey: blockXSTKey)
+        tabUnloadTimeout = userDefaults.double(forKey: tabUnloadTimeoutKey)
+        blockCrossSiteTracking = userDefaults.bool(forKey: blockXSTKey)
     }
 }
 
 // MARK: - Notification Names
+
 extension Notification.Name {
     static let tabUnloadTimeoutChanged = Notification.Name("tabUnloadTimeoutChanged")
     static let blockCrossSiteTrackingChanged = Notification.Name("blockCrossSiteTrackingChanged")

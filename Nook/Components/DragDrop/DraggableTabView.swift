@@ -5,8 +5,8 @@
 //  Draggable wrapper for tab views with drag state management
 //
 
-import SwiftUI
 import AppKit
+import SwiftUI
 
 struct DraggableTabView<Content: View>: View {
     let tab: Tab
@@ -14,10 +14,10 @@ struct DraggableTabView<Content: View>: View {
     let index: Int
     let dragManager: TabDragManager
     let content: Content
-    
+
     @State private var dragGesture = false
     @State private var dragOffset: CGSize = .zero
-    
+
     init(
         tab: Tab,
         container: TabDragManager.DragContainer,
@@ -31,7 +31,7 @@ struct DraggableTabView<Content: View>: View {
         self.dragManager = dragManager
         self.content = content()
     }
-    
+
     var body: some View {
         content
             .opacity(dragManager.isDragging && dragManager.draggedTab?.id == tab.id ? 0.5 : 1.0)
@@ -60,20 +60,20 @@ struct DraggableTabView<Content: View>: View {
                                 dragManager.startDrag(tab: tab, from: container, at: index)
                             }
                         }
-                        
+
                         // Update drag offset for visual feedback
                         dragOffset = value.translation
                     }
-                    .onEnded { value in
+                    .onEnded { _ in
                         dragGesture = false
-                        
+
                         // Ensure drag offset is properly reset in all scenarios
                         withAnimation(.easeOut(duration: 0.15)) {
                             dragOffset = .zero
                         }
-                        
+
                         // Enhanced drag end handling with state validation
-                        if dragManager.isDragging && dragManager.draggedTab?.id == tab.id {
+                        if dragManager.isDragging, dragManager.draggedTab?.id == tab.id {
                             // Add validation that the drag manager is in the expected state
                             guard dragManager.draggedTab != nil else {
                                 return

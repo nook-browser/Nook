@@ -9,6 +9,7 @@ import AppKit
 import SwiftUI
 
 // MARK: - Settings Root (Native macOS Settings)
+
 struct SettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var gradientColorManager: GradientColorManager
@@ -66,11 +67,13 @@ struct SettingsView: View {
 }
 
 // MARK: - Reusable pane wrapper: fixed height + scrolling
+
 private struct SettingsPane<Content: View>: View {
     let content: Content
     init(@ViewBuilder content: () -> Content) {
         self.content = content()
     }
+
     private let fixedHeight: CGFloat = 620
     private let minWidth: CGFloat = 760
 
@@ -93,6 +96,7 @@ private struct SettingsPane<Content: View>: View {
 }
 
 // MARK: - Horizontal Tab Bar
+
 // Legacy custom tab strip retained for reference but no longer used.
 struct SettingsTabStrip: View {
     @Binding var selection: SettingsTabs
@@ -343,7 +347,7 @@ struct ProfilesSettingsView: View {
                     }
                     .buttonStyle(.bordered)
                     .accessibilityLabel("Export current profile")
-                    
+
                     Button(action: showImportPlaceholder) {
                         Label("Import Profile", systemImage: "square.and.arrow.down")
                     }
@@ -397,8 +401,7 @@ struct ProfilesSettingsView: View {
                         .padding(.vertical, 8)
                     } else {
                         VStack(spacing: 8) {
-                            ForEach(browserManager.tabManager.spaces, id: \.id)
-                            { space in
+                            ForEach(browserManager.tabManager.spaces, id: \.id) { space in
                                 SpaceAssignmentRowView(space: space)
                             }
                         }
@@ -412,6 +415,7 @@ struct ProfilesSettingsView: View {
     }
 
     // MARK: - Helpers
+
     private func spacesCount(for profile: Profile) -> Int {
         browserManager.tabManager.spaces.filter { $0.profileId == profile.id }
             .count
@@ -442,6 +446,7 @@ struct ProfilesSettingsView: View {
     }
 
     // MARK: - Actions
+
     private func showCreateDialog() {
         creatingName = ""
         creatingIcon = "person.crop.circle"
@@ -491,7 +496,7 @@ struct ProfilesSettingsView: View {
                 return !browserManager.profileManager.profiles.contains {
                     $0.id != profile.id
                         && $0.name.caseInsensitiveCompare(trimmed)
-                            == .orderedSame
+                        == .orderedSame
                 }
             },
             onSave: {
@@ -534,7 +539,7 @@ struct ProfilesSettingsView: View {
         browserManager.dialogManager.showDialog(dialog)
     }
 
-    private func showDataManagement(for profile: Profile) {
+    private func showDataManagement(for _: Profile) {
         // Placeholder: show info dialog
         let header = AnyView(
             DialogHeader(
@@ -552,7 +557,7 @@ struct ProfilesSettingsView: View {
             DialogFooter(rightButtons: [
                 DialogButton(text: "Close", variant: .primary) {
                     browserManager.dialogManager.closeDialog()
-                }
+                },
             ])
         )
         browserManager.dialogManager.showCustomContentDialog(
@@ -575,7 +580,7 @@ struct ProfilesSettingsView: View {
             DialogFooter(rightButtons: [
                 DialogButton(text: "OK", variant: .primary) {
                     browserManager.dialogManager.closeDialog()
-                }
+                },
             ])
         )
         browserManager.dialogManager.showCustomContentDialog(
@@ -598,7 +603,7 @@ struct ProfilesSettingsView: View {
             DialogFooter(rightButtons: [
                 DialogButton(text: "OK", variant: .primary) {
                     browserManager.dialogManager.closeDialog()
-                }
+                },
             ])
         )
         browserManager.dialogManager.showCustomContentDialog(
@@ -609,6 +614,7 @@ struct ProfilesSettingsView: View {
     }
 
     // MARK: - Space assignment helpers and views
+
     private func assign(space: Space, to id: UUID) {
         browserManager.tabManager.assign(spaceId: space.id, toProfile: id)
     }
@@ -644,7 +650,7 @@ struct ProfilesSettingsView: View {
             DialogFooter(rightButtons: [
                 DialogButton(text: "OK", variant: .primary) {
                     browserManager.dialogManager.closeDialog()
-                }
+                },
             ])
         )
         browserManager.dialogManager.showCustomContentDialog(
@@ -736,9 +742,9 @@ struct ProfilesSettingsView: View {
 
         private var currentProfileName: String {
             if let pid = space.profileId,
-                let p = browserManager.profileManager.profiles.first(where: {
-                    $0.id == pid
-                })
+               let p = browserManager.profileManager.profiles.first(where: {
+                   $0.id == pid
+               })
             {
                 return p.name
             }
@@ -761,6 +767,7 @@ struct ProfilesSettingsView: View {
 }
 
 // MARK: - Migration Controls
+
 private struct MigrationControls: View {
     @EnvironmentObject var browserManager: BrowserManager
     @State private var legacySummary: BrowserManager.LegacyDataSummary? = nil
@@ -847,7 +854,7 @@ private struct MigrationControls: View {
             }
 
             if browserManager.isMigrationInProgress,
-                let mp = browserManager.migrationProgress
+               let mp = browserManager.migrationProgress
             {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
@@ -899,7 +906,7 @@ private struct MigrationControls: View {
                     Label("Export Current Profile", systemImage: "square.and.arrow.up")
                 }
                 .buttonStyle(.bordered)
-                
+
                 Button(action: {
                     let header = AnyView(DialogHeader(icon: "square.and.arrow.down", title: "Import Profile", subtitle: browserManager.currentProfile?.name ?? ""))
                     let body = AnyView(Text("Import is not implemented yet.").font(.body))
@@ -909,7 +916,7 @@ private struct MigrationControls: View {
                     Label("Import Into Current", systemImage: "square.and.arrow.down")
                 }
                 .buttonStyle(.bordered)
-                
+
                 Spacer()
             }
         }
@@ -1018,7 +1025,7 @@ struct ExtensionRowView: View {
             // Extension icon
             Group {
                 if let iconPath = `extension`.iconPath,
-                    let nsImage = NSImage(contentsOfFile: iconPath)
+                   let nsImage = NSImage(contentsOfFile: iconPath)
                 {
                     Image(nsImage: nsImage)
                         .resizable()
@@ -1097,18 +1104,19 @@ struct AdvancedSettingsView: View {
 }
 
 // MARK: - Helper Functions
+
 private let unloadTimeoutOptions: [TimeInterval] = [
-    300,  // 5 min
-    600,  // 10 min
-    900,  // 15 min
-    1800,  // 30 min
-    2700,  // 45 min
-    3600,  // 1 hr
-    7200,  // 2 hr
-    14400,  // 4 hr
-    28800,  // 8 hr
-    43200,  // 12 hr
-    86400,  // 24 hr
+    300, // 5 min
+    600, // 10 min
+    900, // 15 min
+    1800, // 30 min
+    2700, // 45 min
+    3600, // 1 hr
+    7200, // 2 hr
+    14400, // 4 hr
+    28800, // 8 hr
+    43200, // 12 hr
+    86400, // 24 hr
 ]
 
 private func nearestTimeoutOption(to value: TimeInterval) -> TimeInterval {
@@ -1123,9 +1131,10 @@ private func nearestTimeoutOption(to value: TimeInterval) -> TimeInterval {
 }
 
 // MARK: - Styled Components
+
 struct SettingsSectionCard<Content: View>: View {
     let title: String
-    var subtitle: String? = nil
+    var subtitle: String?
     @ViewBuilder var content: Content
 
     init(
@@ -1244,10 +1253,10 @@ struct SettingsPlaceholderView: View {
 }
 
 private func formatTimeout(_ seconds: TimeInterval) -> String {
-    if seconds < 3600 {  // under 1 hour
+    if seconds < 3600 { // under 1 hour
         let minutes = Int(seconds / 60)
         return minutes == 1 ? "1 min" : "\(minutes) mins"
-    } else if seconds < 86400 {  // under 24 hours
+    } else if seconds < 86400 { // under 24 hours
         let hours = seconds / 3600.0
         let rounded = hours.rounded()
         let isWhole = abs(hours - rounded) < 0.01

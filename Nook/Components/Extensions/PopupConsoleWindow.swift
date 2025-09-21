@@ -9,18 +9,18 @@ final class PopupConsole: NSObject {
     private var inputField: NSTextField?
     private weak var targetWebView: WKWebView?
 
-    private override init() { super.init() }
+    override private init() { super.init() }
 
     func attach(to webView: WKWebView) {
         targetWebView = webView
-        
+
         // Add console message handler if not already present
         let consoleScript = """
         (function() {
             const originalLog = console.log;
             const originalError = console.error;
             const originalWarn = console.warn;
-            
+
             function sendToNative(level, args) {
                 try {
                     const message = args.map(arg => 
@@ -35,22 +35,22 @@ final class PopupConsole: NSObject {
                     // Fallback if webkit messaging isn't available
                 }
             }
-            
+
             console.log = function(...args) {
                 originalLog.apply(console, args);
                 sendToNative('log', args);
             };
-            
+
             console.error = function(...args) {
                 originalError.apply(console, args);
                 sendToNative('error', args);
             };
-            
+
             console.warn = function(...args) {
                 originalWarn.apply(console, args);
                 sendToNative('warn', args);
             };
-            
+
             // Log initial extension API availability
             console.log('Extension APIs available:', {
                 browser: typeof browser !== 'undefined',
@@ -61,10 +61,10 @@ final class PopupConsole: NSObject {
             });
         })();
         """
-        
+
         let script = WKUserScript(source: consoleScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
         webView.configuration.userContentController.addUserScript(script)
-        
+
         log("[PopupConsole] Attached to WebView with console logging")
     }
 
@@ -133,4 +133,3 @@ final class PopupConsole: NSObject {
         }
     }
 }
-

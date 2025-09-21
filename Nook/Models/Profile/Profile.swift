@@ -8,8 +8,8 @@
 //
 
 import Foundation
-import WebKit
 import Observation
+import WebKit
 
 @MainActor
 @Observable
@@ -19,10 +19,10 @@ final class Profile: NSObject, Identifiable {
     var icon: String
     let dataStore: WKWebsiteDataStore
     // Metadata (not yet persisted)
-    var createdDate: Date = Date()
-    var lastUsed: Date = Date()
+    var createdDate: Date = .init()
+    var lastUsed: Date = .init()
     var isDefault: Bool { name.lowercased() == "default" }
-    
+
     // Cached stats
     private(set) var cachedCookieCount: Int = 0
     private(set) var cachedRecordCount: Int = 0
@@ -40,11 +40,12 @@ final class Profile: NSObject, Identifiable {
         self.icon = icon
         // Create a persistent, profile-specific data store derived from the profile ID.
         // Falls back to the default store if unavailable for any reason.
-        self.dataStore = Profile.createDataStore(for: id)
+        dataStore = Profile.createDataStore(for: id)
         super.init()
     }
 
     // MARK: - Data Store Creation
+
     /// Create a persistent, profile-specific WKWebsiteDataStore for the given profile ID.
     /// Uses a deterministic identifier so stores remain stable across launches.
     /// Falls back to the default store for compatibility scenarios.
@@ -67,6 +68,7 @@ final class Profile: NSObject, Identifiable {
     }
 
     // MARK: - Validation & Stats
+
     func validateDataStore() async -> Bool {
         if #available(macOS 15.4, *) {
             // Basic check: store exists and is persistent
@@ -90,7 +92,7 @@ final class Profile: NSObject, Identifiable {
             WKWebsiteDataTypeLocalStorage,
             WKWebsiteDataTypeIndexedDBDatabases,
             WKWebsiteDataTypeFetchCache,
-            WKWebsiteDataTypeServiceWorkerRegistrations
+            WKWebsiteDataTypeServiceWorkerRegistrations,
         ]
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
             self.dataStore.fetchDataRecords(ofTypes: types) { records in
@@ -101,6 +103,7 @@ final class Profile: NSObject, Identifiable {
     }
 
     // MARK: - Cleanup
+
     func clearAllData() async {
         let allTypes: Set<String> = [
             WKWebsiteDataTypeCookies,
@@ -109,7 +112,7 @@ final class Profile: NSObject, Identifiable {
             WKWebsiteDataTypeLocalStorage,
             WKWebsiteDataTypeIndexedDBDatabases,
             WKWebsiteDataTypeFetchCache,
-            WKWebsiteDataTypeServiceWorkerRegistrations
+            WKWebsiteDataTypeServiceWorkerRegistrations,
         ]
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
             self.dataStore.removeData(ofTypes: allTypes, modifiedSince: .distantPast) {

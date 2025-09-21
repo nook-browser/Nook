@@ -68,7 +68,7 @@ struct ProfileDeleteConfirmationDialog: DialogProtocol {
         AnyView(
             DialogFooter(rightButtons: [
                 DialogButton(text: "Cancel", variant: .secondary, action: onCancel),
-                DialogButton(text: "Delete Profile", iconName: "trash", variant: isLastProfile ? .secondary : .destructive, action: { if !isLastProfile { onDelete() } })
+                DialogButton(text: "Delete Profile", iconName: "trash", variant: isLastProfile ? .secondary : .destructive, action: { if !isLastProfile { onDelete() } }),
             ])
         )
     }

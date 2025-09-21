@@ -5,6 +5,7 @@ final class SplitViewManager: ObservableObject {
     enum Side { case left, right }
 
     // MARK: - State
+
     @Published var isSplit: Bool = false
     @Published var leftTabId: UUID? = nil
     @Published var rightTabId: UUID? = nil
@@ -19,10 +20,10 @@ final class SplitViewManager: ObservableObject {
     let maxFraction: CGFloat = 0.8
 
     weak var browserManager: BrowserManager?
-    
+
     // Window-specific split state
     private var windowSplitStates: [UUID: WindowSplitState] = [:]
-    
+
     struct WindowSplitState {
         var isSplit: Bool = false
         var leftTabId: UUID? = nil
@@ -35,40 +36,40 @@ final class SplitViewManager: ObservableObject {
     init(browserManager: BrowserManager? = nil) {
         self.browserManager = browserManager
     }
-    
+
     // MARK: - Window-Aware Split Management
-    
+
     /// Get split state for a specific window
     func getSplitState(for windowId: UUID) -> WindowSplitState {
         return windowSplitStates[windowId] ?? WindowSplitState()
     }
-    
+
     /// Set split state for a specific window
     func setSplitState(_ state: WindowSplitState, for windowId: UUID) {
         windowSplitStates[windowId] = state
         syncPublishedStateIfNeeded(for: windowId)
     }
-    
+
     /// Check if split is active for a specific window
     func isSplit(for windowId: UUID) -> Bool {
         return getSplitState(for: windowId).isSplit
     }
-    
+
     /// Get left tab ID for a specific window
     func leftTabId(for windowId: UUID) -> UUID? {
         return getSplitState(for: windowId).leftTabId
     }
-    
+
     /// Get right tab ID for a specific window
     func rightTabId(for windowId: UUID) -> UUID? {
         return getSplitState(for: windowId).rightTabId
     }
-    
+
     /// Get divider fraction for a specific window
     func dividerFraction(for windowId: UUID) -> CGFloat {
         return getSplitState(for: windowId).dividerFraction
     }
-    
+
     /// Set divider fraction for a specific window
     func setDividerFraction(_ value: CGFloat, for windowId: UUID) {
         let clamped = min(max(value, minFraction), maxFraction)
@@ -97,7 +98,7 @@ final class SplitViewManager: ObservableObject {
     func refreshPublishedState(for windowId: UUID) {
         updatePublishedState(from: getSplitState(for: windowId))
     }
-    
+
     /// Enter split mode for a specific window
     func enterSplit(leftTabId: UUID, rightTabId: UUID, for windowId: UUID) {
         var state = getSplitState(for: windowId)
@@ -106,21 +107,21 @@ final class SplitViewManager: ObservableObject {
         state.rightTabId = rightTabId
         state.dividerFraction = 0.5
         setSplitState(state, for: windowId)
-        
+
         // Note: No need to update tab display ownership since windows are independent
-        
+
         if let windowState = browserManager?.windowStates[windowId] {
             browserManager?.refreshCompositor(for: windowState)
         }
-        
+
         print("🪟 [SplitViewManager] Entered split mode for window \(windowId)")
     }
-    
+
     /// Exit split mode for a specific window
     func exitSplit(keep: Side, for windowId: UUID) {
         var state = getSplitState(for: windowId)
         guard state.isSplit else { return }
-        
+
         let keepTabId = keep == .left ? state.leftTabId : state.rightTabId
         state.isSplit = false
         state.leftTabId = nil
@@ -128,23 +129,23 @@ final class SplitViewManager: ObservableObject {
         state.isPreviewActive = false
         state.previewSide = nil
         setSplitState(state, for: windowId)
-        
+
         // Note: No need to update tab display ownership since windows are independent
-        
+
         if let windowState = browserManager?.windowStates[windowId] {
             browserManager?.refreshCompositor(for: windowState)
         }
-        
+
         print("🪟 [SplitViewManager] Exited split mode for window \(windowId), keeping \(keep)")
     }
-    
+
     /// Close a pane in a specific window
     func closePane(_ side: Side, for windowId: UUID) {
         guard let bm = browserManager else { return }
         let state = getSplitState(for: windowId)
         guard state.isSplit else { return }
         guard let windowState = bm.windowStates[windowId] else { return }
-        
+
         switch side {
         case .left:
             if let rightId = state.rightTabId, let rightTab = bm.tabManager.allTabs().first(where: { $0.id == rightId }) {
@@ -178,6 +179,7 @@ final class SplitViewManager: ObservableObject {
     }
 
     // MARK: - Helpers
+
     func resolveTab(_ id: UUID?) -> Tab? {
         guard let id, let bm = browserManager else { return nil }
         return bm.tabManager.allTabs().first(where: { $0.id == id })
@@ -197,6 +199,7 @@ final class SplitViewManager: ObservableObject {
     }
 
     // MARK: - Entry points
+
     func enterSplit(with tab: Tab, placeOn side: Side = .right, animate: Bool = true) {
         guard let windowState = browserManager?.activeWindowState else { return }
         enterSplit(with: tab, placeOn: side, in: windowState, animate: animate)
@@ -281,7 +284,7 @@ final class SplitViewManager: ObservableObject {
         guard let bm = browserManager, let activeWindow = bm.activeWindowState else { return }
         swapSides(for: activeWindow.id)
     }
-    
+
     /// Swap sides for a specific window
     func swapSides(for windowId: UUID) {
         var state = getSplitState(for: windowId)
@@ -293,7 +296,7 @@ final class SplitViewManager: ObservableObject {
         if let windowState = browserManager?.windowStates[windowId] {
             browserManager?.refreshCompositor(for: windowState)
         }
-        
+
         print("🪟 [SplitViewManager] Swapped sides for window \(windowId)")
     }
 
@@ -306,6 +309,7 @@ final class SplitViewManager: ObservableObject {
     }
 
     // MARK: - Preview during drag-over
+
     func beginPreview(side: Side) {
         guard let bm = browserManager, let windowState = bm.activeWindowState else { return }
         beginPreview(side: side, for: windowState.id)

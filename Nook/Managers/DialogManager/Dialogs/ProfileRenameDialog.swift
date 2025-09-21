@@ -5,8 +5,8 @@
 //  Dialog to edit existing Profile name and icon.
 //
 
-import SwiftUI
 import Observation
+import SwiftUI
 
 struct ProfileRenameDialog: DialogProtocol {
     let originalProfileName: String
@@ -26,10 +26,10 @@ struct ProfileRenameDialog: DialogProtocol {
         onCancel: @escaping () -> Void
     ) {
         // Access MainActor-isolated properties using MainActor.assumeIsolated
-        self.originalProfileName = MainActor.assumeIsolated { originalProfile.name }
-        self.originalProfileIcon = MainActor.assumeIsolated { originalProfile.icon }
-        self._profileName = profileName
-        self._profileIcon = profileIcon
+        originalProfileName = MainActor.assumeIsolated { originalProfile.name }
+        originalProfileIcon = MainActor.assumeIsolated { originalProfile.icon }
+        _profileName = profileName
+        _profileIcon = profileIcon
         self.isNameAvailable = isNameAvailable
         self.onSave = onSave
         self.onCancel = onCancel
@@ -78,9 +78,8 @@ struct ProfileRenameDialog: DialogProtocol {
         return AnyView(
             DialogFooter(rightButtons: [
                 DialogButton(text: "Cancel", variant: .secondary, action: onCancel),
-                DialogButton(text: "Save Changes", iconName: "checkmark", variant: canSave ? .primary : .secondary, action: { if canSave { onSave() } })
+                DialogButton(text: "Save Changes", iconName: "checkmark", variant: canSave ? .primary : .secondary, action: { if canSave { onSave() } }),
             ])
         )
     }
 }
-

@@ -1,5 +1,5 @@
 //
-//  NookButton.swift
+//  PulseButton.swift
 //  NookDev
 //
 //  Created by Maciek Bagiński on 04/08/2025.
@@ -8,7 +8,7 @@
 import SwiftUI
 
 /// A unified, highly configurable button component that provides a consistent button experience.
-/// 
+///
 /// NookButton provides a consistent button experience with support for:
 /// - Multiple visual variants (primary, secondary, destructive)
 /// - Icon animations (checkmark, custom icons)
@@ -57,13 +57,13 @@ import SwiftUI
 ///         shadowOffset: CGSize(width: 0, height: 4)
 ///     )
 /// )
-/// 
+///
 /// // Programmatically trigger animation
 /// button.triggerAnimation()
 /// ```
 struct NookButton: View {
     // MARK: - Types
-    
+
     /// Visual style variants for the button
     enum Variant {
         /// Primary action button - typically accent colored with white text
@@ -73,7 +73,7 @@ struct NookButton: View {
         /// Destructive action button - typically red with white text
         case destructive
     }
-    
+
     /// Animation types for icon transitions
     enum AnimationType: Equatable {
         /// No animation - icon remains static
@@ -83,7 +83,7 @@ struct NookButton: View {
         /// Animates to a custom icon when pressed
         case custom(String)
     }
-    
+
     /// Shadow/depth styles for the button
     enum ShadowStyle {
         /// No shadow outline
@@ -93,41 +93,42 @@ struct NookButton: View {
         /// Prominent gray background with white stroke, 6px offset (create buttons)
         case prominent
     }
-    
+
     // MARK: - Properties
-    
+
     /// The text displayed on the button
     let text: String
-    
+
     /// Optional SF Symbol name for the icon displayed next to the text
     let iconName: String?
-    
+
     /// Visual variant determining the button's appearance
     let variant: Variant
-    
+
     /// Action to perform when the button is tapped
     let action: () -> Void
-    
+
     /// Optional keyboard shortcut that triggers the button action
     let keyboardShortcut: KeyEquivalent?
-    
+
     /// Type of animation to perform on the icon when pressed
     let animationType: AnimationType
-    
+
     /// Shadow/depth style for the button's 3D effect
     let shadowStyle: ShadowStyle
-    
+
     /// Optional custom color scheme overriding the variant's default colors
     let customColors: CustomColors?
-    
+
     // MARK: - Private State
+
     @State private var isHovered: Bool = false
     @State private var isPressed: Bool = false
     @State private var currentIconName: String?
     @State private var hasAnimated: Bool = false
-    
+
     // MARK: - Custom Colors
-    
+
     /// Custom color scheme for complete button appearance control
     struct CustomColors {
         /// Background color of the button
@@ -141,9 +142,9 @@ struct NookButton: View {
         /// Shadow outline offset from the button
         let shadowOffset: CGSize
     }
-    
+
     // MARK: - Initializers
-    
+
     /// Creates a fully configurable NookButton
     /// - Parameters:
     ///   - text: The text displayed on the button
@@ -173,9 +174,9 @@ struct NookButton: View {
         self.shadowStyle = shadowStyle
         self.customColors = customColors
     }
-    
+
     // MARK: - Convenience Initializers
-    
+
     /// Creates a standard button without animations
     /// - Parameters:
     ///   - text: The text displayed on the button
@@ -201,7 +202,7 @@ struct NookButton: View {
             shadowStyle: .subtle
         )
     }
-    
+
     /// Creates an animated create button that transitions to checkmark
     /// - Parameters:
     ///   - text: The text displayed on the button
@@ -227,16 +228,16 @@ struct NookButton: View {
             shadowStyle: .prominent
         )
     }
-    
+
     // MARK: - Public Methods
-    
+
     /// Manually triggers the button's icon animation
-    /// 
+    ///
     /// This method can be used to programmatically trigger the button's icon animation
     /// without relying on the button's internal animation system. The animation will
     /// follow the button's configured `animationType`.
     func triggerAnimation() {
-        if animationType != .none && !hasAnimated {
+        if animationType != .none, !hasAnimated {
             hasAnimated = true
             withAnimation(.easeInOut(duration: 0.3)) {
                 switch animationType {
@@ -244,21 +245,22 @@ struct NookButton: View {
                     break
                 case .checkmark:
                     currentIconName = "checkmark"
-                case .custom(let iconName):
+                case let .custom(iconName):
                     currentIconName = iconName
                 }
             }
         }
     }
-    
+
     // MARK: - Body
+
     var body: some View {
         ZStack {
             // Shadow outline (bottom layer) - only if shadow style is not none
             if shadowStyle != .none {
                 shadowOutline
             }
-            
+
             // Main button (top layer)
             Button(action: handleAction) {
                 buttonContent
@@ -281,14 +283,15 @@ struct NookButton: View {
             currentIconName = iconName
         }
     }
-    
+
     // MARK: - Subviews
+
     private var shadowOutline: some View {
         HStack(spacing: shadowStyle == .prominent ? 7 : 8) {
             Text(text)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Color.clear)
-            
+
             if let iconName = currentIconName ?? iconName {
                 Image(systemName: iconName)
                     .font(.system(size: 12, weight: .semibold))
@@ -305,13 +308,13 @@ struct NookButton: View {
         )
         .offset(shadowOffset)
     }
-    
+
     private var buttonContent: some View {
         HStack(spacing: 8) {
             Text(text)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(textColor)
-            
+
             if let iconName = currentIconName ?? iconName {
                 Image(systemName: iconName)
                     .font(.system(size: 12, weight: .semibold))
@@ -333,7 +336,7 @@ struct NookButton: View {
                     LinearGradient(
                         colors: [
                             Color.white.opacity(0.3),
-                            Color.white.opacity(0.1)
+                            Color.white.opacity(0.1),
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -344,22 +347,24 @@ struct NookButton: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .offset(y: isPressed ? 2 : 0)
     }
-    
+
     // MARK: - Action Handling
+
     private func handleAction() {
         // Trigger animation if configured
         triggerAnimation()
-        
+
         // Execute the action
         action()
     }
-    
+
     // MARK: - Computed Properties
+
     private var backgroundColor: Color {
         if let customColors = customColors {
             return customColors.backgroundColor
         }
-        
+
         switch variant {
         case .primary:
             return isHovered ? Color.accentColor.opacity(0.8) : Color.accentColor
@@ -369,12 +374,12 @@ struct NookButton: View {
             return isHovered ? Color.red.opacity(0.8) : Color.red
         }
     }
-    
+
     private var textColor: Color {
         if let customColors = customColors {
             return customColors.textColor
         }
-        
+
         switch variant {
         case .primary:
             return Color.white
@@ -384,12 +389,12 @@ struct NookButton: View {
             return Color.white
         }
     }
-    
+
     private var borderColor: Color {
         if let customColors = customColors {
             return customColors.borderColor
         }
-        
+
         switch variant {
         case .primary, .destructive:
             return Color.clear
@@ -397,7 +402,7 @@ struct NookButton: View {
             return isHovered ? Color.primary.opacity(0.2) : Color.primary.opacity(0.1)
         }
     }
-    
+
     private var borderWidth: CGFloat {
         switch variant {
         case .primary, .destructive:
@@ -406,13 +411,14 @@ struct NookButton: View {
             return 1
         }
     }
-    
+
     // MARK: - Shadow Properties
+
     private var shadowBackgroundColor: Color {
         if let customColors = customColors {
             return customColors.shadowColor
         }
-        
+
         switch shadowStyle {
         case .none:
             return Color.clear
@@ -422,12 +428,12 @@ struct NookButton: View {
             return Color.gray
         }
     }
-    
+
     private var shadowStrokeColor: Color {
         if let customColors = customColors {
             return customColors.shadowColor
         }
-        
+
         switch shadowStyle {
         case .none:
             return Color.clear
@@ -437,12 +443,12 @@ struct NookButton: View {
             return Color.white.opacity(1)
         }
     }
-    
+
     private var shadowOffset: CGSize {
         if let customColors = customColors {
             return customColors.shadowOffset
         }
-        
+
         switch shadowStyle {
         case .none:
             return CGSize.zero
@@ -459,7 +465,7 @@ struct NookButton: View {
 // MARK: - Backward Compatibility
 
 /// Backward compatibility alias for legacy PulseButton usage
-/// 
+///
 /// This allows existing code using `PulseButton` to continue working
 /// while encouraging migration to the new `NookButton` API.
 typealias PulseButton = NookButton
@@ -469,7 +475,7 @@ typealias PulseButton = NookButton
 /// Internal modifier for handling optional keyboard shortcuts
 struct KeyboardShortcutModifier: ViewModifier {
     let shortcut: KeyEquivalent?
-    
+
     func body(content: Content) -> some View {
         if let shortcut = shortcut {
             content.keyboardShortcut(shortcut, modifiers: [])
@@ -483,9 +489,9 @@ struct KeyboardShortcutModifier: ViewModifier {
 
 /*
  ## Migration from Legacy Button Components to NookButton
- 
+
  ### Legacy NookButton → NookButton.createButton()
- 
+
  **Before:**
  ```swift
  NookButton(
@@ -494,7 +500,7 @@ struct KeyboardShortcutModifier: ViewModifier {
      action: onCancel
  )
  ```
- 
+
  **After:**
  ```swift
  NookButton.createButton(
@@ -503,9 +509,9 @@ struct KeyboardShortcutModifier: ViewModifier {
      action: onCancel
  )
  ```
- 
+
  ### AnimatedCreateButton → NookButton.animatedCreateButton()
- 
+
  **Before:**
  ```swift
  AnimatedCreateButton(
@@ -516,7 +522,7 @@ struct KeyboardShortcutModifier: ViewModifier {
      onSave: handleSave
  )
  ```
- 
+
  **After:**
  ```swift
  NookButton.animatedCreateButton(
@@ -526,9 +532,9 @@ struct KeyboardShortcutModifier: ViewModifier {
      action: handleSave
  )
  ```
- 
+
  ### Legacy PulseButton → NookButton (Backward Compatible)
- 
+
  **Legacy code still works:**
  ```swift
  PulseButton.createButton(
@@ -537,7 +543,7 @@ struct KeyboardShortcutModifier: ViewModifier {
      action: onCancel
  )
  ```
- 
+
  **Recommended migration:**
  ```swift
  NookButton.createButton(
@@ -546,16 +552,16 @@ struct KeyboardShortcutModifier: ViewModifier {
      action: onCancel
  )
  ```
- 
+
  ### Key Changes:
  - `isCreating` binding is no longer needed (animation is handled internally)
  - `onSave` parameter is now `action`
  - `animateToCheckmark()` method is now `triggerAnimation()` (works with any animation type)
  - All existing functionality is preserved
  - New features available: custom animations, shadow styles, custom colors
- 
+
  ### New Features Available:
- 
+
  **Custom Icon Animation:**
  ```swift
  NookButton(
@@ -566,7 +572,7 @@ struct KeyboardShortcutModifier: ViewModifier {
      animationType: .custom("heart.fill")
  )
  ```
- 
+
  **Custom Colors:**
  ```swift
  NookButton(

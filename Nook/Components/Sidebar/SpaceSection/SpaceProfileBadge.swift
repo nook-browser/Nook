@@ -62,4 +62,3 @@ struct SpaceProfileBadge: View {
     private var iconSize: CGFloat { size == .compact ? 9 : 12 }
     private var cornerRadius: CGFloat { size == .compact ? 3 : 4 }
 }
-

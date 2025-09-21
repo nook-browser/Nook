@@ -8,12 +8,12 @@
 import Foundation
 
 enum NewDocumentTarget: String, CaseIterable, Identifiable {
-    case tab = "tab"
-    case window = "window"
-    case space = "space"
-    
+    case tab
+    case window
+    case space
+
     var id: String { rawValue }
-    
+
     var displayName: String {
         switch self {
         case .tab: return "New Tab"
@@ -22,4 +22,3 @@ enum NewDocumentTarget: String, CaseIterable, Identifiable {
         }
     }
 }
-

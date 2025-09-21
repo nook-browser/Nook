@@ -5,9 +5,9 @@
 //  Created by Jonathan Caudill on 26/08/2025.
 //
 
+import AppKit
 import SwiftUI
 import WebKit
-import AppKit
 
 @MainActor
 final class MiniWindowSession: ObservableObject, Identifiable {
@@ -39,8 +39,8 @@ final class MiniWindowSession: ObservableObject, Identifiable {
         self.targetSpaceResolver = targetSpaceResolver
         self.adoptHandler = adoptHandler
         self.authCompletionHandler = authCompletionHandler
-        self.currentURL = url
-        self.title = url.absoluteString
+        currentURL = url
+        title = url.absoluteString
     }
 
     var targetSpaceName: String { targetSpaceResolver() }
@@ -61,10 +61,11 @@ final class MiniWindowSession: ObservableObject, Identifiable {
     func updateProgress(_ progress: Double) {
         estimatedProgress = progress
     }
-    
+
     func updateToolbarColor(hexString: String?) {
         guard let trimmed = hexString?.trimmingCharacters(in: .whitespacesAndNewlines),
-              trimmed.isEmpty == false else {
+              trimmed.isEmpty == false
+        else {
             toolbarColor = nil
             return
         }
@@ -75,7 +76,7 @@ final class MiniWindowSession: ObservableObject, Identifiable {
             toolbarColor = nil
         }
     }
-    
+
     func completeAuth(success: Bool, finalURL: URL? = nil) {
         isAuthComplete = true
         authSuccess = success
@@ -83,7 +84,7 @@ final class MiniWindowSession: ObservableObject, Identifiable {
             currentURL = finalURL
         }
         authCompletionHandler?(success, finalURL)
-        
+
         // Don't auto-adopt - let the user decide when to adopt the window
         // The authentication completion is communicated back to the original tab
         // but the mini window stays open for the user to manually adopt if desired
@@ -188,7 +189,7 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
         window.delegate = self
     }
 
-    required init?(coder: NSCoder) {
+    required init?(coder _: NSCoder) {
         nil
     }
 
@@ -197,7 +198,7 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
         window?.makeKeyAndOrderFront(sender)
     }
 
-    func windowWillClose(_ notification: Notification) {
+    func windowWillClose(_: Notification) {
         onClose(session)
     }
 }

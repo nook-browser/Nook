@@ -11,7 +11,7 @@ import WebKit
 
 class BrowserConfiguration {
     static let shared = BrowserConfiguration()
-    
+
     lazy var webViewConfiguration: WKWebViewConfiguration = {
         let config = WKWebViewConfiguration()
 
@@ -30,29 +30,27 @@ class BrowserConfiguration {
 
         // Media settings
         config.mediaTypesRequiringUserActionForPlayback = []
-        
+
         // Enable Picture-in-Picture for web media
         config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
-        
+
         // Enable full-screen API support
         config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
         config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
-        
+
         // CRITICAL: Enable HTML5 Fullscreen API
         config.preferences.isElementFullscreenEnabled = true
-        
-        
+
         // Enable full-screen API support
         config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
         config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
-        
+
         // CRITICAL: Enable HTML5 Fullscreen API
         config.preferences.isElementFullscreenEnabled = true
-        
-        
+
         // Enable background media playback
         config.allowsAirPlayForMediaPlayback = true
-        
+
         // User agent for better compatibility
         config.applicationNameForUserAgent = "Version/17.4.1 Safari/605.1.15"
 
@@ -64,6 +62,7 @@ class BrowserConfiguration {
     }()
 
     // MARK: - Cache-Optimized Configuration
+
     // Returns a fresh configuration each call to avoid cross-tab state sharing
     func cacheOptimizedWebViewConfiguration() -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
@@ -85,15 +84,13 @@ class BrowserConfiguration {
 
         // Enable Picture-in-Picture for web media
         config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
-        
+
         // Enable full-screen API support
         config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
         config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
-        
+
         // CRITICAL: Enable HTML5 Fullscreen API
         config.preferences.isElementFullscreenEnabled = true
-        
-        
 
         // Enable background media playback
         config.allowsAirPlayForMediaPlayback = true
@@ -109,6 +106,7 @@ class BrowserConfiguration {
     }
 
     // MARK: - Profile-Aware Configurations
+
     // Create a fresh configuration using a profile-specific data store
     func webViewConfiguration(for profile: Profile) -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
@@ -130,15 +128,13 @@ class BrowserConfiguration {
 
         // Enable Picture-in-Picture for web media
         config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
-        
+
         // Enable full-screen API support
         config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
         config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
-        
+
         // CRITICAL: Enable HTML5 Fullscreen API
         config.preferences.isElementFullscreenEnabled = true
-        
-        
 
         // Enable background media playback
         config.allowsAirPlayForMediaPlayback = true
@@ -160,5 +156,4 @@ class BrowserConfiguration {
     }
 
     private init() {}
-    
 }

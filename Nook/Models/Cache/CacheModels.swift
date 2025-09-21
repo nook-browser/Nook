@@ -18,7 +18,7 @@ struct CacheInfo: Identifiable, Hashable, Codable {
     let lastModified: Date?
     let diskUsage: Int64
     let memoryUsage: Int64
-    
+
     init(id: UUID = UUID(), domain: String, dataTypes: [String], size: Int64, lastModified: Date?, diskUsage: Int64, memoryUsage: Int64) {
         self.id = id
         self.domain = domain
@@ -28,98 +28,98 @@ struct CacheInfo: Identifiable, Hashable, Codable {
         self.diskUsage = diskUsage
         self.memoryUsage = memoryUsage
     }
-    
+
     init(from record: WKWebsiteDataRecord) {
-        self.id = UUID()
-        self.domain = record.displayName
-        self.dataTypes = Array(record.dataTypes)
-        
+        id = UUID()
+        domain = record.displayName
+        dataTypes = Array(record.dataTypes)
+
         // Estimate size based on data types
         var estimatedSize: Int64 = 0
         var diskSize: Int64 = 0
         var memorySize: Int64 = 0
-        
+
         // Basic size estimation (WebKit doesn't provide exact sizes)
         for dataType in record.dataTypes {
             switch dataType {
             case WKWebsiteDataTypeDiskCache:
-                let size = Int64.random(in: 1024...10485760) // 1KB - 10MB estimate
+                let size = Int64.random(in: 1024 ... 10_485_760) // 1KB - 10MB estimate
                 diskSize += size
                 estimatedSize += size
             case WKWebsiteDataTypeMemoryCache:
-                let size = Int64.random(in: 512...1048576) // 512B - 1MB estimate  
+                let size = Int64.random(in: 512 ... 1_048_576) // 512B - 1MB estimate
                 memorySize += size
                 estimatedSize += size
             case WKWebsiteDataTypeOfflineWebApplicationCache:
-                let size = Int64.random(in: 2048...5242880) // 2KB - 5MB estimate
+                let size = Int64.random(in: 2048 ... 5_242_880) // 2KB - 5MB estimate
                 diskSize += size
                 estimatedSize += size
             default:
-                let size = Int64.random(in: 256...524288) // 256B - 512KB estimate
+                let size = Int64.random(in: 256 ... 524_288) // 256B - 512KB estimate
                 diskSize += size
                 estimatedSize += size
             }
         }
-        
-        self.size = estimatedSize
-        self.diskUsage = diskSize
-        self.memoryUsage = memorySize
-        self.lastModified = Date().addingTimeInterval(-TimeInterval.random(in: 0...2592000)) // Random within last 30 days
+
+        size = estimatedSize
+        diskUsage = diskSize
+        memoryUsage = memorySize
+        lastModified = Date().addingTimeInterval(-TimeInterval.random(in: 0 ... 2_592_000)) // Random within last 30 days
     }
-    
+
     var displayDomain: String {
         return domain.hasPrefix(".") ? String(domain.dropFirst()) : domain
     }
-    
+
     var sizeDescription: String {
         return formatBytes(size)
     }
-    
+
     var diskUsageDescription: String {
         return formatBytes(diskUsage)
     }
-    
+
     var memoryUsageDescription: String {
         return formatBytes(memoryUsage)
     }
-    
+
     var lastModifiedDescription: String {
         guard let lastModified = lastModified else {
             return "Unknown"
         }
-        
+
         let formatter = RelativeDateTimeFormatter()
         formatter.dateTimeStyle = .named
         return formatter.localizedString(for: lastModified, relativeTo: Date())
     }
-    
+
     var isStale: Bool {
         guard let lastModified = lastModified else { return false }
-        return Date().timeIntervalSince(lastModified) > 2592000 // 30 days
+        return Date().timeIntervalSince(lastModified) > 2_592_000 // 30 days
     }
-    
+
     // MARK: - Privacy & Data Retention Compliance
-    
+
     var dataRetentionRisk: DataRetentionRisk {
         let ageInDays = lastModified.map { Date().timeIntervalSince($0) / 86400 } ?? 0
-        
+
         switch ageInDays {
-        case 0...7: return .fresh
-        case 8...30: return .moderate
-        case 31...90: return .aging
+        case 0 ... 7: return .fresh
+        case 8 ... 30: return .moderate
+        case 31 ... 90: return .aging
         default: return .stale
         }
     }
-    
+
     var shouldRetainForPrivacy: Bool {
         // Apply GDPR-compliant data retention
         let maxRetentionDays = 90.0 // 3 months
         guard let lastModified = lastModified else { return false }
-        
+
         let ageInDays = Date().timeIntervalSince(lastModified) / 86400
-        return ageInDays <= maxRetentionDays && size < 104857600 // < 100MB
+        return ageInDays <= maxRetentionDays && size < 104_857_600 // < 100MB
     }
-    
+
     var privacyCategory: PrivacyCategory {
         // Categorize cache types by privacy sensitivity
         if cacheTypes.contains(.localStorage) || cacheTypes.contains(.sessionStorage) {
@@ -132,11 +132,11 @@ struct CacheInfo: Identifiable, Hashable, Codable {
             return .performance
         }
     }
-    
+
     var cacheTypes: [CacheType] {
         return dataTypes.compactMap { CacheType.from($0) }
     }
-    
+
     var primaryCacheType: CacheType {
         if dataTypes.contains(WKWebsiteDataTypeDiskCache) {
             return .disk
@@ -148,7 +148,7 @@ struct CacheInfo: Identifiable, Hashable, Codable {
             return .other
         }
     }
-    
+
     private func formatBytes(_ bytes: Int64) -> String {
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useAll]
@@ -161,56 +161,56 @@ struct DomainCacheGroup: Identifiable, Hashable, Codable {
     let id: UUID
     let domain: String
     let cacheEntries: [CacheInfo]
-    
+
     var displayDomain: String {
         return domain.hasPrefix(".") ? String(domain.dropFirst()) : domain
     }
-    
+
     var totalSize: Int64 {
         return cacheEntries.reduce(0) { $0 + $1.size }
     }
-    
+
     var totalDiskUsage: Int64 {
         return cacheEntries.reduce(0) { $0 + $1.diskUsage }
     }
-    
+
     var totalMemoryUsage: Int64 {
         return cacheEntries.reduce(0) { $0 + $1.memoryUsage }
     }
-    
+
     var entryCount: Int {
         return cacheEntries.count
     }
-    
+
     var totalSizeDescription: String {
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useAll]
         formatter.countStyle = .file
         return formatter.string(fromByteCount: totalSize)
     }
-    
+
     var hasStaleCache: Bool {
         return cacheEntries.contains { $0.isStale }
     }
-    
+
     var lastModified: Date? {
         return cacheEntries.compactMap { $0.lastModified }.max()
     }
-    
+
     var cacheEfficiency: Double {
         let recentEntries = cacheEntries.filter { !$0.isStale }.count
         return entryCount > 0 ? Double(recentEntries) / Double(entryCount) : 0.0
     }
-    
+
     var cacheTypeBreakdown: [CacheType: Int64] {
         var breakdown: [CacheType: Int64] = [:]
-        
+
         for entry in cacheEntries {
             for type in entry.cacheTypes {
                 breakdown[type, default: 0] += entry.size
             }
         }
-        
+
         return breakdown
     }
 }
@@ -222,7 +222,7 @@ enum DataRetentionRisk: String, CaseIterable {
     case moderate = "Moderate (8-30 days)"
     case aging = "Aging (31-90 days)"
     case stale = "Stale (90+ days)"
-    
+
     var color: String {
         switch self {
         case .fresh: return "green"
@@ -231,12 +231,12 @@ enum DataRetentionRisk: String, CaseIterable {
         case .stale: return "red"
         }
     }
-    
+
     var shouldRetain: Bool {
         switch self {
         case .fresh, .moderate: return true
-        case .aging: return false  // Review needed
-        case .stale: return false  // Should be deleted
+        case .aging: return false // Review needed
+        case .stale: return false // Should be deleted
         }
     }
 }
@@ -246,16 +246,16 @@ enum PrivacyCategory: String, CaseIterable {
     case userData = "User Data"
     case functional = "Functional"
     case performance = "Performance"
-    
+
     var sensitivityLevel: Int {
         switch self {
-        case .personalData: return 4  // Highest sensitivity
+        case .personalData: return 4 // Highest sensitivity
         case .userData: return 3
         case .functional: return 2
-        case .performance: return 1   // Lowest sensitivity
+        case .performance: return 1 // Lowest sensitivity
         }
     }
-    
+
     var icon: String {
         switch self {
         case .personalData: return "person.circle.fill"
@@ -278,7 +278,7 @@ enum CacheType: String, CaseIterable, Codable {
     case sessionStorage = "Session Storage"
     case serviceWorker = "Service Worker"
     case other = "Other"
-    
+
     var icon: String {
         switch self {
         case .disk: return "internaldrive"
@@ -290,7 +290,7 @@ enum CacheType: String, CaseIterable, Codable {
         case .other: return "doc"
         }
     }
-    
+
     var color: String {
         switch self {
         case .disk: return "blue"
@@ -302,7 +302,7 @@ enum CacheType: String, CaseIterable, Codable {
         case .other: return "gray"
         }
     }
-    
+
     static func from(_ dataTypeString: String) -> CacheType? {
         switch dataTypeString {
         case WKWebsiteDataTypeDiskCache:
@@ -325,7 +325,7 @@ enum CacheType: String, CaseIterable, Codable {
             return .other
         }
     }
-    
+
     var websiteDataType: String {
         switch self {
         case .disk: return WKWebsiteDataTypeDiskCache
@@ -351,7 +351,7 @@ enum CacheFilter: String, CaseIterable {
     case personalData = "Personal Data"
     case aging = "Aging (30+ days)"
     case shouldDelete = "Should Delete"
-    
+
     func matches(_ cache: CacheInfo) -> Bool {
         switch self {
         case .all:
@@ -365,7 +365,7 @@ enum CacheFilter: String, CaseIterable {
         case .stale:
             return cache.isStale
         case .large:
-            return cache.size > 1048576 // 1MB
+            return cache.size > 1_048_576 // 1MB
         case .personalData:
             return cache.privacyCategory == .personalData
         case .aging:
@@ -381,7 +381,7 @@ enum CacheSortOption: String, CaseIterable {
     case size = "Size"
     case lastModified = "Last Modified"
     case type = "Cache Type"
-    
+
     var displayName: String {
         return rawValue
     }

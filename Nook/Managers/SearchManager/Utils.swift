@@ -41,9 +41,10 @@ public func normalizeURL(_ input: String, provider: SearchProvider) -> String {
 
     // Preserve explicit schemes (including file and extension schemes)
     if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") ||
-       trimmed.hasPrefix("file://") || trimmed.hasPrefix("chrome-extension://") ||
-       trimmed.hasPrefix("moz-extension://") || trimmed.hasPrefix("webkit-extension://") ||
-       trimmed.hasPrefix("safari-web-extension://") {
+        trimmed.hasPrefix("file://") || trimmed.hasPrefix("chrome-extension://") ||
+        trimmed.hasPrefix("moz-extension://") || trimmed.hasPrefix("webkit-extension://") ||
+        trimmed.hasPrefix("safari-web-extension://")
+    {
         return trimmed
     }
 
@@ -53,7 +54,7 @@ public func normalizeURL(_ input: String, provider: SearchProvider) -> String {
 
     let encoded =
         trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
-        ?? trimmed
+            ?? trimmed
     let urlString = String(format: provider.queryTemplate, encoded)
     return urlString
 }

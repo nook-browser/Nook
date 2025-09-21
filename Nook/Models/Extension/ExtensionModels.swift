@@ -22,7 +22,7 @@ final class ExtensionEntity {
     var lastUpdateDate: Date
     var packagePath: String // Path to the extension package
     var iconPath: String?
-    
+
     init(
         id: String,
         name: String,
@@ -61,18 +61,18 @@ struct InstalledExtension {
     let packagePath: String
     let iconPath: String?
     let manifest: [String: Any]
-    
+
     init(from entity: ExtensionEntity, manifest: [String: Any]) {
-        self.id = entity.id
-        self.name = entity.name
-        self.version = entity.version
-        self.manifestVersion = entity.manifestVersion
-        self.description = entity.extensionDescription
-        self.isEnabled = entity.isEnabled
-        self.installDate = entity.installDate
-        self.lastUpdateDate = entity.lastUpdateDate
-        self.packagePath = entity.packagePath
-        self.iconPath = entity.iconPath
+        id = entity.id
+        name = entity.name
+        version = entity.version
+        manifestVersion = entity.manifestVersion
+        description = entity.extensionDescription
+        isEnabled = entity.isEnabled
+        installDate = entity.installDate
+        lastUpdateDate = entity.lastUpdateDate
+        packagePath = entity.packagePath
+        iconPath = entity.iconPath
         self.manifest = manifest
     }
 }

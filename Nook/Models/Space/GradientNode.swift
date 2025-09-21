@@ -8,7 +8,7 @@
 import Foundation
 import SwiftUI
 #if canImport(AppKit)
-import AppKit
+    import AppKit
 #endif
 
 // MARK: - Gradient Node Model
@@ -32,9 +32,9 @@ struct GradientNode: Identifiable, Codable, Hashable {
 
     init(id: UUID = UUID(), color: Color, location: Double) {
         #if canImport(AppKit)
-        let hex = NSColor(color).toHexString() ?? "#000000"
+            let hex = NSColor(color).toHexString() ?? "#000000"
         #else
-        let hex = "#000000"
+            let hex = "#000000"
         #endif
         self.init(id: id, colorHex: hex, location: location)
     }

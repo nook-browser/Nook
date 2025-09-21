@@ -1,9 +1,10 @@
 import SwiftUI
 #if canImport(AppKit)
-import AppKit
+    import AppKit
 #endif
 
 // MARK: - ColorSwatchRowView
+
 // Horizontal palette row with arrows
 struct ColorSwatchRowView: View {
     var selectedColor: Color?
@@ -21,7 +22,7 @@ struct ColorSwatchRowView: View {
             Color.green,
             Color.cyan,
             Color.blue,
-            Color.gray
+            Color.gray,
         ]
         let alt: [Color] = [
             Color(white: 0.9),
@@ -33,7 +34,7 @@ struct ColorSwatchRowView: View {
             Color(hue: 0.33, saturation: 0.75, brightness: 0.85),
             Color(hue: 0.55, saturation: 0.6, brightness: 0.9),
             Color(hue: 0.62, saturation: 0.7, brightness: 0.85),
-            Color(hue: 0.75, saturation: 0.4, brightness: 0.7)
+            Color(hue: 0.75, saturation: 0.4, brightness: 0.7),
         ]
         return [base, alt]
     }()
@@ -82,16 +83,15 @@ struct ColorSwatchRowView: View {
 
     private func approxEqual(_ a: Color, _ b: Color) -> Bool {
         #if canImport(AppKit)
-        let nsA = NSColor(a)
-        let nsB = NSColor(b)
-        var (ha, sa, ba): (CGFloat, CGFloat, CGFloat) = (0,0,0)
-        var (hb, sb, bb): (CGFloat, CGFloat, CGFloat) = (0,0,0)
-        nsA.usingColorSpace(.deviceRGB)?.getHue(&ha, saturation: &sa, brightness: &ba, alpha: nil)
-        nsB.usingColorSpace(.deviceRGB)?.getHue(&hb, saturation: &sb, brightness: &bb, alpha: nil)
-        return abs(ha - hb) < 0.03 && abs(sa - sb) < 0.08 && abs(ba - bb) < 0.08
+            let nsA = NSColor(a)
+            let nsB = NSColor(b)
+            var (ha, sa, ba): (CGFloat, CGFloat, CGFloat) = (0, 0, 0)
+            var (hb, sb, bb): (CGFloat, CGFloat, CGFloat) = (0, 0, 0)
+            nsA.usingColorSpace(.deviceRGB)?.getHue(&ha, saturation: &sa, brightness: &ba, alpha: nil)
+            nsB.usingColorSpace(.deviceRGB)?.getHue(&hb, saturation: &sb, brightness: &bb, alpha: nil)
+            return abs(ha - hb) < 0.03 && abs(sa - sb) < 0.08 && abs(ba - bb) < 0.08
         #else
-        return false
+            return false
         #endif
     }
 }
-

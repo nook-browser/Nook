@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 // Presents content in an NSPopover with .applicationDefined behavior
 // so it doesn't auto-close when Web Inspector is open.
@@ -10,8 +10,8 @@ struct PersistentPopover<Content: View>: NSViewRepresentable {
     let content: () -> Content
 
     init(isPresented: Binding<Bool>, contentSize: Binding<CGSize>, preferredEdge: NSRectEdge = .maxY, @ViewBuilder content: @escaping () -> Content) {
-        self._isPresented = isPresented
-        self._contentSize = contentSize
+        _isPresented = isPresented
+        _contentSize = contentSize
         self.preferredEdge = preferredEdge
         self.content = content
     }
@@ -22,7 +22,7 @@ struct PersistentPopover<Content: View>: NSViewRepresentable {
         return view
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {
+    func updateNSView(_: NSView, context: Context) {
         let coordinator = context.coordinator
 
         if isPresented {

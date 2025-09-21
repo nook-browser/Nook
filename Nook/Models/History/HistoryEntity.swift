@@ -19,7 +19,7 @@ class HistoryEntity {
     var lastVisited: Date
     // Optional profile association for backward compatibility during migration
     var profileId: UUID?
-    
+
     init(
         id: UUID = UUID(),
         url: String,

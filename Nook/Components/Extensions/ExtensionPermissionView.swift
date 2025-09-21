@@ -17,26 +17,26 @@ struct ExtensionPermissionView: View {
     let optionalHostPermissions: [String]
     let onGrant: (Set<String>, Set<String>) -> Void
     let onDeny: () -> Void
-    
+
     @State private var selectedPermissions: Set<String> = []
     @State private var selectedHostPermissions: Set<String> = []
-    
+
     var body: some View {
         VStack(spacing: 20) {
             VStack(spacing: 8) {
                 Image(systemName: "puzzlepiece.extension")
                     .font(.system(size: 48))
                     .foregroundColor(.blue)
-                
+
                 Text("Extension Permission Request")
                     .font(.title2)
                     .fontWeight(.semibold)
-                
+
                 Text("\"\(extensionName)\" wants to:")
                     .font(.headline)
                     .foregroundColor(.secondary)
             }
-            
+
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     if !requestedPermissions.isEmpty {
@@ -83,7 +83,7 @@ struct ExtensionPermissionView: View {
                             }
                         }
                     }
-                    
+
                     if !requestedHostPermissions.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Requested Website Access")
@@ -132,16 +132,16 @@ struct ExtensionPermissionView: View {
                 .padding()
             }
             .frame(maxHeight: 300)
-            
+
             HStack(spacing: 12) {
                 Button("Deny") {
                     onDeny()
                 }
                 .buttonStyle(.bordered)
                 .keyboardShortcut(.escape)
-                
+
                 Spacer()
-                
+
                 Button("Allow Selected") {
                     onGrant(selectedPermissions, selectedHostPermissions)
                 }
@@ -160,7 +160,7 @@ struct ExtensionPermissionView: View {
             }
         }
     }
-    
+
     private func getPermissionDescription(_ permission: String) -> String {
         switch permission {
         case "storage":
@@ -185,7 +185,7 @@ struct ExtensionPermissionView: View {
             return "Access \(permission) functionality"
         }
     }
-    
+
     private func getHostPermissionDescription(_ host: String) -> String {
         if host == "<all_urls>" {
             return "Access all websites"
@@ -196,7 +196,7 @@ struct ExtensionPermissionView: View {
             return "Access \(host)"
         }
     }
-    
+
     private func isSafePermission(_ permission: String) -> Bool {
         let safePermissions = ["storage", "notifications"]
         return safePermissions.contains(permission)
@@ -207,21 +207,21 @@ struct PermissionRowView: View {
     let permission: String
     let description: String
     @Binding var isSelected: Bool
-    
+
     var body: some View {
         HStack(spacing: 12) {
             Toggle("", isOn: $isSelected)
                 .toggleStyle(.checkbox)
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(permission)
                     .font(.headline)
-                
+
                 Text(description)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            
+
             Spacer()
         }
         .padding(8)
@@ -240,7 +240,7 @@ struct ExtensionPermissionView_Previews: PreviewProvider {
             requestedHostPermissions: ["https://*.google.com/*"],
             optionalHostPermissions: ["https://github.com/*"],
             onGrant: { _, _ in },
-            onDeny: { }
+            onDeny: {}
         )
     }
 }

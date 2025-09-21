@@ -1,9 +1,9 @@
-//    
+//
 //      PinnedGrid.swift
 //      Nook
-//    
+//
 //      Created by Maciek Bagiński on 30/07/2025.
-//    
+//
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -18,7 +18,7 @@ struct PinnedGrid: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var windowState: BrowserWindowState
     @State private var draggedItem: UUID? = nil
-    
+
     init(width: CGFloat, profileId: UUID? = nil) {
         self.width = width
         self.profileId = profileId
@@ -33,7 +33,7 @@ struct PinnedGrid: View {
         let colsCount: Int = columnCount(for: width, itemCount: items.count)
         let columns: [GridItem] = makeColumns(count: colsCount)
         // Ora-style DnD: no geometry/boundary computation
-        
+
         let shouldAnimate = (browserManager.activeWindowState?.id == windowState.id) && !browserManager.isTransitioningProfile
 
         // For embedded use, return proper sized container even when empty to support transitions
@@ -52,12 +52,12 @@ struct PinnedGrid: View {
                     )
             )
         }
-        
+
         return AnyView(ZStack { // Container to support transitions
             VStack(spacing: 6) {
                 ZStack(alignment: .top) {
                     LazyVGrid(columns: columns, alignment: .center, spacing: rowSpacing) {
-                        ForEach(Array(items.enumerated()), id: \.element.id) { index, tab in
+                        ForEach(Array(items.enumerated()), id: \.element.id) { _, tab in
                             let isActive: Bool = (browserManager.currentTab(for: windowState)?.id == tab.id)
                             let title: String = safeTitle(tab)
 
@@ -83,7 +83,6 @@ struct PinnedGrid: View {
                                     tabManager: browserManager.tabManager
                                 )
                             )
-                            
                         }
                     }
                     // Section-level drop for empty grid or background
@@ -107,7 +106,7 @@ struct PinnedGrid: View {
         .allowsHitTesting(!browserManager.isTransitioningProfile)
         )
     }
-    
+
     private func safeTitle(_ tab: Tab) -> String {
         let t = tab.name.trimmingCharacters(in: .whitespacesAndNewlines)
         return t.isEmpty ? (tab.url.host ?? "New Tab") : t
@@ -134,7 +133,7 @@ struct PinnedGrid: View {
             count: count
         )
     }
-    
+
     // no boundary math needed
 }
 
@@ -177,4 +176,5 @@ private struct PinnedTile: View {
 }
 
 // MARK: - Preference Keys
+
 // no-op

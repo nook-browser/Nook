@@ -14,7 +14,7 @@ struct SettingsDialog: DialogProtocol {
     @Binding var fontSize: Double
     let onSave: () -> Void
     let onCancel: () -> Void
-    
+
     init(
         autoSave: Binding<Bool>,
         notifications: Binding<Bool>,
@@ -23,14 +23,14 @@ struct SettingsDialog: DialogProtocol {
         onSave: @escaping () -> Void,
         onCancel: @escaping () -> Void
     ) {
-        self._autoSave = autoSave
-        self._notifications = notifications
-        self._theme = theme
-        self._fontSize = fontSize
+        _autoSave = autoSave
+        _notifications = notifications
+        _theme = theme
+        _fontSize = fontSize
         self.onSave = onSave
         self.onCancel = onCancel
     }
-    
+
     var header: AnyView {
         AnyView(
             DialogHeader(
@@ -40,7 +40,7 @@ struct SettingsDialog: DialogProtocol {
             )
         )
     }
-    
+
     var content: AnyView {
         AnyView(
             VStack(alignment: .leading, spacing: 20) {
@@ -54,18 +54,18 @@ struct SettingsDialog: DialogProtocol {
                     }
                     .pickerStyle(.segmented)
                 }
-                
+
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Font Size")
                         .font(.system(size: 14, weight: .medium))
                     HStack {
-                        Slider(value: $fontSize, in: 12...20, step: 1)
+                        Slider(value: $fontSize, in: 12 ... 20, step: 1)
                         Text("\(Int(fontSize))")
                             .font(.system(size: 12))
                             .foregroundColor(.secondary)
                     }
                 }
-                
+
                 VStack(alignment: .leading, spacing: 12) {
                     Toggle("Auto-save tabs", isOn: $autoSave)
                     Toggle("Enable notifications", isOn: $notifications)
@@ -73,7 +73,7 @@ struct SettingsDialog: DialogProtocol {
             }
         )
     }
-    
+
     var footer: AnyView {
         AnyView(
             DialogFooter(
@@ -88,9 +88,9 @@ struct SettingsDialog: DialogProtocol {
                         iconName: "checkmark",
                         variant: .primary,
                         action: onSave
-                    )
+                    ),
                 ]
             )
         )
     }
-} 
+}

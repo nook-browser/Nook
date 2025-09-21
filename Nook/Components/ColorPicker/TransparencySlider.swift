@@ -1,6 +1,7 @@
 import SwiftUI
 
 // MARK: - TransparencySlider
+
 // Controls global opacity of the gradient layer
 struct TransparencySlider: View {
     @Binding var gradient: SpaceGradient
@@ -24,7 +25,7 @@ struct TransparencySlider: View {
                     .frame(width: 48, height: 28)
                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
 
-                Slider(value: $localOpacity, in: 0...1)
+                Slider(value: $localOpacity, in: 0 ... 1)
             }
         }
         .onAppear { localOpacity = clamp(gradient.opacity) }
@@ -64,7 +65,7 @@ struct TransparencySlider: View {
             let single = mapped[0]
             mapped = [
                 Gradient.Stop(color: single.color, location: 0.0),
-                Gradient.Stop(color: single.color, location: 1.0)
+                Gradient.Stop(color: single.color, location: 1.0),
             ]
         }
         return mapped
@@ -81,6 +82,7 @@ struct TransparencySlider: View {
 }
 
 // MARK: - Checkerboard Background
+
 private struct CheckerboardBackground: View {
     var body: some View {
         GeometryReader { proxy in
@@ -89,8 +91,8 @@ private struct CheckerboardBackground: View {
             let cols = Int(ceil(size.width / tile))
             let rows = Int(ceil(size.height / tile))
             Canvas { context, _ in
-                for r in 0..<rows {
-                    for c in 0..<cols {
+                for r in 0 ..< rows {
+                    for c in 0 ..< cols {
                         let isDark = (r + c) % 2 == 0
                         let rect = CGRect(x: CGFloat(c) * tile, y: CGFloat(r) * tile, width: tile, height: tile)
                         context.fill(Path(rect), with: .color(isDark ? Color.black.opacity(0.08) : Color.white.opacity(0.9)))

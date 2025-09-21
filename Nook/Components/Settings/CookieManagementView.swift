@@ -18,11 +18,11 @@ struct CookieManagementView: View {
     @State private var showingCookieDetails: Bool = false
     @State private var viewMode: ViewMode = .domain
     @Environment(\.dismiss) private var dismiss
-    
+
     enum ViewMode: String, CaseIterable {
         case domain = "By Domain"
         case list = "All Cookies"
-        
+
         var icon: String {
             switch self {
             case .domain: return "folder"
@@ -30,19 +30,19 @@ struct CookieManagementView: View {
             }
         }
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Header with stats and controls
             headerView
-            
+
             Divider()
-            
+
             // Search and filter controls
             controlsView
-            
+
             Divider()
-            
+
             // Main content
             if cookieManager.isLoading {
                 loadingView
@@ -62,24 +62,24 @@ struct CookieManagementView: View {
             }
         }
     }
-    
+
     // MARK: - Header View
-    
+
     private var headerView: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Cookie Management")
                     .font(.title2)
                     .fontWeight(.semibold)
-                
+
                 let stats = cookieManager.getCookieStats()
                 Text("\(stats.total) cookies • \(stats.session) session • \(stats.persistent) persistent • \(formatSize(stats.totalSize))")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            
+
             Spacer()
-            
+
             // Action buttons
             HStack(spacing: 12) {
                 Button("Refresh") {
@@ -88,16 +88,16 @@ struct CookieManagementView: View {
                     }
                 }
                 .buttonStyle(.bordered)
-                
+
                 Menu("Clear Cookies") {
                     Button("Clear Expired") {
                         Task {
                             await cookieManager.deleteExpiredCookies()
                         }
                     }
-                    
+
                     Divider()
-                    
+
                     Button("Clear All", role: .destructive) {
                         Task {
                             await cookieManager.deleteAllCookies()
@@ -105,7 +105,7 @@ struct CookieManagementView: View {
                     }
                 }
                 .buttonStyle(.bordered)
-                
+
                 Button("Close") {
                     dismiss()
                 }
@@ -115,9 +115,9 @@ struct CookieManagementView: View {
         }
         .padding()
     }
-    
+
     // MARK: - Controls View
-    
+
     private var controlsView: some View {
         HStack {
             // Search
@@ -132,9 +132,9 @@ struct CookieManagementView: View {
             .background(Color(NSColor.controlBackgroundColor))
             .cornerRadius(6)
             .frame(maxWidth: 300)
-            
+
             Spacer()
-            
+
             // View mode toggle
             Picker("View Mode", selection: $viewMode) {
                 ForEach(ViewMode.allCases, id: \.self) { mode in
@@ -144,7 +144,7 @@ struct CookieManagementView: View {
             }
             .pickerStyle(.segmented)
             .frame(width: 200)
-            
+
             // Filter
             Picker("Filter", selection: $selectedFilter) {
                 ForEach(CookieFilter.allCases, id: \.self) { filter in
@@ -153,7 +153,7 @@ struct CookieManagementView: View {
             }
             .pickerStyle(.menu)
             .frame(width: 120)
-            
+
             // Sort
             HStack(spacing: 4) {
                 Picker("Sort", selection: $selectedSort) {
@@ -163,7 +163,7 @@ struct CookieManagementView: View {
                 }
                 .pickerStyle(.menu)
                 .frame(width: 100)
-                
+
                 Button(action: { sortAscending.toggle() }) {
                     Image(systemName: sortAscending ? "arrow.up" : "arrow.down")
                         .font(.caption)
@@ -173,9 +173,9 @@ struct CookieManagementView: View {
         }
         .padding()
     }
-    
+
     // MARK: - Content Views
-    
+
     private var loadingView: some View {
         VStack {
             ProgressView()
@@ -185,7 +185,7 @@ struct CookieManagementView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-    
+
     @ViewBuilder
     private var contentView: some View {
         switch viewMode {
@@ -195,9 +195,9 @@ struct CookieManagementView: View {
             listView
         }
     }
-    
+
     // MARK: - Domain View
-    
+
     private var domainView: some View {
         List {
             ForEach(filteredDomainGroups) { group in
@@ -223,9 +223,9 @@ struct CookieManagementView: View {
         }
         .listStyle(.sidebar)
     }
-    
+
     // MARK: - List View
-    
+
     private var listView: some View {
         Table(filteredAndSortedCookies) {
             TableColumn("Name") { cookie in
@@ -236,33 +236,33 @@ struct CookieManagementView: View {
                 }
             }
             .width(min: 120, ideal: 180, max: 250)
-            
+
             TableColumn("Domain") { cookie in
                 Text(cookie.displayDomain)
                     .foregroundColor(.secondary)
             }
             .width(min: 100, ideal: 150, max: 200)
-            
+
             TableColumn("Size") { cookie in
                 Text(cookie.sizeDescription)
                     .foregroundColor(.secondary)
                     .font(.caption)
             }
             .width(60)
-            
+
             TableColumn("Expires") { cookie in
                 Text(cookie.expirationStatus)
                     .foregroundColor(cookie.isSessionCookie ? .orange : .secondary)
                     .font(.caption)
             }
             .width(min: 80, ideal: 120)
-            
+
             TableColumn("Secure") { cookie in
                 Image(systemName: cookie.isSecure ? "checkmark.circle.fill" : "xmark.circle")
                     .foregroundColor(cookie.isSecure ? .green : .red)
             }
             .width(50)
-            
+
             TableColumn("Actions") { cookie in
                 HStack {
                     Button("Details") {
@@ -271,7 +271,7 @@ struct CookieManagementView: View {
                     }
                     .buttonStyle(.borderless)
                     .controlSize(.small)
-                    
+
                     Button("Delete") {
                         Task {
                             await cookieManager.deleteCookie(cookie)
@@ -286,26 +286,26 @@ struct CookieManagementView: View {
         }
         .tableStyle(.bordered(alternatesRowBackgrounds: true))
     }
-    
+
     // MARK: - Computed Properties
-    
+
     private var filteredDomainGroups: [DomainCookieGroup] {
-        let searchFiltered = searchText.isEmpty ? cookieManager.domainGroups : 
+        let searchFiltered = searchText.isEmpty ? cookieManager.domainGroups :
             cookieManager.domainGroups.filter { group in
                 group.displayDomain.localizedCaseInsensitiveContains(searchText) ||
-                group.cookies.contains { cookie in
-                    cookie.name.localizedCaseInsensitiveContains(searchText)
-                }
+                    group.cookies.contains { cookie in
+                        cookie.name.localizedCaseInsensitiveContains(searchText)
+                    }
             }
-        
+
         return searchFiltered
     }
-    
+
     private func filteredCookiesForGroup(_ group: DomainCookieGroup) -> [CookieInfo] {
         let filtered = group.cookies.filter { selectedFilter.matches($0) }
         return cookieManager.sortCookies(filtered, by: selectedSort, ascending: sortAscending)
     }
-    
+
     private var filteredAndSortedCookies: [CookieInfo] {
         let searchFiltered = searchText.isEmpty ? cookieManager.cookies : cookieManager.searchCookies(searchText)
         let filtered = cookieManager.filterCookies(selectedFilter).filter { cookie in
@@ -313,9 +313,9 @@ struct CookieManagementView: View {
         }
         return cookieManager.sortCookies(filtered, by: selectedSort, ascending: sortAscending)
     }
-    
+
     // MARK: - Helper Methods
-    
+
     private func formatSize(_ bytes: Int) -> String {
         if bytes < 1024 {
             return "\(bytes) bytes"
@@ -332,29 +332,29 @@ struct CookieManagementView: View {
 struct DomainRowView: View {
     let group: DomainCookieGroup
     let onDelete: () -> Void
-    
+
     var body: some View {
         HStack {
             Image(systemName: "globe")
                 .foregroundColor(.blue)
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(group.displayDomain)
                     .font(.headline)
-                
+
                 Text("\(group.cookieCount) cookies • \(group.totalSizeDescription)")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            
+
             Spacer()
-            
+
             if group.hasExpiredCookies {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundColor(.orange)
                     .help("Has expired cookies")
             }
-            
+
             Button("Delete All") {
                 onDelete()
             }
@@ -370,22 +370,22 @@ struct CookieRowView: View {
     let cookie: CookieInfo
     let onTap: () -> Void
     let onDelete: () -> Void
-    
+
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(cookie.name)
                     .font(.system(.body, design: .monospaced))
-                
+
                 HStack {
                     Text(cookie.sizeDescription)
                     Text("•")
                     Text(cookie.expirationStatus)
-                    
+
                     if cookie.isSecure {
                         Text("• Secure")
                     }
-                    
+
                     if cookie.isHTTPOnly {
                         Text("• HTTP Only")
                     }
@@ -393,16 +393,16 @@ struct CookieRowView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
             }
-            
+
             Spacer()
-            
+
             HStack {
                 Button("Details") {
                     onTap()
                 }
                 .buttonStyle(.borderless)
                 .controlSize(.small)
-                
+
                 Button("Delete") {
                     onDelete()
                 }

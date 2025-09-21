@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+
 //
 //  WindowUtils.swift
 //  Nook
@@ -14,12 +15,12 @@ func zoomCurrentWindow() {
     }
 }
 
-extension View {
-    public func backgroundDraggable() -> some View {
+public extension View {
+    func backgroundDraggable() -> some View {
         modifier(BackgroundDraggableModifier(gesture: WindowDragGesture()))
     }
 
-    public func backgroundDraggable<G: Gesture>(gesture: G) -> some View {
+    func backgroundDraggable<G: Gesture>(gesture: G) -> some View {
         modifier(BackgroundDraggableModifier(gesture: gesture))
     }
 }

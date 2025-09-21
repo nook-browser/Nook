@@ -3,7 +3,7 @@ import SwiftUI
 
 public struct TooltipStyle {
     public var padding: EdgeInsets =
-        EdgeInsets(top: 5, leading: 10, bottom: 5, trailing: 18)
+        .init(top: 5, leading: 10, bottom: 5, trailing: 18)
     public init() {}
 }
 
@@ -28,24 +28,23 @@ private final class FloatingTooltipWindow: NSWindow {
             defer: false
         )
 
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.level = .floating
-        self.ignoresMouseEvents = true
-        self.hasShadow = false
-        self.isReleasedWhenClosed = false
+        isOpaque = false
+        backgroundColor = .clear
+        level = .floating
+        ignoresMouseEvents = true
+        hasShadow = false
+        isReleasedWhenClosed = false
 
         let isDark = NSAppearance.currentDrawing().name == .darkAqua
 
         let hostingView = NSHostingView(
             rootView:
-                content
+            content
                 .foregroundStyle(Color(hex: isDark ? "EFEFF0" : "212124"))
                 .font(.system(size: 12, weight: .medium))
                 .padding(style.padding)
                 .fixedSize()
                 .background(
-
                     ZStack {
                         UnevenRoundedRectangle(
                             topLeadingRadius: 3,
@@ -71,7 +70,7 @@ private final class FloatingTooltipWindow: NSWindow {
                 .animation(.easeOut(duration: 0.1), value: isDark)
         )
 
-        self.contentView = hostingView
+        contentView = hostingView
 
         let fittingSize = hostingView.fittingSize
         let finalFrame = CGRect(
@@ -81,7 +80,7 @@ private final class FloatingTooltipWindow: NSWindow {
             height: fittingSize.height
         )
 
-        self.setFrame(finalFrame, display: true)
+        setFrame(finalFrame, display: true)
     }
 
     deinit {
@@ -182,12 +181,12 @@ private struct HelpTooltipModifier<TooltipContent: View>: ViewModifier {
                 }
             }
     }
-    
+
     private func showTooltip() {
         // Get the current window frame
         guard let window = NSApp.keyWindow else { return }
         let windowFrame = window.frame
-        
+
         // Calculate the position relative to the current window size
         print(anchorFrame.minY)
         print(anchorFrame.height)
@@ -198,7 +197,7 @@ private struct HelpTooltipModifier<TooltipContent: View>: ViewModifier {
 
         FloatingTooltipManager.shared.show(
             at: tooltipPosition,
-            style: self.style
+            style: style
         ) {
             self.tooltipContent()
         }
@@ -212,15 +211,15 @@ private struct TooltipFrameKey: PreferenceKey {
     }
 }
 
-extension View {
-    public func helpTooltip<Content: View>(
+public extension View {
+    func helpTooltip<Content: View>(
         style: TooltipStyle = TooltipStyle(),
         @ViewBuilder content: @escaping () -> Content
     ) -> some View {
         modifier(HelpTooltipModifier(style: style, tooltipContent: content))
     }
 
-    public func helpTooltip(
+    func helpTooltip(
         _ text: String,
         style: TooltipStyle = TooltipStyle()
     ) -> some View {

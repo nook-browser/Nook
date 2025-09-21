@@ -58,7 +58,6 @@ struct SidebarMenu: View {
                     Spacer()
                 }
                 .padding(.bottom, 8)
-
             }
             .padding(8)
             .frame(width: 110)

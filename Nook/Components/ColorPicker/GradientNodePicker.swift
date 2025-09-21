@@ -1,6 +1,7 @@
 import SwiftUI
 
 // MARK: - GradientNodePicker
+
 // Manage 1-3 gradient nodes and a rotatable angle dial
 struct GradientNodePicker: View {
     @Binding var gradient: SpaceGradient
@@ -38,8 +39,8 @@ struct GradientNodePicker: View {
                         Circle()
                             .fill(Color(hex: node.colorHex))
                             .frame(width: 14, height: 14)
-                        Slider(value: binding(for: node), in: 0...1)
-                        Text(String(format: "%.0f%%", (node.location * 100)))
+                        Slider(value: binding(for: node), in: 0 ... 1)
+                        Text(String(format: "%.0f%%", node.location * 100))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .frame(width: 44, alignment: .trailing)
@@ -51,6 +52,7 @@ struct GradientNodePicker: View {
     }
 
     // MARK: - Swatches
+
     private var nodeSwatches: some View {
         HStack(spacing: 8) {
             ForEach(gradient.nodes) { node in
@@ -70,6 +72,7 @@ struct GradientNodePicker: View {
     }
 
     // MARK: - Angle Dial
+
     private var angleDial: some View {
         GeometryReader { proxy in
             let size = min(proxy.size.width, proxy.size.height, 140)
@@ -81,23 +84,23 @@ struct GradientNodePicker: View {
 
                 // Handle
                 let angle = Angle(degrees: gradient.angle)
-                let handle = point(onCircleOf: size/2 - 8, angle: angle)
+                let handle = point(onCircleOf: size / 2 - 8, angle: angle)
                 Circle()
                     .fill(Color.accentColor)
                     .frame(width: 12, height: 12)
-                    .position(x: size/2 + handle.x, y: size/2 + handle.y)
+                    .position(x: size / 2 + handle.x, y: size / 2 + handle.y)
 
                 // Direction line
                 Path { p in
-                    p.move(to: CGPoint(x: size/2, y: size/2))
-                    p.addLine(to: CGPoint(x: size/2 + handle.x, y: size/2 + handle.y))
+                    p.move(to: CGPoint(x: size / 2, y: size / 2))
+                    p.addLine(to: CGPoint(x: size / 2 + handle.x, y: size / 2 + handle.y))
                 }
                 .stroke(Color.accentColor.opacity(0.7), lineWidth: 2)
             }
             .frame(width: size, height: size)
             .contentShape(Circle())
             .gesture(DragGesture(minimumDistance: 0).onChanged { value in
-                let center = CGPoint(x: size/2, y: size/2)
+                let center = CGPoint(x: size / 2, y: size / 2)
                 let dx = value.location.x - center.x
                 let dy = value.location.y - center.y
                 let degrees = atan2(dy, dx) * 180 / .pi
@@ -117,6 +120,7 @@ struct GradientNodePicker: View {
     }
 
     // MARK: - Node CRUD
+
     private func addNode() {
         guard gradient.nodes.count < 3 else { return }
         let color = gradient.nodes.first?.colorHex ?? "#FFFFFFFF"

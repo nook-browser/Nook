@@ -30,7 +30,6 @@ struct KeyIcon: View {
                     .overlay {
                         RoundedRectangle(cornerRadius: 4)
                             .stroke(Color(hex: "9B9AA7"), lineWidth: 1)
-
                     }
             } else {
                 Image(systemName: iconName)
@@ -45,12 +44,9 @@ struct KeyIcon: View {
                     .overlay {
                         RoundedRectangle(cornerRadius: 4)
                             .stroke(Color(hex: "9B9AA7"), lineWidth: 1)
-
                     }
             }
-
         }
-
     }
 }
 
@@ -58,7 +54,6 @@ struct KeyIcon: View {
     HStack {
         KeyIcon(iconName: "command", type: .symbol)
         KeyIcon(iconName: "C", type: .letter)
-
     }
     .frame(width: 100, height: 100)
 }
