@@ -18,7 +18,10 @@ final class Persistence {
 
     // MARK: - Constants
 
-    private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "Persistence")
+    private static let log = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "Nook",
+        category: "Persistence"
+    )
     private static let storeFileName = "default.store"
     private static let backupPrefix = "default_backup_"
     // Backups now use a directory per snapshot: default_backup_<timestamp>/
@@ -44,13 +47,18 @@ final class Persistence {
 
     private nonisolated static var appSupportURL: URL {
         let fm = FileManager.default
-        let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let base = fm.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first!
         let bundleID = Bundle.main.bundleIdentifier ?? "Nook"
         let dir = base.appendingPathComponent(bundleID, isDirectory: true)
         do {
             try fm.createDirectory(at: dir, withIntermediateDirectories: true)
         } catch {
-            log.error("Failed to create Application Support directory: \(String(describing: error), privacy: .public)")
+            log.error(
+                "Failed to create Application Support directory: \(String(describing: error), privacy: .public)"
+            )
         }
         return dir
     }
@@ -60,10 +68,17 @@ final class Persistence {
     }
 
     private nonisolated static var backupsDirectoryURL: URL {
-        let dir = appSupportURL.appendingPathComponent("Backups", isDirectory: true)
+        let dir = appSupportURL.appendingPathComponent(
+            "Backups",
+            isDirectory: true
+        )
         let fm = FileManager.default
-        do { try fm.createDirectory(at: dir, withIntermediateDirectories: true) } catch {
-            log.error("Failed to create Backups directory: \(String(describing: error), privacy: .public)")
+        do {
+            try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        } catch {
+            log.error(
+                "Failed to create Backups directory: \(String(describing: error), privacy: .public)"
+            )
         }
         return dir
     }
@@ -73,11 +88,16 @@ final class Persistence {
     private init() {
         do {
             let config = ModelConfiguration(url: Self.storeURL)
-            container = try ModelContainer(for: Self.schema, configurations: [config])
+            container = try ModelContainer(
+                for: Self.schema,
+                configurations: [config]
+            )
             Self.log.info("SwiftData container initialized successfully")
         } catch {
             let classification = Self.classifyStoreError(error)
-            Self.log.error("SwiftData container initialization failed. Classification=\(String(describing: classification)) error=\(String(describing: error), privacy: .public)")
+            Self.log.error(
+                "SwiftData container initialization failed. Classification=\(String(describing: classification)) error=\(String(describing: error), privacy: .public)"
+            )
 
             switch classification {
             case .schemaMismatch:
@@ -90,46 +110,75 @@ final class Persistence {
                     switch backupError {
                     case .storeNotFound:
                         // Treat as recoverable: proceed without a backup
-                        Self.log.notice("No existing store to back up. Proceeding with reset.")
+                        Self.log.notice(
+                            "No existing store to back up. Proceeding with reset."
+                        )
                     case .noBackupsFound:
                         // Not expected here but log just in case
-                        Self.log.notice("No backups found when attempting to create backup.")
+                        Self.log.notice(
+                            "No backups found when attempting to create backup."
+                        )
                     }
                 } catch {
                     // Unexpected backup failure — continue but warn
-                    Self.log.error("Backup attempt failed: \(String(describing: error), privacy: .public). Proceeding with cautious reset.")
+                    Self.log.error(
+                        "Backup attempt failed: \(String(describing: error), privacy: .public). Proceeding with cautious reset."
+                    )
                 }
 
                 do {
                     try Self.deleteStore()
-                    Self.log.notice("Deleted existing store (and sidecars) for schema-mismatch recovery")
+                    Self.log.notice(
+                        "Deleted existing store (and sidecars) for schema-mismatch recovery"
+                    )
 
                     let config = ModelConfiguration(url: Self.storeURL)
-                    container = try ModelContainer(for: Self.schema, configurations: [config])
-                    Self.log.notice("Recreated SwiftData container after schema mismatch using configured URL")
+                    container = try ModelContainer(
+                        for: Self.schema,
+                        configurations: [config]
+                    )
+                    Self.log.notice(
+                        "Recreated SwiftData container after schema mismatch using configured URL"
+                    )
                 } catch {
                     // On any failure, attempt to restore backup (if one was made) and abort
                     if didCreateBackup {
                         do {
                             try Self.restoreFromBackup()
-                            Self.log.fault("Restored store from latest backup after failed recovery attempt")
+                            Self.log.fault(
+                                "Restored store from latest backup after failed recovery attempt"
+                            )
                         } catch {
-                            Self.log.fault("Failed to restore store from backup: \(String(describing: error), privacy: .public)")
+                            Self.log.fault(
+                                "Failed to restore store from backup: \(String(describing: error), privacy: .public)"
+                            )
                         }
                     }
-                    fatalError("Failed to recover from schema mismatch. Aborting to protect data integrity: \(error)")
+                    fatalError(
+                        "Failed to recover from schema mismatch. Aborting to protect data integrity: \(error)"
+                    )
                 }
 
             case .diskSpace:
-                Self.log.fault("Store initialization failed due to insufficient disk space. Not deleting store.")
-                fatalError("SwiftData initialization failed due to insufficient disk space: \(error)")
+                Self.log.fault(
+                    "Store initialization failed due to insufficient disk space. Not deleting store."
+                )
+                fatalError(
+                    "SwiftData initialization failed due to insufficient disk space: \(error)"
+                )
 
             case .corruption:
-                Self.log.fault("Store appears corrupted. Not deleting store. Please investigate backups manually.")
-                fatalError("SwiftData initialization failed due to suspected corruption: \(error)")
+                Self.log.fault(
+                    "Store appears corrupted. Not deleting store. Please investigate backups manually."
+                )
+                fatalError(
+                    "SwiftData initialization failed due to suspected corruption: \(error)"
+                )
 
             case .other:
-                Self.log.error("Store initialization failed with unclassified error. Not deleting store.")
+                Self.log.error(
+                    "Store initialization failed with unclassified error. Not deleting store."
+                )
                 fatalError("SwiftData initialization failed: \(error)")
             }
         }
@@ -137,25 +186,38 @@ final class Persistence {
 
     // MARK: - Error Classification
 
-    private enum StoreErrorType { case schemaMismatch, diskSpace, corruption, other }
+    private enum StoreErrorType {
+        case schemaMismatch, diskSpace, corruption, other
+    }
+
     private static func classifyStoreError(_ error: Error) -> StoreErrorType {
         let ns = error as NSError
         let domain = ns.domain
         let code = ns.code
-        let desc = (ns.userInfo[NSLocalizedDescriptionKey] as? String) ?? ns.localizedDescription
+        let desc =
+            (ns.userInfo[NSLocalizedDescriptionKey] as? String)
+                ?? ns.localizedDescription
         let lower = (desc + " " + domain).lowercased()
 
         // Disk space: POSIX ENOSPC or clear full-disk wording
         if domain == NSPOSIXErrorDomain && code == 28 { return .diskSpace }
-        if lower.contains("no space left") || lower.contains("disk full") { return .diskSpace }
+        if lower.contains("no space left") || lower.contains("disk full") {
+            return .diskSpace
+        }
 
         // Schema mismatch / migration issues
-        if lower.contains("migration") || lower.contains("incompatible") || lower.contains("model") || lower.contains("version hash") || lower.contains("mapping model") || lower.contains("schema") {
+        if lower.contains("migration") || lower.contains("incompatible")
+            || lower.contains("model") || lower.contains("version hash")
+            || lower.contains("mapping model") || lower.contains("schema")
+        {
             return .schemaMismatch
         }
 
         // Corruption indicators (SQLite/CoreData wording)
-        if lower.contains("corrupt") || lower.contains("malformed") || lower.contains("database disk image is malformed") || lower.contains("file is encrypted or is not a database") {
+        if lower.contains("corrupt") || lower.contains("malformed")
+            || lower.contains("database disk image is malformed")
+            || lower.contains("file is encrypted or is not a database")
+        {
             return .corruption
         }
 
@@ -164,7 +226,9 @@ final class Persistence {
 
     // MARK: - Backup / Restore
 
-    private enum PersistenceBackupError: Error { case storeNotFound, noBackupsFound }
+    private enum PersistenceBackupError: Error {
+        case storeNotFound, noBackupsFound
+    }
 
     // Include SQLite sidecars (-wal/-shm) and back up into a directory
     private nonisolated static func createBackup() throws -> URL {
@@ -172,7 +236,9 @@ final class Persistence {
             let fm = FileManager.default
             let source = Self.storeURL
             guard fm.fileExists(atPath: source.path) else {
-                Self.log.info("No existing store found to back up at \(source.path, privacy: .public)")
+                Self.log.info(
+                    "No existing store found to back up at \(source.path, privacy: .public)"
+                )
                 throw PersistenceBackupError.storeNotFound
             }
 
@@ -182,18 +248,29 @@ final class Persistence {
             // Create a timestamped backup directory
             let stamp = Self.dateFormatter.string(from: Date())
             let dirName = "\(Self.backupPrefix)\(stamp)"
-            let backupDir = backupsRoot.appendingPathComponent(dirName, isDirectory: true)
-            try fm.createDirectory(at: backupDir, withIntermediateDirectories: true)
+            let backupDir = backupsRoot.appendingPathComponent(
+                dirName,
+                isDirectory: true
+            )
+            try fm.createDirectory(
+                at: backupDir,
+                withIntermediateDirectories: true
+            )
 
             // Gather store + sidecars
             let candidates = [source] + Self.sidecarURLs(for: source)
             for file in candidates {
                 if fm.fileExists(atPath: file.path) {
-                    let dest = backupDir.appendingPathComponent(file.lastPathComponent, isDirectory: false)
+                    let dest = backupDir.appendingPathComponent(
+                        file.lastPathComponent,
+                        isDirectory: false
+                    )
                     do {
                         try fm.copyItem(at: file, to: dest)
                     } catch {
-                        Self.log.error("Failed to copy \(file.lastPathComponent, privacy: .public) to backup: \(String(describing: error), privacy: .public)")
+                        Self.log.error(
+                            "Failed to copy \(file.lastPathComponent, privacy: .public) to backup: \(String(describing: error), privacy: .public)"
+                        )
                         throw error
                     }
                 }
@@ -210,22 +287,40 @@ final class Persistence {
             let root = Self.backupsDirectoryURL
             let contents: [URL]
             do {
-                contents = try fm.contentsOfDirectory(at: root, includingPropertiesForKeys: [.contentModificationDateKey, .isDirectoryKey], options: [.skipsHiddenFiles])
+                contents = try fm.contentsOfDirectory(
+                    at: root,
+                    includingPropertiesForKeys: [
+                        .contentModificationDateKey, .isDirectoryKey,
+                    ],
+                    options: [.skipsHiddenFiles]
+                )
             } catch {
-                Self.log.error("Failed to list backups: \(String(describing: error), privacy: .public)")
+                Self.log.error(
+                    "Failed to list backups: \(String(describing: error), privacy: .public)"
+                )
                 throw error
             }
 
             let backups = contents.filter { url in
-                url.lastPathComponent.hasPrefix(Self.backupPrefix) && (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+                url.lastPathComponent.hasPrefix(Self.backupPrefix)
+                    && (try? url.resourceValues(forKeys: [.isDirectoryKey])
+                        .isDirectory) == true
             }
 
-            guard !backups.isEmpty else { throw PersistenceBackupError.noBackupsFound }
+            guard !backups.isEmpty else {
+                throw PersistenceBackupError.noBackupsFound
+            }
 
             // Pick the most recently modified backup directory
             let latest = backups.max { lhs, rhs in
-                let l = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date.distantPast
-                let r = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date.distantPast
+                let l =
+                    (try? lhs.resourceValues(forKeys: [
+                        .contentModificationDateKey,
+                    ]).contentModificationDate) ?? Date.distantPast
+                let r =
+                    (try? rhs.resourceValues(forKeys: [
+                        .contentModificationDateKey,
+                    ]).contentModificationDate) ?? Date.distantPast
                 return l < r
             }!
 
@@ -233,16 +328,27 @@ final class Persistence {
             try Self.deleteStore()
 
             // Copy all files from backup dir back to app support dir
-            let backupFiles = try fm.contentsOfDirectory(at: latest, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])
+            let backupFiles = try fm.contentsOfDirectory(
+                at: latest,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles]
+            )
             for file in backupFiles {
-                let dest = Self.appSupportURL.appendingPathComponent(file.lastPathComponent, isDirectory: false)
+                let dest = Self.appSupportURL.appendingPathComponent(
+                    file.lastPathComponent,
+                    isDirectory: false
+                )
                 do { try fm.copyItem(at: file, to: dest) } catch {
-                    Self.log.error("Restore copy failed for \(file.lastPathComponent, privacy: .public): \(String(describing: error), privacy: .public)")
+                    Self.log.error(
+                        "Restore copy failed for \(file.lastPathComponent, privacy: .public): \(String(describing: error), privacy: .public)"
+                    )
                     throw error
                 }
             }
 
-            Self.log.notice("Restored store from backup directory: \(latest.lastPathComponent, privacy: .public)")
+            Self.log.notice(
+                "Restored store from backup directory: \(latest.lastPathComponent, privacy: .public)"
+            )
         }
     }
 
@@ -255,7 +361,9 @@ final class Persistence {
             for file in files {
                 if fm.fileExists(atPath: file.path) {
                     do { try fm.removeItem(at: file) } catch {
-                        Self.log.error("Failed to remove \(file.lastPathComponent, privacy: .public): \(String(describing: error), privacy: .public)")
+                        Self.log.error(
+                            "Failed to remove \(file.lastPathComponent, privacy: .public): \(String(describing: error), privacy: .public)"
+                        )
                         throw error
                     }
                 }
@@ -274,12 +382,16 @@ final class Persistence {
     }
 
     // Run a throwing closure on a background utility queue and block until it finishes
-    private nonisolated static func runBlockingOnUtilityQueue<T>(_ work: @escaping () throws -> T) throws -> T {
+    private nonisolated static func runBlockingOnUtilityQueue<T>(
+        _ work: @escaping () throws -> T
+    ) throws -> T {
         let group = DispatchGroup()
         group.enter()
         var result: Result<T, Error>!
         DispatchQueue.global(qos: .utility).async {
-            do { result = try .success(work()) } catch { result = .failure(error) }
+            do { result = try .success(work()) } catch {
+                result = .failure(error)
+            }
             group.leave()
         }
         group.wait()
@@ -330,6 +442,8 @@ class BrowserManager: ObservableObject {
     // Migration state
     @Published var migrationProgress: MigrationProgress?
     @Published var isMigrationInProgress: Bool = false
+
+    @Published var didCleanUpTabs: Bool = false
 
     // MARK: - Window State Management
 
@@ -407,14 +521,19 @@ class BrowserManager: ObservableObject {
     }
 
     func removeAllWebViews(for tab: Tab) {
-        guard let entries = webViewsByTabAndWindow.removeValue(forKey: tab.id) else { return }
+        guard let entries = webViewsByTabAndWindow.removeValue(forKey: tab.id)
+        else { return }
         for (_, webView) in entries {
             tab.cleanupCloneWebView(webView)
             removeWebViewFromContainers(webView)
         }
     }
 
-    private func enforceExclusiveAudio(for tab: Tab, activeWindowId: UUID, desiredMuteState: Bool? = nil) {
+    private func enforceExclusiveAudio(
+        for tab: Tab,
+        activeWindowId: UUID,
+        desiredMuteState: Bool? = nil
+    ) {
         guard let clones = webViewsByTabAndWindow[tab.id] else { return }
         let activeMute = desiredMuteState ?? tab.isAudioMuted
         for (windowId, webView) in clones {
@@ -422,12 +541,19 @@ class BrowserManager: ObservableObject {
                 webView.isMuted = activeMute
             } else {
                 webView.isMuted = true
-                webView.evaluateJavaScript("document.querySelectorAll('video,audio').forEach(function(el){try{el.pause();}catch(e){}});", completionHandler: nil)
+                webView.evaluateJavaScript(
+                    "document.querySelectorAll('video,audio').forEach(function(el){try{el.pause();}catch(e){}});",
+                    completionHandler: nil
+                )
             }
         }
     }
 
-    private func updateGradient(for windowState: BrowserWindowState, to newGradient: SpaceGradient, animate: Bool) {
+    private func updateGradient(
+        for windowState: BrowserWindowState,
+        to newGradient: SpaceGradient,
+        animate: Bool
+    ) {
         let previousGradient = windowState.activeGradient
         guard !previousGradient.visuallyEquals(newGradient) else {
             windowState.activeGradient = newGradient
@@ -442,7 +568,10 @@ class BrowserManager: ObservableObject {
         guard activeWindowState?.id == windowState.id else { return }
 
         if animate {
-            gradientColorManager.transition(from: previousGradient, to: newGradient)
+            gradientColorManager.transition(
+                from: previousGradient,
+                to: newGradient
+            )
         } else {
             gradientColorManager.setImmediate(newGradient)
         }
@@ -450,19 +579,36 @@ class BrowserManager: ObservableObject {
 
     func refreshGradientsForSpace(_ space: Space, animate: Bool) {
         for (_, state) in windowStates where state.currentSpaceId == space.id {
-            updateGradient(for: state, to: space.gradient, animate: animate && activeWindowState?.id == state.id)
+            updateGradient(
+                for: state,
+                to: space.gradient,
+                animate: animate && activeWindowState?.id == state.id
+            )
         }
     }
 
-    private func adoptProfileIfNeeded(for windowState: BrowserWindowState, context: ProfileSwitchContext) {
+    private func adoptProfileIfNeeded(
+        for windowState: BrowserWindowState,
+        context: ProfileSwitchContext
+    ) {
         guard let targetProfileId = windowState.currentProfileId else { return }
         guard !isSwitchingProfile else { return }
         guard currentProfile?.id != targetProfileId else { return }
-        guard let targetProfile = profileManager.profiles.first(where: { $0.id == targetProfileId }) else { return }
+        guard
+            let targetProfile = profileManager.profiles.first(where: {
+                $0.id == targetProfileId
+            })
+        else { return }
         Task { [weak self] in
-            await self?.switchToProfile(targetProfile, context: context, in: windowState)
+            await self?.switchToProfile(
+                targetProfile,
+                context: context,
+                in: windowState
+            )
             await MainActor.run {
-                if let activeId = self?.activeWindowState?.id, activeId == windowState.id {
+                if let activeId = self?.activeWindowState?.id,
+                   activeId == windowState.id
+                {
                     self?.activeWindowState?.currentProfileId = targetProfileId
                 }
             }
@@ -517,7 +663,10 @@ class BrowserManager: ObservableObject {
         downloadManager = DownloadManager.shared
         authenticationManager = AuthenticationManager()
         // Initialize managers with current profile context for isolation
-        historyManager = HistoryManager(context: modelContext, profileId: initialProfile?.id)
+        historyManager = HistoryManager(
+            context: modelContext,
+            profileId: initialProfile?.id
+        )
         cookieManager = CookieManager(dataStore: initialProfile?.dataStore)
         cacheManager = CacheManager(dataStore: initialProfile?.dataStore)
         compositorManager = TabCompositorManager()
@@ -545,7 +694,9 @@ class BrowserManager: ObservableObject {
             gradientColorManager.setImmediate(.default)
         }
         trackingProtectionManager.attach(browserManager: self)
-        trackingProtectionManager.setEnabled(settingsManager.blockCrossSiteTracking)
+        trackingProtectionManager.setEnabled(
+            settingsManager.blockCrossSiteTracking
+        )
         externalMiniWindowManager.attach(browserManager: self)
         authenticationManager.attach(browserManager: self)
         // Migrate legacy history entries (with nil profile) to default profile to avoid cross-profile leakage
@@ -563,7 +714,9 @@ class BrowserManager: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] note in
-            guard let enabled = note.userInfo?["enabled"] as? Bool else { return }
+            guard let enabled = note.userInfo?["enabled"] as? Bool else {
+                return
+            }
             self?.trackingProtectionManager.setEnabled(enabled)
         }
     }
@@ -572,8 +725,11 @@ class BrowserManager: ObservableObject {
 
     func maybeShowOAuthAssist(for url: URL, in tab: Tab) {
         // Only when protection is enabled and not already disabled for this tab
-        guard settingsManager.blockCrossSiteTracking, trackingProtectionManager.isEnabled else { return }
-        guard !trackingProtectionManager.isTemporarilyDisabled(tabId: tab.id) else { return }
+        guard settingsManager.blockCrossSiteTracking,
+              trackingProtectionManager.isEnabled
+        else { return }
+        guard !trackingProtectionManager.isTemporarilyDisabled(tabId: tab.id)
+        else { return }
         let host = url.host?.lowercased() ?? ""
         guard !host.isEmpty else { return }
         // Respect per-domain allow list
@@ -581,8 +737,15 @@ class BrowserManager: ObservableObject {
         // Simple heuristic for OAuth endpoints
         if isLikelyOAuthURL(url) {
             let now = Date()
-            if let coolUntil = oauthAssistCooldown[host], coolUntil > now { return }
-            oauthAssist = OAuthAssist(host: host, url: url, tabId: tab.id, timestamp: now)
+            if let coolUntil = oauthAssistCooldown[host], coolUntil > now {
+                return
+            }
+            oauthAssist = OAuthAssist(
+                host: host,
+                url: url,
+                tabId: tab.id,
+                timestamp: now
+            )
             // Cooldown: don't show again for this host for 10 minutes
             oauthAssistCooldown[host] = now.addingTimeInterval(10 * 60)
             // Auto-hide after 8 seconds
@@ -596,8 +759,15 @@ class BrowserManager: ObservableObject {
 
     func oauthAssistAllowForThisTab(duration: TimeInterval = 15 * 60) {
         guard let assist = oauthAssist else { return }
-        guard let tab = tabManager.allTabs().first(where: { $0.id == assist.tabId }) else { return }
-        trackingProtectionManager.disableTemporarily(for: tab, duration: duration)
+        guard
+            let tab = tabManager.allTabs().first(where: {
+                $0.id == assist.tabId
+            })
+        else { return }
+        trackingProtectionManager.disableTemporarily(
+            for: tab,
+            duration: duration
+        )
         hideOAuthAssist()
     }
 
@@ -613,15 +783,25 @@ class BrowserManager: ObservableObject {
         let query = url.query?.lowercased() ?? ""
         // Common IdP hosts
         let hostHints = [
-            "accounts.google.com", "login.microsoftonline.com", "login.live.com",
+            "accounts.google.com", "login.microsoftonline.com",
+            "login.live.com",
             "appleid.apple.com", "github.com", "gitlab.com", "bitbucket.org",
             "auth0.com", "okta.com", "onelogin.com", "pingidentity.com",
             "slack.com", "zoom.us", "login.cloudflareaccess.com",
         ]
         if hostHints.contains(where: { host.contains($0) }) { return true }
         // Common OAuth paths and signals
-        if path.contains("/oauth") || path.contains("oauth2") || path.contains("/authorize") || path.contains("/signin") || path.contains("/login") || path.contains("/callback") { return true }
-        if query.contains("client_id=") || query.contains("redirect_uri=") || query.contains("response_type=") { return true }
+        if path.contains("/oauth") || path.contains("oauth2")
+            || path.contains("/authorize") || path.contains("/signin")
+            || path.contains("/login") || path.contains("/callback")
+        {
+            return true
+        }
+        if query.contains("client_id=") || query.contains("redirect_uri=")
+            || query.contains("response_type=")
+        {
+            return true
+        }
         return false
     }
 
@@ -640,21 +820,32 @@ class BrowserManager: ObservableObject {
         case recovery
     }
 
-    actor ProfileOps { func run(_ body: @MainActor () async -> Void) async { await body() } }
+    actor ProfileOps {
+        func run(_ body: @MainActor () async -> Void) async { await body() }
+    }
+
     private let profileOps = ProfileOps()
 
-    func switchToProfile(_ profile: Profile, context: ProfileSwitchContext = .userInitiated, in windowState: BrowserWindowState? = nil) async {
+    func switchToProfile(
+        _ profile: Profile,
+        context: ProfileSwitchContext = .userInitiated,
+        in windowState: BrowserWindowState? = nil
+    ) async {
         await profileOps.run { [weak self] in
             guard let self else { return }
             if self.isSwitchingProfile {
-                print("⏳ [BrowserManager] Ignoring concurrent profile switch request")
+                print(
+                    "⏳ [BrowserManager] Ignoring concurrent profile switch request"
+                )
                 return
             }
             self.isSwitchingProfile = true
             defer { self.isSwitchingProfile = false }
 
             let previousProfile = self.currentProfile
-            print("🔀 [BrowserManager] Switching to profile: \(profile.name) (\(profile.id.uuidString)) from: \(previousProfile?.name ?? "none")")
+            print(
+                "🔀 [BrowserManager] Switching to profile: \(profile.name) (\(profile.id.uuidString)) from: \(previousProfile?.name ?? "none")"
+            )
             let animateTransition = context.shouldAnimateTransition
 
             let performUpdates = {
@@ -666,8 +857,14 @@ class BrowserManager: ObservableObject {
                 self.currentProfile = profile
                 self.activeWindowState?.currentProfileId = profile.id
                 // Switch data stores for cookie/cache
-                self.cookieManager.switchDataStore(profile.dataStore, profileId: profile.id)
-                self.cacheManager.switchDataStore(profile.dataStore, profileId: profile.id)
+                self.cookieManager.switchDataStore(
+                    profile.dataStore,
+                    profileId: profile.id
+                )
+                self.cacheManager.switchDataStore(
+                    profile.dataStore,
+                    profileId: profile.id
+                )
                 // Update history filtering
                 self.historyManager.switchProfile(profile.id)
                 // TabManager awareness (updates currentTab/currentSpace visibility)
@@ -687,8 +884,15 @@ class BrowserManager: ObservableObject {
             }
 
             if context.shouldProvideFeedback {
-                self.showProfileSwitchToast(from: previousProfile, to: profile, in: windowState ?? self.activeWindowState)
-                NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .drawCompleted)
+                self.showProfileSwitchToast(
+                    from: previousProfile,
+                    to: profile,
+                    in: windowState ?? self.activeWindowState
+                )
+                NSHapticFeedbackManager.defaultPerformer.perform(
+                    .generic,
+                    performanceTime: .drawCompleted
+                )
             }
 
             if animateTransition {
@@ -708,7 +912,10 @@ class BrowserManager: ObservableObject {
         savedSidebarWidth = width
     }
 
-    func updateSidebarWidth(_ width: CGFloat, for windowState: BrowserWindowState) {
+    func updateSidebarWidth(
+        _ width: CGFloat,
+        for windowState: BrowserWindowState
+    ) {
         windowState.sidebarWidth = width
         windowState.savedSidebarWidth = width
         if activeWindowState?.id == windowState.id {
@@ -759,7 +966,9 @@ class BrowserManager: ObservableObject {
     // MARK: - Sidebar width access for overlays
 
     /// Returns the last saved sidebar width (used when sidebar is collapsed to size hover overlay)
-    func getSavedSidebarWidth(for windowState: BrowserWindowState? = nil) -> CGFloat {
+    func getSavedSidebarWidth(for windowState: BrowserWindowState? = nil)
+        -> CGFloat
+    {
         if let state = windowState {
             return state.savedSidebarWidth
         }
@@ -771,7 +980,11 @@ class BrowserManager: ObservableObject {
 
     // MARK: - Command Palette
 
-    private func showCommandPalette(in windowState: BrowserWindowState, prefill: String, navigateCurrentTab: Bool) {
+    private func showCommandPalette(
+        in windowState: BrowserWindowState,
+        prefill: String,
+        navigateCurrentTab: Bool
+    ) {
         for state in windowStates.values where state.id != windowState.id {
             state.isCommandPaletteVisible = false
             state.isMiniCommandPaletteVisible = false
@@ -809,7 +1022,11 @@ class BrowserManager: ObservableObject {
             return
         }
         let prefill = currentTab(for: target)?.url.absoluteString ?? ""
-        showCommandPalette(in: target, prefill: prefill, navigateCurrentTab: true)
+        showCommandPalette(
+            in: target,
+            prefill: prefill,
+            navigateCurrentTab: true
+        )
     }
 
     func closeCommandPalette(for windowState: BrowserWindowState? = nil) {
@@ -847,7 +1064,10 @@ class BrowserManager: ObservableObject {
         }
     }
 
-    private func showMiniCommandPalette(in windowState: BrowserWindowState, prefill: String) {
+    private func showMiniCommandPalette(
+        in windowState: BrowserWindowState,
+        prefill: String
+    ) {
         for state in windowStates.values where state.id != windowState.id {
             state.isMiniCommandPaletteVisible = false
         }
@@ -907,18 +1127,21 @@ class BrowserManager: ObservableObject {
 
     /// Create a new tab and set it as active in the specified window
     func createNewTab(in windowState: BrowserWindowState) {
-        let targetSpace = windowState.currentSpaceId.flatMap { id in
-            tabManager.spaces.first(where: { $0.id == id })
-        } ?? windowState.currentProfileId.flatMap { pid in
-            tabManager.spaces.first(where: { $0.profileId == pid })
-        }
+        let targetSpace =
+            windowState.currentSpaceId.flatMap { id in
+                tabManager.spaces.first(where: { $0.id == id })
+            }
+            ?? windowState.currentProfileId.flatMap { pid in
+                tabManager.spaces.first(where: { $0.profileId == pid })
+            }
         let newTab = tabManager.createNewTab(in: targetSpace)
         selectTab(newTab, in: windowState)
     }
 
     func closeCurrentTab() {
         if let activeWindow = activeWindowState,
-           activeWindow.isCommandPaletteVisible || activeWindow.isMiniCommandPaletteVisible
+           activeWindow.isCommandPaletteVisible
+           || activeWindow.isMiniCommandPaletteVisible
         {
             closeCommandPalette(for: activeWindow)
             return
@@ -934,10 +1157,52 @@ class BrowserManager: ObservableObject {
         }
     }
 
+    func cleanUpTabs() {
+        if let activeWindow = activeWindowState,
+           let currentTab = currentTab(for: activeWindow)
+        {
+            if tabManager.tabs.count == 1 {
+                tabManager.closeActiveTab()
+            } else {
+                for tab in tabManager.tabs
+                    where tab.id != currentTab.id
+                    && tab.spaceId == currentTab.spaceId
+                {
+                    tabManager.removeTab(tab.id)
+                }
+            }
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                self.didCleanUpTabs = true
+            }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                    self.didCleanUpTabs = false
+                }
+            }
+
+        } else {
+            for tab in tabManager.tabs {
+                tabManager.removeTab(tab.id)
+            }
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                self.didCleanUpTabs = true
+            }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                    self.didCleanUpTabs = false
+                }
+            }
+        }
+    }
+
     func focusURLBar() {
         // Open the mini palette anchored to the URL bar
         // Pre-fill with current tab's URL and set to navigate current tab
-        guard let target = activeWindowState ?? windowStates.values.first else { return }
+        guard let target = activeWindowState ?? windowStates.values.first else {
+            return
+        }
         let prefill = currentTab(for: target)?.url.absoluteString ?? ""
         showMiniCommandPalette(in: target, prefill: prefill)
     }
@@ -982,7 +1247,11 @@ class BrowserManager: ObservableObject {
         content: Content,
         footer: AnyView?
     ) {
-        dialogManager.showCustomContentDialog(header: header, content: content, footer: footer)
+        dialogManager.showCustomContentDialog(
+            header: header,
+            content: content,
+            footer: footer
+        )
     }
 
     // MARK: - Appearance / Gradient Editing
@@ -1009,7 +1278,11 @@ class BrowserManager: ObservableObject {
                     },
                 ])
             )
-            showCustomContentDialog(header: header, content: Color.clear.frame(height: 0), footer: footer)
+            showCustomContentDialog(
+                header: header,
+                content: Color.clear.frame(height: 0),
+                footer: footer
+            )
             return
         }
 
@@ -1033,7 +1306,10 @@ class BrowserManager: ObservableObject {
                     action: { [weak self] in
                         // Restore background to the saved gradient for this space
                         self?.gradientColorManager.endInteractivePreview()
-                        self?.gradientColorManager.transition(to: space.gradient, duration: 0.25)
+                        self?.gradientColorManager.transition(
+                            to: space.gradient,
+                            duration: 0.25
+                        )
                         self?.refreshGradientsForSpace(space, animate: true)
                         self?.closeDialog()
                     }
@@ -1048,7 +1324,10 @@ class BrowserManager: ObservableObject {
                             space.gradient = draft.value
                             // End interactive editing then morph to the committed gradient
                             self?.gradientColorManager.endInteractivePreview()
-                            self?.gradientColorManager.transition(to: draft.value, duration: 0.35)
+                            self?.gradientColorManager.transition(
+                                to: draft.value,
+                                duration: 0.35
+                            )
                             self?.refreshGradientsForSpace(space, animate: true)
                             self?.tabManager.persistSnapshot()
                             self?.closeDialog()
@@ -1103,7 +1382,9 @@ class BrowserManager: ObservableObject {
         userDefaults.set(isSidebarVisible, forKey: "sidebarVisible")
     }
 
-    @objc private func handleTabUnloadTimeoutChange(_ notification: Notification) {
+    @objc private func handleTabUnloadTimeoutChange(
+        _ notification: Notification
+    ) {
         if let timeout = notification.userInfo?["timeout"] as? TimeInterval {
             compositorManager.setUnloadTimeout(timeout)
         }
@@ -1117,7 +1398,8 @@ class BrowserManager: ObservableObject {
 
     func clearCurrentPageCookies() {
         guard let currentTab = currentTabForActiveWindow(),
-              let host = currentTab.url.host else { return }
+              let host = currentTab.url.host
+        else { return }
 
         Task {
             await cookieManager.deleteCookiesForDomain(host)
@@ -1140,7 +1422,8 @@ class BrowserManager: ObservableObject {
 
     func clearCurrentPageCache() {
         guard let currentTab = currentTabForActiveWindow(),
-              let host = currentTab.url.host else { return }
+              let host = currentTab.url.host
+        else { return }
 
         Task {
             await cacheManager.clearCacheForDomain(host)
@@ -1151,7 +1434,8 @@ class BrowserManager: ObservableObject {
     func hardReloadCurrentPage() {
         guard let currentTab = currentTabForActiveWindow(),
               let host = currentTab.url.host,
-              let activeWindowId = activeWindowState?.id else { return }
+              let activeWindowId = activeWindowState?.id
+        else { return }
         Task { @MainActor in
             await cacheManager.clearCacheForDomainExcludingCookies(host)
             // Use the WebView that's actually visible in the current window
@@ -1212,34 +1496,44 @@ class BrowserManager: ObservableObject {
     // Profile-specific cleanup helpers
     func clearCurrentProfileCookies() {
         guard let pid = currentProfile?.id else { return }
-        print("🧹 [BrowserManager] Clearing cookies for current profile: \(pid.uuidString)")
+        print(
+            "🧹 [BrowserManager] Clearing cookies for current profile: \(pid.uuidString)"
+        )
         Task { await cookieManager.deleteAllCookies() }
     }
 
     func clearCurrentProfileCache() {
-        guard let _ = currentProfile?.id else { return }
+        guard currentProfile?.id != nil else { return }
         print("🧹 [BrowserManager] Clearing cache for current profile")
         Task { await cacheManager.clearAllCache() }
     }
 
     func clearAllProfilesCookies() {
-        print("🧹 [BrowserManager] Clearing cookies for ALL profiles (sequential, isolated)")
+        print(
+            "🧹 [BrowserManager] Clearing cookies for ALL profiles (sequential, isolated)"
+        )
         let profiles = profileManager.profiles
         Task { @MainActor in
             for profile in profiles {
                 let cm = CookieManager(dataStore: profile.dataStore)
-                print("   → Clearing cookies for profile=\(profile.id.uuidString) [\(profile.name)]")
+                print(
+                    "   → Clearing cookies for profile=\(profile.id.uuidString) [\(profile.name)]"
+                )
                 await cm.deleteAllCookies()
             }
         }
     }
 
     func performPrivacyCleanupAllProfiles() {
-        print("🧹 [BrowserManager] Performing privacy cleanup across ALL profiles (sequential, isolated)")
+        print(
+            "🧹 [BrowserManager] Performing privacy cleanup across ALL profiles (sequential, isolated)"
+        )
         let profiles = profileManager.profiles
         Task { @MainActor in
             for profile in profiles {
-                print("   → Cleaning profile=\(profile.id.uuidString) [\(profile.name)]")
+                print(
+                    "   → Cleaning profile=\(profile.id.uuidString) [\(profile.name)]"
+                )
                 let cm = CookieManager(dataStore: profile.dataStore)
                 let cam = CacheManager(dataStore: profile.dataStore)
                 await cm.performPrivacyCleanup()
@@ -1252,14 +1546,18 @@ class BrowserManager: ObservableObject {
 
     /// Assign a default profile to any history entries without a profileId for backward compatibility
     func migrateUnassignedDataToDefaultProfile() {
-        guard let defaultProfileId = profileManager.profiles.first?.id else { return }
+        guard let defaultProfileId = profileManager.profiles.first?.id else {
+            return
+        }
         assignDefaultProfileToExistingData(defaultProfileId)
     }
 
     func assignDefaultProfileToExistingData(_ profileId: UUID) {
         do {
             let predicate = #Predicate<HistoryEntity> { $0.profileId == nil }
-            let descriptor = FetchDescriptor<HistoryEntity>(predicate: predicate)
+            let descriptor = FetchDescriptor<HistoryEntity>(
+                predicate: predicate
+            )
             let entities = try modelContext.fetch(descriptor)
             var updated = 0
             for entity in entities {
@@ -1267,9 +1565,13 @@ class BrowserManager: ObservableObject {
                 updated += 1
             }
             try modelContext.save()
-            print("🔧 [BrowserManager] Assigned default profile to \(updated) legacy history entries")
+            print(
+                "🔧 [BrowserManager] Assigned default profile to \(updated) legacy history entries"
+            )
         } catch {
-            print("⚠️ [BrowserManager] Failed to assign default profile to existing data: \(error)")
+            print(
+                "⚠️ [BrowserManager] Failed to assign default profile to existing data: \(error)"
+            )
         }
     }
 
@@ -1371,7 +1673,10 @@ class BrowserManager: ObservableObject {
 
             DispatchQueue.main.async {
                 NSPasteboard.general.clearContents()
-                let success = NSPasteboard.general.setString(url, forType: .string)
+                let success = NSPasteboard.general.setString(
+                    url,
+                    forType: .string
+                )
                 let e = NSHapticFeedbackManager.defaultPerformer
                 e.perform(.generic, performanceTime: .drawCompleted)
                 print("Clipboard operation success: \(success)")
@@ -1404,7 +1709,10 @@ class BrowserManager: ObservableObject {
         if #available(macOS 13.3, *) {
             // Use the WebView that's actually visible in the current window
             let webView: WKWebView
-            if let windowWebView = getWebView(for: currentTab.id, in: activeWindowId) {
+            if let windowWebView = getWebView(
+                for: currentTab.id,
+                in: activeWindowId
+            ) {
                 webView = windowWebView
             } else {
                 webView = currentTab.activeWebView
@@ -1450,9 +1758,19 @@ class BrowserManager: ObservableObject {
 
     // MARK: - Profile Switch Toast
 
-    func showProfileSwitchToast(from: Profile?, to: Profile, in windowState: BrowserWindowState?) {
-        guard let targetWindow = windowState ?? activeWindowState else { return }
-        let toast = ProfileSwitchToast(fromProfile: from, toProfile: to, timestamp: Date())
+    func showProfileSwitchToast(
+        from: Profile?,
+        to: Profile,
+        in windowState: BrowserWindowState?
+    ) {
+        guard let targetWindow = windowState ?? activeWindowState else {
+            return
+        }
+        let toast = ProfileSwitchToast(
+            fromProfile: from,
+            toProfile: to,
+            timestamp: Date()
+        )
         let windowId = targetWindow.id
         targetWindow.profileSwitchToast = toast
         withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
@@ -1469,7 +1787,10 @@ class BrowserManager: ObservableObject {
     }
 
     private func hideProfileSwitchToast(forWindowId windowId: UUID) {
-        guard let window = windowStates[windowId] ?? (activeWindowState?.id == windowId ? activeWindowState : nil) else { return }
+        guard
+            let window = windowStates[windowId]
+            ?? (activeWindowState?.id == windowId ? activeWindowState : nil)
+        else { return }
         withAnimation(.spring(response: 0.45, dampingFraction: 0.9)) {
             window.isShowingProfileSwitchToast = false
         }
@@ -1511,15 +1832,18 @@ class BrowserManager: ObservableObject {
             WKWebsiteDataTypeServiceWorkerRegistrations,
         ]
 
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+        await withCheckedContinuation {
+            (cont: CheckedContinuation<Void, Never>) in
             defaultStore.httpCookieStore.getAllCookies { cookies in
                 cookieCount = cookies.count
                 cont.resume()
             }
         }
 
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            WKWebsiteDataStore.default().fetchDataRecords(ofTypes: types) { records in
+        await withCheckedContinuation {
+            (cont: CheckedContinuation<Void, Never>) in
+            WKWebsiteDataStore.default().fetchDataRecords(ofTypes: types) {
+                records in
                 recordCount = records.count
                 cont.resume()
             }
@@ -1543,11 +1867,19 @@ class BrowserManager: ObservableObject {
     func migrateCookiesToCurrentProfile() async throws {
         guard let targetStore = currentProfile?.dataStore else { return }
         isMigrationInProgress = true
-        migrationProgress = MigrationProgress(currentStep: "Copying cookies…", progress: 0.0, totalSteps: 3, currentStepIndex: 1)
+        migrationProgress = MigrationProgress(
+            currentStep: "Copying cookies…",
+            progress: 0.0,
+            totalSteps: 3,
+            currentStepIndex: 1
+        )
         let defaultStore = WKWebsiteDataStore.default()
 
-        let cookies = await withCheckedContinuation { (cont: CheckedContinuation<[HTTPCookie], Never>) in
-            defaultStore.httpCookieStore.getAllCookies { cookies in cont.resume(returning: cookies) }
+        let cookies = await withCheckedContinuation {
+            (cont: CheckedContinuation<[HTTPCookie], Never>) in
+            defaultStore.httpCookieStore.getAllCookies { cookies in
+                cont.resume(returning: cookies)
+            }
         }
         let total = max(1, cookies.count)
         var copied = 0
@@ -1555,13 +1887,15 @@ class BrowserManager: ObservableObject {
             for cookie in cookies {
                 group.addTask { @MainActor in
                     if Task.isCancelled { return }
-                    await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                    await withCheckedContinuation {
+                        (cont: CheckedContinuation<Void, Never>) in
                         targetStore.httpCookieStore.setCookie(cookie) {
                             cont.resume()
                         }
                     }
                     copied += 1
-                    self.migrationProgress?.progress = Double(copied) / Double(total) * (1.0 / 3.0)
+                    self.migrationProgress?.progress =
+                        Double(copied) / Double(total) * (1.0 / 3.0)
                 }
             }
             try await group.waitForAll()
@@ -1578,7 +1912,8 @@ class BrowserManager: ObservableObject {
         for i in 1 ... 10 { // 10 ticks
             if Task.isCancelled { throw CancellationError() }
             try await Task.sleep(nanoseconds: 80_000_000) // 80ms per tick
-            migrationProgress?.progress = (1.0 / 3.0) + Double(i) / 10.0 * (1.0 / 3.0)
+            migrationProgress?.progress =
+                (1.0 / 3.0) + Double(i) / 10.0 * (1.0 / 3.0)
         }
     }
 
@@ -1594,8 +1929,12 @@ class BrowserManager: ObservableObject {
             WKWebsiteDataTypeFetchCache,
             WKWebsiteDataTypeServiceWorkerRegistrations,
         ]
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            WKWebsiteDataStore.default().removeData(ofTypes: allTypes, modifiedSince: .distantPast) {
+        await withCheckedContinuation {
+            (cont: CheckedContinuation<Void, Never>) in
+            WKWebsiteDataStore.default().removeData(
+                ofTypes: allTypes,
+                modifiedSince: .distantPast
+            ) {
                 cont.resume()
             }
         }
@@ -1618,24 +1957,61 @@ class BrowserManager: ObservableObject {
     func startMigrationToCurrentProfile() {
         guard isMigrationInProgress == false else { return }
         isMigrationInProgress = true
-        migrationProgress = MigrationProgress(currentStep: "Preparing…", progress: 0.0, totalSteps: 3, currentStepIndex: 0)
+        migrationProgress = MigrationProgress(
+            currentStep: "Preparing…",
+            progress: 0.0,
+            totalSteps: 3,
+            currentStepIndex: 0
+        )
         migrationTask = Task { @MainActor in
             do {
-                if Task.isCancelled { self.resetMigrationState(); return }
+                if Task.isCancelled {
+                    self.resetMigrationState()
+                    return
+                }
                 try await migrateCookiesToCurrentProfile()
-                if Task.isCancelled { self.resetMigrationState(); return }
+                if Task.isCancelled {
+                    self.resetMigrationState()
+                    return
+                }
                 try await migrateCacheToCurrentProfile()
-                if Task.isCancelled { self.resetMigrationState(); return }
+                if Task.isCancelled {
+                    self.resetMigrationState()
+                    return
+                }
                 await clearSharedDataAfterMigration()
-                let header = AnyView(DialogHeader(icon: "checkmark.seal", title: "Migration Complete", subtitle: currentProfile?.name ?? ""))
-                let body = AnyView(Text("Your shared data has been migrated to the current profile.").font(.body))
-                let footer = AnyView(DialogFooter(rightButtons: [DialogButton(text: "OK", variant: .primary) { self.dialogManager.closeDialog() }]))
-                self.dialogManager.showCustomContentDialog(header: header, content: body, footer: footer)
+                let header = AnyView(
+                    DialogHeader(
+                        icon: "checkmark.seal",
+                        title: "Migration Complete",
+                        subtitle: currentProfile?.name ?? ""
+                    )
+                )
+                let body = AnyView(
+                    Text(
+                        "Your shared data has been migrated to the current profile."
+                    ).font(.body)
+                )
+                let footer = AnyView(
+                    DialogFooter(rightButtons: [
+                        DialogButton(text: "OK", variant: .primary) {
+                            self.dialogManager.closeDialog()
+                        },
+                    ])
+                )
+                self.dialogManager.showCustomContentDialog(
+                    header: header,
+                    content: body,
+                    footer: footer
+                )
             } catch is CancellationError {
                 self.resetMigrationState()
             } catch {
                 self.resetMigrationState()
-                self.recoverFromProfileError(error, profile: self.currentProfile)
+                self.recoverFromProfileError(
+                    error,
+                    profile: self.currentProfile
+                )
             }
             self.migrationTask = nil
         }
@@ -1650,8 +2026,12 @@ class BrowserManager: ObservableObject {
 
     func validateProfileIntegrity() {
         // Ensure currentProfile is still valid
-        if let cp = currentProfile, profileManager.profiles.first(where: { $0.id == cp.id }) == nil {
-            print("⚠️ [BrowserManager] Current profile invalid; falling back to first available")
+        if let cp = currentProfile,
+           profileManager.profiles.first(where: { $0.id == cp.id }) == nil
+        {
+            print(
+                "⚠️ [BrowserManager] Current profile invalid; falling back to first available"
+            )
             currentProfile = profileManager.profiles.first
         }
         // Ensure spaces have profile assignments
@@ -1661,12 +2041,34 @@ class BrowserManager: ObservableObject {
     func recoverFromProfileError(_ error: Error, profile: Profile?) {
         print("❗️[BrowserManager] Profile operation failed: \(error)")
         // Fallback to default/first profile
-        if let first = profileManager.profiles.first { Task { await switchToProfile(first, context: .recovery) } }
+        if let first = profileManager.profiles.first {
+            Task { await switchToProfile(first, context: .recovery) }
+        }
         // Show dialog
-        let header = AnyView(DialogHeader(icon: "exclamationmark.triangle", title: "Profile Error", subtitle: profile?.name ?? ""))
-        let body = AnyView(Text("An error occurred while performing a profile operation. Your session has been switched to a safe profile.").font(.body))
-        let footer = AnyView(DialogFooter(rightButtons: [DialogButton(text: "OK", variant: .primary) { self.dialogManager.closeDialog() }]))
-        dialogManager.showCustomContentDialog(header: header, content: body, footer: footer)
+        let header = AnyView(
+            DialogHeader(
+                icon: "exclamationmark.triangle",
+                title: "Profile Error",
+                subtitle: profile?.name ?? ""
+            )
+        )
+        let body = AnyView(
+            Text(
+                "An error occurred while performing a profile operation. Your session has been switched to a safe profile."
+            ).font(.body)
+        )
+        let footer = AnyView(
+            DialogFooter(rightButtons: [
+                DialogButton(text: "OK", variant: .primary) {
+                    self.dialogManager.closeDialog()
+                },
+            ])
+        )
+        dialogManager.showCustomContentDialog(
+            header: header,
+            content: body,
+            footer: footer
+        )
     }
 
     // MARK: - Profile Deletion Coordinator
@@ -1674,16 +2076,36 @@ class BrowserManager: ObservableObject {
     func deleteProfile(_ profile: Profile) {
         // Avoid deleting the last profile
         guard profileManager.profiles.count > 1 else {
-            let header = AnyView(DialogHeader(icon: "exclamationmark.triangle", title: "Cannot Delete Last Profile", subtitle: profile.name))
-            let body = AnyView(Text("At least one profile must remain.").font(.body))
-            let footer = AnyView(DialogFooter(rightButtons: [DialogButton(text: "OK", variant: .primary) { self.dialogManager.closeDialog() }]))
-            dialogManager.showCustomContentDialog(header: header, content: body, footer: footer)
+            let header = AnyView(
+                DialogHeader(
+                    icon: "exclamationmark.triangle",
+                    title: "Cannot Delete Last Profile",
+                    subtitle: profile.name
+                )
+            )
+            let body = AnyView(
+                Text("At least one profile must remain.").font(.body)
+            )
+            let footer = AnyView(
+                DialogFooter(rightButtons: [
+                    DialogButton(text: "OK", variant: .primary) {
+                        self.dialogManager.closeDialog()
+                    },
+                ])
+            )
+            dialogManager.showCustomContentDialog(
+                header: header,
+                content: body,
+                footer: footer
+            )
             return
         }
         Task { @MainActor in
             // Choose replacement if current is being deleted
             if self.currentProfile?.id == profile.id {
-                if let replacement = self.profileManager.profiles.first(where: { $0.id != profile.id }) {
+                if let replacement = self.profileManager.profiles.first(where: {
+                    $0.id != profile.id
+                }) {
                     await self.switchToProfile(replacement)
                 }
             }
@@ -1695,10 +2117,30 @@ class BrowserManager: ObservableObject {
             // Delete from manager
             let ok = self.profileManager.deleteProfile(profile)
             if !ok {
-                let header = AnyView(DialogHeader(icon: "exclamationmark.triangle", title: "Couldn't Delete Profile", subtitle: profile.name))
-                let body = AnyView(Text("An error occurred while saving changes. Please try again.").font(.body))
-                let footer = AnyView(DialogFooter(rightButtons: [DialogButton(text: "OK", variant: .primary) { self.dialogManager.closeDialog() }]))
-                self.dialogManager.showCustomContentDialog(header: header, content: body, footer: footer)
+                let header = AnyView(
+                    DialogHeader(
+                        icon: "exclamationmark.triangle",
+                        title: "Couldn't Delete Profile",
+                        subtitle: profile.name
+                    )
+                )
+                let body = AnyView(
+                    Text(
+                        "An error occurred while saving changes. Please try again."
+                    ).font(.body)
+                )
+                let footer = AnyView(
+                    DialogFooter(rightButtons: [
+                        DialogButton(text: "OK", variant: .primary) {
+                            self.dialogManager.closeDialog()
+                        },
+                    ])
+                )
+                self.dialogManager.showCustomContentDialog(
+                    header: header,
+                    content: body,
+                    footer: footer
+                )
             }
         }
     }
@@ -1722,7 +2164,8 @@ class BrowserManager: ObservableObject {
         windowState.commandPalettePrefilledText = ""
         windowState.shouldNavigateCurrentTab = false
         windowState.urlBarFrame = urlBarFrame
-        windowState.activeGradient = tabManager.currentSpace?.gradient ?? .default
+        windowState.activeGradient =
+            tabManager.currentSpace?.gradient ?? .default
         windowState.currentProfileId = currentProfile?.id
 
         // Set initial tab and space
@@ -1745,7 +2188,9 @@ class BrowserManager: ObservableObject {
     func unregisterWindowState(_ windowId: UUID) {
         guard let windowState = windowStates[windowId] else { return }
 
-        print("🧹 [BrowserManager] Starting comprehensive cleanup for window: \(windowId)")
+        print(
+            "🧹 [BrowserManager] Starting comprehensive cleanup for window: \(windowId)"
+        )
 
         closeCommandPalette(for: windowState)
 
@@ -1772,17 +2217,23 @@ class BrowserManager: ObservableObject {
             }
         }
 
-        print("✅ [BrowserManager] Completed comprehensive cleanup for window: \(windowId)")
+        print(
+            "✅ [BrowserManager] Completed comprehensive cleanup for window: \(windowId)"
+        )
     }
 
     /// MEMORY LEAK FIX: Comprehensive cleanup for all WebViews in a specific window
     private func cleanupWebViewsForWindow(_ windowId: UUID) {
-        let webViewsToCleanup = webViewsByTabAndWindow.compactMap { tabId, windowWebViews -> (UUID, WKWebView)? in
+        let webViewsToCleanup = webViewsByTabAndWindow.compactMap {
+            tabId,
+                windowWebViews -> (UUID, WKWebView)? in
             guard let webView = windowWebViews[windowId] else { return nil }
             return (tabId, webView)
         }
 
-        print("🧹 [BrowserManager] Cleaning up \(webViewsToCleanup.count) WebViews for window \(windowId)")
+        print(
+            "🧹 [BrowserManager] Cleaning up \(webViewsToCleanup.count) WebViews for window \(windowId)"
+        )
 
         for (tabId, webView) in webViewsToCleanup {
             // Use comprehensive cleanup from Tab class
@@ -1802,13 +2253,20 @@ class BrowserManager: ObservableObject {
                 webViewsByTabAndWindow.removeValue(forKey: tabId)
             }
 
-            print("✅ [BrowserManager] Cleaned up WebView for tab \(tabId) in window \(windowId)")
+            print(
+                "✅ [BrowserManager] Cleaned up WebView for tab \(tabId) in window \(windowId)"
+            )
         }
     }
 
     /// MEMORY LEAK FIX: Fallback cleanup for WebViews when tab is not available
-    private func performFallbackWebViewCleanup(_ webView: WKWebView, tabId: UUID) {
-        print("🧹 [BrowserManager] Performing fallback WebView cleanup for tab: \(tabId)")
+    private func performFallbackWebViewCleanup(
+        _ webView: WKWebView,
+        tabId: UUID
+    ) {
+        print(
+            "🧹 [BrowserManager] Performing fallback WebView cleanup for tab: \(tabId)"
+        )
 
         // Stop loading
         webView.stopLoading()
@@ -1837,21 +2295,30 @@ class BrowserManager: ObservableObject {
         // Remove from view hierarchy
         webView.removeFromSuperview()
 
-        print("✅ [BrowserManager] Fallback WebView cleanup completed for tab: \(tabId)")
+        print(
+            "✅ [BrowserManager] Fallback WebView cleanup completed for tab: \(tabId)"
+        )
     }
 
     /// MEMORY LEAK FIX: Comprehensive cleanup for all WebViews across all windows
     func cleanupAllWebViews() {
-        print("🧹 [BrowserManager] Starting comprehensive cleanup for ALL WebViews")
+        print(
+            "🧹 [BrowserManager] Starting comprehensive cleanup for ALL WebViews"
+        )
 
-        let totalWebViews = webViewsByTabAndWindow.values.flatMap { $0.values }.count
-        print("🧹 [BrowserManager] Cleaning up \(totalWebViews) WebViews across all windows")
+        let totalWebViews = webViewsByTabAndWindow.values.flatMap { $0.values }
+            .count
+        print(
+            "🧹 [BrowserManager] Cleaning up \(totalWebViews) WebViews across all windows"
+        )
 
         // Clean up all WebViews for all tabs in all windows
         for (tabId, windowWebViews) in webViewsByTabAndWindow {
             for (windowId, webView) in windowWebViews {
                 // Use comprehensive cleanup from Tab class
-                if let tab = tabManager.allTabs().first(where: { $0.id == tabId }) {
+                if let tab = tabManager.allTabs().first(where: {
+                    $0.id == tabId
+                }) {
                     tab.cleanupCloneWebView(webView)
                 } else {
                     // Fallback cleanup if tab is not found
@@ -1861,7 +2328,9 @@ class BrowserManager: ObservableObject {
                 // Remove from containers
                 removeWebViewFromContainers(webView)
 
-                print("✅ [BrowserManager] Cleaned up WebView for tab \(tabId) in window \(windowId)")
+                print(
+                    "✅ [BrowserManager] Cleaned up WebView for tab \(tabId) in window \(windowId)"
+                )
             }
         }
 
@@ -1869,7 +2338,9 @@ class BrowserManager: ObservableObject {
         webViewsByTabAndWindow.removeAll()
         compositorContainerViews.removeAll()
 
-        print("✅ [BrowserManager] Completed comprehensive cleanup for ALL WebViews")
+        print(
+            "✅ [BrowserManager] Completed comprehensive cleanup for ALL WebViews"
+        )
     }
 
     /// Set the active window state (called when a window gains focus)
@@ -1950,7 +2421,10 @@ class BrowserManager: ObservableObject {
 
         // Notify extensions about tab activation
         if #available(macOS 15.5, *) {
-            ExtensionManager.shared.notifyTabActivated(newTab: tab, previous: nil)
+            ExtensionManager.shared.notifyTabActivated(
+                newTab: tab,
+                previous: nil
+            )
         }
 
         // Update find manager with new current tab
@@ -1961,7 +2435,9 @@ class BrowserManager: ObservableObject {
 
         enforceExclusiveAudio(for: tab, activeWindowId: windowState.id)
 
-        print("🪟 [BrowserManager] Selected tab \(tab.name) in window \(windowState.id)")
+        print(
+            "🪟 [BrowserManager] Selected tab \(tab.name) in window \(windowState.id)"
+        )
 
         // Update global tab state for the active window
         if activeWindowState?.id == windowState.id {
@@ -1977,9 +2453,13 @@ class BrowserManager: ObservableObject {
             tabManager.spaces.first(where: { $0.id == id })
         }
 
-        let profileId = windowState.currentProfileId ?? currentSpace?.profileId ?? currentProfile?.id
-        let essentials = profileId.flatMap { tabManager.essentialTabs(for: $0) } ?? []
-        let spacePinned = currentSpace.map { tabManager.spacePinnedTabs(for: $0.id) } ?? []
+        let profileId =
+            windowState.currentProfileId ?? currentSpace?.profileId
+                ?? currentProfile?.id
+        let essentials =
+            profileId.flatMap { tabManager.essentialTabs(for: $0) } ?? []
+        let spacePinned =
+            currentSpace.map { tabManager.spacePinnedTabs(for: $0.id) } ?? []
         let regularTabs = currentSpace.map { tabManager.tabs(in: $0) } ?? []
 
         return essentials + spacePinned + regularTabs
@@ -2009,7 +2489,8 @@ class BrowserManager: ObservableObject {
     /// Create a new web view for a specific tab in a specific window
     func createWebView(for tabId: UUID, in windowId: UUID) -> WKWebView {
         // Get the tab
-        guard let tab = tabManager.allTabs().first(where: { $0.id == tabId }) else {
+        guard let tab = tabManager.allTabs().first(where: { $0.id == tabId })
+        else {
             fatalError("Tab not found: \(tabId)")
         }
 
@@ -2018,21 +2499,31 @@ class BrowserManager: ObservableObject {
 
         // Copy configuration from the original tab's web view if it exists
         if let originalWebView = tab.webView {
-            configuration.websiteDataStore = originalWebView.configuration.websiteDataStore
-            configuration.processPool = originalWebView.configuration.processPool
+            configuration.websiteDataStore =
+                originalWebView.configuration.websiteDataStore
+            configuration.processPool =
+                originalWebView.configuration.processPool
             // CRITICAL: Copy all preferences including PiP settings
-            configuration.preferences = originalWebView.configuration.preferences
-            configuration.defaultWebpagePreferences = originalWebView.configuration.defaultWebpagePreferences
-            configuration.mediaTypesRequiringUserActionForPlayback = originalWebView.configuration.mediaTypesRequiringUserActionForPlayback
-            configuration.allowsAirPlayForMediaPlayback = originalWebView.configuration.allowsAirPlayForMediaPlayback
-            configuration.applicationNameForUserAgent = originalWebView.configuration.applicationNameForUserAgent
+            configuration.preferences =
+                originalWebView.configuration.preferences
+            configuration.defaultWebpagePreferences =
+                originalWebView.configuration.defaultWebpagePreferences
+            configuration.mediaTypesRequiringUserActionForPlayback =
+                originalWebView.configuration
+                    .mediaTypesRequiringUserActionForPlayback
+            configuration.allowsAirPlayForMediaPlayback =
+                originalWebView.configuration.allowsAirPlayForMediaPlayback
+            configuration.applicationNameForUserAgent =
+                originalWebView.configuration.applicationNameForUserAgent
             if #available(macOS 15.5, *) {
-                configuration.webExtensionController = originalWebView.configuration.webExtensionController
+                configuration.webExtensionController =
+                    originalWebView.configuration.webExtensionController
             }
         } else {
             // Use the tab's resolved profile data store and apply proper configuration
             let resolvedProfile = tab.resolveProfile()
-            configuration.websiteDataStore = resolvedProfile?.dataStore ?? WKWebsiteDataStore.default()
+            configuration.websiteDataStore =
+                resolvedProfile?.dataStore ?? WKWebsiteDataStore.default()
 
             // Apply the same configuration as BrowserConfiguration
             let preferences = WKWebpagePreferences()
@@ -2040,17 +2531,28 @@ class BrowserManager: ObservableObject {
             configuration.defaultWebpagePreferences = preferences
 
             configuration.preferences.javaScriptEnabled = true
-            configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
+            configuration.preferences.javaScriptCanOpenWindowsAutomatically =
+                true
             configuration.mediaTypesRequiringUserActionForPlayback = []
             configuration.allowsAirPlayForMediaPlayback = true
-            configuration.applicationNameForUserAgent = "Version/17.4.1 Safari/605.1.15"
+            configuration.applicationNameForUserAgent =
+                "Version/17.4.1 Safari/605.1.15"
 
             // CRITICAL: Enable Picture-in-Picture
-            configuration.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
+            configuration.preferences.setValue(
+                true,
+                forKey: "allowsPictureInPictureMediaPlayback"
+            )
 
             // CRITICAL: Enable full-screen API support
-            configuration.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
-            configuration.preferences.setValue(true, forKey: "mediaDevicesEnabled")
+            configuration.preferences.setValue(
+                true,
+                forKey: "allowsInlineMediaPlayback"
+            )
+            configuration.preferences.setValue(
+                true,
+                forKey: "mediaDevicesEnabled"
+            )
 
             // CRITICAL: Enable HTML5 Fullscreen API
             configuration.preferences.isElementFullscreenEnabled = true
@@ -2065,14 +2567,38 @@ class BrowserManager: ObservableObject {
         newWebView.setValue(false, forKey: "drawsBackground")
 
         // Set up message handlers
-        newWebView.configuration.userContentController.add(tab, name: "linkHover")
-        newWebView.configuration.userContentController.add(tab, name: "commandHover")
-        newWebView.configuration.userContentController.add(tab, name: "commandClick")
-        newWebView.configuration.userContentController.add(tab, name: "pipStateChange")
-        newWebView.configuration.userContentController.add(tab, name: "mediaStateChange_\(tabId.uuidString)")
-        newWebView.configuration.userContentController.add(tab, name: "backgroundColor_\(tabId.uuidString)")
-        newWebView.configuration.userContentController.add(tab, name: "historyStateDidChange")
-        newWebView.configuration.userContentController.add(tab, name: "NookIdentity")
+        newWebView.configuration.userContentController.add(
+            tab,
+            name: "linkHover"
+        )
+        newWebView.configuration.userContentController.add(
+            tab,
+            name: "commandHover"
+        )
+        newWebView.configuration.userContentController.add(
+            tab,
+            name: "commandClick"
+        )
+        newWebView.configuration.userContentController.add(
+            tab,
+            name: "pipStateChange"
+        )
+        newWebView.configuration.userContentController.add(
+            tab,
+            name: "mediaStateChange_\(tabId.uuidString)"
+        )
+        newWebView.configuration.userContentController.add(
+            tab,
+            name: "backgroundColor_\(tabId.uuidString)"
+        )
+        newWebView.configuration.userContentController.add(
+            tab,
+            name: "historyStateDidChange"
+        )
+        newWebView.configuration.userContentController.add(
+            tab,
+            name: "NookIdentity"
+        )
 
         tab.setupThemeColorObserver(for: newWebView)
 
@@ -2094,7 +2620,9 @@ class BrowserManager: ObservableObject {
             enforceExclusiveAudio(for: tab, activeWindowId: windowId)
         }
 
-        print("🪟 [BrowserManager] Created new web view for tab \(tab.name) in window \(windowId)")
+        print(
+            "🪟 [BrowserManager] Created new web view for tab \(tab.name) in window \(windowId)"
+        )
         return newWebView
     }
 
@@ -2106,7 +2634,8 @@ class BrowserManager: ObservableObject {
             return
         }
 
-        guard let tab = tabManager.allTabs().first(where: { $0.id == tabId }) else { return }
+        guard let tab = tabManager.allTabs().first(where: { $0.id == tabId })
+        else { return }
 
         isSyncingTab.insert(tabId)
         defer { isSyncingTab.remove(tabId) }
@@ -2130,12 +2659,15 @@ class BrowserManager: ObservableObject {
             // Note: Navigation state (back/forward) is handled by the Tab's navigationDelegate
         }
 
-        print("🪟 [BrowserManager] Synchronized tab \(tab.name) across \(allWebViews.count) windows")
+        print(
+            "🪟 [BrowserManager] Synchronized tab \(tab.name) across \(allWebViews.count) windows"
+        )
     }
 
     /// Navigate a tab across all windows that are displaying it
     func navigateTabAcrossWindows(_ tabId: UUID, to url: URL) {
-        guard let tab = tabManager.allTabs().first(where: { $0.id == tabId }) else { return }
+        guard let tab = tabManager.allTabs().first(where: { $0.id == tabId })
+        else { return }
 
         // Update the tab's URL
         tab.url = url
@@ -2152,12 +2684,15 @@ class BrowserManager: ObservableObject {
             webView.load(URLRequest(url: url))
         }
 
-        print("🪟 [BrowserManager] Navigated tab \(tab.name) to \(url.absoluteString) across \(allWebViews.count) windows")
+        print(
+            "🪟 [BrowserManager] Navigated tab \(tab.name) to \(url.absoluteString) across \(allWebViews.count) windows"
+        )
     }
 
     /// Reload a tab across all windows that are displaying it
     func reloadTabAcrossWindows(_ tabId: UUID) {
-        guard let tab = tabManager.allTabs().first(where: { $0.id == tabId }) else { return }
+        guard let tab = tabManager.allTabs().first(where: { $0.id == tabId })
+        else { return }
 
         // Get all web views for this tab across all windows
         let allWebViews: [WKWebView]
@@ -2171,14 +2706,25 @@ class BrowserManager: ObservableObject {
             webView.reload()
         }
 
-        print("🪟 [BrowserManager] Reloaded tab \(tab.name) across \(allWebViews.count) windows")
+        print(
+            "🪟 [BrowserManager] Reloaded tab \(tab.name) across \(allWebViews.count) windows"
+        )
     }
 
     /// Apply mute state to all window-specific web views for a tab
-    func setMuteState(_ muted: Bool, for tabId: UUID, originatingWindowId: UUID?) {
-        guard let tab = tabManager.allTabs().first(where: { $0.id == tabId }) else { return }
+    func setMuteState(
+        _ muted: Bool,
+        for tabId: UUID,
+        originatingWindowId: UUID?
+    ) {
+        guard let tab = tabManager.allTabs().first(where: { $0.id == tabId })
+        else { return }
         if let origin = originatingWindowId {
-            enforceExclusiveAudio(for: tab, activeWindowId: origin, desiredMuteState: muted)
+            enforceExclusiveAudio(
+                for: tab,
+                activeWindowId: origin,
+                desiredMuteState: muted
+            )
         } else if let webViews = webViewsByTabAndWindow[tabId] {
             for webView in webViews.values {
                 webView.isMuted = muted
@@ -2201,7 +2747,10 @@ class BrowserManager: ObservableObject {
         // Get the active tab for this space
         let spacePinned = tabManager.spacePinnedTabs(for: space.id)
         let regularTabs = tabManager.tabs(in: space)
-        let profileEssentials = (space.profileId ?? currentProfile?.id).flatMap { tabManager.essentialTabs(for: $0) } ?? []
+        let profileEssentials =
+            (space.profileId ?? currentProfile?.id).flatMap {
+                tabManager.essentialTabs(for: $0)
+            } ?? []
         let allTabsForSpace = profileEssentials + spacePinned + regularTabs
 
         // Find the active tab for this space - prioritize window-specific memory
@@ -2231,7 +2780,9 @@ class BrowserManager: ObservableObject {
             adoptProfileIfNeeded(for: windowState, context: .spaceChange)
         }
 
-        print("🪟 [BrowserManager] Set active space \(space.name) for window \(windowState.id), active tab: \(targetTab?.name ?? "none")")
+        print(
+            "🪟 [BrowserManager] Set active space \(space.name) for window \(windowState.id), active tab: \(targetTab?.name ?? "none")"
+        )
     }
 
     /// Validate and fix window states after tab/space mutations
@@ -2241,7 +2792,9 @@ class BrowserManager: ObservableObject {
 
             // Check if current tab still exists
             if let currentTabId = windowState.currentTabId {
-                if tabManager.allTabs().first(where: { $0.id == currentTabId }) == nil {
+                if tabManager.allTabs().first(where: { $0.id == currentTabId })
+                    == nil
+                {
                     windowState.currentTabId = nil
                     needsUpdate = true
                 }
@@ -2249,7 +2802,9 @@ class BrowserManager: ObservableObject {
 
             // Check if current space still exists
             if let currentSpaceId = windowState.currentSpaceId {
-                if tabManager.spaces.first(where: { $0.id == currentSpaceId }) == nil {
+                if tabManager.spaces.first(where: { $0.id == currentSpaceId })
+                    == nil
+                {
                     windowState.currentSpaceId = tabManager.spaces.first?.id
                     needsUpdate = true
                 }
@@ -2273,8 +2828,13 @@ class BrowserManager: ObservableObject {
             if let spaceId = windowState.currentSpaceId,
                let space = tabManager.spaces.first(where: { $0.id == spaceId })
             {
-                updateGradient(for: windowState, to: space.gradient, animate: false)
-                windowState.currentProfileId = space.profileId ?? currentProfile?.id
+                updateGradient(
+                    for: windowState,
+                    to: space.gradient,
+                    animate: false
+                )
+                windowState.currentProfileId =
+                    space.profileId ?? currentProfile?.id
             } else if windowState.currentSpaceId == nil {
                 updateGradient(for: windowState, to: .default, animate: false)
                 windowState.currentProfileId = currentProfile?.id

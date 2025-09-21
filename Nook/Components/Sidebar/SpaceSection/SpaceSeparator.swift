@@ -7,6 +7,7 @@
 import SwiftUI
 
 struct SpaceSeparator: View {
+    @EnvironmentObject var browserManager: BrowserManager
     var isHovering: Bool
     @State private var isClearHovered: Bool = false
     var body: some View {
@@ -15,7 +16,9 @@ struct SpaceSeparator: View {
                 .fill(Color.white.opacity(0.15))
                 .frame(height: 1)
             if isHovering {
-                Button {} label: {
+                Button {
+                    browserManager.cleanUpTabs()
+                } label: {
                     Text("􀄩 Clear")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(isClearHovered ? .white : Color.white.opacity(0.3))
