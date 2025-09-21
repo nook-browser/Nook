@@ -184,6 +184,18 @@ struct SidebarView: View {
                             hideMenuAfterDelay()
                         }
                     }
+                    .helpTooltip {
+                        HStack(spacing: 5) {
+                            Text("Show library")
+                            HStack(spacing: 2) {
+                                KeyIcon(iconName: "shift", type: .symbol)
+                                KeyIcon(iconName: "command", type: .symbol)
+                                KeyIcon(iconName: "L", type: .letter)
+                            }
+
+                        }
+                    }
+                    
                     DownloadIndicator()
                         .offset(x: 12, y: -12)
 
@@ -199,6 +211,7 @@ struct SidebarView: View {
                 NavButton(iconName: "plus") {
                     showSpaceCreationDialog()
                 }
+                .helpTooltip("Create a new space")
 
             }
             .frame(height: 32)
