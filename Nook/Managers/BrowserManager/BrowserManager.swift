@@ -2159,6 +2159,30 @@ class BrowserManager: ObservableObject {
     /// Set active space for a specific window
     func setActiveSpace(_ space: Space, in windowState: BrowserWindowState) {
         let isActiveWindow = activeWindowState?.id == windowState.id
+        
+        // CRITICAL FIX: Switch profile FIRST, before any space/tab operations
+        if isActiveWindow {
+            let targetProfileId = space.profileId ?? currentProfile?.id
+            if currentProfile?.id != targetProfileId,
+               let targetProfile = profileManager.profiles.first(where: { $0.id == targetProfileId }),
+               !isSwitchingProfile {
+                // Perform synchronous profile switch before space operations
+                Task { [weak self] in
+                    await self?.switchToProfile(targetProfile, context: .spaceChange, in: windowState)
+                    await MainActor.run {
+                        // Continue with space switch after profile is switched
+                        self?.performSpaceSwitch(space, in: windowState)
+                    }
+                }
+                return
+            }
+        }
+        
+        performSpaceSwitch(space, in: windowState)
+    }
+    
+    private func performSpaceSwitch(_ space: Space, in windowState: BrowserWindowState) {
+        let isActiveWindow = activeWindowState?.id == windowState.id
         if isActiveWindow {
             tabManager.setActiveSpace(space)
         }
@@ -2195,10 +2219,6 @@ class BrowserManager: ObservableObject {
         // Set the active tab for this window
         if let tab = targetTab {
             selectTab(tab, in: windowState)
-        }
-
-        if isActiveWindow {
-            adoptProfileIfNeeded(for: windowState, context: .spaceChange)
         }
 
         print("🪟 [BrowserManager] Set active space \(space.name) for window \(windowState.id), active tab: \(targetTab?.name ?? "none")")
