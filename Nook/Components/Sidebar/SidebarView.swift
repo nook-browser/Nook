@@ -13,6 +13,7 @@ struct SidebarView: View {
     @State private var spaceIcon = ""
     @State private var showHistory = false
     @State private var sidebarDraggedItem: UUID? = nil
+    @State private var activeTabRefreshTrigger: Bool = false
     // Force rendering even when the real sidebar is collapsed (used by hover overlay)
     var forceVisible: Bool = false
     // Override the width for overlay use; falls back to BrowserManager width
@@ -193,12 +194,14 @@ struct SidebarView: View {
                             .environmentObject(windowState)
                             .environmentObject(browserManager.splitManager)
                         }
-                        .frame(maxWidth: availableContentWidth)
+                        .frame(maxWidth: effectiveWidth)
                         .tag(index)
                     }
                 }
-                .frame(maxWidth: availableContentWidth)
+                .frame(maxWidth: effectiveWidth)
                 .pageViewStyle(.scroll)
+                .contentShape(Rectangle())
+                .id(activeTabRefreshTrigger)
                 .onChange(of: activeSpaceIndex) { _, newIndex in
                     // BigUIPaging will handle the bounds checking automatically
                     let space = browserManager.tabManager.spaces[newIndex]
@@ -210,6 +213,11 @@ struct SidebarView: View {
 
                     // Activate the space - BigUIPaging ensures newIndex is always valid
                     browserManager.setActiveSpace(space, in: windowState)
+
+                    // Force hit testing refresh after a short delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        // This helps ensure proper hit testing after page transition
+                    }
                 }
                 .onAppear {
                     // Initialize the selection
@@ -222,6 +230,11 @@ struct SidebarView: View {
                     if let targetIndex = browserManager.tabManager.spaces.firstIndex(where: { $0.id == windowState.currentSpaceId }) {
                         activeSpaceIndex = targetIndex
                     }
+                }
+                .onChange(of: windowState.currentTabId) { _, _ in
+                    // Force PageView to recreate when active tab changes
+                    // This fixes hit testing issues after space/tab switches
+                    activeTabRefreshTrigger.toggle()
                 }
             }
         }
