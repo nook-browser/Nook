@@ -18,47 +18,73 @@ struct SettingsView: View {
             SettingsPane {
                 GeneralSettingsView()
             }
-                .tag(SettingsTabs.general)
+            .tabItem {
+                Label(
+                    SettingsTabs.general.name,
+                    systemImage: SettingsTabs.general.icon
+                )
+            }
+            .tag(SettingsTabs.general)
 
             SettingsPane {
                 PrivacySettingsView()
             }
-                .tag(SettingsTabs.privacy)
+            .tabItem {
+                Label(
+                    SettingsTabs.privacy.name,
+                    systemImage: SettingsTabs.privacy.icon
+                )
+            }
+            .tag(SettingsTabs.privacy)
+
 
             SettingsPane {
                 ProfilesSettingsView()
             }
-                .tag(SettingsTabs.profiles)
+            .tabItem {
+                Label(
+                    SettingsTabs.profiles.name,
+                    systemImage: SettingsTabs.profiles.icon
+                )
+            }
+            .tag(SettingsTabs.profiles)
 
-            
 
             SettingsPane {
                 ShortcutsSettingsView()
             }
-                .tag(SettingsTabs.shortcuts)
+            .tabItem {
+                Label(
+                    SettingsTabs.shortcuts.name,
+                    systemImage: SettingsTabs.shortcuts.icon
+                )
+            }
+            .tag(SettingsTabs.shortcuts)
+
 
             SettingsPane {
                 ExtensionsSettingsView()
             }
-                .tag(SettingsTabs.extensions)
+            .tabItem {
+                Label(
+                    SettingsTabs.extensions.name,
+                    systemImage: SettingsTabs.extensions.icon
+                )
+            }
+            .tag(SettingsTabs.extensions)
+
 
             SettingsPane {
                 AdvancedSettingsView()
             }
-                .tag(SettingsTabs.advanced)
-        }
-        .toolbar {
-            ToolbarItem(placement: .automatic) {
-                Picker("Settings Tabs", selection: $browserManager.settingsManager.currentSettingsTab) {
-                    ForEach(SettingsTabs.ordered, id: \.self) { tab in
-                        Image(systemName: tab.icon)
-                            .help(tab.name)
-                            .tag(tab)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
+            .tabItem {
+                Label(
+                    SettingsTabs.advanced.name,
+                    systemImage: SettingsTabs.advanced.icon
+                )
             }
+            .tag(SettingsTabs.advanced)
+
         }
     }
 }
@@ -82,7 +108,11 @@ private struct SettingsPane<Content: View>: View {
         }
         .scrollIndicators(.automatic)
         .frame(minWidth: minWidth)
-        .frame(minHeight: fixedHeight, idealHeight: fixedHeight, maxHeight: fixedHeight)
+        .frame(
+            minHeight: fixedHeight,
+            idealHeight: fixedHeight,
+            maxHeight: fixedHeight
+        )
     }
 }
 
@@ -113,13 +143,23 @@ struct GeneralSettingsView: View {
             // Right side stacked cards
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    SettingsSectionCard(title: "Appearance", subtitle: "Window materials and visual style") {
+                    SettingsSectionCard(
+                        title: "Appearance",
+                        subtitle: "Window materials and visual style"
+                    ) {
                         HStack(alignment: .firstTextBaseline) {
                             Text("Background Material")
                             Spacer()
-                            Picker("Background Material", selection: $browserManager.settingsManager.currentMaterialRaw) {
-                                ForEach(materials, id: \.value.rawValue) { material in
-                                    Text(material.name).tag(material.value.rawValue)
+                            Picker(
+                                "Background Material",
+                                selection: $browserManager.settingsManager
+                                    .currentMaterialRaw
+                            ) {
+                                ForEach(materials, id: \.value.rawValue) {
+                                    material in
+                                    Text(material.name).tag(
+                                        material.value.rawValue
+                                    )
                                 }
                             }
                             .labelsHidden()
@@ -129,21 +169,33 @@ struct GeneralSettingsView: View {
 
                         Divider().opacity(0.4)
 
-                        Toggle(isOn: $browserManager.settingsManager.isLiquidGlassEnabled) {
+                        Toggle(
+                            isOn: $browserManager.settingsManager
+                                .isLiquidGlassEnabled
+                        ) {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Liquid Glass")
-                                Text("Enable frosted translucency for UI surfaces")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                Text(
+                                    "Enable frosted translucency for UI surfaces"
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                             }
                         }
                     }
 
-                    SettingsSectionCard(title: "Search", subtitle: "Default provider for address bar") {
+                    SettingsSectionCard(
+                        title: "Search",
+                        subtitle: "Default provider for address bar"
+                    ) {
                         HStack(alignment: .firstTextBaseline) {
                             Text("Search Engine")
                             Spacer()
-                            Picker("Search Engine", selection: $browserManager.settingsManager.searchEngine) {
+                            Picker(
+                                "Search Engine",
+                                selection: $browserManager.settingsManager
+                                    .searchEngine
+                            ) {
                                 ForEach(SearchProvider.allCases) { provider in
                                     Text(provider.displayName).tag(provider)
                                 }
@@ -154,22 +206,32 @@ struct GeneralSettingsView: View {
                         }
                     }
 
-                    SettingsSectionCard(title: "Performance", subtitle: "Manage memory by unloading inactive tabs") {
+                    SettingsSectionCard(
+                        title: "Performance",
+                        subtitle: "Manage memory by unloading inactive tabs"
+                    ) {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack(alignment: .firstTextBaseline) {
                                 Text("Tab Unload Timeout")
                                 Spacer()
-                                Picker("Tab Unload Timeout",
-                                       selection: Binding<TimeInterval>(
-                                           get: {
-                                               nearestTimeoutOption(to: browserManager.settingsManager.tabUnloadTimeout)
-                                           },
-                                           set: { newValue in
-                                               browserManager.settingsManager.tabUnloadTimeout = newValue
-                                           }
-                                       )
+                                Picker(
+                                    "Tab Unload Timeout",
+                                    selection: Binding<TimeInterval>(
+                                        get: {
+                                            nearestTimeoutOption(
+                                                to: browserManager
+                                                    .settingsManager
+                                                    .tabUnloadTimeout
+                                            )
+                                        },
+                                        set: { newValue in
+                                            browserManager.settingsManager
+                                                .tabUnloadTimeout = newValue
+                                        }
+                                    )
                                 ) {
-                                    ForEach(unloadTimeoutOptions, id: \.self) { value in
+                                    ForEach(unloadTimeoutOptions, id: \.self) {
+                                        value in
                                         Text(formatTimeout(value)).tag(value)
                                     }
                                 }
@@ -177,18 +239,25 @@ struct GeneralSettingsView: View {
                                 .pickerStyle(.menu)
                                 .frame(width: 220)
                                 .onAppear {
-                                    browserManager.settingsManager.tabUnloadTimeout =
-                                        nearestTimeoutOption(to: browserManager.settingsManager.tabUnloadTimeout)
+                                    browserManager.settingsManager
+                                        .tabUnloadTimeout =
+                                        nearestTimeoutOption(
+                                            to: browserManager.settingsManager
+                                                .tabUnloadTimeout
+                                        )
                                 }
                             }
 
-                            Text("Automatically unload inactive tabs to reduce memory usage.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            Text(
+                                "Automatically unload inactive tabs to reduce memory usage."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
 
                             HStack {
                                 Button("Unload All Inactive Tabs") {
-                                    browserManager.tabManager.unloadAllInactiveTabs()
+                                    browserManager.tabManager
+                                        .unloadAllInactiveTabs()
                                 }
                                 .buttonStyle(.bordered)
                                 Spacer()
@@ -217,7 +286,10 @@ struct ProfilesSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Profiles list and actions
-            SettingsSectionCard(title: "Profiles", subtitle: "Create, switch, and manage browsing personas") {
+            SettingsSectionCard(
+                title: "Profiles",
+                subtitle: "Create, switch, and manage browsing personas"
+            ) {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Button(action: showCreateDialog) {
@@ -225,7 +297,9 @@ struct ProfilesSettingsView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .accessibilityLabel("Create Profile")
-                        .accessibilityHint("Open dialog to create a new profile")
+                        .accessibilityHint(
+                            "Open dialog to create a new profile"
+                        )
 
                         Spacer()
                     }
@@ -242,76 +316,112 @@ struct ProfilesSettingsView: View {
                         .padding(.vertical, 8)
                     } else {
                         VStack(spacing: 8) {
-                            ForEach(browserManager.profileManager.profiles, id: \.id) { profile in
+                            ForEach(
+                                browserManager.profileManager.profiles,
+                                id: \.id
+                            ) { profile in
                                 ProfileRowView(
                                     profile: profile,
-                                    isCurrent: browserManager.currentProfile?.id == profile.id,
+                                    isCurrent: browserManager.currentProfile?.id
+                                        == profile.id,
                                     spacesCount: spacesCount(for: profile),
                                     tabsCount: tabsCount(for: profile),
                                     dataSizeDescription: "Shared store",
                                     pinnedCount: pinnedCount(for: profile),
-                                    onMakeCurrent: { Task { await browserManager.switchToProfile(profile) } },
+                                    onMakeCurrent: {
+                                        Task {
+                                            await browserManager.switchToProfile(
+                                                profile
+                                            )
+                                        }
+                                    },
                                     onRename: { startRename(profile) },
                                     onDelete: { startDelete(profile) },
-                                    onManageData: { showDataManagement(for: profile) }
+                                    onManageData: {
+                                        showDataManagement(for: profile)
+                                    }
                                 )
                                 .accessibilityLabel("Profile \(profile.name)")
-                                .accessibilityHint(browserManager.currentProfile?.id == profile.id ? "Current profile" : "Inactive profile")
+                                .accessibilityHint(
+                                    browserManager.currentProfile?.id
+                                        == profile.id
+                                        ? "Current profile" : "Inactive profile"
+                                )
                             }
                         }
                     }
                 }
-                
+
                 Divider().opacity(0.4)
-                
+
                 // Migration controls appear under the profile list
                 MigrationControls()
                     .environmentObject(browserManager)
-                
+
                 Divider().opacity(0.4)
-                
+
                 // Export / Import actions (placeholders)
                 HStack(spacing: 8) {
                     Button(action: showExportPlaceholder) {
-                        Label("Export Current Profile", systemImage: "square.and.arrow.up")
+                        Label(
+                            "Export Current Profile",
+                            systemImage: "square.and.arrow.up"
+                        )
                     }
                     .buttonStyle(.bordered)
                     .accessibilityLabel("Export current profile")
-                    
+
                     Button(action: showImportPlaceholder) {
-                        Label("Import Profile", systemImage: "square.and.arrow.down")
+                        Label(
+                            "Import Profile",
+                            systemImage: "square.and.arrow.down"
+                        )
                     }
                     .buttonStyle(.bordered)
                     .accessibilityLabel("Import profile")
-                    
+
                     Spacer()
                 }
             }
 
-            
-
             // Space assignments management
-            SettingsSectionCard(title: "Space Assignments", subtitle: "Assign spaces to specific profiles") {
+            SettingsSectionCard(
+                title: "Space Assignments",
+                subtitle: "Assign spaces to specific profiles"
+            ) {
                 VStack(alignment: .leading, spacing: 12) {
                     // Bulk actions
                     HStack(spacing: 8) {
                         Button(action: assignAllSpacesToCurrentProfile) {
-                            Label("Assign All to Current Profile", systemImage: "checkmark.circle")
+                            Label(
+                                "Assign All to Current Profile",
+                                systemImage: "checkmark.circle"
+                            )
                         }
                         .buttonStyle(.bordered)
-                        .accessibilityLabel("Assign all spaces to current profile")
+                        .accessibilityLabel(
+                            "Assign all spaces to current profile"
+                        )
 
                         Button(action: resetAllSpaceAssignments) {
-                            Label("Reset to Default Profile", systemImage: "arrow.uturn.backward")
+                            Label(
+                                "Reset to Default Profile",
+                                systemImage: "arrow.uturn.backward"
+                            )
                         }
                         .buttonStyle(.bordered)
                         .accessibilityLabel("Reset space assignments to none")
 
                         Button(action: showAutoAssignPlaceholder) {
-                            Label("Auto-assign by Usage", systemImage: "sparkles")
+                            Label(
+                                "Auto-assign by Usage",
+                                systemImage: "sparkles"
+                            )
                         }
                         .buttonStyle(.bordered)
-                        .accessibilityLabel("Auto assign by usage (placeholder)")
+                        .accessibilityLabel(
+                            "Auto assign by usage (placeholder)"
+                        )
 
                         Spacer()
                     }
@@ -322,13 +432,16 @@ struct ProfilesSettingsView: View {
                         HStack(spacing: 8) {
                             Image(systemName: "rectangle.3.group")
                                 .foregroundStyle(.secondary)
-                            Text("No spaces yet. Create a space to assign profiles.")
-                                .foregroundStyle(.secondary)
+                            Text(
+                                "No spaces yet. Create a space to assign profiles."
+                            )
+                            .foregroundStyle(.secondary)
                         }
                         .padding(.vertical, 8)
                     } else {
                         VStack(spacing: 8) {
-                            ForEach(browserManager.tabManager.spaces, id: \.id) { space in
+                            ForEach(browserManager.tabManager.spaces, id: \.id)
+                            { space in
                                 SpaceAssignmentRowView(space: space)
                             }
                         }
@@ -343,11 +456,16 @@ struct ProfilesSettingsView: View {
 
     // MARK: - Helpers
     private func spacesCount(for profile: Profile) -> Int {
-        browserManager.tabManager.spaces.filter { $0.profileId == profile.id }.count
+        browserManager.tabManager.spaces.filter { $0.profileId == profile.id }
+            .count
     }
 
     private func tabsCount(for profile: Profile) -> Int {
-        let spaceIds = Set(browserManager.tabManager.spaces.filter { $0.profileId == profile.id }.map { $0.id })
+        let spaceIds = Set(
+            browserManager.tabManager.spaces.filter {
+                $0.profileId == profile.id
+            }.map { $0.id }
+        )
         return browserManager.tabManager.allTabs().filter { tab in
             if let sid = tab.spaceId { return spaceIds.contains(sid) }
             return false
@@ -374,15 +492,25 @@ struct ProfilesSettingsView: View {
             profileName: $creatingName,
             profileIcon: $creatingIcon,
             isNameAvailable: { proposed in
-                let trimmed = proposed.trimmingCharacters(in: .whitespacesAndNewlines)
+                let trimmed = proposed.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
                 guard !trimmed.isEmpty else { return false }
-                return !browserManager.profileManager.profiles.contains { $0.name.caseInsensitiveCompare(trimmed) == .orderedSame }
+                return !browserManager.profileManager.profiles.contains {
+                    $0.name.caseInsensitiveCompare(trimmed) == .orderedSame
+                }
             },
             onSave: {
-                let trimmed = creatingName.trimmingCharacters(in: .whitespacesAndNewlines)
+                let trimmed = creatingName.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
                 guard !trimmed.isEmpty else { return }
-                let safeIcon = creatingIcon.isEmpty ? "person.crop.circle" : creatingIcon
-                let created = browserManager.profileManager.createProfile(name: trimmed, icon: safeIcon)
+                let safeIcon =
+                    creatingIcon.isEmpty ? "person.crop.circle" : creatingIcon
+                let created = browserManager.profileManager.createProfile(
+                    name: trimmed,
+                    icon: safeIcon
+                )
                 Task { await browserManager.switchToProfile(created) }
             },
             onCancel: { browserManager.dialogManager.closeDialog() },
@@ -400,12 +528,20 @@ struct ProfilesSettingsView: View {
             profileName: $renamingName,
             profileIcon: $renamingIcon,
             isNameAvailable: { proposed in
-                let trimmed = proposed.trimmingCharacters(in: .whitespacesAndNewlines)
-                return !browserManager.profileManager.profiles.contains { $0.id != profile.id && $0.name.caseInsensitiveCompare(trimmed) == .orderedSame }
+                let trimmed = proposed.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+                return !browserManager.profileManager.profiles.contains {
+                    $0.id != profile.id
+                        && $0.name.caseInsensitiveCompare(trimmed)
+                            == .orderedSame
+                }
             },
             onSave: {
                 guard let p = profileToRename else { return }
-                let trimmed = renamingName.trimmingCharacters(in: .whitespacesAndNewlines)
+                let trimmed = renamingName.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
                 guard !trimmed.isEmpty else { return }
                 p.name = trimmed
                 p.icon = renamingIcon
@@ -443,30 +579,76 @@ struct ProfilesSettingsView: View {
 
     private func showDataManagement(for profile: Profile) {
         // Placeholder: show info dialog
-        let header = AnyView(DialogHeader(icon: "internaldrive", title: "Manage Data", subtitle: "Per‑profile data isolation coming soon"))
+        let header = AnyView(
+            DialogHeader(
+                icon: "internaldrive",
+                title: "Manage Data",
+                subtitle: "Per‑profile data isolation coming soon"
+            )
+        )
         let content = VStack(alignment: .leading, spacing: 12) {
             Text("Currently, profiles share a single website data store.")
             Text("Privacy tools are available under the Privacy tab.")
                 .foregroundStyle(.secondary)
         }
-        let footer = AnyView(DialogFooter(rightButtons: [
-            DialogButton(text: "Close", variant: .primary) { browserManager.dialogManager.closeDialog() }
-        ]))
-        browserManager.dialogManager.showCustomContentDialog(header: header, content: AnyView(content), footer: footer)
+        let footer = AnyView(
+            DialogFooter(rightButtons: [
+                DialogButton(text: "Close", variant: .primary) {
+                    browserManager.dialogManager.closeDialog()
+                }
+            ])
+        )
+        browserManager.dialogManager.showCustomContentDialog(
+            header: header,
+            content: AnyView(content),
+            footer: footer
+        )
     }
 
     private func showExportPlaceholder() {
-        let header = AnyView(DialogHeader(icon: "square.and.arrow.up", title: "Export Profile", subtitle: "Coming soon"))
+        let header = AnyView(
+            DialogHeader(
+                icon: "square.and.arrow.up",
+                title: "Export Profile",
+                subtitle: "Coming soon"
+            )
+        )
         let body = AnyView(Text("Profile export is not yet implemented."))
-        let footer = AnyView(DialogFooter(rightButtons: [DialogButton(text: "OK", variant: .primary) { browserManager.dialogManager.closeDialog() }]))
-        browserManager.dialogManager.showCustomContentDialog(header: header, content: body, footer: footer)
+        let footer = AnyView(
+            DialogFooter(rightButtons: [
+                DialogButton(text: "OK", variant: .primary) {
+                    browserManager.dialogManager.closeDialog()
+                }
+            ])
+        )
+        browserManager.dialogManager.showCustomContentDialog(
+            header: header,
+            content: body,
+            footer: footer
+        )
     }
 
     private func showImportPlaceholder() {
-        let header = AnyView(DialogHeader(icon: "square.and.arrow.down", title: "Import Profile", subtitle: "Coming soon"))
+        let header = AnyView(
+            DialogHeader(
+                icon: "square.and.arrow.down",
+                title: "Import Profile",
+                subtitle: "Coming soon"
+            )
+        )
         let body = AnyView(Text("Profile import is not yet implemented."))
-        let footer = AnyView(DialogFooter(rightButtons: [DialogButton(text: "OK", variant: .primary) { browserManager.dialogManager.closeDialog() }]))
-        browserManager.dialogManager.showCustomContentDialog(header: header, content: body, footer: footer)
+        let footer = AnyView(
+            DialogFooter(rightButtons: [
+                DialogButton(text: "OK", variant: .primary) {
+                    browserManager.dialogManager.closeDialog()
+                }
+            ])
+        )
+        browserManager.dialogManager.showCustomContentDialog(
+            header: header,
+            content: body,
+            footer: footer
+        )
     }
 
     // MARK: - Space assignment helpers and views
@@ -482,22 +664,50 @@ struct ProfilesSettingsView: View {
     }
 
     private func resetAllSpaceAssignments() {
-        guard let defaultProfileId = browserManager.profileManager.profiles.first?.id else { return }
+        guard
+            let defaultProfileId = browserManager.profileManager.profiles.first?
+                .id
+        else { return }
         for sp in browserManager.tabManager.spaces {
-            browserManager.tabManager.assign(spaceId: sp.id, toProfile: defaultProfileId)
+            browserManager.tabManager.assign(
+                spaceId: sp.id,
+                toProfile: defaultProfileId
+            )
         }
     }
 
     private func showAutoAssignPlaceholder() {
-        let header = AnyView(DialogHeader(icon: "sparkles", title: "Auto-assign by Usage", subtitle: "Coming soon"))
-        let body = AnyView(Text("Automatic assignment based on recent tab activity will be available in a future update."))
-        let footer = AnyView(DialogFooter(rightButtons: [DialogButton(text: "OK", variant: .primary) { browserManager.dialogManager.closeDialog() }]))
-        browserManager.dialogManager.showCustomContentDialog(header: header, content: body, footer: footer)
+        let header = AnyView(
+            DialogHeader(
+                icon: "sparkles",
+                title: "Auto-assign by Usage",
+                subtitle: "Coming soon"
+            )
+        )
+        let body = AnyView(
+            Text(
+                "Automatic assignment based on recent tab activity will be available in a future update."
+            )
+        )
+        let footer = AnyView(
+            DialogFooter(rightButtons: [
+                DialogButton(text: "OK", variant: .primary) {
+                    browserManager.dialogManager.closeDialog()
+                }
+            ])
+        )
+        browserManager.dialogManager.showCustomContentDialog(
+            header: header,
+            content: body,
+            footer: footer
+        )
     }
 
     private func resolvedProfile(for id: UUID?) -> Profile? {
         guard let id else { return nil }
-        return browserManager.profileManager.profiles.first(where: { $0.id == id })
+        return browserManager.profileManager.profiles.first(where: {
+            $0.id == id
+        })
     }
 
     private struct SpaceAssignmentRowView: View {
@@ -541,7 +751,10 @@ struct ProfilesSettingsView: View {
                     Button {
                         assign(space: space, to: current.id)
                     } label: {
-                        Label("Assign to \(current.name)", systemImage: "checkmark.circle")
+                        Label(
+                            "Assign to \(current.name)",
+                            systemImage: "checkmark.circle"
+                        )
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
@@ -551,14 +764,21 @@ struct ProfilesSettingsView: View {
                 Menu {
                     // Use compact picker inside menu
                     let binding = Binding<UUID>(
-                        get: { space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID() },
+                        get: {
+                            space.profileId ?? browserManager.profileManager
+                                .profiles.first?.id ?? UUID()
+                        },
                         set: { newId in assign(space: space, to: newId) }
                     )
                     Text("Current: \(currentProfileName)")
                         .foregroundStyle(.secondary)
                     Divider()
-                    ProfilePickerView(selectedProfileId: binding, onSelect: { _ in }, compact: true)
-                        .environmentObject(browserManager)
+                    ProfilePickerView(
+                        selectedProfileId: binding,
+                        onSelect: { _ in },
+                        compact: true
+                    )
+                    .environmentObject(browserManager)
                 } label: {
                     Label("Change", systemImage: "person.crop.circle")
                         .labelStyle(.titleAndIcon)
@@ -572,11 +792,15 @@ struct ProfilesSettingsView: View {
 
         private var currentProfileName: String {
             if let pid = space.profileId,
-               let p = browserManager.profileManager.profiles.first(where: { $0.id == pid }) {
+                let p = browserManager.profileManager.profiles.first(where: {
+                    $0.id == pid
+                })
+            {
                 return p.name
             }
             // If no profile assigned, show the default profile name
-            return browserManager.profileManager.profiles.first?.name ?? "Default"
+            return browserManager.profileManager.profiles.first?.name
+                ?? "Default"
         }
 
         private func assign(space: Space, to id: UUID) {
@@ -585,9 +809,9 @@ struct ProfilesSettingsView: View {
 
         private func isEmoji(_ string: String) -> Bool {
             return string.unicodeScalars.contains { scalar in
-                (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF) ||
-                (scalar.value >= 0x2600 && scalar.value <= 0x26FF) ||
-                (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
+                (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF)
+                    || (scalar.value >= 0x2600 && scalar.value <= 0x26FF)
+                    || (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
             }
         }
     }
@@ -609,7 +833,8 @@ private struct MigrationControls: View {
             HStack(spacing: 8) {
                 Button(action: {
                     Task { @MainActor in
-                        let summary = await browserManager.detectLegacySharedData()
+                        let summary =
+                            await browserManager.detectLegacySharedData()
                         legacySummary = summary
                         lastDetectionDate = Date()
                     }
@@ -622,7 +847,10 @@ private struct MigrationControls: View {
                 Button(action: {
                     browserManager.startMigrationToCurrentProfile()
                 }) {
-                    Label("Migrate to Current Profile", systemImage: "arrow.down.to.line")
+                    Label(
+                        "Migrate to Current Profile",
+                        systemImage: "arrow.down.to.line"
+                    )
                 }
                 .buttonStyle(.bordered)
                 .disabled(browserManager.isMigrationInProgress == true)
@@ -638,34 +866,49 @@ private struct MigrationControls: View {
                 }
                 .buttonStyle(.bordered)
                 .tint(.red)
-                .accessibilityLabel("Clear shared website data without migration")
+                .accessibilityLabel(
+                    "Clear shared website data without migration"
+                )
 
                 Spacer()
             }
 
             if let summary = legacySummary {
                 HStack(spacing: 8) {
-                    Image(systemName: summary.hasAny ? "exclamationmark.circle" : "checkmark.circle")
-                        .foregroundStyle(summary.hasAny ? .orange : .green)
-                    Text(summary.hasAny ? "Legacy data detected — \(summary.estimatedDescription)" : "No legacy shared data found")
-                        .font(.subheadline)
+                    Image(
+                        systemName: summary.hasAny
+                            ? "exclamationmark.circle" : "checkmark.circle"
+                    )
+                    .foregroundStyle(summary.hasAny ? .orange : .green)
+                    Text(
+                        summary.hasAny
+                            ? "Legacy data detected — \(summary.estimatedDescription)"
+                            : "No legacy shared data found"
+                    )
+                    .font(.subheadline)
                     if let dt = lastDetectionDate {
-                        Text("• \(DateFormatter.localizedString(from: dt, dateStyle: .none, timeStyle: .short))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        Text(
+                            "• \(DateFormatter.localizedString(from: dt, dateStyle: .none, timeStyle: .short))"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
                 }
             } else {
                 HStack(spacing: 8) {
                     Image(systemName: "info.circle")
                         .foregroundStyle(.secondary)
-                    Text("Scan for cookies and site data in the shared store and migrate them into \(browserManager.currentProfile?.name ?? "current profile").")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text(
+                        "Scan for cookies and site data in the shared store and migrate them into \(browserManager.currentProfile?.name ?? "current profile")."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
             }
 
-            if browserManager.isMigrationInProgress, let mp = browserManager.migrationProgress {
+            if browserManager.isMigrationInProgress,
+                let mp = browserManager.migrationProgress
+            {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text(mp.currentStep)
@@ -686,7 +929,10 @@ private struct MigrationControls: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .confirmationDialog("Cancel migration?", isPresented: $showingCancelConfirm) {
+                .confirmationDialog(
+                    "Cancel migration?",
+                    isPresented: $showingCancelConfirm
+                ) {
                     Button("Cancel Migration", role: .destructive) {
                         browserManager.migrationTask?.cancel()
                         browserManager.isMigrationInProgress = false
@@ -705,25 +951,67 @@ private struct MigrationControls: View {
                     // Reuse existing placeholders for now
                     // showExportPlaceholder() is defined in parent view; keep UI consistent
                     // For now, present a minimal dialog here
-                    let header = AnyView(DialogHeader(icon: "square.and.arrow.up", title: "Export Profile", subtitle: browserManager.currentProfile?.name ?? ""))
-                    let body = AnyView(Text("Export is not implemented yet.").font(.body))
-                    let footer = AnyView(DialogFooter(rightButtons: [DialogButton(text: "OK", variant: .primary) { browserManager.dialogManager.closeDialog() }]))
-                    browserManager.dialogManager.showCustomContentDialog(header: header, content: body, footer: footer)
+                    let header = AnyView(
+                        DialogHeader(
+                            icon: "square.and.arrow.up",
+                            title: "Export Profile",
+                            subtitle: browserManager.currentProfile?.name ?? ""
+                        )
+                    )
+                    let body = AnyView(
+                        Text("Export is not implemented yet.").font(.body)
+                    )
+                    let footer = AnyView(
+                        DialogFooter(rightButtons: [
+                            DialogButton(text: "OK", variant: .primary) {
+                                browserManager.dialogManager.closeDialog()
+                            }
+                        ])
+                    )
+                    browserManager.dialogManager.showCustomContentDialog(
+                        header: header,
+                        content: body,
+                        footer: footer
+                    )
                 }) {
-                    Label("Export Current Profile", systemImage: "square.and.arrow.up")
+                    Label(
+                        "Export Current Profile",
+                        systemImage: "square.and.arrow.up"
+                    )
                 }
                 .buttonStyle(.bordered)
-                
+
                 Button(action: {
-                    let header = AnyView(DialogHeader(icon: "square.and.arrow.down", title: "Import Profile", subtitle: browserManager.currentProfile?.name ?? ""))
-                    let body = AnyView(Text("Import is not implemented yet.").font(.body))
-                    let footer = AnyView(DialogFooter(rightButtons: [DialogButton(text: "OK", variant: .primary) { browserManager.dialogManager.closeDialog() }]))
-                    browserManager.dialogManager.showCustomContentDialog(header: header, content: body, footer: footer)
+                    let header = AnyView(
+                        DialogHeader(
+                            icon: "square.and.arrow.down",
+                            title: "Import Profile",
+                            subtitle: browserManager.currentProfile?.name ?? ""
+                        )
+                    )
+                    let body = AnyView(
+                        Text("Import is not implemented yet.").font(.body)
+                    )
+                    let footer = AnyView(
+                        DialogFooter(rightButtons: [
+                            DialogButton(text: "OK", variant: .primary) {
+                                browserManager.dialogManager.closeDialog()
+                            }
+                        ])
+                    )
+                    browserManager.dialogManager.showCustomContentDialog(
+                        header: header,
+                        content: body,
+                        footer: footer
+                    )
                 }) {
-                    Label("Import Into Current", systemImage: "square.and.arrow.down")
+                    Label(
+                        "Import Into Current",
+                        systemImage: "square.and.arrow.down"
+                    )
                 }
                 .buttonStyle(.bordered)
-                
+
                 Spacer()
             }
         }
@@ -732,14 +1020,18 @@ private struct MigrationControls: View {
 
 struct ShortcutsSettingsView: View {
     var body: some View {
-        SettingsPlaceholderView(title: "Shortcuts", subtitle: "Keyboard and quick actions", icon: "keyboard")
+        SettingsPlaceholderView(
+            title: "Shortcuts",
+            subtitle: "Keyboard and quick actions",
+            icon: "keyboard"
+        )
     }
 }
 
 struct ExtensionsSettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @State private var showingInstallDialog = false
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             if #available(macOS 15.5, *) {
@@ -754,9 +1046,9 @@ struct ExtensionsSettingsView: View {
                         }
                         .buttonStyle(.borderedProminent)
                     }
-                    
+
                     Divider()
-                    
+
                     if extensionManager.installedExtensions.isEmpty {
                         VStack(spacing: 12) {
                             Image(systemName: "puzzlepiece.extension")
@@ -765,15 +1057,20 @@ struct ExtensionsSettingsView: View {
                             Text("No Extensions Installed")
                                 .font(.title2)
                                 .fontWeight(.medium)
-                            Text("Install browser extensions to enhance your browsing experience")
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
+                            Text(
+                                "Install browser extensions to enhance your browsing experience"
+                            )
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         ScrollView {
                             LazyVStack(spacing: 12) {
-                                ForEach(extensionManager.installedExtensions, id: \.id) { ext in
+                                ForEach(
+                                    extensionManager.installedExtensions,
+                                    id: \.id
+                                ) { ext in
                                     ExtensionRowView(extension: ext)
                                         .environmentObject(browserManager)
                                 }
@@ -817,13 +1114,14 @@ struct ExtensionsSettingsView: View {
 struct ExtensionRowView: View {
     let `extension`: InstalledExtension
     @EnvironmentObject var browserManager: BrowserManager
-    
+
     var body: some View {
         HStack(spacing: 12) {
             // Extension icon
             Group {
                 if let iconPath = `extension`.iconPath,
-                   let nsImage = NSImage(contentsOfFile: iconPath) {
+                    let nsImage = NSImage(contentsOfFile: iconPath)
+                {
                     Image(nsImage: nsImage)
                         .resizable()
                 } else {
@@ -834,18 +1132,18 @@ struct ExtensionRowView: View {
             .frame(width: 32, height: 32)
             .background(Color(.controlBackgroundColor))
             .clipShape(RoundedRectangle(cornerRadius: 6))
-            
+
             // Extension info
             VStack(alignment: .leading, spacing: 2) {
                 Text(`extension`.name)
                     .font(.headline)
                     .lineLimit(1)
-                
+
                 HStack(spacing: 8) {
                     Text("v\(`extension`.version)")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    
+
                     if let description = `extension`.description {
                         Text("•")
                             .font(.caption)
@@ -857,23 +1155,26 @@ struct ExtensionRowView: View {
                     }
                 }
             }
-            
+
             Spacer()
-            
+
             // Controls
             HStack(spacing: 8) {
-                Toggle("", isOn: Binding(
-                    get: { `extension`.isEnabled },
-                    set: { isEnabled in
-                        if isEnabled {
-                            browserManager.enableExtension(`extension`.id)
-                        } else {
-                            browserManager.disableExtension(`extension`.id)
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { `extension`.isEnabled },
+                        set: { isEnabled in
+                            if isEnabled {
+                                browserManager.enableExtension(`extension`.id)
+                            } else {
+                                browserManager.disableExtension(`extension`.id)
+                            }
                         }
-                    }
-                ))
+                    )
+                )
                 .toggleStyle(.switch)
-                
+
                 Button("Remove") {
                     browserManager.uninstallExtension(`extension`.id)
                 }
@@ -889,27 +1190,35 @@ struct ExtensionRowView: View {
 
 struct AdvancedSettingsView: View {
     var body: some View {
-        SettingsPlaceholderView(title: "Advanced", subtitle: "Power features and diagnostics", icon: "wrench.and.screwdriver")
+        SettingsPlaceholderView(
+            title: "Advanced",
+            subtitle: "Power features and diagnostics",
+            icon: "wrench.and.screwdriver"
+        )
     }
 }
 
 // MARK: - Helper Functions
 private let unloadTimeoutOptions: [TimeInterval] = [
-    300,    // 5 min
-    600,    // 10 min
-    900,    // 15 min
-    1800,   // 30 min
-    2700,   // 45 min
-    3600,   // 1 hr
-    7200,   // 2 hr
+    300,  // 5 min
+    600,  // 10 min
+    900,  // 15 min
+    1800,  // 30 min
+    2700,  // 45 min
+    3600,  // 1 hr
+    7200,  // 2 hr
     14400,  // 4 hr
     28800,  // 8 hr
     43200,  // 12 hr
-    86400   // 24 hr
+    86400,  // 24 hr
 ]
 
 private func nearestTimeoutOption(to value: TimeInterval) -> TimeInterval {
-    guard let nearest = unloadTimeoutOptions.min(by: { abs($0 - value) < abs($1 - value) }) else {
+    guard
+        let nearest = unloadTimeoutOptions.min(by: {
+            abs($0 - value) < abs($1 - value)
+        })
+    else {
         return value
     }
     return nearest
@@ -921,7 +1230,11 @@ struct SettingsSectionCard<Content: View>: View {
     var subtitle: String? = nil
     @ViewBuilder var content: Content
 
-    init(title: String, subtitle: String? = nil, @ViewBuilder content: () -> Content) {
+    init(
+        title: String,
+        subtitle: String? = nil,
+        @ViewBuilder content: () -> Content
+    ) {
         self.title = title
         self.subtitle = subtitle
         self.content = content()
@@ -931,7 +1244,9 @@ struct SettingsSectionCard<Content: View>: View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.headline)
-                if let subtitle { Text(subtitle).font(.caption).foregroundStyle(.secondary) }
+                if let subtitle {
+                    Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                }
             }
             content
         }
@@ -960,9 +1275,11 @@ struct SettingsHeroCard: View {
                         RoundedRectangle(cornerRadius: 16)
                             .strokeBorder(Color.primary.opacity(0.08))
                     )
-                BarycentricGradientView(gradient: gradientColorManager.displayGradient)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .padding(12)
+                BarycentricGradientView(
+                    gradient: gradientColorManager.displayGradient
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(12)
             }
             .frame(height: 220)
 
@@ -1029,10 +1346,10 @@ struct SettingsPlaceholderView: View {
 }
 
 private func formatTimeout(_ seconds: TimeInterval) -> String {
-    if seconds < 3600 { // under 1 hour
+    if seconds < 3600 {  // under 1 hour
         let minutes = Int(seconds / 60)
         return minutes == 1 ? "1 min" : "\(minutes) mins"
-    } else if seconds < 86400 { // under 24 hours
+    } else if seconds < 86400 {  // under 24 hours
         let hours = seconds / 3600.0
         let rounded = hours.rounded()
         let isWhole = abs(hours - rounded) < 0.01
