@@ -59,10 +59,8 @@ struct URLBarView: View {
         }
         .frame(maxWidth: .infinity, minHeight: 36, maxHeight: 36)
         .background(
-            ZStack {
-                BlurEffectView(material: browserManager.settingsManager.currentMaterial, state: .active)
-                (isHovering ? AppColors.controlBackgroundHover : AppColors.inactiveTab)
-            }
+                (isHovering ? AppColors.inactiveTab : AppColors.hoverTab)
+            
         )
         .clipShape(RoundedRectangle(cornerRadius: 12))
         // Report the frame in the window space so we can overlay the mini palette above all content

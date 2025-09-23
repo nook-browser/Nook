@@ -122,13 +122,7 @@ struct SidebarView: View {
             }
 
             // MARK: - Bottom
-            ZStack {
-                // Left side icons - anchored to left
                 HStack {
-                    NavButton(iconName: "square.and.arrow.down") {
-                        print("Downloads button pressed")
-                    }
-
                     NavButton(iconName: "clock") {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             showHistory.toggle()
@@ -136,22 +130,17 @@ struct SidebarView: View {
                     }
 
                     Spacer()
-                }
-
-                // Center content - space indicators or history text
-                if !showHistory {
-                    SpacesList()
-                        .environmentObject(windowState)
-                } else {
-                    Text("History")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
-                }
-
-                // Right side icons - anchored to right
-                HStack {
+                    
+                    if !showHistory {
+                        SpacesList()
+                            .environmentObject(windowState)
+                    } else {
+                        Text("History")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.secondary)
+                    }
                     Spacer()
-
+                    
                     if !showHistory {
                         NavButton(iconName: "plus") {
                             showSpaceCreationDialog()
@@ -163,9 +152,10 @@ struct SidebarView: View {
                             }
                         }
                     }
+                    
                 }
-            }
-            .padding(.horizontal, 8)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 4)
         }
         .padding(.top, 8)
         .frame(width: effectiveWidth)

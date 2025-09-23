@@ -49,7 +49,7 @@ struct SpaceView: View {
             VStack(spacing: 0) {
                 // Space-level pinned tabs FIRST
                 if !spacePinnedTabs.isEmpty {
-                    VStack(spacing: 2) {
+                    VStack(spacing: 5) {
                         ForEach(spacePinnedTabs, id: \.id) { tab in
                             SpaceTab(
                                 tab: tab,
@@ -121,7 +121,7 @@ struct SpaceView: View {
                 ScrollView {
                     VStack(spacing: 2) {
                         if !tabs.isEmpty {
-                            VStack(spacing: 2) {
+                            VStack(spacing: 5) {
                                 // Snapshot current regular tabs to keep indices stable during render
                                 let currentTabs = tabs
                                 let split = splitManager
