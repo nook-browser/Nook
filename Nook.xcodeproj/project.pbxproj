@@ -68,7 +68,6 @@
 		2CC067602E789ECB001D37C6 /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066C72E789ECB001D37C6 /* Utils.swift */; };
 		2CC067612E789ECB001D37C6 /* syn-att.c in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066F72E789ECB001D37C6 /* syn-att.c */; };
 		2CC067622E789ECB001D37C6 /* HistoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066BE2E789ECB001D37C6 /* HistoryManager.swift */; };
-		2CC067632E789ECB001D37C6 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066922E789ECB001D37C6 /* HistoryView.swift */; };
 		2CC067642E789ECB001D37C6 /* WindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066442E789ECB001D37C6 /* WindowView.swift */; };
 		2CC067652E789ECB001D37C6 /* mach_override.c in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066FF2E789ECB001D37C6 /* mach_override.c */; };
 		2CC067662E789ECB001D37C6 /* SidebarResizeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC066952E789ECB001D37C6 /* SidebarResizeView.swift */; };
@@ -175,6 +174,12 @@
 		2CC067CC2E789ECB001D37C6 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 2CC067062E789ECB001D37C6 /* README.md */; };
 		552E742C758115FEBA7189D8 /* AuthenticationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA35A0AE48F7A45FAD44575D /* AuthenticationManager.swift */; };
 		7FAFC5DA2E3ADDCD009D7DC4 /* FaviconFinder in Frameworks */ = {isa = PBXBuildFile; productRef = 7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */; };
+		7FFFC77A2E83235C00CAD45B /* SidebarMenuTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FFFC7792E83235800CAD45B /* SidebarMenuTab.swift */; };
+		7FFFC77C2E83237800CAD45B /* SidebarMenuDownloadsHover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FFFC77B2E83237000CAD45B /* SidebarMenuDownloadsHover.swift */; };
+		7FFFC77E2E83239B00CAD45B /* SidebarMenuHistoryTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FFFC77D2E83239900CAD45B /* SidebarMenuHistoryTab.swift */; };
+		7FFFC7802E8323C500CAD45B /* SidebarMenuDownloadsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FFFC77F2E8323C400CAD45B /* SidebarMenuDownloadsTab.swift */; };
+		7FFFC7822E8323CF00CAD45B /* SidebarMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FFFC7812E8323CE00CAD45B /* SidebarMenu.swift */; };
+		7FFFC7852E8323E700CAD45B /* DownloadIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FFFC7842E8323E300CAD45B /* DownloadIndicator.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -363,6 +368,12 @@
 		2CC067282E789ECB001D37C6 /* NookApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NookApp.swift; sourceTree = "<group>"; };
 		2CC067CD2E78A6CF001D37C6 /* Nook-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Nook-Bridging-Header.h"; sourceTree = "<group>"; };
 		7F8340FC2E37F39400674A5D /* Nook.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Nook.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7FFFC7792E83235800CAD45B /* SidebarMenuTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarMenuTab.swift; sourceTree = "<group>"; };
+		7FFFC77B2E83237000CAD45B /* SidebarMenuDownloadsHover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarMenuDownloadsHover.swift; sourceTree = "<group>"; };
+		7FFFC77D2E83239900CAD45B /* SidebarMenuHistoryTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarMenuHistoryTab.swift; sourceTree = "<group>"; };
+		7FFFC77F2E8323C400CAD45B /* SidebarMenuDownloadsTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarMenuDownloadsTab.swift; sourceTree = "<group>"; };
+		7FFFC7812E8323CE00CAD45B /* SidebarMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarMenu.swift; sourceTree = "<group>"; };
+		7FFFC7842E8323E300CAD45B /* DownloadIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadIndicator.swift; sourceTree = "<group>"; };
 		EA35A0AE48F7A45FAD44575D /* AuthenticationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -589,11 +600,11 @@
 		2CC066992E789ECB001D37C6 /* Sidebar */ = {
 			isa = PBXGroup;
 			children = (
+				7FFFC7782E83235300CAD45B /* Menu */,
 				2CC066812E789ECB001D37C6 /* NavButtons */,
 				2CC066862E789ECB001D37C6 /* PinnedButtons */,
 				2CC066902E789ECB001D37C6 /* SpaceSection */,
 				2CC066912E789ECB001D37C6 /* FallbackDropBelowEssentialsModifier.swift */,
-				2CC066922E789ECB001D37C6 /* HistoryView.swift */,
 				2CC066932E789ECB001D37C6 /* NewTabButton.swift */,
 				2CC066942E789ECB001D37C6 /* SidebarHoverOverlayView.swift */,
 				2CC066952E789ECB001D37C6 /* SidebarResizeView.swift */,
@@ -1081,6 +1092,19 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		7FFFC7782E83235300CAD45B /* Menu */ = {
+			isa = PBXGroup;
+			children = (
+				7FFFC7842E8323E300CAD45B /* DownloadIndicator.swift */,
+				7FFFC7812E8323CE00CAD45B /* SidebarMenu.swift */,
+				7FFFC77F2E8323C400CAD45B /* SidebarMenuDownloadsTab.swift */,
+				7FFFC77D2E83239900CAD45B /* SidebarMenuHistoryTab.swift */,
+				7FFFC77B2E83237000CAD45B /* SidebarMenuDownloadsHover.swift */,
+				7FFFC7792E83235800CAD45B /* SidebarMenuTab.swift */,
+			);
+			path = Menu;
+			sourceTree = "<group>";
+		};
 		ABEA23CF0A4FC830442A31E3 /* AuthenticationManager */ = {
 			isa = PBXGroup;
 			children = (
@@ -1205,6 +1229,7 @@
 				2CC067492E789ECB001D37C6 /* MiniWindowButtonStyle.swift in Sources */,
 				2CC0674A2E789ECB001D37C6 /* MethodSwizzler.m in Sources */,
 				2CC0674B2E789ECB001D37C6 /* TabCollectionView.swift in Sources */,
+				7FFFC7802E8323C500CAD45B /* SidebarMenuDownloadsTab.swift in Sources */,
 				2CC0674C2E789ECB001D37C6 /* ControlButtons.swift in Sources */,
 				2CC0674D2E789ECB001D37C6 /* syn-intel.c in Sources */,
 				2CC0674E2E789ECB001D37C6 /* EssentialsGridLayout.swift in Sources */,
@@ -1219,6 +1244,7 @@
 				2CC067572E789ECB001D37C6 /* PersistentPopover.swift in Sources */,
 				2CC067582E789ECB001D37C6 /* TrackingProtectionManager.swift in Sources */,
 				2CC067592E789ECB001D37C6 /* BrowserConfig.swift in Sources */,
+				7FFFC7852E8323E700CAD45B /* DownloadIndicator.swift in Sources */,
 				2CC0675A2E789ECB001D37C6 /* SpaceGradientBackgroundView.swift in Sources */,
 				2CC0675B2E789ECB001D37C6 /* input.c in Sources */,
 				2CC0675C2E789ECB001D37C6 /* ProfileCreationDialog.swift in Sources */,
@@ -1228,7 +1254,6 @@
 				2CC067602E789ECB001D37C6 /* Utils.swift in Sources */,
 				2CC067612E789ECB001D37C6 /* syn-att.c in Sources */,
 				2CC067622E789ECB001D37C6 /* HistoryManager.swift in Sources */,
-				2CC067632E789ECB001D37C6 /* HistoryView.swift in Sources */,
 				2CC067642E789ECB001D37C6 /* WindowView.swift in Sources */,
 				2CC067652E789ECB001D37C6 /* mach_override.c in Sources */,
 				2CC067662E789ECB001D37C6 /* SidebarResizeView.swift in Sources */,
@@ -1238,6 +1263,7 @@
 				2CC067692E789ECB001D37C6 /* TabCollectionView_Previews.swift in Sources */,
 				2CC0676A2E789ECB001D37C6 /* TabListAdapter.swift in Sources */,
 				2CC0676B2E789ECB001D37C6 /* NewDocumentTarget.swift in Sources */,
+				7FFFC77E2E83239B00CAD45B /* SidebarMenuHistoryTab.swift in Sources */,
 				2C0516632E7B44990038ADBE /* FindBarView.swift in Sources */,
 				552E742C758115FEBA7189D8 /* AuthenticationManager.swift in Sources */,
 				2CC0676C2E789ECB001D37C6 /* MiniBrowserWindowView.swift in Sources */,
@@ -1284,6 +1310,7 @@
 				2CC067942E789ECB001D37C6 /* ExtensionActionView.swift in Sources */,
 				2CC067952E789ECB001D37C6 /* MuteableWKWebView.m in Sources */,
 				2CC067962E789ECB001D37C6 /* NavButtonsView.swift in Sources */,
+				7FFFC77A2E83235C00CAD45B /* SidebarMenuTab.swift in Sources */,
 				2C0516672E7B6C750038ADBE /* BasicAuthDialog.swift in Sources */,
 				2CC067972E789ECB001D37C6 /* HTSymbolHook.m in Sources */,
 				2CC067982E789ECB001D37C6 /* TabManager.swift in Sources */,
@@ -1299,11 +1326,13 @@
 				2CC067A22E789ECB001D37C6 /* GrainSlider.swift in Sources */,
 				2CC067A32E789ECB001D37C6 /* PinnedGrid.swift in Sources */,
 				2CC067A42E789ECB001D37C6 /* SettingsUtils.swift in Sources */,
+				7FFFC77C2E83237800CAD45B /* SidebarMenuDownloadsHover.swift in Sources */,
 				2CC067A52E789ECB001D37C6 /* CookieManagementView.swift in Sources */,
 				2CC067A62E789ECB001D37C6 /* ProfileRenameDialog.swift in Sources */,
 				2CC067A72E789ECB001D37C6 /* SplitViewManager.swift in Sources */,
 				2CC067A82E789ECB001D37C6 /* SpaceProfileBadge.swift in Sources */,
 				2CC067A92E789ECB001D37C6 /* CommandPaletteSuggestionView.swift in Sources */,
+				7FFFC7822E8323CF00CAD45B /* SidebarMenu.swift in Sources */,
 				2CC067AA2E789ECB001D37C6 /* GradientNode.swift in Sources */,
 				2CC067AB2E789ECB001D37C6 /* GradientColorManager.swift in Sources */,
 				2CC067AC2E789ECB001D37C6 /* SplitTabRow.swift in Sources */,
@@ -1470,7 +1499,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 9DLM793N9T;
+				DEVELOPMENT_TEAM = 96M8ZZRJK6;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -1514,7 +1543,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 9DLM793N9T;
+				DEVELOPMENT_TEAM = 96M8ZZRJK6;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;

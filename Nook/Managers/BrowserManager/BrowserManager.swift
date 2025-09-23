@@ -323,6 +323,7 @@ class BrowserManager: ObservableObject {
     @Published var migrationProgress: MigrationProgress?
     @Published var isMigrationInProgress: Bool = false
     
+    
     // MARK: - Window State Management
     /// Registry of all active window states
     var windowStates: [UUID: BrowserWindowState] = [:]

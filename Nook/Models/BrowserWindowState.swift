@@ -37,6 +37,9 @@ class BrowserWindowState: ObservableObject {
     /// Whether the sidebar is visible in this window
     var isSidebarVisible: Bool = true
     
+    /// Whether the sidebar menu is visible in this window
+    var isSidebarMenuVisible: Bool = false
+    
     /// Whether the command palette is visible in this window
     var isCommandPaletteVisible: Bool = false
     

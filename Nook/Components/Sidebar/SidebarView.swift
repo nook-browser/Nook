@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 import UniformTypeIdentifiers
 
 struct SidebarView: View {
@@ -14,6 +14,17 @@ struct SidebarView: View {
     @State private var spaceIcon = ""
     @State private var showHistory = false
     @State private var sidebarDraggedItem: UUID? = nil
+
+    // Downloads Menu Hover
+    @State private var isMenuButtonHovered = false
+    @State private var isDownloadsHovered = false
+    @State private var showDownloadsMenu = false
+    @State private var animateDownloadsMenu: Bool = false
+
+    private var shouldShowDownloads: Bool {
+        isMenuButtonHovered || isDownloadsHovered
+    }
+
     // Force rendering even when the real sidebar is collapsed (used by hover overlay)
     var forceVisible: Bool = false
     // Override the width for overlay use; falls back to BrowserManager width
@@ -25,30 +36,35 @@ struct SidebarView: View {
 
     private var targetScrollPosition: Int {
         if let currentSpaceId = windowState.currentSpaceId,
-           let index = browserManager.tabManager.spaces.firstIndex(where: { $0.id == currentSpaceId }) {
+            let index = browserManager.tabManager.spaces.firstIndex(where: {
+                $0.id == currentSpaceId
+            })
+        {
             return index
         }
         return 0
     }
-    
+
     private var visibleSpaceIndices: [Int] {
         let totalSpaces = browserManager.tabManager.spaces.count
-        
+
         guard totalSpaces > 0 else { return [] }
-        
+
         // Ensure activeSpaceIndex is within bounds
         let safeActiveIndex = min(max(activeSpaceIndex, 0), totalSpaces - 1)
-        
+
         // If the activeSpaceIndex is out of bounds, update it
         if activeSpaceIndex != safeActiveIndex {
-            print("⚠️ activeSpaceIndex out of bounds: \(activeSpaceIndex), correcting to: \(safeActiveIndex)")
+            print(
+                "⚠️ activeSpaceIndex out of bounds: \(activeSpaceIndex), correcting to: \(safeActiveIndex)"
+            )
             DispatchQueue.main.async {
                 self.activeSpaceIndex = safeActiveIndex
             }
         }
-        
+
         var indices: [Int] = []
-        
+
         if safeActiveIndex == 0 {
             // First space: show [0, 1]
             indices.append(0)
@@ -65,23 +81,41 @@ struct SidebarView: View {
             indices.append(safeActiveIndex)
             indices.append(safeActiveIndex + 1)
         }
-        
-        print("🔍 visibleSpaceIndices - activeSpaceIndex: \(activeSpaceIndex), safeIndex: \(safeActiveIndex), totalSpaces: \(totalSpaces), result: \(indices)")
+
+        print(
+            "🔍 visibleSpaceIndices - activeSpaceIndex: \(activeSpaceIndex), safeIndex: \(safeActiveIndex), totalSpaces: \(totalSpaces), result: \(indices)"
+        )
         return indices
     }
-    
+
+    private func hideMenuAfterDelay() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            if !isMenuButtonHovered, !isDownloadsHovered {
+                animateDownloadsMenu = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    showDownloadsMenu = false
+                }
+            }
+        }
+    }
 
     var body: some View {
         if windowState.isSidebarVisible || forceVisible {
             sidebarContent
         }
     }
-    
-    private var sidebarContent: some View {
-        let effectiveProfileId = windowState.currentProfileId ?? browserManager.currentProfile?.id
-        let essentialsCount = effectiveProfileId.map { browserManager.tabManager.essentialTabs(for: $0).count } ?? 0
 
-        let shouldAnimate = (browserManager.activeWindowState?.id == windowState.id) && !browserManager.isTransitioningProfile
+    private var sidebarContent: some View {
+        let effectiveProfileId =
+            windowState.currentProfileId ?? browserManager.currentProfile?.id
+        let essentialsCount =
+            effectiveProfileId.map {
+                browserManager.tabManager.essentialTabs(for: $0).count
+            } ?? 0
+
+        let shouldAnimate =
+            (browserManager.activeWindowState?.id == windowState.id)
+            && !browserManager.isTransitioningProfile
 
         let content = VStack(spacing: 8) {
             HStack(spacing: 2) {
@@ -109,78 +143,98 @@ struct SidebarView: View {
                     width: max(0, effectiveWidth - 16),
                     profileId: effectiveProfileId
                 )
-                    .environmentObject(windowState)
+                .environmentObject(windowState)
             }
             .padding(.horizontal, 8)
             .modifier(FallbackDropBelowEssentialsModifier())
-
-            if showHistory {
-                historyView
-                    .padding(.horizontal, 8)
-            } else {
-                spacesScrollView
+            spacesScrollView
+            if showDownloadsMenu {
+                SidebarMenuHoverDownloads(
+                    isVisible: animateDownloadsMenu
+                )
+                .onHover { isHovered in
+                    isDownloadsHovered = isHovered
+                    if isHovered {
+                        showDownloadsMenu = true
+                        animateDownloadsMenu = true
+                    } else {
+                        hideMenuAfterDelay()
+                    }
+                }
             }
 
             // MARK: - Bottom
-                HStack {
-                    NavButton(iconName: "clock") {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showHistory.toggle()
+
+            HStack {
+                ZStack {
+                    NavButton(iconName: "archivebox") {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            windowState.isSidebarMenuVisible = true
+                            windowState.savedSidebarWidth = windowState.sidebarWidth
+                            windowState.sidebarWidth = 400
+                        }
+                    }
+                    .onHover { isHovered in
+                        isMenuButtonHovered = isHovered
+                        if isHovered {
+                            showDownloadsMenu = true
+                            animateDownloadsMenu = true
+                        } else {
+                            hideMenuAfterDelay()
                         }
                     }
 
-                    Spacer()
-                    
-                    if !showHistory {
-                        SpacesList()
-                            .environmentObject(windowState)
-                    } else {
-                        Text("History")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
-                    
-                    if !showHistory {
-                        NavButton(iconName: "plus") {
-                            showSpaceCreationDialog()
-                        }
-                    } else {
-                        NavButton(iconName: "arrow.left") {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                showHistory = false
-                            }
-                        }
-                    }
-                    
+                    DownloadIndicator()
+                        .offset(x: 12, y: -12)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 4)
+
+                Spacer()
+
+                SpacesList()
+                    .environmentObject(windowState)
+
+                Spacer()
+
+                NavButton(iconName: "plus") {
+                    showSpaceCreationDialog()
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
         .padding(.top, 8)
         .frame(width: effectiveWidth)
+        .animation(
+            shouldAnimate ? .easeInOut(duration: 0.18) : nil,
+            value: essentialsCount)
         
-        return content.animation(shouldAnimate ? .easeInOut(duration: 0.18) : nil, value: essentialsCount)
+        let finalContent = ZStack {
+                if !windowState.isSidebarMenuVisible {
+                    content
+                        .transition(.scale.combined(with: .opacity))
+                } else {
+                    SidebarMenu()
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                }
+            }
+            .frame(width: effectiveWidth)
+
+        return finalContent
+        
     }
-    
-    private var historyView: some View {
-        HistoryView()
-            .transition(.asymmetric(
-                insertion: .move(edge: .trailing).combined(with: .opacity),
-                removal: .move(edge: .leading).combined(with: .opacity)
-            ))
-    }
-    
+
     private var spacesScrollView: some View {
         ZStack {
             spacesContent
         }
-        .transition(.asymmetric(
-            insertion: .move(edge: .leading).combined(with: .opacity),
-            removal: .move(edge: .trailing).combined(with: .opacity)
-        ))
+        .transition(
+            .asymmetric(
+                insertion: .move(edge: .leading).combined(with: .opacity),
+                removal: .move(edge: .trailing).combined(with: .opacity)
+            )
+        )
     }
-    
+
     private var spacesContent: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             spacesHStack
@@ -215,13 +269,17 @@ struct SidebarView: View {
             // Initialize to current active space
             activeSpaceIndex = targetScrollPosition
             currentScrollID = targetScrollPosition
-            print("🔄 Initialized activeSpaceIndex: \(activeSpaceIndex), currentScrollID: \(targetScrollPosition)")
+            print(
+                "🔄 Initialized activeSpaceIndex: \(activeSpaceIndex), currentScrollID: \(targetScrollPosition)"
+            )
         }
         .onChange(of: windowState.currentSpaceId) { _, _ in
             // Space was changed programmatically (e.g., clicking bottom icons)
             let newSpaceIndex = targetScrollPosition
             if newSpaceIndex != activeSpaceIndex {
-                print("🎯 Programmatic space change - snapping to space \(newSpaceIndex)")
+                print(
+                    "🎯 Programmatic space change - snapping to space \(newSpaceIndex)"
+                )
                 // Step 1: clear scroll target without animation
                 var t = Transaction()
                 t.disablesAnimations = true
@@ -240,7 +298,9 @@ struct SidebarView: View {
             // Spaces were added or deleted - ensure activeSpaceIndex is valid
             let newSpaceIndex = targetScrollPosition
             if newSpaceIndex != activeSpaceIndex {
-                print("🔄 Spaces count changed to \(newCount) - updating activeSpaceIndex from \(activeSpaceIndex) to \(newSpaceIndex)")
+                print(
+                    "🔄 Spaces count changed to \(newCount) - updating activeSpaceIndex from \(activeSpaceIndex) to \(newSpaceIndex)"
+                )
                 activeSpaceIndex = newSpaceIndex
                 currentScrollID = newSpaceIndex
             }
@@ -258,17 +318,19 @@ struct SidebarView: View {
                 }
             } else if newPhase == .idle && oldPhase != .idle {
                 // Drag just ended - activate the space and update visible window
-                hasTriggeredHaptic = false // Reset haptic flag
+                hasTriggeredHaptic = false  // Reset haptic flag
                 if let newSpaceIndex = currentScrollID {
                     let space = browserManager.tabManager.spaces[newSpaceIndex]
-                    print("🎯 Drag ended - Activating space: \(space.name) (index: \(newSpaceIndex))")
+                    print(
+                        "🎯 Drag ended - Activating space: \(space.name) (index: \(newSpaceIndex))"
+                    )
                     browserManager.setActiveSpace(space, in: windowState)
                     activeSpaceIndex = newSpaceIndex  // Update visible window ONLY on drag end
                 }
             }
         }
     }
-    
+
     private var spacesHStack: some View {
         LazyHStack(spacing: 0) {
             ForEach(visibleSpaceIndices, id: \.self) { spaceIndex in
@@ -278,11 +340,19 @@ struct SidebarView: View {
                         space: space,
                         isActive: windowState.currentSpaceId == space.id,
                         width: effectiveWidth,
-                        onActivateTab: { browserManager.selectTab($0, in: windowState) },
-                        onCloseTab: { browserManager.tabManager.removeTab($0.id) },
+                        onActivateTab: {
+                            browserManager.selectTab($0, in: windowState)
+                        },
+                        onCloseTab: {
+                            browserManager.tabManager.removeTab($0.id)
+                        },
                         onPinTab: { browserManager.tabManager.pinTab($0) },
-                        onMoveTabUp: { browserManager.tabManager.moveTabUp($0.id) },
-                        onMoveTabDown: { browserManager.tabManager.moveTabDown($0.id) },
+                        onMoveTabUp: {
+                            browserManager.tabManager.moveTabUp($0.id)
+                        },
+                        onMoveTabDown: {
+                            browserManager.tabManager.moveTabDown($0.id)
+                        },
                         onMuteTab: { $0.toggleMute() }
                     )
                     .id(space.id)
@@ -294,15 +364,13 @@ struct SidebarView: View {
         }
         .scrollTargetLayout()
     }
-    
-
 
     func scrollToSpace(_ space: Space, proxy: ScrollViewProxy) {
         withAnimation(.easeInOut(duration: 0.25)) {
             proxy.scrollTo(space.id, anchor: .center)
         }
     }
-    
+
     private func showSpaceCreationDialog() {
         let dialog = SpaceCreationDialog(
             spaceName: $spaceName,
@@ -313,14 +381,14 @@ struct SidebarView: View {
                     name: spaceName.isEmpty ? "New Space" : spaceName,
                     icon: spaceIcon.isEmpty ? "✨" : spaceIcon
                 )
-                
+
                 // Reset form
                 spaceName = ""
                 spaceIcon = ""
             },
             onCancel: {
                 browserManager.dialogManager.closeDialog()
-                
+
                 // Reset form
                 spaceName = ""
                 spaceIcon = ""
@@ -329,7 +397,7 @@ struct SidebarView: View {
                 browserManager.dialogManager.closeDialog()
             }
         )
-        
+
         browserManager.dialogManager.showDialog(dialog)
     }
 }
