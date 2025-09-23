@@ -25,7 +25,7 @@ struct RefreshButton: View {
         } label: {
             Image(systemName: "arrow.clockwise")
                 .font(.system(size: 16))
-                .foregroundStyle(disabled ? AppColors.textQuaternary : AppColors.textSecondary)
+                .foregroundStyle(disabled ? AppColors.textQuaternary : .black.opacity(0.55))
                 .padding(4)
                 .symbolEffect(.rotate.clockwise.byLayer, options: .speed(1.5), value: animateFlag)
         }
@@ -34,7 +34,7 @@ struct RefreshButton: View {
         .background(
             RoundedRectangle(cornerRadius: 6)
                 .fill(isHovering && !disabled ? AppColors.controlBackgroundHover : Color.clear)
-                .frame(width: 24, height: 24) // Fixed 20x20 square
+                .frame(width: 32, height: 32)
                 .animation(.easeInOut(duration: 0.15), value: isHovering)
         )
         .onHover { hovering in
