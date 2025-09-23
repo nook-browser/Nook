@@ -148,6 +148,49 @@ struct NookCommands: Commands {
         CommandGroup(replacing: .windowList) {}
         // Use the native Settings menu (no replacement of .appSettings)
         
+        // File Section
+        CommandGroup(after: .newItem) {
+            
+            Button("New Tab") {
+                browserManager.openCommandPalette()
+            }
+            .keyboardShortcut("t", modifiers: .command)
+            Button("New Window") {
+                // Create a new window using SwiftUI's WindowGroup
+                let newWindow = NSWindow(
+                    contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800),
+                    styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                    backing: .buffered,
+                    defer: false
+                )
+                newWindow.contentView = NSHostingView(rootView: ContentView()
+                    .background(BackgroundWindowModifier())
+                    .ignoresSafeArea(.all)
+                    .environmentObject(browserManager))
+                newWindow.title = "Nook"
+                newWindow.center()
+                newWindow.makeKeyAndOrderFront(nil)
+            }
+            .keyboardShortcut("n", modifiers: .command)
+
+            Button("Close Tab") {
+                if browserManager.activeWindowState?.isCommandPaletteVisible == true {
+                    browserManager.closeCommandPalette(for: browserManager.activeWindowState)
+                } else {
+                    browserManager.closeCurrentTab()
+                }
+            }
+            .keyboardShortcut("w", modifiers: .command)
+            .disabled(browserManager.tabManager.tabs.isEmpty)
+            
+            Button("Copy Current URL") {
+                browserManager.copyCurrentURL()
+            }
+            .keyboardShortcut("c", modifiers: [.command, .shift])
+            .disabled(browserManager.currentTabForActiveWindow() == nil)
+
+        }
+        
         // Sidebar commands
         CommandGroup(after: .sidebar) {
             Button("Toggle Sidebar") {
@@ -211,49 +254,6 @@ struct NookCommands: Commands {
             .keyboardShortcut("m", modifiers: .command)
             .disabled(browserManager.currentTabForActiveWindow() == nil ||
                      !browserManager.currentTabHasAudioContent())
-        }
-
-        // File Section
-        CommandMenu("File") {
-            
-            Button("New Tab") {
-                browserManager.openCommandPalette()
-            }
-            .keyboardShortcut("t", modifiers: .command)
-            Button("New Window") {
-                // Create a new window using SwiftUI's WindowGroup
-                let newWindow = NSWindow(
-                    contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800),
-                    styleMask: [.titled, .closable, .miniaturizable, .resizable],
-                    backing: .buffered,
-                    defer: false
-                )
-                newWindow.contentView = NSHostingView(rootView: ContentView()
-                    .background(BackgroundWindowModifier())
-                    .ignoresSafeArea(.all)
-                    .environmentObject(browserManager))
-                newWindow.title = "Nook"
-                newWindow.center()
-                newWindow.makeKeyAndOrderFront(nil)
-            }
-            .keyboardShortcut("n", modifiers: .command)
-
-            Button("Close Tab") {
-                if browserManager.activeWindowState?.isCommandPaletteVisible == true {
-                    browserManager.closeCommandPalette(for: browserManager.activeWindowState)
-                } else {
-                    browserManager.closeCurrentTab()
-                }
-            }
-            .keyboardShortcut("w", modifiers: .command)
-            .disabled(browserManager.tabManager.tabs.isEmpty)
-            
-            Button("Copy Current URL") {
-                browserManager.copyCurrentURL()
-            }
-            .keyboardShortcut("c", modifiers: [.command, .shift])
-            .disabled(browserManager.currentTabForActiveWindow() == nil)
-
         }
         
         // Privacy/Cookie Commands
