@@ -11,14 +11,18 @@ struct WindowView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var windowState: BrowserWindowState
     @StateObject private var hoverSidebarManager = HoverSidebarManager()
+    @Environment(\.colorScheme) var colorScheme
 
     var body: some View {
+        let isDark = colorScheme == .dark
         ZStack {
             // Gradient background for the current space (bottom-most layer)
             SpaceGradientBackgroundView()
                 .environmentObject(windowState)
 
             // Attach background context menu to the window background layer
+            Color.white.opacity(isDark ? 0.3 : 0.4)
+                .ignoresSafeArea(.all)
             WindowBackgroundView()
                 .contextMenu {
                     Button("Customize Space Gradient...") {
