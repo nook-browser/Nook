@@ -39,7 +39,7 @@ struct SpaceView: View {
         return VStack(spacing: 8) {
             SpaceTittle(space: space)
                 .padding(.horizontal, 8)
-            
+
             if !spacePinnedTabs.isEmpty || !tabs.isEmpty {
                 SpaceSeparator()
                     .padding(.horizontal, 8)
@@ -221,6 +221,7 @@ struct SpaceView: View {
                                     }
                                 }
                             }
+                            .frame(maxWidth: width - 16) // Constrain content to available width
                             .contentShape(Rectangle())
                             .padding(.top, 8)
                             .onDrop(
@@ -249,6 +250,7 @@ struct SpaceView: View {
                     }
                     .animation(.easeInOut(duration: 0.15), value: tabs.count)
                 }
+                .frame(maxWidth: width - 16) // Constrain ScrollView to available width
                 // Fallback drop target that covers the entire scroll area, including
                 // the large empty region below the last tab. Drops here append to end.
                 .onDrop(
@@ -263,10 +265,9 @@ struct SpaceView: View {
                 .contentShape(Rectangle())
                 Spacer()
             }
-            .padding(.horizontal, 8)
-        }
+          }
         // Keep page width equal to the whole sidebar
-        .frame(width: width)
+        .frame(maxWidth: width)
         .contentShape(Rectangle())
         // Avoid window-drag gestures in the sidebar content area
         .scrollTargetLayout()

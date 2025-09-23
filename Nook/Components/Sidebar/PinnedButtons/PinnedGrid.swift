@@ -72,6 +72,7 @@ struct PinnedGrid: View {
                                 onSplitRight: { browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState) },
                                 onSplitLeft: { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) }
                             )
+                            .environmentObject(browserManager)
                             .onTabDrag(tab.id, draggedItem: $draggedItem)
                             .opacity(draggedItem == tab.id ? 0.0 : 1.0)
                             .onDrop(

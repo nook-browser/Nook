@@ -38,6 +38,7 @@ struct SidebarHoverOverlayView: View {
                     }
                 // Overlay sidebar inside a rounded, translucent container
                 SidebarView(forceVisible: true, forcedWidth: overlayWidth)
+                    .environmentObject(browserManager)
                     .environmentObject(windowState)
                     .frame(width: overlayWidth)
                     .frame(maxHeight: .infinity)

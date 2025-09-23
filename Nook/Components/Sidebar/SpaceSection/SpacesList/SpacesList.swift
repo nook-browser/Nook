@@ -68,6 +68,7 @@ struct SpacesList: View {
                 let isFaded = shouldUseMinimal && !isActive
                 
                 SpacesListItem(space: space, isActive: isActive, compact: shouldUseCompact)
+                    .environmentObject(browserManager)
                     .environmentObject(windowState)
                     .id(space.id)
                     .opacity(isFaded ? 0.3 : 1.0)
