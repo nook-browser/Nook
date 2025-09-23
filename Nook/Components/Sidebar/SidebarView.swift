@@ -77,6 +77,7 @@ struct SidebarView: View {
                     .padding(.horizontal, 8)
             } else {
                 spacesScrollView
+                    .padding(.horizontal, 8)
             }
 
             // MARK: - Bottom
@@ -128,7 +129,7 @@ struct SidebarView: View {
         }
         .padding(.top, 8)
         .frame(width: effectiveWidth)
-        
+
         return content.animation(shouldAnimate ? .easeInOut(duration: 0.18) : nil, value: essentialsCount)
     }
     
