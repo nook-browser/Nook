@@ -5,8 +5,8 @@
 //  Created by Maciek Bagiński on 28/07/2025.
 //
 
-import SwiftUI
 import AppKit
+import SwiftUI
 
 struct CommandPaletteView: View {
     @EnvironmentObject var browserManager: BrowserManager
@@ -18,14 +18,16 @@ struct CommandPaletteView: View {
     @FocusState private var isSearchFocused: Bool
     @State private var text: String = ""
     @State private var selectedSuggestionIndex: Int = -1
+    @State private var hoveredSuggestionIndex: Int? = nil
 
     var body: some View {
         let isDark = colorScheme == .dark
-        let isActiveWindow = browserManager.activeWindowState?.id == windowState.id
+        let isActiveWindow =
+            browserManager.activeWindowState?.id == windowState.id
         let isVisible = isActiveWindow && windowState.isCommandPaletteVisible
-        
+
         ZStack {
-            Color.black.opacity(0.2)
+            Color.clear
                 .ignoresSafeArea()
                 .onTapGesture {
                     browserManager.closeCommandPalette(for: windowState)
@@ -35,22 +37,31 @@ struct CommandPaletteView: View {
             GeometryReader { geometry in
                 HStack {
                     Spacer()
-                    
-                    // Single box that expands/contracts but stays anchored at top
-                    VStack(spacing: 0) {
+
+                    VStack(spacing: 6) {
                         // Input field - fixed at top of box
-                        HStack(spacing: 12) {
+                        HStack(spacing: 15) {
                             Image(
                                 systemName: isLikelyURL(text)
                                     ? "globe" : "magnifyingglass"
                             )
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(AppColors.textPrimary)
+                            .font(.system(size: 14, weight: .regular))
+                            .foregroundStyle(isDark ? .white : .black)
 
-                            TextField("Search or enter address", text: $text)
+                            TextField("Search or enter URL...", text: $text)
                                 .textFieldStyle(.plain)
-                                .font(.system(size: 16, weight: .regular))
-                                .foregroundColor(AppColors.textPrimary)
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundColor(
+                                    text.isEmpty
+                                        ? isDark
+                                            ? .white.opacity(0.25)
+                                            : .black.opacity(0.25)
+                                        : isDark
+                                            ? .white.opacity(0.9)
+                                            : .black.opacity(0.9)
+
+                                )
+                                .tint(gradientColorManager.primaryColor)
                                 .focused($isSearchFocused)
                                 .onKeyPress(.return) {
                                     handleReturn()
@@ -69,22 +80,29 @@ struct CommandPaletteView: View {
                                     searchManager.searchSuggestions(
                                         for: newValue
                                     )
-                                    if windowState.commandPalettePrefilledText != newValue {
-                                        windowState.commandPalettePrefilledText = newValue
+                                    if windowState.commandPalettePrefilledText
+                                        != newValue
+                                    {
+                                        windowState
+                                            .commandPalettePrefilledText =
+                                            newValue
                                     }
                                 }
                         }
-                        .padding(.vertical, 16)
-                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 8)
 
                         // Separator
                         if !searchManager.suggestions.isEmpty {
                             RoundedRectangle(cornerRadius: 100)
-                                .fill(Color.white.opacity(0.4))
-                                .frame(height: 1)
+                                .fill(
+                                    isDark
+                                        ? Color.white.opacity(0.4)
+                                        : Color.black.opacity(0.4)
+                                )
+                                .frame(height: 0.5)
                                 .frame(maxWidth: .infinity)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 5)
+
                         }
 
                         // Suggestions - expand the box downward
@@ -93,30 +111,40 @@ struct CommandPaletteView: View {
                             CommandPaletteSuggestionsListView(
                                 suggestions: suggestions,
                                 selectedIndex: $selectedSuggestionIndex,
+                                hoveredIndex: $hoveredSuggestionIndex,
                                 onSelect: { suggestion in
                                     selectSuggestion(suggestion)
                                 }
                             )
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 4)
                         }
                     }
-                    .frame(width: 600)
-                    .background(isDark ? Color.white.opacity(0.3) : Color.white.opacity(0.8))
-                    .background(.thinMaterial)
+                    .padding(10)
+                    .frame(width: 765)
+                    .background(.thickMaterial)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                            .stroke(
+                                Color.white.opacity(isDark ? 0.3 : 0.6),
+                                lineWidth: 0.5
+                            )
                     )
-                    .animation(.easeInOut(duration: 0.15), value: searchManager.suggestions.count)
+                    .shadow(color: .black.opacity(0.4), radius: 50, x: 0, y: 4)
+                    .animation(
+                        .easeInOut(duration: 0.15),
+                        value: searchManager.suggestions.count
+                    )
                     .alignmentGuide(.top) { _ in -geometry.size.height / 2 }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    
+                    .frame(
+                        maxWidth: .infinity,
+                        maxHeight: .infinity,
+                        alignment: .top
+                    )
+
                     Spacer()
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
         }
         .allowsHitTesting(isVisible)
         .opacity(isVisible ? 1.0 : 0.0)
@@ -125,15 +153,19 @@ struct CommandPaletteView: View {
                 searchManager.setTabManager(browserManager.tabManager)
                 searchManager.setHistoryManager(browserManager.historyManager)
                 searchManager.updateProfileContext()
-                
+
                 // Pre-fill text if provided and select all for easy replacement
                 text = windowState.commandPalettePrefilledText
-                
+
                 DispatchQueue.main.async {
                     isSearchFocused = true
                     // Select all once focused so the URL is highlighted
                     DispatchQueue.main.async {
-                        NSApplication.shared.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil)
+                        NSApplication.shared.sendAction(
+                            #selector(NSText.selectAll(_:)),
+                            to: nil,
+                            from: nil
+                        )
                     }
                 }
             } else {
@@ -177,9 +209,9 @@ struct CommandPaletteView: View {
 
     private func isEmoji(_ string: String) -> Bool {
         return string.unicodeScalars.contains { scalar in
-            (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF) ||
-            (scalar.value >= 0x2600 && scalar.value <= 0x26FF) ||
-            (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
+            (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF)
+                || (scalar.value >= 0x2600 && scalar.value <= 0x26FF)
+                || (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
         }
     }
 
@@ -188,23 +220,40 @@ struct CommandPaletteView: View {
         @EnvironmentObject var gradientColorManager: GradientColorManager
         let suggestions: [SearchManager.SearchSuggestion]
         @Binding var selectedIndex: Int
+        @Binding var hoveredIndex: Int?
+        @Environment(\.colorScheme) var colorScheme
         let onSelect: (SearchManager.SearchSuggestion) -> Void
 
         var body: some View {
-            LazyVStack(spacing: 2) {
+            let isDark = colorScheme == .dark
+            LazyVStack(spacing: 5) {
                 ForEach(suggestions.indices, id: \.self) { index in
                     let suggestion = suggestions[index]
+                    let isHovered = hoveredIndex == index
                     row(for: suggestion, isSelected: selectedIndex == index)
-                        .padding(8)
-                        .background(selectedIndex == index ? gradientColorManager.primaryColor : Color.clear)
-                        .cornerRadius(10)
-                        .font(.system(size: 16, weight: .regular))
-                        .foregroundStyle(AppColors.textPrimary)
-                        .contentShape(Rectangle())
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 11)
+                        .background(
+                            selectedIndex == index
+                                ? gradientColorManager.primaryColor
+                                : isHovered
+                                    ? isDark
+                                        ? .white.opacity(0.05)
+                                        : .black.opacity(0.05) : .clear
+                        )
+                        .clipShape(
+                            RoundedRectangle(cornerRadius: 6)
+                        )
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .contentShape(RoundedRectangle(cornerRadius: 6))
                         .onHover { hovering in
                             withAnimation(.easeInOut(duration: 0.12)) {
-                                if hovering { selectedIndex = index }
-                                else if selectedIndex == index { selectedIndex = -1 }
+                                if hovering {
+                                    hoveredIndex = index
+                                } else {
+                                    hoveredIndex = nil
+                                }
                             }
                         }
                         .onTapGesture { onSelect(suggestion) }
@@ -213,16 +262,27 @@ struct CommandPaletteView: View {
         }
 
         @ViewBuilder
-        private func row(for suggestion: SearchManager.SearchSuggestion, isSelected: Bool) -> some View {
+        private func row(
+            for suggestion: SearchManager.SearchSuggestion,
+            isSelected: Bool
+        ) -> some View {
             switch suggestion.type {
             case .tab(let tab):
                 TabSuggestionItem(tab: tab, isSelected: isSelected)
             case .history(let entry):
                 HistorySuggestionItem(entry: entry, isSelected: isSelected)
             case .url:
-                GenericSuggestionItem(icon: Image(systemName: "link"), text: suggestion.text, isSelected: isSelected)
+                GenericSuggestionItem(
+                    icon: Image(systemName: "link"),
+                    text: suggestion.text,
+                    isSelected: isSelected
+                )
             case .search:
-                GenericSuggestionItem(icon: Image(systemName: "magnifyingglass"), text: suggestion.text, isSelected: isSelected)
+                GenericSuggestionItem(
+                    icon: Image(systemName: "magnifyingglass"),
+                    text: suggestion.text,
+                    isSelected: isSelected
+                )
             }
         }
     }
@@ -243,32 +303,49 @@ struct CommandPaletteView: View {
         }
     }
 
-    private func selectSuggestion(_ suggestion: SearchManager.SearchSuggestion) {
+    private func selectSuggestion(_ suggestion: SearchManager.SearchSuggestion)
+    {
         switch suggestion.type {
         case .tab(let existingTab):
             // Switch to existing tab in this window
             browserManager.selectTab(existingTab, in: windowState)
             print("Switched to existing tab: \(existingTab.name)")
         case .history(let historyEntry):
-            if windowState.shouldNavigateCurrentTab && browserManager.currentTab(for: windowState) != nil {
+            if windowState.shouldNavigateCurrentTab
+                && browserManager.currentTab(for: windowState) != nil
+            {
                 // Navigate current tab to history URL
-                browserManager.currentTab(for: windowState)?.loadURL(historyEntry.url.absoluteString)
-                print("Navigated current tab to history URL: \(historyEntry.url)")
+                browserManager.currentTab(for: windowState)?.loadURL(
+                    historyEntry.url.absoluteString
+                )
+                print(
+                    "Navigated current tab to history URL: \(historyEntry.url)"
+                )
             } else {
                 // Create new tab from history entry
                 browserManager.createNewTab(in: windowState)
-                browserManager.currentTab(for: windowState)?.loadURL(historyEntry.url.absoluteString)
-                print("Created new tab from history in window \(windowState.id)")
+                browserManager.currentTab(for: windowState)?.loadURL(
+                    historyEntry.url.absoluteString
+                )
+                print(
+                    "Created new tab from history in window \(windowState.id)"
+                )
             }
         case .url, .search:
-            if windowState.shouldNavigateCurrentTab && browserManager.currentTab(for: windowState) != nil {
+            if windowState.shouldNavigateCurrentTab
+                && browserManager.currentTab(for: windowState) != nil
+            {
                 // Navigate current tab to new URL with proper normalization
-                browserManager.currentTab(for: windowState)?.navigateToURL(suggestion.text)
+                browserManager.currentTab(for: windowState)?.navigateToURL(
+                    suggestion.text
+                )
                 print("Navigated current tab to: \(suggestion.text)")
             } else {
                 // Create new tab
                 browserManager.createNewTab(in: windowState)
-                browserManager.currentTab(for: windowState)?.navigateToURL(suggestion.text)
+                browserManager.currentTab(for: windowState)?.navigateToURL(
+                    suggestion.text
+                )
                 print("Created new tab in window \(windowState.id)")
             }
         }
@@ -287,8 +364,10 @@ struct CommandPaletteView: View {
             selectedSuggestionIndex = max(selectedSuggestionIndex - 1, -1)
         }
     }
-    
-    private func iconForSuggestion(_ suggestion: SearchManager.SearchSuggestion) -> Image {
+
+    private func iconForSuggestion(_ suggestion: SearchManager.SearchSuggestion)
+        -> Image
+    {
         switch suggestion.type {
         case .tab(let tab):
             return tab.favicon
@@ -300,9 +379,12 @@ struct CommandPaletteView: View {
             return Image(systemName: "magnifyingglass")
         }
     }
-    
+
     @ViewBuilder
-    private func suggestionRow(for suggestion: SearchManager.SearchSuggestion, isSelected: Bool) -> some View {
+    private func suggestionRow(
+        for suggestion: SearchManager.SearchSuggestion,
+        isSelected: Bool
+    ) -> some View {
         switch suggestion.type {
         case .tab(let tab):
             TabSuggestionItem(tab: tab, isSelected: isSelected)
@@ -311,15 +393,25 @@ struct CommandPaletteView: View {
             HistorySuggestionItem(entry: entry, isSelected: isSelected)
                 .foregroundStyle(AppColors.textPrimary)
         case .url:
-            GenericSuggestionItem(icon: Image(systemName: "link"), text: suggestion.text, isSelected: isSelected)
-                .foregroundStyle(AppColors.textPrimary)
+            GenericSuggestionItem(
+                icon: Image(systemName: "link"),
+                text: suggestion.text,
+                isSelected: isSelected
+            )
+            .foregroundStyle(AppColors.textPrimary)
         case .search:
-            GenericSuggestionItem(icon: Image(systemName: "magnifyingglass"), text: suggestion.text, isSelected: isSelected)
-                .foregroundStyle(AppColors.textPrimary)
+            GenericSuggestionItem(
+                icon: Image(systemName: "magnifyingglass"),
+                text: suggestion.text,
+                isSelected: isSelected
+            )
+            .foregroundStyle(AppColors.textPrimary)
         }
     }
-    
-    private func urlForSuggestion(_ suggestion: SearchManager.SearchSuggestion) -> URL? {
+
+    private func urlForSuggestion(_ suggestion: SearchManager.SearchSuggestion)
+        -> URL?
+    {
         switch suggestion.type {
         case .history(let entry):
             return entry.url
@@ -327,8 +419,10 @@ struct CommandPaletteView: View {
             return nil
         }
     }
-    
-    private func isTabSuggestion(_ suggestion: SearchManager.SearchSuggestion) -> Bool {
+
+    private func isTabSuggestion(_ suggestion: SearchManager.SearchSuggestion)
+        -> Bool
+    {
         switch suggestion.type {
         case .tab:
             return true

@@ -14,32 +14,49 @@ struct HistorySuggestionItem: View {
     
     @State private var isHovered: Bool = false
     @State private var resolvedFavicon: SwiftUI.Image? = nil
+    @Environment(\.colorScheme) var colorScheme
+    
+    // Color configuration
+    private var colors: ColorConfig {
+        ColorConfig(
+            isDark: colorScheme == .dark,
+            isSelected: isSelected,
+            isHovered: isHovered
+        )
+    }
     
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            (resolvedFavicon ?? Image(systemName: "globe"))
-                .resizable()
-                .scaledToFit()
-                .frame(width: 14, height: 14)
-                .foregroundStyle(.white.opacity(0.2))
-            HStack(spacing: 6) {
+        HStack(alignment: .center, spacing: 9) {
+            ZStack {
+                (resolvedFavicon ?? Image(systemName: "globe"))
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundStyle(colors.faviconColor)
+                    .frame(width: 14, height: 14)
+            }
+            .frame(width: 24, height: 24)
+            .background(colors.faviconBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            
+            HStack(spacing: 4) {
                 Text(entry.displayTitle)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(colors.titleColor)
                     .lineLimit(1)
                     .truncationMode(.tail)
+                
                 Text("-")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.35))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(colors.urlColor)
+                
                 Text(entry.displayURL)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(colors.urlColor)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             Spacer()
         }
-        .padding(.horizontal, 5)
-        .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
@@ -58,7 +75,6 @@ struct HistorySuggestionItem: View {
             return
         }
         
-        // Check cache first
         let cacheKey = url.host ?? url.absoluteString
         if let cachedFavicon = Tab.getCachedFavicon(for: cacheKey) {
             await MainActor.run { self.resolvedFavicon = cachedFavicon }
@@ -74,7 +90,6 @@ struct HistorySuggestionItem: View {
                 let nsImage = faviconImage.image
                 let swiftUIImage = SwiftUI.Image(nsImage: nsImage)
                 
-                // Cache the favicon
                 Tab.cacheFavicon(swiftUIImage, for: cacheKey)
                 
                 await MainActor.run { self.resolvedFavicon = swiftUIImage }
@@ -87,3 +102,31 @@ struct HistorySuggestionItem: View {
     }
 }
 
+// MARK: - Colors simplified
+private struct ColorConfig {
+    let isDark: Bool
+    let isSelected: Bool
+    let isHovered: Bool
+    
+    var titleColor: Color {
+        if isSelected {
+            return .white
+        }
+        return isDark ? .white : .black
+    }
+    
+    var urlColor: Color {
+        if isSelected {
+            return .white.opacity(0.5)
+        }
+        return isDark ? .white.opacity(0.3) : .black.opacity(0.3)
+    }
+    
+    var faviconColor: Color {
+        return .white.opacity(0.5)
+    }
+    
+    var faviconBackground: Color {
+        return isSelected ? .white : .clear
+    }
+}
