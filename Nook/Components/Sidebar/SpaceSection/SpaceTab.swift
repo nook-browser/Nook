@@ -125,7 +125,7 @@ struct SpaceTab: View {
             }
             .padding(.horizontal, 10)
             .frame(height: 40)
-            .frame(maxWidth: .infinity)
+            .frame(minWidth: 0, maxWidth: .infinity)
             .background(
                 backgroundColor
             )
