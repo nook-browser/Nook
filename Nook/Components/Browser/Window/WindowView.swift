@@ -30,6 +30,7 @@ struct WindowView: View {
             // Main content flush: sidebar touches left edge; webview touches sidebar
             HStack(spacing: 0) {
                 SidebarView()
+                    .environmentObject(browserManager)
                     .environmentObject(windowState)
 
                 VStack(spacing: 0) {

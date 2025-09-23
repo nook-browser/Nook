@@ -13,6 +13,7 @@ struct DragEnabledSidebarView: View {
     
     var body: some View {
         SidebarView()
+            .environmentObject(browserManager)
             .environmentObject(dragManager)
             .tabDragManager(dragManager)
     }
