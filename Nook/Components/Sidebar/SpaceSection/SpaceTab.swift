@@ -52,6 +52,29 @@ struct SpaceTab: View {
                             .offset(x: 6, y: -6)
                     }
                 }
+                // Mute button (show when tab has audio content OR is muted)
+                if tab.hasAudioContent || tab.isAudioMuted {
+                    Button(action: {
+                        onMute()
+                    }) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(isSpeakerHovering ? (isCurrentTab ? AppColors.controlBackgroundHoverLight : AppColors.controlBackgroundActive) : AppColors.controlBackgroundHoverLight.opacity(0))
+                                .frame(width: 22, height: 22)
+                                .animation(.easeInOut(duration: 0.05), value: isSpeakerHovering)
+                            Image(systemName: tab.isAudioMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                                .contentTransition(.symbolEffect(.replace))
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(tab.isAudioMuted ? AppColors.textSecondary : textTab)
+                        }
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .onHover { hovering in
+                        isSpeakerHovering = hovering
+                    }
+                    .help(tab.isAudioMuted ? "Unmute Audio" : "Mute Audio")
+                }
+                
                 if tab.isRenaming {
                     TextField("", text: $tab.editingName)
                         .font(.system(size: 14, weight: .medium))
@@ -83,28 +106,7 @@ struct SpaceTab: View {
                 }
                 Spacer()
 
-                // Mute button (show when tab has audio content OR is muted)
-                if tab.hasAudioContent || tab.isAudioMuted {
-                    Button(action: {
-                        onMute()
-                    }) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(isSpeakerHovering ? (isCurrentTab ? AppColors.controlBackgroundHoverLight : AppColors.controlBackgroundActive) : AppColors.controlBackgroundHoverLight.opacity(0))              
-                                .frame(width: 22, height: 22)
-                                .animation(.easeInOut(duration: 0.05), value: isSpeakerHovering)
-                            Image(systemName: tab.isAudioMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")                                                                                                        
-                                .contentTransition(.symbolEffect(.replace))
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(tab.isAudioMuted ? AppColors.textSecondary : textTab)
-                        }
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .onHover { hovering in
-                        isSpeakerHovering = hovering
-                    }
-                    .help(tab.isAudioMuted ? "Unmute Audio" : "Mute Audio")
-                }
+
 
                 if isHovering {
                     Button(action: onClose) {
