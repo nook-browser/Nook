@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct SpaceTittle: View {
+struct SpaceTitle: View {
     @EnvironmentObject var browserManager: BrowserManager
 
     let space: Space

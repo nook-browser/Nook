@@ -37,8 +37,7 @@ struct SpaceView: View {
     
     var body: some View {
         return VStack(spacing: 8) {
-            SpaceTittle(space: space)
-                .padding(.horizontal, 8)
+            SpaceTitle(space: space)
 
             if !spacePinnedTabs.isEmpty || !tabs.isEmpty {
                 SpaceSeparator()
@@ -93,7 +92,7 @@ struct SpaceView: View {
                 } else {
                     // Empty pinned section drop target
                     ZStack { Color.clear.frame(height: 1) }
-                        .padding(.bottom, 8)
+                        .padding(.bottom, 4)
                         .contentShape(Rectangle())
                         .onDrop(
                             of: [.text],
@@ -107,6 +106,7 @@ struct SpaceView: View {
                 }
 
                 NewTabButton()
+                    .padding(.top, 8)
                     .onDrop(
                         of: [.text],
                         delegate: SidebarSectionDropDelegateSimple(
@@ -221,7 +221,7 @@ struct SpaceView: View {
                                     }
                                 }
                             }
-                            .frame(maxWidth: width - 16) // Constrain content to available width
+                            .frame(maxWidth: width) // Constrain content to available width
                             .contentShape(Rectangle())
                             .padding(.top, 8)
                             .onDrop(
@@ -250,7 +250,7 @@ struct SpaceView: View {
                     }
                     .animation(.easeInOut(duration: 0.15), value: tabs.count)
                 }
-                .frame(maxWidth: width - 16) // Constrain ScrollView to available width
+                .frame(maxWidth: width) // Constrain ScrollView to available width
                 // Fallback drop target that covers the entire scroll area, including
                 // the large empty region below the last tab. Drops here append to end.
                 .onDrop(
@@ -265,24 +265,26 @@ struct SpaceView: View {
                 .contentShape(Rectangle())
                 Spacer()
             }
-          }
+        }
         // Keep page width equal to the whole sidebar
         .frame(maxWidth: width)
         .contentShape(Rectangle())
         // Avoid window-drag gestures in the sidebar content area
         .scrollTargetLayout()
+        .coordinateSpace(name: "SpaceViewCoordinateSpace")
         .onReceive(NotificationCenter.default.publisher(for: .tabDragDidEnd)) { _ in
             draggedItem = nil
         }
-        
-        func isFirstTab(_ tab: Tab) -> Bool {
-            return tabs.first?.id == tab.id
-        }
-        
-        func isLastTab(_ tab: Tab) -> Bool {
-            return tabs.last?.id == tab.id
-        }
+    }
+    
+    private func isFirstTab(_ tab: Tab) -> Bool {
+        return tabs.first?.id == tab.id
+    }
+    
+    private func isLastTab(_ tab: Tab) -> Bool {
+        return tabs.last?.id == tab.id
     }
     
     // Removed insertion overlays and geometry preference keys (simplified DnD)
 }
+
