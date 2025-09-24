@@ -153,6 +153,8 @@ class TabDragManager: ObservableObject {
     }
     
     func cancelDrag() {
+        // Release drag lock when cancelling tab drag
+        DragLockManager.shared.forceReleaseAll()
         resetDragState()
         NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
     }
@@ -181,7 +183,10 @@ class TabDragManager: ObservableObject {
             // Already reset, prevent multiple reset calls
             return
         }
-        
+
+        // Release drag lock when resetting drag state
+        DragLockManager.shared.forceReleaseAll()
+
         isDragging = false
         draggedTab = nil
         draggedTabOriginalIndex = -1
@@ -192,7 +197,7 @@ class TabDragManager: ObservableObject {
         showInsertionLine = false
         insertionLineFrame = .zero
         lastHapticIndex = -1
-        
+
         // Validate that all state is properly cleared
         assert(!isDragging && draggedTab == nil && dropTarget == .none, "State not properly reset")
     }

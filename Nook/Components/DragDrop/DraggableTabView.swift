@@ -14,9 +14,11 @@ struct DraggableTabView<Content: View>: View {
     let index: Int
     let dragManager: TabDragManager
     let content: Content
-    
+
     @State private var dragGesture = false
     @State private var dragOffset: CGSize = .zero
+    @StateObject private var dragLockManager = DragLockManager.shared
+    @State private var dragSessionID: String = UUID().uuidString
     
     init(
         tab: Tab,
@@ -40,10 +42,17 @@ struct DraggableTabView<Content: View>: View {
             .animation(.easeInOut(duration: 0.2), value: dragManager.isDragging)
             .animation(.easeInOut(duration: 0.2), value: dragOffset)
             .onDrag {
+                // Pre-emptively acquire drag lock BEFORE anything else
+                guard dragLockManager.startDrag(ownerID: dragSessionID) else {
+                    print("🚫 [DraggableTabView] Tab drag blocked at onset - \(dragLockManager.debugInfo)")
+                    return NSItemProvider(object: tab.id.uuidString as NSString)
+                }
+
                 // Start the drag operation with state validation
                 DispatchQueue.main.async {
                     // Harden the start guard to prevent concurrent drags
                     guard !dragManager.isDragging else {
+                        dragLockManager.endDrag(ownerID: dragSessionID)
                         return
                     }
                     dragManager.startDrag(tab: tab, from: container, at: index)
@@ -54,28 +63,35 @@ struct DraggableTabView<Content: View>: View {
                 DragGesture(coordinateSpace: .global)
                     .onChanged { value in
                         if !dragGesture {
+                            // Pre-emptively acquire drag lock for gesture-based drag
+                            guard dragLockManager.startDrag(ownerID: dragSessionID) else {
+                                print("🚫 [DraggableTabView] Gesture drag blocked at onset - \(dragLockManager.debugInfo)")
+                                return
+                            }
+
                             dragGesture = true
                             // Enhanced drag gesture coordination - prevent duplicate drag start calls
                             if !dragManager.isDragging {
                                 dragManager.startDrag(tab: tab, from: container, at: index)
                             }
                         }
-                        
+
                         // Update drag offset for visual feedback
                         dragOffset = value.translation
                     }
                     .onEnded { value in
                         dragGesture = false
-                        
+
                         // Ensure drag offset is properly reset in all scenarios
                         withAnimation(.easeOut(duration: 0.15)) {
                             dragOffset = .zero
                         }
-                        
+
                         // Enhanced drag end handling with state validation
                         if dragManager.isDragging && dragManager.draggedTab?.id == tab.id {
                             // Add validation that the drag manager is in the expected state
                             guard dragManager.draggedTab != nil else {
+                                dragLockManager.endDrag(ownerID: dragSessionID)
                                 return
                             }
                             // Only cancel drag if no valid drop target
@@ -83,6 +99,9 @@ struct DraggableTabView<Content: View>: View {
                                 dragManager.cancelDrag()
                             }
                         }
+
+                        // Always release drag lock when gesture ends
+                        dragLockManager.endDrag(ownerID: dragSessionID)
                     }
             )
     }
