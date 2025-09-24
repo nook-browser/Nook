@@ -121,22 +121,23 @@ struct SidebarView: View {
             && !browserManager.isTransitioningProfile
 
         let content = VStack(spacing: 8) {
+            // Window drag zone above navigation buttons
+            Rectangle()
+                .fill(Color.clear)
+                .frame(height: 20)
+                .contentShape(Rectangle())
+                .conditionalWindowDrag()
+                .onTapGesture(count: 2) {
+                    DispatchQueue.main.async {
+                        zoomCurrentWindow()
+                    }
+                }
+
             HStack(spacing: 2) {
                 NavButtonsView()
             }
             .padding(.horizontal, 8)
             .frame(height: 30)
-            .background(
-                Rectangle()
-                    .fill(Color.clear)
-                    .contentShape(Rectangle())
-                    .onTapGesture(count: 2) {
-                        DispatchQueue.main.async {
-                            zoomCurrentWindow()
-                        }
-                    }
-            )
-            .backgroundDraggable()
 
             URLBarView()
                 .padding(.horizontal, 8)

@@ -60,7 +60,7 @@ struct SpaceView: View {
             pinnedTabsSection
             newTabButtonSection
             regularTabsSection
-            Spacer()
+            windowDragSpacer
         }
     }
 
@@ -306,7 +306,22 @@ struct SpaceView: View {
     private func isLastTab(_ tab: Tab) -> Bool {
         return tabs.last?.id == tab.id
     }
-    
+
+    private var windowDragSpacer: some View {
+        Rectangle()
+            .fill(Color.clear)
+            .frame(height: 30)
+            .contentShape(Rectangle())
+            .conditionalWindowDrag()
+            .overlay(
+                Rectangle()
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(height: 1)
+                    .padding(.horizontal, 8),
+                alignment: .top
+            )
+    }
+
     // Removed insertion overlays and geometry preference keys (simplified DnD)
 }
 
