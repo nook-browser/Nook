@@ -17,8 +17,8 @@ struct SidebarHoverOverlayView: View {
         windowState.isSidebarVisible ? windowState.sidebarWidth : browserManager.getSavedSidebarWidth(for: windowState)
     }
     private let cornerRadius: CGFloat = 12
-    private let horizontalInset: CGFloat = 8
-    private let verticalInset: CGFloat = 10
+    private let horizontalInset: CGFloat = 7
+    private let verticalInset: CGFloat = 7
 
     var body: some View {
         // Only render overlay plumbing when the real sidebar is collapsed

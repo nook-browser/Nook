@@ -60,7 +60,6 @@ struct SpaceView: View {
             pinnedTabsSection
             newTabButtonSection
             regularTabsSection
-            windowDragSpacer
         }
     }
 
@@ -197,6 +196,12 @@ struct SpaceView: View {
             } else {
                 regularTabsView(currentTabs: currentTabs)
             }
+            
+            // Small zone at end of tab list to capture window drag
+            Color.clear
+                .contentShape(Rectangle())
+                .conditionalWindowDrag()
+                .frame(height: 100)
         }
         .frame(minWidth: 0, maxWidth: width)
         .contentShape(Rectangle())
@@ -308,18 +313,13 @@ struct SpaceView: View {
     }
 
     private var windowDragSpacer: some View {
-        Rectangle()
-            .fill(Color.clear)
-            .frame(height: 30)
-            .contentShape(Rectangle())
-            .conditionalWindowDrag()
-            .overlay(
-                Rectangle()
-                    .fill(Color.gray.opacity(0.2))
-                    .frame(height: 1)
-                    .padding(.horizontal, 8),
-                alignment: .top
-            )
+        GeometryReader { geometry in
+            Rectangle()
+                .fill(Color.clear)
+                .frame(width: geometry.size.width, height: max(40, geometry.size.height))
+                .contentShape(Rectangle())
+                .conditionalWindowDrag()
+        }
     }
 
     // Removed insertion overlays and geometry preference keys (simplified DnD)
