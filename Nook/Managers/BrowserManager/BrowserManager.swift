@@ -360,6 +360,7 @@ class BrowserManager: ObservableObject {
     var findManager: FindManager
     
     var externalMiniWindowManager = ExternalMiniWindowManager()
+    @Published var peekManager = PeekManager()
     
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
@@ -537,6 +538,7 @@ class BrowserManager: ObservableObject {
         self.trackingProtectionManager.attach(browserManager: self)
         self.trackingProtectionManager.setEnabled(self.settingsManager.blockCrossSiteTracking)
         self.externalMiniWindowManager.attach(browserManager: self)
+        self.peekManager.attach(browserManager: self)
         self.authenticationManager.attach(browserManager: self)
         // Migrate legacy history entries (with nil profile) to default profile to avoid cross-profile leakage
         self.migrateUnassignedDataToDefaultProfile()

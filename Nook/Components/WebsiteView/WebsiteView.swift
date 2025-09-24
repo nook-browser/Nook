@@ -330,6 +330,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
             }
         }
 
+  
         // Re-add overlay on top
         if let overlay = overlay {
             overlay.frame = containerView.bounds
@@ -369,7 +370,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
         v.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
         return v
     }
-    
+
     private func setupHoverCallbacks(for tab: Tab) {
         // Set up link hover callback
         tab.onLinkHover = { [self] href in
@@ -396,6 +397,8 @@ struct TabCompositorWrapper: NSViewRepresentable {
         return browserManager.createWebView(for: tab.id, in: windowId)
     }
 }
+
+// MARK: - WebsiteView Extensions
 
 private extension WebsiteView {
     var shouldShowSplit: Bool {

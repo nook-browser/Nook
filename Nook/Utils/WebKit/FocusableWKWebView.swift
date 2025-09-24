@@ -6,6 +6,9 @@ final class FocusableWKWebView: WKWebView {
     weak var owningTab: Tab?
 
     override func mouseDown(with event: NSEvent) {
+        // Store Option key state for Peek functionality
+        owningTab?.isOptionKeyDown = event.modifierFlags.contains(.option)
+
         owningTab?.activate()
         super.mouseDown(with: event)
     }
@@ -14,10 +17,15 @@ final class FocusableWKWebView: WKWebView {
         owningTab?.activate()
         super.rightMouseDown(with: event)
     }
-    
+
+    override func mouseUp(with event: NSEvent) {
+        // Reset Option key state after mouse up
+        owningTab?.isOptionKeyDown = false
+        super.mouseUp(with: event)
+    }
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
         super.willOpenMenu(menu, with: event)
-        
+
         // Get the element under the mouse cursor
         let point = convert(event.locationInWindow, from: nil)
         evaluateJavaScript("""
@@ -48,8 +56,24 @@ final class FocusableWKWebView: WKWebView {
 
                 var customItems: [NSMenuItem] = []
 
+              if let href = info["href"] as? String, !href.isEmpty, let url = URL(string: href) {
+                    // Check if this is an external domain and we're not in a mini window
+                    if let currentHost = self.owningTab?.url.host,
+                       let newHost = url.host,
+                       currentHost != newHost,
+                       let browserManager = self.owningTab?.browserManager {
+
+                        let openPeekItem = NSMenuItem(
+                            title: "Peek Link",
+                            action: #selector(self.openLinkInPeek(_:)),
+                            keyEquivalent: ""
+                        )
+                        openPeekItem.target = self
+                        openPeekItem.representedObject = url
+                        customItems.append(openPeekItem)
+                    }
+
 #if DEBUG
-                if let href = info["href"] as? String, !href.isEmpty, let url = URL(string: href) {
                     let openMiniWindowItem = NSMenuItem(
                         title: "Open Link in Mini Window",
                         action: #selector(self.openLinkInMiniWindow(_:)),
@@ -58,8 +82,8 @@ final class FocusableWKWebView: WKWebView {
                     openMiniWindowItem.target = self
                     openMiniWindowItem.representedObject = url
                     customItems.append(openMiniWindowItem)
-                }
 #endif
+                }
 
                 if let imageURL = info["image"] as? String, !imageURL.isEmpty {
                     let saveImageItem = NSMenuItem(
@@ -165,6 +189,14 @@ final class FocusableWKWebView: WKWebView {
         notification.soundName = NSUserNotificationDefaultSoundName
         
         NSUserNotificationCenter.default.deliver(notification)
+    }
+
+  @objc private func openLinkInPeek(_ sender: NSMenuItem) {
+        guard let url = sender.representedObject as? URL else { return }
+        Task { @MainActor [weak self] in
+            guard let tab = self?.owningTab else { return }
+            tab.browserManager?.peekManager.presentExternalURL(url, from: tab)
+        }
     }
 
 #if DEBUG
