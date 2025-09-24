@@ -35,7 +35,8 @@ final class PeekManager: ObservableObject {
             targetURL: url,
             sourceTabId: tab?.id,
             sourceURL: tab?.url,
-            windowId: windowId
+            windowId: windowId,
+            sourceProfileId: tab?.resolveProfile()?.id
         )
 
         // Create WebView FIRST, then activate

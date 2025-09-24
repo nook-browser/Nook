@@ -16,6 +16,7 @@ class PeekSession: ObservableObject, Identifiable {
     let sourceURL: URL?
     let targetURL: URL
     let windowId: UUID
+    let sourceProfileId: UUID?
 
     @Published var currentURL: URL
     @Published var title: String
@@ -27,12 +28,14 @@ class PeekSession: ObservableObject, Identifiable {
         targetURL: URL,
         sourceTabId: UUID?,
         sourceURL: URL?,
-        windowId: UUID
+        windowId: UUID,
+        sourceProfileId: UUID? = nil
     ) {
         self.targetURL = targetURL
         self.sourceTabId = sourceTabId
         self.sourceURL = sourceURL
         self.windowId = windowId
+        self.sourceProfileId = sourceProfileId
         self.currentURL = targetURL
         self.title = targetURL.absoluteString
     }

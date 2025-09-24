@@ -17,8 +17,15 @@ struct PeekWebView: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> WKWebView {
-        // Use standalone WebView configuration (separate from tab management)
-        let configuration = BrowserConfiguration.shared.webViewConfiguration
+        // Use profile-specific WebView configuration if available
+        let configuration: WKWebViewConfiguration
+        if let profileId = session.sourceProfileId,
+           let profile = peekManager?.browserManager?.profileManager.profiles.first(where: { $0.id == profileId }) {
+            configuration = BrowserConfiguration.shared.cacheOptimizedWebViewConfiguration(for: profile)
+        } else {
+            // Fallback to default configuration
+            configuration = BrowserConfiguration.shared.webViewConfiguration
+        }
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
