@@ -26,6 +26,9 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     // If true, this tab is created to host a popup window; do not perform initial load.
     var isPopupHost: Bool = false
 
+    // Track Option key state for Peek functionality
+    var isOptionKeyDown: Bool = false
+
     // MARK: - Favicon Cache
     // Global favicon cache shared across profiles by design to increase hit rate
     // and reduce duplicate downloads. Favicons are cached persistently to survive app restarts.
@@ -1997,6 +2000,20 @@ extension Tab: WKNavigationDelegate {
             browserManager?.maybeShowOAuthAssist(for: url, in: self)
         }
 
+        // Check for Option+click to trigger Peek for any link
+        if let url = navigationAction.request.url,
+           navigationAction.navigationType == .linkActivated,
+           isOptionKeyDown {
+
+            // Trigger Peek instead of normal navigation
+            decisionHandler(.cancel)
+            RunLoop.current.perform { [weak self] in
+                guard let self else { return }
+                self.browserManager?.peekManager.presentExternalURL(url, from: self)
+            }
+            return
+        }
+
         if #available(macOS 12.3, *), navigationAction.shouldPerformDownload {
             decisionHandler(.download)
             return
@@ -2315,6 +2332,26 @@ extension Tab: WKScriptMessageHandler {
         return false
     }
 
+    // MARK: - Peek Detection
+
+    private func shouldRedirectToPeek(url: URL) -> Bool {
+        // Always redirect to Peek if Option key is down (for any URL)
+        if isOptionKeyDown {
+            return true
+        }
+
+        // Check if this is an external domain URL
+        guard let currentHost = self.url.host,
+              let newHost = url.host else { return false }
+
+        // If hosts are different, it's an external URL
+        if currentHost != newHost {
+            return true
+        }
+
+        return false
+    }
+
 }
 
 // MARK: - WKUIDelegate
@@ -2338,9 +2375,22 @@ extension Tab: WKUIDelegate {
             return nil // Don't create a WebView, we're using the miniwindow
         }
         
+        // For regular popups, check if this should be redirected to Peek
+        if let url = navigationAction.request.url,
+           shouldRedirectToPeek(url: url) {
+
+            // Trigger Peek after returning control to WebKit to avoid runloop-mode issues
+            RunLoop.current.perform { [weak self, weak bm] in
+                guard let self, let bm else { return }
+                bm.peekManager.presentExternalURL(url, from: self)
+            }
+
+            return nil // Don't create a WebView, we're using Peek
+        }
+
         // For regular popups, create a new webView with the EXACT configuration that WebKit provided
         let newWebView = FocusableWKWebView(frame: .zero, configuration: configuration)
-        
+
         // Create a new tab to manage this webView
         let space = bm.tabManager.currentSpace
         let newTab = bm.tabManager.createPopupTab(in: space)

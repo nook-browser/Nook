@@ -76,7 +76,10 @@ struct WindowView: View {
 
             CommandPaletteView()
             DialogView()
-            
+
+            // Peek overlay for external link previews
+            PeekOverlayView()
+
             // Find bar overlay - centered top bar
             if browserManager.findManager.isFindBarVisible {
                 VStack {
