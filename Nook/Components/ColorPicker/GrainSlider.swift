@@ -3,7 +3,10 @@ import SwiftUI
 // MARK: - GrainSlider
 // Custom horizontal slider with a sine-wave track and vertical white thumb
 struct GrainSlider: View {
-    @Binding var value: Double // 0...1
+    @Binding var value: Double
+    @StateObject private var dragLockManager = DragLockManager.shared
+    @State private var dragSessionID: String = UUID().uuidString
+    @State private var isDragging = false // 0...1
 
     var body: some View {
         GeometryReader { proxy in
@@ -36,8 +39,18 @@ struct GrainSlider: View {
                     .shadow(color: .black.opacity(0.12), radius: 1, x: 0, y: 1)
             }
             .gesture(DragGesture(minimumDistance: 0).onChanged { g in
+                if !isDragging {
+                    guard dragLockManager.startDrag(ownerID: dragSessionID) else {
+                        print("🚫 [GrainSlider] Drag blocked - \(dragLockManager.debugInfo)")
+                        return
+                    }
+                    isDragging = true
+                }
                 let x = min(max(0, g.location.x), w)
                 value = Double(x / w)
+            }.onEnded { _ in
+                isDragging = false
+                dragLockManager.endDrag(ownerID: dragSessionID)
             })
         }
         .frame(height: 44)

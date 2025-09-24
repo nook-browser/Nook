@@ -121,17 +121,6 @@ struct SidebarView: View {
             && !browserManager.isTransitioningProfile
 
         let content = VStack(spacing: 8) {
-            // Window drag zone above navigation buttons
-            Rectangle()
-                .fill(Color.clear)
-                .frame(height: 20)
-                .contentShape(Rectangle())
-                .conditionalWindowDrag()
-                .onTapGesture(count: 2) {
-                    DispatchQueue.main.async {
-                        zoomCurrentWindow()
-                    }
-                }
 
             HStack(spacing: 2) {
                 NavButtonsView()
@@ -153,8 +142,19 @@ struct SidebarView: View {
             .padding(.horizontal, 8)
             .modifier(FallbackDropBelowEssentialsModifier())
 
-            spacesScrollView
-                .padding(.horizontal, 8)
+            ZStack {
+                spacesScrollView
+                    .padding(.horizontal, 8)
+                    .zIndex(1)
+
+                // Bottom spacer for window dragging - overlay that doesn't compete for space
+                Color.clear
+                    .contentShape(Rectangle())
+                    .conditionalWindowDrag()
+                    .frame(minHeight: 40)
+                    .zIndex(0)
+            }
+
 
             if showDownloadsMenu {
                 SidebarMenuHoverDownloads(
@@ -294,7 +294,7 @@ struct SidebarView: View {
                             .environmentObject(windowState)
                             .environmentObject(browserManager.splitManager)
                         }
-                        .frame(maxWidth: effectiveWidth)
+                        .frame(maxWidth: availableContentWidth)
                         .tag(index)
                     }
                 }
@@ -336,7 +336,8 @@ struct SidebarView: View {
                     // This fixes hit testing issues after space/tab switches
                     activeTabRefreshTrigger.toggle()
                 }
-            }
+
+                }
         }
     }
 

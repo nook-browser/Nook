@@ -381,7 +381,7 @@ struct BackgroundWindowModifier: NSViewRepresentable {
                 window.backgroundColor = .clear
                 window.titleVisibility = .hidden
                 window.isReleasedWhenClosed = false
-                window.isMovableByWindowBackground = true
+                // window.isMovableByWindowBackground = true // Disabled - use SwiftUI-based window drag system instead
                 window.isMovable = true
                 window.styleMask = [
                     .titled, .closable, .miniaturizable, .resizable,

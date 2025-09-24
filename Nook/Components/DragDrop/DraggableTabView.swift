@@ -104,6 +104,10 @@ struct DraggableTabView<Content: View>: View {
                         dragLockManager.endDrag(ownerID: dragSessionID)
                     }
             )
+            .onReceive(NotificationCenter.default.publisher(for: .tabDragDidEnd)) { _ in
+                // Ensure drag lock is released when any tab drag ends
+                dragLockManager.endDrag(ownerID: dragSessionID)
+            }
     }
 }
 

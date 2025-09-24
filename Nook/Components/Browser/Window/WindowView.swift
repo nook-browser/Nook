@@ -13,44 +13,54 @@ struct WindowView: View {
     @StateObject private var hoverSidebarManager = HoverSidebarManager()
     @Environment(\.colorScheme) var colorScheme
 
+    // Calculate webview Y offset (where the web content starts)
+    private var webViewYOffset: CGFloat {
+        // Approximate Y offset for web content start (nav bar + URL bar + padding)
+        return 20 // Accounts for navigation area height
+    }
+
     var body: some View {
         let isDark = colorScheme == .dark
-        ZStack {
-            // Gradient background for the current space (bottom-most layer)
-            SpaceGradientBackgroundView()
-                .environmentObject(windowState)
-
-            // Attach background context menu to the window background layer
-            Color.white.opacity(isDark ? 0.3 : 0.4)
-                .ignoresSafeArea(.all)
-            WindowBackgroundView()
-                .contextMenu {
-                    Button("Customize Space Gradient...") {
-                        browserManager.showGradientEditor()
-                    }
-                    .disabled(browserManager.tabManager.currentSpace == nil)
-                }
-
-            // Main content flush: sidebar touches left edge; webview touches sidebar
-            HStack(spacing: 0) {
-                SidebarView()
-                    .environmentObject(browserManager)
+        GeometryReader { geometry in
+            ZStack {
+                // Gradient background for the current space (bottom-most layer)
+                SpaceGradientBackgroundView()
                     .environmentObject(windowState)
 
-                VStack(spacing: 0) {
-                    WebsiteLoadingIndicator()
-                    WebsiteView()
+                // Attach background context menu to the window background layer
+                Color.white.opacity(isDark ? 0.3 : 0.4)
+                    .ignoresSafeArea(.all)
+                WindowBackgroundView()
+                    .contextMenu {
+                        Button("Customize Space Gradient...") {
+                            browserManager.showGradientEditor()
+                        }
+                        .disabled(browserManager.tabManager.currentSpace == nil)
+                    }
+
+                // Main content flush: sidebar touches left edge; webview touches sidebar
+                HStack(spacing: 0) {
+                    SidebarView()
+                        .environmentObject(browserManager)
+                        .environmentObject(windowState)
+
+                    VStack(spacing: 0) {
+                        WebsiteLoadingIndicator()
+                        WebsiteView()
+                    }
+                    .padding(.bottom, 8)
                 }
-                .padding(.bottom, 8)
-            }
-            // Overlay the resize handle exactly at the sidebar/webview boundary (no visual gap)
+            // Overlay the resize handle spanning the sidebar/webview boundary
             .overlay(alignment: .topLeading) {
                 if windowState.isSidebarVisible {
-                    // Position at current sidebar width (flush boundary)
+                    // Calculate dynamic webview height based on window size
+                    let dynamicWebViewHeight = geometry.size.height - 40 // Subtract navigation area
+
+                    // Position to span 14pts into sidebar and 2pts into web content (moved 6pts left)
                     SidebarResizeView()
-                        .frame(maxHeight: .infinity)
-                        .offset(x: windowState.sidebarWidth)
-                        .zIndex(1000)
+                        .frame(height: dynamicWebViewHeight) // Dynamic height based on window size
+                        .offset(x: windowState.sidebarWidth, y: webViewYOffset) // Position to match webview
+                        .zIndex(2000) // Higher z-index to ensure it's above all other elements
                         .environmentObject(windowState)
                 }
             }
@@ -81,8 +91,6 @@ struct WindowView: View {
                 }
             }
             
-            // (Removed) insertion line overlay; Ora-style DnD uses live reordering
-
             // Profile switch toast overlay (matches WebsitePopup style/presentation)
             VStack {
                 HStack {
@@ -96,26 +104,27 @@ struct WindowView: View {
                 }
                 Spacer()
             }
+            }
+            // Named coordinate space for geometry preferences
+            .coordinateSpace(name: "WindowSpace")
+            // Keep BrowserManager aware of URL bar frame in window space
+            .onPreferenceChange(URLBarFramePreferenceKey.self) { frame in
+                browserManager.urlBarFrame = frame
+                windowState.urlBarFrame = frame
+            }
+            // Attach hover sidebar manager lifecycle
+            .onAppear {
+                hoverSidebarManager.attach(browserManager: browserManager)
+                hoverSidebarManager.start()
+            }
+            .onDisappear {
+                hoverSidebarManager.stop()
+            }
+            .environmentObject(browserManager)
+            .environmentObject(browserManager.gradientColorManager)
+            .environmentObject(browserManager.splitManager)
+            .environmentObject(hoverSidebarManager)
         }
-        // Named coordinate space for geometry preferences
-        .coordinateSpace(name: "WindowSpace")
-        // Keep BrowserManager aware of URL bar frame in window space
-        .onPreferenceChange(URLBarFramePreferenceKey.self) { frame in
-            browserManager.urlBarFrame = frame
-            windowState.urlBarFrame = frame
-        }
-        // Attach hover sidebar manager lifecycle
-        .onAppear {
-            hoverSidebarManager.attach(browserManager: browserManager)
-            hoverSidebarManager.start()
-        }
-        .onDisappear {
-            hoverSidebarManager.stop()
-        }
-        .environmentObject(browserManager)
-        .environmentObject(browserManager.gradientColorManager)
-        .environmentObject(browserManager.splitManager)
-        .environmentObject(hoverSidebarManager)
     }
 
 }
