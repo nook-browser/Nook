@@ -16,6 +16,7 @@ struct ContentView: View {
         WindowView()
             .environmentObject(windowState)
             .background(WindowFocusBridge(windowState: windowState, browserManager: browserManager))
+            .frame(minWidth: 470, minHeight: 382)
             .onAppear {
                 // Register this window state with the browser manager
                 browserManager.registerWindowState(windowState)
