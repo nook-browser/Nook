@@ -168,6 +168,8 @@ struct NookCommands: Commands {
                     .ignoresSafeArea(.all)
                     .environmentObject(browserManager))
                 newWindow.title = "Nook"
+                newWindow.minSize = NSSize(width: 470, height: 382)
+                newWindow.contentMinSize = NSSize(width: 470, height: 382)
                 newWindow.center()
                 newWindow.makeKeyAndOrderFront(nil)
             }
@@ -391,6 +393,8 @@ struct BackgroundWindowModifier: NSViewRepresentable {
                 window.standardWindowButton(.closeButton)?.isHidden = true
                 window.standardWindowButton(.zoomButton)?.isHidden = true
                 window.standardWindowButton(.miniaturizeButton)?.isHidden = true
+                window.minSize = NSSize(width: 470, height: 382)
+                window.contentMinSize = NSSize(width: 470, height: 382)
             }
         }
         return view
