@@ -19,6 +19,7 @@ final class TabEntity {
     var spaceId: UUID?
     // Profile association for global pinned tabs (essentials). Optional for migration compatibility.
     var profileId: UUID?
+    var folderId: UUID? // Folder membership for tabs within spacepinned area
 
     init(
         id: UUID,
@@ -28,7 +29,8 @@ final class TabEntity {
         isSpacePinned: Bool = false,
         index: Int,
         spaceId: UUID?,
-        profileId: UUID? = nil
+        profileId: UUID? = nil,
+        folderId: UUID? = nil
     ) {
         self.id = id
         self.urlString = urlString
@@ -38,6 +40,36 @@ final class TabEntity {
         self.index = index
         self.spaceId = spaceId
         self.profileId = profileId
+        self.folderId = folderId
+    }
+}
+
+@Model
+final class FolderEntity {
+    @Attribute(.unique) var id: UUID
+    var name: String
+    var icon: String
+    var color: String
+    var spaceId: UUID
+    var isOpen: Bool
+    var index: Int
+
+    init(
+        id: UUID,
+        name: String,
+        icon: String,
+        color: String,
+        spaceId: UUID,
+        isOpen: Bool,
+        index: Int
+    ) {
+        self.id = id
+        self.name = name
+        self.icon = icon
+        self.color = color
+        self.spaceId = spaceId
+        self.isOpen = isOpen
+        self.index = index
     }
 }
 

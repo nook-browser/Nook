@@ -99,6 +99,12 @@ struct SpaceTitle: View {
                 } label: {
                     Label("Change Icon", systemImage: "face.smiling")
                 }
+                Divider()
+                Button {
+                    createFolder()
+                } label: {
+                    Label("Create Folder", systemImage: "folder.badge.plus")
+                }
                 Button(role: .destructive) {
                     deleteSpace()
                 } label: {
@@ -203,6 +209,10 @@ struct SpaceTitle: View {
 
     private func deleteSpace() {
         browserManager.tabManager.removeSpace(space.id)
+    }
+
+    private func createFolder() {
+        browserManager.tabManager.createFolder(for: space.id)
     }
 
     private func assignProfile(_ id: UUID) {

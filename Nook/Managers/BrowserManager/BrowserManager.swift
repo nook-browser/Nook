@@ -33,6 +33,7 @@ final class Persistence {
         SpaceEntity.self,
         ProfileEntity.self,
         TabEntity.self,
+        FolderEntity.self,
         TabsStateEntity.self,
         HistoryEntity.self,
         ExtensionEntity.self
@@ -1944,17 +1945,34 @@ class BrowserManager: ObservableObject {
     
     /// Get tabs that should be displayed in a specific window
     func tabsForDisplay(in windowState: BrowserWindowState) -> [Tab] {
+        print("🔍 tabsForDisplay called for window \(windowState.id.uuidString.prefix(8))...")
+
         // Get tabs for the window's current space
         let currentSpace = windowState.currentSpaceId.flatMap { id in
             tabManager.spaces.first(where: { $0.id == id })
         }
+
+        print("   - windowState.currentSpaceId: \(windowState.currentSpaceId?.uuidString ?? "nil")")
+        print("   - resolved currentSpace: \(currentSpace?.name ?? "nil") (id: \(currentSpace?.id.uuidString.prefix(8) ?? "nil"))")
 
         let profileId = windowState.currentProfileId ?? currentSpace?.profileId ?? currentProfile?.id
         let essentials = profileId.flatMap { tabManager.essentialTabs(for: $0) } ?? []
         let spacePinned = currentSpace.map { tabManager.spacePinnedTabs(for: $0.id) } ?? []
         let regularTabs = currentSpace.map { tabManager.tabs(in: $0) } ?? []
 
-        return essentials + spacePinned + regularTabs
+        print("   - essentials: \(essentials.count) tabs")
+        print("   - spacePinned: \(spacePinned.count) tabs")
+        print("   - regularTabs: \(regularTabs.count) tabs")
+
+        print("   - spacePinned tabs details:")
+        for tab in spacePinned {
+            print("     * \(tab.name) (id: \(tab.id.uuidString.prefix(8))..., folderId: \(tab.folderId?.uuidString.prefix(8) ?? "nil"))")
+        }
+
+        let result = essentials + spacePinned + regularTabs
+        print("   - TOTAL tabsForDisplay: \(result.count)")
+
+        return result
     }
     
     /// Check if a tab is frozen (being displayed in another window)
@@ -2070,7 +2088,9 @@ class BrowserManager: ObservableObject {
         print("🪟 [BrowserManager] Created new web view for tab \(tab.name) in window \(windowId)")
         return newWebView
     }
+
     
+
     /// Synchronize a tab's state across all windows that are displaying it
     func syncTabAcrossWindows(_ tabId: UUID) {
         // Prevent recursive sync calls

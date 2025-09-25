@@ -8,6 +8,21 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+// MARK: - Supporting Types
+struct FolderWithTabs: Hashable {
+    let folder: TabFolder
+    let tabs: [Tab]
+
+    // Implement Hashable
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(folder.id)
+    }
+
+    static func == (lhs: FolderWithTabs, rhs: FolderWithTabs) -> Bool {
+        lhs.folder.id == rhs.folder.id && lhs.tabs.count == rhs.tabs.count
+    }
+}
+
 struct SpaceView: View {
     let space: Space
     let isActive: Bool
@@ -15,7 +30,8 @@ struct SpaceView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var windowState: BrowserWindowState
     @State private var draggedItem: UUID? = nil
-    
+    @State private var spacePinnedPreviewIndex: Int? = nil
+
     let onActivateTab: (Tab) -> Void
     let onCloseTab: (Tab) -> Void
     let onPinTab: (Tab) -> Void
@@ -31,6 +47,37 @@ struct SpaceView: View {
     
     private var spacePinnedTabs: [Tab] {
         browserManager.tabManager.spacePinnedTabs(for: space.id)
+    }
+
+    private var folders: [TabFolder] {
+        browserManager.tabManager.folders(for: space.id)
+    }
+
+    private var spacePinnedItems: [AnyHashable] {
+        // Group space-pinned tabs by folderId and create the display structure
+        var items: [AnyHashable] = []
+
+        // Group tabs by folderId
+        let tabsByFolderId = Dictionary(grouping: spacePinnedTabs) { tab in
+            tab.folderId
+        }
+
+        // First, add folders with their tabs embedded
+        for folder in folders {
+            // Get tabs that belong to this folder
+            let folderTabs = tabsByFolderId[folder.id]?.sorted { $0.index < $1.index } ?? []
+
+            // Create a folder wrapper that contains both the folder and its tabs
+            items.append(FolderWithTabs(folder: folder, tabs: folderTabs))
+        }
+
+        // Then, add space-pinned tabs that are not in any folder
+        if let nonFolderTabs = tabsByFolderId[nil] {
+            let sortedTabs = nonFolderTabs.sorted { $0.index < $1.index }
+            items.append(contentsOf: sortedTabs)
+        }
+
+        return items
     }
     
     // (no coordinate spaces needed for simple DnD)
@@ -74,16 +121,35 @@ struct SpaceView: View {
     }
 
     private var pinnedTabsList: some View {
-        VStack(spacing: 2) {
-            ForEach(spacePinnedTabs, id: \.id) { tab in
-                pinnedTabView(tab)
+        let items = spacePinnedItems
+
+        return VStack(spacing: 2) {
+            ForEach(Array(items.enumerated()), id: \.element) { index, item in
+                spacePinnedSpacer(before: index)
+
+                if let folderWithTabs = item as? FolderWithTabs {
+                    TabFolderView(
+                        folder: folderWithTabs.folder,
+                        space: space,
+                        onRename: { renameFolder(folderWithTabs.folder) },
+                        onDelete: { deleteFolder(folderWithTabs.folder) },
+                        onAddTab: { addTabToFolder(folderWithTabs.folder) },
+                        onActivateTab: { onActivateTab($0) }
+                    )
+                    .environmentObject(browserManager)
+                    .environmentObject(windowState)
+                } else if let tab = item as? Tab {
+                    pinnedTabView(tab)
+                }
             }
+
+            spacePinnedSpacer(before: items.count)
         }
         .contentShape(Rectangle())
         .onDrop(
             of: [.text],
             delegate: SidebarSectionDropDelegateSimple(
-                itemsCount: { spacePinnedTabs.count },
+                itemsCount: { browserManager.tabManager.spacePinnedTabs(for: space.id).count },
                 draggedItem: $draggedItem,
                 targetSection: .spacePinned(space.id),
                 tabManager: browserManager.tabManager
@@ -140,6 +206,79 @@ struct SpaceView: View {
                     tabManager: browserManager.tabManager
                 )
             )
+    }
+
+    @ViewBuilder
+    private func spacePinnedSpacer(before displayIndex: Int) -> some View {
+        let isActive = spacePinnedPreviewIndex == displayIndex
+
+        Color.clear
+            .frame(height: 8)
+            .contentShape(Rectangle())
+            .overlay(alignment: .center) {
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(AppColors.controlBackgroundHover)
+                    .frame(height: isActive ? 4 : 0)
+                    .padding(.horizontal, 8)
+                    .opacity(isActive ? 1 : 0)
+                    .animation(.easeInOut(duration: 0.12), value: isActive)
+            }
+            .onDrop(
+                of: [.text],
+                delegate: SidebarSectionDropDelegateSimple(
+                    itemsCount: { 0 },
+                    draggedItem: $draggedItem,
+                    targetSection: .spacePinned(space.id),
+                    tabManager: browserManager.tabManager,
+                    targetIndex: { spacePinnedInsertionIndex(before: displayIndex) },
+                    onDropEntered: { spacePinnedPreviewIndex = displayIndex },
+                    onDropCompleted: { spacePinnedPreviewIndex = nil },
+                    onDropExited: {
+                        if spacePinnedPreviewIndex == displayIndex {
+                            spacePinnedPreviewIndex = nil
+                        }
+                    }
+                )
+            )
+    }
+
+    private func spacePinnedInsertionIndex(before displayIndex: Int) -> Int {
+        let all = browserManager.tabManager.spacePinnedTabs(for: space.id)
+        guard !all.isEmpty else { return 0 }
+
+        if displayIndex <= 0 { return 0 }
+        if displayIndex >= spacePinnedItems.count { return all.count }
+
+        let nextItem = spacePinnedItems[displayIndex]
+        if let anchor = spacePinnedAnchorIndex(for: nextItem, within: all) {
+            return max(0, min(anchor, all.count))
+        }
+
+        if displayIndex > 0 {
+            let previousItem = spacePinnedItems[displayIndex - 1]
+            if let previousAnchor = spacePinnedAnchorIndex(for: previousItem, within: all) {
+                return max(0, min(previousAnchor + 1, all.count))
+            }
+        }
+
+        return all.count
+    }
+
+    private func spacePinnedAnchorIndex(for item: AnyHashable, within all: [Tab]) -> Int? {
+        if let tab = item as? Tab {
+            return tab.index
+        }
+
+        if let folderWithTabs = item as? FolderWithTabs {
+            let tabs = all.filter { $0.folderId == folderWithTabs.folder.id }
+                .sorted { $0.index < $1.index }
+            if let first = tabs.first {
+                return first.index
+            }
+            return folderWithTabs.folder.index
+        }
+
+        return nil
     }
 
     private var newTabButtonSection: some View {
@@ -303,6 +442,26 @@ struct SpaceView: View {
                 )
             )
     }
+
+    // MARK: - Folder Management Helper Methods
+
+    private func renameFolder(_ folder: TabFolder) {
+        // TODO: Implement folder rename dialog
+        // For now, just log the action
+        print("Rename folder: \(folder.name)")
+    }
+
+    private func deleteFolder(_ folder: TabFolder) {
+        browserManager.tabManager.deleteFolder(folder.id)
+    }
+
+    private func addTabToFolder(_ folder: TabFolder) {
+        // Create a new tab and add it to the folder
+        let newTab = browserManager.tabManager.createNewTab(in: space)
+        newTab.folderId = folder.id
+        newTab.isSpacePinned = true
+        browserManager.tabManager.persistSnapshot()
+    }
     
     private func isFirstTab(_ tab: Tab) -> Bool {
         return tabs.first?.id == tab.id
@@ -324,4 +483,3 @@ struct SpaceView: View {
 
     // Removed insertion overlays and geometry preference keys (simplified DnD)
 }
-

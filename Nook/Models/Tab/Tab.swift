@@ -29,6 +29,11 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     // Track Option key state for Peek functionality
     var isOptionKeyDown: Bool = false
 
+    // MARK: - Pin State
+    var isPinned: Bool = false // Global pinned (essentials)
+    var isSpacePinned: Bool = false // Space-level pinned
+    var folderId: UUID? // Folder membership for tabs within spacepinned area
+
     // MARK: - Favicon Cache
     // Global favicon cache shared across profiles by design to increase hit rate
     // and reduce duplicate downloads. Favicons are cached persistently to survive app restarts.
@@ -169,6 +174,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     var isLoading: Bool {
         return loadingState.isLoading
     }
+
+    
 
     // MARK: - Initializers
     init(

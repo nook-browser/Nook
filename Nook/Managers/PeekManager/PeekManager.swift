@@ -66,6 +66,7 @@ final class PeekManager: ObservableObject {
         currentSession = nil
     }
 
+
     func moveToSplitView() {
         guard let session = currentSession,
               let browserManager else { return }

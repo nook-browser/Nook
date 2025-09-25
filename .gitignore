@@ -1,8 +1,10 @@
 # Xcode
 #
 # gitignore contributors: remember to update Global/Xcode.gitignore, Objective-C.gitignore & Swift.gitignore
-
-
+sessions-config.json
+.claude
+Nook/.claude
+.crush
 *.md
 
 ## User settings

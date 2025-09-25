@@ -581,6 +581,9 @@ struct DragDropPreview: View {
 #if DEBUG
             print("❌ Invalid drop container")
 #endif
+        case .folder(_):
+            // Handle folder drop container
+            break
         }
     }
 }
