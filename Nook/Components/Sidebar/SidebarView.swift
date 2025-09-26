@@ -331,9 +331,9 @@ struct SidebarView: View {
                         activeSpaceIndex = targetIndex
                     }
                 }
-                .onChange(of: windowState.currentTabId) { _, _ in
-                    // Force PageView to recreate when active tab changes
-                    // This fixes hit testing issues after space/tab switches
+                .onChange(of: windowState.currentSpaceId) { _, _ in
+                    // Force PageView to recreate when SPACE changes (not tab changes)
+                    // This fixes hit testing issues after space switches while preserving scroll position
                     activeTabRefreshTrigger.toggle()
                 }
 

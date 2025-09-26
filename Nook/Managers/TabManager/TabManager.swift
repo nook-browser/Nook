@@ -449,6 +449,23 @@ class TabManager: ObservableObject {
         }
     }
 
+    deinit {
+        // MEMORY LEAK FIX: Clean up all tab references and break potential cycles
+        Task { @MainActor in
+            tabsBySpace.removeAll()
+            spacePinnedTabs.removeAll()
+            foldersBySpace.removeAll()
+            pinnedByProfile.removeAll()
+            pendingPinnedWithoutProfile.removeAll()
+            spaces.removeAll()
+            currentTab = nil
+            currentSpace = nil
+            browserManager = nil
+
+            print("🧹 [TabManager] Cleaned up all tab resources")
+        }
+    }
+
     // MARK: - Convenience
 
     var tabs: [Tab] {
@@ -1093,6 +1110,19 @@ class TabManager: ObservableObject {
             return
         }
         removeTab(currentTab.id)
+    }
+
+    func clearRegularTabs(for spaceId: UUID) {
+        guard let tabs = tabsBySpace[spaceId] else { return }
+
+        print("🧹 [TabManager] Clearing \(tabs.count) regular tabs for space \(spaceId)")
+
+        // Remove all regular tabs for this space
+        for tab in tabs {
+            removeTab(tab.id)
+        }
+
+        persistSnapshot()
     }
     
     func unloadTab(_ tab: Tab) {

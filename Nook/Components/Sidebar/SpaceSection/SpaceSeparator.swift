@@ -8,21 +8,22 @@ import SwiftUI
 
 struct SpaceSeparator: View {
     @State private var isHovering: Bool = false
+    let onClear: () -> Void
+
     var body: some View {
         HStack {
             RoundedRectangle(cornerRadius: 100)
                 .fill(Color.white.opacity(0.1))
                 .frame(height: 2)
             if(isHovering) {
-                Button {
-                    
-                } label: {
+                Button(action: onClear) {
                     Text("↓ Clear")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Color.white.opacity(0.2))
                         .padding(.horizontal, 4)
                 }
                 .buttonStyle(PlainButtonStyle())
+                .help("Clear all regular tabs")
             }
         }
         .frame(height: 2)
@@ -32,7 +33,5 @@ struct SpaceSeparator: View {
                 isHovering = hovering
             }
         }
-        
-        
     }
 }
