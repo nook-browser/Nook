@@ -1,15 +1,6 @@
 {
-  "originHash" : "f66a26003fee5b05442420b3ea7f47be0643bc9c28027b21b2c27b454c74bdf3",
+  "originHash" : "4a8f02fd451faadc3a76a827d5f316e8ac8c630391e7c74d0609f08b9aa4ceeb",
   "pins" : [
-    {
-      "identity" : "biguipaging",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/notsobigcompany/BigUIPaging.git",
-      "state" : {
-        "revision" : "40fa6e1683bd47b962e216c05377bfd1b8f760de",
-        "version" : "0.0.3"
-      }
-    },
     {
       "identity" : "faviconfinder",
       "kind" : "remoteSourceControl",
@@ -26,15 +17,6 @@
       "state" : {
         "revision" : "a81b1a5ac933dee8c6cfccf05d5ffcc5eb8c7ec4",
         "version" : "2.10.0"
-      }
-    },
-    {
-      "identity" : "swiftuipager",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/fermoya/SwiftUIPager.git",
-      "state" : {
-        "revision" : "4ddc04c801aac143090bb14cf26603a3bf9c74cb",
-        "version" : "2.5.0"
       }
     }
   ],

@@ -33,7 +33,6 @@ struct TabPositionPreferenceKey: PreferenceKey {
 struct SpaceView: View {
     let space: Space
     let isActive: Bool
-    let width: CGFloat
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var windowState: BrowserWindowState
     @State private var draggedItem: UUID? = nil
@@ -61,6 +60,20 @@ struct SpaceView: View {
     let onMoveTabDown: (Tab) -> Void
     let onMuteTab: (Tab) -> Void
     @EnvironmentObject var splitManager: SplitViewManager
+    
+    private var contentWidth: CGFloat {
+        let measured = windowState.sidebarContentWidth
+        if measured > 0 {
+            return measured
+        }
+        let fallbackWidth: CGFloat
+        if windowState.isSidebarVisible {
+            fallbackWidth = windowState.sidebarWidth
+        } else {
+            fallbackWidth = browserManager.getSavedSidebarWidth(for: windowState)
+        }
+        return max(fallbackWidth - 16, 0)
+    }
     
     // Get tabs directly from TabManager to ensure proper observation
     private var tabs: [Tab] {
@@ -112,7 +125,7 @@ struct SpaceView: View {
                 mainContentContainer
             }
         }
-        .frame(minWidth: 0, maxWidth: width)
+        .frame(minWidth: 0, maxWidth: contentWidth)
         .contentShape(Rectangle())
         .coordinateSpace(name: "SpaceViewCoordinateSpace")
         .onReceive(NotificationCenter.default.publisher(for: .tabDragDidEnd)) { _ in
@@ -130,7 +143,7 @@ struct SpaceView: View {
                             newTabButtonSectionWithClear
                             regularTabsList
                         }
-                        .frame(minWidth: 0, maxWidth: width)
+                        .frame(minWidth: 0, maxWidth: contentWidth)
                         .coordinateSpace(name: "ScrollSpace")
                     }
                     .contentShape(Rectangle())
@@ -456,7 +469,7 @@ struct SpaceView: View {
                 .conditionalWindowDrag()
                 .frame(height: 100)
         }
-        .frame(minWidth: 0, maxWidth: width)
+        .frame(minWidth: 0, maxWidth: contentWidth)
         .contentShape(Rectangle())
         .padding(.top, 8)
         .onDrop(

@@ -308,6 +308,7 @@ private extension BrowserManager.ProfileSwitchContext {
 class BrowserManager: ObservableObject {
     // Legacy global state - kept for backward compatibility during transition
     @Published var sidebarWidth: CGFloat = 250
+    @Published var sidebarContentWidth: CGFloat = 234
     @Published var isSidebarVisible: Bool = true
     @Published var isCommandPaletteVisible: Bool = false
     // Mini palette shown when clicking the URL bar
@@ -697,14 +698,17 @@ class BrowserManager: ObservableObject {
         }
         sidebarWidth = width
         savedSidebarWidth = width
+        sidebarContentWidth = max(width - 16, 0)
     }
-    
+
     func updateSidebarWidth(_ width: CGFloat, for windowState: BrowserWindowState) {
         windowState.sidebarWidth = width
         windowState.savedSidebarWidth = width
+        windowState.sidebarContentWidth = max(width - 16, 0)
         if activeWindowState?.id == windowState.id {
             sidebarWidth = width
             savedSidebarWidth = width
+            sidebarContentWidth = max(width - 16, 0)
         }
     }
     
@@ -720,29 +724,35 @@ class BrowserManager: ObservableObject {
                 isSidebarVisible.toggle()
                 if isSidebarVisible {
                     sidebarWidth = savedSidebarWidth
+                    sidebarContentWidth = max(savedSidebarWidth - 16, 0)
                 } else {
                     savedSidebarWidth = sidebarWidth
                     sidebarWidth = 0
+                    sidebarContentWidth = 0
                 }
             }
             saveSidebarSettings()
         }
     }
-    
+
     func toggleSidebar(for windowState: BrowserWindowState) {
         withAnimation(.easeInOut(duration: 0.1)) {
             windowState.isSidebarVisible.toggle()
             if windowState.isSidebarVisible {
-                windowState.sidebarWidth = windowState.savedSidebarWidth
+                let restoredWidth = windowState.savedSidebarWidth
+                windowState.sidebarWidth = restoredWidth
+                windowState.sidebarContentWidth = max(restoredWidth - 16, 0)
             } else {
                 windowState.savedSidebarWidth = max(windowState.sidebarWidth, 0)
                 windowState.sidebarWidth = 0
+                windowState.sidebarContentWidth = 0
             }
         }
         if activeWindowState?.id == windowState.id {
             isSidebarVisible = windowState.isSidebarVisible
             sidebarWidth = windowState.sidebarWidth
             savedSidebarWidth = windowState.savedSidebarWidth
+            sidebarContentWidth = windowState.sidebarContentWidth
         }
         saveSidebarSettings()
     }
@@ -1079,6 +1089,7 @@ class BrowserManager: ObservableObject {
             savedSidebarWidth = savedWidth
             sidebarWidth = savedVisibility ? savedWidth : 0
         }
+        sidebarContentWidth = max(sidebarWidth - 16, 0)
         isSidebarVisible = savedVisibility
     }
 
@@ -1690,6 +1701,7 @@ class BrowserManager: ObservableObject {
     func registerWindowState(_ windowState: BrowserWindowState) {
         // Initialize window state with current global state for backward compatibility
         windowState.sidebarWidth = sidebarWidth
+        windowState.sidebarContentWidth = max(sidebarWidth - 16, 0)
         windowState.isSidebarVisible = isSidebarVisible
         windowState.savedSidebarWidth = savedSidebarWidth
         windowState.isCommandPaletteVisible = false
@@ -1852,6 +1864,7 @@ class BrowserManager: ObservableObject {
         activeWindowState = windowState
         sidebarWidth = windowState.sidebarWidth
         savedSidebarWidth = windowState.savedSidebarWidth
+        sidebarContentWidth = windowState.sidebarContentWidth
         isSidebarVisible = windowState.isSidebarVisible
         urlBarFrame = windowState.urlBarFrame
         gradientColorManager.setImmediate(windowState.activeGradient)
