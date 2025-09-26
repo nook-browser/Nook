@@ -5,7 +5,8 @@ sessions-config.json
 .claude
 Nook/.claude
 .crush
-*.md
+/*.md
+/sessions
 
 ## User settings
 xcuserdata/

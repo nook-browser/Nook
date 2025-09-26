@@ -143,7 +143,6 @@ struct SidebarView: View {
 
             ZStack {
                 spacesScrollView
-                    .padding(.horizontal, 8)
                     .zIndex(1)
 
                 // Bottom spacer for window dragging - overlay that doesn't compete for space
@@ -284,7 +283,7 @@ struct SidebarView: View {
                         makeSpaceView(for: space, index: index)
                     }
                 }
-                .frame(maxWidth: effectiveWidth)
+                .frame(width: effectiveWidth)
                 .pageViewStyle(.scroll)
                 .contentShape(Rectangle())
                 .id(activeTabRefreshTrigger)
@@ -421,7 +420,7 @@ struct SidebarView: View {
             .environmentObject(browserManager.splitManager)
             .id(space.id.uuidString + "-w\(Int(windowState.sidebarContentWidth))")
         }
-        .frame(maxWidth: availableContentWidth)
+        .frame(width: effectiveWidth, alignment: .leading)
         .tag(index)
     }
 }
