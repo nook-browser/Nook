@@ -7,8 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2CAC4DD42E8245B100870189 /* SwiftUIPager in Frameworks */ = {isa = PBXBuildFile; productRef = 2CAC4DD32E8245B100870189 /* SwiftUIPager */; };
-		2CAC4DE02E82F63F00870189 /* BigUIPaging in Frameworks */ = {isa = PBXBuildFile; productRef = 2CAC4DDF2E82F63F00870189 /* BigUIPaging */; };
 		7FAFC5DA2E3ADDCD009D7DC4 /* FaviconFinder in Frameworks */ = {isa = PBXBuildFile; productRef = 7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */; };
 /* End PBXBuildFile section */
 
@@ -20,7 +18,11 @@
 		2CAC4DD12E82457B00870189 /* Exceptions for "Nook" folder in "Nook" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				.claude/settings.local.json,
 				Info.plist,
+				ThirdParty/BigUIPaging/README.md,
+				ThirdParty/HTSymbolHook/README.md,
+				ThirdParty/MuteableWKWebView/README.md,
 			);
 			target = 7F8340FB2E37F39400674A5D /* Nook */;
 		};
@@ -42,9 +44,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2CAC4DD42E8245B100870189 /* SwiftUIPager in Frameworks */,
 				7FAFC5DA2E3ADDCD009D7DC4 /* FaviconFinder in Frameworks */,
-				2CAC4DE02E82F63F00870189 /* BigUIPaging in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -88,8 +88,6 @@
 			name = Nook;
 			packageProductDependencies = (
 				7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */,
-				2CAC4DD32E8245B100870189 /* SwiftUIPager */,
-				2CAC4DDF2E82F63F00870189 /* BigUIPaging */,
 			);
 			productName = Pulse;
 			productReference = 7F8340FC2E37F39400674A5D /* Nook.app */;
@@ -121,8 +119,6 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				7FAFC5D82E3ADDCD009D7DC4 /* XCRemoteSwiftPackageReference "FaviconFinder" */,
-				2CAC4DD22E8245B100870189 /* XCRemoteSwiftPackageReference "SwiftUIPager" */,
-				2CAC4DDE2E82F63F00870189 /* XCRemoteSwiftPackageReference "BigUIPaging" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7F8340FD2E37F39400674A5D /* Products */;
@@ -397,22 +393,6 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		2CAC4DD22E8245B100870189 /* XCRemoteSwiftPackageReference "SwiftUIPager" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/fermoya/SwiftUIPager.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.5.0;
-			};
-		};
-		2CAC4DDE2E82F63F00870189 /* XCRemoteSwiftPackageReference "BigUIPaging" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/notsobigcompany/BigUIPaging.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.0.3;
-			};
-		};
 		7FAFC5D82E3ADDCD009D7DC4 /* XCRemoteSwiftPackageReference "FaviconFinder" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/will-lumley/FaviconFinder";
@@ -424,16 +404,6 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		2CAC4DD32E8245B100870189 /* SwiftUIPager */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 2CAC4DD22E8245B100870189 /* XCRemoteSwiftPackageReference "SwiftUIPager" */;
-			productName = SwiftUIPager;
-		};
-		2CAC4DDF2E82F63F00870189 /* BigUIPaging */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 2CAC4DDE2E82F63F00870189 /* XCRemoteSwiftPackageReference "BigUIPaging" */;
-			productName = BigUIPaging;
-		};
 		7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 7FAFC5D82E3ADDCD009D7DC4 /* XCRemoteSwiftPackageReference "FaviconFinder" */;

@@ -34,7 +34,7 @@ struct EssentialTabsScrollView: View {
             }
             .scrollTargetLayout()
         }
-        .scrollTargetBehavior(.viewAligned)
+        .scrollTargetBehavior(.paging)
         .scrollPosition(id: currentSpaceScrollID, anchor: .topLeading)
         .scrollIndicators(.hidden)
         .scrollDisabled(true) // Controlled by spaces ScrollView

@@ -40,6 +40,18 @@ import OSLog
         let isSpacePinned: Bool
         // Profile association for global pinned tabs; nil for space tabs
         let profileId: UUID?
+        // Folder association for tabs within folders
+        let folderId: UUID?
+    }
+
+    struct SnapshotFolder: Codable {
+        let id: UUID
+        let name: String
+        let icon: String
+        let color: String
+        let spaceId: UUID
+        let isOpen: Bool
+        let index: Int
     }
 
     struct SnapshotSpace: Codable {
@@ -60,6 +72,7 @@ import OSLog
     struct Snapshot: Codable {
         let spaces: [SnapshotSpace]
         let tabs: [SnapshotTab]
+        let folders: [SnapshotFolder]
         let state: SnapshotState
     }
 
@@ -128,7 +141,19 @@ import OSLog
             try upsertTab(in: ctx, tab)
         }
 
-        // 3) Upsert spaces and cleanup removed spaces
+        // 3) Upsert folders and cleanup removed folders
+        for folder in snapshot.folders {
+            try upsertFolder(in: ctx, folder)
+        }
+        do {
+            let allFolders = try ctx.fetch(FetchDescriptor<FolderEntity>())
+            let keep = Set(snapshot.folders.map { $0.id })
+            for e in allFolders where !keep.contains(e.id) { ctx.delete(e) }
+        } catch {
+            throw classify(error)
+        }
+
+        // 4) Upsert spaces and cleanup removed spaces
         for space in snapshot.spaces {
             try upsertSpace(in: ctx, space)
         }
@@ -184,6 +209,7 @@ import OSLog
             e.index = t.index
             e.spaceId = t.spaceId
             e.profileId = t.profileId
+            e.folderId = t.folderId
         } else {
             let e = TabEntity(
                 id: t.id,
@@ -193,7 +219,32 @@ import OSLog
                 isSpacePinned: t.isSpacePinned,
                 index: t.index,
                 spaceId: t.spaceId,
-                profileId: t.profileId
+                profileId: t.profileId,
+                folderId: t.folderId
+            )
+            ctx.insert(e)
+        }
+    }
+
+    private func upsertFolder(in ctx: ModelContext, _ f: SnapshotFolder) throws {
+        let predicate = #Predicate<FolderEntity> { $0.id == f.id }
+        let existing = try ctx.fetch(FetchDescriptor<FolderEntity>(predicate: predicate)).first
+        if let e = existing {
+            e.name = f.name
+            e.icon = f.icon
+            e.color = f.color
+            e.spaceId = f.spaceId
+            e.isOpen = f.isOpen
+            e.index = f.index
+        } else {
+            let e = FolderEntity(
+                id: f.id,
+                name: f.name,
+                icon: f.icon,
+                color: f.color,
+                spaceId: f.spaceId,
+                isOpen: f.isOpen,
+                index: f.index
             )
             ctx.insert(e)
         }
@@ -357,6 +408,9 @@ class TabManager: ObservableObject {
     // Space-level pinned tabs per space
     private var spacePinnedTabs: [UUID: [Tab]] = [:]
 
+    // Folders per space
+    private var foldersBySpace: [UUID: [TabFolder]] = [:]
+
     // Global pinned (essentials), isolated per profile
     private var pinnedByProfile: [UUID: [Tab]] = [:]
     // Pinned tabs encountered during load that have no profile assignment yet
@@ -392,6 +446,23 @@ class TabManager: ObservableObject {
         self.persistence = PersistenceActor(container: context.container)
         Task { @MainActor in
             loadFromStore()
+        }
+    }
+
+    deinit {
+        // MEMORY LEAK FIX: Clean up all tab references and break potential cycles
+        Task { @MainActor in
+            tabsBySpace.removeAll()
+            spacePinnedTabs.removeAll()
+            foldersBySpace.removeAll()
+            pinnedByProfile.removeAll()
+            pendingPinnedWithoutProfile.removeAll()
+            spaces.removeAll()
+            currentTab = nil
+            currentSpace = nil
+            browserManager = nil
+
+            print("🧹 [TabManager] Cleaned up all tab resources")
         }
     }
 
@@ -440,11 +511,47 @@ class TabManager: ObservableObject {
     }
 
     private func contains(_ tab: Tab) -> Bool {
-        if allPinnedTabsAllProfiles.contains(where: { $0.id == tab.id }) { return true }
-        if let sid = tab.spaceId {
-            if let spacePinned = spacePinnedTabs[sid], spacePinned.contains(where: { $0.id == tab.id }) { return true }
-            if let arr = tabsBySpace[sid], arr.contains(where: { $0.id == tab.id }) { return true }
+        print("🔍 contains() checking tab: \(tab.name)")
+        print("   - tab.id: \(tab.id)")
+        print("   - tab.spaceId: \(tab.spaceId?.uuidString ?? "nil")")
+        print("   - tab.folderId: \(tab.folderId?.uuidString ?? "nil")")
+        print("   - tab.isPinned: \(tab.isPinned)")
+        print("   - tab.isSpacePinned: \(tab.isSpacePinned)")
+
+        // Check global pinned tabs
+        if allPinnedTabsAllProfiles.contains(where: { $0.id == tab.id }) {
+            print("✅ Found tab in allPinnedTabsAllProfiles")
+            return true
         }
+
+        // Check space-specific tabs
+        if let sid = tab.spaceId {
+            print("🔍 Checking space-specific tabs for spaceId: \(sid)")
+
+            // Check space pinned tabs
+            if let spacePinned = spacePinnedTabs[sid] {
+                print("   - spacePinnedTabs[\(sid)] has \(spacePinned.count) tabs")
+                let foundInSpacePinned = spacePinned.contains(where: { $0.id == tab.id })
+                print("   - found in spacePinnedTabs: \(foundInSpacePinned)")
+                if foundInSpacePinned { return true }
+            } else {
+                print("   - spacePinnedTabs[\(sid)] is nil")
+            }
+
+            // Check regular tabs
+            if let arr = tabsBySpace[sid] {
+                print("   - tabsBySpace[\(sid)] has \(arr.count) tabs")
+                let foundInRegular = arr.contains(where: { $0.id == tab.id })
+                print("   - found in tabsBySpace: \(foundInRegular)")
+                if foundInRegular { return true }
+            } else {
+                print("   - tabsBySpace[\(sid)] is nil")
+            }
+        } else {
+            print("❌ tab.spaceId is nil")
+        }
+
+        print("❌ Tab not found in any container")
         return false
     }
 
@@ -643,6 +750,70 @@ class TabManager: ObservableObject {
         persistSnapshot()
     }
 
+    // MARK: - Folder Management
+
+    func createFolder(for spaceId: UUID) {
+        let folder = TabFolder(
+            name: "New Folder",
+            spaceId: spaceId,
+            color: spaces.first(where: { $0.id == spaceId })?.color ?? .controlAccentColor
+        )
+
+        var folders = foldersBySpace[spaceId] ?? []
+        folders.append(folder)
+        foldersBySpace[spaceId] = folders
+
+        persistSnapshot()
+    }
+
+    func renameFolder(_ folderId: UUID, newName: String) {
+        for (spaceId, folders) in foldersBySpace {
+            if let folder = folders.first(where: { $0.id == folderId }) {
+                folder.name = newName
+                persistSnapshot()
+                break
+            }
+        }
+    }
+
+    func deleteFolder(_ folderId: UUID) {
+        // Find and remove the folder
+        for (spaceId, folders) in foldersBySpace {
+            if let index = folders.firstIndex(where: { $0.id == folderId }) {
+                let folder = folders[index]
+
+                // Move all tabs in folder to space pinned area
+                for tab in allTabs() {
+                    if tab.folderId == folderId {
+                        tab.folderId = nil
+                        tab.isSpacePinned = true
+                    }
+                }
+
+                // Remove the folder
+                var mutableFolders = folders
+                mutableFolders.remove(at: index)
+                foldersBySpace[spaceId] = mutableFolders
+                persistSnapshot()
+                break
+            }
+        }
+    }
+
+    func folders(for spaceId: UUID) -> [TabFolder] {
+        return foldersBySpace[spaceId] ?? []
+    }
+
+    func toggleFolder(_ folderId: UUID) {
+        for (_, folders) in foldersBySpace {
+            if let folder = folders.first(where: { $0.id == folderId }) {
+                folder.isOpen.toggle()
+                persistSnapshot()
+                break
+            }
+        }
+    }
+
     // MARK: - Tab Management (Normal within current space)
 
     func addTab(_ tab: Tab) {
@@ -766,21 +937,54 @@ class TabManager: ObservableObject {
     }
 
     func setActiveTab(_ tab: Tab) {
+        print("🎯 setActiveTab called for: \(tab.name)")
+        print("   - tab.id: \(tab.id)")
+        print("   - tab.spaceId: \(tab.spaceId?.uuidString ?? "nil")")
+        print("   - tab.folderId: \(tab.folderId?.uuidString ?? "nil")")
+        print("   - tab.isPinned: \(tab.isPinned)")
+        print("   - tab.isSpacePinned: \(tab.isSpacePinned)")
+        print("   - currentSpace.id: \(currentSpace?.id.uuidString ?? "nil")")
+
+        // Show current data structure state
+        if let currentSpace = currentSpace {
+            print("🔍 Current data structure state:")
+            print("   - spacePinnedTabs[\(currentSpace.id)]: \(spacePinnedTabs[currentSpace.id]?.count ?? 0) tabs")
+            print("   - tabsBySpace[\(currentSpace.id)]: \(tabsBySpace[currentSpace.id]?.count ?? 0) tabs")
+
+            // List what's in spacePinnedTabs for this space
+            if let spacePinned = spacePinnedTabs[currentSpace.id] {
+                print("   - spacePinned tabs: \(spacePinned.map { "\($0.name) (id: \($0.id.uuidString.prefix(8))...)" })")
+            }
+        }
+
         guard contains(tab) else {
+            print("❌ setActiveTab failed: tab not found in contains() check")
             return
         }
+        print("✅ contains() check passed - tab found in data structures")
+
         let previous = currentTab
+        print("🔄 Setting currentTab from \(previous?.name ?? "nil") to \(tab.name)")
         currentTab = tab
+        print("✅ currentTab set successfully to: \(currentTab?.name ?? "nil")")
         // Do not auto-exit split when leaving split panes; preserve split state
-        
+
         // Save this tab as the active tab for the appropriate space
+        print("💾 Saving tab as active for space...")
         if let sid = tab.spaceId, let space = spaces.first(where: { $0.id == sid }) {
-            // Tab belongs to a specific space (regular or space-pinned)
+            print("   - Found space: \(space.name)")
+            print("   - Setting space.activeTabId to: \(tab.id)")
             space.activeTabId = tab.id
+            print("   - Setting currentSpace to: \(space.name)")
             currentSpace = space
+            print("   - ✅ Space activation complete")
         } else if let cs = currentSpace {
-            // Tab is globally pinned; remember it for the current space too
+            print("   - Using currentSpace: \(cs.name)")
+            print("   - Setting cs.activeTabId to: \(tab.id)")
             cs.activeTabId = tab.id
+            print("   - ✅ Current space activation complete")
+        } else {
+            print("   - ❌ No space found for tab activation")
         }
         
         persistSnapshot()
@@ -907,6 +1111,19 @@ class TabManager: ObservableObject {
         }
         removeTab(currentTab.id)
     }
+
+    func clearRegularTabs(for spaceId: UUID) {
+        guard let tabs = tabsBySpace[spaceId] else { return }
+
+        print("🧹 [TabManager] Clearing \(tabs.count) regular tabs for space \(spaceId)")
+
+        // Remove all regular tabs for this space
+        for tab in tabs {
+            removeTab(tab.id)
+        }
+
+        persistSnapshot()
+    }
     
     func unloadTab(_ tab: Tab) {
         // Never unload essentials tabs except on browser close/restart
@@ -1011,7 +1228,144 @@ class TabManager: ObservableObject {
             for (i, t) in sp.enumerated() { t.index = i }
             spacePinnedTabs[spaceId] = sp
             persistSnapshot()
-            
+
+        // MARK: - Folder Operations
+
+        case (.folder(let fromFolderId), .folder(let toFolderId)):
+            guard let spaceId = tab.spaceId else { return }
+            var spacePinned = spacePinnedTabs[spaceId] ?? []
+
+            if let currentIndex = spacePinned.firstIndex(where: { $0.id == tab.id }) {
+                if currentIndex < spacePinned.count { spacePinned.remove(at: currentIndex) }
+
+                if fromFolderId != toFolderId {
+                    tab.folderId = toFolderId
+                    tab.isSpacePinned = true
+                }
+
+                let safeIndex = max(0, min(operation.toIndex, spacePinned.count))
+                spacePinned.insert(tab, at: safeIndex)
+
+                for (idx, pinnedTab) in spacePinned.enumerated() {
+                    pinnedTab.index = idx
+                }
+
+                spacePinnedTabs[spaceId] = spacePinned
+                persistSnapshot()
+            }
+
+        case (.folder(let fromFolderId), .essentials):
+            // Move from folder to essentials
+            guard browserManager?.currentProfile?.id != nil else { return }
+            guard let originalSpaceId = tab.spaceId else { return }
+
+            // Remove from spacePinnedTabs since it's no longer a folder tab
+            if var sp = spacePinnedTabs[originalSpaceId] {
+                if let index = sp.firstIndex(where: { $0.id == tab.id }) {
+                    sp.remove(at: index)
+                    // Reindex remaining tabs
+                    for (i, t) in sp.enumerated() { t.index = i }
+                    spacePinnedTabs[originalSpaceId] = sp
+                }
+            }
+
+            tab.folderId = nil
+            tab.spaceId = nil
+            tab.isSpacePinned = false
+            withCurrentProfilePinnedArray { arr in
+                let safeIndex = max(0, min(operation.toIndex, arr.count))
+                arr.insert(tab, at: safeIndex)
+            }
+            persistSnapshot()
+
+        case (.folder(_), .spacePinned(let spaceId)):
+            let originalSpaceId = tab.spaceId
+
+            if let originalSpaceId,
+               var originalSp = spacePinnedTabs[originalSpaceId],
+               let currentIndex = originalSp.firstIndex(where: { $0.id == tab.id }) {
+                if currentIndex < originalSp.count { originalSp.remove(at: currentIndex) }
+                for (idx, existing) in originalSp.enumerated() { existing.index = idx }
+                spacePinnedTabs[originalSpaceId] = originalSp
+            }
+
+            tab.folderId = nil
+            tab.spaceId = spaceId
+            tab.isSpacePinned = true
+
+            var destination = spacePinnedTabs[spaceId] ?? []
+            let safeIndex = max(0, min(operation.toIndex, destination.count))
+            destination.insert(tab, at: safeIndex)
+            for (idx, pinnedTab) in destination.enumerated() { pinnedTab.index = idx }
+            spacePinnedTabs[spaceId] = destination
+            persistSnapshot()
+
+        case (.folder(let fromFolderId), .spaceRegular(let spaceId)):
+            // Move from folder to regular space
+            guard let originalSpaceId = tab.spaceId else { return }
+
+            // Remove from spacePinnedTabs since it's no longer a folder tab
+            if var sp = spacePinnedTabs[originalSpaceId] {
+                if let index = sp.firstIndex(where: { $0.id == tab.id }) {
+                    sp.remove(at: index)
+                    // Reindex remaining tabs
+                    for (i, t) in sp.enumerated() { t.index = i }
+                    spacePinnedTabs[originalSpaceId] = sp
+                }
+            }
+
+            tab.folderId = nil
+            tab.spaceId = spaceId
+            tab.isSpacePinned = false
+            var arr = tabsBySpace[spaceId] ?? []
+            let safeIndex = max(0, min(operation.toIndex, arr.count))
+            arr.insert(tab, at: safeIndex)
+            // Reindex
+            for (i, t) in arr.enumerated() { t.index = i }
+            setTabs(arr, for: spaceId)
+            persistSnapshot()
+
+        case (.spaceRegular(let spaceId), .folder(let toFolderId)):
+            // Move from regular space to folder
+            removeFromCurrentContainer(tab)
+            tab.folderId = toFolderId
+            tab.spaceId = spaceId
+            tab.isSpacePinned = true
+            // Add to spacePinnedTabs since folder tabs are now space-pinned
+            var sp = spacePinnedTabs[spaceId] ?? []
+            let safeIndex = max(0, min(operation.toIndex, sp.count))
+            sp.insert(tab, at: safeIndex)
+            // Reindex
+            for (i, t) in sp.enumerated() { t.index = i }
+            spacePinnedTabs[spaceId] = sp
+            persistSnapshot()
+
+        case (.spacePinned(let spaceId), .folder(let toFolderId)):
+            var spacePinned = spacePinnedTabs[spaceId] ?? []
+
+            if let currentIndex = spacePinned.firstIndex(where: { $0.id == tab.id }) {
+                if currentIndex < spacePinned.count { spacePinned.remove(at: currentIndex) }
+            }
+
+            tab.folderId = toFolderId
+            tab.spaceId = spaceId
+            tab.isSpacePinned = true
+
+            let safeIndex = max(0, min(operation.toIndex, spacePinned.count))
+            spacePinned.insert(tab, at: safeIndex)
+
+            for (idx, pinnedTab) in spacePinned.enumerated() {
+                pinnedTab.index = idx
+            }
+
+            spacePinnedTabs[spaceId] = spacePinned
+            persistSnapshot()
+
+        case (.essentials, .folder(_)):
+            // Prevent global pinned (essentials) tabs from being moved to folders
+            print("⚠️ Cannot move global pinned tabs to folders")
+            return
+
         case (.none, _), (_, .none):
             print("⚠️ Invalid drag operation: \(operation)")
         }
@@ -1251,7 +1605,12 @@ class TabManager: ObservableObject {
     // MARK: - Space-Level Pinned Tabs
     
     func spacePinnedTabs(for spaceId: UUID) -> [Tab] {
-        return (spacePinnedTabs[spaceId] ?? []).sorted { $0.index < $1.index }
+        let tabs = (spacePinnedTabs[spaceId] ?? []).sorted { $0.index < $1.index }
+        print("📌 spacePinnedTabs(for: \(spaceId.uuidString.prefix(8))...) returning \(tabs.count) tabs:")
+        for tab in tabs {
+            print("   - \(tab.name) (id: \(tab.id.uuidString.prefix(8))..., folderId: \(tab.folderId?.uuidString.prefix(8) ?? "nil"))")
+        }
+        return tabs
     }
     
     func pinTabToSpace(_ tab: Tab, spaceId: UUID) {
@@ -1359,6 +1718,9 @@ class TabManager: ObservableObject {
             index: e.index,
             browserManager: browserManager
         )
+        t.folderId = e.folderId
+        t.isPinned = e.isPinned
+        t.isSpacePinned = e.isSpacePinned
         return t
     }
 
@@ -1412,7 +1774,22 @@ class TabManager: ObservableObject {
 
             let globalPinned = sortedTabs.filter { $0.isPinned }
             let spacePinned = sortedTabs.filter { $0.isSpacePinned && !$0.isPinned }
-            let normals = sortedTabs.filter { !$0.isPinned && !$0.isSpacePinned }
+            let normals = sortedTabs.filter { !$0.isPinned && !$0.isSpacePinned && $0.folderId == nil }
+
+            print("📊 Tab loading statistics:")
+            print("   - Total sortedTabs: \(sortedTabs.count)")
+            print("   - globalPinned: \(globalPinned.count)")
+            print("   - spacePinned: \(spacePinned.count)")
+            print("   - normals: \(normals.count)")
+
+            print("🔍 Space-pinned tabs being loaded:")
+            for e in spacePinned {
+                print("   - \(e.name) (id: \(e.id.uuidString.prefix(8))...)")
+                print("     spaceId: \(e.spaceId?.uuidString ?? "nil")")
+                print("     folderId: \(e.folderId?.uuidString ?? "nil")")
+                print("     isPinned: \(e.isPinned)")
+                print("     isSpacePinned: \(e.isSpacePinned)")
+            }
 
             // Global pinned → group by profile
             var pinnedMap: [UUID: [Tab]] = [:]
@@ -1439,12 +1816,21 @@ class TabManager: ObservableObject {
             self.pendingPinnedWithoutProfile = __pending
             
             // Load space-pinned tabs
+            print("🔄 Processing space-pinned tabs for spacePinnedTabs dictionary:")
             for e in spacePinned {
+                print("   Creating runtime tab for: \(e.name)")
                 let t = toRuntime(e)
+                print("   After toRuntime - \(t.name):")
+                print("     - folderId: \(t.folderId?.uuidString ?? "nil")")
+                print("     - isSpacePinned: \(t.isSpacePinned)")
                 if let sid = e.spaceId {
                     var arr = spacePinnedTabs[sid] ?? []
+                    let oldCount = arr.count
                     arr.append(t)
                     spacePinnedTabs[sid] = arr
+                    print("   Added to spacePinnedTabs[\(sid.uuidString.prefix(8))...]: \(oldCount) → \(arr.count) tabs")
+                } else {
+                    print("   ❌ No spaceId for tab: \(e.name)")
                 }
             }
             
@@ -1456,6 +1842,24 @@ class TabManager: ObservableObject {
                     arr.append(t)
                     tabsBySpace[sid] = arr
                 }
+            }
+
+            // Folders
+            let folderEntities = try context.fetch(FetchDescriptor<FolderEntity>())
+            print("📁 Loading \(folderEntities.count) folders:")
+            for e in folderEntities {
+                print("   - Folder: \(e.name) (spaceId: \(e.spaceId.uuidString.prefix(8))...)")
+                let folder = TabFolder(
+                    id: e.id,
+                    name: e.name,
+                    spaceId: e.spaceId,
+                    icon: e.icon,
+                    color: NSColor(hex: e.color) ?? .controlAccentColor
+                )
+                folder.isOpen = e.isOpen
+                var folders = foldersBySpace[e.spaceId] ?? []
+                folders.append(folder)
+                foldersBySpace[e.spaceId] = folders
             }
 
             // Attach browser manager
@@ -1577,7 +1981,8 @@ class TabManager: ObservableObject {
                     spaceId: nil,
                     isPinned: true,
                     isSpacePinned: false,
-                    profileId: pid
+                    profileId: pid,
+                    folderId: t.folderId
                 ))
             }
         }
@@ -1594,7 +1999,8 @@ class TabManager: ObservableObject {
                     spaceId: sp.id,
                     isPinned: false,
                     isSpacePinned: true,
-                    profileId: nil
+                    profileId: nil,
+                    folderId: t.folderId
                 ))
             }
             // Regular tabs for this space
@@ -1608,7 +2014,25 @@ class TabManager: ObservableObject {
                     spaceId: sp.id,
                     isPinned: false,
                     isSpacePinned: false,
-                    profileId: nil
+                    profileId: nil,
+                    folderId: t.folderId
+                ))
+            }
+        }
+
+        // Folders
+        var folderSnapshots: [PersistenceActor.SnapshotFolder] = []
+        for (spaceId, folders) in foldersBySpace {
+            let ordered = folders.sorted { $0.index < $1.index }
+            for (i, folder) in ordered.enumerated() {
+                folderSnapshots.append(.init(
+                    id: folder.id,
+                    name: folder.name,
+                    icon: folder.icon,
+                    color: folder.color.toHexString() ?? "#000000",
+                    spaceId: spaceId,
+                    isOpen: folder.isOpen,
+                    index: i
                 ))
             }
         }
@@ -1618,7 +2042,7 @@ class TabManager: ObservableObject {
             currentSpaceID: currentSpace?.id
         )
 
-        return PersistenceActor.Snapshot(spaces: spaceSnapshots, tabs: tabSnapshots, state: state)
+        return PersistenceActor.Snapshot(spaces: spaceSnapshots, tabs: tabSnapshots, folders: folderSnapshots, state: state)
     }
 }
 

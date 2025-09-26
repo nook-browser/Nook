@@ -34,6 +34,9 @@ class BrowserWindowState: ObservableObject {
     /// Last non-zero sidebar width so we can restore when toggling visibility
     var savedSidebarWidth: CGFloat = 250
     
+    /// Usable width for sidebar content (excludes padding)
+    var sidebarContentWidth: CGFloat = 234
+    
     /// Whether the sidebar is visible in this window
     var isSidebarVisible: Bool = true
     

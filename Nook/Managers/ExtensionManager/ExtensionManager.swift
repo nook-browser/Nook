@@ -28,7 +28,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     private var optionsWindows: [String: NSWindow] = [:]
     // Stable adapters for tabs/windows used when notifying controller events
     private var tabAdapters: [UUID: ExtensionTabAdapter] = [:]
-    internal var windowAdapter: ExtensionWindowAdapter?
+    internal weak var windowAdapter: ExtensionWindowAdapter?
     private weak var browserManagerRef: BrowserManager?
     // Whether to auto-resize extension action popovers to content. Disabled per UX preference.
     private let shouldAutoSizeActionPopups: Bool = false
@@ -45,11 +45,39 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         self.context = Persistence.shared.container.mainContext
         self.isExtensionSupportAvailable = ExtensionUtils.isExtensionSupportAvailable
         super.init()
-        
+
         if isExtensionSupportAvailable {
             setupExtensionController()
             loadInstalledExtensions()
         }
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+
+        // MEMORY LEAK FIX: Clean up all extension contexts and break circular references
+        extensionContexts.removeAll()
+        tabAdapters.removeAll()
+        actionAnchors.removeAll()
+
+        // Close all options windows
+        for (_, window) in optionsWindows {
+            window.close()
+        }
+        optionsWindows.removeAll()
+
+        // Clean up window adapter
+        windowAdapter = nil
+
+        // Unload extension controller
+        if let controller = extensionController {
+            for (_, context) in extensionContexts {
+                try? controller.unload(context)
+            }
+        }
+        extensionController = nil
+
+        print("🧹 [ExtensionManager] Cleaned up all extension resources")
     }
     
     // MARK: - Setup
@@ -876,27 +904,27 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         if #available(macOS 15.5, *), let controller = extensionController {
             let adapter = self.windowAdapter ?? ExtensionWindowAdapter(browserManager: browserManager)
             self.windowAdapter = adapter
-            
+
             print("ExtensionManager: Notifying controller about window and tabs...")
-            
+
             // Important: Notify about window FIRST
             controller.didOpenWindow(adapter)
             controller.didFocusWindow(adapter)
-            
-            // Notify about existing tabs 
+
+            // Notify about existing tabs
             let allTabs = browserManager.tabManager.pinnedTabs + browserManager.tabManager.tabs
             for tab in allTabs {
                 let tabAdapter = self.adapter(for: tab, browserManager: browserManager)
                 controller.didOpenTab(tabAdapter)
             }
-            
+
             // Notify about current active tab
             if let currentTab = browserManager.currentTabForActiveWindow() {
                 let tabAdapter = self.adapter(for: currentTab, browserManager: browserManager)
                 controller.didActivateTab(tabAdapter, previousActiveTab: nil)
                 controller.didSelectTabs([tabAdapter])
             }
-            
+
             print("ExtensionManager: Attached to browser manager and synced \(allTabs.count) tabs in window")
         }
     }
@@ -1406,12 +1434,12 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             print("[ExtensionManager] 🎯 focusedWindowFor() called")
             lastFocusedWindowCall = now
         }
-        
-        guard let bm = browserManagerRef else { 
-            return nil 
+
+        guard let bm = browserManagerRef else {
+            return nil
         }
-        if windowAdapter == nil { 
-            windowAdapter = ExtensionWindowAdapter(browserManager: bm) 
+        if windowAdapter == nil {
+            windowAdapter = ExtensionWindowAdapter(browserManager: bm)
         }
         return windowAdapter
     }
@@ -1424,12 +1452,12 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             print("[ExtensionManager] 🎯 openWindowsFor() called")
             lastOpenWindowsCall = now
         }
-        
-        guard let bm = browserManagerRef else { 
-            return [] 
+
+        guard let bm = browserManagerRef else {
+            return []
         }
-        if windowAdapter == nil { 
-            windowAdapter = ExtensionWindowAdapter(browserManager: bm) 
+        if windowAdapter == nil {
+            windowAdapter = ExtensionWindowAdapter(browserManager: bm)
         }
         return windowAdapter != nil ? [windowAdapter!] : []
     }

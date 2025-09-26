@@ -41,6 +41,7 @@ class TabDragManager: ObservableObject {
         case essentials
         case spacePinned(UUID) // space ID
         case spaceRegular(UUID) // space ID
+        case folder(UUID) // folder ID
     }
     
     // MARK: - Drag Operations
@@ -57,11 +58,11 @@ class TabDragManager: ObservableObject {
     }
     
     func updateDragTarget(container: DragContainer, insertionIndex: Int, spaceId: UUID? = nil) {
-        guard isDragging else { 
+        guard isDragging else {
             print("⚠️ [TabDragManager] updateDragTarget called but not dragging")
-            return 
+            return
         }
-        
+
         print("🎯 [TabDragManager] Update target: \(container) at \(insertionIndex)")
 
         let previousIndex = self.insertionIndex
@@ -69,7 +70,7 @@ class TabDragManager: ObservableObject {
 
         // Enhanced cross-zone state validation
         let validatedIndex = max(0, insertionIndex)
-        
+
         // Validate state consistency for cross-zone transitions
         if previousContainer != .none && container != .none && previousContainer != container {
             // Clear stale state when switching between different container types
@@ -85,12 +86,12 @@ class TabDragManager: ObservableObject {
             updateInsertionLineVisibility()
             return
         }
-        
+
         // Validate that insertionIndex is appropriate for target container
         guard isValidInsertionIndex(validatedIndex, for: container) else {
             return
         }
-        
+
         // Ensure insertionSpaceId is properly set/cleared based on container type
         let validatedSpaceId = validateSpaceIdForContainer(spaceId, container: container)
 
@@ -220,12 +221,12 @@ class TabDragManager: ObservableObject {
     private func isValidInsertionIndex(_ index: Int, for container: DragContainer) -> Bool {
         // Basic validation - index should be non-negative
         guard index >= 0 else { return false }
-        
+
         // Additional container-specific validation could be added here
         switch container {
         case .none:
             return false
-        case .essentials, .spacePinned, .spaceRegular:
+        case .essentials, .spacePinned, .spaceRegular, .folder:
             // For now, accept any non-negative index
             // More sophisticated validation could check actual container sizes
             return true
@@ -240,6 +241,9 @@ class TabDragManager: ObservableObject {
         case .spacePinned(let containerSpaceId), .spaceRegular(let containerSpaceId):
             // Use the container's space ID if provided spaceId is nil or matches
             return spaceId ?? containerSpaceId
+        case .folder:
+            // Folders inherit space ID from their parent context
+            return spaceId
         }
     }
 }

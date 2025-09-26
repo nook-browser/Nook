@@ -204,6 +204,6 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
         if manager.windowAdapter == nil {
             manager.windowAdapter = ExtensionWindowAdapter(browserManager: browserManager)
         }
-        return manager.windowAdapter!
+        return manager.windowAdapter
     }
 }

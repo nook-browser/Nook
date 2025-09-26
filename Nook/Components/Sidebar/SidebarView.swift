@@ -1,7 +1,6 @@
 import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
-import BigUIPaging
 
 struct SidebarView: View {
     @EnvironmentObject var browserManager: BrowserManager
@@ -144,7 +143,6 @@ struct SidebarView: View {
 
             ZStack {
                 spacesScrollView
-                    .padding(.horizontal, 8)
                     .zIndex(1)
 
                 // Bottom spacer for window dragging - overlay that doesn't compete for space
@@ -179,8 +177,11 @@ struct SidebarView: View {
                         NavButton(iconName: "archivebox") {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 windowState.isSidebarMenuVisible = true
-                                windowState.savedSidebarWidth = windowState.sidebarWidth
-                                windowState.sidebarWidth = 400
+                                let previousWidth = windowState.sidebarWidth
+                                windowState.savedSidebarWidth = previousWidth
+                                let newWidth: CGFloat = 400
+                                windowState.sidebarWidth = newWidth
+                                windowState.sidebarContentWidth = max(newWidth - 16, 0)
                             }
                         }
                         .onHover { isHovered in
@@ -275,30 +276,14 @@ struct SidebarView: View {
                 .padding()
             } else {
                 // Use BigUIPaging PageView for space navigation
+                let spaces = browserManager.tabManager.spaces
                 PageView(selection: $activeSpaceIndex) {
-                    ForEach(browserManager.tabManager.spaces.indices, id: \.self) { index in
-                        let space = browserManager.tabManager.spaces[index]
-                        VStack(spacing: 0) {
-                            SpaceView(
-                                space: space,
-                                isActive: windowState.currentSpaceId == space.id,
-                                width: availableContentWidth,
-                                onActivateTab: { browserManager.selectTab($0, in: windowState) },
-                                onCloseTab: { browserManager.tabManager.removeTab($0.id) },
-                                onPinTab: { browserManager.tabManager.pinTab($0) },
-                                onMoveTabUp: { browserManager.tabManager.moveTabUp($0.id) },
-                                onMoveTabDown: { browserManager.tabManager.moveTabDown($0.id) },
-                                onMuteTab: { $0.toggleMute() }
-                            )
-                            .environmentObject(browserManager)
-                            .environmentObject(windowState)
-                            .environmentObject(browserManager.splitManager)
-                        }
-                        .frame(maxWidth: availableContentWidth)
-                        .tag(index)
+                    ForEach(spaces.indices, id: \.self) { index in
+                        let space = spaces[index]
+                        makeSpaceView(for: space, index: index)
                     }
                 }
-                .frame(maxWidth: effectiveWidth)
+                .frame(width: effectiveWidth)
                 .pageViewStyle(.scroll)
                 .contentShape(Rectangle())
                 .id(activeTabRefreshTrigger)
@@ -331,9 +316,13 @@ struct SidebarView: View {
                         activeSpaceIndex = targetIndex
                     }
                 }
-                .onChange(of: windowState.currentTabId) { _, _ in
-                    // Force PageView to recreate when active tab changes
-                    // This fixes hit testing issues after space/tab switches
+                .onChange(of: windowState.currentSpaceId) { _, _ in
+                    // Force PageView to recreate when SPACE changes (not tab changes)
+                    // This fixes hit testing issues after space switches while preserving scroll position
+                    activeTabRefreshTrigger.toggle()
+                }
+                .onChange(of: windowState.sidebarContentWidth) { _, _ in
+                    // Rebuild cached page views so width-sensitive content refreshes immediately
                     activeTabRefreshTrigger.toggle()
                 }
 
@@ -349,7 +338,6 @@ struct SidebarView: View {
                     SpaceView(
                         space: space,
                         isActive: windowState.currentSpaceId == space.id,
-                        width: effectiveWidth,
                         onActivateTab: {
                             browserManager.selectTab($0, in: windowState)
                         },
@@ -365,7 +353,7 @@ struct SidebarView: View {
                         },
                         onMuteTab: { $0.toggleMute() }
                     )
-                    .id(space.id)
+                    .id(space.id.uuidString + "-w\(Int(windowState.sidebarContentWidth))")
                     // Each page is exactly one sidebar-width wide for viewAligned snapping
                     .frame(width: effectiveWidth)
                 }
@@ -413,6 +401,27 @@ struct SidebarView: View {
         )
 
         browserManager.dialogManager.showDialog(dialog)
+    }
+
+    private func makeSpaceView(for space: Space, index: Int) -> some View {
+        VStack(spacing: 0) {
+            SpaceView(
+                space: space,
+                isActive: windowState.currentSpaceId == space.id,
+                onActivateTab: { browserManager.selectTab($0, in: windowState) },
+                onCloseTab: { browserManager.tabManager.removeTab($0.id) },
+                onPinTab: { browserManager.tabManager.pinTab($0) },
+                onMoveTabUp: { browserManager.tabManager.moveTabUp($0.id) },
+                onMoveTabDown: { browserManager.tabManager.moveTabDown($0.id) },
+                onMuteTab: { $0.toggleMute() }
+            )
+            .environmentObject(browserManager)
+            .environmentObject(windowState)
+            .environmentObject(browserManager.splitManager)
+            .id(space.id.uuidString + "-w\(Int(windowState.sidebarContentWidth))")
+        }
+        .frame(width: effectiveWidth, alignment: .leading)
+        .tag(index)
     }
 }
 

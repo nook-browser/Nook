@@ -21,7 +21,7 @@ struct TabCompositorView: NSViewRepresentable {
     private func updateCompositor(_ containerView: NSView) {
         // Remove all existing webview subviews
         containerView.subviews.forEach { $0.removeFromSuperview() }
-        
+
         // Only add the current tab's webView to avoid WKWebView conflicts
         guard let currentTabId = windowState.currentTabId,
               let currentTab = browserManager.tabsForDisplay(in: windowState).first(where: { $0.id == currentTabId }),

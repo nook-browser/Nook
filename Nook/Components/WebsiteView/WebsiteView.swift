@@ -173,7 +173,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
         containerView.wantsLayer = true
         containerView.layer?.backgroundColor = NSColor.clear.cgColor
         containerView.postsFrameChangedNotifications = true
-        
+
         // Store reference to container view in browser manager
         browserManager.setCompositorContainerView(containerView, for: windowState.id)
         
@@ -305,6 +305,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
                 lWeb.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
                 lWeb.isHidden = false
                 pane.addSubview(lWeb)
+                
             }
 
             if let rId = rightId, let rightTab = allKnownTabs.first(where: { $0.id == rId }) {
@@ -316,6 +317,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
                 rWeb.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
                 rWeb.isHidden = false
                 pane.addSubview(rWeb)
+                
             }
         } else {
             for tab in allTabs {
@@ -328,6 +330,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
                     webView.isHidden = tab.id != browserManager.currentTab(for: windowState)?.id
                 }
             }
+            
         }
 
   
@@ -396,6 +399,8 @@ struct TabCompositorWrapper: NSViewRepresentable {
         }
         return browserManager.createWebView(for: tab.id, in: windowId)
     }
+
+
 }
 
 // MARK: - WebsiteView Extensions

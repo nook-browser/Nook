@@ -53,7 +53,9 @@ struct SidebarMenu: View {
                     NavButton(iconName: "arrow.backward") {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             windowState.isSidebarMenuVisible = false
-                            windowState.sidebarWidth = windowState.savedSidebarWidth
+                            let restoredWidth = windowState.savedSidebarWidth
+                            windowState.sidebarWidth = restoredWidth
+                            windowState.sidebarContentWidth = max(restoredWidth - 16, 0)
                         }
                     }
                     Spacer()
