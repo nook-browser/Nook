@@ -343,7 +343,10 @@ class BrowserManager: ObservableObject {
     
     /// The currently focused/active window state
     var activeWindowState: BrowserWindowState?
-    
+
+    /// Reference to the app delegate for Sparkle integration
+    weak var appDelegate: AppDelegate?
+
     var modelContext: ModelContext
     var tabManager: TabManager
     var profileManager: ProfileManager

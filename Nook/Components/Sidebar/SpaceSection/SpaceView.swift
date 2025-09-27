@@ -244,7 +244,7 @@ struct SpaceView: View {
     private var pinnedTabsList: some View {
         let items = spacePinnedItems
         
-        return VStack(spacing: 2) {
+        return VStack(spacing: 0) {
             ForEach(Array(items.enumerated()), id: \.element) { index, item in
                 spacePinnedSpacer(before: index)
                 
@@ -341,7 +341,7 @@ struct SpaceView: View {
         let isActive = spacePinnedPreviewIndex == displayIndex
         
         Color.clear
-            .frame(height: 8)
+            .frame(height: 2)
             .contentShape(Rectangle())
             .overlay(alignment: .center) {
                 RoundedRectangle(cornerRadius: 3)

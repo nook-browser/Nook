@@ -1189,12 +1189,37 @@ struct ExtensionRowView: View {
 }
 
 struct AdvancedSettingsView: View {
+    @EnvironmentObject var browserManager: BrowserManager
+
     var body: some View {
-        SettingsPlaceholderView(
-            title: "Advanced",
-            subtitle: "Power features and diagnostics",
-            icon: "wrench.and.screwdriver"
-        )
+        VStack(alignment: .leading, spacing: 16) {
+            #if DEBUG
+            SettingsSectionCard(
+                title: "Debug Options",
+                subtitle: "Development and debugging features"
+            ) {
+                Toggle(
+                    isOn: $browserManager.settingsManager.debugToggleUpdateNotification
+                ) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Show Update Notification")
+                        Text(
+                            "Force display the sidebar update notification for appearance debugging"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            #endif
+
+            SettingsPlaceholderView(
+                title: "Advanced",
+                subtitle: "Power features and diagnostics",
+                icon: "wrench.and.screwdriver"
+            )
+        }
+        .padding()
     }
 }
 
