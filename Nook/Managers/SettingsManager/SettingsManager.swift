@@ -16,6 +16,7 @@ class SettingsManager {
     private let liquidGlassKey = "settings.isLiquidGlassEnabled"
     private let tabUnloadTimeoutKey = "settings.tabUnloadTimeout"
     private let blockXSTKey = "settings.blockCrossSiteTracking"
+    private let debugToggleUpdateNotificationKey = "settings.debugToggleUpdateNotification"
     var currentSettingsTab: SettingsTabs = .general
 
     // Stored properties
@@ -60,6 +61,12 @@ class SettingsManager {
         }
     }
 
+    var debugToggleUpdateNotification: Bool {
+        didSet {
+            userDefaults.set(debugToggleUpdateNotification, forKey: debugToggleUpdateNotificationKey)
+        }
+    }
+
     init() {
         // Register default values
         userDefaults.register(defaults: [
@@ -68,7 +75,8 @@ class SettingsManager {
             searchEngineKey: SearchProvider.google.rawValue,
             // Default tab unload timeout: 60 minutes
             tabUnloadTimeoutKey: 3600.0,
-            blockXSTKey: false
+            blockXSTKey: false,
+            debugToggleUpdateNotificationKey: false
         ])
 
         // Initialize properties from UserDefaults
@@ -88,6 +96,7 @@ class SettingsManager {
         // Initialize tab unload timeout
         self.tabUnloadTimeout = userDefaults.double(forKey: tabUnloadTimeoutKey)
         self.blockCrossSiteTracking = userDefaults.bool(forKey: blockXSTKey)
+        self.debugToggleUpdateNotification = userDefaults.bool(forKey: debugToggleUpdateNotificationKey)
     }
 }
 

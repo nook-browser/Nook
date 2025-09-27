@@ -10,6 +10,7 @@ import WebKit
 import OSLog
 import AppKit
 import Carbon
+import Sparkle
 
 @main
 struct NookApp: App {
@@ -23,8 +24,9 @@ struct NookApp: App {
                 .ignoresSafeArea(.all)
                 .environmentObject(browserManager)
                 .onAppear {
-                    // Connect browser manager to app delegate for cleanup
+                    // Connect browser manager to app delegate for cleanup and Sparkle integration
                     appDelegate.browserManager = browserManager
+                    browserManager.appDelegate = appDelegate
                 }
         }
         .windowStyle(.hiddenTitleBar)
@@ -46,6 +48,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     weak var browserManager: BrowserManager?
     private let urlEventClass = AEEventClass(kInternetEventClass)
     private let urlEventID = AEEventID(kAEGetURL)
+
+    // Sparkle updater controller
+    lazy var updaterController: SPUStandardUpdaterController = {
+        return SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+    }()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSAppleEventManager.shared().setEventHandler(
@@ -138,6 +145,7 @@ struct NookCommands: Commands {
     let browserManager: BrowserManager
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     init(browserManager: BrowserManager) {
         self.browserManager = browserManager
@@ -150,7 +158,14 @@ struct NookCommands: Commands {
         
         // File Section
         CommandGroup(after: .newItem) {
-            
+
+            Button("Check for Updates...") {
+                appDelegate.updaterController.checkForUpdates(nil)
+            }
+            .keyboardShortcut("u", modifiers: [.command, .shift])
+
+            Divider()
+
             Button("New Tab") {
                 browserManager.openCommandPalette()
             }

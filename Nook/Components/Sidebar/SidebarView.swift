@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
+import Sparkle
 
 struct SidebarView: View {
     @EnvironmentObject var browserManager: BrowserManager
@@ -168,6 +169,14 @@ struct SidebarView: View {
                     }
                 }
             }
+
+            // Update notification overlay
+            SidebarUpdateNotification(downloadsMenuVisible: showDownloadsMenu)
+                .environmentObject(browserManager)
+                .environmentObject(windowState)
+                .environment(browserManager.settingsManager)
+                .padding(.horizontal, 8)
+                .padding(.bottom, 8)
 
             // MARK: - Bottom
             ZStack {

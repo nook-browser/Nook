@@ -50,8 +50,8 @@ struct TabFolderView: View {
             if folder.isOpen {
                 folderContent
                     .transition(.asymmetric(
-                        insertion: .move(edge: .top).combined(with: .opacity),
-                        removal: .move(edge: .top).combined(with: .opacity)
+                        insertion: .identity,
+                        removal: .identity
                     ))
             }
         }
@@ -140,7 +140,8 @@ struct TabFolderView: View {
                 }
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.vertical, 12)
+            .frame(height: 40)
             .frame(maxWidth: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: 12)
@@ -198,7 +199,7 @@ struct TabFolderView: View {
     private var folderContent: some View {
         let tabs = tabsInFolder
 
-        return VStack(spacing: 2) {
+        return VStack(spacing: 0) {
             ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
                 folderDropSpacer(before: index, tabs: tabs)
 
@@ -335,7 +336,7 @@ struct TabFolderView: View {
         let isActive = dropPreviewIndex == displayIndex
 
         Color.clear
-            .frame(height: 6)
+            .frame(height: 2)
             .contentShape(Rectangle())
             .overlay(alignment: .center) {
                 RoundedRectangle(cornerRadius: 3)
