@@ -83,7 +83,7 @@ class SettingsManager {
             // Default tab unload timeout: 60 minutes
             tabUnloadTimeoutKey: 3600.0,
             blockXSTKey: false,
-            debugToggleUpdateNotificationKey: false
+            debugToggleUpdateNotificationKey: false,
             askBeforeQuitKey: true
         ])
 
