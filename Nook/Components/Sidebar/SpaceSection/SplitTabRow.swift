@@ -94,7 +94,7 @@ private struct SplitHalfTab: View {
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                     Text(tab.name)
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(isActive ? Color.black : AppColors.textSecondary)
+                        .foregroundStyle(isActive ? Color.white : AppColors.textSecondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
                     Spacer(minLength: 4)

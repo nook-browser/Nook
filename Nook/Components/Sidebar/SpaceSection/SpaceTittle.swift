@@ -146,8 +146,23 @@ struct SpaceTitle: View {
         }
         // Provide a right-click context menu mirroring the hover menu
         .contextMenu {
-            // Profile assignment submenu
-            Menu("Assign to Profile") {
+            Button {
+                emojiFieldFocused = true
+                NSApp.orderFrontCharacterPalette(nil)
+            } label: {
+                Label("Change Space Icon", systemImage: "face.smiling")
+            }
+            Button {
+                startRenaming()
+            } label: {
+                Label("Rename Space", systemImage: "pencil")
+            }
+            Button {
+                browserManager.showGradientEditor()
+            } label: {
+                Label("Edit Theme Color", systemImage: "paintpalette")
+            }
+            Menu("Set Profile") {
                 let currentName = resolvedProfileName(for: space.profileId) ?? browserManager.profileManager.profiles.first?.name ?? "Default"
                 Text("Current: \(currentName)")
                     .foregroundStyle(.secondary)
@@ -164,16 +179,11 @@ struct SpaceTitle: View {
             }
             Divider()
             Button {
-                startRenaming()
-            } label: {
-                Label("Rename Space", systemImage: "pencil")
+                createFolder()
+            } label : {
+                Label("New Folder", systemImage: "folder.badge.plus")
             }
-            Button {
-                emojiFieldFocused = true
-                NSApp.orderFrontCharacterPalette(nil)
-            } label: {
-                Label("Change Icon", systemImage: "face.smiling")
-            }
+            Divider()
             Button(role: .destructive) {
                 deleteSpace()
             } label: {
