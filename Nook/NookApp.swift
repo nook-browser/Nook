@@ -69,22 +69,84 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     // Prefer async termination path to avoid MainActor deadlocks
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        AppDelegate.log.info("applicationShouldTerminate: returning terminateLater and starting async persistence")
-
-        // Minimal fallback if BrowserManager is unavailable
-        guard let manager = browserManager else {
-            // Attempt a best-effort save via shared persistence container
-            do {
-                let ctx = Persistence.shared.container.mainContext
-                try ctx.save()
-                AppDelegate.log.info("Fallback save without BrowserManager succeeded")
-            } catch {
-                AppDelegate.log.error("Fallback save without BrowserManager failed: \(String(describing: error))")
+        let reason = NSAppleEventManager.shared()
+            .currentAppleEvent?
+            .attributeDescriptor(forKeyword: kAEQuitReason)
+        
+        switch reason?.enumCodeValue {
+            case nil:
+            if browserManager?.settingsManager.askBeforeQuit ?? true {
+                // This probably means it's command-q
+                let header = AnyView(
+                    DialogHeader(
+                        icon: "questionmark.circle",
+                        title: "Quit Nook?",
+                    )
+                )
+                let footer = AnyView(
+                    DialogFooter(leftButton: DialogButton(text: "Quit, and don't ask again", variant: .secondary) { [weak self] in
+                        // Safely unwrap self
+                        guard let self = self else {
+                            sender.reply(toApplicationShouldTerminate: true)
+                            return
+                        }
+                        self.browserManager?.settingsManager.askBeforeQuit = false
+                        self.handletermination(sender: sender, shouldTerminate: true)
+                    }, rightButtons: [
+                        DialogButton(text: "Cancel", variant: .secondary) { [weak self] in
+                            // Safely unwrap self
+                            guard let self = self else {
+                                sender.reply(toApplicationShouldTerminate: true)
+                                return
+                            }
+                            self.browserManager?.dialogManager.closeDialog()
+                            self.handletermination(sender: sender, shouldTerminate: false)
+                        },
+                        DialogButton(text: "Quit", variant: .primary) {
+                            self.handletermination(sender: sender, shouldTerminate: true)
+                        }
+                    ])
+                )
+                browserManager?.dialogManager.showCustomContentDialog(
+                    header: header,
+                    content: EmptyView(),
+                    footer: footer
+                )
+            } else {
+                self.handletermination(sender: sender, shouldTerminate: true)
             }
-            return .terminateNow
-        }
+            
 
+        default:
+            handletermination(sender: sender, shouldTerminate: true)
+        }
+        
+        return .terminateLater
+    }
+    
+    private func handletermination(sender: NSApplication, shouldTerminate: Bool) {
+        AppDelegate.log.info("applicationShouldTerminate: returning terminateLater and starting async persistence")
+    
         Task { @MainActor in
+            guard shouldTerminate else {
+                sender.reply(toApplicationShouldTerminate: false)
+                return
+            }
+            
+            // Minimal fallback if BrowserManager is unavailable
+            guard let manager = browserManager else {
+                // Attempt a best-effort save via shared persistence container
+                do {
+                    let ctx = Persistence.shared.container.mainContext
+                    try ctx.save()
+                    AppDelegate.log.info("Fallback save without BrowserManager succeeded")
+                } catch {
+                    AppDelegate.log.error("Fallback save without BrowserManager failed: \(String(describing: error))")
+                }
+                sender.reply(toApplicationShouldTerminate: true)
+                return
+            }
+            
             let overallStart = CFAbsoluteTimeGetCurrent()
             AppDelegate.log.info("Termination task started on MainActor")
 
@@ -113,8 +175,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             AppDelegate.log.info("Termination task finished in \(String(format: "%.3f", total))s; replying to terminate")
             sender.reply(toApplicationShouldTerminate: true)
         }
-
-        return .terminateLater
     }
 
     func applicationWillTerminate(_ notification: Notification) {

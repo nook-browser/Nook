@@ -183,6 +183,27 @@ struct GeneralSettingsView: View {
                             }
                         }
                     }
+                    
+                    SettingsSectionCard(
+                        title: "Nook",
+                        subtitle: "General Nook settings"
+                    ) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Toggle(
+                                isOn: $browserManager.settingsManager
+                                    .askBeforeQuit
+                            ) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Ask Before Quitting")
+                                    Text(
+                                        "Warn before quitting Nook"
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+                            }.frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
 
                     SettingsSectionCard(
                         title: "Search",
