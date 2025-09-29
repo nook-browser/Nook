@@ -2061,6 +2061,7 @@ class BrowserManager: ObservableObject {
             // CRITICAL: Enable HTML5 Fullscreen API
             configuration.preferences.isElementFullscreenEnabled = true
             
+            configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
         }
         
         // Create the new web view

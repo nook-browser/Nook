@@ -17,6 +17,7 @@ struct WebView: NSViewRepresentable {
         webView.allowsBackForwardNavigationGestures = true
         webView.allowsMagnification = true
         
+        
         // Enable web inspector for debugging
         if #available(macOS 13.3, *) {
             webView.isInspectable = true
