@@ -363,6 +363,7 @@ class BrowserManager: ObservableObject {
     var gradientColorManager: GradientColorManager
     var trackingProtectionManager: TrackingProtectionManager
     var findManager: FindManager
+    var importManager: ImportManager
     
     var externalMiniWindowManager = ExternalMiniWindowManager()
     @Published var peekManager = PeekManager()
@@ -521,6 +522,7 @@ class BrowserManager: ObservableObject {
         self.gradientColorManager = GradientColorManager()
         self.trackingProtectionManager = TrackingProtectionManager()
         self.findManager = FindManager()
+        self.importManager = ImportManager()
 
         // Phase 2: wire dependencies and perform side effects (safe to use self)
         self.compositorManager.browserManager = self
@@ -2294,5 +2296,29 @@ class BrowserManager: ObservableObject {
         }
         
         // Note: No need to clean up tab display owners since they're no longer used
+    }
+    
+    /// Import Data from arc
+    func importArcData() {
+        Task {
+            let result = await importManager.importArcSidebarData()
+            
+            for space in result.spaces {
+                self.tabManager.createSpace(name: space.title, icon: space.icon ?? "person")
+                
+                guard let createdSpace = self.tabManager.spaces.first(where: { $0.name == space.title }) else {
+                    continue
+                }
+                
+                for tab in space.tabs {
+                    self.tabManager.createNewTab(url: tab.url, in: createdSpace)
+                }
+            }
+            
+            for topTab in result.topTabs {
+                let tab = self.tabManager.createNewTab(url: topTab.url, in: self.tabManager.spaces.first!)
+                self.tabManager.addToEssentials(tab)
+            }
+        }
     }
 }
