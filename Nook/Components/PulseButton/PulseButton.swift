@@ -62,6 +62,8 @@ import SwiftUI
 /// button.triggerAnimation()
 /// ```
 struct NookButton: View {
+    @EnvironmentObject var gradientColorManager: GradientColorManager
+
     // MARK: - Types
     
     /// Visual style variants for the button
@@ -362,7 +364,7 @@ struct NookButton: View {
         
         switch variant {
         case .primary:
-            return isHovered ? Color.accentColor.opacity(0.8) : Color.accentColor
+            return isHovered ? gradientColorManager.primaryColor.opacity(0.8) : gradientColorManager.primaryColor
         case .secondary:
             return isHovered ? Color.primary.opacity(0.08) : Color.primary.opacity(0.05)
         case .destructive:

@@ -12,8 +12,7 @@ struct PeekOverlayView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var windowState: BrowserWindowState
     @Environment(\.colorScheme) var colorScheme
-
-    @State private var webView: PeekWebView?
+        @State private var webView: PeekWebView?
     @State private var scale: CGFloat = 0.001
     @State private var opacity: Double = 0.0
     @State private var backgroundOpacity: Double = 0.0
@@ -27,6 +26,14 @@ struct PeekOverlayView: View {
 
     private var session: PeekSession? {
         browserManager.peekManager.currentSession
+    }
+
+    private var currentSpaceColor: Color {
+        if let spaceId = windowState.currentSpaceId,
+           let space = browserManager.tabManager.spaces.first(where: { $0.id == spaceId }) {
+            return Color(space.color)
+        }
+        return Color.accentColor // fallback
     }
 
     var body: some View {
@@ -214,14 +221,14 @@ struct PeekOverlayView: View {
             actionButton(
                 icon: "xmark",
                 action: { browserManager.peekManager.dismissPeek() },
-                color: .red
+                color: currentSpaceColor
             )
 
             // Split view button (disabled if already in split view)
             actionButton(
                 icon: "square.split.2x1",
                 action: { browserManager.peekManager.moveToSplitView() },
-                color: .blue,
+                color: currentSpaceColor,
                 disabled: !browserManager.peekManager.canEnterSplitView
             )
 
@@ -229,7 +236,7 @@ struct PeekOverlayView: View {
             actionButton(
                 icon: "plus.square.on.square",
                 action: { browserManager.peekManager.moveToNewTab() },
-                color: .green
+                color: currentSpaceColor
             )
         }
     }
@@ -257,7 +264,7 @@ struct PeekOverlayView: View {
             Button(action: action) {
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(disabled ? Color.gray : Color.accentColor)
+                    .foregroundStyle(disabled ? Color.gray : color)
                     .frame(width: 32, height: 32)
                     .background(
                         Circle()
@@ -266,7 +273,7 @@ struct PeekOverlayView: View {
                     )
                     .overlay(
                         Circle()
-                            .stroke(Color.accentColor.opacity(disabled ? 0.3 : (isHovering ? 0.8 : 0.6)), lineWidth: 1)
+                            .stroke(color.opacity(disabled ? 0.3 : (isHovering ? 0.8 : 0.6)), lineWidth: 1)
                     )
             }
             .disabled(disabled)

@@ -31,6 +31,7 @@ struct TabFolderView: View {
 
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var windowState: BrowserWindowState
+  
 
     // Get tabs in this folder
     private var tabsInFolder: [Tab] {
@@ -109,7 +110,7 @@ struct TabFolderView: View {
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.white)
                         .frame(width: 18, height: 18)
-                        .background(Color(space.color).opacity(0.8))
+                        .background(Color(space.gradient.primaryColor).opacity(0.8))
                         .clipShape(Circle())
                 }
 
@@ -178,7 +179,7 @@ struct TabFolderView: View {
     private var folderIconView: some View {
         Image(systemName: folder.isOpen ? "folder.fill" : "folder")
             .font(.system(size: 16, weight: .medium))
-            .foregroundStyle(Color(space.color))
+            .foregroundStyle(space.gradient.primaryColor)
             .rotationEffect(.degrees(folder.isOpen ? 0 : -5))
             .scaleEffect(folder.isOpen ? 1.1 : 1.0)
             .animation(.spring(response: 0.3, dampingFraction: 0.7, blendDuration: 0), value: folder.isOpen)

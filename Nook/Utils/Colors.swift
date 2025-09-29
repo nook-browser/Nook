@@ -19,6 +19,10 @@ struct AppColors {
     static let controlBackgroundActive = Color.white.opacity(0.3)
     static let activeTab = Color.white.opacity(1.0)
     static let inactiveTab = Color(nsColor: .controlBackgroundColor).opacity(0.1)
+
+    // Animated gradient primary color that responds to space changes
+    // This should be accessed through @EnvironmentObject var gradientColorManager: GradientColorManager
+    // using gradientColorManager.primaryColor
 }
 
 extension Color {

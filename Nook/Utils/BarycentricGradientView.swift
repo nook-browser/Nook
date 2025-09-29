@@ -18,7 +18,17 @@ struct BarycentricGradientView: View, Animatable {
     // Bridge SpaceGradient's animatable data so SwiftUI drives shader args smoothly
     var animatableData: SpaceGradient.AnimVector {
         get { gradient.animatableData }
-        set { gradient.animatableData = newValue }
+        set {
+            gradient.animatableData = newValue
+            // Update activation progress when gradient changes
+            let currentCount = max(1, min(3, gradient.sortedNodes.count))
+            if currentCount != previousCount {
+                activationProgress = 0.0
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    activationProgress = 1.0
+                }
+            }
+        }
     }
 
     // Anchor inset controls how far in from the edges the color anchors sit.
@@ -43,7 +53,7 @@ struct BarycentricGradientView: View, Animatable {
                 pA: pA, pB: pB, pC: pC,
                 previousCount: previousCount,
                 currentCount: count,
-                t: 1.0,
+                t: activationProgress,
                 primaryID: gradientColorManager.activePrimaryNodeID ?? gradientColorManager.preferredPrimaryNodeID
             )
             context.fill(Path(rect), with: .shader(shader))
@@ -52,6 +62,16 @@ struct BarycentricGradientView: View, Animatable {
             let c = max(1, min(3, gradient.sortedNodes.count))
             previousCount = c
             activationProgress = 1.0
+        }
+        .onChange(of: gradient) { _ in
+            let currentCount = max(1, min(3, gradient.sortedNodes.count))
+            if currentCount != previousCount {
+                previousCount = currentCount
+                activationProgress = 0.0
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    activationProgress = 1.0
+                }
+            }
         }
     }
 

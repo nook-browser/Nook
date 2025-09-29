@@ -35,6 +35,7 @@ struct SpaceView: View {
     let isActive: Bool
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var windowState: BrowserWindowState
+    @EnvironmentObject var gradientColorManager: GradientColorManager
     @State private var draggedItem: UUID? = nil
     @State private var spacePinnedPreviewIndex: Int? = nil
     @State private var canScrollUp: Bool = false

@@ -6,17 +6,22 @@
 //
 
 import SwiftUI
+
+#if RELEASE
 import Sparkle
+#endif
 
 struct SidebarUpdateNotification: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var windowState: BrowserWindowState
+    @EnvironmentObject var gradientColorManager: GradientColorManager
     @Environment(SettingsManager.self) var settingsManager
     let downloadsMenuVisible: Bool
-    @State private var isExpanded: Bool = true
+    @State private var isExpanded: Bool = false
     @State private var isHovering: Bool = false
     @State private var isVisible: Bool = false
-    @State private var collapseTimer: Timer?
+    @State private var buttonHovering: Bool = false
+    @State private var gradientPhase: Double = 0.0
 
     private var updateAvailable: Bool {
         // For now, return false to avoid API issues
@@ -25,12 +30,16 @@ struct SidebarUpdateNotification: View {
     }
 
     private var updateAgeHours: Int {
+        #if RELEASE
         guard let lastUpdateCheck = browserManager.appDelegate?.updaterController.updater.lastUpdateCheckDate else {
             return 0
         }
         let now = Date()
         let timeInterval = now.timeIntervalSince(lastUpdateCheck)
         return Int(timeInterval / 3600)
+        #else
+        return 0
+        #endif
     }
 
     private var shouldShowNotification: Bool {
@@ -44,83 +53,64 @@ struct SidebarUpdateNotification: View {
     var body: some View {
         if shouldShowNotification {
             VStack(spacing: 0) {
-                if isExpanded {
-                    // Expanded state
-                    HStack(spacing: 12) {
-                        // Update icon
-                        Image(systemName: "arrow.down.circle.dotted")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white)
-                            .frame(width: 32, height: 32)
-                            .background(Color.blue.opacity(0.8))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                // The button that expands/collapses
+                VStack(spacing: 0) {
+                    // Title text that moves up on hover
+                    Text("New version of Nook available")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.black)
+                        .offset(y: isExpanded ? -25 : 0)
+                        .zIndex(2)
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("A new version of Nook is available!")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.9))
-                                .lineLimit(1)
-
-                            Text("Click to restart and update")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.7))
-                                .lineLimit(1)
-                        }
-
-                        Spacer(minLength: 0)
-
-                        // Update button
+                    // Expandable button that appears below
+                    if isExpanded {
                         Button(action: {
                             installUpdate()
                         }) {
                             Text("Restart and Update")
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.white)
+                                .foregroundColor(.black)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)
+                                .frame(maxWidth: .infinity)
                                 .background(
                                     RoundedRectangle(cornerRadius: 8)
-                                        .fill(Color.white.opacity(0.2))
+                                        .fill(
+                                            LinearGradient(
+                                                gradient: Gradient(colors: [
+                                                Color.green,
+                                                Color.white,
+                                                Color.green,
+                                                Color.white
+                                            ]),
+                                                startPoint: UnitPoint(x: gradientPhase, y: gradientPhase),
+                                                endPoint: UnitPoint(x: gradientPhase + 1.0, y: gradientPhase + 1.0)
+                                            )
+                                        )
                                 )
                         }
                         .buttonStyle(PlainButtonStyle())
                         .onHover { hovering in
-                            isHovering = hovering
+                            buttonHovering = hovering
                         }
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.8).combined(with: .opacity),
+                            removal: .scale(scale: 0.8).combined(with: .opacity)
+                        ))
+                        .zIndex(1)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.blue.opacity(0.6))
-                    )
-                } else {
-                    // Collapsed state
-                    Button(action: {
-                        installUpdate()
-                    }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "arrow.down.circle.dotted")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.white)
-
-                            Text("Restart and Update")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.white)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.blue.opacity(0.6))
-                        )
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .onHover { hovering in
-                        isHovering = hovering
-                        if hovering {
-                            expandTemporarily()
-                        }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.gray.opacity(0.2))
+                )
+                .frame(maxWidth: .infinity)
+                .onHover { hovering in
+                    isHovering = hovering
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        isExpanded = hovering
                     }
                 }
             }
@@ -134,168 +124,46 @@ struct SidebarUpdateNotification: View {
                 .easeOut(duration: 0.3),
                 value: notificationOffset
             )
+            .animation(
+                .easeInOut(duration: 0.2),
+                value: isExpanded
+            )
+            .animation(
+                .easeInOut(duration: 0.3),
+                value: buttonHovering
+            )
             .onAppear {
                 showNotification()
-                startCollapseTimer()
+                // Start smooth gradient scrolling
+                Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { timer in
+                    gradientPhase += 0.005
+                }
             }
             .onChange(of: shouldShowNotification) { _, newValue in
                 if newValue {
                     showNotification()
-                    startCollapseTimer()
                 } else {
                     hideNotification()
                 }
-            }
-            .onDisappear {
-                collapseTimer?.invalidate()
             }
         }
     }
 
     private func showNotification() {
         isVisible = true
-        isExpanded = true
+        isExpanded = false // Start collapsed
     }
 
     private func hideNotification() {
         isVisible = false
-        collapseTimer?.invalidate()
-    }
-
-    private func startCollapseTimer() {
-        collapseTimer?.invalidate()
-        collapseTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: false) { _ in
-            isExpanded = false
-        }
-    }
-
-    private func expandTemporarily() {
-        isExpanded = true
-        collapseTimer?.invalidate()
-        // Don't automatically collapse again - stays expanded until hover ends
     }
 
     private func installUpdate() {
+        #if RELEASE
         // Use the updater controller to check for and install updates
         browserManager.appDelegate?.updaterController.checkForUpdates(nil)
+        #endif
     }
 }
 
-struct MockSidebarUpdateNotification: View {
-    @State private var forceExpanded = true
-    @State private var forceCollapsed = false
 
-    var body: some View {
-        VStack(spacing: 16) {
-            Text("Expanded State (first minute)")
-                .font(.caption)
-                .foregroundColor(.secondary)
-
-            SidebarUpdateNotificationPreviewView(isExpanded: true)
-                .frame(width: 300)
-
-            Text("Collapsed State (after 1 minute)")
-                .font(.caption)
-                .foregroundColor(.secondary)
-
-            SidebarUpdateNotificationPreviewView(isExpanded: false)
-                .frame(width: 300)
-
-            Text("Positioned above downloads menu")
-                .font(.caption)
-                .foregroundColor(.secondary)
-
-            ZStack(alignment: .bottom) {
-                Rectangle()
-                    .fill(Color.gray.opacity(0.2))
-                    .frame(height: 100)
-                    .overlay(
-                        Text("Downloads Menu Area")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    )
-                SidebarUpdateNotificationPreviewView(isExpanded: true)
-                    .frame(width: 300)
-            }
-            .frame(height: 150)
-
-            Spacer()
-        }
-        .padding()
-        .frame(width: 400, height: 600)
-        .background(Color.gray.opacity(0.1))
-    }
-}
-
-struct SidebarUpdateNotificationPreviewView: View {
-    let isExpanded: Bool
-
-    var body: some View {
-        VStack(spacing: 0) {
-            if isExpanded {
-                HStack(spacing: 12) {
-                    Image(systemName: "arrow.down.circle.dotted")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(width: 32, height: 32)
-                        .background(Color.blue.opacity(0.8))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("A new version of Nook is available!")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.9))
-                            .lineLimit(1)
-
-                        Text("Click to restart and update")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.7))
-                            .lineLimit(1)
-                    }
-                    Spacer(minLength: 0)
-                    Button(action: {}) {
-                        Text("Restart and Update")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.white.opacity(0.2))
-                            )
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.blue.opacity(0.6))
-                )
-            } else {
-                Button(action: {}) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "arrow.down.circle.dotted")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.white)
-                        Text("Restart and Update")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.white)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.blue.opacity(0.6))
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-        }
-        .opacity(1)
-    }
-}
-
-#Preview {
-    MockSidebarUpdateNotification()
-}

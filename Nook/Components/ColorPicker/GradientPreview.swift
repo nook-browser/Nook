@@ -11,7 +11,7 @@ struct GradientPreview: View {
 
     var body: some View {
         ZStack {
-            DitheredGradientView(gradient: gradient)
+            BarycentricGradientView(gradient: gradient)
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
 
             if showDitherOverlay {
