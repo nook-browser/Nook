@@ -21,6 +21,7 @@ class BrowserConfiguration {
 
         // Configure JavaScript preferences for extension support
         let preferences = WKWebpagePreferences()
+        preferences.allowsContentJavaScript = true
         config.defaultWebpagePreferences = preferences
 
         // Core WebKit preferences for extensions
