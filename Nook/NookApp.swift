@@ -27,6 +27,9 @@ struct NookApp: App {
                     // Connect browser manager to app delegate for cleanup and Sparkle integration
                     appDelegate.browserManager = browserManager
                     browserManager.appDelegate = appDelegate
+
+                    // Initialize keyboard shortcut manager
+                    browserManager.settingsManager.keyboardShortcutManager.setBrowserManager(browserManager)
                 }
         }
         .windowStyle(.hiddenTitleBar)

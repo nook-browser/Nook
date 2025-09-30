@@ -10,6 +10,7 @@ import SwiftUI
 
 @Observable
 class SettingsManager {
+    let keyboardShortcutManager = KeyboardShortcutManager()
     private let userDefaults = UserDefaults.standard
     private let materialKey = "settings.currentMaterialRaw"
     private let searchEngineKey = "settings.searchEngine"

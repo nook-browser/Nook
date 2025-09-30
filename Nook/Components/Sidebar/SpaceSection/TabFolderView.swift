@@ -180,9 +180,6 @@ struct TabFolderView: View {
         Image(systemName: folder.isOpen ? "folder.fill" : "folder")
             .font(.system(size: 16, weight: .medium))
             .foregroundStyle(space.gradient.primaryColor)
-            .rotationEffect(.degrees(folder.isOpen ? 0 : -5))
-            .scaleEffect(folder.isOpen ? 1.1 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7, blendDuration: 0), value: folder.isOpen)
             .symbolEffect(.bounce, options: .speed(0.5).repeat(1), value: isFolderIconAnimating)
             .onAppear {
                 isFolderIconAnimating = false
