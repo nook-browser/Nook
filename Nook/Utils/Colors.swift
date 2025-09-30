@@ -14,15 +14,11 @@ struct AppColors {
     static let backgroundSecondary = Color(nsColor: .underPageBackgroundColor)
 
     static let controlBackground = Color(nsColor: .controlBackgroundColor)
-    static let controlBackgroundHover = Color.white.opacity(0.1)
-    static let controlBackgroundHoverLight = Color.white.opacity(0.15)
-    static let controlBackgroundActive = Color.white.opacity(0.4)
-    static let activeTab = Color.white.opacity(0.2)
-    static let inactiveTab = Color.white.opacity(0.1)
-
-    // Animated gradient primary color that responds to space changes
-    // This should be accessed through @EnvironmentObject var gradientColorManager: GradientColorManager
-    // using gradientColorManager.primaryColor
+    static let controlBackgroundHover = Color.gray.opacity(0.8)
+    static let controlBackgroundHoverLight = Color.gray.opacity(0.2)
+    static let controlBackgroundActive = Color.white.opacity(0.3)
+    static let activeTab = Color.white.opacity(1.0)
+    static let inactiveTab = Color(nsColor: .controlBackgroundColor).opacity(0.1)
 }
 
 extension Color {
