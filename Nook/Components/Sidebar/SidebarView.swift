@@ -263,79 +263,89 @@ struct SidebarView: View {
     private var spacesContent: some View {
         Group {
             if browserManager.tabManager.spaces.isEmpty {
-                // Empty state when no spaces exist
-                VStack(spacing: 16) {
-                    Image(systemName: "square.grid.2x2")
-                        .font(.system(size: 48))
-                        .foregroundColor(.secondary)
-                    VStack(spacing: 8) {
-                        Text("No Spaces")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                        Text("Create a space to start browsing")
-                            .font(.body)
-                            .foregroundColor(.secondary)
-                    }
-                    Button(action: showSpaceCreationDialog) {
-                        Label("Create Space", systemImage: "plus")
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-                .frame(width: effectiveWidth)
-                .padding()
+                emptyStateView
             } else {
-                // Use BigUIPaging PageView for space navigation
-                let spaces = browserManager.tabManager.spaces
-                PageView(selection: $activeSpaceIndex) {
-                    ForEach(spaces.indices, id: \.self) { index in
-                        let space = spaces[index]
-                        makeSpaceView(for: space, index: index)
-                    }
-                }
-                .frame(width: effectiveWidth)
-                .pageViewStyle(.scroll)
-                .contentShape(Rectangle())
-                .id(activeTabRefreshTrigger)
-                .onChange(of: activeSpaceIndex) { _, newIndex in
-                    // BigUIPaging will handle the bounds checking automatically
-                    let space = browserManager.tabManager.spaces[newIndex]
-                    print("🎯 Page changed to space: \(space.name) (index: \(newIndex))")
+                spacesPageView
+            }
+        }
+    }
 
-                    // Trigger haptic feedback
-                    let impact = NSHapticFeedbackManager.defaultPerformer
-                    impact.perform(.alignment, performanceTime: .default)
+    private var emptyStateView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "square.grid.2x2")
+                .font(.system(size: 48))
+                .foregroundColor(.secondary)
+            VStack(spacing: 8) {
+                Text("No Spaces")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Text("Create a space to start browsing")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+            }
+            Button(action: showSpaceCreationDialog) {
+                Label("Create Space", systemImage: "plus")
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .frame(width: effectiveWidth)
+        .padding()
+    }
 
-                    // Activate the space - BigUIPaging ensures newIndex is always valid
-                    browserManager.setActiveSpace(space, in: windowState)
+    private var spacesPageView: some View {
+        let spaces = browserManager.tabManager.spaces
+        return PageView(selection: $activeSpaceIndex) {
+            ForEach(spaces.indices, id: \.self) { index in
+                if index >= 0 && index < spaces.count {
+                    makeSpaceView(for: spaces[index], index: index)
+                } else {
+                    EmptyView()
+                }
+            }
+        }
+        .frame(width: effectiveWidth)
+        .pageViewStyle(.scroll)
+        .contentShape(Rectangle())
+        .id(activeTabRefreshTrigger)
+        .onAppear {
+            // Initialize the selection
+            if let targetIndex = browserManager.tabManager.spaces.firstIndex(where: { $0.id == windowState.currentSpaceId }) {
+                activeSpaceIndex = targetIndex
+            }
+        }
+        .onChange(of: activeSpaceIndex) { _, newIndex in
+            // Add explicit bounds checking to prevent index out of range crashes
+            guard newIndex >= 0 && newIndex < browserManager.tabManager.spaces.count else {
+                print("⚠️ Invalid space index in onChange: \(newIndex), spaces count: \(browserManager.tabManager.spaces.count)")
+                return
+            }
+            let space = browserManager.tabManager.spaces[newIndex]
+            print("🎯 Page changed to space: \(space.name) (index: \(newIndex))")
 
-                    // Force hit testing refresh after a short delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        // This helps ensure proper hit testing after page transition
-                    }
-                }
-                .onAppear {
-                    // Initialize the selection
-                    if let targetIndex = browserManager.tabManager.spaces.firstIndex(where: { $0.id == windowState.currentSpaceId }) {
-                        activeSpaceIndex = targetIndex
-                    }
-                }
-                .onChange(of: windowState.currentSpaceId) { _, _ in
-                    // Update selection when space changes externally
-                    if let targetIndex = browserManager.tabManager.spaces.firstIndex(where: { $0.id == windowState.currentSpaceId }) {
-                        activeSpaceIndex = targetIndex
-                    }
-                }
-                .onChange(of: windowState.currentSpaceId) { _, _ in
-                    // Force PageView to recreate when SPACE changes (not tab changes)
-                    // This fixes hit testing issues after space switches while preserving scroll position
-                    activeTabRefreshTrigger.toggle()
-                }
-                .onChange(of: windowState.sidebarContentWidth) { _, _ in
-                    // Rebuild cached page views so width-sensitive content refreshes immediately
-                    activeTabRefreshTrigger.toggle()
-                }
+            // Trigger haptic feedback
+            let impact = NSHapticFeedbackManager.defaultPerformer
+            impact.perform(.alignment, performanceTime: .default)
 
-                }
+            // Activate the space - BigUIPaging ensures newIndex is always valid
+            browserManager.setActiveSpace(space, in: windowState)
+
+            // Force hit testing refresh after a short delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                // This helps ensure proper hit testing after page transition
+            }
+        }
+        .onChange(of: windowState.currentSpaceId) { _, _ in
+            // Update selection when space changes externally
+            if let targetIndex = browserManager.tabManager.spaces.firstIndex(where: { $0.id == windowState.currentSpaceId }) {
+                activeSpaceIndex = targetIndex
+            }
+            // Force PageView to recreate when SPACE changes (not tab changes)
+            // This fixes hit testing issues after space switches while preserving scroll position
+            activeTabRefreshTrigger.toggle()
+        }
+        .onChange(of: windowState.sidebarContentWidth) { _, _ in
+            // Rebuild cached page views so width-sensitive content refreshes immediately
+            activeTabRefreshTrigger.toggle()
         }
     }
 

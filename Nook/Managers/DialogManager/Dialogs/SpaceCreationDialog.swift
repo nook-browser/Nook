@@ -249,8 +249,9 @@ struct EmojiTextField: NSViewRepresentable {
             if let textField = obj.object as? NSTextField {
                 let newText = textField.stringValue
                 if !newText.isEmpty {
-                    // Take only the last character (emoji)
-                    let emoji = String(newText.last!)
+                    // Take only the last character (emoji) - safely unwrap
+                    guard let lastChar = newText.last else { return }
+                    let emoji = String(lastChar)
                     DispatchQueue.main.async {
                         self.parent.text = emoji
                     }

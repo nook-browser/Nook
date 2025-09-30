@@ -63,7 +63,9 @@ struct SpaceTitle: View {
                 .focused($emojiFieldFocused)
                 .onChange(of: selectedEmoji) { _, newValue in
                     if !newValue.isEmpty {
-                        space.icon = String(newValue.last!)
+                        // Safely unwrap the last character
+                        guard let lastChar = newValue.last else { return }
+                        space.icon = String(lastChar)
                         browserManager.tabManager.persistSnapshot()
                         selectedEmoji = ""
                     }

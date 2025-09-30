@@ -421,15 +421,16 @@ class TabManager: ObservableObject {
     // Essentials API - profile-filtered view of global pinned tabs
     var pinnedTabs: [Tab] {
         guard let pid = browserManager?.currentProfile?.id else { return [] }
-        // Always present pinned in sorted order by index
-        return (pinnedByProfile[pid] ?? []).sorted { $0.index < $1.index }
+        // Always present pinned in sorted order by index - create copy to prevent race conditions
+        return Array(pinnedByProfile[pid] ?? []).sorted { $0.index < $1.index }
     }
     
     var essentialTabs: [Tab] { pinnedTabs }
     
     func essentialTabs(for profileId: UUID?) -> [Tab] {
         guard let profileId = profileId else { return [] }
-        return (pinnedByProfile[profileId] ?? []).sorted { $0.index < $1.index }
+        // Create copy to prevent race conditions during sorting
+        return Array(pinnedByProfile[profileId] ?? []).sorted { $0.index < $1.index }
     }
     
     // Flattened pinned across all profiles for internal ops
@@ -470,7 +471,8 @@ class TabManager: ObservableObject {
 
     var tabs: [Tab] {
         guard let s = currentSpace else { return [] }
-        return (tabsBySpace[s.id] ?? []).sorted { $0.index < $1.index }
+        // Create copy to prevent race conditions during sorting
+        return Array(tabsBySpace[s.id] ?? []).sorted { $0.index < $1.index }
     }
 
     private func setTabs(_ items: [Tab], for spaceId: UUID) {
@@ -500,13 +502,14 @@ class TabManager: ObservableObject {
             return allTabs()
         }
         let spaceIds = Set(spaces.filter { $0.profileId == pid }.map { $0.id })
-        let pinned = (pinnedByProfile[pid] ?? []).sorted { $0.index < $1.index }
+        // Create copies to prevent race conditions during sorting
+        let pinned = Array(pinnedByProfile[pid] ?? []).sorted { $0.index < $1.index }
         let spacePinned = spaces
             .filter { spaceIds.contains($0.id) }
-            .flatMap { (spacePinnedTabs[$0.id] ?? []).sorted { $0.index < $1.index } }
+            .flatMap { Array(spacePinnedTabs[$0.id] ?? []).sorted { $0.index < $1.index } }
         let regular = spaces
             .filter { spaceIds.contains($0.id) }
-            .flatMap { (tabsBySpace[$0.id] ?? []).sorted { $0.index < $1.index } }
+            .flatMap { Array(tabsBySpace[$0.id] ?? []).sorted { $0.index < $1.index } }
         return pinned + spacePinned + regular
     }
 
@@ -1605,7 +1608,8 @@ class TabManager: ObservableObject {
     // MARK: - Space-Level Pinned Tabs
     
     func spacePinnedTabs(for spaceId: UUID) -> [Tab] {
-        let tabs = (spacePinnedTabs[spaceId] ?? []).sorted { $0.index < $1.index }
+        // Create a copy of the array before sorting to prevent race conditions
+        let tabs = Array(spacePinnedTabs[spaceId] ?? []).sorted { $0.index < $1.index }
         print("📌 spacePinnedTabs(for: \(spaceId.uuidString.prefix(8))...) returning \(tabs.count) tabs:")
         for tab in tabs {
             print("   - \(tab.name) (id: \(tab.id.uuidString.prefix(8))..., folderId: \(tab.folderId?.uuidString.prefix(8) ?? "nil"))")
@@ -1971,7 +1975,8 @@ class TabManager: ObservableObject {
         var tabSnapshots: [PersistenceActor.SnapshotTab] = []
         // Global pinned (across profiles)
         for (pid, arr) in pinnedByProfile {
-            let ordered = arr.sorted { $0.index < $1.index }
+            // Create copy to prevent race conditions during sorting
+            let ordered = Array(arr).sorted { $0.index < $1.index }
             for (i, t) in ordered.enumerated() {
                 tabSnapshots.append(.init(
                     id: t.id,
@@ -1989,7 +1994,8 @@ class TabManager: ObservableObject {
         // Per-space collections
         for sp in spaces {
             // Space-pinned for this space
-            let spPinned = (spacePinnedTabs[sp.id] ?? []).sorted { $0.index < $1.index }
+            // Create copy to prevent race conditions during sorting
+            let spPinned = Array(spacePinnedTabs[sp.id] ?? []).sorted { $0.index < $1.index }
             for (i, t) in spPinned.enumerated() {
                 tabSnapshots.append(.init(
                     id: t.id,
@@ -2004,7 +2010,8 @@ class TabManager: ObservableObject {
                 ))
             }
             // Regular tabs for this space
-            let regs = (tabsBySpace[sp.id] ?? []).sorted { $0.index < $1.index }
+            // Create copy to prevent race conditions during sorting
+            let regs = Array(tabsBySpace[sp.id] ?? []).sorted { $0.index < $1.index }
             for (i, t) in regs.enumerated() {
                 tabSnapshots.append(.init(
                     id: t.id,

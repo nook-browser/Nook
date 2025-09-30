@@ -17,6 +17,11 @@ struct EssentialTabsScrollView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: 0) {
                 ForEach(visibleSpaceIndices, id: \.self) { spaceIndex in
+                    // Add bounds checking to prevent index out of range crashes
+                    guard spaceIndex >= 0 && spaceIndex < browserManager.tabManager.spaces.count else {
+                        print("⚠️ Invalid space index in EssentialTabsScrollView: \(spaceIndex)")
+                        return EmptyView()
+                    }
                     let space = browserManager.tabManager.spaces[spaceIndex]
                     let boundaryInfo = getProfileBoundaryInfo(for: spaceIndex)
                     
@@ -30,6 +35,7 @@ struct EssentialTabsScrollView: View {
                         Color.clear
                             .frame(width: width, height: 44)
                     }
+                    return EmptyView()
                 }
             }
             .scrollTargetLayout()
@@ -47,12 +53,22 @@ struct EssentialTabsScrollView: View {
         
         let currentSpace = browserManager.tabManager.spaces[spaceIndex]
         let currentProfile = currentSpace.profileId
-        
-        let isProfileStart = spaceIndex == 0 || 
-                            browserManager.tabManager.spaces[spaceIndex - 1].profileId != currentProfile
-        
-        let isProfileEnd = spaceIndex == browserManager.tabManager.spaces.count - 1 || 
-                          browserManager.tabManager.spaces[spaceIndex + 1].profileId != currentProfile
+
+        // Safely check previous space profile with bounds checking
+        let isProfileStart = spaceIndex == 0 || {
+            guard spaceIndex - 1 >= 0 && spaceIndex - 1 < browserManager.tabManager.spaces.count else {
+                return true // Treat as profile start if previous space is invalid
+            }
+            return browserManager.tabManager.spaces[spaceIndex - 1].profileId != currentProfile
+        }()
+
+        // Safely check next space profile with bounds checking
+        let isProfileEnd = spaceIndex == browserManager.tabManager.spaces.count - 1 || {
+            guard spaceIndex + 1 >= 0 && spaceIndex + 1 < browserManager.tabManager.spaces.count else {
+                return true // Treat as profile end if next space is invalid
+            }
+            return browserManager.tabManager.spaces[spaceIndex + 1].profileId != currentProfile
+        }()
         
         return (isProfileStart, isProfileEnd, currentProfile)
     }
