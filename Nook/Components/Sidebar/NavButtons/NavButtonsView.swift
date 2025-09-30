@@ -33,11 +33,11 @@ struct NavButtonsView: View {
 
             } else {
                 HStack(alignment: .center, spacing: 8) {
-                    NavButton(iconName: "arrow.backward", disabled: browserManager.currentTab(for: windowState)?.canGoBack ?? true) {
+                    NavButton(iconName: "arrow.backward", disabled: !(browserManager.currentTab(for: windowState)?.canGoBack ?? false)) {
                         browserManager.currentTab(for: windowState)?.goBack()
                         print("back")
                     }
-                    NavButton(iconName: "arrow.forward", disabled: browserManager.currentTab(for: windowState)?.canGoForward ?? true) {
+                    NavButton(iconName: "arrow.forward", disabled: !(browserManager.currentTab(for: windowState)?.canGoForward ?? false)) {
                         browserManager.currentTab(for: windowState)?.goForward()
                         print("forward")
 

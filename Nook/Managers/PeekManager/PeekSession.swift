@@ -2,7 +2,7 @@
 //  PeekSession.swift
 //  Nook
 //
-//  Created by Claude on 24/09/2025.
+//  Created by Jonathan Caudill on 24/09/2025.
 //
 
 import Foundation

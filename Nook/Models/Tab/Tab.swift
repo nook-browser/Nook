@@ -1892,6 +1892,9 @@ extension Tab: WKNavigationDelegate {
             browserManager?.syncTabAcrossWindows(self.id)
         }
 
+        // CRITICAL: Update navigation state after back/forward navigation
+        updateNavigationState()
+
         webView.evaluateJavaScript("document.title") {
             [weak self] result, error in
             if let title = result as? String {

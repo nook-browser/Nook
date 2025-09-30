@@ -2,7 +2,7 @@
 //  SidebarUpdateNotification.swift
 //  Nook
 //
-//  Created by Claude on 27/09/2025.
+//  Created by Jonathan Caudill on 27/09/2025.
 //
 
 import SwiftUI
