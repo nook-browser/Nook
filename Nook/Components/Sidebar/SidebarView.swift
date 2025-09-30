@@ -105,6 +105,30 @@ struct SidebarView: View {
     var body: some View {
         if windowState.isSidebarVisible || forceVisible {
             sidebarContent
+                .contextMenu {
+                    Button {
+                        // TODO: Implement space icon change ouside of SpaceTitle
+                    } label: {
+                        Label("Change Space Icon", systemImage: "pencil")
+                    }
+
+                    Button {
+                        // TODO: Implement space renaming outside of SpaceTitle
+                    } label: {
+                        Label("Rename Space", systemImage: "face.smiling")
+                    }
+                    Button {
+                        browserManager.showGradientEditor()
+                    } label: {
+                        Label("Edit Theme Color", systemImage: "paintpalette")
+                    }
+                    Divider()
+                    Button(role: .destructive) {
+                        browserManager.tabManager.removeSpace(browserManager.tabManager.currentSpace!.id)
+                    } label: {
+                        Label("Delete Space", systemImage: "trash")
+                    }
+                }
         }
     }
 
@@ -252,12 +276,6 @@ struct SidebarView: View {
         ZStack {
             spacesContent
         }
-        .transition(
-            .asymmetric(
-                insertion: .move(edge: .leading).combined(with: .opacity),
-                removal: .move(edge: .trailing).combined(with: .opacity)
-            )
-        )
     }
 
     private var spacesContent: some View {
@@ -438,6 +456,7 @@ struct SidebarView: View {
             .environmentObject(windowState)
             .environmentObject(browserManager.splitManager)
             .id(space.id.uuidString + "-w\(Int(windowState.sidebarContentWidth))")
+            Spacer()
         }
         .frame(width: effectiveWidth, alignment: .leading)
         .tag(index)
