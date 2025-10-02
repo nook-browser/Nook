@@ -5,7 +5,6 @@
 //  Created by Maciek Bagiński on 30/07/2025.
 //
 
-
 import SwiftUI
 
 // MARK: - MacButtonsViewNew
@@ -55,6 +54,7 @@ class MacButtonsViewModel {
     var isHovered = false
     var buttonState: ButtonState = .idle
     let showIcons = true
+    
     enum ButtonType {
         case close
         case minimize
@@ -67,11 +67,11 @@ class MacButtonsViewModel {
         case hover
     }
 
-    func getButtonColor(buttonType: ButtonType) -> (Color, Color) {
+    func getButtonColor(buttonType: ButtonType, isDark: Bool) -> (Color, Color) {
         if buttonState != .idle {
             return (macFillColor(buttonType: buttonType), macStrokeColor(buttonType: buttonType))
         }
-        return (Color.primary.opacity(0.2), Color.clear)
+        return (isDark ? AppColors.pinnedTabHoverDark : AppColors.pinnedTabHoverLight, Color.clear)
     }
 
     func macFillColor(buttonType: ButtonType) -> Color {
@@ -126,6 +126,7 @@ class MacButtonsViewModel {
 // MARK: - MacButtonsView
 
 struct MacButtonsView: View {
+    @EnvironmentObject var browserManager: BrowserManager
     let viewModel = MacButtonsViewModel()
 
     var body: some View {
@@ -158,6 +159,7 @@ struct MacButtonsView: View {
 // MARK: - MacButtonView
 
 struct MacButtonView: View {
+    @EnvironmentObject var browserManager: BrowserManager
     var viewModel: MacButtonsViewModel
     var buttonType: MacButtonsViewModel.ButtonType
 
@@ -165,16 +167,16 @@ struct MacButtonView: View {
         Button(action: viewModel.getButtonAction(buttonType: buttonType)) {
             if viewModel.buttonState == .idle {
                 Circle()
-                    .fill(viewModel.getButtonColor(buttonType: buttonType).0)
+                    .fill(viewModel.getButtonColor(buttonType: buttonType, isDark: browserManager.gradientColorManager.isDark).0)
                     .frame(width: 12.5, height: 12.5)
             } else {
                 ZStack {
                     Circle()
-                        .fill(viewModel.getButtonColor(buttonType: buttonType).1)
+                        .fill(viewModel.getButtonColor(buttonType: buttonType, isDark: browserManager.gradientColorManager.isDark).1)
                         .overlay(
                             Circle()
                                 .inset(by: 0.5)
-                                .fill(viewModel.getButtonColor(buttonType: buttonType).0)
+                                .fill(viewModel.getButtonColor(buttonType: buttonType, isDark: browserManager.gradientColorManager.isDark).0)
                         )
                     if viewModel.buttonState == .hover {}
                 }.frame(width: 12.5, height: 12.5)

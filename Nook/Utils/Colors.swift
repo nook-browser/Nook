@@ -19,6 +19,38 @@ struct AppColors {
     static let controlBackgroundActive = Color.white.opacity(0.3)
     static let activeTab = Color.white.opacity(1.0)
     static let inactiveTab = Color(nsColor: .controlBackgroundColor).opacity(0.1)
+    
+    
+    
+    static let iconActiveLight = Color.white.opacity(0.6)
+    static let iconDisabledLight = Color.white.opacity(0.25)
+    static let iconHoverLight = Color.white.opacity(0.1)
+    
+    static let iconActiveDark = Color.black.opacity(0.55)
+    static let iconDisabledDark = Color.black.opacity(0.15)
+    static let iconHoverDark = Color.black.opacity(0.1)
+    
+    static let spaceTabActiveLight = Color.white.opacity(0.2)
+    static let spaceTabHoverLight = Color.white.opacity(0.1)
+    static let spaceTabTextLight = Color(hex: "EAE6DC")
+    
+    static let spaceTabActiveDark = Color.white
+    static let spaceTabHoverDark = Color.black.opacity(0.05)
+    static let spaceTabTextDark = Color(hex: "001E21")
+    
+    
+    static let pinnedTabActiveLight = Color.white.opacity(0.2)
+    static let pinnedTabHoverLight = Color.white.opacity(0.15)
+    static let pinnedTabIdleLight = Color.white.opacity(0.1)
+    
+    static let pinnedTabActiveDark = Color.white
+    static let pinnedTabHoverDark = Color.black.opacity(0.1)
+    static let pinnedTabIdleDark = Color.black.opacity(0.05)
+    
+    
+    static let sidebarTextLight = Color.white.opacity(0.5)
+    static let sidebarTextDark = Color.black.opacity(0.5)
+    
 }
 
 extension Color {
