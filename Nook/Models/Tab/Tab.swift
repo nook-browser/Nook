@@ -87,8 +87,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     var loadingState: LoadingState = .idle
 
-    var canGoBack: Bool = false
-    var canGoForward: Bool = false
+    @Published var canGoBack: Bool = false
+    @Published var canGoForward: Bool = false
     
     // MARK: - Video State
     @Published var hasPlayingVideo: Bool = false
@@ -249,8 +249,18 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     private func updateNavigationState() {
         guard let webView = _webView else { return }
-        canGoBack = webView.canGoBack
-        canGoForward = webView.canGoForward
+
+        // Force UI update by notifying object will change
+        objectWillChange.send()
+
+        let newCanGoBack = webView.canGoBack
+        let newCanGoForward = webView.canGoForward
+
+        // Only update if values actually changed to prevent unnecessary redraws
+        if newCanGoBack != canGoBack || newCanGoForward != canGoForward {
+            canGoBack = newCanGoBack
+            canGoForward = newCanGoForward
+        }
     }
 
     // MARK: - WebView Setup
