@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct NavButton: View {
+    @EnvironmentObject var browserManager: BrowserManager
     var iconName: String
     var disabled: Bool
     var action: (() -> Void)?
@@ -25,7 +26,7 @@ struct NavButton: View {
         } label: {
             Image(systemName: iconName)
                 .font(.system(size: 16))
-                .foregroundStyle(disabled ? AppColors.textQuaternary : AppColors.textSecondary)
+                .foregroundStyle(iconColor)
                 .padding(4)
                 .contentTransition(.symbolEffect(.replace.upUp.byLayer, options: .nonRepeating))
         }
@@ -33,12 +34,27 @@ struct NavButton: View {
         .disabled(disabled)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(isHovering && !disabled ? AppColors.controlBackgroundHover : Color.clear)
-                .frame(width: 24, height: 24) // Fixed 20x20 square
+                .fill(backgroundColor)
+                .frame(width: 32, height: 32)
                 .animation(.easeInOut(duration: 0.15), value: isHovering)
         )
         .onHover { hovering in
             isHovering = hovering
+        }
+    }
+    
+    private var backgroundColor: Color {
+        if isHovering {
+            return browserManager.gradientColorManager.isDark ? AppColors.iconHoverDark : AppColors.iconHoverLight
+        } else {
+            return Color.clear
+        }
+    }
+    private var iconColor: Color {
+        if disabled {
+            return browserManager.gradientColorManager.isDark ? AppColors.iconDisabledDark : AppColors.iconDisabledLight
+        } else {
+            return browserManager.gradientColorManager.isDark ? AppColors.iconActiveDark : AppColors.iconActiveLight
         }
     }
 }

@@ -28,7 +28,7 @@ struct SpaceTitle: View {
             if isRenaming {
                 TextField("", text: $draftName)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(AppColors.textSecondary)
+                    .foregroundStyle(textColor)
                     .textFieldStyle(PlainTextFieldStyle())
                     .autocorrectionDisabled()
                     .focused($nameFieldFocused)
@@ -48,7 +48,7 @@ struct SpaceTitle: View {
                 HStack(spacing: 6) {
                     Text(space.name)
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(AppColors.textSecondary)
+                        .foregroundStyle(textColor)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
@@ -132,7 +132,7 @@ struct SpaceTitle: View {
         .padding(.horizontal, 10)
         .frame(height: 40)
         .frame(maxWidth: .infinity)
-        .background(isHovering ? AppColors.controlBackgroundHover : Color.clear)
+        .background(hoverColor)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .contentShape(RoundedRectangle(cornerRadius: 12))
         .onHover { hovering in
@@ -192,6 +192,19 @@ struct SpaceTitle: View {
                 Label("Delete Space", systemImage: "trash")
             }
         }
+    }
+    
+    //MARK: - Colors
+    
+    private var hoverColor: Color {
+        if isHovering {
+            return browserManager.gradientColorManager.isDark ? AppColors.spaceTabHoverDark : AppColors.spaceTabHoverLight
+        } else {
+            return .clear
+        }
+    }
+    private var textColor: Color {
+        return browserManager.gradientColorManager.isDark ? AppColors.sidebarTextDark : AppColors.sidebarTextLight
     }
 
     // MARK: - Actions

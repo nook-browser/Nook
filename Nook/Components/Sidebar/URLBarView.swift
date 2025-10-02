@@ -20,16 +20,16 @@ struct URLBarView: View {
                             displayURL
                         )
                         .font(.system(size: 12, weight: .medium, design: .default))
-                        .foregroundStyle(AppColors.textPrimary.opacity(0.5))
+                        .foregroundStyle(textColor)
                         .lineLimit(1)
                         .truncationMode(.tail)
                     } else {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 12))
-                            .foregroundStyle(AppColors.textPrimary.opacity(0.5))
+                            .foregroundStyle(textColor)
                         Text("Search or Enter URL...")
                             .font(.system(size: 12, weight: .medium, design: .default))
-                            .foregroundStyle(AppColors.textPrimary.opacity(0.5))
+                            .foregroundStyle(textColor)
                     }
                     
                     Spacer()
@@ -42,7 +42,7 @@ struct URLBarView: View {
                         }) {
                             Image(systemName: currentTab.hasPiPActive ? "pip.exit" : "pip.enter")
                                 .font(.system(size: 12))
-                                .foregroundStyle(AppColors.textPrimary.opacity(currentTab.hasPiPActive ? 1.0 : 0.7))
+                                .foregroundStyle(textColor.opacity(currentTab.hasPiPActive ? 1.0 : 0.7))
                         }
                         .buttonStyle(.plain)
                         .help(currentTab.hasPiPActive ? "Exit Picture in Picture" : "Enter Picture in Picture")
@@ -59,10 +59,7 @@ struct URLBarView: View {
         }
         .frame(maxWidth: .infinity, minHeight: 36, maxHeight: 36)
         .background(
-            ZStack {
-                BlurEffectView(material: browserManager.settingsManager.currentMaterial, state: .active)
-                (isHovering ? AppColors.controlBackgroundHover : AppColors.inactiveTab)
-            }
+           backgroundColor
         )
         .clipShape(RoundedRectangle(cornerRadius: 12))
         // Report the frame in the window space so we can overlay the mini palette above all content
@@ -85,6 +82,17 @@ struct URLBarView: View {
             browserManager.focusURLBar()
         }
         
+    }
+    
+    private var backgroundColor: Color {
+        if isHovering {
+            return browserManager.gradientColorManager.isDark ? AppColors.pinnedTabHoverDark : AppColors.pinnedTabHoverLight
+        } else {
+            return browserManager.gradientColorManager.isDark ? AppColors.pinnedTabIdleDark : AppColors.pinnedTabIdleLight
+        }
+    }
+    private var textColor: Color {
+        return browserManager.gradientColorManager.isDark ? AppColors.spaceTabTextDark : AppColors.spaceTabTextLight
     }
     
     private var displayURL: String {
