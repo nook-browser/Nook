@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct NavButton: View {
+    @EnvironmentObject var browserManager: BrowserManager
     var iconName: String
     var disabled: Bool
     var action: (() -> Void)?
@@ -28,20 +29,19 @@ struct NavButton: View {
             action?()
         } label: {
             ZStack {
-                // Background that fills entire clickable area
+                // Background that fills entire clickable area (32x32 to match design)
                 RoundedRectangle(cornerRadius: 6)
-                    .fill((isHovering || isPressing) && !disabled ? AppColors.controlBackgroundHover : Color.clear)
-                    .frame(width: 24, height: 24) // Fixed 24x24 square
+                    .fill(backgroundColor)
+                    .frame(width: 32, height: 32)
 
                 // Icon centered in the button
                 Image(systemName: iconName)
                     .font(.system(size: 16))
-                    .foregroundStyle(disabled ? AppColors.textQuaternary : AppColors.textSecondary)
+                    .foregroundStyle(iconColor)
             }
         }
         .buttonStyle(.plain)
         .disabled(disabled)
-        .padding(4)
         .contentTransition(.symbolEffect(.replace.upUp.byLayer, options: .nonRepeating))
         .scaleEffect(isPressing && !disabled ? 0.95 : 1.0)
         .animation(.easeInOut(duration: 0.1), value: isPressing)
@@ -78,5 +78,20 @@ struct NavButton: View {
     private func cancelLongPressTimer() {
         longPressTimer?.invalidate()
         longPressTimer = nil
+    }
+    
+    private var backgroundColor: Color {
+        if (isHovering || isPressing) && !disabled {
+            return browserManager.gradientColorManager.isDark ? AppColors.iconHoverDark : AppColors.iconHoverLight
+        } else {
+            return Color.clear
+        }
+    }
+    private var iconColor: Color {
+        if disabled {
+            return browserManager.gradientColorManager.isDark ? AppColors.iconDisabledDark : AppColors.iconDisabledLight
+        } else {
+            return browserManager.gradientColorManager.isDark ? AppColors.iconActiveDark : AppColors.iconActiveLight
+        }
     }
 }

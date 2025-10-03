@@ -25,16 +25,16 @@ struct PinnedTabView: View {
 
     // Stroke overlay tunables
     private let strokeThickness: CGFloat = 2.5   // ring thickness
-    private let faviconScale: CGFloat = 9.0      // favicon scale to fit the ring
+    private let faviconScale: CGFloat = 10.0      // favicon scale to fit the ring
     private let faviconBlur: CGFloat = 80.0      // blur applied to favicon
 
     var body: some View {
         Button(action: action) {
             ZStack {
-                // Background replaced with RoundedRectangle directly using AppColors
                 RoundedRectangle(cornerRadius: corner, style: .continuous)
-                    .fill(isActive ? AppColors.activeTab : isHovered ? AppColors.controlBackgroundHover : AppColors.inactiveTab)
+                    .fill(backgroundColor)
                     .animation(.easeInOut(duration: 0.2), value: isHovered)
+                    .shadow(color: shadowColor, radius: 1, y: 2)
 
                 tabIcon
                     .resizable()
@@ -61,6 +61,25 @@ struct PinnedTabView: View {
         .buttonStyle(.plain)
         .onHover { hovering in
             self.isHovered = hovering
+        }
+    }
+    
+    //MARK: - Colors
+    private var backgroundColor: Color {
+        if isActive {
+            return browserManager.gradientColorManager.isDark ? AppColors.pinnedTabActiveDark : AppColors.pinnedTabActiveLight
+        } else if isHovered {
+            return browserManager.gradientColorManager.isDark ? AppColors.pinnedTabHoverDark : AppColors.pinnedTabHoverLight
+        } else {
+            return browserManager.gradientColorManager.isDark ? AppColors.pinnedTabIdleDark : AppColors.pinnedTabIdleLight
+        }
+    }
+    
+    private var shadowColor: Color {
+        if isActive {
+            return browserManager.gradientColorManager.isDark ? Color.black.opacity(0.15) : Color.clear
+        } else {
+            return Color.clear
         }
     }
 

@@ -13,22 +13,49 @@ struct SpaceTitle: View {
     @FocusState private var nameFieldFocused: Bool
     @FocusState private var emojiFieldFocused: Bool
     @State private var isEllipsisHovering: Bool = false
+    
+    @StateObject private var emojiManager = EmojiPickerManager()
 
     var body: some View {
         HStack(spacing: 6) {
             // Show emoji or SF Symbol icon
-            if isEmoji(space.icon) {
-                Text(space.icon)
-                    .font(.system(size: iconSize))
-            } else {
-                Image(systemName: space.icon)
-                    .font(.system(size: iconSize))
+            ZStack {
+                // Hidden TextField for capturing emoji selection
+                TextField("", text: $selectedEmoji)
+                    .frame(width: 0, height: 0)
+                    .opacity(0)
+                    .focused($emojiFieldFocused)
+                    .onChange(of: selectedEmoji) { _, newValue in
+                        if !newValue.isEmpty {
+                            // Safely unwrap the last character
+                            guard let lastChar = newValue.last else { return }
+                            space.icon = String(lastChar)
+                            browserManager.tabManager.persistSnapshot()
+                            selectedEmoji = ""
+                        }
+                    }
+                
+                if isEmoji(space.icon) {
+                    Text(space.icon)
+                        .font(.system(size: iconSize))
+                        .background(EmojiPickerAnchor(manager: emojiManager))
+                        .onChange(of: emojiManager.selectedEmoji) { _, newValue in
+                            print(newValue)
+                            space.icon = newValue
+                            browserManager.tabManager.persistSnapshot()
+                         }
+                } else {
+                    Image(systemName: space.icon)
+                        .font(.system(size: iconSize))
+                }
+                
             }
+
 
             if isRenaming {
                 TextField("", text: $draftName)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(AppColors.textSecondary)
+                    .foregroundStyle(textColor)
                     .textFieldStyle(PlainTextFieldStyle())
                     .autocorrectionDisabled()
                     .focused($nameFieldFocused)
@@ -48,7 +75,7 @@ struct SpaceTitle: View {
                 HStack(spacing: 6) {
                     Text(space.name)
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(AppColors.textSecondary)
+                        .foregroundStyle(textColor)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
@@ -56,20 +83,7 @@ struct SpaceTitle: View {
 
             Spacer()
             
-            // Hidden TextField for capturing emoji selection
-            TextField("", text: $selectedEmoji)
-                .frame(width: 0, height: 0)
-                .opacity(0)
-                .focused($emojiFieldFocused)
-                .onChange(of: selectedEmoji) { _, newValue in
-                    if !newValue.isEmpty {
-                        // Safely unwrap the last character
-                        guard let lastChar = newValue.last else { return }
-                        space.icon = String(lastChar)
-                        browserManager.tabManager.persistSnapshot()
-                        selectedEmoji = ""
-                    }
-                }
+
 
             Menu {
                 // Profile assignment submenu
@@ -96,8 +110,9 @@ struct SpaceTitle: View {
                     Label("Rename Space", systemImage: "pencil")
                 }
                 Button {
-                    emojiFieldFocused = true
-                    NSApp.orderFrontCharacterPalette(nil)
+//                    emojiFieldFocused = true
+//                    NSApp.orderFrontCharacterPalette(nil)
+                    emojiManager.toggle()
                 } label: {
                     Label("Change Icon", systemImage: "face.smiling")
                 }
@@ -132,7 +147,7 @@ struct SpaceTitle: View {
         .padding(.horizontal, 10)
         .frame(height: 40)
         .frame(maxWidth: .infinity)
-        .background(isHovering ? AppColors.controlBackgroundHover : Color.clear)
+        .background(hoverColor)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .contentShape(RoundedRectangle(cornerRadius: 12))
         .onHover { hovering in
@@ -192,6 +207,19 @@ struct SpaceTitle: View {
                 Label("Delete Space", systemImage: "trash")
             }
         }
+    }
+    
+    //MARK: - Colors
+    
+    private var hoverColor: Color {
+        if isHovering {
+            return browserManager.gradientColorManager.isDark ? AppColors.spaceTabHoverDark : AppColors.spaceTabHoverLight
+        } else {
+            return .clear
+        }
+    }
+    private var textColor: Color {
+        return browserManager.gradientColorManager.isDark ? AppColors.sidebarTextDark : AppColors.sidebarTextLight
     }
 
     // MARK: - Actions

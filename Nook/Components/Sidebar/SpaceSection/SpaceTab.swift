@@ -65,7 +65,7 @@ struct SpaceTab: View {
                             Image(systemName: tab.isAudioMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                                 .contentTransition(.symbolEffect(.replace))
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(tab.isAudioMuted ? AppColors.textSecondary : Color.white)
+                                .foregroundColor(tab.isAudioMuted ? AppColors.textSecondary : textTab)
                         }
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -78,7 +78,7 @@ struct SpaceTab: View {
                 if tab.isRenaming {
                     TextField("", text: $tab.editingName)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(tab.isUnloaded ? AppColors.textSecondary : Color.white)
+                        .foregroundStyle(tab.isUnloaded ? AppColors.textSecondary : textTab)
                         .textFieldStyle(.plain)
                         .onSubmit {
                             tab.saveRename()
@@ -99,7 +99,7 @@ struct SpaceTab: View {
                 } else {
                     Text(tab.name)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(tab.isUnloaded ? AppColors.textSecondary : Color.white)
+                        .foregroundStyle(textTab)
                         .lineLimit(1)
                         .truncationMode(.tail)
                         .textSelection(.disabled) // Make text non-selectable
@@ -112,9 +112,9 @@ struct SpaceTab: View {
                     Button(action: onClose) {
                         Image(systemName: "xmark")
                             .font(.system(size: 12, weight: .heavy))
-                            .foregroundColor(Color.white)
+                            .foregroundColor(textTab)
                             .padding(4)
-                            .background(isCloseHovering ? (isCurrentTab ? AppColors.controlBackgroundHoverLight : AppColors.controlBackgroundActive) : Color.clear)
+                            .background(isCloseHovering ? (isCurrentTab ? AppColors.controlBackgroundHoverLight : AppColors.controlBackgroundActive) : Color.clear)                                                   
                             .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -199,6 +199,7 @@ struct SpaceTab: View {
                 Label("Close Tab", systemImage: "xmark.circle")
             }
         }
+        .shadow(color: isActive ? shadowColor : Color.clear, radius: isActive ? 1 : 0, y: 2)
     }
 
     private var isActive: Bool {
@@ -208,15 +209,21 @@ struct SpaceTab: View {
     private var isCurrentTab: Bool {
         return browserManager.currentTab(for: windowState)?.id == tab.id
     }
+    private var shadowColor: Color {
+        return browserManager.gradientColorManager.isDark ? Color.black.opacity(0.15) : Color.clear
+    }
     
     private var backgroundColor: Color {
         if isCurrentTab {
-            return AppColors.activeTab
+            return browserManager.gradientColorManager.isDark ? AppColors.spaceTabActiveDark : AppColors.spaceTabActiveLight
         } else if isHovering {
-            return AppColors.controlBackgroundHover
+            return browserManager.gradientColorManager.isDark ? AppColors.spaceTabHoverDark : AppColors.spaceTabHoverLight
         } else {
             return Color.clear
         }
+    }
+    private var textTab: Color {
+        return browserManager.gradientColorManager.isDark ? AppColors.spaceTabTextDark : AppColors.spaceTabTextLight
     }
 
 }
