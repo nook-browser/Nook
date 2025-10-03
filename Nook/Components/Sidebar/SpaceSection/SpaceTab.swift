@@ -18,6 +18,7 @@ struct SpaceTab: View {
     @FocusState private var isTextFieldFocused: Bool
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(\.colorScheme) var colorScheme
 
     var body: some View {
         Button(action: {
@@ -210,20 +211,20 @@ struct SpaceTab: View {
         return browserManager.currentTab(for: windowState)?.id == tab.id
     }
     private var shadowColor: Color {
-        return browserManager.gradientColorManager.isDark ? Color.black.opacity(0.15) : Color.clear
+        return colorScheme == .dark ? Color.clear : Color.black.opacity(0.15)
     }
-    
+
     private var backgroundColor: Color {
         if isCurrentTab {
-            return browserManager.gradientColorManager.isDark ? AppColors.spaceTabActiveDark : AppColors.spaceTabActiveLight
+            return colorScheme == .dark ? AppColors.spaceTabActiveLight : AppColors.spaceTabActiveDark
         } else if isHovering {
-            return browserManager.gradientColorManager.isDark ? AppColors.spaceTabHoverDark : AppColors.spaceTabHoverLight
+            return colorScheme == .dark ? AppColors.spaceTabHoverLight : AppColors.spaceTabHoverDark
         } else {
             return Color.clear
         }
     }
     private var textTab: Color {
-        return browserManager.gradientColorManager.isDark ? AppColors.spaceTabTextDark : AppColors.spaceTabTextLight
+        return colorScheme == .dark ? AppColors.spaceTabTextLight : AppColors.spaceTabTextDark
     }
 
 }

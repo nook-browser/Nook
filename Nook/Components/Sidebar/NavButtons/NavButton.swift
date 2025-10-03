@@ -9,6 +9,7 @@ import SwiftUI
 
 struct NavButton: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @Environment(\.colorScheme) var colorScheme
     var iconName: String
     var disabled: Bool
     var action: (() -> Void)?
@@ -61,16 +62,16 @@ struct NavButton: View {
     
     private var backgroundColor: Color {
         if (isHovering || isPressing) && !disabled {
-            return browserManager.gradientColorManager.isDark ? AppColors.iconHoverDark : AppColors.iconHoverLight
+            return colorScheme == .dark ? AppColors.iconHoverLight : AppColors.iconHoverDark
         } else {
             return Color.clear
         }
     }
     private var iconColor: Color {
         if disabled {
-            return browserManager.gradientColorManager.isDark ? AppColors.iconDisabledDark : AppColors.iconDisabledLight
+            return colorScheme == .dark ? AppColors.iconDisabledLight : AppColors.iconDisabledDark
         } else {
-            return browserManager.gradientColorManager.isDark ? AppColors.iconActiveDark : AppColors.iconActiveLight
+            return colorScheme == .dark ? AppColors.iconActiveLight : AppColors.iconActiveDark
         }
     }
 }

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SpaceTitle: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @Environment(\.colorScheme) var colorScheme
 
     let space: Space
     var iconSize: CGFloat = 12
@@ -213,13 +214,13 @@ struct SpaceTitle: View {
     
     private var hoverColor: Color {
         if isHovering {
-            return browserManager.gradientColorManager.isDark ? AppColors.spaceTabHoverDark : AppColors.spaceTabHoverLight
+            return colorScheme == .dark ? AppColors.spaceTabHoverLight : AppColors.spaceTabHoverDark
         } else {
             return .clear
         }
     }
     private var textColor: Color {
-        return browserManager.gradientColorManager.isDark ? AppColors.sidebarTextDark : AppColors.sidebarTextLight
+        return colorScheme == .dark ? AppColors.sidebarTextLight : AppColors.sidebarTextDark
     }
 
     // MARK: - Actions
