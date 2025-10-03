@@ -252,6 +252,7 @@ struct SpaceTitle: View {
     }
 
     private func createFolder() {
+        print("🎯 SpaceTitle.createFolder() called for space '\(space.name)' (id: \(space.id.uuidString.prefix(8))...)")
         browserManager.tabManager.createFolder(for: space.id)
     }
 

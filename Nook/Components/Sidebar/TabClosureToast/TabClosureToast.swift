@@ -38,9 +38,9 @@ struct TabClosureToast: View {
                     .foregroundStyle(.white.opacity(0.8))
             }
 
-            Spacer()
         }
         .padding(12)
+        .fixedSize(horizontal: true, vertical: false)
         .background(Color(hex: "3E4D2E"))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay {

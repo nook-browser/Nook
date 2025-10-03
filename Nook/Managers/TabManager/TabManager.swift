@@ -392,7 +392,6 @@ import OSLog
 }
 
 @MainActor
-@Observable
 class TabManager: ObservableObject {
     weak var browserManager: BrowserManager?
     private let context: ModelContext
@@ -765,15 +764,27 @@ class TabManager: ObservableObject {
     // MARK: - Folder Management
 
     func createFolder(for spaceId: UUID) {
+        print("📁 Creating folder for spaceId: \(spaceId.uuidString)")
         let folder = TabFolder(
             name: "New Folder",
             spaceId: spaceId,
             color: spaces.first(where: { $0.id == spaceId })?.color ?? .controlAccentColor
         )
+        print("   Created folder: \(folder.name) (id: \(folder.id.uuidString.prefix(8))...)")
 
         var folders = foldersBySpace[spaceId] ?? []
+        let oldCount = folders.count
         folders.append(folder)
         foldersBySpace[spaceId] = folders
+        print("   Added to foldersBySpace[\(spaceId.uuidString.prefix(8))...]: \(oldCount) → \(folders.count) folders")
+
+        // Trigger UI update to ensure folder appears immediately
+        objectWillChange.send()
+        print("   ✅ objectWillChange.send() called for folder creation")
+
+        // Post notification to force immediate UI refresh
+        NotificationCenter.default.post(name: .init("TabFoldersDidChange"), object: nil)
+        print("   📢 TabFoldersDidChange notification posted")
 
         persistSnapshot()
     }
@@ -782,6 +793,8 @@ class TabManager: ObservableObject {
         for (spaceId, folders) in foldersBySpace {
             if let folder = folders.first(where: { $0.id == folderId }) {
                 folder.name = newName
+                // Trigger UI update to ensure rename appears immediately
+                objectWillChange.send()
                 persistSnapshot()
                 break
             }
@@ -789,23 +802,38 @@ class TabManager: ObservableObject {
     }
 
     func deleteFolder(_ folderId: UUID) {
+        print("🗑️ Deleting folder: \(folderId.uuidString)")
         // Find and remove the folder
         for (spaceId, folders) in foldersBySpace {
             if let index = folders.firstIndex(where: { $0.id == folderId }) {
                 let folder = folders[index]
+                print("   Found folder '\(folder.name)' in space \(spaceId.uuidString.prefix(8))...")
 
                 // Move all tabs in folder to space pinned area
+                var movedTabsCount = 0
                 for tab in allTabs() {
                     if tab.folderId == folderId {
                         tab.folderId = nil
                         tab.isSpacePinned = true
+                        movedTabsCount += 1
                     }
                 }
+                print("   Moved \(movedTabsCount) tabs out of folder")
 
                 // Remove the folder
                 var mutableFolders = folders
                 mutableFolders.remove(at: index)
                 foldersBySpace[spaceId] = mutableFolders
+                print("   Removed folder from foldersBySpace[\(spaceId.uuidString.prefix(8))...]: \(folders.count) → \(mutableFolders.count) folders")
+
+                // Trigger UI update to ensure folder deletion appears immediately
+                objectWillChange.send()
+                print("   ✅ objectWillChange.send() called for folder deletion")
+
+                // Post notification to force immediate UI refresh
+                NotificationCenter.default.post(name: .init("TabFoldersDidChange"), object: nil)
+                print("   📢 TabFoldersDidChange notification posted")
+
                 persistSnapshot()
                 break
             }

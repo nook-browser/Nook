@@ -50,8 +50,6 @@ struct NavButtonsView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var windowState: BrowserWindowState
     var sidebarThreshold: CGFloat = 150
-    @State private var showBackHistory = false
-    @State private var showForwardHistory = false
     @StateObject private var tabWrapper = ObservableTabWrapper()
 
     var body: some View {
@@ -60,7 +58,7 @@ struct NavButtonsView: View {
                 .frame(width: 70)
             NavButton(iconName: "sidebar.left", disabled: false, action: {
                 browserManager.toggleSidebar(for: windowState)
-            }, onLongPress: nil)
+            })
 
             Spacer()
 
@@ -70,7 +68,7 @@ struct NavButtonsView: View {
                     Label("Go Back", systemImage: "arrow.backward")
                     Label("Go Forward", systemImage: "arrow.forward")
                 } label: {
-                    NavButton(iconName: "ellipsis", disabled: false, action: {}, onLongPress: nil)
+                    NavButton(iconName: "ellipsis", disabled: false, action: {})
                 }
                 .buttonStyle(PlainButtonStyle())
 
@@ -87,11 +85,14 @@ struct NavButtonsView: View {
                             } else {
                                 tabWrapper.tab?.goBack() // Fallback to original method
                             }
-                        },
-                        onLongPress: {
-                            showBackHistory = true
                         }
                     )
+                    .contextMenu {
+                        NavigationHistoryContextMenu(
+                            historyType: .back,
+                            windowState: windowState
+                        )
+                    }
                     NavButton(
                         iconName: "arrow.forward",
                         disabled: !tabWrapper.canGoForward,
@@ -103,14 +104,17 @@ struct NavButtonsView: View {
                             } else {
                                 tabWrapper.tab?.goForward() // Fallback to original method
                             }
-                        },
-                        onLongPress: {
-                            showForwardHistory = true
                         }
                     )
-                    RefreshButton() {
-                        tabWrapper.tab?.refresh()
+                    .contextMenu {
+                        NavigationHistoryContextMenu(
+                            historyType: .forward,
+                            windowState: windowState
+                        )
                     }
+                    RefreshButton(action: {
+                        tabWrapper.tab?.refresh()
+                    })
                 }
             }
         }
@@ -124,24 +128,6 @@ struct NavButtonsView: View {
         .onReceive(Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()) { _ in
             updateCurrentTab()
         }
-        .overlay(
-            // Back history overlay
-            NavigationHistoryOverlay(
-                windowState: windowState,
-                isPresented: $showBackHistory,
-                menuType: .back
-            )
-            .environmentObject(browserManager)
-        )
-        .overlay(
-            // Forward history overlay
-            NavigationHistoryOverlay(
-                windowState: windowState,
-                isPresented: $showForwardHistory,
-                menuType: .forward
-            )
-            .environmentObject(browserManager)
-        )
     }
 
     private func updateCurrentTab() {

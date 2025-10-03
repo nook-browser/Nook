@@ -12,16 +12,13 @@ struct NavButton: View {
     var iconName: String
     var disabled: Bool
     var action: (() -> Void)?
-    var onLongPress: (() -> Void)?
     @State private var isHovering: Bool = false
     @State private var isPressing: Bool = false
-    @State private var longPressTimer: Timer?
 
-    init(iconName: String, disabled: Bool = false, action: (() -> Void)? = nil, onLongPress: (() -> Void)? = nil) {
+    init(iconName: String, disabled: Bool = false, action: (() -> Void)? = nil) {
         self.iconName = iconName
         self.action = action
         self.disabled = disabled
-        self.onLongPress = onLongPress
     }
     
     var body: some View {
@@ -54,30 +51,12 @@ struct NavButton: View {
                 .onChanged { _ in
                     if !disabled && !isPressing {
                         isPressing = true
-                        startLongPressTimer()
                     }
                 }
                 .onEnded { _ in
-                    if isPressing {
-                        isPressing = false
-                        cancelLongPressTimer()
-                    }
+                    isPressing = false
                 }
         )
-    }
-
-    private func startLongPressTimer() {
-        longPressTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { _ in
-            if isPressing {
-                onLongPress?()
-                isPressing = false
-            }
-        }
-    }
-
-    private func cancelLongPressTimer() {
-        longPressTimer?.invalidate()
-        longPressTimer = nil
     }
     
     private var backgroundColor: Color {
