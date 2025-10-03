@@ -36,6 +36,7 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
     // Tab Management
     case newTab = "new_tab"
     case closeTab = "close_tab"
+    case undoCloseTab = "undo_close_tab"
     case nextTab = "next_tab"
     case previousTab = "previous_tab"
     case goToTab1 = "go_to_tab_1"
@@ -74,6 +75,7 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
         case .clearCookiesAndRefresh: return "Clear Cookies and Refresh"
         case .newTab: return "New Tab"
         case .closeTab: return "Close Tab"
+        case .undoCloseTab: return "Undo Close Tab"
         case .nextTab: return "Next Tab"
         case .previousTab: return "Previous Tab"
         case .goToTab1: return "Go to Tab 1"
@@ -104,7 +106,7 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
         switch self {
         case .goBack, .goForward, .refresh, .clearCookiesAndRefresh:
             return .navigation
-        case .newTab, .closeTab, .nextTab, .previousTab, .goToTab1, .goToTab2, .goToTab3, .goToTab4, .goToTab5, .goToTab6, .goToTab7, .goToTab8, .goToLastTab:
+        case .newTab, .closeTab, .undoCloseTab, .nextTab, .previousTab, .goToTab1, .goToTab2, .goToTab3, .goToTab4, .goToTab5, .goToTab6, .goToTab7, .goToTab8, .goToLastTab:
             return .tabs
         case .nextSpace, .previousSpace:
             return .spaces
@@ -209,6 +211,7 @@ extension KeyboardShortcut {
             // Tab Management
             KeyboardShortcut(action: .newTab, keyCombination: KeyCombination(key: "t", modifiers: [.command])),
             KeyboardShortcut(action: .closeTab, keyCombination: KeyCombination(key: "w", modifiers: [.command])),
+            KeyboardShortcut(action: .undoCloseTab, keyCombination: KeyCombination(key: "z", modifiers: [.command])),
             KeyboardShortcut(action: .nextTab, keyCombination: KeyCombination(key: "tab", modifiers: [.control])),
             KeyboardShortcut(action: .previousTab, keyCombination: KeyCombination(key: "tab", modifiers: [.control, .shift])),
             KeyboardShortcut(action: .goToTab1, keyCombination: KeyCombination(key: "1", modifiers: [.command])),

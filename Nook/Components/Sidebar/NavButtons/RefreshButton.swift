@@ -26,11 +26,11 @@ struct RefreshButton: View {
             Image(systemName: "arrow.clockwise")
                 .font(.system(size: 16))
                 .foregroundStyle(disabled ? AppColors.textQuaternary : .black.opacity(0.55))
-                .padding(4)
-                .symbolEffect(.rotate.clockwise.byLayer, options: .speed(1.5), value: animateFlag)
         }
         .buttonStyle(.plain)
         .disabled(disabled)
+        .padding(4)
+        .symbolEffect(.rotate.clockwise.byLayer, options: .speed(1.5), value: animateFlag)
         .background(
             RoundedRectangle(cornerRadius: 6)
                 .fill(isHovering && !disabled ? AppColors.controlBackgroundHover : Color.clear)

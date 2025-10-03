@@ -207,7 +207,7 @@ struct SidebarView: View {
                 // Left side icons - anchored to left
                 HStack {
                     ZStack {
-                        NavButton(iconName: "archivebox") {
+                        NavButton(iconName: "archivebox", disabled: false, action: {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 windowState.isSidebarMenuVisible = true
                                 let previousWidth = windowState.sidebarWidth
@@ -216,7 +216,7 @@ struct SidebarView: View {
                                 windowState.sidebarWidth = newWidth
                                 windowState.sidebarContentWidth = max(newWidth - 16, 0)
                             }
-                        }
+                        }, onLongPress: nil)
                         .onHover { isHovered in
                             isMenuButtonHovered = isHovered
                             if isHovered {
@@ -244,9 +244,9 @@ struct SidebarView: View {
                 HStack {
                     Spacer()
 
-                    NavButton(iconName: "plus") {
+                    NavButton(iconName: "plus", disabled: false, action: {
                         showSpaceCreationDialog()
-                    }
+                    }, onLongPress: nil)
                 }
             }
             .padding(.horizontal, 8)
@@ -261,7 +261,7 @@ struct SidebarView: View {
         let finalContent = ZStack {
                 if !windowState.isSidebarMenuVisible {
                     content
-                        .transition(.scale.combined(with: .opacity))
+                        .transition(.scale(scale: 0.9))
                 } else {
                     SidebarMenu()
                         .transition(.move(edge: .leading).combined(with: .opacity))

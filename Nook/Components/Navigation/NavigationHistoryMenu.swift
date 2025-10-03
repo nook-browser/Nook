@@ -173,11 +173,11 @@ struct NavigationHistoryItemRow: View {
 
                 Spacer()
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(Color.clear)
-            .hoverEffect()
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.clear)
+        .hoverEffect()
         .buttonStyle(PlainButtonStyle())
     }
 

@@ -6,22 +6,43 @@
 //
 import SwiftUI
 
-// Wrapper to properly observe Tab object
+// Wrapper to properly observe Tab object and use active window's WebView
 @MainActor
 class ObservableTabWrapper: ObservableObject {
     @Published var tab: Tab?
+    weak var browserManager: BrowserManager?
+    weak var windowState: BrowserWindowState?
 
     var canGoBack: Bool {
-        tab?.canGoBack ?? false
+        // Use active window's WebView for navigation state to ensure consistency
+        if let tab = tab,
+           let browserManager = browserManager,
+           let windowState = windowState,
+           let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
+            return webView.canGoBack
+        }
+        return tab?.canGoBack ?? false // Fallback to tab's default WebView
     }
 
     var canGoForward: Bool {
-        tab?.canGoForward ?? false
+        // Use active window's WebView for navigation state to ensure consistency
+        if let tab = tab,
+           let browserManager = browserManager,
+           let windowState = windowState,
+           let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
+            return webView.canGoForward
+        }
+        return tab?.canGoForward ?? false // Fallback to tab's default WebView
     }
 
     func updateTab(_ newTab: Tab?) {
         tab = newTab
         objectWillChange.send()
+    }
+
+    func setContext(browserManager: BrowserManager, windowState: BrowserWindowState) {
+        self.browserManager = browserManager
+        self.windowState = windowState
     }
 }
 
@@ -59,7 +80,13 @@ struct NavButtonsView: View {
                         iconName: "arrow.backward",
                         disabled: !tabWrapper.canGoBack,
                         action: {
-                            tabWrapper.tab?.goBack()
+                            // Use the active window's WebView to ensure navigation history consistency
+                            if let tab = tabWrapper.tab,
+                               let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
+                                webView.goBack()
+                            } else {
+                                tabWrapper.tab?.goBack() // Fallback to original method
+                            }
                         },
                         onLongPress: {
                             showBackHistory = true
@@ -69,7 +96,13 @@ struct NavButtonsView: View {
                         iconName: "arrow.forward",
                         disabled: !tabWrapper.canGoForward,
                         action: {
-                            tabWrapper.tab?.goForward()
+                            // Use the active window's WebView to ensure navigation history consistency
+                            if let tab = tabWrapper.tab,
+                               let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
+                                webView.goForward()
+                            } else {
+                                tabWrapper.tab?.goForward() // Fallback to original method
+                            }
                         },
                         onLongPress: {
                             showForwardHistory = true
@@ -82,6 +115,7 @@ struct NavButtonsView: View {
             }
         }
         .onAppear {
+            tabWrapper.setContext(browserManager: browserManager, windowState: windowState)
             updateCurrentTab()
         }
         .onChange(of: browserManager.currentTab(for: windowState)?.id) { _, _ in

@@ -218,7 +218,15 @@ struct NookCommands: Commands {
         CommandGroup(replacing: .newItem) {}
         CommandGroup(replacing: .windowList) {}
         // Use the native Settings menu (no replacement of .appSettings)
-        
+
+        // Edit Section
+        CommandGroup(replacing: .undoRedo) {
+            Button("Undo Close Tab") {
+                browserManager.undoCloseTab()
+            }
+            .keyboardShortcut("z", modifiers: .command)
+        }
+
         // File Section
         CommandGroup(after: .newItem) {
 

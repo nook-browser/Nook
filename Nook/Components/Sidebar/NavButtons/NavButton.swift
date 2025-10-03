@@ -27,22 +27,25 @@ struct NavButton: View {
         Button {
             action?()
         } label: {
-            Image(systemName: iconName)
-                .font(.system(size: 16))
-                .foregroundStyle(disabled ? AppColors.textQuaternary : AppColors.textSecondary)
-                .padding(4)
-                .contentTransition(.symbolEffect(.replace.upUp.byLayer, options: .nonRepeating))
-                .scaleEffect(isPressing && !disabled ? 0.95 : 1.0)
-                .animation(.easeInOut(duration: 0.1), value: isPressing)
+            ZStack {
+                // Background that fills entire clickable area
+                RoundedRectangle(cornerRadius: 6)
+                    .fill((isHovering || isPressing) && !disabled ? AppColors.controlBackgroundHover : Color.clear)
+                    .frame(width: 24, height: 24) // Fixed 24x24 square
+
+                // Icon centered in the button
+                Image(systemName: iconName)
+                    .font(.system(size: 16))
+                    .foregroundStyle(disabled ? AppColors.textQuaternary : AppColors.textSecondary)
+            }
         }
         .buttonStyle(.plain)
         .disabled(disabled)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill((isHovering || isPressing) && !disabled ? AppColors.controlBackgroundHover : Color.clear)
-                .frame(width: 24, height: 24) // Fixed 20x20 square
-                .animation(.easeInOut(duration: 0.15), value: isHovering)
-        )
+        .padding(4)
+        .contentTransition(.symbolEffect(.replace.upUp.byLayer, options: .nonRepeating))
+        .scaleEffect(isPressing && !disabled ? 0.95 : 1.0)
+        .animation(.easeInOut(duration: 0.1), value: isPressing)
+        .animation(.easeInOut(duration: 0.15), value: isHovering)
         .onHover { hovering in
             isHovering = hovering
         }

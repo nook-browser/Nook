@@ -324,8 +324,12 @@ class BrowserManager: ObservableObject {
     // Migration state
     @Published var migrationProgress: MigrationProgress?
     @Published var isMigrationInProgress: Bool = false
-    
-    
+
+    // Tab closure undo notification
+    @Published var showTabClosureToast: Bool = false
+    @Published var tabClosureToastCount: Int = 0
+
+
     // MARK: - Window State Management
     /// Registry of all active window states
     var windowStates: [UUID: BrowserWindowState] = [:]
@@ -2444,6 +2448,27 @@ class BrowserManager: ObservableObject {
     func showHistory() {
         // TODO: Implement history UI
         openCommandPaletteWithCurrentURL()
+    }
+
+    // MARK: - Tab Closure Undo Notification
+
+    func showTabClosureToast(tabCount: Int) {
+        tabClosureToastCount = tabCount
+        showTabClosureToast = true
+
+        // Auto-hide the toast after 3 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            self.hideTabClosureToast()
+        }
+    }
+
+    func hideTabClosureToast() {
+        showTabClosureToast = false
+        tabClosureToastCount = 0
+    }
+
+    func undoCloseTab() {
+        tabManager.undoCloseTab()
     }
 
     /// Expand all folders in the sidebar

@@ -130,6 +130,8 @@ class KeyboardShortcutManager: ObservableObject {
                 browserManager.openCommandPalette()
             case .closeTab:
                 browserManager.closeCurrentTab()
+            case .undoCloseTab:
+                browserManager.undoCloseTab()
             case .nextTab:
                 browserManager.selectNextTabInActiveWindow()
             case .previousTab:
@@ -185,8 +187,19 @@ class KeyboardShortcutManager: ObservableObject {
 
     private func setupGlobalMonitor() {
         let monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
-            if let self = self, self.executeShortcut(event) {
-                return nil // Consume the event
+            if let self = self {
+                // Check if this is cmd+z for undo close tab
+                if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers?.lowercased() == "z" {
+                    if let shortcut = self.shortcut(for: .undoCloseTab), shortcut.isEnabled {
+                        self.executeAction(.undoCloseTab)
+                        return nil // Consume the event to prevent system sound
+                    }
+                }
+
+                // Check all other shortcuts
+                if self.executeShortcut(event) {
+                    return nil // Consume the event
+                }
             }
             return event
         }

@@ -398,6 +398,15 @@ class TabManager: ObservableObject {
     private let context: ModelContext
     private let persistence: PersistenceActor
 
+    // Tab closure undo tracking
+    private var recentlyClosedTabs: [(tab: Tab, spaceId: UUID?, timestamp: Date)] = []
+    private let undoDuration: TimeInterval = 20.0 // 20 seconds
+    private var undoTimer: Timer?
+
+    // Toast notification cooldown
+    private var lastTabClosureTime: Date?
+    private let toastCooldown: TimeInterval = 2 * 60 * 60 // 2 hours in seconds
+
     // Spaces
     public private(set) var spaces: [Space] = []
     public private(set) var currentSpace: Space?
@@ -851,6 +860,7 @@ class TabManager: ObservableObject {
     func removeTab(_ id: UUID) {
         let wasCurrent = (currentTab?.id == id)
         var removed: Tab?
+        var removedSpaceId: UUID?
         var removedIndexInCurrentSpace: Int?
 
         for space in spaces {
@@ -859,6 +869,7 @@ class TabManager: ObservableObject {
                 let i = spacePinned.firstIndex(where: { $0.id == id })
             {
                 if i < spacePinned.count { removed = spacePinned.remove(at: i) }
+                removedSpaceId = space.id
                 removedIndexInCurrentSpace =
                     (space.id == currentSpace?.id) ? i : nil
                 spacePinnedTabs[space.id] = spacePinned
@@ -869,6 +880,7 @@ class TabManager: ObservableObject {
                 let i = arr.firstIndex(where: { $0.id == id })
             {
                 if i < arr.count { removed = arr.remove(at: i) }
+                removedSpaceId = space.id
                 removedIndexInCurrentSpace =
                     (space.id == currentSpace?.id) ? i : nil
                 setTabs(arr, for: space.id)
@@ -887,6 +899,9 @@ class TabManager: ObservableObject {
         }
 
         guard let tab = removed else { return }
+
+        // Add to recently closed tabs for undo functionality
+        trackRecentlyClosedTab(tab, spaceId: removedSpaceId)
 
         // Force unload the tab from compositor before removing
         browserManager?.compositorManager.unloadTab(tab)
@@ -2226,5 +2241,264 @@ extension TabManager {
             }
             persistSnapshot()
         }
+    }
+
+    // MARK: - Tab Closure Undo
+
+    private func trackRecentlyClosedTab(_ tab: Tab, spaceId: UUID?) {
+        let now = Date()
+
+        // Check if we should show toast notification (2-hour cooldown)
+        let shouldShowToast = shouldShowTabClosureToast(now: now)
+
+        // Update last tab closure time
+        lastTabClosureTime = now
+
+        // Create a deep copy of the tab for restoration
+        let tabCopy = Tab(
+            id: UUID(), // New ID for the restored tab
+            url: tab.url,
+            name: tab.name,
+            favicon: "globe", // Default icon, will be updated when tab loads
+            spaceId: spaceId,
+            index: tab.index
+        )
+        tabCopy.browserManager = browserManager
+
+        // Copy additional properties
+        tabCopy.isPinned = tab.isPinned
+        tabCopy.isSpacePinned = tab.isSpacePinned
+        tabCopy.folderId = tab.folderId
+
+        recentlyClosedTabs.append((tab: tabCopy, spaceId: spaceId, timestamp: now))
+
+        // Schedule cleanup of expired tabs
+        scheduleUndoTimerCleanup()
+
+        // Show toast notification only if cooldown has passed
+        if shouldShowToast {
+            browserManager?.showTabClosureToast(tabCount: 1)
+        }
+    }
+
+    private func trackRecentlyClosedTabs(_ tabs: [(tab: Tab, spaceId: UUID?)], count: Int) {
+        let now = Date()
+
+        // Update last tab closure time for cooldown
+        lastTabClosureTime = now
+
+        // Create deep copies of all tabs for restoration
+        for (tab, spaceId) in tabs {
+            let tabCopy = Tab(
+                id: UUID(), // New ID for the restored tab
+                url: tab.url,
+                name: tab.name,
+                favicon: "globe", // Default icon, will be updated when tab loads
+                spaceId: spaceId,
+                index: tab.index
+            )
+            tabCopy.browserManager = browserManager
+
+            // Copy additional properties
+            tabCopy.isPinned = tab.isPinned
+            tabCopy.isSpacePinned = tab.isSpacePinned
+            tabCopy.folderId = tab.folderId
+
+            recentlyClosedTabs.append((tab: tabCopy, spaceId: spaceId, timestamp: now))
+        }
+
+        // Schedule cleanup of expired tabs
+        scheduleUndoTimerCleanup()
+
+        // Always show toast for bulk operations (bypass cooldown)
+        browserManager?.showTabClosureToast(tabCount: count)
+    }
+
+    private func shouldShowTabClosureToast(now: Date) -> Bool {
+        guard let lastClosure = lastTabClosureTime else {
+            // First tab closure, show the toast
+            return true
+        }
+
+        // Check if at least 2 hours have passed since last tab closure
+        return now.timeIntervalSince(lastClosure) >= toastCooldown
+    }
+
+    func undoCloseTab() {
+        guard !recentlyClosedTabs.isEmpty else { return }
+
+        let mostRecent = recentlyClosedTabs.removeLast()
+
+        // Restore the tab
+        addTab(mostRecent.tab)
+        setActiveTab(mostRecent.tab)
+
+        // Clear the timer if no more tabs to undo
+        if recentlyClosedTabs.isEmpty {
+            clearUndoTimer()
+        }
+    }
+
+    func undoCloseMultipleTabs(count: Int) {
+        let actualCount = min(count, recentlyClosedTabs.count)
+        var restoredTabs: [Tab] = []
+
+        for _ in 0..<actualCount {
+            guard !recentlyClosedTabs.isEmpty else { break }
+            let tabInfo = recentlyClosedTabs.removeLast()
+            restoredTabs.append(tabInfo.tab)
+            addTab(tabInfo.tab)
+        }
+
+        // Set the most recently restored tab as active
+        if let lastTab = restoredTabs.last {
+            setActiveTab(lastTab)
+        }
+
+        // Clear the timer if no more tabs to undo
+        if recentlyClosedTabs.isEmpty {
+            clearUndoTimer()
+        }
+    }
+
+    private func scheduleUndoTimerCleanup() {
+        // Clear any existing timer
+        clearUndoTimer()
+
+        // Schedule a new timer to clean up expired tabs
+        undoTimer = Timer.scheduledTimer(withTimeInterval: undoDuration, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                self?.cleanupExpiredTabs()
+            }
+        }
+    }
+
+    private func cleanupExpiredTabs() {
+        let now = Date()
+        recentlyClosedTabs.removeAll { tabInfo in
+            now.timeIntervalSince(tabInfo.timestamp) >= undoDuration
+        }
+
+        if recentlyClosedTabs.isEmpty {
+            clearUndoTimer()
+        }
+    }
+
+    private func clearUndoTimer() {
+        undoTimer?.invalidate()
+        undoTimer = nil
+    }
+
+    func clearRecentlyClosedTabs() {
+        recentlyClosedTabs.removeAll()
+        clearUndoTimer()
+
+        // Reset toast cooldown timer when no more tabs to undo
+        // This allows the toast to appear again on next tab closure after 2 hours
+        lastTabClosureTime = nil
+    }
+
+    func hasRecentlyClosedTabs() -> Bool {
+        return !recentlyClosedTabs.isEmpty
+    }
+
+    // MARK: - Bulk Tab Operations
+
+    func closeAllTabsBelow(_ tab: Tab) {
+        guard let spaceId = tab.spaceId else { return }
+        guard let tabs = tabsBySpace[spaceId] else { return }
+
+        // Find the current tab's index
+        guard let currentIndex = tabs.firstIndex(where: { $0.id == tab.id }) else { return }
+
+        // Get all tabs below the current tab (higher index values)
+        let tabsBelow = tabs.filter { $0.index > tab.index }
+
+        // Return early if no tabs below
+        if tabsBelow.isEmpty { return }
+
+        // Prepare tabs for tracking
+        let tabsToTrack = tabsBelow.map { (tab: $0, spaceId: spaceId) }
+
+        // Close all tabs below
+        for tabToClose in tabsBelow {
+            // Close the tab without tracking (we'll do bulk tracking)
+            closeTabWithoutTracking(tabToClose.id)
+        }
+
+        // Track all closed tabs for undo and show toast
+        trackRecentlyClosedTabs(tabsToTrack, count: tabsBelow.count)
+    }
+
+    private func closeTabWithoutTracking(_ id: UUID) {
+        // This is a copy of removeTab but without the tracking call
+        let wasCurrent = (currentTab?.id == id)
+        var removed: Tab?
+        var removedSpaceId: UUID?
+        var removedIndexInCurrentSpace: Int?
+
+        for space in spaces {
+            // Check space-pinned tabs first
+            if var spacePinned = spacePinnedTabs[space.id],
+                let i = spacePinned.firstIndex(where: { $0.id == id })
+            {
+                if i < spacePinned.count { removed = spacePinned.remove(at: i) }
+                removedSpaceId = space.id
+                removedIndexInCurrentSpace =
+                    (space.id == currentSpace?.id) ? i : nil
+                spacePinnedTabs[space.id] = spacePinned
+                break
+            }
+            // Then check regular tabs
+            if var arr = tabsBySpace[space.id],
+                let i = arr.firstIndex(where: { $0.id == id })
+            {
+                if i < arr.count { removed = arr.remove(at: i) }
+                removedSpaceId = space.id
+                removedIndexInCurrentSpace =
+                    (space.id == currentSpace?.id) ? i : nil
+                setTabs(arr, for: space.id)
+                break
+            }
+        }
+        if removed == nil {
+            outer: for (pid, arr) in pinnedByProfile {
+                if let i = arr.firstIndex(where: { $0.id == id }) {
+                    var copy = arr
+                    if i < copy.count { removed = copy.remove(at: i) }
+                    pinnedByProfile[pid] = copy
+                    break outer
+                }
+            }
+        }
+
+        guard let tab = removed else { return }
+
+        // Force unload the tab from compositor before removing
+        browserManager?.compositorManager.unloadTab(tab)
+        browserManager?.removeAllWebViews(for: tab)
+
+        if #available(macOS 15.5, *) {
+            ExtensionManager.shared.notifyTabClosed(tab)
+        }
+
+        if wasCurrent {
+            if tab.spaceId == nil {
+                // Tab was global pinned
+                let tabs = essentialTabs(for: browserManager?.currentProfile?.id)
+                if !tabs.isEmpty {
+                    setActiveTab(tabs[0])
+                }
+            } else {
+                // Tab was in a space
+                if let spaceTabs = tabsBySpace[tab.spaceId!], !spaceTabs.isEmpty {
+                    // Try to select the tab at the same index, or the one before
+                    let targetIndex = min(removedIndexInCurrentSpace ?? 0, spaceTabs.count - 1)
+                    setActiveTab(spaceTabs[targetIndex])
+                }
+            }
+        }
+
+        persistSnapshot()
     }
 }
