@@ -19,11 +19,9 @@ struct SpaceGradient: Codable, Hashable {
     var opacity: Double
 
     init(angle: Double, nodes: [GradientNode], grain: Double, opacity: Double = 1.0) {
-        // Normalize angle to [0, 360)
         var normalized = angle.truncatingRemainder(dividingBy: 360.0)
         if normalized < 0 { normalized += 360.0 }
         self.angle = normalized
-        // Clamp grain to [0,1]
         self.grain = max(0.0, min(1.0, grain))
         self.nodes = nodes
         self.opacity = max(0.0, min(1.0, opacity))
@@ -57,9 +55,6 @@ struct SpaceGradient: Codable, Hashable {
     }
 
     // MARK: - Primary Color
-    // Defines a "primary" color for a space derived from the gradient.
-    // Rule: pick the node with the lowest location (leading stop). If no nodes
-    // are defined, fall back to the system accent-derived default.
     var primaryColorHex: String {
         if let first = sortedNodes.first { return first.colorHex }
         return SpaceGradient.accentHex()
@@ -134,13 +129,10 @@ extension SpaceGradient {
 }
 
 // MARK: - Animatable Conformance
-// Provide an animatable representation so SwiftUI can smoothly interpolate gradients.
-// We flatten angle, grain and up to maxStops nodes (RGBA + location) into a VectorArithmetic.
 extension SpaceGradient: Animatable {
     static let maxStopsForAnimation = 8
 
     struct AnimVector: VectorArithmetic {
-        // Fixed-size vector: [(cosθ, sinθ), grain, (r,g,b,a,loc) * maxStops]
         static let width = 2 + 1 + maxStopsForAnimation * 5
         var scalars: [Double] = Array(repeating: 0, count: width)
 
@@ -162,7 +154,6 @@ extension SpaceGradient: Animatable {
             scalars.reduce(0) { $0 + $1*$1 }
         }
         static func == (lhs: AnimVector, rhs: AnimVector) -> Bool {
-            // Not strictly required for VectorArithmetic but handy for stability
             guard lhs.scalars.count == rhs.scalars.count else { return false }
             for i in 0..<lhs.scalars.count {
                 if lhs.scalars[i] != rhs.scalars[i] { return false }
@@ -266,7 +257,7 @@ extension SpaceGradient: Animatable {
 }
 
 #if canImport(AppKit)
-// MARK: - Cached NSColor for hex strings (to reduce per-frame parsing)
+// MARK: - Cached NSColor
 private let _SpaceGradientColorCache = NSCache<NSString, NSColor>()
 private func cachedNSColor(for hex: String) -> NSColor {
     if let c = _SpaceGradientColorCache.object(forKey: hex as NSString) { return c }

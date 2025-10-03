@@ -77,7 +77,6 @@ struct SpaceView: View {
         max(outerWidth - 16, 0)
     }
     
-    // Get tabs directly from TabManager to ensure proper observation
     private var tabs: [Tab] {
         browserManager.tabManager.tabs(in: space)
     }
@@ -93,27 +92,18 @@ struct SpaceView: View {
     }
     
     private var spacePinnedItems: [AnyHashable] {
-        // Include folderChangeCount to force recomputation when folders change
         _ = folderChangeCount
 
-        // Group space-pinned tabs by folderId and create the display structure
         var items: [AnyHashable] = []
 
-        // Group tabs by folderId
         let tabsByFolderId = Dictionary(grouping: spacePinnedTabs) { tab in
             tab.folderId
         }
 
-        // First, add folders with their tabs embedded
         for folder in folders {
-            // Get tabs that belong to this folder
             let folderTabs = tabsByFolderId[folder.id]?.sorted { $0.index < $1.index } ?? []
-
-            // Create a folder wrapper that contains both the folder and its tabs
             items.append(FolderWithTabs(folder: folder, tabs: folderTabs))
         }
-
-        // Then, add space-pinned tabs that are not in any folder
         if let nonFolderTabs = tabsByFolderId[nil] {
             let sortedTabs = nonFolderTabs.sorted { $0.index < $1.index }
             items.append(contentsOf: sortedTabs)
@@ -123,7 +113,6 @@ struct SpaceView: View {
         return items
     }
     
-    // (no coordinate spaces needed for simple DnD)
     
     var body: some View {
         VStack(spacing: 4) {
@@ -173,7 +162,6 @@ struct SpaceView: View {
                             tabManager: browserManager.tabManager
                         )
                     )
-                    // Top border indicator
                     VStack {
                         if showTopArrow {
                             HStack {
@@ -202,7 +190,6 @@ struct SpaceView: View {
                     }
                     .zIndex(10)
                     
-                    // Bottom border and arrow button
                     VStack {
                         Spacer()
                         if showBottomArrow {
@@ -231,10 +218,9 @@ struct SpaceView: View {
                     }
                 }
                 .onPreferenceChange(TabPositionPreferenceKey.self) { positions in
-                    // Debounce position updates to prevent layout cycles
                     let now = Date()
                     guard now.timeIntervalSince(lastPositionUpdate) > 0.1 else { return }
-                    
+
                     tabPositions = positions
                     lastPositionUpdate = now
                     updateActiveTabPosition()
@@ -489,7 +475,6 @@ struct SpaceView: View {
                 regularTabsView(currentTabs: currentTabs)
             }
             
-            // Small zone at end of tab list to capture window drag
             Color.clear
                 .contentShape(Rectangle())
                 .conditionalWindowDrag()
@@ -603,11 +588,9 @@ struct SpaceView: View {
             )
     }
     
-    // MARK: - Folder Management Helper Methods
+    // MARK: - Folder Management
     
     private func renameFolder(_ folder: TabFolder) {
-        // TODO: Implement folder rename dialog
-        // For now, just log the action
         print("Rename folder: \(folder.name)")
     }
     
@@ -641,68 +624,55 @@ struct SpaceView: View {
         }
     }
     
-    // MARK: - Scroll State Management
+    // MARK: - Scroll State
     
     private func updateScrollState(bounds: CGRect) {
         let minY = bounds.minY
         let contentHeight = bounds.height
         
-        // Update viewport height and scroll offset
         viewportHeight = contentHeight
         scrollOffset = -minY
         lastScrollOffset = scrollOffset
         
-        // Check if we can scroll up (content hidden at top)
         canScrollUp = minY < 0
         
-        // Check if we can scroll down (content hidden at bottom)
         canScrollDown = totalContentHeight > viewportHeight && (-minY + viewportHeight) < totalContentHeight
         
-        // Check if we're at the very top
         isAtTop = minY >= 0
         
-        // Update content height calculation and arrow indicators
         updateContentHeight()
         updateArrowIndicators()
     }
     
     private func updateContentHeight() {
-        // Calculate total content height
         var height: CGFloat = 0
-        
-        // Space separator (top)
-        height += 17 // 8 padding + 1 separator + 8 padding
-        
-        // Pinned tabs section
+
+        height += 17
+
         let pinnedCount = spacePinnedItems.count
         if pinnedCount > 0 {
-            height += CGFloat(pinnedCount) * 40 // Approximate tab height
-            height += 8 // Section padding
+            height += CGFloat(pinnedCount) * 40
+            height += 8
         }
-        
-        // New tab button
-        height += 32 + 8 // Button height + padding
-        
-        // Regular tabs
+
+        height += 32 + 8
+
         let regularCount = tabs.count
         if regularCount > 0 {
-            height += CGFloat(regularCount) * 40 // Approximate tab height
+            height += CGFloat(regularCount) * 40
         } else {
-            height += 40 // Empty state
+            height += 40
         }
-        
+
         totalContentHeight = height
     }
     
     private func handleUserTabActivation(_ tab: Tab) {
-        // Lock the ScrollView to prevent automatic scrolling
         lockScrollView = true
         isUserInitiatedTabSelection = true
-        
-        // Activate the tab immediately
+
         onActivateTab(tab)
-        
-        // Unlock after a short delay
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             self.lockScrollView = false
             self.isUserInitiatedTabSelection = false
@@ -718,12 +688,10 @@ struct SpaceView: View {
             return
         }
         
-        // Get the active tab position from our tracked positions
         if let tabFrame = tabPositions[activeTab.id] {
             activeTabPosition = tabFrame
         }
         
-        // Only update arrow indicators - don't trigger scrolling
         DispatchQueue.main.async {
             self.updateArrowIndicators()
         }
@@ -738,23 +706,17 @@ struct SpaceView: View {
             return
         }
         
-        // Don't show arrows if this was a user-initiated tab selection
         guard !isUserInitiatedTabSelection else {
             showTopArrow = false
             showBottomArrow = false
             return
         }
         
-        // Check if active tab is visible in the current viewport
         let activeTabTop = activeTabPosition.minY
         let activeTabBottom = activeTabPosition.maxY
-        
-        // Tab is above viewport if its bottom is above the top of the viewport
+
         let activeTabIsAbove = activeTabBottom < scrollOffset
-        // Tab is below viewport if its top is below the bottom of the viewport
         let activeTabIsBelow = activeTabTop > scrollOffset + viewportHeight
-        
-        // Only show arrows if active tab is actually out of view
         showTopArrow = activeTabIsAbove && canScrollUp
         showBottomArrow = activeTabIsBelow && canScrollDown
     }
@@ -763,27 +725,21 @@ struct SpaceView: View {
         guard let activeTab = browserManager.currentTabForActiveWindow(),
               activeTab.spaceId == space.id else { return }
         
-        // Don't scroll if this was a user-initiated tab selection or ScrollView is locked
         guard !isUserInitiatedTabSelection && !lockScrollView else { return }
         
-        // First ensure the content height is updated
         updateContentHeight()
         updateActiveTabPosition()
         
-        // Check if active tab is below viewport - scroll just enough to make it visible at bottom
         let activeTabTop = activeTabPosition.minY
         if activeTabTop > scrollOffset + viewportHeight {
-            // Tab is below - scroll until tab's top is at bottom of viewport
             withAnimation(.easeInOut(duration: 0.3)) {
                 proxy.scrollTo(activeTab.id, anchor: .bottom)
             }
             return
         }
-        
-        // Check if active tab is above viewport - scroll just enough to make it visible at top
+
         let activeTabBottom = activeTabPosition.maxY
         if activeTabBottom < scrollOffset {
-            // Tab is above - scroll until tab's bottom is at top of viewport
             withAnimation(.easeInOut(duration: 0.3)) {
                 proxy.scrollTo(activeTab.id, anchor: .top)
             }
@@ -792,13 +748,11 @@ struct SpaceView: View {
     }
     
     private func scrollToTop(proxy: ScrollViewProxy) {
-        // Scroll to the very top of the space content
         withAnimation(.easeInOut(duration: 0.3)) {
             proxy.scrollTo("space-separator-top", anchor: .top)
         }
     }
     
     
-    // Removed insertion overlays and geometry preference keys (simplified DnD)
 
 }

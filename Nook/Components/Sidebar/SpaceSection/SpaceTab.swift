@@ -23,12 +23,10 @@ struct SpaceTab: View {
     var body: some View {
         Button(action: {
             if isCurrentTab {
-                // Only allow renaming if this tab is the current tab in THIS window
                 print("🔄 [SpaceTab] Starting rename for tab '\(tab.name)' in window \(windowState.id)")
                 tab.startRenaming()
                 isTextFieldFocused = true
             } else {
-                // For inactive tabs, end any active renaming and switch
                 if tab.isRenaming {
                     tab.saveRename()
                 }
@@ -53,7 +51,6 @@ struct SpaceTab: View {
                             .offset(x: 6, y: -6)
                     }
                 }
-                // Mute button (show when tab has audio content OR is muted)
                 if tab.hasAudioContent || tab.isAudioMuted {
                     Button(action: {
                         onMute()
@@ -88,9 +85,7 @@ struct SpaceTab: View {
                             tab.cancelRename()
                         }
                         .onAppear {
-                            // Select all text when editing starts
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                // Use a more reliable approach to select all text
                                 if let textField = NSApp.keyWindow?.firstResponder as? NSTextView {
                                     textField.selectAll(nil)
                                 }
@@ -140,7 +135,6 @@ struct SpaceTab: View {
             }
         }
         .background(
-            // Invisible overlay to capture clicks outside when renaming
             Group {
                 if tab.isRenaming {
                     Color.clear
@@ -152,13 +146,11 @@ struct SpaceTab: View {
             }
         )
         .contextMenu {
-            // Split view
             Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState) }
             label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
             Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) }
             label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
             Divider()
-            // Mute/Unmute option (show if tab has audio content OR is muted)
             if tab.hasAudioContent || tab.isAudioMuted {
                 Button(action: onMute) {
                     Label(tab.isAudioMuted ? "Unmute Audio" : "Mute Audio",
@@ -167,8 +159,6 @@ struct SpaceTab: View {
 
                 Divider()
             }
-
-            // Unload options
             Button(action: {
                 browserManager.tabManager.unloadTab(tab)
             }) {
@@ -184,7 +174,6 @@ struct SpaceTab: View {
 
             Divider()
 
-            // Close All Tabs Below (only for regular, non-pinned tabs)
             if !tab.isPinned && !tab.isSpacePinned && tab.spaceId != nil {
                 Button(action: {
                     browserManager.tabManager.closeAllTabsBelow(tab)

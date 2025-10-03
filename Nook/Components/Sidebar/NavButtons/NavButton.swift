@@ -27,12 +27,10 @@ struct NavButton: View {
             action?()
         } label: {
             ZStack {
-                // Background that fills entire clickable area (32x32 to match design)
                 RoundedRectangle(cornerRadius: 6)
                     .fill(backgroundColor)
                     .frame(width: 32, height: 32)
 
-                // Icon centered in the button
                 Image(systemName: iconName)
                     .font(.system(size: 16))
                     .foregroundStyle(iconColor)

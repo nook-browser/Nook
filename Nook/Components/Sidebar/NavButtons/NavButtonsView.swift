@@ -14,25 +14,23 @@ class ObservableTabWrapper: ObservableObject {
     weak var windowState: BrowserWindowState?
 
     var canGoBack: Bool {
-        // Use active window's WebView for navigation state to ensure consistency
         if let tab = tab,
            let browserManager = browserManager,
            let windowState = windowState,
            let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
             return webView.canGoBack
         }
-        return tab?.canGoBack ?? false // Fallback to tab's default WebView
+        return tab?.canGoBack ?? false
     }
 
     var canGoForward: Bool {
-        // Use active window's WebView for navigation state to ensure consistency
         if let tab = tab,
            let browserManager = browserManager,
            let windowState = windowState,
            let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
             return webView.canGoForward
         }
-        return tab?.canGoForward ?? false // Fallback to tab's default WebView
+        return tab?.canGoForward ?? false
     }
 
     func updateTab(_ newTab: Tab?) {
@@ -78,12 +76,11 @@ struct NavButtonsView: View {
                         iconName: "arrow.backward",
                         disabled: !tabWrapper.canGoBack,
                         action: {
-                            // Use the active window's WebView to ensure navigation history consistency
                             if let tab = tabWrapper.tab,
                                let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
                                 webView.goBack()
                             } else {
-                                tabWrapper.tab?.goBack() // Fallback to original method
+                                tabWrapper.tab?.goBack()
                             }
                         }
                     )
@@ -97,12 +94,11 @@ struct NavButtonsView: View {
                         iconName: "arrow.forward",
                         disabled: !tabWrapper.canGoForward,
                         action: {
-                            // Use the active window's WebView to ensure navigation history consistency
                             if let tab = tabWrapper.tab,
                                let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
                                 webView.goForward()
                             } else {
-                                tabWrapper.tab?.goForward() // Fallback to original method
+                                tabWrapper.tab?.goForward()
                             }
                         }
                     )
