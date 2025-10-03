@@ -418,8 +418,8 @@ class TabManager: ObservableObject {
     private let toastCooldown: TimeInterval = 2 * 60 * 60 // 2 hours in seconds
 
     // Spaces
-    public private(set) var spaces: [Space] = []
-    public private(set) var currentSpace: Space?
+    @Published public private(set) var spaces: [Space] = []
+    @Published public private(set) var currentSpace: Space?
 
     // Normal tabs per space
     private var tabsBySpace: [UUID: [Tab]] = [:]
