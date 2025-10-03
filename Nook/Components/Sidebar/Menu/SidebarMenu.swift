@@ -57,7 +57,7 @@ struct SidebarMenu: View {
                             windowState.sidebarWidth = restoredWidth
                             windowState.sidebarContentWidth = max(restoredWidth - 16, 0)
                         }
-                    }, onLongPress: nil)
+                    })
                     Spacer()
                 }
                 .padding(.leading, 8)

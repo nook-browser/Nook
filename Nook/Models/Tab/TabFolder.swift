@@ -10,15 +10,24 @@ import SwiftUI
 import Combine
 
 @MainActor
-@Observable
 public class TabFolder: NSObject, Identifiable, ObservableObject {
     public let id: UUID
-    var name: String
+    var name: String {
+        didSet { objectWillChange.send() }
+    }
     var spaceId: UUID
-    var isOpen: Bool = false
-    var icon: String = "folder"
-    var index: Int
-    var color: NSColor
+    var isOpen: Bool = false {
+        didSet { objectWillChange.send() }
+    }
+    var icon: String = "folder" {
+        didSet { objectWillChange.send() }
+    }
+    var index: Int {
+        didSet { objectWillChange.send() }
+    }
+    var color: NSColor {
+        didSet { objectWillChange.send() }
+    }
 
     init(
         id: UUID = UUID(),

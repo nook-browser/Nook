@@ -42,6 +42,11 @@ import OSLog
         let profileId: UUID?
         // Folder association for tabs within folders
         let folderId: UUID?
+
+        // Navigation state
+        let currentURLString: String?
+        let canGoBack: Bool
+        let canGoForward: Bool
     }
 
     struct SnapshotFolder: Codable {
@@ -210,6 +215,9 @@ import OSLog
             e.spaceId = t.spaceId
             e.profileId = t.profileId
             e.folderId = t.folderId
+            e.currentURLString = t.currentURLString
+            e.canGoBack = t.canGoBack
+            e.canGoForward = t.canGoForward
         } else {
             let e = TabEntity(
                 id: t.id,
@@ -220,7 +228,10 @@ import OSLog
                 index: t.index,
                 spaceId: t.spaceId,
                 profileId: t.profileId,
-                folderId: t.folderId
+                folderId: t.folderId,
+                currentURLString: t.currentURLString,
+                canGoBack: t.canGoBack,
+                canGoForward: t.canGoForward
             )
             ctx.insert(e)
         }
@@ -392,7 +403,6 @@ import OSLog
 }
 
 @MainActor
-@Observable
 class TabManager: ObservableObject {
     weak var browserManager: BrowserManager?
     private let context: ModelContext
@@ -408,8 +418,8 @@ class TabManager: ObservableObject {
     private let toastCooldown: TimeInterval = 2 * 60 * 60 // 2 hours in seconds
 
     // Spaces
-    public private(set) var spaces: [Space] = []
-    public private(set) var currentSpace: Space?
+    @Published public private(set) var spaces: [Space] = []
+    @Published public private(set) var currentSpace: Space?
 
     // Normal tabs per space
     private var tabsBySpace: [UUID: [Tab]] = [:]
@@ -765,15 +775,27 @@ class TabManager: ObservableObject {
     // MARK: - Folder Management
 
     func createFolder(for spaceId: UUID) {
+        print("📁 Creating folder for spaceId: \(spaceId.uuidString)")
         let folder = TabFolder(
             name: "New Folder",
             spaceId: spaceId,
             color: spaces.first(where: { $0.id == spaceId })?.color ?? .controlAccentColor
         )
+        print("   Created folder: \(folder.name) (id: \(folder.id.uuidString.prefix(8))...)")
 
         var folders = foldersBySpace[spaceId] ?? []
+        let oldCount = folders.count
         folders.append(folder)
         foldersBySpace[spaceId] = folders
+        print("   Added to foldersBySpace[\(spaceId.uuidString.prefix(8))...]: \(oldCount) → \(folders.count) folders")
+
+        // Trigger UI update to ensure folder appears immediately
+        objectWillChange.send()
+        print("   ✅ objectWillChange.send() called for folder creation")
+
+        // Post notification to force immediate UI refresh
+        NotificationCenter.default.post(name: .init("TabFoldersDidChange"), object: nil)
+        print("   📢 TabFoldersDidChange notification posted")
 
         persistSnapshot()
     }
@@ -782,6 +804,8 @@ class TabManager: ObservableObject {
         for (spaceId, folders) in foldersBySpace {
             if let folder = folders.first(where: { $0.id == folderId }) {
                 folder.name = newName
+                // Trigger UI update to ensure rename appears immediately
+                objectWillChange.send()
                 persistSnapshot()
                 break
             }
@@ -789,23 +813,38 @@ class TabManager: ObservableObject {
     }
 
     func deleteFolder(_ folderId: UUID) {
+        print("🗑️ Deleting folder: \(folderId.uuidString)")
         // Find and remove the folder
         for (spaceId, folders) in foldersBySpace {
             if let index = folders.firstIndex(where: { $0.id == folderId }) {
                 let folder = folders[index]
+                print("   Found folder '\(folder.name)' in space \(spaceId.uuidString.prefix(8))...")
 
                 // Move all tabs in folder to space pinned area
+                var movedTabsCount = 0
                 for tab in allTabs() {
                     if tab.folderId == folderId {
                         tab.folderId = nil
                         tab.isSpacePinned = true
+                        movedTabsCount += 1
                     }
                 }
+                print("   Moved \(movedTabsCount) tabs out of folder")
 
                 // Remove the folder
                 var mutableFolders = folders
                 mutableFolders.remove(at: index)
                 foldersBySpace[spaceId] = mutableFolders
+                print("   Removed folder from foldersBySpace[\(spaceId.uuidString.prefix(8))...]: \(folders.count) → \(mutableFolders.count) folders")
+
+                // Trigger UI update to ensure folder deletion appears immediately
+                objectWillChange.send()
+                print("   ✅ objectWillChange.send() called for folder deletion")
+
+                // Post notification to force immediate UI refresh
+                NotificationCenter.default.post(name: .init("TabFoldersDidChange"), object: nil)
+                print("   📢 TabFoldersDidChange notification posted")
+
                 persistSnapshot()
                 break
             }
@@ -1726,8 +1765,9 @@ class TabManager: ObservableObject {
     }
 
     private func toRuntime(_ e: TabEntity) -> Tab {
-        let url =
-            URL(string: e.urlString) ?? URL(string: "https://www.google.com")!
+        // Use the currentURLString for restoration, fallback to urlString for backward compatibility
+        let urlString = e.currentURLString ?? e.urlString
+        let url = URL(string: urlString) ?? URL(string: e.urlString) ?? URL(string: "https://www.google.com")!
         let t = Tab(
             id: e.id,
             url: url,
@@ -1740,6 +1780,11 @@ class TabManager: ObservableObject {
         t.folderId = e.folderId
         t.isPinned = e.isPinned
         t.isSpacePinned = e.isSpacePinned
+
+        // Restore navigation state
+        t.canGoBack = e.canGoBack
+        t.canGoForward = e.canGoForward
+
         return t
     }
 
@@ -2002,7 +2047,10 @@ class TabManager: ObservableObject {
                     isPinned: true,
                     isSpacePinned: false,
                     profileId: pid,
-                    folderId: t.folderId
+                    folderId: t.folderId,
+                    currentURLString: t.url.absoluteString,
+                    canGoBack: t.canGoBack,
+                    canGoForward: t.canGoForward
                 ))
             }
         }
@@ -2021,7 +2069,10 @@ class TabManager: ObservableObject {
                     isPinned: false,
                     isSpacePinned: true,
                     profileId: nil,
-                    folderId: t.folderId
+                    folderId: t.folderId,
+                    currentURLString: t.url.absoluteString,
+                    canGoBack: t.canGoBack,
+                    canGoForward: t.canGoForward
                 ))
             }
             // Regular tabs for this space
@@ -2037,7 +2088,10 @@ class TabManager: ObservableObject {
                     isPinned: false,
                     isSpacePinned: false,
                     profileId: nil,
-                    folderId: t.folderId
+                    folderId: t.folderId,
+                    currentURLString: t.url.absoluteString,
+                    canGoBack: t.canGoBack,
+                    canGoForward: t.canGoForward
                 ))
             }
         }
@@ -2400,6 +2454,16 @@ extension TabManager {
 
     func hasRecentlyClosedTabs() -> Bool {
         return !recentlyClosedTabs.isEmpty
+    }
+
+    // MARK: - Navigation State Management
+
+    /// Called when a tab's navigation state changes to ensure it's persisted
+    func updateTabNavigationState(_ tab: Tab) {
+        // Schedule a persistence update to save the current navigation state
+        Task { @MainActor in
+            persistSnapshot()
+        }
     }
 
     // MARK: - Bulk Tab Operations
