@@ -42,6 +42,11 @@ import OSLog
         let profileId: UUID?
         // Folder association for tabs within folders
         let folderId: UUID?
+
+        // Navigation state
+        let currentURLString: String?
+        let canGoBack: Bool
+        let canGoForward: Bool
     }
 
     struct SnapshotFolder: Codable {
@@ -210,6 +215,9 @@ import OSLog
             e.spaceId = t.spaceId
             e.profileId = t.profileId
             e.folderId = t.folderId
+            e.currentURLString = t.currentURLString
+            e.canGoBack = t.canGoBack
+            e.canGoForward = t.canGoForward
         } else {
             let e = TabEntity(
                 id: t.id,
@@ -220,7 +228,10 @@ import OSLog
                 index: t.index,
                 spaceId: t.spaceId,
                 profileId: t.profileId,
-                folderId: t.folderId
+                folderId: t.folderId,
+                currentURLString: t.currentURLString,
+                canGoBack: t.canGoBack,
+                canGoForward: t.canGoForward
             )
             ctx.insert(e)
         }
@@ -1754,8 +1765,9 @@ class TabManager: ObservableObject {
     }
 
     private func toRuntime(_ e: TabEntity) -> Tab {
-        let url =
-            URL(string: e.urlString) ?? URL(string: "https://www.google.com")!
+        // Use the currentURLString for restoration, fallback to urlString for backward compatibility
+        let urlString = e.currentURLString ?? e.urlString
+        let url = URL(string: urlString) ?? URL(string: e.urlString) ?? URL(string: "https://www.google.com")!
         let t = Tab(
             id: e.id,
             url: url,
@@ -1768,6 +1780,11 @@ class TabManager: ObservableObject {
         t.folderId = e.folderId
         t.isPinned = e.isPinned
         t.isSpacePinned = e.isSpacePinned
+
+        // Restore navigation state
+        t.canGoBack = e.canGoBack
+        t.canGoForward = e.canGoForward
+
         return t
     }
 
@@ -2030,7 +2047,10 @@ class TabManager: ObservableObject {
                     isPinned: true,
                     isSpacePinned: false,
                     profileId: pid,
-                    folderId: t.folderId
+                    folderId: t.folderId,
+                    currentURLString: t.url.absoluteString,
+                    canGoBack: t.canGoBack,
+                    canGoForward: t.canGoForward
                 ))
             }
         }
@@ -2049,7 +2069,10 @@ class TabManager: ObservableObject {
                     isPinned: false,
                     isSpacePinned: true,
                     profileId: nil,
-                    folderId: t.folderId
+                    folderId: t.folderId,
+                    currentURLString: t.url.absoluteString,
+                    canGoBack: t.canGoBack,
+                    canGoForward: t.canGoForward
                 ))
             }
             // Regular tabs for this space
@@ -2065,7 +2088,10 @@ class TabManager: ObservableObject {
                     isPinned: false,
                     isSpacePinned: false,
                     profileId: nil,
-                    folderId: t.folderId
+                    folderId: t.folderId,
+                    currentURLString: t.url.absoluteString,
+                    canGoBack: t.canGoBack,
+                    canGoForward: t.canGoForward
                 ))
             }
         }
@@ -2428,6 +2454,16 @@ extension TabManager {
 
     func hasRecentlyClosedTabs() -> Bool {
         return !recentlyClosedTabs.isEmpty
+    }
+
+    // MARK: - Navigation State Management
+
+    /// Called when a tab's navigation state changes to ensure it's persisted
+    func updateTabNavigationState(_ tab: Tab) {
+        // Schedule a persistence update to save the current navigation state
+        Task { @MainActor in
+            persistSnapshot()
+        }
     }
 
     // MARK: - Bulk Tab Operations

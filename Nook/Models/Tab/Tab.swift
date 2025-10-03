@@ -261,6 +261,9 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         if newCanGoBack != canGoBack || newCanGoForward != canGoForward {
             canGoBack = newCanGoBack
             canGoForward = newCanGoForward
+
+            // Notify TabManager to persist navigation state
+            browserManager?.tabManager.updateTabNavigationState(self)
         }
     }
 
