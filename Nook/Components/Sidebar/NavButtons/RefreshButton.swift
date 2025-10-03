@@ -32,6 +32,7 @@ struct RefreshButton: View {
         }
         .buttonStyle(.plain)
         .disabled(disabled)
+        .padding(4)
         .background(
             RoundedRectangle(cornerRadius: 6)
                 .fill(backgroundColor)

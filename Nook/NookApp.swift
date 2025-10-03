@@ -27,6 +27,9 @@ struct NookApp: App {
                     // Connect browser manager to app delegate for cleanup and Sparkle integration
                     appDelegate.browserManager = browserManager
                     browserManager.appDelegate = appDelegate
+
+                    // Initialize keyboard shortcut manager
+                    browserManager.settingsManager.keyboardShortcutManager.setBrowserManager(browserManager)
                 }
         }
         .windowStyle(.hiddenTitleBar)
@@ -215,7 +218,15 @@ struct NookCommands: Commands {
         CommandGroup(replacing: .newItem) {}
         CommandGroup(replacing: .windowList) {}
         // Use the native Settings menu (no replacement of .appSettings)
-        
+
+        // Edit Section
+        CommandGroup(replacing: .undoRedo) {
+            Button("Undo Close Tab") {
+                browserManager.undoCloseTab()
+            }
+            .keyboardShortcut("z", modifiers: .command)
+        }
+
         // File Section
         CommandGroup(after: .newItem) {
 

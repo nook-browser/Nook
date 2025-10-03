@@ -75,7 +75,10 @@ class BrowserWindowState: ObservableObject {
 
     /// Gradient currently displayed for this window's active space
     var activeGradient: SpaceGradient = .default
-    
+
+    /// Reference to the actual NSWindow for this window state
+    var window: NSWindow?
+
     init(id: UUID = UUID()) {
         self.id = id
     }

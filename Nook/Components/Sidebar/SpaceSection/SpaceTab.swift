@@ -152,21 +152,21 @@ struct SpaceTab: View {
         )
         .contextMenu {
             // Split view
-            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState) } 
+            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState) }
             label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
-            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) } 
+            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) }
             label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
             Divider()
             // Mute/Unmute option (show if tab has audio content OR is muted)
             if tab.hasAudioContent || tab.isAudioMuted {
                 Button(action: onMute) {
-                    Label(tab.isAudioMuted ? "Unmute Audio" : "Mute Audio", 
+                    Label(tab.isAudioMuted ? "Unmute Audio" : "Mute Audio",
                           systemImage: tab.isAudioMuted ? "speaker.wave.2" : "speaker.slash")
                 }
-                
+
                 Divider()
             }
-            
+
             // Unload options
             Button(action: {
                 browserManager.tabManager.unloadTab(tab)
@@ -174,15 +174,27 @@ struct SpaceTab: View {
                 Label("Unload Tab", systemImage: "arrow.down.circle")
             }
             .disabled(tab.isUnloaded)
-            
+
             Button(action: {
                 browserManager.tabManager.unloadAllInactiveTabs()
             }) {
                 Label("Unload All Inactive Tabs", systemImage: "arrow.down.circle.fill")
             }
-            
+
             Divider()
-            
+
+            // Close All Tabs Below (only for regular, non-pinned tabs)
+            if !tab.isPinned && !tab.isSpacePinned && tab.spaceId != nil {
+                Button(action: {
+                    browserManager.tabManager.closeAllTabsBelow(tab)
+                }) {
+                    Label("Close All Tabs Below", systemImage: "xmark.square.fill")
+                }
+                .help("Close all tabs that appear below this one in the sidebar")
+
+                Divider()
+            }
+
             Button(action: onClose) {
                 Label("Close Tab", systemImage: "xmark.circle")
             }

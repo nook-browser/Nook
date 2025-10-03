@@ -50,14 +50,14 @@ struct SidebarMenu: View {
 
                 Spacer()
                 HStack {
-                    NavButton(iconName: "arrow.backward") {
+                    NavButton(iconName: "arrow.backward", disabled: false, action: {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             windowState.isSidebarMenuVisible = false
                             let restoredWidth = windowState.savedSidebarWidth
                             windowState.sidebarWidth = restoredWidth
                             windowState.sidebarContentWidth = max(restoredWidth - 16, 0)
                         }
-                    }
+                    }, onLongPress: nil)
                     Spacer()
                 }
                 .padding(.leading, 8)

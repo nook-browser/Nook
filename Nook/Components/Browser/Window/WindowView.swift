@@ -94,16 +94,28 @@ struct WindowView: View {
                 }
             }
             
-            // Profile switch toast overlay (matches WebsitePopup style/presentation)
+            // Toast overlays (matches WebsitePopup style/presentation)
             VStack {
                 HStack {
                     Spacer()
-                    if windowState.isShowingProfileSwitchToast, let toast = windowState.profileSwitchToast {
-                        ProfileSwitchToastView(toast: toast)
-                            .animation(.spring(response: 0.5, dampingFraction: 0.8), value: windowState.isShowingProfileSwitchToast)
-                            .padding(10)
-                            .onTapGesture { browserManager.hideProfileSwitchToast(for: windowState) }
+                    VStack(spacing: 8) {
+                        // Profile switch toast
+                        if windowState.isShowingProfileSwitchToast, let toast = windowState.profileSwitchToast {
+                            ProfileSwitchToastView(toast: toast)
+                                .animation(.spring(response: 0.5, dampingFraction: 0.8), value: windowState.isShowingProfileSwitchToast)
+                                .onTapGesture { browserManager.hideProfileSwitchToast(for: windowState) }
+                        }
+
+                        // Tab closure toast
+                        if browserManager.showTabClosureToast && browserManager.tabClosureToastCount > 0 {
+                            TabClosureToast()
+                                .environmentObject(browserManager)
+                                .environmentObject(windowState)
+                                .animation(.spring(response: 0.5, dampingFraction: 0.8), value: browserManager.showTabClosureToast)
+                                .onTapGesture { browserManager.hideTabClosureToast() }
+                        }
                     }
+                    .padding(10)
                 }
                 Spacer()
             }
@@ -140,6 +152,7 @@ private struct ProfileSwitchToastView: View {
         HStack {
             Text("Switched to \(toast.toProfile.name)")
                 .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white)
             Image(systemName: "person.crop.circle")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.white)

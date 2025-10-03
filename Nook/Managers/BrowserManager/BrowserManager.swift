@@ -324,8 +324,12 @@ class BrowserManager: ObservableObject {
     // Migration state
     @Published var migrationProgress: MigrationProgress?
     @Published var isMigrationInProgress: Bool = false
-    
-    
+
+    // Tab closure undo notification
+    @Published var showTabClosureToast: Bool = false
+    @Published var tabClosureToastCount: Int = 0
+
+
     // MARK: - Window State Management
     /// Registry of all active window states
     var windowStates: [UUID: BrowserWindowState] = [:]
@@ -1714,6 +1718,13 @@ class BrowserManager: ObservableObject {
         windowState.didCopyURL = false
         windowState.commandPalettePrefilledText = ""
         windowState.shouldNavigateCurrentTab = false
+
+        // Set the NSWindow reference for keyboard shortcuts
+        if let window = NSApplication.shared.windows.first(where: { $0.contentView?.subviews.contains(where: {
+            ($0 as? NSHostingView<ContentView>) != nil
+        }) ?? false }) {
+            windowState.window = window
+        }
         windowState.urlBarFrame = urlBarFrame
         windowState.activeGradient = tabManager.currentSpace?.gradient ?? .default
         windowState.currentProfileId = currentProfile?.id
@@ -2321,5 +2332,156 @@ class BrowserManager: ObservableObject {
                 self.tabManager.addToEssentials(tab)
             }
         }
+    }
+
+    // MARK: - Keyboard Shortcut Support Methods
+
+    /// Select the next tab in the active window
+    func selectNextTabInActiveWindow() {
+        guard let activeWindow = activeWindowState else { return }
+        let currentTabs = tabsForDisplay(in: activeWindow)
+        guard let currentTab = currentTab(for: activeWindow),
+              let currentIndex = currentTabs.firstIndex(where: { $0.id == currentTab.id }) else { return }
+
+        let nextIndex = (currentIndex + 1) % currentTabs.count
+        if let nextTab = currentTabs[safe: nextIndex] {
+            selectTab(nextTab, in: activeWindow)
+        }
+    }
+
+    /// Select the previous tab in the active window
+    func selectPreviousTabInActiveWindow() {
+        guard let activeWindow = activeWindowState else { return }
+        let currentTabs = tabsForDisplay(in: activeWindow)
+        guard let currentTab = currentTab(for: activeWindow),
+              let currentIndex = currentTabs.firstIndex(where: { $0.id == currentTab.id }) else { return }
+
+        let previousIndex = currentIndex > 0 ? currentIndex - 1 : currentTabs.count - 1
+        if let previousTab = currentTabs[safe: previousIndex] {
+            selectTab(previousTab, in: activeWindow)
+        }
+    }
+
+    /// Select tab by index in the active window
+    func selectTabByIndexInActiveWindow(_ index: Int) {
+        guard let activeWindow = activeWindowState else { return }
+        let currentTabs = tabsForDisplay(in: activeWindow)
+        guard currentTabs.indices.contains(index) else { return }
+
+        let tab = currentTabs[index]
+        selectTab(tab, in: activeWindow)
+    }
+
+    /// Select the last tab in the active window
+    func selectLastTabInActiveWindow() {
+        guard let activeWindow = activeWindowState else { return }
+        let currentTabs = tabsForDisplay(in: activeWindow)
+        guard let lastTab = currentTabs.last else { return }
+
+        selectTab(lastTab, in: activeWindow)
+    }
+
+    /// Select the next space in the active window
+    func selectNextSpaceInActiveWindow() {
+        guard let activeWindow = activeWindowState,
+              let currentSpaceId = activeWindow.currentSpaceId,
+              let currentSpaceIndex = tabManager.spaces.firstIndex(where: { $0.id == currentSpaceId }) else { return }
+
+        let nextIndex = (currentSpaceIndex + 1) % tabManager.spaces.count
+        if let nextSpace = tabManager.spaces[safe: nextIndex] {
+            setActiveSpace(nextSpace, in: activeWindow)
+        }
+    }
+
+    /// Select the previous space in the active window
+    func selectPreviousSpaceInActiveWindow() {
+        guard let activeWindow = activeWindowState,
+              let currentSpaceId = activeWindow.currentSpaceId,
+              let currentSpaceIndex = tabManager.spaces.firstIndex(where: { $0.id == currentSpaceId }) else { return }
+
+        let previousIndex = currentSpaceIndex > 0 ? currentSpaceIndex - 1 : tabManager.spaces.count - 1
+        if let previousSpace = tabManager.spaces[safe: previousIndex] {
+            setActiveSpace(previousSpace, in: activeWindow)
+        }
+    }
+
+    /// Create a new window
+    func createNewWindow() {
+        // This is handled by the Command+N shortcut in NookApp.swift
+        // For consistency, we'll trigger the same menu action
+        // Create new window using the same approach as NookApp.swift
+        let newWindow = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        newWindow.contentView = NSHostingView(rootView: ContentView()
+            .background(BackgroundWindowModifier())
+            .ignoresSafeArea(.all)
+            .environmentObject(self))
+        newWindow.title = "Nook"
+        newWindow.minSize = NSSize(width: 470, height: 382)
+        newWindow.contentMinSize = NSSize(width: 470, height: 382)
+        newWindow.center()
+        newWindow.makeKeyAndOrderFront(nil)
+    }
+
+    /// Close the active window
+    func closeActiveWindow() {
+        guard let activeWindow = activeWindowState?.window else { return }
+        activeWindow.close()
+    }
+
+    /// Toggle full screen for the active window
+    func toggleFullScreenForActiveWindow() {
+        guard let activeWindow = activeWindowState?.window else { return }
+        activeWindow.toggleFullScreen(nil)
+    }
+
+    /// Show downloads (placeholder implementation)
+    func showDownloads() {
+        // TODO: Implement downloads UI
+        openCommandPaletteWithCurrentURL()
+    }
+
+    /// Show history (placeholder implementation)
+    func showHistory() {
+        // TODO: Implement history UI
+        openCommandPaletteWithCurrentURL()
+    }
+
+    // MARK: - Tab Closure Undo Notification
+
+    func showTabClosureToast(tabCount: Int) {
+        tabClosureToastCount = tabCount
+        showTabClosureToast = true
+
+        // Auto-hide the toast after 3 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            self.hideTabClosureToast()
+        }
+    }
+
+    func hideTabClosureToast() {
+        showTabClosureToast = false
+        tabClosureToastCount = 0
+    }
+
+    func undoCloseTab() {
+        tabManager.undoCloseTab()
+    }
+
+    /// Expand all folders in the sidebar
+    func expandAllFoldersInSidebar() {
+        // TODO: Implement folder expansion
+        // This would need to be handled by the sidebar component
+        toggleSidebar()
+    }
+}
+
+extension Array {
+    subscript(safe index: Int) -> Element? {
+        return indices.contains(index) ? self[index] : nil
     }
 }
