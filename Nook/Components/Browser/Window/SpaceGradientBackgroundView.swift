@@ -19,20 +19,9 @@ struct SpaceGradientBackgroundView: View {
 
     var body: some View {
         ZStack {
-            let useShader: Bool = {
-                if isActiveWindow {
-                    return gradientColorManager.isAnimating ? gradientColorManager.preferBarycentricDuringAnimation : (gradient.nodes.count <= 3)
-                }
-                return gradient.nodes.count <= 3
-            }()
-            if useShader {
-                // GPU barycentric blend for 1–3 color gradients with smooth transitions
-                BarycentricGradientView(gradient: gradient)
-            } else {
-                // Properly dithered gradient image respecting current displayGradient
-                // While animating, DitheredGradientView will show a lightweight gradient.
-                DitheredGradientView(gradient: gradient)
-            }
+            // Always use BarycentricGradientView for active window - it handles 1-3 colors smoothly
+            // For inactive windows, also use Barycentric since spaces only have 1-3 colors max
+            BarycentricGradientView(gradient: gradient)
         }
         .opacity(max(0.0, min(1.0, gradient.opacity)))
         .allowsHitTesting(false) // Entire background should not intercept input

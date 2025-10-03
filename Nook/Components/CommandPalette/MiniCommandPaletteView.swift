@@ -26,6 +26,7 @@ struct MiniCommandPaletteView: View {
     @FocusState private var isSearchFocused: Bool
     @State private var text: String = ""
     @State private var selectedSuggestionIndex: Int = -1
+    @State private var hoveredSuggestionIndex: Int? = nil
 
     // Will be overridden by overlay to match URL bar width
     var forcedWidth: CGFloat? = nil
@@ -37,20 +38,23 @@ struct MiniCommandPaletteView: View {
         let isActiveWindow = browserManager.activeWindowState?.id == windowState.id
         let suggestions = searchManager.suggestions
 
-        VStack(spacing: 0) {
+        VStack(spacing: 6) {
             inputRow(symbolName: symbolName)
             separatorIfNeeded(hasSuggestions: !suggestions.isEmpty)
             suggestionsListView(suggestions: suggestions)
         }
+        .padding(10)
         .frame(width: forcedWidth ?? 460)
-        .background(isDark ? Color.white.opacity(0.28) : Color.white.opacity(0.85))
-        .background(.thinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: forcedCornerRadius ?? 12))
+        .background(.thickMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
-            RoundedRectangle(cornerRadius: forcedCornerRadius ?? 12)
-                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(
+                    Color.white.opacity(isDark ? 0.3 : 0.6),
+                    lineWidth: 0.5
+                )
         )
-        .shadow(color: .black.opacity(0.12), radius: 18, x: 0, y: 12)
+        .shadow(color: .black.opacity(0.4), radius: 50, x: 0, y: 4)
         .onAppear {
             // Wire managers
             searchManager.setTabManager(browserManager.tabManager)
@@ -101,15 +105,25 @@ struct MiniCommandPaletteView: View {
     }
 
     private func inputRow(symbolName: String) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 15) {
             Image(systemName: symbolName)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(AppColors.textPrimary)
+                .font(.system(size: 14, weight: .regular))
+                .foregroundStyle(colorScheme == .dark ? .white : .black)
 
-            TextField("Search or enter address", text: $text)
+            TextField("Search or enter URL...", text: $text)
                 .textFieldStyle(.plain)
-                .font(.system(size: 15, weight: .regular))
-                .foregroundStyle(AppColors.textPrimary)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundColor(
+                    text.isEmpty
+                    ? colorScheme == .dark
+                            ? .white.opacity(0.25)
+                            : .black.opacity(0.25)
+                    : colorScheme == .dark
+                            ? .white.opacity(0.9)
+                            : .black.opacity(0.9)
+
+                )
+                .tint(gradientColorManager.primaryColor)
                 .focused($isSearchFocused)
                 .onKeyPress(.return) {
                     handleReturn()
@@ -139,11 +153,13 @@ struct MiniCommandPaletteView: View {
     private func separatorIfNeeded(hasSuggestions: Bool) -> some View {
         if hasSuggestions {
             RoundedRectangle(cornerRadius: 100)
-                .fill(Color.white.opacity(0.35))
-                .frame(height: 1)
+                .fill(
+                    colorScheme == .dark
+                        ? Color.white.opacity(0.4)
+                        : Color.black.opacity(0.4)
+                )
+                .frame(height: 0.5)
                 .frame(maxWidth: .infinity)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
         }
     }
 
@@ -152,31 +168,35 @@ struct MiniCommandPaletteView: View {
         if suggestions.isEmpty {
             EmptyView()
         } else {
-            LazyVStack(spacing: 2) {
+            LazyVStack(spacing: 5) {
                 ForEach(suggestions.indices, id: \.self) { index in
                     let suggestion = suggestions[index]
                     suggestionRow(for: suggestion, isSelected: selectedSuggestionIndex == index)
-                        .padding(6)
-                        .background(selectedSuggestionIndex == index ? gradientColorManager.primaryColor : Color.clear)
-                        .cornerRadius(8)
-                        .font(.system(size: 15, weight: .regular))
-                        .foregroundStyle(AppColors.textPrimary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 11)
+                        .background(
+                            selectedSuggestionIndex == index
+                                ? gradientColorManager.primaryColor
+                                : hoveredSuggestionIndex == index
+                            ? colorScheme == .dark
+                                        ? .white.opacity(0.05)
+                                        : .black.opacity(0.05) : .clear
+                        )                        .cornerRadius(8)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
                         .contentShape(Rectangle())
                         .onHover { hovering in
                             withAnimation(.easeInOut(duration: 0.12)) {
                                 if hovering {
-                                    selectedSuggestionIndex = index
-                                } else if selectedSuggestionIndex == index {
-                                    selectedSuggestionIndex = -1
+                                    hoveredSuggestionIndex = index
+                                } else {
+                                    hoveredSuggestionIndex = nil
                                 }
                             }
                         }
                         .onTapGesture { selectSuggestion(suggestion) }
                 }
             }
-            .padding(.horizontal, 4)
-            .padding(.vertical, 4)
-            .frame(maxHeight: 240)
         }
     }
 

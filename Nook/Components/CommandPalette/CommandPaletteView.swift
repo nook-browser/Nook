@@ -19,6 +19,29 @@ struct CommandPaletteView: View {
     @State private var text: String = ""
     @State private var selectedSuggestionIndex: Int = -1
     @State private var hoveredSuggestionIndex: Int? = nil
+    
+    let commandPaletteWidth: CGFloat = 765
+    let commandPaletteHorizontalPadding: CGFloat = 10
+    
+    /// Active window width
+    private var currentWindowWidth: CGFloat {
+        return NSApplication.shared.keyWindow?.frame.width ?? 0
+    }
+    
+    /// Check if the command palette fits in the window
+    private var isWindowTooNarrow: Bool {
+        let requiredWidth = commandPaletteWidth + (commandPaletteHorizontalPadding * 2)
+        return currentWindowWidth <= requiredWidth
+    }
+    
+    /// Caclulate the correct command palette width
+    private var effectiveCommandPaletteWidth: CGFloat {
+        if isWindowTooNarrow {
+            return max(200, currentWindowWidth - (commandPaletteHorizontalPadding * 2))
+        } else {
+            return commandPaletteWidth
+        }
+    }
 
     var body: some View {
         let isDark = colorScheme == .dark
@@ -119,7 +142,8 @@ struct CommandPaletteView: View {
                         }
                     }
                     .padding(10)
-                    .frame(width: 765)
+                    .frame(maxWidth: .infinity)
+                    .frame(width: effectiveCommandPaletteWidth)
                     .background(.thickMaterial)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .overlay(

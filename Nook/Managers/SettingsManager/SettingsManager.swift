@@ -10,12 +10,15 @@ import SwiftUI
 
 @Observable
 class SettingsManager {
+    let keyboardShortcutManager = KeyboardShortcutManager()
     private let userDefaults = UserDefaults.standard
     private let materialKey = "settings.currentMaterialRaw"
     private let searchEngineKey = "settings.searchEngine"
     private let liquidGlassKey = "settings.isLiquidGlassEnabled"
     private let tabUnloadTimeoutKey = "settings.tabUnloadTimeout"
     private let blockXSTKey = "settings.blockCrossSiteTracking"
+    private let debugToggleUpdateNotificationKey = "settings.debugToggleUpdateNotification"
+    private let askBeforeQuitKey = "settings.askBeforeQuit"
     var currentSettingsTab: SettingsTabs = .general
 
     // Stored properties
@@ -59,6 +62,18 @@ class SettingsManager {
             NotificationCenter.default.post(name: .blockCrossSiteTrackingChanged, object: nil, userInfo: ["enabled": blockCrossSiteTracking])
         }
     }
+    
+    var askBeforeQuit: Bool {
+        didSet {
+            userDefaults.set(askBeforeQuit, forKey: askBeforeQuitKey)
+        }
+    }
+
+    var debugToggleUpdateNotification: Bool {
+        didSet {
+            userDefaults.set(debugToggleUpdateNotification, forKey: debugToggleUpdateNotificationKey)
+        }
+    }
 
     init() {
         // Register default values
@@ -68,7 +83,9 @@ class SettingsManager {
             searchEngineKey: SearchProvider.google.rawValue,
             // Default tab unload timeout: 60 minutes
             tabUnloadTimeoutKey: 3600.0,
-            blockXSTKey: false
+            blockXSTKey: false,
+            debugToggleUpdateNotificationKey: false,
+            askBeforeQuitKey: true
         ])
 
         // Initialize properties from UserDefaults
@@ -88,6 +105,8 @@ class SettingsManager {
         // Initialize tab unload timeout
         self.tabUnloadTimeout = userDefaults.double(forKey: tabUnloadTimeoutKey)
         self.blockCrossSiteTracking = userDefaults.bool(forKey: blockXSTKey)
+        self.debugToggleUpdateNotification = userDefaults.bool(forKey: debugToggleUpdateNotificationKey)
+        self.askBeforeQuit = userDefaults.bool(forKey: askBeforeQuitKey)
     }
 }
 

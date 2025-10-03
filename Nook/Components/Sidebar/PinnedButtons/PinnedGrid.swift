@@ -32,7 +32,6 @@ struct PinnedGrid: View {
             : []
         let colsCount: Int = columnCount(for: width, itemCount: items.count)
         let columns: [GridItem] = makeColumns(count: colsCount)
-        // Ora-style DnD: no geometry/boundary computation
         
         let shouldAnimate = (browserManager.activeWindowState?.id == windowState.id) && !browserManager.isTransitioningProfile
 

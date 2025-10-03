@@ -7,8 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2CAC4DD42E8245B100870189 /* SwiftUIPager in Frameworks */ = {isa = PBXBuildFile; productRef = 2CAC4DD32E8245B100870189 /* SwiftUIPager */; };
-		2CAC4DE02E82F63F00870189 /* BigUIPaging in Frameworks */ = {isa = PBXBuildFile; productRef = 2CAC4DDF2E82F63F00870189 /* BigUIPaging */; };
+		2C16A0262E87430B0070894B /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 2C16A0252E87430B0070894B /* Sparkle */; };
 		7FAFC5DA2E3ADDCD009D7DC4 /* FaviconFinder in Frameworks */ = {isa = PBXBuildFile; productRef = 7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */; };
 /* End PBXBuildFile section */
 
@@ -21,6 +20,9 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
+				ThirdParty/BigUIPaging/README.md,
+				ThirdParty/HTSymbolHook/README.md,
+				ThirdParty/MuteableWKWebView/README.md,
 			);
 			target = 7F8340FB2E37F39400674A5D /* Nook */;
 		};
@@ -42,9 +44,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2CAC4DD42E8245B100870189 /* SwiftUIPager in Frameworks */,
 				7FAFC5DA2E3ADDCD009D7DC4 /* FaviconFinder in Frameworks */,
-				2CAC4DE02E82F63F00870189 /* BigUIPaging in Frameworks */,
+				2C16A0262E87430B0070894B /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -88,8 +89,7 @@
 			name = Nook;
 			packageProductDependencies = (
 				7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */,
-				2CAC4DD32E8245B100870189 /* SwiftUIPager */,
-				2CAC4DDF2E82F63F00870189 /* BigUIPaging */,
+				2C16A0252E87430B0070894B /* Sparkle */,
 			);
 			productName = Pulse;
 			productReference = 7F8340FC2E37F39400674A5D /* Nook.app */;
@@ -102,7 +102,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1640;
+				LastSwiftUpdateCheck = 2600;
 				LastUpgradeCheck = 1640;
 				TargetAttributes = {
 					7F8340FB2E37F39400674A5D = {
@@ -121,8 +121,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				7FAFC5D82E3ADDCD009D7DC4 /* XCRemoteSwiftPackageReference "FaviconFinder" */,
-				2CAC4DD22E8245B100870189 /* XCRemoteSwiftPackageReference "SwiftUIPager" */,
-				2CAC4DDE2E82F63F00870189 /* XCRemoteSwiftPackageReference "BigUIPaging" */,
+				2C16A0242E87430B0070894B /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7F8340FD2E37F39400674A5D /* Products */;
@@ -278,7 +277,7 @@
 		7F8341092E37F39500674A5D /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = logo;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				AUTOMATION_APPLE_EVENTS = NO;
 				CODE_SIGN_ENTITLEMENTS = Nook/Nook.entitlements;
@@ -322,7 +321,7 @@
 		7F83410A2E37F39500674A5D /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = logo;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				AUTOMATION_APPLE_EVENTS = NO;
 				CODE_SIGN_ENTITLEMENTS = Nook/Nook.entitlements;
@@ -397,20 +396,12 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		2CAC4DD22E8245B100870189 /* XCRemoteSwiftPackageReference "SwiftUIPager" */ = {
+		2C16A0242E87430B0070894B /* XCRemoteSwiftPackageReference "Sparkle" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/fermoya/SwiftUIPager.git";
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 2.5.0;
-			};
-		};
-		2CAC4DDE2E82F63F00870189 /* XCRemoteSwiftPackageReference "BigUIPaging" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/notsobigcompany/BigUIPaging.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.0.3;
+				minimumVersion = 2.8.0;
 			};
 		};
 		7FAFC5D82E3ADDCD009D7DC4 /* XCRemoteSwiftPackageReference "FaviconFinder" */ = {
@@ -424,15 +415,10 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		2CAC4DD32E8245B100870189 /* SwiftUIPager */ = {
+		2C16A0252E87430B0070894B /* Sparkle */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 2CAC4DD22E8245B100870189 /* XCRemoteSwiftPackageReference "SwiftUIPager" */;
-			productName = SwiftUIPager;
-		};
-		2CAC4DDF2E82F63F00870189 /* BigUIPaging */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 2CAC4DDE2E82F63F00870189 /* XCRemoteSwiftPackageReference "BigUIPaging" */;
-			productName = BigUIPaging;
+			package = 2C16A0242E87430B0070894B /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 		7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */ = {
 			isa = XCSwiftPackageProductDependency;

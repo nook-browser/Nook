@@ -99,7 +99,7 @@ struct SpaceTab: View {
                 } else {
                     Text(tab.name)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(tab.isUnloaded ? AppColors.textSecondary : textTab)
+                        .foregroundStyle(textTab)
                         .lineLimit(1)
                         .truncationMode(.tail)
                         .textSelection(.disabled) // Make text non-selectable
@@ -152,21 +152,21 @@ struct SpaceTab: View {
         )
         .contextMenu {
             // Split view
-            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState) } 
+            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState) }
             label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
-            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) } 
+            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) }
             label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
             Divider()
             // Mute/Unmute option (show if tab has audio content OR is muted)
             if tab.hasAudioContent || tab.isAudioMuted {
                 Button(action: onMute) {
-                    Label(tab.isAudioMuted ? "Unmute Audio" : "Mute Audio", 
+                    Label(tab.isAudioMuted ? "Unmute Audio" : "Mute Audio",
                           systemImage: tab.isAudioMuted ? "speaker.wave.2" : "speaker.slash")
                 }
-                
+
                 Divider()
             }
-            
+
             // Unload options
             Button(action: {
                 browserManager.tabManager.unloadTab(tab)
@@ -174,20 +174,32 @@ struct SpaceTab: View {
                 Label("Unload Tab", systemImage: "arrow.down.circle")
             }
             .disabled(tab.isUnloaded)
-            
+
             Button(action: {
                 browserManager.tabManager.unloadAllInactiveTabs()
             }) {
                 Label("Unload All Inactive Tabs", systemImage: "arrow.down.circle.fill")
             }
-            
+
             Divider()
-            
+
+            // Close All Tabs Below (only for regular, non-pinned tabs)
+            if !tab.isPinned && !tab.isSpacePinned && tab.spaceId != nil {
+                Button(action: {
+                    browserManager.tabManager.closeAllTabsBelow(tab)
+                }) {
+                    Label("Close All Tabs Below", systemImage: "xmark.square.fill")
+                }
+                .help("Close all tabs that appear below this one in the sidebar")
+
+                Divider()
+            }
+
             Button(action: onClose) {
                 Label("Close Tab", systemImage: "xmark.circle")
             }
         }
-        .shadow(color: isActive ? Color.gray : Color.clear, radius: isActive ? 1 : 0, y: 1)
+        .shadow(color: isActive ? shadowColor : Color.clear, radius: isActive ? 1 : 0, y: 2)
     }
 
     private var isActive: Bool {
@@ -197,22 +209,21 @@ struct SpaceTab: View {
     private var isCurrentTab: Bool {
         return browserManager.currentTab(for: windowState)?.id == tab.id
     }
+    private var shadowColor: Color {
+        return browserManager.gradientColorManager.isDark ? Color.black.opacity(0.15) : Color.clear
+    }
     
     private var backgroundColor: Color {
         if isCurrentTab {
-            return AppColors.activeTab
+            return browserManager.gradientColorManager.isDark ? AppColors.spaceTabActiveDark : AppColors.spaceTabActiveLight
         } else if isHovering {
-            return AppColors.controlBackgroundHover
+            return browserManager.gradientColorManager.isDark ? AppColors.spaceTabHoverDark : AppColors.spaceTabHoverLight
         } else {
             return Color.clear
         }
     }
     private var textTab: Color {
-        if isCurrentTab {
-            return Color.black
-        } else {
-            return AppColors.textSecondary
-        }
+        return browserManager.gradientColorManager.isDark ? AppColors.spaceTabTextDark : AppColors.spaceTabTextLight
     }
 
 }

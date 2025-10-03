@@ -128,9 +128,9 @@ struct GradientCanvasEditor: View {
             .onTapGesture {
                 selectedMode = idx
                 switch idx {
-                case 0: lightness = 0.6 // sparkle
-                case 1: lightness = 0.7 // sun
-                case 2: lightness = 0.45 // moon
+                case 0: gradientColorManager.isDark = true // sparkle
+                case 1: gradientColorManager.isDark = false // sun
+                case 2: gradientColorManager.isDark = true // moon
                 default: lightness = 0.6
                 }
             }

@@ -10,6 +10,7 @@ import WebKit
 import OSLog
 import AppKit
 import Carbon
+import Sparkle
 
 @main
 struct NookApp: App {
@@ -23,8 +24,12 @@ struct NookApp: App {
                 .ignoresSafeArea(.all)
                 .environmentObject(browserManager)
                 .onAppear {
-                    // Connect browser manager to app delegate for cleanup
+                    // Connect browser manager to app delegate for cleanup and Sparkle integration
                     appDelegate.browserManager = browserManager
+                    browserManager.appDelegate = appDelegate
+
+                    // Initialize keyboard shortcut manager
+                    browserManager.settingsManager.keyboardShortcutManager.setBrowserManager(browserManager)
                 }
         }
         .windowStyle(.hiddenTitleBar)
@@ -47,6 +52,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let urlEventClass = AEEventClass(kInternetEventClass)
     private let urlEventID = AEEventID(kAEGetURL)
 
+    // Sparkle updater controller
+    lazy var updaterController: SPUStandardUpdaterController = {
+        return SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+    }()
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSAppleEventManager.shared().setEventHandler(
             self,
@@ -62,22 +72,84 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     // Prefer async termination path to avoid MainActor deadlocks
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        AppDelegate.log.info("applicationShouldTerminate: returning terminateLater and starting async persistence")
-
-        // Minimal fallback if BrowserManager is unavailable
-        guard let manager = browserManager else {
-            // Attempt a best-effort save via shared persistence container
-            do {
-                let ctx = Persistence.shared.container.mainContext
-                try ctx.save()
-                AppDelegate.log.info("Fallback save without BrowserManager succeeded")
-            } catch {
-                AppDelegate.log.error("Fallback save without BrowserManager failed: \(String(describing: error))")
+        let reason = NSAppleEventManager.shared()
+            .currentAppleEvent?
+            .attributeDescriptor(forKeyword: kAEQuitReason)
+        
+        switch reason?.enumCodeValue {
+            case nil:
+            if browserManager?.settingsManager.askBeforeQuit ?? true {
+                // This probably means it's command-q
+                let header = AnyView(
+                    DialogHeader(
+                        icon: "questionmark.circle",
+                        title: "Quit Nook?",
+                    )
+                )
+                let footer = AnyView(
+                    DialogFooter(leftButton: DialogButton(text: "Quit, and don't ask again", variant: .secondary) { [weak self] in
+                        // Safely unwrap self
+                        guard let self = self else {
+                            sender.reply(toApplicationShouldTerminate: true)
+                            return
+                        }
+                        self.browserManager?.settingsManager.askBeforeQuit = false
+                        self.handletermination(sender: sender, shouldTerminate: true)
+                    }, rightButtons: [
+                        DialogButton(text: "Cancel", variant: .secondary) { [weak self] in
+                            // Safely unwrap self
+                            guard let self = self else {
+                                sender.reply(toApplicationShouldTerminate: true)
+                                return
+                            }
+                            self.browserManager?.dialogManager.closeDialog()
+                            self.handletermination(sender: sender, shouldTerminate: false)
+                        },
+                        DialogButton(text: "Quit", variant: .primary) {
+                            self.handletermination(sender: sender, shouldTerminate: true)
+                        }
+                    ])
+                )
+                browserManager?.dialogManager.showCustomContentDialog(
+                    header: header,
+                    content: EmptyView(),
+                    footer: footer
+                )
+            } else {
+                self.handletermination(sender: sender, shouldTerminate: true)
             }
-            return .terminateNow
-        }
+            
 
+        default:
+            handletermination(sender: sender, shouldTerminate: true)
+        }
+        
+        return .terminateLater
+    }
+    
+    private func handletermination(sender: NSApplication, shouldTerminate: Bool) {
+        AppDelegate.log.info("applicationShouldTerminate: returning terminateLater and starting async persistence")
+    
         Task { @MainActor in
+            guard shouldTerminate else {
+                sender.reply(toApplicationShouldTerminate: false)
+                return
+            }
+            
+            // Minimal fallback if BrowserManager is unavailable
+            guard let manager = browserManager else {
+                // Attempt a best-effort save via shared persistence container
+                do {
+                    let ctx = Persistence.shared.container.mainContext
+                    try ctx.save()
+                    AppDelegate.log.info("Fallback save without BrowserManager succeeded")
+                } catch {
+                    AppDelegate.log.error("Fallback save without BrowserManager failed: \(String(describing: error))")
+                }
+                sender.reply(toApplicationShouldTerminate: true)
+                return
+            }
+            
             let overallStart = CFAbsoluteTimeGetCurrent()
             AppDelegate.log.info("Termination task started on MainActor")
 
@@ -106,8 +178,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             AppDelegate.log.info("Termination task finished in \(String(format: "%.3f", total))s; replying to terminate")
             sender.reply(toApplicationShouldTerminate: true)
         }
-
-        return .terminateLater
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -138,6 +208,7 @@ struct NookCommands: Commands {
     let browserManager: BrowserManager
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     init(browserManager: BrowserManager) {
         self.browserManager = browserManager
@@ -147,10 +218,28 @@ struct NookCommands: Commands {
         CommandGroup(replacing: .newItem) {}
         CommandGroup(replacing: .windowList) {}
         // Use the native Settings menu (no replacement of .appSettings)
-        
+
+        // Edit Section
+        CommandGroup(replacing: .undoRedo) {
+            Button("Undo Close Tab") {
+                browserManager.undoCloseTab()
+            }
+            .keyboardShortcut("z", modifiers: .command)
+        }
+
         // File Section
         CommandGroup(after: .newItem) {
+
+            Button("Check for Updates...") {
+                appDelegate.updaterController.checkForUpdates(nil)
+            }
+            .keyboardShortcut("u", modifiers: [.command, .shift])
             
+            Button("Import from Arc") {
+                browserManager.importArcData()
+            }
+            Divider()
+
             Button("New Tab") {
                 browserManager.openCommandPalette()
             }
@@ -168,6 +257,8 @@ struct NookCommands: Commands {
                     .ignoresSafeArea(.all)
                     .environmentObject(browserManager))
                 newWindow.title = "Nook"
+                newWindow.minSize = NSSize(width: 470, height: 382)
+                newWindow.contentMinSize = NSSize(width: 470, height: 382)
                 newWindow.center()
                 newWindow.makeKeyAndOrderFront(nil)
             }
@@ -391,6 +482,8 @@ struct BackgroundWindowModifier: NSViewRepresentable {
                 window.standardWindowButton(.closeButton)?.isHidden = true
                 window.standardWindowButton(.zoomButton)?.isHidden = true
                 window.standardWindowButton(.miniaturizeButton)?.isHidden = true
+                window.minSize = NSSize(width: 470, height: 382)
+                window.contentMinSize = NSSize(width: 470, height: 382)
             }
         }
         return view

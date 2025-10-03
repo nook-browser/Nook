@@ -10,6 +10,7 @@ import AppKit
 
 struct MiniWindowToolbar: View {
     @Environment(\.colorScheme) private var colorScheme
+    @EnvironmentObject var gradientColorManager: GradientColorManager
     private var fallbackBackgroundNSColor: NSColor {
         NSColor(hex: colorScheme == .dark ? "#242424" : "#EDEDED") ?? (colorScheme == .dark ? .black : .white)
     }
@@ -94,7 +95,7 @@ struct MiniWindowToolbar: View {
                                 .foregroundStyle(subduedTextColor)
                             Text("\(cleanedTargetSpaceName)")
                                 .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(Color.accentColor.opacity(0.8))
+                                .foregroundStyle(gradientColorManager.primaryColor.opacity(0.8))
                         }
                         .padding(.vertical, 0)
                     }

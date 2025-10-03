@@ -565,22 +565,33 @@ struct DragDropPreview: View {
             if tabManager.spacePinnedTabs[spaceId] == nil {
                 tabManager.spacePinnedTabs[spaceId] = []
             }
-            let clampedIndex = min(max(atIndex, 0), tabManager.spacePinnedTabs[spaceId]!.count)
-            tabManager.spacePinnedTabs[spaceId]!.insert(tab, at: clampedIndex)
+            // Safely access the array with optional chaining instead of force unwrap
+            if var spacePinnedArray = tabManager.spacePinnedTabs[spaceId] {
+                let clampedIndex = min(max(atIndex, 0), spacePinnedArray.count)
+                spacePinnedArray.insert(tab, at: clampedIndex)
+                tabManager.spacePinnedTabs[spaceId] = spacePinnedArray
+            }
             tab.spaceId = spaceId
             
         case .spaceRegular(let spaceId):
             if tabManager.regularTabs[spaceId] == nil {
                 tabManager.regularTabs[spaceId] = []
             }
-            let clampedIndex = min(max(atIndex, 0), tabManager.regularTabs[spaceId]!.count)
-            tabManager.regularTabs[spaceId]!.insert(tab, at: clampedIndex)
+            // Safely access the array with optional chaining instead of force unwrap
+            if var regularTabsArray = tabManager.regularTabs[spaceId] {
+                let clampedIndex = min(max(atIndex, 0), regularTabsArray.count)
+                regularTabsArray.insert(tab, at: clampedIndex)
+                tabManager.regularTabs[spaceId] = regularTabsArray
+            }
             tab.spaceId = spaceId
             
         case .none:
 #if DEBUG
             print("❌ Invalid drop container")
 #endif
+        case .folder(_):
+            // Handle folder drop container
+            break
         }
     }
 }

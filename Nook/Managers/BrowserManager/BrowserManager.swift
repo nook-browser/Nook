@@ -33,6 +33,7 @@ final class Persistence {
         SpaceEntity.self,
         ProfileEntity.self,
         TabEntity.self,
+        FolderEntity.self,
         TabsStateEntity.self,
         HistoryEntity.self,
         ExtensionEntity.self
@@ -307,6 +308,7 @@ private extension BrowserManager.ProfileSwitchContext {
 class BrowserManager: ObservableObject {
     // Legacy global state - kept for backward compatibility during transition
     @Published var sidebarWidth: CGFloat = 250
+    @Published var sidebarContentWidth: CGFloat = 234
     @Published var isSidebarVisible: Bool = true
     @Published var isCommandPaletteVisible: Bool = false
     // Mini palette shown when clicking the URL bar
@@ -322,8 +324,12 @@ class BrowserManager: ObservableObject {
     // Migration state
     @Published var migrationProgress: MigrationProgress?
     @Published var isMigrationInProgress: Bool = false
-    
-    
+
+    // Tab closure undo notification
+    @Published var showTabClosureToast: Bool = false
+    @Published var tabClosureToastCount: Int = 0
+
+
     // MARK: - Window State Management
     /// Registry of all active window states
     var windowStates: [UUID: BrowserWindowState] = [:]
@@ -341,7 +347,10 @@ class BrowserManager: ObservableObject {
     
     /// The currently focused/active window state
     var activeWindowState: BrowserWindowState?
-    
+
+    /// Reference to the app delegate for Sparkle integration
+    weak var appDelegate: AppDelegate?
+
     var modelContext: ModelContext
     var tabManager: TabManager
     var profileManager: ProfileManager
@@ -358,8 +367,10 @@ class BrowserManager: ObservableObject {
     var gradientColorManager: GradientColorManager
     var trackingProtectionManager: TrackingProtectionManager
     var findManager: FindManager
+    var importManager: ImportManager
     
     var externalMiniWindowManager = ExternalMiniWindowManager()
+    @Published var peekManager = PeekManager()
     
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
@@ -515,6 +526,7 @@ class BrowserManager: ObservableObject {
         self.gradientColorManager = GradientColorManager()
         self.trackingProtectionManager = TrackingProtectionManager()
         self.findManager = FindManager()
+        self.importManager = ImportManager()
 
         // Phase 2: wire dependencies and perform side effects (safe to use self)
         self.compositorManager.browserManager = self
@@ -537,6 +549,7 @@ class BrowserManager: ObservableObject {
         self.trackingProtectionManager.attach(browserManager: self)
         self.trackingProtectionManager.setEnabled(self.settingsManager.blockCrossSiteTracking)
         self.externalMiniWindowManager.attach(browserManager: self)
+        self.peekManager.attach(browserManager: self)
         self.authenticationManager.attach(browserManager: self)
         // Migrate legacy history entries (with nil profile) to default profile to avoid cross-profile leakage
         self.migrateUnassignedDataToDefaultProfile()
@@ -694,14 +707,17 @@ class BrowserManager: ObservableObject {
         }
         sidebarWidth = width
         savedSidebarWidth = width
+        sidebarContentWidth = max(width - 16, 0)
     }
-    
+
     func updateSidebarWidth(_ width: CGFloat, for windowState: BrowserWindowState) {
         windowState.sidebarWidth = width
         windowState.savedSidebarWidth = width
+        windowState.sidebarContentWidth = max(width - 16, 0)
         if activeWindowState?.id == windowState.id {
             sidebarWidth = width
             savedSidebarWidth = width
+            sidebarContentWidth = max(width - 16, 0)
         }
     }
     
@@ -717,29 +733,35 @@ class BrowserManager: ObservableObject {
                 isSidebarVisible.toggle()
                 if isSidebarVisible {
                     sidebarWidth = savedSidebarWidth
+                    sidebarContentWidth = max(savedSidebarWidth - 16, 0)
                 } else {
                     savedSidebarWidth = sidebarWidth
                     sidebarWidth = 0
+                    sidebarContentWidth = 0
                 }
             }
             saveSidebarSettings()
         }
     }
-    
+
     func toggleSidebar(for windowState: BrowserWindowState) {
         withAnimation(.easeInOut(duration: 0.1)) {
             windowState.isSidebarVisible.toggle()
             if windowState.isSidebarVisible {
-                windowState.sidebarWidth = windowState.savedSidebarWidth
+                let restoredWidth = windowState.savedSidebarWidth
+                windowState.sidebarWidth = restoredWidth
+                windowState.sidebarContentWidth = max(restoredWidth - 16, 0)
             } else {
                 windowState.savedSidebarWidth = max(windowState.sidebarWidth, 0)
                 windowState.sidebarWidth = 0
+                windowState.sidebarContentWidth = 0
             }
         }
         if activeWindowState?.id == windowState.id {
             isSidebarVisible = windowState.isSidebarVisible
             sidebarWidth = windowState.sidebarWidth
             savedSidebarWidth = windowState.savedSidebarWidth
+            sidebarContentWidth = windowState.sidebarContentWidth
         }
         saveSidebarSettings()
     }
@@ -1076,6 +1098,7 @@ class BrowserManager: ObservableObject {
             savedSidebarWidth = savedWidth
             sidebarWidth = savedVisibility ? savedWidth : 0
         }
+        sidebarContentWidth = max(sidebarWidth - 16, 0)
         isSidebarVisible = savedVisibility
     }
 
@@ -1687,6 +1710,7 @@ class BrowserManager: ObservableObject {
     func registerWindowState(_ windowState: BrowserWindowState) {
         // Initialize window state with current global state for backward compatibility
         windowState.sidebarWidth = sidebarWidth
+        windowState.sidebarContentWidth = max(sidebarWidth - 16, 0)
         windowState.isSidebarVisible = isSidebarVisible
         windowState.savedSidebarWidth = savedSidebarWidth
         windowState.isCommandPaletteVisible = false
@@ -1694,6 +1718,13 @@ class BrowserManager: ObservableObject {
         windowState.didCopyURL = false
         windowState.commandPalettePrefilledText = ""
         windowState.shouldNavigateCurrentTab = false
+
+        // Set the NSWindow reference for keyboard shortcuts
+        if let window = NSApplication.shared.windows.first(where: { $0.contentView?.subviews.contains(where: {
+            ($0 as? NSHostingView<ContentView>) != nil
+        }) ?? false }) {
+            windowState.window = window
+        }
         windowState.urlBarFrame = urlBarFrame
         windowState.activeGradient = tabManager.currentSpace?.gradient ?? .default
         windowState.currentProfileId = currentProfile?.id
@@ -1849,6 +1880,7 @@ class BrowserManager: ObservableObject {
         activeWindowState = windowState
         sidebarWidth = windowState.sidebarWidth
         savedSidebarWidth = windowState.savedSidebarWidth
+        sidebarContentWidth = windowState.sidebarContentWidth
         isSidebarVisible = windowState.isSidebarVisible
         urlBarFrame = windowState.urlBarFrame
         gradientColorManager.setImmediate(windowState.activeGradient)
@@ -1942,17 +1974,34 @@ class BrowserManager: ObservableObject {
     
     /// Get tabs that should be displayed in a specific window
     func tabsForDisplay(in windowState: BrowserWindowState) -> [Tab] {
+        print("🔍 tabsForDisplay called for window \(windowState.id.uuidString.prefix(8))...")
+
         // Get tabs for the window's current space
         let currentSpace = windowState.currentSpaceId.flatMap { id in
             tabManager.spaces.first(where: { $0.id == id })
         }
+
+        print("   - windowState.currentSpaceId: \(windowState.currentSpaceId?.uuidString ?? "nil")")
+        print("   - resolved currentSpace: \(currentSpace?.name ?? "nil") (id: \(currentSpace?.id.uuidString.prefix(8) ?? "nil"))")
 
         let profileId = windowState.currentProfileId ?? currentSpace?.profileId ?? currentProfile?.id
         let essentials = profileId.flatMap { tabManager.essentialTabs(for: $0) } ?? []
         let spacePinned = currentSpace.map { tabManager.spacePinnedTabs(for: $0.id) } ?? []
         let regularTabs = currentSpace.map { tabManager.tabs(in: $0) } ?? []
 
-        return essentials + spacePinned + regularTabs
+        print("   - essentials: \(essentials.count) tabs")
+        print("   - spacePinned: \(spacePinned.count) tabs")
+        print("   - regularTabs: \(regularTabs.count) tabs")
+
+        print("   - spacePinned tabs details:")
+        for tab in spacePinned {
+            print("     * \(tab.name) (id: \(tab.id.uuidString.prefix(8))..., folderId: \(tab.folderId?.uuidString.prefix(8) ?? "nil"))")
+        }
+
+        let result = essentials + spacePinned + regularTabs
+        print("   - TOTAL tabsForDisplay: \(result.count)")
+
+        return result
     }
     
     /// Check if a tab is frozen (being displayed in another window)
@@ -2025,6 +2074,7 @@ class BrowserManager: ObservableObject {
             // CRITICAL: Enable HTML5 Fullscreen API
             configuration.preferences.isElementFullscreenEnabled = true
             
+            configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
         }
         
         // Create the new web view
@@ -2068,7 +2118,9 @@ class BrowserManager: ObservableObject {
         print("🪟 [BrowserManager] Created new web view for tab \(tab.name) in window \(windowId)")
         return newWebView
     }
+
     
+
     /// Synchronize a tab's state across all windows that are displaying it
     func syncTabAcrossWindows(_ tabId: UUID) {
         // Prevent recursive sync calls
@@ -2256,5 +2308,180 @@ class BrowserManager: ObservableObject {
         }
         
         // Note: No need to clean up tab display owners since they're no longer used
+    }
+    
+    /// Import Data from arc
+    func importArcData() {
+        Task {
+            let result = await importManager.importArcSidebarData()
+            
+            for space in result.spaces {
+                self.tabManager.createSpace(name: space.title, icon: space.icon ?? "person")
+                
+                guard let createdSpace = self.tabManager.spaces.first(where: { $0.name == space.title }) else {
+                    continue
+                }
+                
+                for tab in space.tabs {
+                    self.tabManager.createNewTab(url: tab.url, in: createdSpace)
+                }
+            }
+            
+            for topTab in result.topTabs {
+                let tab = self.tabManager.createNewTab(url: topTab.url, in: self.tabManager.spaces.first!)
+                self.tabManager.addToEssentials(tab)
+            }
+        }
+    }
+
+    // MARK: - Keyboard Shortcut Support Methods
+
+    /// Select the next tab in the active window
+    func selectNextTabInActiveWindow() {
+        guard let activeWindow = activeWindowState else { return }
+        let currentTabs = tabsForDisplay(in: activeWindow)
+        guard let currentTab = currentTab(for: activeWindow),
+              let currentIndex = currentTabs.firstIndex(where: { $0.id == currentTab.id }) else { return }
+
+        let nextIndex = (currentIndex + 1) % currentTabs.count
+        if let nextTab = currentTabs[safe: nextIndex] {
+            selectTab(nextTab, in: activeWindow)
+        }
+    }
+
+    /// Select the previous tab in the active window
+    func selectPreviousTabInActiveWindow() {
+        guard let activeWindow = activeWindowState else { return }
+        let currentTabs = tabsForDisplay(in: activeWindow)
+        guard let currentTab = currentTab(for: activeWindow),
+              let currentIndex = currentTabs.firstIndex(where: { $0.id == currentTab.id }) else { return }
+
+        let previousIndex = currentIndex > 0 ? currentIndex - 1 : currentTabs.count - 1
+        if let previousTab = currentTabs[safe: previousIndex] {
+            selectTab(previousTab, in: activeWindow)
+        }
+    }
+
+    /// Select tab by index in the active window
+    func selectTabByIndexInActiveWindow(_ index: Int) {
+        guard let activeWindow = activeWindowState else { return }
+        let currentTabs = tabsForDisplay(in: activeWindow)
+        guard currentTabs.indices.contains(index) else { return }
+
+        let tab = currentTabs[index]
+        selectTab(tab, in: activeWindow)
+    }
+
+    /// Select the last tab in the active window
+    func selectLastTabInActiveWindow() {
+        guard let activeWindow = activeWindowState else { return }
+        let currentTabs = tabsForDisplay(in: activeWindow)
+        guard let lastTab = currentTabs.last else { return }
+
+        selectTab(lastTab, in: activeWindow)
+    }
+
+    /// Select the next space in the active window
+    func selectNextSpaceInActiveWindow() {
+        guard let activeWindow = activeWindowState,
+              let currentSpaceId = activeWindow.currentSpaceId,
+              let currentSpaceIndex = tabManager.spaces.firstIndex(where: { $0.id == currentSpaceId }) else { return }
+
+        let nextIndex = (currentSpaceIndex + 1) % tabManager.spaces.count
+        if let nextSpace = tabManager.spaces[safe: nextIndex] {
+            setActiveSpace(nextSpace, in: activeWindow)
+        }
+    }
+
+    /// Select the previous space in the active window
+    func selectPreviousSpaceInActiveWindow() {
+        guard let activeWindow = activeWindowState,
+              let currentSpaceId = activeWindow.currentSpaceId,
+              let currentSpaceIndex = tabManager.spaces.firstIndex(where: { $0.id == currentSpaceId }) else { return }
+
+        let previousIndex = currentSpaceIndex > 0 ? currentSpaceIndex - 1 : tabManager.spaces.count - 1
+        if let previousSpace = tabManager.spaces[safe: previousIndex] {
+            setActiveSpace(previousSpace, in: activeWindow)
+        }
+    }
+
+    /// Create a new window
+    func createNewWindow() {
+        // This is handled by the Command+N shortcut in NookApp.swift
+        // For consistency, we'll trigger the same menu action
+        // Create new window using the same approach as NookApp.swift
+        let newWindow = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        newWindow.contentView = NSHostingView(rootView: ContentView()
+            .background(BackgroundWindowModifier())
+            .ignoresSafeArea(.all)
+            .environmentObject(self))
+        newWindow.title = "Nook"
+        newWindow.minSize = NSSize(width: 470, height: 382)
+        newWindow.contentMinSize = NSSize(width: 470, height: 382)
+        newWindow.center()
+        newWindow.makeKeyAndOrderFront(nil)
+    }
+
+    /// Close the active window
+    func closeActiveWindow() {
+        guard let activeWindow = activeWindowState?.window else { return }
+        activeWindow.close()
+    }
+
+    /// Toggle full screen for the active window
+    func toggleFullScreenForActiveWindow() {
+        guard let activeWindow = activeWindowState?.window else { return }
+        activeWindow.toggleFullScreen(nil)
+    }
+
+    /// Show downloads (placeholder implementation)
+    func showDownloads() {
+        // TODO: Implement downloads UI
+        openCommandPaletteWithCurrentURL()
+    }
+
+    /// Show history (placeholder implementation)
+    func showHistory() {
+        // TODO: Implement history UI
+        openCommandPaletteWithCurrentURL()
+    }
+
+    // MARK: - Tab Closure Undo Notification
+
+    func showTabClosureToast(tabCount: Int) {
+        tabClosureToastCount = tabCount
+        showTabClosureToast = true
+
+        // Auto-hide the toast after 3 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            self.hideTabClosureToast()
+        }
+    }
+
+    func hideTabClosureToast() {
+        showTabClosureToast = false
+        tabClosureToastCount = 0
+    }
+
+    func undoCloseTab() {
+        tabManager.undoCloseTab()
+    }
+
+    /// Expand all folders in the sidebar
+    func expandAllFoldersInSidebar() {
+        // TODO: Implement folder expansion
+        // This would need to be handled by the sidebar component
+        toggleSidebar()
+    }
+}
+
+extension Array {
+    subscript(safe index: Int) -> Element? {
+        return indices.contains(index) ? self[index] : nil
     }
 }

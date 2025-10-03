@@ -1,15 +1,6 @@
 {
-  "originHash" : "f66a26003fee5b05442420b3ea7f47be0643bc9c28027b21b2c27b454c74bdf3",
+  "originHash" : "ccaf047e1899acecebb40aabe971bd25c6b6afd753c4059a74ac1f246662d56f",
   "pins" : [
-    {
-      "identity" : "biguipaging",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/notsobigcompany/BigUIPaging.git",
-      "state" : {
-        "revision" : "40fa6e1683bd47b962e216c05377bfd1b8f760de",
-        "version" : "0.0.3"
-      }
-    },
     {
       "identity" : "faviconfinder",
       "kind" : "remoteSourceControl",
@@ -20,21 +11,21 @@
       }
     },
     {
+      "identity" : "sparkle",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/sparkle-project/Sparkle",
+      "state" : {
+        "revision" : "9a1d2a19d3595fcf8d9c447173f9a1687b3dcadb",
+        "version" : "2.8.0"
+      }
+    },
+    {
       "identity" : "swiftsoup",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/scinfu/SwiftSoup.git",
       "state" : {
         "revision" : "a81b1a5ac933dee8c6cfccf05d5ffcc5eb8c7ec4",
         "version" : "2.10.0"
-      }
-    },
-    {
-      "identity" : "swiftuipager",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/fermoya/SwiftUIPager.git",
-      "state" : {
-        "revision" : "4ddc04c801aac143090bb14cf26603a3bf9c74cb",
-        "version" : "2.5.0"
       }
     }
   ],

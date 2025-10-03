@@ -183,6 +183,27 @@ struct GeneralSettingsView: View {
                             }
                         }
                     }
+                    
+                    SettingsSectionCard(
+                        title: "Nook",
+                        subtitle: "General Nook settings"
+                    ) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Toggle(
+                                isOn: $browserManager.settingsManager
+                                    .askBeforeQuit
+                            ) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Ask Before Quitting")
+                                    Text(
+                                        "Warn before quitting Nook"
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+                            }.frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
 
                     SettingsSectionCard(
                         title: "Search",
@@ -1019,12 +1040,233 @@ private struct MigrationControls: View {
 }
 
 struct ShortcutsSettingsView: View {
+    @EnvironmentObject var browserManager: BrowserManager
+    @State private var searchText = ""
+    @State private var selectedCategory: ShortcutCategory? = nil
+
+    private var shortcutManager: KeyboardShortcutManager {
+        browserManager.settingsManager.keyboardShortcutManager
+    }
+
+    private var filteredShortcuts: [KeyboardShortcut] {
+        var filtered = shortcutManager.shortcuts
+
+        // Filter by category
+        if let category = selectedCategory {
+            filtered = filtered.filter { $0.action.category == category }
+        }
+
+        // Filter by search text
+        if !searchText.isEmpty {
+            filtered = filtered.filter { shortcut in
+                shortcut.action.displayName.localizedCaseInsensitiveContains(searchText)
+            }
+        }
+
+        // Sort by category and display name
+        return filtered.sorted {
+            if $0.action.category != $1.action.category {
+                return $0.action.category.rawValue < $1.action.category.rawValue
+            }
+            return $0.action.displayName < $1.action.displayName
+        }
+    }
+
+    private var shortcutsByCategory: [ShortcutCategory: [KeyboardShortcut]] {
+        Dictionary(grouping: filteredShortcuts, by: { $0.action.category })
+    }
+
     var body: some View {
-        SettingsPlaceholderView(
-            title: "Shortcuts",
-            subtitle: "Keyboard and quick actions",
-            icon: "keyboard"
-        )
+        VStack(alignment: .leading, spacing: 16) {
+            // Header with search and reset
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Keyboard Shortcuts")
+                        .font(.title)
+                        .fontWeight(.bold)
+                    Text("Customize keyboard shortcuts for faster navigation")
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Reset to Defaults") {
+                    shortcutManager.resetToDefaults()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+
+            Divider().opacity(0.4)
+
+            // Search and filter controls
+            HStack(spacing: 12) {
+                TextField("Search shortcuts...", text: $searchText)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 240)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        CategoryFilterChip(
+                            title: "All",
+                            icon: nil,
+                            isSelected: selectedCategory == nil,
+                            onTap: { selectedCategory = nil }
+                        )
+                        ForEach(ShortcutCategory.allCases, id: \.self) { category in
+                            CategoryFilterChip(
+                                title: category.displayName,
+                                icon: category.icon,
+                                isSelected: selectedCategory == category,
+                                onTap: { selectedCategory = category }
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                }
+            }
+
+            Divider().opacity(0.4)
+
+            // Shortcuts list
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    ForEach(ShortcutCategory.allCases, id: \.self) { category in
+                        if let categoryShortcuts = shortcutsByCategory[category], !categoryShortcuts.isEmpty {
+                            CategorySection(
+                                category: category,
+                                shortcuts: categoryShortcuts,
+                                shortcutManager: shortcutManager
+                            )
+                        }
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+        }
+        .padding()
+    }
+}
+
+// MARK: - Category Section
+private struct CategorySection: View {
+    let category: ShortcutCategory
+    let shortcuts: [KeyboardShortcut]
+    @ObservedObject var shortcutManager: KeyboardShortcutManager
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label(category.displayName, systemImage: category.icon)
+                    .font(.headline)
+                Spacer()
+            }
+
+            VStack(spacing: 8) {
+                ForEach(shortcuts, id: \.id) { shortcut in
+                    ShortcutRowView(
+                        shortcut: shortcut,
+                        shortcutManager: shortcutManager
+                    )
+                }
+            }
+        }
+        .padding(.horizontal, 4)
+    }
+}
+
+// MARK: - Shortcut Row
+private struct ShortcutRowView: View {
+    let shortcut: KeyboardShortcut
+    @ObservedObject var shortcutManager: KeyboardShortcutManager
+    @State private var localKeyCombination: KeyCombination
+
+    init(shortcut: KeyboardShortcut, shortcutManager: KeyboardShortcutManager) {
+        self.shortcut = shortcut
+        self.shortcutManager = shortcutManager
+        self._localKeyCombination = State(initialValue: shortcut.keyCombination)
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // Action description
+            VStack(alignment: .leading, spacing: 2) {
+                Text(shortcut.action.displayName)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                Text(shortcut.action.category.displayName)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            // Shortcut recorder
+            if shortcut.isCustomizable {
+                ShortcutRecorderView(
+                    keyCombination: $localKeyCombination,
+                    action: shortcut.action,
+                    shortcutManager: shortcutManager,
+                    onRecordingComplete: {
+                        updateShortcut()
+                    }
+                )
+            } else {
+                Text(shortcut.keyCombination.displayString)
+                    .font(.system(.body, design: .monospaced))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color(.controlBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+
+            // Enable toggle
+            if shortcut.isCustomizable {
+                Toggle("", isOn: Binding(
+                    get: { shortcut.isEnabled },
+                    set: { newValue in
+                        shortcutManager.toggleShortcut(action: shortcut.action, isEnabled: newValue)
+                    }
+                ))
+                .toggleStyle(.switch)
+                .labelsHidden()
+            }
+        }
+        .padding(12)
+        .background(Color(.controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func updateShortcut() {
+        shortcutManager.updateShortcut(action: shortcut.action, keyCombination: localKeyCombination)
+    }
+}
+
+// MARK: - Category Filter Chip
+private struct CategoryFilterChip: View {
+    let title: String
+    let icon: String?
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 4) {
+                if let icon = icon {
+                    Image(systemName: icon)
+                        .font(.caption)
+                }
+                Text(title)
+                    .font(.caption)
+                    .fontWeight(.medium)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(isSelected ? Color.accentColor : Color(.controlBackgroundColor))
+            )
+            .foregroundColor(isSelected ? .white : .primary)
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -1189,12 +1431,37 @@ struct ExtensionRowView: View {
 }
 
 struct AdvancedSettingsView: View {
+    @EnvironmentObject var browserManager: BrowserManager
+
     var body: some View {
-        SettingsPlaceholderView(
-            title: "Advanced",
-            subtitle: "Power features and diagnostics",
-            icon: "wrench.and.screwdriver"
-        )
+        VStack(alignment: .leading, spacing: 16) {
+            #if DEBUG
+            SettingsSectionCard(
+                title: "Debug Options",
+                subtitle: "Development and debugging features"
+            ) {
+                Toggle(
+                    isOn: $browserManager.settingsManager.debugToggleUpdateNotification
+                ) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Show Update Notification")
+                        Text(
+                            "Force display the sidebar update notification for appearance debugging"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            #endif
+
+            SettingsPlaceholderView(
+                title: "Advanced",
+                subtitle: "Power features and diagnostics",
+                icon: "wrench.and.screwdriver"
+            )
+        }
+        .padding()
     }
 }
 

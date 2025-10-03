@@ -19,11 +19,11 @@ struct SpacesListItem: View {
     private var currentSpaceID: UUID? {
         windowState.currentSpaceId
     }
-    
-    private var cellSize: CGFloat { compact && !isActive ? 16 : 24 }
+
+    private var cellSize: CGFloat { compact && !isActive ? 16 : 32 }
     private let dotVisualSize: CGFloat = 6
     private let cornerRadius: CGFloat = 6
-    
+
     var body: some View {
         Button {
             browserManager.setActiveSpace(space, in: windowState)
@@ -31,20 +31,25 @@ struct SpacesListItem: View {
             ZStack {
                 if compact && !isActive {
                     Circle()
-                        .fill(AppColors.textTertiary)
+                        .fill(iconColor)
                         .frame(width: dotVisualSize, height: dotVisualSize)
                 } else {
                     if isEmoji(space.icon) {
                         // Fixed inner content size to avoid glyph cropping
                         Text(space.icon)
                             .font(.system(size: 14))
-                            .frame(width: 20, height: 20)
+                            .frame(width: 16, height: 16)
                     } else {
                         Image(systemName: space.icon)
                             .font(.system(size: 14))
-                            .foregroundStyle(AppColors.textSecondary)
+                            .foregroundStyle(iconColor)
                             .frame(width: 20, height: 20)
-                            .contentTransition(.symbolEffect(.replace.upUp.byLayer, options: .nonRepeating))
+                            .contentTransition(
+                                .symbolEffect(
+                                    .replace.upUp.byLayer,
+                                    options: .nonRepeating
+                                )
+                            )
                     }
                 }
             }
@@ -54,7 +59,9 @@ struct SpacesListItem: View {
         .buttonStyle(.plain)
         .background(
             RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(isHovering ? AppColors.controlBackgroundHover : Color.clear)
+                .fill(
+                    backgroundColor
+                )
         )
         .frame(width: cellSize, height: cellSize)
         .layoutPriority(isActive ? 1 : 0)
@@ -70,7 +77,9 @@ struct SpacesListItem: View {
                 .focused($emojiFieldFocused)
                 .onChange(of: selectedEmoji) { _, newValue in
                     if !newValue.isEmpty {
-                        space.icon = String(newValue.last!)
+                        // Safely unwrap the last character
+                        guard let lastChar = newValue.last else { return }
+                        space.icon = String(lastChar)
                         browserManager.tabManager.persistSnapshot()
                         selectedEmoji = ""
                     }
@@ -78,13 +87,18 @@ struct SpacesListItem: View {
         )
         .contextMenu {
             // Profile assignment
-            let currentName = resolvedProfileName(for: space.profileId) ?? browserManager.profileManager.profiles.first?.name ?? "Default"
+            let currentName =
+                resolvedProfileName(for: space.profileId) ?? browserManager
+                .profileManager.profiles.first?.name ?? "Default"
             Text("Current Profile: \(currentName)")
                 .foregroundStyle(.secondary)
             Divider()
             ProfilePickerView(
                 selectedProfileId: Binding(
-                    get: { space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID() },
+                    get: {
+                        space.profileId ?? browserManager.profileManager
+                            .profiles.first?.id ?? UUID()
+                    },
                     set: { assignProfile($0) }
                 ),
                 onSelect: { _ in },
@@ -99,20 +113,33 @@ struct SpacesListItem: View {
             }
         }
     }
-    
+
+    private var backgroundColor: Color {
+        if isHovering {
+            return browserManager.gradientColorManager.isDark
+                ? AppColors.spaceTabHoverDark : AppColors.spaceTabHoverLight
+        } else {
+            return Color.clear
+        }
+    }
+    private var iconColor: Color {
+        return browserManager.gradientColorManager.isDark
+            ? AppColors.spaceTabTextDark : AppColors.spaceTabTextLight
+    }
+
     private func changeIcon() {
         let emojis = ["🚀", "💡", "🎯", "⚡️", "🔥", "🌟", "💼", "🏠", "🎨", "📱"]
         let randomEmoji = emojis.randomElement() ?? "🚀"
-        
+
         space.icon = randomEmoji
         browserManager.tabManager.persistSnapshot()
     }
-    
+
     private func isEmoji(_ string: String) -> Bool {
         return string.unicodeScalars.contains { scalar in
-            (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF) ||
-            (scalar.value >= 0x2600 && scalar.value <= 0x26FF) ||
-            (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
+            (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF)
+                || (scalar.value >= 0x2600 && scalar.value <= 0x26FF)
+                || (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
         }
     }
 
@@ -122,6 +149,8 @@ struct SpacesListItem: View {
 
     private func resolvedProfileName(for id: UUID?) -> String? {
         guard let id else { return nil }
-        return browserManager.profileManager.profiles.first(where: { $0.id == id })?.name
+        return browserManager.profileManager.profiles.first(where: {
+            $0.id == id
+        })?.name
     }
 }

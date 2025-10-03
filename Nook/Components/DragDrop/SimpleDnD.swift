@@ -16,6 +16,7 @@ enum SidebarTargetSection: Equatable {
     case essentials
     case spacePinned(UUID)    // spaceId
     case spaceRegular(UUID)   // spaceId
+    case folder(UUID)          // folderId
 }
 
 // MARK: - Helpers
@@ -29,6 +30,9 @@ private func containerFor(tab: Tab, tabManager: TabManager) -> (TabDragManager.D
     if tab.spaceId == nil {
         // Essentials (global pinned)
         return (.essentials, tab.index, nil)
+    } else if let folderId = tab.folderId {
+        // Tab is in a folder
+        return (.folder(folderId), tab.index, tab.spaceId)
     } else if let sid = tab.spaceId {
         // Distinguish space-pinned vs regular by membership
         let pinned = tabManager.spacePinnedTabs(for: sid)
@@ -49,6 +53,8 @@ private func targetContainer(from section: SidebarTargetSection) -> (TabDragMana
         return (.spacePinned(sid), sid)
     case .spaceRegular(let sid):
         return (.spaceRegular(sid), sid)
+    case .folder(let folderId):
+        return (.folder(folderId), nil)
     }
 }
 
@@ -121,6 +127,30 @@ struct SidebarSectionDropDelegateSimple: DropDelegate {
     @Binding var draggedItem: UUID?
     let targetSection: SidebarTargetSection
     let tabManager: TabManager
+    let targetIndex: (() -> Int)?
+    private let onDropEntered: (() -> Void)?
+    private let onDropCompleted: (() -> Void)?
+    private let onDropExited: (() -> Void)?
+
+    init(
+        itemsCount: @escaping () -> Int,
+        draggedItem: Binding<UUID?>,
+        targetSection: SidebarTargetSection,
+        tabManager: TabManager,
+        targetIndex: (() -> Int)? = nil,
+        onDropEntered: (() -> Void)? = nil,
+        onDropCompleted: (() -> Void)? = nil,
+        onDropExited: (() -> Void)? = nil
+    ) {
+        self.itemsCount = itemsCount
+        self._draggedItem = draggedItem
+        self.targetSection = targetSection
+        self.tabManager = tabManager
+        self.targetIndex = targetIndex
+        self.onDropEntered = onDropEntered
+        self.onDropCompleted = onDropCompleted
+        self.onDropExited = onDropExited
+    }
 
     func dropEntered(info: DropInfo) {
         guard let provider = info.itemProviders(for: [.text]).first else { return }
@@ -134,9 +164,15 @@ struct SidebarSectionDropDelegateSimple: DropDelegate {
                 let all = tabManager.allTabs()
                 guard let from = all.first(where: { $0.id == uuid }) else { return }
 
+                if case .folder = self.targetSection {
+                    self.draggedItem = uuid
+                    self.onDropEntered?()
+                    return
+                }
+
                 let (fromContainer, fromIndex, _) = containerFor(tab: from, tabManager: tabManager)
                 let (toContainer, toSpace) = targetContainer(from: self.targetSection)
-                let toIndex = max(0, self.itemsCount())
+                let toIndex = max(0, self.targetIndex?() ?? self.itemsCount())
 
                 let op = DragOperation(
                     tab: from,
@@ -151,6 +187,7 @@ struct SidebarSectionDropDelegateSimple: DropDelegate {
                 }
                 self.draggedItem = uuid
                 haptic(.alignment)
+                self.onDropCompleted?()
             }
         }
     }
@@ -162,14 +199,69 @@ struct SidebarSectionDropDelegateSimple: DropDelegate {
     }
 
     func dropExited(info: DropInfo) {
-        draggedItem = nil
-        NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
+        finishDrop()
     }
 
     func performDrop(info: DropInfo) -> Bool {
-        draggedItem = nil
-        NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
+        if case .folder = targetSection {
+            handleFolderDrop(info: info)
+        } else {
+            finishDrop()
+        }
         return true
+    }
+
+    private func handleFolderDrop(info: DropInfo) {
+        guard let provider = info.itemProviders(for: [.text]).first else {
+            finishDrop()
+            return
+        }
+        provider.loadObject(ofClass: NSString.self) { object, _ in
+            guard
+                let string = object as? String,
+                let uuid = UUID(uuidString: string)
+            else {
+                DispatchQueue.main.async {
+                    self.finishDrop()
+                }
+                return
+            }
+
+            DispatchQueue.main.async {
+                let all = tabManager.allTabs()
+                guard let from = all.first(where: { $0.id == uuid }) else {
+                    self.finishDrop()
+                    return
+                }
+
+                let (fromContainer, fromIndex, _) = containerFor(tab: from, tabManager: tabManager)
+                let (toContainer, toSpace) = targetContainer(from: self.targetSection)
+                let toIndex = max(0, self.targetIndex?() ?? self.itemsCount())
+
+                let op = DragOperation(
+                    tab: from,
+                    fromContainer: fromContainer,
+                    fromIndex: max(fromIndex, 0),
+                    toContainer: toContainer,
+                    toIndex: toIndex,
+                    toSpaceId: toSpace
+                )
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    tabManager.handleDragOperation(op)
+                }
+                haptic(.alignment)
+                self.onDropCompleted?()
+                self.finishDrop()
+            }
+        }
+    }
+
+    private func finishDrop() {
+        DispatchQueue.main.async {
+            self.onDropExited?()
+            self.draggedItem = nil
+            NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
+        }
     }
 }
 

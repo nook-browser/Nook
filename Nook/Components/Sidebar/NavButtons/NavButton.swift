@@ -8,37 +8,90 @@
 import SwiftUI
 
 struct NavButton: View {
+    @EnvironmentObject var browserManager: BrowserManager
     var iconName: String
     var disabled: Bool
     var action: (() -> Void)?
+    var onLongPress: (() -> Void)?
     @State private var isHovering: Bool = false
-    
-    init(iconName: String, disabled: Bool = false, action: (() -> Void)? = nil) {
+    @State private var isPressing: Bool = false
+    @State private var longPressTimer: Timer?
+
+    init(iconName: String, disabled: Bool = false, action: (() -> Void)? = nil, onLongPress: (() -> Void)? = nil) {
         self.iconName = iconName
         self.action = action
         self.disabled = disabled
+        self.onLongPress = onLongPress
     }
     
     var body: some View {
         Button {
             action?()
         } label: {
-            Image(systemName: iconName)
-                .font(.system(size: 16))
-                .foregroundStyle(disabled ? AppColors.textQuaternary : AppColors.textSecondary)
-                .padding(4)
-                .contentTransition(.symbolEffect(.replace.upUp.byLayer, options: .nonRepeating))
+            ZStack {
+                // Background that fills entire clickable area (32x32 to match design)
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(backgroundColor)
+                    .frame(width: 32, height: 32)
+
+                // Icon centered in the button
+                Image(systemName: iconName)
+                    .font(.system(size: 16))
+                    .foregroundStyle(iconColor)
+            }
         }
         .buttonStyle(.plain)
         .disabled(disabled)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(isHovering && !disabled ? AppColors.controlBackgroundHover : Color.clear)
-                .frame(width: 24, height: 24) // Fixed 20x20 square
-                .animation(.easeInOut(duration: 0.15), value: isHovering)
-        )
+        .contentTransition(.symbolEffect(.replace.upUp.byLayer, options: .nonRepeating))
+        .scaleEffect(isPressing && !disabled ? 0.95 : 1.0)
+        .animation(.easeInOut(duration: 0.1), value: isPressing)
+        .animation(.easeInOut(duration: 0.15), value: isHovering)
         .onHover { hovering in
             isHovering = hovering
+        }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    if !disabled && !isPressing {
+                        isPressing = true
+                        startLongPressTimer()
+                    }
+                }
+                .onEnded { _ in
+                    if isPressing {
+                        isPressing = false
+                        cancelLongPressTimer()
+                    }
+                }
+        )
+    }
+
+    private func startLongPressTimer() {
+        longPressTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { _ in
+            if isPressing {
+                onLongPress?()
+                isPressing = false
+            }
+        }
+    }
+
+    private func cancelLongPressTimer() {
+        longPressTimer?.invalidate()
+        longPressTimer = nil
+    }
+    
+    private var backgroundColor: Color {
+        if (isHovering || isPressing) && !disabled {
+            return browserManager.gradientColorManager.isDark ? AppColors.iconHoverDark : AppColors.iconHoverLight
+        } else {
+            return Color.clear
+        }
+    }
+    private var iconColor: Color {
+        if disabled {
+            return browserManager.gradientColorManager.isDark ? AppColors.iconDisabledDark : AppColors.iconDisabledLight
+        } else {
+            return browserManager.gradientColorManager.isDark ? AppColors.iconActiveDark : AppColors.iconActiveLight
         }
     }
 }

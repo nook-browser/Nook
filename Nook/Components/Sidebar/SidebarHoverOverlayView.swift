@@ -36,26 +36,29 @@ struct SidebarHoverOverlayView: View {
                         }
                         NSCursor.arrow.set()
                     }
-                // Overlay sidebar inside a rounded, translucent container
-                SidebarView(forceVisible: true, forcedWidth: overlayWidth)
-                    .environmentObject(browserManager)
-                    .environmentObject(windowState)
-                    .frame(width: overlayWidth)
-                    .frame(maxHeight: .infinity)
-                    .background(BlurEffectView(material: browserManager.settingsManager.currentMaterial, state: .active))
-                    .mask(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .stroke(.white.opacity(0.12), lineWidth: 1)
-                    )
-                    // Force arrow cursor for the entire overlay region
-                    .alwaysArrowCursor()
-                    .shadow(color: Color.black.opacity(0.14), radius: 14, x: 0, y: 0)
-                    .padding(.leading, horizontalInset)
-                    .padding(.vertical, verticalInset)
-                    .offset(x: hoverManager.isOverlayVisible ? 0 : -(overlayWidth + horizontalInset + 16))
-                    .animation(.easeInOut(duration: 0.2), value: hoverManager.isOverlayVisible)
-                    .allowsHitTesting(true)
+
+                if hoverManager.isOverlayVisible {
+                    SidebarView(forceVisible: true, forcedWidth: overlayWidth)
+                        .environmentObject(browserManager)
+                        .environmentObject(windowState)
+                        .frame(width: overlayWidth)
+                        .frame(maxHeight: .infinity)
+                        .background(BlurEffectView(material: browserManager.settingsManager.currentMaterial, state: .active))
+                        .mask(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                                .stroke(.white.opacity(0.12), lineWidth: 1)
+                        )
+                        // Force arrow cursor for the entire overlay region
+                        .alwaysArrowCursor()
+                        .shadow(color: Color.black.opacity(0.14), radius: 14, x: 0, y: 0)
+                        .padding(.leading, horizontalInset)
+                        .padding(.vertical, verticalInset)
+                        .transition(
+                            .move(edge: .leading)
+                                .combined(with: .opacity)
+                        )
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             // Container remains passive; only overlay/hotspot intercept

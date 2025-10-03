@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
-import BigUIPaging
+import Sparkle
 
 struct SidebarView: View {
     @EnvironmentObject var browserManager: BrowserManager
@@ -105,6 +105,30 @@ struct SidebarView: View {
     var body: some View {
         if windowState.isSidebarVisible || forceVisible {
             sidebarContent
+                .contextMenu {
+                    Button {
+                        // TODO: Implement space icon change ouside of SpaceTitle
+                    } label: {
+                        Label("Change Space Icon", systemImage: "pencil")
+                    }
+
+                    Button {
+                        // TODO: Implement space renaming outside of SpaceTitle
+                    } label: {
+                        Label("Rename Space", systemImage: "face.smiling")
+                    }
+                    Button {
+                        browserManager.showGradientEditor()
+                    } label: {
+                        Label("Edit Theme Color", systemImage: "paintpalette")
+                    }
+                    Divider()
+                    Button(role: .destructive) {
+                        browserManager.tabManager.removeSpace(browserManager.tabManager.currentSpace!.id)
+                    } label: {
+                        Label("Delete Space", systemImage: "trash")
+                    }
+                }
         }
     }
 
@@ -144,7 +168,6 @@ struct SidebarView: View {
 
             ZStack {
                 spacesScrollView
-                    .padding(.horizontal, 8)
                     .zIndex(1)
 
                 // Bottom spacer for window dragging - overlay that doesn't compete for space
@@ -171,18 +194,29 @@ struct SidebarView: View {
                 }
             }
 
+            // Update notification overlay
+            SidebarUpdateNotification(downloadsMenuVisible: showDownloadsMenu)
+                .environmentObject(browserManager)
+                .environmentObject(windowState)
+                .environment(browserManager.settingsManager)
+                .padding(.horizontal, 8)
+                .padding(.bottom, 8)
+
             // MARK: - Bottom
             ZStack {
                 // Left side icons - anchored to left
                 HStack {
                     ZStack {
-                        NavButton(iconName: "archivebox") {
+                        NavButton(iconName: "archivebox", disabled: false, action: {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 windowState.isSidebarMenuVisible = true
-                                windowState.savedSidebarWidth = windowState.sidebarWidth
-                                windowState.sidebarWidth = 400
+                                let previousWidth = windowState.sidebarWidth
+                                windowState.savedSidebarWidth = previousWidth
+                                let newWidth: CGFloat = 400
+                                windowState.sidebarWidth = newWidth
+                                windowState.sidebarContentWidth = max(newWidth - 16, 0)
                             }
-                        }
+                        }, onLongPress: nil)
                         .onHover { isHovered in
                             isMenuButtonHovered = isHovered
                             if isHovered {
@@ -210,9 +244,9 @@ struct SidebarView: View {
                 HStack {
                     Spacer()
 
-                    NavButton(iconName: "plus") {
+                    NavButton(iconName: "plus", disabled: false, action: {
                         showSpaceCreationDialog()
-                    }
+                    }, onLongPress: nil)
                 }
             }
             .padding(.horizontal, 8)
@@ -227,7 +261,7 @@ struct SidebarView: View {
         let finalContent = ZStack {
                 if !windowState.isSidebarMenuVisible {
                     content
-                        .transition(.scale.combined(with: .opacity))
+                        .transition(.scale(scale: 0.9))
                 } else {
                     SidebarMenu()
                         .transition(.move(edge: .leading).combined(with: .opacity))
@@ -242,102 +276,94 @@ struct SidebarView: View {
         ZStack {
             spacesContent
         }
-        .transition(
-            .asymmetric(
-                insertion: .move(edge: .leading).combined(with: .opacity),
-                removal: .move(edge: .trailing).combined(with: .opacity)
-            )
-        )
     }
 
     private var spacesContent: some View {
         Group {
             if browserManager.tabManager.spaces.isEmpty {
-                // Empty state when no spaces exist
-                VStack(spacing: 16) {
-                    Image(systemName: "square.grid.2x2")
-                        .font(.system(size: 48))
-                        .foregroundColor(.secondary)
-                    VStack(spacing: 8) {
-                        Text("No Spaces")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                        Text("Create a space to start browsing")
-                            .font(.body)
-                            .foregroundColor(.secondary)
-                    }
-                    Button(action: showSpaceCreationDialog) {
-                        Label("Create Space", systemImage: "plus")
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-                .frame(width: effectiveWidth)
-                .padding()
+                emptyStateView
             } else {
-                // Use BigUIPaging PageView for space navigation
-                PageView(selection: $activeSpaceIndex) {
-                    ForEach(browserManager.tabManager.spaces.indices, id: \.self) { index in
-                        let space = browserManager.tabManager.spaces[index]
-                        VStack(spacing: 0) {
-                            SpaceView(
-                                space: space,
-                                isActive: windowState.currentSpaceId == space.id,
-                                width: availableContentWidth,
-                                onActivateTab: { browserManager.selectTab($0, in: windowState) },
-                                onCloseTab: { browserManager.tabManager.removeTab($0.id) },
-                                onPinTab: { browserManager.tabManager.pinTab($0) },
-                                onMoveTabUp: { browserManager.tabManager.moveTabUp($0.id) },
-                                onMoveTabDown: { browserManager.tabManager.moveTabDown($0.id) },
-                                onMuteTab: { $0.toggleMute() }
-                            )
-                            .environmentObject(browserManager)
-                            .environmentObject(windowState)
-                            .environmentObject(browserManager.splitManager)
-                        }
-                        .frame(maxWidth: availableContentWidth)
-                        .tag(index)
-                    }
-                }
-                .frame(maxWidth: effectiveWidth)
-                .pageViewStyle(.scroll)
-                .contentShape(Rectangle())
-                .id(activeTabRefreshTrigger)
-                .onChange(of: activeSpaceIndex) { _, newIndex in
-                    // BigUIPaging will handle the bounds checking automatically
-                    let space = browserManager.tabManager.spaces[newIndex]
-                    print("🎯 Page changed to space: \(space.name) (index: \(newIndex))")
+                spacesPageView
+            }
+        }
+    }
 
-                    // Trigger haptic feedback
-                    let impact = NSHapticFeedbackManager.defaultPerformer
-                    impact.perform(.alignment, performanceTime: .default)
+    private var emptyStateView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "square.grid.2x2")
+                .font(.system(size: 48))
+                .foregroundColor(.secondary)
+            VStack(spacing: 8) {
+                Text("No Spaces")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Text("Create a space to start browsing")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+            }
+            Button(action: showSpaceCreationDialog) {
+                Label("Create Space", systemImage: "plus")
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .frame(width: effectiveWidth)
+        .padding()
+    }
 
-                    // Activate the space - BigUIPaging ensures newIndex is always valid
-                    browserManager.setActiveSpace(space, in: windowState)
+    private var spacesPageView: some View {
+        let spaces = browserManager.tabManager.spaces
+        return PageView(selection: $activeSpaceIndex) {
+            ForEach(spaces.indices, id: \.self) { index in
+                if index >= 0 && index < spaces.count {
+                    makeSpaceView(for: spaces[index], index: index)
+                } else {
+                    EmptyView()
+                }
+            }
+        }
+        .frame(width: effectiveWidth)
+        .pageViewStyle(.scroll)
+        .contentShape(Rectangle())
+        .id(activeTabRefreshTrigger)
+        .onAppear {
+            // Initialize the selection
+            if let targetIndex = browserManager.tabManager.spaces.firstIndex(where: { $0.id == windowState.currentSpaceId }) {
+                activeSpaceIndex = targetIndex
+            }
+        }
+        .onChange(of: activeSpaceIndex) { _, newIndex in
+            // Add explicit bounds checking to prevent index out of range crashes
+            guard newIndex >= 0 && newIndex < browserManager.tabManager.spaces.count else {
+                print("⚠️ Invalid space index in onChange: \(newIndex), spaces count: \(browserManager.tabManager.spaces.count)")
+                return
+            }
+            let space = browserManager.tabManager.spaces[newIndex]
+            print("🎯 Page changed to space: \(space.name) (index: \(newIndex))")
 
-                    // Force hit testing refresh after a short delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        // This helps ensure proper hit testing after page transition
-                    }
-                }
-                .onAppear {
-                    // Initialize the selection
-                    if let targetIndex = browserManager.tabManager.spaces.firstIndex(where: { $0.id == windowState.currentSpaceId }) {
-                        activeSpaceIndex = targetIndex
-                    }
-                }
-                .onChange(of: windowState.currentSpaceId) { _, _ in
-                    // Update selection when space changes externally
-                    if let targetIndex = browserManager.tabManager.spaces.firstIndex(where: { $0.id == windowState.currentSpaceId }) {
-                        activeSpaceIndex = targetIndex
-                    }
-                }
-                .onChange(of: windowState.currentTabId) { _, _ in
-                    // Force PageView to recreate when active tab changes
-                    // This fixes hit testing issues after space/tab switches
-                    activeTabRefreshTrigger.toggle()
-                }
+            // Trigger haptic feedback
+            let impact = NSHapticFeedbackManager.defaultPerformer
+            impact.perform(.alignment, performanceTime: .default)
 
-                }
+            // Activate the space - BigUIPaging ensures newIndex is always valid
+            browserManager.setActiveSpace(space, in: windowState)
+
+            // Force hit testing refresh after a short delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                // This helps ensure proper hit testing after page transition
+            }
+        }
+        .onChange(of: windowState.currentSpaceId) { _, _ in
+            // Update selection when space changes externally
+            if let targetIndex = browserManager.tabManager.spaces.firstIndex(where: { $0.id == windowState.currentSpaceId }) {
+                activeSpaceIndex = targetIndex
+            }
+            // Force PageView to recreate when SPACE changes (not tab changes)
+            // This fixes hit testing issues after space switches while preserving scroll position
+            activeTabRefreshTrigger.toggle()
+        }
+        .onChange(of: windowState.sidebarContentWidth) { _, _ in
+            // Rebuild cached page views so width-sensitive content refreshes immediately
+            activeTabRefreshTrigger.toggle()
         }
     }
 
@@ -349,7 +375,6 @@ struct SidebarView: View {
                     SpaceView(
                         space: space,
                         isActive: windowState.currentSpaceId == space.id,
-                        width: effectiveWidth,
                         onActivateTab: {
                             browserManager.selectTab($0, in: windowState)
                         },
@@ -365,7 +390,7 @@ struct SidebarView: View {
                         },
                         onMuteTab: { $0.toggleMute() }
                     )
-                    .id(space.id)
+                    .id(space.id.uuidString + "-w\(Int(windowState.sidebarContentWidth))")
                     // Each page is exactly one sidebar-width wide for viewAligned snapping
                     .frame(width: effectiveWidth)
                 }
@@ -413,6 +438,28 @@ struct SidebarView: View {
         )
 
         browserManager.dialogManager.showDialog(dialog)
+    }
+
+    private func makeSpaceView(for space: Space, index: Int) -> some View {
+        VStack(spacing: 0) {
+            SpaceView(
+                space: space,
+                isActive: windowState.currentSpaceId == space.id,
+                onActivateTab: { browserManager.selectTab($0, in: windowState) },
+                onCloseTab: { browserManager.tabManager.removeTab($0.id) },
+                onPinTab: { browserManager.tabManager.pinTab($0) },
+                onMoveTabUp: { browserManager.tabManager.moveTabUp($0.id) },
+                onMoveTabDown: { browserManager.tabManager.moveTabDown($0.id) },
+                onMuteTab: { $0.toggleMute() }
+            )
+            .environmentObject(browserManager)
+            .environmentObject(windowState)
+            .environmentObject(browserManager.splitManager)
+            .id(space.id.uuidString + "-w\(Int(windowState.sidebarContentWidth))")
+            Spacer()
+        }
+        .frame(width: effectiveWidth, alignment: .leading)
+        .tag(index)
     }
 }
 

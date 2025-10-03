@@ -295,7 +295,7 @@ struct SidebarSectionDropDelegate: DropDelegate {
         switch container {
         case .none:
             return false
-        case .essentials, .spacePinned, .spaceRegular:
+        case .essentials, .spacePinned, .spaceRegular, .folder:
             // Basic validation - more sophisticated checks could be added
             return true
         }

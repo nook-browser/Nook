@@ -26,6 +26,14 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     // If true, this tab is created to host a popup window; do not perform initial load.
     var isPopupHost: Bool = false
 
+    // Track Option key state for Peek functionality
+    var isOptionKeyDown: Bool = false
+
+    // MARK: - Pin State
+    var isPinned: Bool = false // Global pinned (essentials)
+    var isSpacePinned: Bool = false // Space-level pinned
+    var folderId: UUID? // Folder membership for tabs within spacepinned area
+
     // MARK: - Favicon Cache
     // Global favicon cache shared across profiles by design to increase hit rate
     // and reduce duplicate downloads. Favicons are cached persistently to survive app restarts.
@@ -79,8 +87,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     var loadingState: LoadingState = .idle
 
-    var canGoBack: Bool = false
-    var canGoForward: Bool = false
+    @Published var canGoBack: Bool = false
+    @Published var canGoForward: Bool = false
     
     // MARK: - Video State
     @Published var hasPlayingVideo: Bool = false
@@ -147,6 +155,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     var onCommandHover: ((String?) -> Void)? = nil
 
     private let themeColorObservedWebViews = NSHashTable<AnyObject>.weakObjects()
+    private let navigationStateObservedWebViews = NSHashTable<AnyObject>.weakObjects()
 
     var isCurrentTab: Bool {
         // This property is used in contexts where we don't have window state
@@ -166,6 +175,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     var isLoading: Bool {
         return loadingState.isLoading
     }
+
+    
 
     // MARK: - Initializers
     init(
@@ -239,8 +250,33 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     private func updateNavigationState() {
         guard let webView = _webView else { return }
-        canGoBack = webView.canGoBack
-        canGoForward = webView.canGoForward
+
+        // Force UI update by notifying object will change
+        objectWillChange.send()
+
+        let newCanGoBack = webView.canGoBack
+        let newCanGoForward = webView.canGoForward
+
+        // Only update if values actually changed to prevent unnecessary redraws
+        if newCanGoBack != canGoBack || newCanGoForward != canGoForward {
+            canGoBack = newCanGoBack
+            canGoForward = newCanGoForward
+        }
+    }
+
+    /// Enhanced navigation state update with aggressive timing for same-domain navigation
+    func updateNavigationStateEnhanced(source: String = "unknown") {
+        // Immediate update
+        updateNavigationState()
+
+        // Additional delayed updates to catch timing issues with same-domain navigation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.updateNavigationState()
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            self?.updateNavigationState()
+        }
     }
 
     // MARK: - WebView Setup
@@ -308,6 +344,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         
         if let webView = _webView {
             setupThemeColorObserver(for: webView)
+            setupNavigationStateObservers(for: webView)
         }
         
         // Remove existing handlers first to prevent duplicates
@@ -418,6 +455,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         // 14. REMOVE THEME COLOR OBSERVER
         if let webView = _webView {
             removeThemeColorObserver(from: webView)
+            removeNavigationStateObservers(from: webView)
         }
         
         // 15. REMOVE FROM TAB MANAGER
@@ -1036,9 +1074,10 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { _ in }
         webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { _ in }
         
-        // Remove theme color observer before clearing webview reference
+        // Remove theme color and navigation state observers before clearing webview reference
         if let webView = _webView {
             removeThemeColorObserver(from: webView)
+            removeNavigationStateObservers(from: webView)
         }
         
         // Clear the webview reference (this will trigger reload when accessed)
@@ -1235,7 +1274,29 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             themeColorObservedWebViews.remove(webView)
         }
     }
-    
+
+    // MARK: - Navigation State Observation
+
+    /// Set up KVO observers for navigation state properties
+    func setupNavigationStateObservers(for webView: WKWebView) {
+        if !navigationStateObservedWebViews.contains(webView) {
+            webView.addObserver(self, forKeyPath: "canGoBack", options: [.new, .initial], context: nil)
+            webView.addObserver(self, forKeyPath: "canGoForward", options: [.new, .initial], context: nil)
+            navigationStateObservedWebViews.add(webView)
+            print("🔍 [Tab] Set up navigation state observers for \(name)")
+        }
+    }
+
+    /// Remove KVO observers for navigation state properties
+    func removeNavigationStateObservers(from webView: WKWebView) {
+        if navigationStateObservedWebViews.contains(webView) {
+            webView.removeObserver(self, forKeyPath: "canGoBack")
+            webView.removeObserver(self, forKeyPath: "canGoForward")
+            navigationStateObservedWebViews.remove(webView)
+            print("🔍 [Tab] Removed navigation state observers for \(name)")
+        }
+    }
+
     /// MEMORY LEAK FIX: Comprehensive WebView cleanup to prevent memory leaks
     func cleanupCloneWebView(_ webView: WKWebView) {
         print("🧹 [Tab] Starting comprehensive WebView cleanup for: \(name)")
@@ -1297,8 +1358,9 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             controller.removeScriptMessageHandler(forName: handlerName)
         }
         
-        // 4. Remove theme color observer
+        // 4. Remove theme color and navigation state observers
         removeThemeColorObserver(from: webView)
+        removeNavigationStateObservers(from: webView)
         
         // 5. Clear all delegates
         webView.navigationDelegate = nil
@@ -1331,6 +1393,10 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     public override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
         if keyPath == "themeColor", let webView = object as? WKWebView {
             updateBackgroundColor(from: webView)
+        } else if (keyPath == "canGoBack" || keyPath == "canGoForward"), let webView = object as? WKWebView {
+            // Real-time navigation state updates from KVO observers
+            print("🔄 [Tab] KVO navigation state change for \(name): \(keyPath) = \(webView.canGoBack), \(webView.canGoForward)")
+            updateNavigationState()
         } else {
             super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
         }
@@ -1882,6 +1948,9 @@ extension Tab: WKNavigationDelegate {
             browserManager?.syncTabAcrossWindows(self.id)
         }
 
+        // CRITICAL: Update navigation state after back/forward navigation
+        updateNavigationStateEnhanced(source: "didFinish")
+
         webView.evaluateJavaScript("document.title") {
             [weak self] result, error in
             if let title = result as? String {
@@ -1924,8 +1993,8 @@ extension Tab: WKNavigationDelegate {
         injectPiPStateListener(to: webView)
         injectMediaDetection(to: webView)
         injectHistoryStateObserver(into: webView)
-        updateNavigationState()
-        
+        updateNavigationStateEnhanced(source: "didCommit")
+
         // Trigger background color extraction
         updateBackgroundColor(from: webView)
         
@@ -1950,7 +2019,7 @@ extension Tab: WKNavigationDelegate {
             self.favicon = Image(systemName: "exclamationmark.triangle")
         }
 
-        updateNavigationState()
+        updateNavigationStateEnhanced(source: "didFail")
     }
 
     // MARK: - Loading Failed (before content started loading)
@@ -1968,7 +2037,7 @@ extension Tab: WKNavigationDelegate {
             self.favicon = Image(systemName: "wifi.exclamationmark")
         }
 
-        updateNavigationState()
+        updateNavigationStateEnhanced(source: "didFailProvisional")
     }
 
     public func webView(
@@ -1995,6 +2064,20 @@ extension Tab: WKNavigationDelegate {
         if let url = navigationAction.request.url,
            navigationAction.targetFrame?.isMainFrame == true {
             browserManager?.maybeShowOAuthAssist(for: url, in: self)
+        }
+
+        // Check for Option+click to trigger Peek for any link
+        if let url = navigationAction.request.url,
+           navigationAction.navigationType == .linkActivated,
+           isOptionKeyDown {
+
+            // Trigger Peek instead of normal navigation
+            decisionHandler(.cancel)
+            RunLoop.current.perform { [weak self] in
+                guard let self else { return }
+                self.browserManager?.peekManager.presentExternalURL(url, from: self)
+            }
+            return
         }
 
         if #available(macOS 12.3, *), navigationAction.shouldPerformDownload {
@@ -2315,6 +2398,26 @@ extension Tab: WKScriptMessageHandler {
         return false
     }
 
+    // MARK: - Peek Detection
+
+    private func shouldRedirectToPeek(url: URL) -> Bool {
+        // Always redirect to Peek if Option key is down (for any URL)
+        if isOptionKeyDown {
+            return true
+        }
+
+        // Check if this is an external domain URL
+        guard let currentHost = self.url.host,
+              let newHost = url.host else { return false }
+
+        // If hosts are different, it's an external URL
+        if currentHost != newHost {
+            return true
+        }
+
+        return false
+    }
+
 }
 
 // MARK: - WKUIDelegate
@@ -2338,9 +2441,22 @@ extension Tab: WKUIDelegate {
             return nil // Don't create a WebView, we're using the miniwindow
         }
         
+        // For regular popups, check if this should be redirected to Peek
+        if let url = navigationAction.request.url,
+           shouldRedirectToPeek(url: url) {
+
+            // Trigger Peek after returning control to WebKit to avoid runloop-mode issues
+            RunLoop.current.perform { [weak self, weak bm] in
+                guard let self, let bm else { return }
+                bm.peekManager.presentExternalURL(url, from: self)
+            }
+
+            return nil // Don't create a WebView, we're using Peek
+        }
+
         // For regular popups, create a new webView with the EXACT configuration that WebKit provided
         let newWebView = FocusableWKWebView(frame: .zero, configuration: configuration)
-        
+
         // Create a new tab to manage this webView
         let space = bm.tabManager.currentSpace
         let newTab = bm.tabManager.createPopupTab(in: space)
