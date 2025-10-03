@@ -10,6 +10,7 @@ import SwiftUI
 struct NewTabButton: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(\.colorScheme) var colorScheme
     @State private var isHovering: Bool = false
 
     var body: some View {
@@ -25,8 +26,8 @@ struct NewTabButton: View {
                 Spacer()
             }
             .foregroundStyle(
-                browserManager.gradientColorManager.isDark
-                    ? AppColors.sidebarTextDark : AppColors.sidebarTextLight
+                colorScheme == .dark
+                    ? AppColors.sidebarTextLight : AppColors.sidebarTextDark
             )
             .padding(.horizontal, 10)
             .frame(height: 40)
@@ -48,9 +49,9 @@ struct NewTabButton: View {
 
     private var backgroundColor: Color {
         if windowState.isCommandPaletteVisible {
-            return browserManager.gradientColorManager.isDark ? AppColors.spaceTabActiveDark : AppColors.spaceTabActiveLight
+            return colorScheme == .dark ? AppColors.spaceTabActiveLight : AppColors.spaceTabActiveDark
         } else if isHovering {
-            return browserManager.gradientColorManager.isDark ? AppColors.spaceTabHoverDark : AppColors.spaceTabHoverLight
+            return colorScheme == .dark ? AppColors.spaceTabHoverLight : AppColors.spaceTabHoverDark
         } else {
             return Color.clear
         }

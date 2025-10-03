@@ -16,6 +16,7 @@ struct PinnedTabView: View {
     var action: () -> Void
 
     @EnvironmentObject var browserManager: BrowserManager
+    @Environment(\.colorScheme) var colorScheme
     @State private var isHovered: Bool = false
 
     // Layout tunables
@@ -67,17 +68,17 @@ struct PinnedTabView: View {
     //MARK: - Colors
     private var backgroundColor: Color {
         if isActive {
-            return browserManager.gradientColorManager.isDark ? AppColors.pinnedTabActiveDark : AppColors.pinnedTabActiveLight
+            return colorScheme == .dark ? AppColors.pinnedTabActiveLight : AppColors.pinnedTabActiveDark
         } else if isHovered {
-            return browserManager.gradientColorManager.isDark ? AppColors.pinnedTabHoverDark : AppColors.pinnedTabHoverLight
+            return colorScheme == .dark ? AppColors.pinnedTabHoverLight : AppColors.pinnedTabHoverDark
         } else {
-            return browserManager.gradientColorManager.isDark ? AppColors.pinnedTabIdleDark : AppColors.pinnedTabIdleLight
+            return colorScheme == .dark ? AppColors.pinnedTabIdleLight : AppColors.pinnedTabIdleDark
         }
     }
-    
+
     private var shadowColor: Color {
         if isActive {
-            return browserManager.gradientColorManager.isDark ? Color.black.opacity(0.15) : Color.clear
+            return colorScheme == .dark ? Color.clear : Color.black.opacity(0.15)
         } else {
             return Color.clear
         }

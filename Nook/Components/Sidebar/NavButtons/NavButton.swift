@@ -9,19 +9,17 @@ import SwiftUI
 
 struct NavButton: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @Environment(\.colorScheme) var colorScheme
     var iconName: String
     var disabled: Bool
     var action: (() -> Void)?
-    var onLongPress: (() -> Void)?
     @State private var isHovering: Bool = false
     @State private var isPressing: Bool = false
-    @State private var longPressTimer: Timer?
 
-    init(iconName: String, disabled: Bool = false, action: (() -> Void)? = nil, onLongPress: (() -> Void)? = nil) {
+    init(iconName: String, disabled: Bool = false, action: (() -> Void)? = nil) {
         self.iconName = iconName
         self.action = action
         self.disabled = disabled
-        self.onLongPress = onLongPress
     }
     
     var body: some View {
@@ -29,12 +27,10 @@ struct NavButton: View {
             action?()
         } label: {
             ZStack {
-                // Background that fills entire clickable area (32x32 to match design)
                 RoundedRectangle(cornerRadius: 6)
                     .fill(backgroundColor)
                     .frame(width: 32, height: 32)
 
-                // Icon centered in the button
                 Image(systemName: iconName)
                     .font(.system(size: 16))
                     .foregroundStyle(iconColor)
@@ -54,44 +50,26 @@ struct NavButton: View {
                 .onChanged { _ in
                     if !disabled && !isPressing {
                         isPressing = true
-                        startLongPressTimer()
                     }
                 }
                 .onEnded { _ in
-                    if isPressing {
-                        isPressing = false
-                        cancelLongPressTimer()
-                    }
+                    isPressing = false
                 }
         )
-    }
-
-    private func startLongPressTimer() {
-        longPressTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { _ in
-            if isPressing {
-                onLongPress?()
-                isPressing = false
-            }
-        }
-    }
-
-    private func cancelLongPressTimer() {
-        longPressTimer?.invalidate()
-        longPressTimer = nil
     }
     
     private var backgroundColor: Color {
         if (isHovering || isPressing) && !disabled {
-            return browserManager.gradientColorManager.isDark ? AppColors.iconHoverDark : AppColors.iconHoverLight
+            return colorScheme == .dark ? AppColors.iconHoverLight : AppColors.iconHoverDark
         } else {
             return Color.clear
         }
     }
     private var iconColor: Color {
         if disabled {
-            return browserManager.gradientColorManager.isDark ? AppColors.iconDisabledDark : AppColors.iconDisabledLight
+            return colorScheme == .dark ? AppColors.iconDisabledLight : AppColors.iconDisabledDark
         } else {
-            return browserManager.gradientColorManager.isDark ? AppColors.iconActiveDark : AppColors.iconActiveLight
+            return colorScheme == .dark ? AppColors.iconActiveLight : AppColors.iconActiveDark
         }
     }
 }

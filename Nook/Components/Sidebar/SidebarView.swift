@@ -216,7 +216,7 @@ struct SidebarView: View {
                                 windowState.sidebarWidth = newWidth
                                 windowState.sidebarContentWidth = max(newWidth - 16, 0)
                             }
-                        }, onLongPress: nil)
+                        })
                         .onHover { isHovered in
                             isMenuButtonHovered = isHovered
                             if isHovered {
@@ -246,7 +246,7 @@ struct SidebarView: View {
 
                     NavButton(iconName: "plus", disabled: false, action: {
                         showSpaceCreationDialog()
-                    }, onLongPress: nil)
+                    })
                 }
             }
             .padding(.horizontal, 8)
