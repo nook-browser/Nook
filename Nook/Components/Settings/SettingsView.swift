@@ -202,14 +202,22 @@ struct GeneralSettingsView: View {
                                     .foregroundStyle(.secondary)
                                 }
                             }.frame(maxWidth: .infinity, alignment: .leading)
-                            Toggle(
-                                isOn: $browserManager.settingsManager
-                                    .shouldShowSidebarRightSide
-                            ) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Show sidebar on right side")
+                            HStack(alignment: .firstTextBaseline) {
+                                Text("Sidebar Position")
+                                Spacer()
+                                Picker(
+                                    "Sidebar Position",
+                                    selection: $browserManager.settingsManager
+                                        .sidebarPosition
+                                ) {
+                                    ForEach(SidebarPosition.allCases) { provider in
+                                        Text(provider.displayName).tag(provider)
+                                    }
                                 }
-                            }.frame(maxWidth: .infinity, alignment: .leading)
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .frame(width: 220)
+                            }
                         }
                     }
 

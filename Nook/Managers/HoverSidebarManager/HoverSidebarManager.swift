@@ -111,13 +111,13 @@ final class HoverSidebarManager: ObservableObject {
         var inKeepOpenZone = false
 
         // Right Side Calculations (if flag is true)
-        if bm.settingsManager.shouldShowSidebarRightSide {
+        if bm.settingsManager.sidebarPosition == .left {
+            inTriggerZone = (mouse.x >= frame.minX - overshootSlack) && (mouse.x <= frame.minX + triggerWidth)
+            inKeepOpenZone = (mouse.x >= frame.minX) && (mouse.x <= frame.minX + overlayWidth + keepOpenHysteresis)
+        } else {
             let rightEdge = frame.maxX
             inTriggerZone = (mouse.x >= rightEdge - triggerWidth - overshootSlack) && (mouse.x <= rightEdge + overshootSlack)
             inKeepOpenZone = (mouse.x >= rightEdge - overlayWidth - keepOpenHysteresis) && (mouse.x <= rightEdge)
-        } else {
-            inTriggerZone = (mouse.x >= frame.minX - overshootSlack) && (mouse.x <= frame.minX + triggerWidth)
-            inKeepOpenZone = (mouse.x >= frame.minX) && (mouse.x <= frame.minX + overlayWidth + keepOpenHysteresis)
         }
         
         let shouldShow = inTriggerZone || (isOverlayVisible && inKeepOpenZone)

@@ -23,7 +23,7 @@ struct SidebarHoverOverlayView: View {
     var body: some View {
         // Only render overlay plumbing when the real sidebar is collapsed
         if !windowState.isSidebarVisible {
-            ZStack(alignment: browserManager.settingsManager.shouldShowSidebarRightSide ? .trailing : .leading) {
+            ZStack(alignment: browserManager.settingsManager.sidebarPosition == .left ? .leading : .trailing) {
                 // Edge hover hotspot
                 Color.clear
                     .frame(width: hoverManager.triggerWidth)
@@ -52,15 +52,15 @@ struct SidebarHoverOverlayView: View {
                         // Force arrow cursor for the entire overlay region
                         .alwaysArrowCursor()
                         .shadow(color: Color.black.opacity(0.14), radius: 14, x: 0, y: 0)
-                        .padding(browserManager.settingsManager.shouldShowSidebarRightSide ? .trailing : .leading, horizontalInset)
+                        .padding(browserManager.settingsManager.sidebarPosition == .left ? .leading : .trailing, horizontalInset)
                         .padding(.vertical, verticalInset)
                         .transition(
-                            .move(edge: browserManager.settingsManager.shouldShowSidebarRightSide ? .trailing : .leading)
+                            .move(edge: browserManager.settingsManager.sidebarPosition == .left ? .leading : .trailing)
                                 .combined(with: .opacity)
                         )
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: browserManager.settingsManager.shouldShowSidebarRightSide ? .topTrailing : .topLeading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: browserManager.settingsManager.sidebarPosition == .left ? .topLeading : .topTrailing)
             // Container remains passive; only overlay/hotspot intercept
         }
     }

@@ -19,7 +19,7 @@ class SettingsManager {
     private let blockXSTKey = "settings.blockCrossSiteTracking"
     private let debugToggleUpdateNotificationKey = "settings.debugToggleUpdateNotification"
     private let askBeforeQuitKey = "settings.askBeforeQuit"
-    private let shouldShowSidebarRightSideKey = "settings.shouldShowSidebarRightSide"
+    private let sidebarPositionKey = "settings.sidebarPosition"
     var currentSettingsTab: SettingsTabs = .general
 
     // Stored properties
@@ -70,9 +70,9 @@ class SettingsManager {
         }
     }
     
-    var shouldShowSidebarRightSide: Bool {
+    var sidebarPosition: SidebarPosition {
         didSet {
-            userDefaults.set(shouldShowSidebarRightSide, forKey: shouldShowSidebarRightSideKey)
+            userDefaults.set(sidebarPosition.rawValue, forKey: sidebarPositionKey)
         }
     }
 
@@ -93,7 +93,7 @@ class SettingsManager {
             blockXSTKey: false,
             debugToggleUpdateNotificationKey: false,
             askBeforeQuitKey: true,
-            shouldShowSidebarRightSideKey: false
+            sidebarPositionKey: SidebarPosition.left.rawValue
         ])
 
         // Initialize properties from UserDefaults
@@ -115,7 +115,7 @@ class SettingsManager {
         self.blockCrossSiteTracking = userDefaults.bool(forKey: blockXSTKey)
         self.debugToggleUpdateNotification = userDefaults.bool(forKey: debugToggleUpdateNotificationKey)
         self.askBeforeQuit = userDefaults.bool(forKey: askBeforeQuitKey)
-        self.shouldShowSidebarRightSide = userDefaults.bool(forKey: shouldShowSidebarRightSideKey)
+        self.sidebarPosition = SidebarPosition(rawValue: userDefaults.string(forKey: sidebarPositionKey) ?? "left") ?? SidebarPosition.left
     }
 }
 

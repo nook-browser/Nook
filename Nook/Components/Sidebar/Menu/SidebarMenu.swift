@@ -12,6 +12,19 @@ enum Tabs {
     case downloads
 }
 
+public enum SidebarPosition: String, CaseIterable, Identifiable {
+    case left
+    case right
+    public var id: String { rawValue }
+    
+    var displayName: String {
+      switch self {
+      case .left: return "Left"
+      case .right: return "Right"
+      }
+    }
+}
+
 struct SidebarMenu: View {
     @State private var selectedTab: Tabs = .history
     @EnvironmentObject var windowState: BrowserWindowState
@@ -20,7 +33,7 @@ struct SidebarMenu: View {
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
             VStack {
-                if !browserManager.settingsManager.shouldShowSidebarRightSide {
+                if browserManager.settingsManager.sidebarPosition == .left {
                     HStack {
                         MacButtonsView()
                             .frame(width: 70, height: 20)

@@ -21,14 +21,15 @@ struct WindowView: View {
     }
 
     // To reverse the sidebar and window, for left/right switching
-    enum SidebarItems {
-        case sidebar
-        case windowVStack
+    enum SidebarItems: String, CaseIterable, Identifiable {
+        case sidebar,windowVStack
+
+        var id: String { self.rawValue }
     }
     @State private var sidebarItems: [SidebarItems] = [.sidebar, .windowVStack]
     
-    var reversedSidebarItems: [SidebarItems] {
-        browserManager.settingsManager.shouldShowSidebarRightSide ? sidebarItems.reversed() : sidebarItems
+    private var sortedSidebarItems: [SidebarItems] {
+        browserManager.settingsManager.sidebarPosition == .left ? sidebarItems : sidebarItems.reversed()
     }
 
     var body: some View {
@@ -39,7 +40,7 @@ struct WindowView: View {
                 SpaceGradientBackgroundView()
                     .environmentObject(windowState)
                 
-                if browserManager.settingsManager.shouldShowSidebarRightSide {
+                if browserManager.settingsManager.sidebarPosition == .right {
                     HStack {
                         Rectangle().fill(Color.clear).frame(width: 100, height: 30).onHover { hover in
                             isHoveringMenu = hover
@@ -60,7 +61,7 @@ struct WindowView: View {
 
                 // Main content flush: sidebar touches left edge; webview touches sidebar
                 HStack(spacing: 0) {
-                    ForEach(reversedSidebarItems, id: \.self) { item in
+                    ForEach(sortedSidebarItems, id: \.self) { item in
                         switch item {
                         case .sidebar:
                             SidebarView()
@@ -68,23 +69,24 @@ struct WindowView: View {
                                 .environmentObject(windowState)
                         case .windowVStack:
                             VStack(spacing: 0) {
-                                if browserManager.settingsManager.shouldShowSidebarRightSide && isHoveringMenu {
+                                if browserManager.settingsManager.sidebarPosition == .right && isHoveringMenu {
                                     HStack() {
                                         MacButtonsView().frame(width: 70, height: 20, alignment: .leading).padding(8)
                                         Spacer()
                                     }.transition(.move(edge: .leading).combined(with: .opacity))
                                 }
                                 WebsiteLoadingIndicator()
-                                WebsiteView().animation(.easeInOut, value: browserManager.settingsManager.shouldShowSidebarRightSide && isHoveringMenu)
+                                WebsiteView().animation(.easeInOut, value: browserManager.settingsManager.sidebarPosition == .right && isHoveringMenu)
                             }
                             .padding(.bottom, 8)
                             .zIndex(2000)
+
                         }
                     }
 
                 }
                 // Overlay the resize handle spanning the sidebar/webview boundary
-                .overlay(alignment: browserManager.settingsManager.shouldShowSidebarRightSide ? .topTrailing : .topLeading) {
+                .overlay(alignment: browserManager.settingsManager.sidebarPosition == .left ? .topLeading : .topTrailing) {
                     if windowState.isSidebarVisible {
                         // Calculate dynamic webview height based on window size
                         let dynamicWebViewHeight = geometry.size.height - 40  // Subtract navigation area
@@ -93,7 +95,7 @@ struct WindowView: View {
                         SidebarResizeView()
                             .frame(height: dynamicWebViewHeight)  // Dynamic height based on window size
                             .offset(
-                                x: browserManager.settingsManager.shouldShowSidebarRightSide ? -windowState.sidebarWidth : windowState.sidebarWidth,
+                                x: browserManager.settingsManager.sidebarPosition == .left ? windowState.sidebarWidth : -windowState.sidebarWidth,
                                 y: webViewYOffset
                             )  // Position to match webview
                             .zIndex(2000)  // Higher z-index to ensure it's above all other elements
@@ -249,7 +251,7 @@ private struct MiniCommandPaletteOverlay: View {
             isActiveWindow && windowState.isMiniCommandPaletteVisible
             && !windowState.isCommandPaletteVisible
 
-        ZStack(alignment: browserManager.settingsManager.shouldShowSidebarRightSide ? .topTrailing : .topLeading) {
+        ZStack(alignment: browserManager.settingsManager.sidebarPosition == .left ? .topLeading : .topTrailing) {
             if isVisible {
                 // Click-away hit target
                 Color.clear
@@ -275,7 +277,7 @@ private struct MiniCommandPaletteOverlay: View {
                     forcedWidth: 400,
                     forcedCornerRadius: 12
                 )
-                .offset(x: browserManager.settingsManager.shouldShowSidebarRightSide ? -anchorX : anchorX, y: anchorY)
+                .offset(x: browserManager.settingsManager.sidebarPosition == .left ? anchorX : -anchorX, y: anchorY)
                 .zIndex(1)
             }
         }
