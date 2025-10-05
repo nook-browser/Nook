@@ -52,9 +52,12 @@ struct NavButtonsView: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            MacButtonsView()
-                .frame(width: 70)
-            NavButton(iconName: "sidebar.left", disabled: false, action: {
+            if !browserManager.settingsManager.shouldShowSidebarRightSide {
+                MacButtonsView()
+                    .frame(width: 70)
+            }
+            
+            NavButton(iconName: browserManager.settingsManager.shouldShowSidebarRightSide ? "sidebar.right" :"sidebar.left", disabled: false, action: {
                 browserManager.toggleSidebar(for: windowState)
             })
 

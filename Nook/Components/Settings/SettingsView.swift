@@ -188,7 +188,7 @@ struct GeneralSettingsView: View {
                         title: "Nook",
                         subtitle: "General Nook settings"
                     ) {
-                        HStack(alignment: .firstTextBaseline) {
+                        VStack(alignment: .leading, spacing: 16) {
                             Toggle(
                                 isOn: $browserManager.settingsManager
                                     .askBeforeQuit
@@ -200,6 +200,14 @@ struct GeneralSettingsView: View {
                                     )
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
+                                }
+                            }.frame(maxWidth: .infinity, alignment: .leading)
+                            Toggle(
+                                isOn: $browserManager.settingsManager
+                                    .shouldShowSidebarRightSide
+                            ) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Show sidebar on right side")
                                 }
                             }.frame(maxWidth: .infinity, alignment: .leading)
                         }

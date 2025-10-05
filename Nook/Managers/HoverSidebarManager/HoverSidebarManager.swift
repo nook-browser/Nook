@@ -106,10 +106,20 @@ final class HoverSidebarManager: ObservableObject {
         // Use saved width when sidebar is collapsed to size the overlay and sticky zone
         let overlayWidth = max(activeState.sidebarWidth, activeState.savedSidebarWidth)
 
-        // Edge zones in screen space
-        let inTriggerZone = (mouse.x >= frame.minX - overshootSlack) && (mouse.x <= frame.minX + triggerWidth)
-        let inKeepOpenZone = (mouse.x >= frame.minX) && (mouse.x <= frame.minX + overlayWidth + keepOpenHysteresis)
+        // Edge zone calculation
+        var inTriggerZone = false
+        var inKeepOpenZone = false
 
+        // Right Side Calculations (if flag is true)
+        if bm.settingsManager.shouldShowSidebarRightSide {
+            let rightEdge = frame.maxX
+            inTriggerZone = (mouse.x >= rightEdge - triggerWidth - overshootSlack) && (mouse.x <= rightEdge + overshootSlack)
+            inKeepOpenZone = (mouse.x >= rightEdge - overlayWidth - keepOpenHysteresis) && (mouse.x <= rightEdge)
+        } else {
+            inTriggerZone = (mouse.x >= frame.minX - overshootSlack) && (mouse.x <= frame.minX + triggerWidth)
+            inKeepOpenZone = (mouse.x >= frame.minX) && (mouse.x <= frame.minX + overlayWidth + keepOpenHysteresis)
+        }
+        
         let shouldShow = inTriggerZone || (isOverlayVisible && inKeepOpenZone)
         if shouldShow != isOverlayVisible {
             withAnimation(.easeInOut(duration: 0.15)) {

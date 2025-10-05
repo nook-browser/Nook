@@ -15,15 +15,18 @@ enum Tabs {
 struct SidebarMenu: View {
     @State private var selectedTab: Tabs = .history
     @EnvironmentObject var windowState: BrowserWindowState
+    @EnvironmentObject var browserManager: BrowserManager
 
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
             VStack {
-                HStack {
-                    MacButtonsView()
-                        .frame(width: 70, height: 20)
-                        .padding(8)
-                    Spacer()
+                if !browserManager.settingsManager.shouldShowSidebarRightSide {
+                    HStack {
+                        MacButtonsView()
+                            .frame(width: 70, height: 20)
+                            .padding(8)
+                        Spacer()
+                    }
                 }
 
                 Spacer()

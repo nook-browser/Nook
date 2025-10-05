@@ -19,6 +19,7 @@ class SettingsManager {
     private let blockXSTKey = "settings.blockCrossSiteTracking"
     private let debugToggleUpdateNotificationKey = "settings.debugToggleUpdateNotification"
     private let askBeforeQuitKey = "settings.askBeforeQuit"
+    private let shouldShowSidebarRightSideKey = "settings.shouldShowSidebarRightSide"
     var currentSettingsTab: SettingsTabs = .general
 
     // Stored properties
@@ -68,6 +69,12 @@ class SettingsManager {
             userDefaults.set(askBeforeQuit, forKey: askBeforeQuitKey)
         }
     }
+    
+    var shouldShowSidebarRightSide: Bool {
+        didSet {
+            userDefaults.set(shouldShowSidebarRightSide, forKey: shouldShowSidebarRightSideKey)
+        }
+    }
 
     var debugToggleUpdateNotification: Bool {
         didSet {
@@ -85,7 +92,8 @@ class SettingsManager {
             tabUnloadTimeoutKey: 3600.0,
             blockXSTKey: false,
             debugToggleUpdateNotificationKey: false,
-            askBeforeQuitKey: true
+            askBeforeQuitKey: true,
+            shouldShowSidebarRightSideKey: false
         ])
 
         // Initialize properties from UserDefaults
@@ -107,6 +115,7 @@ class SettingsManager {
         self.blockCrossSiteTracking = userDefaults.bool(forKey: blockXSTKey)
         self.debugToggleUpdateNotification = userDefaults.bool(forKey: debugToggleUpdateNotificationKey)
         self.askBeforeQuit = userDefaults.bool(forKey: askBeforeQuitKey)
+        self.shouldShowSidebarRightSide = userDefaults.bool(forKey: shouldShowSidebarRightSideKey)
     }
 }
 
