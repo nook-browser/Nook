@@ -157,7 +157,7 @@ struct SpaceView: View {
             GeometryReader { geometry in
                 ZStack {
                     ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: 0) {
+                        VStack(spacing: 8) {
                             pinnedTabsSection
                             newTabButtonSectionWithClear
                             regularTabsList
