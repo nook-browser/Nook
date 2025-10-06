@@ -41,3 +41,8 @@ Some obj-c libraries may not play nice with Intel Macs, though there should tech
 You’ll need to set your personal Development Team in Signing to build locally.
 
 Join our Discord to help with development: https://discord.gg/J3XfPvg7Fs
+
+
+
+### LICENSES
+With the exception of third-party libraries in Nook/ThirdParty, all code is under the GPL 3.0 License. The relevant third-party code is licensed per-folder under a variety of free, open-source software licenses.
