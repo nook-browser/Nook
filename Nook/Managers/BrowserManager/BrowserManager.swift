@@ -11,6 +11,7 @@ import AppKit
 import WebKit
 import OSLog
 import Combine
+import Sparkle
 
 @MainActor
 final class Persistence {
@@ -329,6 +330,7 @@ class BrowserManager: ObservableObject {
     // Tab closure undo notification
     @Published var showTabClosureToast: Bool = false
     @Published var tabClosureToastCount: Int = 0
+    @Published var updateAvailability: UpdateAvailability?
 
 
     // MARK: - Window State Management
@@ -369,7 +371,7 @@ class BrowserManager: ObservableObject {
     var trackingProtectionManager: TrackingProtectionManager
     var findManager: FindManager
     var importManager: ImportManager
-    
+
     var externalMiniWindowManager = ExternalMiniWindowManager()
     @Published var peekManager = PeekManager()
     
@@ -2505,6 +2507,65 @@ class BrowserManager: ObservableObject {
         // TODO: Implement folder expansion
         // This would need to be handled by the sidebar component
         toggleSidebar()
+    }
+}
+
+// MARK: - Update Handling
+
+extension BrowserManager {
+    struct UpdateAvailability: Equatable {
+        let version: String
+        let shortVersion: String
+        let releaseNotesURL: URL?
+        var isDownloaded: Bool
+
+        init(version: String, shortVersion: String, releaseNotesURL: URL?, isDownloaded: Bool) {
+            self.version = version
+            self.shortVersion = shortVersion
+            self.releaseNotesURL = releaseNotesURL
+            self.isDownloaded = isDownloaded
+        }
+
+        init(item: SUAppcastItem, isDownloaded: Bool) {
+            self.init(
+                version: item.versionString,
+                shortVersion: item.displayVersionString,
+                releaseNotesURL: item.releaseNotesURL,
+                isDownloaded: isDownloaded
+            )
+        }
+    }
+
+    func handleUpdaterFoundValidUpdate(_ item: SUAppcastItem) {
+        updateAvailability = UpdateAvailability(
+            item: item,
+            isDownloaded: updateAvailability?.isDownloaded ?? false
+        )
+    }
+
+    func handleUpdaterFinishedDownloading(_ item: SUAppcastItem) {
+        if var availability = updateAvailability {
+            availability.isDownloaded = true
+            updateAvailability = availability
+        } else {
+            updateAvailability = UpdateAvailability(item: item, isDownloaded: true)
+        }
+    }
+
+    func handleUpdaterDidNotFindUpdate() {
+        updateAvailability = nil
+    }
+
+    func handleUpdaterAbortedUpdate() {
+        updateAvailability = nil
+    }
+
+    func handleUpdaterWillInstallOnQuit(_ item: SUAppcastItem) {
+        handleUpdaterFinishedDownloading(item)
+    }
+
+    func installPendingUpdateIfAvailable() {
+        appDelegate?.updaterController.checkForUpdates(nil)
     }
 }
 

@@ -147,7 +147,7 @@ struct SidebarView: View {
         let content = VStack(spacing: 8) {
 
             HStack(spacing: 2) {
-                NavButtonsView()
+                NavButtonsView(effectiveSidebarWidth: effectiveWidth)
             }
             .padding(.horizontal, 8)
             .frame(height: 30)

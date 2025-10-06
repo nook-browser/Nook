@@ -46,11 +46,16 @@ class ObservableTabWrapper: ObservableObject {
 struct NavButtonsView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var windowState: BrowserWindowState
-    var sidebarThreshold: CGFloat = 150
+    var effectiveSidebarWidth: CGFloat?
     @StateObject private var tabWrapper = ObservableTabWrapper()
 
     var body: some View {
         let sidebarOnLeft = browserManager.settingsManager.sidebarPosition == .left
+        let sidebarWidthForLayout = effectiveSidebarWidth ?? windowState.sidebarWidth
+        let navigationCollapseThreshold: CGFloat = 190
+        let refreshCollapseThreshold: CGFloat = 150
+        let shouldCollapseNavigation = sidebarWidthForLayout < navigationCollapseThreshold
+        let shouldCollapseRefresh = sidebarWidthForLayout < refreshCollapseThreshold
 
         HStack(spacing: 2) {
             if sidebarOnLeft {
@@ -65,11 +70,19 @@ struct NavButtonsView: View {
             Spacer()
 
             HStack(alignment: .center, spacing: 8) {
-                if windowState.sidebarWidth < sidebarThreshold {
+                if shouldCollapseNavigation {
                     Menu {
-                        Label("Reload", systemImage: "arrow.clockwise")
-                        Label("Go Back", systemImage: "arrow.backward")
-                        Label("Go Forward", systemImage: "arrow.forward")
+                        Button(action: goBack) {
+                            Label("Go Back", systemImage: "arrow.backward")
+                        }
+                        .disabled(!tabWrapper.canGoBack)
+                        Button(action: goForward) {
+                            Label("Go Forward", systemImage: "arrow.forward")
+                        }
+                        .disabled(!tabWrapper.canGoForward)
+                        Button(action: refreshCurrentTab) {
+                            Label("Reload", systemImage: "arrow.clockwise")
+                        }
                     } label: {
                         NavButton(iconName: "ellipsis", disabled: false, action: {})
                     }
@@ -79,14 +92,7 @@ struct NavButtonsView: View {
                         NavButton(
                             iconName: "arrow.backward",
                             disabled: !tabWrapper.canGoBack,
-                            action: {
-                                if let tab = tabWrapper.tab,
-                                   let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
-                                    webView.goBack()
-                                } else {
-                                    tabWrapper.tab?.goBack()
-                                }
-                            }
+                            action: goBack
                         )
                         .contextMenu {
                             NavigationHistoryContextMenu(
@@ -97,14 +103,7 @@ struct NavButtonsView: View {
                         NavButton(
                             iconName: "arrow.forward",
                             disabled: !tabWrapper.canGoForward,
-                            action: {
-                                if let tab = tabWrapper.tab,
-                                   let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
-                                    webView.goForward()
-                                } else {
-                                    tabWrapper.tab?.goForward()
-                                }
-                            }
+                            action: goForward
                         )
                         .contextMenu {
                             NavigationHistoryContextMenu(
@@ -112,10 +111,11 @@ struct NavButtonsView: View {
                                 windowState: windowState
                             )
                         }
-                        RefreshButton(action: {
-                            tabWrapper.tab?.refresh()
-                        })
                     }
+                }
+
+                if !shouldCollapseRefresh {
+                    RefreshButton(action: refreshCurrentTab)
                 }
 
                 if !sidebarOnLeft {
@@ -138,5 +138,27 @@ struct NavButtonsView: View {
 
     private func updateCurrentTab() {
         tabWrapper.updateTab(browserManager.currentTab(for: windowState))
+    }
+
+    private func goBack() {
+        if let tab = tabWrapper.tab,
+           let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
+            webView.goBack()
+        } else {
+            tabWrapper.tab?.goBack()
+        }
+    }
+
+    private func goForward() {
+        if let tab = tabWrapper.tab,
+           let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
+            webView.goForward()
+        } else {
+            tabWrapper.tab?.goForward()
+        }
+    }
+
+    private func refreshCurrentTab() {
+        tabWrapper.tab?.refresh()
     }
 }

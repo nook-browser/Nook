@@ -14,9 +14,7 @@
 		<string>audio</string>
 	</array>
 	<key>SUFeedURL</key>
-	<string>https://updates.nookbrowser.com/appcast.xml</string>
-	<key>SUPublicEDKey</key>
-	<string>YOUR_PUBLIC_ED_KEY_HERE</string>
+	<string>https://nook-browser.github.io/Nook/appcast.xml</string>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUAutomaticallyUpdate</key>
