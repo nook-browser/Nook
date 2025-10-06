@@ -188,7 +188,7 @@ struct GeneralSettingsView: View {
                         title: "Nook",
                         subtitle: "General Nook settings"
                     ) {
-                        HStack(alignment: .firstTextBaseline) {
+                        VStack(alignment: .leading, spacing: 16) {
                             Toggle(
                                 isOn: $browserManager.settingsManager
                                     .askBeforeQuit
@@ -202,6 +202,22 @@ struct GeneralSettingsView: View {
                                     .foregroundStyle(.secondary)
                                 }
                             }.frame(maxWidth: .infinity, alignment: .leading)
+                            HStack(alignment: .firstTextBaseline) {
+                                Text("Sidebar Position")
+                                Spacer()
+                                Picker(
+                                    "Sidebar Position",
+                                    selection: $browserManager.settingsManager
+                                        .sidebarPosition
+                                ) {
+                                    ForEach(SidebarPosition.allCases) { provider in
+                                        Text(provider.displayName).tag(provider)
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .frame(width: 220)
+                            }
                         }
                     }
 

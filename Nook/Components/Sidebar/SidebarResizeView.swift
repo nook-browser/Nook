@@ -55,7 +55,7 @@ struct SidebarResizeView: View {
 
                             // Use absolute mouse positions for true 1:1 tracking
                             let currentMouseX = value.location.x
-                            let mouseMovement = currentMouseX - startingMouseX
+                            let mouseMovement = browserManager.settingsManager.sidebarPosition == .left ? (currentMouseX - startingMouseX) : (startingMouseX - currentMouseX)
                             let newWidth = startingWidth + mouseMovement
                             let clampedWidth = max(170, min(400, newWidth))
 
@@ -74,7 +74,7 @@ struct SidebarResizeView: View {
                                 NSCursor.arrow.set()
                             }
                         }
-                )
+                ).offset(x: browserManager.settingsManager.sidebarPosition == .left ? 0 : 2)
 
             // Visual feedback line - positioned within sidebar area
             if isHovering && !isResizing {
@@ -82,7 +82,7 @@ struct SidebarResizeView: View {
                     .fill(Color.accentColor)
                     .frame(width: 2)
                     .frame(maxHeight: .infinity)
-                    .offset(x: -6) // Positioned within sidebar area (14pts into sidebar - 1pt for centering)
+                    .offset(x: browserManager.settingsManager.sidebarPosition == .left ? -6 : 6) // Positioned within sidebar area (14pts into sidebar - 1pt for centering)
                     .animation(.easeInOut(duration: 0.15), value: isHovering)
             }
         }
