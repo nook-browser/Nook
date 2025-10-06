@@ -48,12 +48,14 @@ struct NavButtonsView: View {
     @EnvironmentObject var windowState: BrowserWindowState
     var effectiveSidebarWidth: CGFloat?
     @StateObject private var tabWrapper = ObservableTabWrapper()
+    @State private var isMenuHovered = false
 
     var body: some View {
         let sidebarOnLeft = browserManager.settingsManager.sidebarPosition == .left
         let sidebarWidthForLayout = effectiveSidebarWidth ?? windowState.sidebarWidth
-        let navigationCollapseThreshold: CGFloat = 190
-        let refreshCollapseThreshold: CGFloat = 150
+        let navigationCollapseThreshold: CGFloat = 250
+        let refreshCollapseThreshold: CGFloat = 210
+        
         let shouldCollapseNavigation = sidebarWidthForLayout < navigationCollapseThreshold
         let shouldCollapseRefresh = sidebarWidthForLayout < refreshCollapseThreshold
 
@@ -71,22 +73,10 @@ struct NavButtonsView: View {
 
             HStack(alignment: .center, spacing: 8) {
                 if shouldCollapseNavigation {
-                    Menu {
-                        Button(action: goBack) {
-                            Label("Go Back", systemImage: "arrow.backward")
-                        }
-                        .disabled(!tabWrapper.canGoBack)
-                        Button(action: goForward) {
-                            Label("Go Forward", systemImage: "arrow.forward")
-                        }
-                        .disabled(!tabWrapper.canGoForward)
-                        Button(action: refreshCurrentTab) {
-                            Label("Reload", systemImage: "arrow.clockwise")
-                        }
-                    } label: {
-                        NavButton(iconName: "ellipsis", disabled: false, action: {})
-                    }
-                    .buttonStyle(PlainButtonStyle())
+                    collapsedMenu(
+                        includeNavigation: true,
+                        includeRefresh: shouldCollapseRefresh
+                    )
                 } else {
                     HStack(alignment: .center, spacing: 8) {
                         NavButton(
@@ -111,6 +101,13 @@ struct NavButtonsView: View {
                                 windowState: windowState
                             )
                         }
+                    }
+
+                    if shouldCollapseRefresh {
+                        collapsedMenu(
+                            includeNavigation: false,
+                            includeRefresh: true
+                        )
                     }
                 }
 
@@ -160,5 +157,49 @@ struct NavButtonsView: View {
 
     private func refreshCurrentTab() {
         tabWrapper.tab?.refresh()
+    }
+
+    @ViewBuilder
+    private func collapsedMenu(includeNavigation: Bool, includeRefresh: Bool) -> some View {
+        if includeNavigation || includeRefresh {
+            Menu {
+                if includeNavigation {
+                    Button(action: goBack) {
+                        Label("Go Back", systemImage: "arrow.backward")
+                    }
+                    .disabled(!tabWrapper.canGoBack)
+
+                    Button(action: goForward) {
+                        Label("Go Forward", systemImage: "arrow.forward")
+                    }
+                    .disabled(!tabWrapper.canGoForward)
+                }
+
+                if includeRefresh {
+                    if includeNavigation {
+                        Divider()
+                    }
+                    Button(action: refreshCurrentTab) {
+                        Label("Reload", systemImage: "arrow.clockwise")
+                    }
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.primary)
+                    .frame(width: 32, height: 32)
+                    .contentShape(RoundedRectangle(cornerRadius: 6))
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(isMenuHovered ? Color.gray.opacity(0.1) : Color.clear)
+                    )
+                    .onHover { isHovered in
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            isMenuHovered = isHovered
+                        }
+                    }
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
     }
 }
