@@ -685,13 +685,52 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     
     func disableExtension(_ extensionId: String) {
         guard let context = extensionContexts[extensionId] else { return }
-        
+
         do {
             try extensionController?.unload(context)
             updateExtensionEnabled(extensionId, enabled: false)
         } catch {
             print("ExtensionManager: Failed to disable extension: \(error.localizedDescription)")
         }
+    }
+
+    /// Disable all extensions (used when experimental extension support is disabled)
+    func disableAllExtensions() {
+        print("🔌 [ExtensionManager] Disabling all extensions...")
+
+        let enabledExtensions = installedExtensions.filter { $0.isEnabled }
+
+        for ext in enabledExtensions {
+            disableExtension(ext.id)
+            print("   Disabled: \(ext.name)")
+        }
+
+        print("🔌 [ExtensionManager] Disabled \(enabledExtensions.count) extensions")
+    }
+
+    /// Enable all previously enabled extensions (used when experimental extension support is re-enabled)
+    func enableAllExtensions() {
+        print("🔌 [ExtensionManager] Re-enabling previously enabled extensions...")
+
+        let disabledExtensions = installedExtensions.filter { !$0.isEnabled }
+
+        for ext in disabledExtensions {
+            // Only enable extensions that were previously enabled (check database)
+            do {
+                let id = ext.id
+                let predicate = #Predicate<ExtensionEntity> { $0.id == id }
+                let entities = try self.context.fetch(FetchDescriptor<ExtensionEntity>(predicate: predicate))
+
+                if let entity = entities.first, entity.isEnabled {
+                    enableExtension(ext.id)
+                    print("   Re-enabled: \(ext.name)")
+                }
+            } catch {
+                print("   Failed to check extension \(ext.name): \(error)")
+            }
+        }
+
+        print("🔌 [ExtensionManager] Re-enabled extensions complete")
     }
     
     func uninstallExtension(_ extensionId: String) {
@@ -706,7 +745,8 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         
         // Remove from database and filesystem
         do {
-            let predicate = #Predicate<ExtensionEntity> { $0.id == extensionId }
+            let id = extensionId
+            let predicate = #Predicate<ExtensionEntity> { $0.id == id }
             let entities = try self.context.fetch(FetchDescriptor<ExtensionEntity>(predicate: predicate))
             
             for entity in entities {
@@ -725,7 +765,8 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     
     private func updateExtensionEnabled(_ extensionId: String, enabled: Bool) {
         do {
-            let predicate = #Predicate<ExtensionEntity> { $0.id == extensionId }
+            let id = extensionId
+            let predicate = #Predicate<ExtensionEntity> { $0.id == id }
             let entities = try self.context.fetch(FetchDescriptor<ExtensionEntity>(predicate: predicate))
             
             if let entity = entities.first {

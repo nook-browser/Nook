@@ -14,7 +14,6 @@ struct GradientCanvasEditor: View {
     // ephemeral Y-positions (0...1) for visual placement only
     @State private var yPositions: [UUID: CGFloat] = [:]
     @State private var xPositions: [UUID: CGFloat] = [:]
-    @State private var selectedMode: Int = 0 // 0 sparkle, 1 sun, 2 moon
     @State private var lightness: Double = 0.6 // HSL L component
     // Lock a primary node identity when in 3-node mode
     @State private var lockedPrimaryID: UUID?
@@ -52,16 +51,7 @@ struct GradientCanvasEditor: View {
                     .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
                     .allowsHitTesting(false)
 
-                // Top mode toggles
-                HStack(spacing: 12) {
-                    modeButton(symbol: "sparkles", idx: 0)
-                    modeButton(symbol: "sun.max", idx: 1)
-                    modeButton(symbol: "moon.stars", idx: 2)
-                    Spacer()
-                }
-                .padding(12)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-
+  
                 // Draggable handles
                 ForEach(gradient.nodes) { node in
                     let posX = xPositions[node.id] ?? CGFloat(node.location)
@@ -117,26 +107,6 @@ struct GradientCanvasEditor: View {
     }
 
     // MARK: - Helpers
-    private func modeButton(symbol: String, idx: Int) -> some View {
-        Image(systemName: symbol)
-            .padding(6)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(selectedMode == idx ? AnyShapeStyle(.thinMaterial) : AnyShapeStyle(Color.clear))
-            )
-            .foregroundStyle(selectedMode == idx ? .primary : .secondary)
-            .onTapGesture {
-                selectedMode = idx
-                switch idx {
-                case 0, 2: // sparkle, moon
-                    lightness = 0.3
-                case 1: // sun
-                    lightness = 0.6
-                default: lightness = 0.6
-                }
-            }
-    }
-
     private func defaultY(for node: GradientNode) -> CGFloat {
         // spread defaults by index for nicer initial layout
         if let idx = gradient.nodes.firstIndex(where: { $0.id == node.id }) {

@@ -90,26 +90,41 @@ struct SpaceView: View {
         print("🔄 SpaceView.folders recomputed: \(folders.count) folders")
         return folders
     }
+
+    private var hasSpacePinnedContent: Bool {
+        !spacePinnedTabs.isEmpty || !folders.isEmpty
+    }
     
     private var spacePinnedItems: [AnyHashable] {
+        // Force dependency tracking for both folder changes and tab changes
         _ = folderChangeCount
+        let currentFolders = folders
 
         var items: [AnyHashable] = []
 
-        let tabsByFolderId = Dictionary(grouping: spacePinnedTabs) { tab in
+        // CRITICAL FIX: Filter out folder tabs from spacePinnedTabs before processing
+        // Only tabs with folderId == nil should appear outside folders
+        let nonFolderSpacePinnedTabs = spacePinnedTabs.filter { $0.folderId == nil }
+        let folderSpacePinnedTabs = spacePinnedTabs.filter { $0.folderId != nil }
+
+        // Group folder tabs by their folderId
+        let tabsByFolderId = Dictionary(grouping: folderSpacePinnedTabs) { tab in
             tab.folderId
         }
 
-        for folder in folders {
+        // Add folders with their tabs
+        for folder in currentFolders {
             let folderTabs = tabsByFolderId[folder.id]?.sorted { $0.index < $1.index } ?? []
             items.append(FolderWithTabs(folder: folder, tabs: folderTabs))
         }
-        if let nonFolderTabs = tabsByFolderId[nil] {
-            let sortedTabs = nonFolderTabs.sorted { $0.index < $1.index }
-            items.append(contentsOf: sortedTabs)
-        }
 
-        print("🔄 spacePinnedItems recomputed: \(items.count) items (folderChangeCount: \(folderChangeCount))")
+        // Add non-folder tabs (these appear outside folders)
+        let sortedNonFolderTabs = nonFolderSpacePinnedTabs.sorted { $0.index < $1.index }
+        items.append(contentsOf: sortedNonFolderTabs)
+
+        print("🔄 spacePinnedItems recomputed: \(items.count) items (folderChangeCount: \(folderChangeCount), folders: \(currentFolders.count))")
+        print("   - nonFolderSpacePinnedTabs: \(nonFolderSpacePinnedTabs.count)")
+        print("   - folderSpacePinnedTabs: \(folderSpacePinnedTabs.count)")
         return items
     }
     
@@ -118,7 +133,7 @@ struct SpaceView: View {
         VStack(spacing: 4) {
             SpaceTitle(space: space)
 
-            if !spacePinnedTabs.isEmpty || !tabs.isEmpty {
+            if hasSpacePinnedContent || !tabs.isEmpty {
                 mainContentContainer
             }
         }
@@ -231,7 +246,7 @@ struct SpaceView: View {
     
     private var pinnedTabsSection: some View {
         Group {
-            if !spacePinnedTabs.isEmpty {
+            if hasSpacePinnedContent {
                 pinnedTabsList
                     .transition(.asymmetric(
                         insertion: .opacity.combined(with: .scale(scale: 0.95, anchor: .top)).animation(.easeInOut(duration: 0.3)),
@@ -245,7 +260,7 @@ struct SpaceView: View {
                     ))
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: spacePinnedTabs.isEmpty)
+        .animation(.easeInOut(duration: 0.25), value: hasSpacePinnedContent)
     }
     
     private var pinnedTabsList: some View {

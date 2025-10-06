@@ -19,6 +19,8 @@ class SettingsManager {
     private let blockXSTKey = "settings.blockCrossSiteTracking"
     private let debugToggleUpdateNotificationKey = "settings.debugToggleUpdateNotification"
     private let askBeforeQuitKey = "settings.askBeforeQuit"
+    private let sidebarPositionKey = "settings.sidebarPosition"
+    private let experimentalExtensionsKey = "settings.experimentalExtensions"
     var currentSettingsTab: SettingsTabs = .general
 
     // Stored properties
@@ -68,10 +70,22 @@ class SettingsManager {
             userDefaults.set(askBeforeQuit, forKey: askBeforeQuitKey)
         }
     }
+    
+    var sidebarPosition: SidebarPosition {
+        didSet {
+            userDefaults.set(sidebarPosition.rawValue, forKey: sidebarPositionKey)
+        }
+    }
 
     var debugToggleUpdateNotification: Bool {
         didSet {
             userDefaults.set(debugToggleUpdateNotification, forKey: debugToggleUpdateNotificationKey)
+        }
+    }
+
+    var experimentalExtensions: Bool {
+        didSet {
+            userDefaults.set(experimentalExtensions, forKey: experimentalExtensionsKey)
         }
     }
 
@@ -85,7 +99,9 @@ class SettingsManager {
             tabUnloadTimeoutKey: 3600.0,
             blockXSTKey: false,
             debugToggleUpdateNotificationKey: false,
-            askBeforeQuitKey: true
+            askBeforeQuitKey: true,
+            sidebarPositionKey: SidebarPosition.left.rawValue,
+            experimentalExtensionsKey: false
         ])
 
         // Initialize properties from UserDefaults
@@ -107,6 +123,8 @@ class SettingsManager {
         self.blockCrossSiteTracking = userDefaults.bool(forKey: blockXSTKey)
         self.debugToggleUpdateNotification = userDefaults.bool(forKey: debugToggleUpdateNotificationKey)
         self.askBeforeQuit = userDefaults.bool(forKey: askBeforeQuitKey)
+        self.sidebarPosition = SidebarPosition(rawValue: userDefaults.string(forKey: sidebarPositionKey) ?? "left") ?? SidebarPosition.left
+        self.experimentalExtensions = userDefaults.bool(forKey: experimentalExtensionsKey)
     }
 }
 

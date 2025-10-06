@@ -10,6 +10,8 @@ import SwiftData
 import AppKit
 import WebKit
 import OSLog
+import Combine
+import Sparkle
 
 @MainActor
 final class Persistence {
@@ -328,6 +330,7 @@ class BrowserManager: ObservableObject {
     // Tab closure undo notification
     @Published var showTabClosureToast: Bool = false
     @Published var tabClosureToastCount: Int = 0
+    @Published var updateAvailability: UpdateAvailability?
 
 
     // MARK: - Window State Management
@@ -368,13 +371,14 @@ class BrowserManager: ObservableObject {
     var trackingProtectionManager: TrackingProtectionManager
     var findManager: FindManager
     var importManager: ImportManager
-    
+
     var externalMiniWindowManager = ExternalMiniWindowManager()
     @Published var peekManager = PeekManager()
     
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
     var isSwitchingProfile: Bool = false
+    private var cancellables: Set<AnyCancellable> = []
     
     // Compositor container view
     func setCompositorContainerView(_ view: NSView?, for windowId: UUID) {
@@ -534,6 +538,7 @@ class BrowserManager: ObservableObject {
         self.compositorManager.setUnloadTimeout(self.settingsManager.tabUnloadTimeout)
         self.tabManager.browserManager = self
         self.tabManager.reattachBrowserManager(self)
+        bindTabManagerUpdates()
         if #available(macOS 15.5, *), let mgr = self.extensionManager {
             // Attach extension manager BEFORE any WKWebView is created so content scripts can inject
             mgr.attach(browserManager: self)
@@ -550,6 +555,7 @@ class BrowserManager: ObservableObject {
         self.trackingProtectionManager.setEnabled(self.settingsManager.blockCrossSiteTracking)
         self.externalMiniWindowManager.attach(browserManager: self)
         self.peekManager.attach(browserManager: self)
+        bindPeekManagerUpdates()
         self.authenticationManager.attach(browserManager: self)
         // Migrate legacy history entries (with nil profile) to default profile to avoid cross-profile leakage
         self.migrateUnassignedDataToDefaultProfile()
@@ -569,6 +575,22 @@ class BrowserManager: ObservableObject {
             guard let enabled = note.userInfo?["enabled"] as? Bool else { return }
             self?.trackingProtectionManager.setEnabled(enabled)
         }
+    }
+
+    private func bindTabManagerUpdates() {
+        tabManager.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+    }
+
+    private func bindPeekManagerUpdates() {
+        peekManager.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - OAuth Assist Controls
@@ -2278,13 +2300,21 @@ class BrowserManager: ObservableObject {
                 }
             }
             
-            // If no current tab, try to find a suitable one
+            // If no current tab, try to find a suitable one using TabManager's current tab
             if windowState.currentTabId == nil {
-                let availableTabs = tabsForDisplay(in: windowState)
-                if let firstTab = availableTabs.first {
-                    windowState.currentTabId = firstTab.id
-                    needsUpdate = true
+                // Prefer TabManager's current tab over arbitrary first tab
+                if let managerCurrentTab = tabManager.currentTab {
+                    windowState.currentTabId = managerCurrentTab.id
+                    print("🔧 [validateWindowStates] Using TabManager's current tab: \(managerCurrentTab.name)")
+                } else {
+                    // Fallback to first available tab
+                    let availableTabs = tabsForDisplay(in: windowState)
+                    if let firstTab = availableTabs.first {
+                        windowState.currentTabId = firstTab.id
+                        print("🔧 [validateWindowStates] Using fallback first tab: \(firstTab.name)")
+                    }
                 }
+                needsUpdate = true
             }
             
             // If no current space, use the first available space
@@ -2477,6 +2507,65 @@ class BrowserManager: ObservableObject {
         // TODO: Implement folder expansion
         // This would need to be handled by the sidebar component
         toggleSidebar()
+    }
+}
+
+// MARK: - Update Handling
+
+extension BrowserManager {
+    struct UpdateAvailability: Equatable {
+        let version: String
+        let shortVersion: String
+        let releaseNotesURL: URL?
+        var isDownloaded: Bool
+
+        init(version: String, shortVersion: String, releaseNotesURL: URL?, isDownloaded: Bool) {
+            self.version = version
+            self.shortVersion = shortVersion
+            self.releaseNotesURL = releaseNotesURL
+            self.isDownloaded = isDownloaded
+        }
+
+        init(item: SUAppcastItem, isDownloaded: Bool) {
+            self.init(
+                version: item.versionString,
+                shortVersion: item.displayVersionString,
+                releaseNotesURL: item.releaseNotesURL,
+                isDownloaded: isDownloaded
+            )
+        }
+    }
+
+    func handleUpdaterFoundValidUpdate(_ item: SUAppcastItem) {
+        updateAvailability = UpdateAvailability(
+            item: item,
+            isDownloaded: updateAvailability?.isDownloaded ?? false
+        )
+    }
+
+    func handleUpdaterFinishedDownloading(_ item: SUAppcastItem) {
+        if var availability = updateAvailability {
+            availability.isDownloaded = true
+            updateAvailability = availability
+        } else {
+            updateAvailability = UpdateAvailability(item: item, isDownloaded: true)
+        }
+    }
+
+    func handleUpdaterDidNotFindUpdate() {
+        updateAvailability = nil
+    }
+
+    func handleUpdaterAbortedUpdate() {
+        updateAvailability = nil
+    }
+
+    func handleUpdaterWillInstallOnQuit(_ item: SUAppcastItem) {
+        handleUpdaterFinishedDownloading(item)
+    }
+
+    func installPendingUpdateIfAvailable() {
+        appDelegate?.updaterController.checkForUpdates(nil)
     }
 }
 

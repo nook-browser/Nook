@@ -66,13 +66,19 @@ struct SpacesList: View {
             ForEach(Array(visibleSpaces.enumerated()), id: \.element.id) { index, space in
                 let isActive = windowState.currentSpaceId == space.id
                 let isFaded = shouldUseMinimal && !isActive
-                
+
                 SpacesListItem(space: space, isActive: isActive, compact: shouldUseCompact)
                     .environmentObject(browserManager)
                     .environmentObject(windowState)
                     .id(space.id)
                     .opacity(isFaded ? 0.3 : 1.0)
+                    .transition(.asymmetric(
+                        insertion: .scale.combined(with: .opacity),
+                        removal: .scale.combined(with: .opacity)
+                    ))
+                    .animation(.easeInOut(duration: 0.3), value: visibleSpaces.map(\.id))
             }
         }
+        .animation(.easeInOut(duration: 0.3), value: visibleSpaces.count)
     }
 }

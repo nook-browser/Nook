@@ -87,10 +87,10 @@ struct WebsiteView: View {
                             }
                         }
                         // Restore visual margins around the web content card
-                        // - Keep leading flush with the sidebar when visible
-                        // - Add a leading margin when the sidebar is hidden
-                        .padding(.trailing, 8)
-                        .padding(.leading, windowState.isSidebarVisible ? 0 : 8)
+                        // - Keep webview flush with the sidebar when visible (left or right)
+                        // - Add margins when the sidebar is hidden
+                        .padding(.trailing, windowState.isSidebarVisible && browserManager.settingsManager.sidebarPosition == .right ? 0 : 8)
+                        .padding(.leading, windowState.isSidebarVisible && browserManager.settingsManager.sidebarPosition == .left ? 0 : 8)
                     }
                     .contextMenu {
                         // Divider + close buttons overlay when split is active

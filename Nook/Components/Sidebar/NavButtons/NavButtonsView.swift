@@ -35,7 +35,6 @@ class ObservableTabWrapper: ObservableObject {
 
     func updateTab(_ newTab: Tab?) {
         tab = newTab
-        objectWillChange.send()
     }
 
     func setContext(browserManager: BrowserManager, windowState: BrowserWindowState) {
@@ -47,70 +46,81 @@ class ObservableTabWrapper: ObservableObject {
 struct NavButtonsView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var windowState: BrowserWindowState
-    var sidebarThreshold: CGFloat = 150
+    var effectiveSidebarWidth: CGFloat?
     @StateObject private var tabWrapper = ObservableTabWrapper()
 
     var body: some View {
+        let sidebarOnLeft = browserManager.settingsManager.sidebarPosition == .left
+        let sidebarWidthForLayout = effectiveSidebarWidth ?? windowState.sidebarWidth
+        let navigationCollapseThreshold: CGFloat = 190
+        let refreshCollapseThreshold: CGFloat = 150
+        let shouldCollapseNavigation = sidebarWidthForLayout < navigationCollapseThreshold
+        let shouldCollapseRefresh = sidebarWidthForLayout < refreshCollapseThreshold
+
         HStack(spacing: 2) {
-            MacButtonsView()
-                .frame(width: 70)
-            NavButton(iconName: "sidebar.left", disabled: false, action: {
+            if sidebarOnLeft {
+                MacButtonsView()
+                    .frame(width: 70)
+            }
+
+            NavButton(iconName: sidebarOnLeft ? "sidebar.left" : "sidebar.right", disabled: false, action: {
                 browserManager.toggleSidebar(for: windowState)
             })
 
             Spacer()
 
-            if windowState.sidebarWidth < sidebarThreshold {
-                Menu {
-                    Label("Reload", systemImage: "arrow.clockwise")
-                    Label("Go Back", systemImage: "arrow.backward")
-                    Label("Go Forward", systemImage: "arrow.forward")
-                } label: {
-                    NavButton(iconName: "ellipsis", disabled: false, action: {})
+            HStack(alignment: .center, spacing: 8) {
+                if shouldCollapseNavigation {
+                    Menu {
+                        Button(action: goBack) {
+                            Label("Go Back", systemImage: "arrow.backward")
+                        }
+                        .disabled(!tabWrapper.canGoBack)
+                        Button(action: goForward) {
+                            Label("Go Forward", systemImage: "arrow.forward")
+                        }
+                        .disabled(!tabWrapper.canGoForward)
+                        Button(action: refreshCurrentTab) {
+                            Label("Reload", systemImage: "arrow.clockwise")
+                        }
+                    } label: {
+                        NavButton(iconName: "ellipsis", disabled: false, action: {})
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                } else {
+                    HStack(alignment: .center, spacing: 8) {
+                        NavButton(
+                            iconName: "arrow.backward",
+                            disabled: !tabWrapper.canGoBack,
+                            action: goBack
+                        )
+                        .contextMenu {
+                            NavigationHistoryContextMenu(
+                                historyType: .back,
+                                windowState: windowState
+                            )
+                        }
+                        NavButton(
+                            iconName: "arrow.forward",
+                            disabled: !tabWrapper.canGoForward,
+                            action: goForward
+                        )
+                        .contextMenu {
+                            NavigationHistoryContextMenu(
+                                historyType: .forward,
+                                windowState: windowState
+                            )
+                        }
+                    }
                 }
-                .buttonStyle(PlainButtonStyle())
 
-            } else {
-                HStack(alignment: .center, spacing: 8) {
-                    NavButton(
-                        iconName: "arrow.backward",
-                        disabled: !tabWrapper.canGoBack,
-                        action: {
-                            if let tab = tabWrapper.tab,
-                               let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
-                                webView.goBack()
-                            } else {
-                                tabWrapper.tab?.goBack()
-                            }
-                        }
-                    )
-                    .contextMenu {
-                        NavigationHistoryContextMenu(
-                            historyType: .back,
-                            windowState: windowState
-                        )
-                    }
-                    NavButton(
-                        iconName: "arrow.forward",
-                        disabled: !tabWrapper.canGoForward,
-                        action: {
-                            if let tab = tabWrapper.tab,
-                               let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
-                                webView.goForward()
-                            } else {
-                                tabWrapper.tab?.goForward()
-                            }
-                        }
-                    )
-                    .contextMenu {
-                        NavigationHistoryContextMenu(
-                            historyType: .forward,
-                            windowState: windowState
-                        )
-                    }
-                    RefreshButton(action: {
-                        tabWrapper.tab?.refresh()
-                    })
+                if !shouldCollapseRefresh {
+                    RefreshButton(action: refreshCurrentTab)
+                }
+
+                if !sidebarOnLeft {
+                    MacButtonsView()
+                        .frame(width: 70)
                 }
             }
         }
@@ -128,5 +138,27 @@ struct NavButtonsView: View {
 
     private func updateCurrentTab() {
         tabWrapper.updateTab(browserManager.currentTab(for: windowState))
+    }
+
+    private func goBack() {
+        if let tab = tabWrapper.tab,
+           let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
+            webView.goBack()
+        } else {
+            tabWrapper.tab?.goBack()
+        }
+    }
+
+    private func goForward() {
+        if let tab = tabWrapper.tab,
+           let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
+            webView.goForward()
+        } else {
+            tabWrapper.tab?.goForward()
+        }
+    }
+
+    private func refreshCurrentTab() {
+        tabWrapper.tab?.refresh()
     }
 }

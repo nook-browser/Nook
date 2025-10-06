@@ -87,23 +87,11 @@ struct SpaceTitle: View {
 
 
             Menu {
-                // Profile assignment submenu
-                Menu("Assign to Profile") {
-                    // Quick info item
-                    let currentName = resolvedProfileName(for: space.profileId) ?? browserManager.profileManager.profiles.first?.name ?? "Default"
-                    Text("Current: \(currentName)")
-                        .foregroundStyle(.secondary)
-                    Divider()
-                    ProfilePickerView(
-                        selectedProfileId: Binding(
-                            get: { space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID() },
-                            set: { assignProfile($0) }
-                        ),
-                        onSelect: { _ in },
-                        compact: true
-                    )
-                    .environmentObject(browserManager)
-                }
+                SpaceProfileDropdown(
+                    currentProfileId: space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID(),
+                    onProfileSelected: { assignProfile($0) }
+                )
+                .environmentObject(browserManager)
                 Divider()
                 Button {
                     startRenaming()
@@ -180,21 +168,11 @@ struct SpaceTitle: View {
             } label: {
                 Label("Edit Theme Color", systemImage: "paintpalette")
             }
-            Menu("Set Profile") {
-                let currentName = resolvedProfileName(for: space.profileId) ?? browserManager.profileManager.profiles.first?.name ?? "Default"
-                Text("Current: \(currentName)")
-                    .foregroundStyle(.secondary)
-                Divider()
-                ProfilePickerView(
-                    selectedProfileId: Binding(
-                        get: { space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID() },
-                        set: { assignProfile($0) }
-                    ),
-                    onSelect: { _ in },
-                    compact: true
-                )
-                .environmentObject(browserManager)
-            }
+            SpaceProfileDropdown(
+                currentProfileId: space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID(),
+                onProfileSelected: { assignProfile($0) }
+            )
+            .environmentObject(browserManager)
             Divider()
             Button {
                 createFolder()

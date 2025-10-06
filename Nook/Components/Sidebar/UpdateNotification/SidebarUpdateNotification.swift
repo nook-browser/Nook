@@ -7,43 +7,33 @@
 
 import SwiftUI
 
-#if RELEASE
-import Sparkle
-#endif
-
 struct SidebarUpdateNotification: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var windowState: BrowserWindowState
-    @EnvironmentObject var gradientColorManager: GradientColorManager
     @Environment(SettingsManager.self) var settingsManager
     let downloadsMenuVisible: Bool
+    @State private var isVisible: Bool = false
     @State private var isExpanded: Bool = false
     @State private var isHovering: Bool = false
-    @State private var isVisible: Bool = false
-    @State private var buttonHovering: Bool = false
     @State private var gradientPhase: Double = 0.0
 
-    private var updateAvailable: Bool {
-        // For now, return false to avoid API issues
-        // In production, this would check Sparkle's actual update state
-        return false
-    }
-
-    private var updateAgeHours: Int {
-        #if RELEASE
-        guard let lastUpdateCheck = browserManager.appDelegate?.updaterController.updater.lastUpdateCheckDate else {
-            return 0
+    private var availability: BrowserManager.UpdateAvailability? {
+        if let update = browserManager.updateAvailability {
+            return update
         }
-        let now = Date()
-        let timeInterval = now.timeIntervalSince(lastUpdateCheck)
-        return Int(timeInterval / 3600)
-        #else
-        return 0
-        #endif
+        if settingsManager.debugToggleUpdateNotification {
+            return BrowserManager.UpdateAvailability(
+                version: "9999.0",
+                shortVersion: "Preview Build",
+                releaseNotesURL: nil,
+                isDownloaded: true
+            )
+        }
+        return nil
     }
 
     private var shouldShowNotification: Bool {
-        settingsManager.debugToggleUpdateNotification || (updateAvailable && updateAgeHours >= 24)
+        availability != nil
     }
 
     private var notificationOffset: CGFloat {
@@ -51,21 +41,18 @@ struct SidebarUpdateNotification: View {
     }
 
     var body: some View {
-        if shouldShowNotification {
+        if let availability, shouldShowNotification {
             VStack(spacing: 0) {
-                // The button that expands/collapses
                 VStack(spacing: 0) {
-                    // Title text that moves up on hover
                     Text("New version of Nook available")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(.black)
                         .offset(y: isExpanded ? -25 : 0)
                         .zIndex(2)
 
-                    // Expandable button that appears below
                     if isExpanded {
                         Button(action: {
-                            installUpdate()
+                            installUpdate(wasDownloaded: availability.isDownloaded)
                         }) {
                             Text("Restart and Update")
                                 .font(.system(size: 12, weight: .semibold))
@@ -78,11 +65,11 @@ struct SidebarUpdateNotification: View {
                                         .fill(
                                             LinearGradient(
                                                 gradient: Gradient(colors: [
-                                                Color.green,
-                                                Color.white,
-                                                Color.green,
-                                                Color.white
-                                            ]),
+                                                    Color.green,
+                                                    Color.white,
+                                                    Color.green,
+                                                    Color.white
+                                                ]),
                                                 startPoint: UnitPoint(x: gradientPhase, y: gradientPhase),
                                                 endPoint: UnitPoint(x: gradientPhase + 1.0, y: gradientPhase + 1.0)
                                             )
@@ -90,9 +77,6 @@ struct SidebarUpdateNotification: View {
                                 )
                         }
                         .buttonStyle(PlainButtonStyle())
-                        .onHover { hovering in
-                            buttonHovering = hovering
-                        }
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.8).combined(with: .opacity),
                             removal: .scale(scale: 0.8).combined(with: .opacity)
@@ -116,26 +100,12 @@ struct SidebarUpdateNotification: View {
             }
             .opacity(isVisible ? 1 : 0)
             .offset(y: isVisible ? notificationOffset : 50)
-            .animation(
-                .easeOut(duration: 0.3),
-                value: isVisible
-            )
-            .animation(
-                .easeOut(duration: 0.3),
-                value: notificationOffset
-            )
-            .animation(
-                .easeInOut(duration: 0.2),
-                value: isExpanded
-            )
-            .animation(
-                .easeInOut(duration: 0.3),
-                value: buttonHovering
-            )
+            .animation(.easeOut(duration: 0.3), value: isVisible)
+            .animation(.easeOut(duration: 0.3), value: notificationOffset)
+            .animation(.easeInOut(duration: 0.2), value: isExpanded)
             .onAppear {
                 showNotification()
-                // Start smooth gradient scrolling
-                Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { timer in
+                Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
                     gradientPhase += 0.005
                 }
             }
@@ -151,19 +121,13 @@ struct SidebarUpdateNotification: View {
 
     private func showNotification() {
         isVisible = true
-        isExpanded = false // Start collapsed
     }
 
     private func hideNotification() {
         isVisible = false
     }
 
-    private func installUpdate() {
-        #if RELEASE
-        // Use the updater controller to check for and install updates
-        browserManager.appDelegate?.updaterController.checkForUpdates(nil)
-        #endif
+    private func installUpdate(wasDownloaded: Bool) {
+        browserManager.installPendingUpdateIfAvailable()
     }
 }
-
-

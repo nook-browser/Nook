@@ -46,7 +46,7 @@ struct NookApp: App {
     }
 }
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "AppTermination")
     weak var browserManager: BrowserManager?
     private let urlEventClass = AEEventClass(kInternetEventClass)
@@ -54,7 +54,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // Sparkle updater controller
     lazy var updaterController: SPUStandardUpdaterController = {
-        return SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+        return SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: self, userDriverDelegate: nil)
     }()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -200,6 +200,46 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         Task { @MainActor in
             manager.presentExternalURL(url)
+        }
+    }
+}
+
+// MARK: - Sparkle Delegate
+
+extension AppDelegate {
+    func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
+        Task { @MainActor in
+            browserManager?.handleUpdaterFoundValidUpdate(item)
+        }
+    }
+
+    func updater(_ updater: SPUUpdater, didFinishDownloadingUpdate item: SUAppcastItem) {
+        Task { @MainActor in
+            browserManager?.handleUpdaterFinishedDownloading(item)
+        }
+    }
+
+    func updaterDidNotFindUpdate(_ updater: SPUUpdater) {
+        Task { @MainActor in
+            browserManager?.handleUpdaterDidNotFindUpdate()
+        }
+    }
+
+    func userDidCancelDownload(_ updater: SPUUpdater) {
+        Task { @MainActor in
+            browserManager?.handleUpdaterAbortedUpdate()
+        }
+    }
+
+    func updater(_ updater: SPUUpdater, didAbortWithError error: any Error) {
+        Task { @MainActor in
+            browserManager?.handleUpdaterAbortedUpdate()
+        }
+    }
+
+    func updater(_ updater: SPUUpdater, willInstallUpdateOnQuit item: SUAppcastItem, immediateInstallationInvocation: @escaping () -> Void) {
+        Task { @MainActor in
+            browserManager?.handleUpdaterWillInstallOnQuit(item)
         }
     }
 }
@@ -431,22 +471,24 @@ struct NookCommands: Commands {
         }
         
         // Extensions Commands
-        CommandMenu("Extensions") {
-            Button("Install Extension...") {
-                browserManager.showExtensionInstallDialog()
-            }
-            .keyboardShortcut("e", modifiers: [.command, .shift])
-            
-            Button("Manage Extensions...") {
-                // Open native Settings to Extensions pane
-                openSettings()
-                browserManager.settingsManager.currentSettingsTab = .extensions
-            }
+        if browserManager.settingsManager.experimentalExtensions {
+            CommandMenu("Extensions") {
+                Button("Install Extension...") {
+                    browserManager.showExtensionInstallDialog()
+                }
+                .keyboardShortcut("e", modifiers: [.command, .shift])
 
-            if #available(macOS 15.5, *) {
-                Divider()
-                Button("Open Popup Console") {
-                    browserManager.extensionManager?.showPopupConsole()
+                Button("Manage Extensions...") {
+                    // Open native Settings to Extensions pane
+                    openSettings()
+                    browserManager.settingsManager.currentSettingsTab = .extensions
+                }
+
+                if #available(macOS 15.5, *) {
+                    Divider()
+                    Button("Open Popup Console") {
+                        browserManager.extensionManager?.showPopupConsole()
+                    }
                 }
             }
         }

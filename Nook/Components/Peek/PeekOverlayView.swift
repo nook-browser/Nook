@@ -31,7 +31,7 @@ struct PeekOverlayView: View {
     private var currentSpaceColor: Color {
         if let spaceId = windowState.currentSpaceId,
            let space = browserManager.tabManager.spaces.first(where: { $0.id == spaceId }) {
-            return Color(space.color)
+            return space.gradient.primaryColor
         }
         return Color.accentColor // fallback
     }
@@ -297,10 +297,11 @@ struct PeekOverlayView: View {
     private func calculateLayout(geometry: GeometryProxy) -> (frame: CGRect, cornerRadius: CGFloat) {
         let windowSize = geometry.size
         let isSplit = browserManager.splitManager.isSplit(for: windowState.id)
+        let sidebarPosition = browserManager.settingsManager.sidebarPosition
 
         // Compute the visible web content area by excluding the sidebar width
-        let sidebarOffsetX: CGFloat = windowState.isSidebarVisible ? windowState.sidebarWidth : 0
-        let webAreaWidth = max(0, windowSize.width - sidebarOffsetX)
+        let sidebarWidth: CGFloat = windowState.isSidebarVisible ? windowState.sidebarWidth : 0
+        let webAreaWidth = max(0, windowSize.width - sidebarWidth)
 
         let webViewHeight = windowSize.height - 10 // Full height PLUS 10pts
         let cornerRadius: CGFloat = 16
@@ -309,7 +310,16 @@ struct PeekOverlayView: View {
         let horizontalMargin: CGFloat = 60
         let peekWidth = max(0, webAreaWidth - (horizontalMargin * 2))
         let peekXWithinWebArea = (webAreaWidth - peekWidth) / 2 // equals horizontalMargin
-        let peekX = sidebarOffsetX + peekXWithinWebArea
+
+        // Calculate peek X position based on sidebar position
+        let peekX: CGFloat
+        if sidebarPosition == .left {
+            // Sidebar on left: peek window starts after sidebar
+            peekX = sidebarWidth + peekXWithinWebArea
+        } else {
+            // Sidebar on right: peek window starts from left edge
+            peekX = peekXWithinWebArea
+        }
 
         // If split view, behavior remains the same as single; centering is relative to web area
         _ = isSplit // currently unused but kept for future adjustments
