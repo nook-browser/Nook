@@ -972,15 +972,19 @@ class BrowserManager: ObservableObject {
     // MARK: - Dialog Methods
     
     func showQuitDialog() {
-        dialogManager.showQuitDialog(
-            onAlwaysQuit: {
-                // Save always quit preference
-                self.quitApplication()
-            },
-            onQuit: {
-                self.quitApplication()
-            }
-        )
+        if(self.settingsManager.askBeforeQuit) {
+            dialogManager.showQuitDialog(
+                onAlwaysQuit: {
+                    self.quitApplication()
+                },
+                onQuit: {
+                    self.quitApplication()
+                }
+            )
+        } else {
+            NSApplication.shared.terminate(nil)
+        }
+
     }
     
     func showCustomDialog<Header: View, Body: View, Footer: View>(

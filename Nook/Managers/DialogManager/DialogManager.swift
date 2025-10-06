@@ -108,7 +108,7 @@ class DialogManager {
             ]
         )
         
-        showDialog(header: header, body: Text("Body text"), footer: footer)
+        showDialog(header: header, body: EmptyView(), footer: footer)
     }
     
     func showCustomContentDialog<Content: View>(
