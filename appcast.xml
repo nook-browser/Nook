@@ -4,7 +4,7 @@
 
 <channel>
     <title>Nook App Updates</title>
-    <link>https://nook-browser.github.io/nook-appcast/appcast.xml</link>
+    <link>https://nook-browser.github.io/Nook/appcast.xml</link>
     <description>Latest versions of the Nook browser.</description>
     <language>en</language>
 
