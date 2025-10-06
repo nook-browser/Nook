@@ -135,6 +135,9 @@ struct SpaceView: View {
 
             if hasSpacePinnedContent || !tabs.isEmpty {
                 mainContentContainer
+            } else {
+                // Always show new tab button and separator even when empty
+                newTabButtonSectionWithClear
             }
         }
         .padding(.horizontal, 8)
