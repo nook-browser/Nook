@@ -35,7 +35,6 @@ class ObservableTabWrapper: ObservableObject {
 
     func updateTab(_ newTab: Tab?) {
         tab = newTab
-        objectWillChange.send()
     }
 
     func setContext(browserManager: BrowserManager, windowState: BrowserWindowState) {

@@ -47,8 +47,6 @@ final class PeekManager: ObservableObject {
         // Defer activation to avoid runloop-mode reentrancy from WebKit delegates
         RunLoop.current.perform {
             self.isActive = true
-            // Proactively nudge SwiftUI and provide out-of-band signal
-            self.browserManager?.objectWillChange.send()
             NotificationCenter.default.post(name: .peekDidActivate, object: self)
         }
     }
@@ -59,8 +57,6 @@ final class PeekManager: ObservableObject {
         isActive = false
         webView = nil
 
-        // Proactively notify dismissal
-        browserManager?.objectWillChange.send()
         NotificationCenter.default.post(name: .peekDidDeactivate, object: self)
 
         currentSession = nil

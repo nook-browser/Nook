@@ -10,6 +10,7 @@ import SwiftData
 import AppKit
 import WebKit
 import OSLog
+import Combine
 
 @MainActor
 final class Persistence {
@@ -375,6 +376,7 @@ class BrowserManager: ObservableObject {
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
     var isSwitchingProfile: Bool = false
+    private var cancellables: Set<AnyCancellable> = []
     
     // Compositor container view
     func setCompositorContainerView(_ view: NSView?, for windowId: UUID) {
@@ -534,6 +536,7 @@ class BrowserManager: ObservableObject {
         self.compositorManager.setUnloadTimeout(self.settingsManager.tabUnloadTimeout)
         self.tabManager.browserManager = self
         self.tabManager.reattachBrowserManager(self)
+        bindTabManagerUpdates()
         if #available(macOS 15.5, *), let mgr = self.extensionManager {
             // Attach extension manager BEFORE any WKWebView is created so content scripts can inject
             mgr.attach(browserManager: self)
@@ -550,6 +553,7 @@ class BrowserManager: ObservableObject {
         self.trackingProtectionManager.setEnabled(self.settingsManager.blockCrossSiteTracking)
         self.externalMiniWindowManager.attach(browserManager: self)
         self.peekManager.attach(browserManager: self)
+        bindPeekManagerUpdates()
         self.authenticationManager.attach(browserManager: self)
         // Migrate legacy history entries (with nil profile) to default profile to avoid cross-profile leakage
         self.migrateUnassignedDataToDefaultProfile()
@@ -569,6 +573,22 @@ class BrowserManager: ObservableObject {
             guard let enabled = note.userInfo?["enabled"] as? Bool else { return }
             self?.trackingProtectionManager.setEnabled(enabled)
         }
+    }
+
+    private func bindTabManagerUpdates() {
+        tabManager.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+    }
+
+    private func bindPeekManagerUpdates() {
+        peekManager.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - OAuth Assist Controls
@@ -2278,13 +2298,21 @@ class BrowserManager: ObservableObject {
                 }
             }
             
-            // If no current tab, try to find a suitable one
+            // If no current tab, try to find a suitable one using TabManager's current tab
             if windowState.currentTabId == nil {
-                let availableTabs = tabsForDisplay(in: windowState)
-                if let firstTab = availableTabs.first {
-                    windowState.currentTabId = firstTab.id
-                    needsUpdate = true
+                // Prefer TabManager's current tab over arbitrary first tab
+                if let managerCurrentTab = tabManager.currentTab {
+                    windowState.currentTabId = managerCurrentTab.id
+                    print("🔧 [validateWindowStates] Using TabManager's current tab: \(managerCurrentTab.name)")
+                } else {
+                    // Fallback to first available tab
+                    let availableTabs = tabsForDisplay(in: windowState)
+                    if let firstTab = availableTabs.first {
+                        windowState.currentTabId = firstTab.id
+                        print("🔧 [validateWindowStates] Using fallback first tab: \(firstTab.name)")
+                    }
                 }
+                needsUpdate = true
             }
             
             // If no current space, use the first available space

@@ -177,11 +177,7 @@ struct PrivacySettingsView: View {
                     }
                     .buttonStyle(.bordered)
                     
-                    Button("Clear Downloads List") {
-                        clearDownloads()
-                    }
-                    .buttonStyle(.bordered)
-                }
+                                    }
                 .padding()
                 .background(Color(NSColor.controlBackgroundColor))
                 .cornerRadius(8)
@@ -338,11 +334,7 @@ struct PrivacySettingsView: View {
         }
     }
     
-    private func clearDownloads() {
-        // TODO: Implement download manager clearing
-        print("Clear downloads - not implemented yet")
-    }
-    
+        
     // MARK: - Helper Methods
     
     // MARK: - Cache Action Methods

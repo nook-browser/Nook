@@ -422,16 +422,16 @@ class TabManager: ObservableObject {
     @Published public private(set) var currentSpace: Space?
 
     // Normal tabs per space
-    private var tabsBySpace: [UUID: [Tab]] = [:]
-    
+    @Published private var tabsBySpace: [UUID: [Tab]] = [:]
+
     // Space-level pinned tabs per space
-    private var spacePinnedTabs: [UUID: [Tab]] = [:]
+    @Published private var spacePinnedTabs: [UUID: [Tab]] = [:]
 
     // Folders per space
-    private var foldersBySpace: [UUID: [TabFolder]] = [:]
+    @Published private var foldersBySpace: [UUID: [TabFolder]] = [:]
 
     // Global pinned (essentials), isolated per profile
-    private var pinnedByProfile: [UUID: [Tab]] = [:]
+    @Published private var pinnedByProfile: [UUID: [Tab]] = [:]
     // Pinned tabs encountered during load that have no profile assignment yet
     private var pendingPinnedWithoutProfile: [Tab] = []
     // Space activation to resume after a deferred profile switch
@@ -495,7 +495,27 @@ class TabManager: ObservableObject {
     }
 
     private func setTabs(_ items: [Tab], for spaceId: UUID) {
-        tabsBySpace[spaceId] = items
+        var updated = tabsBySpace
+        updated[spaceId] = items
+        tabsBySpace = updated
+    }
+
+    private func setSpacePinnedTabs(_ items: [Tab], for spaceId: UUID) {
+        var updated = spacePinnedTabs
+        updated[spaceId] = items
+        spacePinnedTabs = updated
+    }
+
+    private func setFolders(_ items: [TabFolder], for spaceId: UUID) {
+        var updated = foldersBySpace
+        updated[spaceId] = items
+        foldersBySpace = updated
+    }
+
+    private func setPinnedTabs(_ items: [Tab], for profileId: UUID) {
+        var updated = pinnedByProfile
+        updated[profileId] = items
+        pinnedByProfile = updated
     }
 
     private func attach(_ tab: Tab) {
@@ -654,9 +674,13 @@ class TabManager: ObservableObject {
             profileId: profileId
         )
         spaces.append(space)
-        tabsBySpace[space.id] = []
-        spacePinnedTabs[space.id] = []
+        setTabs([], for: space.id)
+        setSpacePinnedTabs([], for: space.id)
         if currentSpace == nil { currentSpace = space } else { setActiveSpace(space) }
+
+        // Create a new tab with the user's preferred search engine
+        createNewTab(in: space)
+
         persistSnapshot()
         return space
     }
@@ -671,14 +695,15 @@ class TabManager: ObservableObject {
         for t in closing + spacePinnedClosing {
             if currentTab?.id == t.id { currentTab = nil }
         }
-        tabsBySpace[id] = []
-        spacePinnedTabs[id] = []
+        setTabs([], for: id)
+        setSpacePinnedTabs([], for: id)
         if idx < spaces.count { spaces.remove(at: idx) }
         if currentSpace?.id == id {
             currentSpace = spaces.first
         }
+
         persistSnapshot()
-        
+
         // Validate window states after space removal
         browserManager?.validateWindowStates()
     }
@@ -786,16 +811,11 @@ class TabManager: ObservableObject {
         var folders = foldersBySpace[spaceId] ?? []
         let oldCount = folders.count
         folders.append(folder)
-        foldersBySpace[spaceId] = folders
+        setFolders(folders, for: spaceId)
         print("   Added to foldersBySpace[\(spaceId.uuidString.prefix(8))...]: \(oldCount) → \(folders.count) folders")
 
-        // Trigger UI update to ensure folder appears immediately
-        objectWillChange.send()
-        print("   ✅ objectWillChange.send() called for folder creation")
-
-        // Post notification to force immediate UI refresh
+        // Send notification for SpaceView folderChangeCount
         NotificationCenter.default.post(name: .init("TabFoldersDidChange"), object: nil)
-        print("   📢 TabFoldersDidChange notification posted")
 
         persistSnapshot()
     }
@@ -804,8 +824,7 @@ class TabManager: ObservableObject {
         for (spaceId, folders) in foldersBySpace {
             if let folder = folders.first(where: { $0.id == folderId }) {
                 folder.name = newName
-                // Trigger UI update to ensure rename appears immediately
-                objectWillChange.send()
+                // SwiftUI will automatically detect changes to @Published foldersBySpace
                 persistSnapshot()
                 break
             }
@@ -834,16 +853,11 @@ class TabManager: ObservableObject {
                 // Remove the folder
                 var mutableFolders = folders
                 mutableFolders.remove(at: index)
-                foldersBySpace[spaceId] = mutableFolders
+                setFolders(mutableFolders, for: spaceId)
                 print("   Removed folder from foldersBySpace[\(spaceId.uuidString.prefix(8))...]: \(folders.count) → \(mutableFolders.count) folders")
 
-                // Trigger UI update to ensure folder deletion appears immediately
-                objectWillChange.send()
-                print("   ✅ objectWillChange.send() called for folder deletion")
-
-                // Post notification to force immediate UI refresh
+                // Send notification for SpaceView folderChangeCount
                 NotificationCenter.default.post(name: .init("TabFoldersDidChange"), object: nil)
-                print("   📢 TabFoldersDidChange notification posted")
 
                 persistSnapshot()
                 break
@@ -859,6 +873,7 @@ class TabManager: ObservableObject {
         for (_, folders) in foldersBySpace {
             if let folder = folders.first(where: { $0.id == folderId }) {
                 folder.isOpen.toggle()
+                // SwiftUI will automatically detect changes to @Published foldersBySpace
                 persistSnapshot()
                 break
             }
@@ -911,7 +926,7 @@ class TabManager: ObservableObject {
                 removedSpaceId = space.id
                 removedIndexInCurrentSpace =
                     (space.id == currentSpace?.id) ? i : nil
-                spacePinnedTabs[space.id] = spacePinned
+                setSpacePinnedTabs(spacePinned, for: space.id)
                 break
             }
             // Then check regular tabs
@@ -931,7 +946,7 @@ class TabManager: ObservableObject {
                 if let i = arr.firstIndex(where: { $0.id == id }) {
                     var copy = arr
                     if i < copy.count { removed = copy.remove(at: i) }
-                    pinnedByProfile[pid] = copy
+                    setPinnedTabs(copy, for: pid)
                     break outer
                 }
             }
@@ -1150,8 +1165,8 @@ class TabManager: ObservableObject {
             let resolvedProfileId = browserManager?.currentProfile?.id
             let personal = Space(name: "Personal", icon: "person.crop.circle", gradient: .default, profileId: resolvedProfileId)
             spaces.append(personal)
-            tabsBySpace[personal.id] = []
-            spacePinnedTabs[personal.id] = []
+            setTabs([], for: personal.id)
+            setSpacePinnedTabs([], for: personal.id)
             currentSpace = personal
             persistSnapshot()
             return personal
@@ -1283,7 +1298,7 @@ class TabManager: ObservableObject {
             sp.insert(tab, at: safeIndex)
             // Reindex
             for (i, t) in sp.enumerated() { t.index = i }
-            spacePinnedTabs[spaceId] = sp
+            setSpacePinnedTabs(sp, for: spaceId)
             persistSnapshot()
 
         // MARK: - Folder Operations
@@ -1307,7 +1322,7 @@ class TabManager: ObservableObject {
                     pinnedTab.index = idx
                 }
 
-                spacePinnedTabs[spaceId] = spacePinned
+                setSpacePinnedTabs(spacePinned, for: spaceId)
                 persistSnapshot()
             }
 
@@ -1322,7 +1337,7 @@ class TabManager: ObservableObject {
                     sp.remove(at: index)
                     // Reindex remaining tabs
                     for (i, t) in sp.enumerated() { t.index = i }
-                    spacePinnedTabs[originalSpaceId] = sp
+                    setSpacePinnedTabs(sp, for: originalSpaceId)
                 }
             }
 
@@ -1343,7 +1358,7 @@ class TabManager: ObservableObject {
                let currentIndex = originalSp.firstIndex(where: { $0.id == tab.id }) {
                 if currentIndex < originalSp.count { originalSp.remove(at: currentIndex) }
                 for (idx, existing) in originalSp.enumerated() { existing.index = idx }
-                spacePinnedTabs[originalSpaceId] = originalSp
+                setSpacePinnedTabs(originalSp, for: originalSpaceId)
             }
 
             tab.folderId = nil
@@ -1354,7 +1369,7 @@ class TabManager: ObservableObject {
             let safeIndex = max(0, min(operation.toIndex, destination.count))
             destination.insert(tab, at: safeIndex)
             for (idx, pinnedTab) in destination.enumerated() { pinnedTab.index = idx }
-            spacePinnedTabs[spaceId] = destination
+            setSpacePinnedTabs(destination, for: spaceId)
             persistSnapshot()
 
         case (.folder(let fromFolderId), .spaceRegular(let spaceId)):
@@ -1367,7 +1382,7 @@ class TabManager: ObservableObject {
                     sp.remove(at: index)
                     // Reindex remaining tabs
                     for (i, t) in sp.enumerated() { t.index = i }
-                    spacePinnedTabs[originalSpaceId] = sp
+                    setSpacePinnedTabs(sp, for: originalSpaceId)
                 }
             }
 
@@ -1394,7 +1409,7 @@ class TabManager: ObservableObject {
             sp.insert(tab, at: safeIndex)
             // Reindex
             for (i, t) in sp.enumerated() { t.index = i }
-            spacePinnedTabs[spaceId] = sp
+            setSpacePinnedTabs(sp, for: spaceId)
             persistSnapshot()
 
         case (.spacePinned(let spaceId), .folder(let toFolderId)):
@@ -1415,7 +1430,7 @@ class TabManager: ObservableObject {
                 pinnedTab.index = idx
             }
 
-            spacePinnedTabs[spaceId] = spacePinned
+            setSpacePinnedTabs(spacePinned, for: spaceId)
             persistSnapshot()
 
         case (.essentials, .folder(_)):
@@ -1467,7 +1482,7 @@ class TabManager: ObservableObject {
             pinnedTab.index = i
         }
         
-        spacePinnedTabs[spaceId] = spacePinned
+        setSpacePinnedTabs(spacePinned, for: spaceId)
         persistSnapshot()
     }
     
@@ -1485,7 +1500,7 @@ class TabManager: ObservableObject {
             regularTab.index = i
         }
         
-        tabsBySpace[spaceId] = regularTabs
+        setTabs(regularTabs, for: spaceId)
         persistSnapshot()
     }
     
@@ -1504,7 +1519,7 @@ class TabManager: ObservableObject {
             for (i, pinnedTab) in spacePinned.enumerated() {
                 pinnedTab.index = i
             }
-            spacePinnedTabs[toSpaceId] = spacePinned
+            setSpacePinnedTabs(spacePinned, for: toSpaceId)
         } else {
             var regularTabs = tabsBySpace[toSpaceId] ?? []
             tab.index = toIndex
@@ -1514,9 +1529,9 @@ class TabManager: ObservableObject {
             for (i, regularTab) in regularTabs.enumerated() {
                 regularTab.index = i
             }
-            tabsBySpace[toSpaceId] = regularTabs
+            setTabs(regularTabs, for: toSpaceId)
         }
-        
+
         persistSnapshot()
     }
 
@@ -1577,7 +1592,7 @@ class TabManager: ObservableObject {
         var arr = pinnedByProfile[pid] ?? []
         mutate(&arr)
         for (i, t) in arr.enumerated() { t.index = i }
-        pinnedByProfile[pid] = arr
+        setPinnedTabs(arr, for: pid)
     }
 
     // MARK: - Pinned tabs (global)
@@ -1592,7 +1607,13 @@ class TabManager: ObservableObject {
 
         // Remove from its current container (regular or space-pinned)
         removeFromCurrentContainer(tab)
+
+        // CRITICAL: Clear ALL conflicting properties to prevent duplication
         tab.spaceId = nil
+        tab.isSpacePinned = false  // Clear space-pinned status
+        tab.folderId = nil         // Clear folder reference
+        tab.isPinned = true        // CRITICAL: Explicitly set global pin status
+
         withCurrentProfilePinnedArray { arr in
             // Append to end; index normalized after mutation
             let nextIndex = (arr.map { $0.index }.max() ?? -1) + 1
@@ -1610,7 +1631,7 @@ class TabManager: ObservableObject {
             if let idx = arr.firstIndex(where: { $0.id == tab.id }) {
                 var copy = arr
                 if idx < copy.count { moved = copy.remove(at: idx) }
-                pinnedByProfile[pid] = copy
+                setPinnedTabs(copy, for: pid)
                 break
             }
         }
@@ -1626,6 +1647,7 @@ class TabManager: ObservableObject {
         setTabs(arr, for: sid)
         print("Unpinned tab: \(moved.name) -> space \(sid)")
         if currentTab?.id == moved.id { currentTab = moved }
+
         persistSnapshot()
     }
 
@@ -1674,19 +1696,22 @@ class TabManager: ObservableObject {
     func pinTabToSpace(_ tab: Tab, spaceId: UUID) {
         guard contains(tab) else { return }
         guard let space = spaces.first(where: { $0.id == spaceId }) else { return }
-        
+
         // Remove from current location
         removeFromCurrentContainer(tab)
-        
+
         // Add to space pinned tabs
         tab.spaceId = spaceId
+        tab.isSpacePinned = true   // CRITICAL: Explicitly set space-pinned status
+        tab.isPinned = false       // CRITICAL: Clear global pin status
         var spacePinned = spacePinnedTabs[spaceId] ?? []
         let nextIndex = (spacePinned.map { $0.index }.max() ?? -1) + 1
         tab.index = nextIndex
         spacePinned.append(tab)
-        spacePinnedTabs[spaceId] = spacePinned
-        
+        setSpacePinnedTabs(spacePinned, for: spaceId)
+
         print("Pinned tab '\(tab.name)' to space '\(space.name)'")
+
         persistSnapshot()
     }
     
@@ -1694,49 +1719,50 @@ class TabManager: ObservableObject {
         guard let spaceId = tab.spaceId,
               var spacePinned = spacePinnedTabs[spaceId],
               let index = spacePinned.firstIndex(where: { $0.id == tab.id }) else { return }
-        
+
         // Remove from space pinned tabs
         guard index < spacePinned.count else { return }
         let unpinned = spacePinned.remove(at: index)
-        spacePinnedTabs[spaceId] = spacePinned
-        
+        setSpacePinnedTabs(spacePinned, for: spaceId)
+
         // Add to regular tabs in the same space
         var regularTabs = tabsBySpace[spaceId] ?? []
         let nextIndex = (regularTabs.map { $0.index }.max() ?? -1) + 1
         unpinned.index = nextIndex
         regularTabs.append(unpinned)
-        tabsBySpace[spaceId] = regularTabs
-        
+        setTabs(regularTabs, for: spaceId)
+
         print("Unpinned tab '\(tab.name)' from space")
+
         persistSnapshot()
     }
-    
+
     private func removeFromCurrentContainer(_ tab: Tab) {
         // Remove from global pinned (search across profiles)
         for (pid, arr) in pinnedByProfile {
             if let index = arr.firstIndex(where: { $0.id == tab.id }) {
                 var copy = arr
                 if index < copy.count { copy.remove(at: index) }
-                pinnedByProfile[pid] = copy
+                setPinnedTabs(copy, for: pid)
                 return
             }
         }
-        
+
         // Remove from space pinned
         if let spaceId = tab.spaceId,
            var spacePinned = spacePinnedTabs[spaceId],
            let index = spacePinned.firstIndex(where: { $0.id == tab.id }) {
             if index < spacePinned.count { spacePinned.remove(at: index) }
-            spacePinnedTabs[spaceId] = spacePinned
+            setSpacePinnedTabs(spacePinned, for: spaceId)
             return
         }
-        
+
         // Remove from regular tabs
         if let spaceId = tab.spaceId,
            var regularTabs = tabsBySpace[spaceId],
            let index = regularTabs.firstIndex(where: { $0.id == tab.id }) {
             if index < regularTabs.count { regularTabs.remove(at: index) }
-            tabsBySpace[spaceId] = regularTabs
+            setTabs(regularTabs, for: spaceId)
         }
     }
 
@@ -1807,8 +1833,8 @@ class TabManager: ObservableObject {
                 )
             }
             for sp in spaces {
-                tabsBySpace[sp.id] = []
-                spacePinnedTabs[sp.id] = []
+                setTabs([], for: sp.id)
+                setSpacePinnedTabs([], for: sp.id)
             }
 
             // Ensure all spaces have profile assignments
@@ -1891,7 +1917,7 @@ class TabManager: ObservableObject {
                     var arr = spacePinnedTabs[sid] ?? []
                     let oldCount = arr.count
                     arr.append(t)
-                    spacePinnedTabs[sid] = arr
+                    setSpacePinnedTabs(arr, for: sid)
                     print("   Added to spacePinnedTabs[\(sid.uuidString.prefix(8))...]: \(oldCount) → \(arr.count) tabs")
                 } else {
                     print("   ❌ No spaceId for tab: \(e.name)")
@@ -1904,7 +1930,7 @@ class TabManager: ObservableObject {
                 if let sid = e.spaceId {
                     var arr = tabsBySpace[sid] ?? []
                     arr.append(t)
-                    tabsBySpace[sid] = arr
+                    setTabs(arr, for: sid)
                 }
             }
 
@@ -1923,7 +1949,7 @@ class TabManager: ObservableObject {
                 folder.isOpen = e.isOpen
                 var folders = foldersBySpace[e.spaceId] ?? []
                 folders.append(folder)
-                foldersBySpace[e.spaceId] = folders
+                setFolders(folders, for: e.spaceId)
             }
 
             // Attach browser manager
@@ -1938,7 +1964,7 @@ class TabManager: ObservableObject {
             if spaces.isEmpty {
                 let personalSpace = Space(name: "Personal", icon: "person.crop.circle", gradient: .default)
                 spaces.append(personalSpace)
-                tabsBySpace[personalSpace.id] = []
+                setTabs([], for: personalSpace.id)
                 self.currentSpace = personalSpace
                 persistSnapshot() // Save the initial space
             } else {
@@ -2219,8 +2245,6 @@ extension TabManager {
             }
         }
 
-        // Trigger UI refresh due to computed pinnedTabs/essentialTabs changes
-        objectWillChange.send()
         // Build the set of visible tabs under the new profile
         let spacePinned = currentSpace.flatMap { spacePinnedTabs(for: $0.id) } ?? []
         let visible = pinnedTabs + spacePinned + tabs
@@ -2510,7 +2534,7 @@ extension TabManager {
                 removedSpaceId = space.id
                 removedIndexInCurrentSpace =
                     (space.id == currentSpace?.id) ? i : nil
-                spacePinnedTabs[space.id] = spacePinned
+                setSpacePinnedTabs(spacePinned, for: space.id)
                 break
             }
             // Then check regular tabs
@@ -2530,7 +2554,7 @@ extension TabManager {
                 if let i = arr.firstIndex(where: { $0.id == id }) {
                     var copy = arr
                     if i < copy.count { removed = copy.remove(at: i) }
-                    pinnedByProfile[pid] = copy
+                    setPinnedTabs(copy, for: pid)
                     break outer
                 }
             }

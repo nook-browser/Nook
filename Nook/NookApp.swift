@@ -431,22 +431,24 @@ struct NookCommands: Commands {
         }
         
         // Extensions Commands
-        CommandMenu("Extensions") {
-            Button("Install Extension...") {
-                browserManager.showExtensionInstallDialog()
-            }
-            .keyboardShortcut("e", modifiers: [.command, .shift])
-            
-            Button("Manage Extensions...") {
-                // Open native Settings to Extensions pane
-                openSettings()
-                browserManager.settingsManager.currentSettingsTab = .extensions
-            }
+        if browserManager.settingsManager.experimentalExtensions {
+            CommandMenu("Extensions") {
+                Button("Install Extension...") {
+                    browserManager.showExtensionInstallDialog()
+                }
+                .keyboardShortcut("e", modifiers: [.command, .shift])
 
-            if #available(macOS 15.5, *) {
-                Divider()
-                Button("Open Popup Console") {
-                    browserManager.extensionManager?.showPopupConsole()
+                Button("Manage Extensions...") {
+                    // Open native Settings to Extensions pane
+                    openSettings()
+                    browserManager.settingsManager.currentSettingsTab = .extensions
+                }
+
+                if #available(macOS 15.5, *) {
+                    Divider()
+                    Button("Open Popup Console") {
+                        browserManager.extensionManager?.showPopupConsole()
+                    }
                 }
             }
         }

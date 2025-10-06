@@ -61,18 +61,18 @@ struct SettingsView: View {
             }
             .tag(SettingsTabs.shortcuts)
 
-
-            SettingsPane {
-                ExtensionsSettingsView()
+            if browserManager.settingsManager.experimentalExtensions {
+                SettingsPane {
+                    ExtensionsSettingsView()
+                }
+                .tabItem {
+                    Label(
+                        SettingsTabs.extensions.name,
+                        systemImage: SettingsTabs.extensions.icon
+                    )
+                }
+                .tag(SettingsTabs.extensions)
             }
-            .tabItem {
-                Label(
-                    SettingsTabs.extensions.name,
-                    systemImage: SettingsTabs.extensions.icon
-                )
-            }
-            .tag(SettingsTabs.extensions)
-
 
             SettingsPane {
                 AdvancedSettingsView()
@@ -85,6 +85,21 @@ struct SettingsView: View {
             }
             .tag(SettingsTabs.advanced)
 
+        }
+        .onChange(of: browserManager.settingsManager.experimentalExtensions) { experimentalEnabled in
+            // If extensions are disabled and the current tab is extensions, switch to a valid tab
+            if !experimentalEnabled && browserManager.settingsManager.currentSettingsTab == .extensions {
+                browserManager.settingsManager.currentSettingsTab = .advanced
+            }
+
+            // Handle extension state when experimental flag changes
+            if experimentalEnabled {
+                // Re-enable extensions that were previously enabled
+                browserManager.extensionManager?.enableAllExtensions()
+            } else {
+                // Disable all extensions when experimental support is turned off
+                browserManager.extensionManager?.disableAllExtensions()
+            }
         }
     }
 }
@@ -397,29 +412,7 @@ struct ProfilesSettingsView: View {
 
                 Divider().opacity(0.4)
 
-                // Export / Import actions (placeholders)
-                HStack(spacing: 8) {
-                    Button(action: showExportPlaceholder) {
-                        Label(
-                            "Export Current Profile",
-                            systemImage: "square.and.arrow.up"
-                        )
-                    }
-                    .buttonStyle(.bordered)
-                    .accessibilityLabel("Export current profile")
-
-                    Button(action: showImportPlaceholder) {
-                        Label(
-                            "Import Profile",
-                            systemImage: "square.and.arrow.down"
-                        )
-                    }
-                    .buttonStyle(.bordered)
-                    .accessibilityLabel("Import profile")
-
-                    Spacer()
-                }
-            }
+              }
 
             // Space assignments management
             SettingsSectionCard(
@@ -449,17 +442,7 @@ struct ProfilesSettingsView: View {
                         .buttonStyle(.bordered)
                         .accessibilityLabel("Reset space assignments to none")
 
-                        Button(action: showAutoAssignPlaceholder) {
-                            Label(
-                                "Auto-assign by Usage",
-                                systemImage: "sparkles"
-                            )
-                        }
-                        .buttonStyle(.bordered)
-                        .accessibilityLabel(
-                            "Auto assign by usage (placeholder)"
-                        )
-
+        
                         Spacer()
                     }
 
@@ -615,16 +598,15 @@ struct ProfilesSettingsView: View {
     }
 
     private func showDataManagement(for profile: Profile) {
-        // Placeholder: show info dialog
         let header = AnyView(
             DialogHeader(
                 icon: "internaldrive",
                 title: "Manage Data",
-                subtitle: "Per‑profile data isolation coming soon"
+                subtitle: "Profile data management"
             )
         )
         let content = VStack(alignment: .leading, spacing: 12) {
-            Text("Currently, profiles share a single website data store.")
+            Text("Each profile maintains its own isolated website data store.")
             Text("Privacy tools are available under the Privacy tab.")
                 .foregroundStyle(.secondary)
         }
@@ -713,33 +695,7 @@ struct ProfilesSettingsView: View {
         }
     }
 
-    private func showAutoAssignPlaceholder() {
-        let header = AnyView(
-            DialogHeader(
-                icon: "sparkles",
-                title: "Auto-assign by Usage",
-                subtitle: "Coming soon"
-            )
-        )
-        let body = AnyView(
-            Text(
-                "Automatic assignment based on recent tab activity will be available in a future update."
-            )
-        )
-        let footer = AnyView(
-            DialogFooter(rightButtons: [
-                DialogButton(text: "OK", variant: .primary) {
-                    browserManager.dialogManager.closeDialog()
-                }
-            ])
-        )
-        browserManager.dialogManager.showCustomContentDialog(
-            header: header,
-            content: body,
-            footer: footer
-        )
-    }
-
+    
     private func resolvedProfile(for id: UUID?) -> Profile? {
         guard let id else { return nil }
         return browserManager.profileManager.profiles.first(where: {
@@ -981,77 +937,7 @@ private struct MigrationControls: View {
 
             Divider().opacity(0.4)
 
-            // Export/Import placeholders with profile context
-            HStack(spacing: 8) {
-                Button(action: {
-                    // Placeholder; future: export WK data + SwiftData snapshot
-                    // Reuse existing placeholders for now
-                    // showExportPlaceholder() is defined in parent view; keep UI consistent
-                    // For now, present a minimal dialog here
-                    let header = AnyView(
-                        DialogHeader(
-                            icon: "square.and.arrow.up",
-                            title: "Export Profile",
-                            subtitle: browserManager.currentProfile?.name ?? ""
-                        )
-                    )
-                    let body = AnyView(
-                        Text("Export is not implemented yet.").font(.body)
-                    )
-                    let footer = AnyView(
-                        DialogFooter(rightButtons: [
-                            DialogButton(text: "OK", variant: .primary) {
-                                browserManager.dialogManager.closeDialog()
-                            }
-                        ])
-                    )
-                    browserManager.dialogManager.showCustomContentDialog(
-                        header: header,
-                        content: body,
-                        footer: footer
-                    )
-                }) {
-                    Label(
-                        "Export Current Profile",
-                        systemImage: "square.and.arrow.up"
-                    )
-                }
-                .buttonStyle(.bordered)
-
-                Button(action: {
-                    let header = AnyView(
-                        DialogHeader(
-                            icon: "square.and.arrow.down",
-                            title: "Import Profile",
-                            subtitle: browserManager.currentProfile?.name ?? ""
-                        )
-                    )
-                    let body = AnyView(
-                        Text("Import is not implemented yet.").font(.body)
-                    )
-                    let footer = AnyView(
-                        DialogFooter(rightButtons: [
-                            DialogButton(text: "OK", variant: .primary) {
-                                browserManager.dialogManager.closeDialog()
-                            }
-                        ])
-                    )
-                    browserManager.dialogManager.showCustomContentDialog(
-                        header: header,
-                        content: body,
-                        footer: footer
-                    )
-                }) {
-                    Label(
-                        "Import Into Current",
-                        systemImage: "square.and.arrow.down"
-                    )
-                }
-                .buttonStyle(.bordered)
-
-                Spacer()
-            }
-        }
+                    }
     }
 }
 
@@ -1451,6 +1337,24 @@ struct AdvancedSettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            SettingsSectionCard(
+                title: "Experimental Features",
+                subtitle: "Cutting-edge features in development"
+            ) {
+                Toggle(
+                    isOn: $browserManager.settingsManager.experimentalExtensions
+                ) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("EXPERIMENTAL: Enable Extension Support")
+                        Text(
+                            "Enable browser extension support. Extensions are experimental and may cause instability or security issues."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
             #if DEBUG
             SettingsSectionCard(
                 title: "Debug Options",

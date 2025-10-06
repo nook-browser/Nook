@@ -43,7 +43,7 @@ struct SidebarHoverOverlayView: View {
                         .environmentObject(windowState)
                         .frame(width: overlayWidth)
                         .frame(maxHeight: .infinity)
-                        .background(BlurEffectView(material: browserManager.settingsManager.currentMaterial, state: .active))
+                        .background(BlurEffectView(material: .contentBackground, state: .active))
                         .mask(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
                         .overlay(
                             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)

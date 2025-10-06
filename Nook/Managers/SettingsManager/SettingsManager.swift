@@ -20,6 +20,7 @@ class SettingsManager {
     private let debugToggleUpdateNotificationKey = "settings.debugToggleUpdateNotification"
     private let askBeforeQuitKey = "settings.askBeforeQuit"
     private let sidebarPositionKey = "settings.sidebarPosition"
+    private let experimentalExtensionsKey = "settings.experimentalExtensions"
     var currentSettingsTab: SettingsTabs = .general
 
     // Stored properties
@@ -82,6 +83,12 @@ class SettingsManager {
         }
     }
 
+    var experimentalExtensions: Bool {
+        didSet {
+            userDefaults.set(experimentalExtensions, forKey: experimentalExtensionsKey)
+        }
+    }
+
     init() {
         // Register default values
         userDefaults.register(defaults: [
@@ -93,7 +100,8 @@ class SettingsManager {
             blockXSTKey: false,
             debugToggleUpdateNotificationKey: false,
             askBeforeQuitKey: true,
-            sidebarPositionKey: SidebarPosition.left.rawValue
+            sidebarPositionKey: SidebarPosition.left.rawValue,
+            experimentalExtensionsKey: false
         ])
 
         // Initialize properties from UserDefaults
@@ -116,6 +124,7 @@ class SettingsManager {
         self.debugToggleUpdateNotification = userDefaults.bool(forKey: debugToggleUpdateNotificationKey)
         self.askBeforeQuit = userDefaults.bool(forKey: askBeforeQuitKey)
         self.sidebarPosition = SidebarPosition(rawValue: userDefaults.string(forKey: sidebarPositionKey) ?? "left") ?? SidebarPosition.left
+        self.experimentalExtensions = userDefaults.bool(forKey: experimentalExtensionsKey)
     }
 }
 
