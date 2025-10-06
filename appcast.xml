@@ -1,26 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
-  <channel>
-    <title>Nook Browser Updates</title>
-    <link>https://updates.nookbrowser.com/appcast.xml</link>
-    <description>Most recent updates for Nook Browser</description>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
+     xmlns:dc="http://purl.org/dc/elements/1.1/">
+
+<channel>
+    <title>Nook App Updates</title>
+    <link>https://nook-browser.github.io/nook-appcast/appcast.xml</link>
+    <description>Latest versions of the Nook browser.</description>
     <language>en</language>
 
     <item>
-      <title>Version 1.0.0</title>
-      <link>https://nookbrowser.com</link>
-      <sparkle:version>1.0.0</sparkle:version>
-      <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
-      <sparkle:releaseNotesLink>https://updates.nookbrowser.com/release-notes/1.0.0.html</sparkle:releaseNotesLink>
-      <pubDate>Mon, 27 Sep 2025 12:00:00 +0000</pubDate>
-      <enclosure url="https://updates.nookbrowser.com/downloads/Nook-1.0.0.zip"
-                sparkle:version="1.0.0"
-                sparkle:shortVersionString="1.0.0"
-                length="0"
-                type="application/octet-stream"
-                sparkle:edSignature="YOUR_ED_SIGNATURE_HERE"
-                sparkle:downloadable="true" />
+        <title>Version 1.0.0</title>
+        <sparkle:releaseNotesLink>https://github.com/yourusername/Nook/releases/tag/v1.0.0</sparkle:releaseNotesLink>
+        <pubDate>Mon, 06 Oct 2025 00:00:00 +0000</pubDate>
+        <enclosure
+            url="https://github.com/nook-browser/Nook/releases/download/v1.0.0/Nook-1.0.0.dmg"
+            sparkle:version="100"
+            sparkle:shortVersionString="1.0.0"
+            type="application/octet-stream"/>
     </item>
 
-  </channel>
+</channel>
 </rss>
