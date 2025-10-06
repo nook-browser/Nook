@@ -1,5 +1,6 @@
 name: macOS Build, Sign, & Notarize
 
+
 on:
   push:
     tags:
@@ -10,7 +11,8 @@ on:
 jobs:
   build-sign-notarize:
     runs-on: macos-latest
-
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -24,13 +26,18 @@ jobs:
           security unlock-keychain -p "" ~/Library/Keychains/build.keychain
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" ~/Library/Keychains/build.keychain
 
-      - name: Build app
+      - name: Build app (Universal, fallback to arm64)
         run: |
+          set -e
           mkdir -p build
-          # replace this with your actual build step if needed
-          xcodebuild -scheme Nook -configuration Release -derivedDataPath build
+          
+          echo "Attempting universal build (arm64 + x86_64)..."
+          if ! xcodebuild -scheme Nook -configuration Release -arch arm64 -arch x86_64 -derivedDataPath build; then
+            echo "❌ Universal build failed, retrying Apple Silicon only..."
+            xcodebuild -scheme Nook -configuration Release -arch arm64 -derivedDataPath build
+          fi
+          
           cp -R "build/Build/Products/Release/Nook.app" ./Nook.app
-
       - name: Codesign app
         run: |
           codesign --deep --force --verify --verbose \
@@ -67,12 +74,17 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: Nook.dmg
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update Sparkle appcast
         if: github.event_name == 'release'
         run: |
+          if [ ! -f appcast.xml ]; then
+            echo "appcast.xml not found, skipping Sparkle update"
+            exit 0
+          fi
           VERSION=${GITHUB_REF#refs/tags/}
           DMG_URL="https://github.com/${{ github.repository }}/releases/download/${VERSION}/Nook.dmg"
           DATE=$(date -R)
