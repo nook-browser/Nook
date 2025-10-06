@@ -12,7 +12,6 @@ struct WindowView: View {
     @EnvironmentObject var windowState: BrowserWindowState
     @StateObject private var hoverSidebarManager = HoverSidebarManager()
     @Environment(\.colorScheme) var colorScheme
-    @State private var isHoveringMenu = false
 
     // Calculate webview Y offset (where the web content starts)
     private var webViewYOffset: CGFloat {
@@ -40,14 +39,6 @@ struct WindowView: View {
                 SpaceGradientBackgroundView()
                     .environmentObject(windowState)
                 
-                if browserManager.settingsManager.sidebarPosition == .right {
-                    HStack {
-                        Rectangle().fill(Color.clear).frame(width: 100, height: 30).onHover { hover in
-                            isHoveringMenu = hover
-                        }
-                    }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).zIndex(1)
-                }
-
                 // Attach background context menu to the window background layer
                 Color.white.opacity(isDark ? 0.3 : 0.4)
                     .ignoresSafeArea(.all)
@@ -69,14 +60,8 @@ struct WindowView: View {
                                 .environmentObject(windowState)
                         case .windowVStack:
                             VStack(spacing: 0) {
-                                if browserManager.settingsManager.sidebarPosition == .right && isHoveringMenu {
-                                    HStack() {
-                                        MacButtonsView().frame(width: 70, height: 20, alignment: .leading).padding(8)
-                                        Spacer()
-                                    }.transition(.move(edge: .leading).combined(with: .opacity))
-                                }
                                 WebsiteLoadingIndicator()
-                                WebsiteView().animation(.easeInOut, value: browserManager.settingsManager.sidebarPosition == .right && isHoveringMenu)
+                                WebsiteView()
                             }
                             .padding(.bottom, 8)
                             .zIndex(2000)

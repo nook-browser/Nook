@@ -1339,7 +1339,7 @@ struct AdvancedSettingsView: View {
         VStack(alignment: .leading, spacing: 16) {
             SettingsSectionCard(
                 title: "Experimental Features",
-                subtitle: "Cutting-edge features in development"
+                subtitle: "Features in development"
             ) {
                 Toggle(
                     isOn: $browserManager.settingsManager.experimentalExtensions
@@ -1374,12 +1374,6 @@ struct AdvancedSettingsView: View {
                 }
             }
             #endif
-
-            SettingsPlaceholderView(
-                title: "Advanced",
-                subtitle: "Power features and diagnostics",
-                icon: "wrench.and.screwdriver"
-            )
         }
         .padding()
     }
