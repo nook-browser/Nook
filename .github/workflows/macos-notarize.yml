@@ -1,0 +1,98 @@
+name: macOS Build, Sign, & Notarize
+
+on:
+  push:
+    tags:
+      - 'v*'
+  release:
+    types: [published]
+
+jobs:
+  build-sign-notarize:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Import Developer ID certificate
+        run: |
+          echo "$APPLE_CERTIFICATE_P12_BASE64" | base64 --decode > signing_certificate.p12
+          security create-keychain -p "" build.keychain
+          security import signing_certificate.p12 -k ~/Library/Keychains/build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security list-keychains -d user -s ~/Library/Keychains/build.keychain
+          security unlock-keychain -p "" ~/Library/Keychains/build.keychain
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" ~/Library/Keychains/build.keychain
+
+      - name: Build app
+        run: |
+          mkdir -p build
+          # replace this with your actual build step if needed
+          xcodebuild -scheme Nook -configuration Release -derivedDataPath build
+          cp -R "build/Build/Products/Release/Nook.app" ./Nook.app
+
+      - name: Codesign app
+        run: |
+          codesign --deep --force --verify --verbose \
+            --options runtime \
+            --entitlements entitlements.plist \
+            --sign "$SIGNING_IDENTITY" \
+            "Nook.app"
+
+      - name: Verify code signature
+        run: codesign --verify --deep --strict --verbose=2 "Nook.app"
+
+      - name: Notarize app
+        env:
+          NOTARYTOOL_PROFILE: "nook-notary"
+        run: |
+          xcrun notarytool store-credentials "$NOTARYTOOL_PROFILE" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD"
+
+          zip -r Nook.zip "Nook.app"
+          xcrun notarytool submit "Nook.zip" \
+            --keychain-profile "$NOTARYTOOL_PROFILE" \
+            --wait
+
+      - name: Staple notarization ticket
+        run: xcrun stapler staple "Nook.app"
+
+      - name: Create DMG
+        run: |
+          hdiutil create -volname "Nook" -srcfolder "Nook.app" -ov -format UDZO "Nook.dmg"
+
+      - name: Upload DMG to release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Nook.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Sparkle appcast
+        if: github.event_name == 'release'
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          DMG_URL="https://github.com/${{ github.repository }}/releases/download/${VERSION}/Nook.dmg"
+          DATE=$(date -R)
+          SHORT_VERSION=${VERSION#v}
+
+          ENTRY=$(cat <<EOF
+          <item>
+            <title>Version ${SHORT_VERSION}</title>
+            <sparkle:releaseNotesLink>https://github.com/${{ github.repository }}/releases/tag/${VERSION}</sparkle:releaseNotesLink>
+            <pubDate>${DATE}</pubDate>
+            <enclosure url="${DMG_URL}" sparkle:version="${SHORT_VERSION}" length="$(stat -f%z Nook.dmg)" type="application/octet-stream"/>
+          </item>
+          EOF
+          )
+
+          git fetch origin gh-pages
+          git checkout gh-pages
+          sed -i '' "s|</channel>|${ENTRY}\n</channel>|" appcast.xml
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add appcast.xml
+          git commit -m "Add release ${VERSION} to appcast"
+          git push origin gh-pages
