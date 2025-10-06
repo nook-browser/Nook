@@ -1,0 +1,114 @@
+//
+//  NavButtonsView.swift
+//  Nook
+//
+//  Created by Maciek Bagiński on 30/07/2025.
+//
+import SwiftUI
+
+struct NavButtonsView: View {
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
+    @State private var backHistoryMenuVisible = false
+    @State private var forwardHistoryMenuVisible = false
+    var sidebarThreshold: CGFloat = 210
+    var body: some View {
+        HStack(spacing: 2) {
+            MacButtonsView()
+                .frame(width: 70)
+            NavButton(iconName: "sidebar.left") {
+                browserManager.toggleSidebar(for: windowState)
+            }
+            
+            Spacer()
+            
+            if windowState.sidebarWidth < sidebarThreshold {
+                Menu {
+                    Label("Reload", systemImage: "arrow.clockwise")
+                    Label("Go Back", systemImage: "arrow.backward")
+                    Label("Go Forward", systemImage: "arrow.forward")
+                } label: {
+                    NavButton(iconName: "ellipsis")
+                }
+                .buttonStyle(PlainButtonStyle())
+
+            } else {
+                HStack(alignment: .center, spacing: 8) {
+                    ZStack(alignment: .bottomLeading) {
+                        NavButton(iconName: "arrow.backward", disabled: !(browserManager.currentTab(for: windowState)?.canGoBack ?? false)) {
+                            browserManager.currentTab(for: windowState)?.goBack()
+                            print("back")
+                        }
+                        .onLongPressGesture(minimumDuration: 0.5, maximumDistance: .infinity, pressing: { pressing in
+                            if pressing {
+                                backHistoryMenuVisible = true
+                                let menu = NavigationHistoryMenu(windowState: windowState, historyType: .back)
+                                menu.showMenu()
+                            }
+                        }, perform: {})
+
+                        if backHistoryMenuVisible {
+                            NavigationHistoryMenu(
+                                windowState: windowState,
+                                historyType: .back
+                            )
+                            .environmentObject(browserManager)
+                            .onAppear {
+                                backHistoryMenuVisible = true
+                            }
+                            .onDisappear {
+                                backHistoryMenuVisible = false
+                            }
+                            .offset(x: 0, y: 40)
+                            .zIndex(1)
+                        }
+                    }
+
+                    ZStack(alignment: .bottomLeading) {
+                        NavButton(iconName: "arrow.forward", disabled: !(browserManager.currentTab(for: windowState)?.canGoForward ?? false)) {
+                            browserManager.currentTab(for: windowState)?.goForward()
+                            print("forward")
+                        }
+                        .onLongPressGesture(minimumDuration: 0.5, maximumDistance: .infinity, pressing: { pressing in
+                            if pressing {
+                                forwardHistoryMenuVisible = true
+                                let menu = NavigationHistoryMenu(windowState: windowState, historyType: .forward)
+                                menu.showMenu()
+                            }
+                        }, perform: {})
+
+                        if forwardHistoryMenuVisible {
+                            NavigationHistoryMenu(
+                                windowState: windowState,
+                                historyType: .forward
+                            )
+                            .environmentObject(browserManager)
+                            .onAppear {
+                                forwardHistoryMenuVisible = true
+                            }
+                            .onDisappear {
+                                forwardHistoryMenuVisible = false
+                            }
+                            .offset(x: 0, y: 40)
+                            .zIndex(1)
+                        }
+                    }
+
+                    RefreshButton() {
+                        browserManager.currentTab(for: windowState)?.refresh()
+                    }
+                }
+            }
+
+        }
+    }
+        .onTapGesture {
+            hideAllMenus()
+        }
+    }
+
+    private func hideAllMenus() {
+        backHistoryMenuVisible = false
+        forwardHistoryMenuVisible = false
+    }
+}
