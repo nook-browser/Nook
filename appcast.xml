@@ -9,13 +9,13 @@
     <language>en</language>
 
     <item>
-        <title>Version 1.0.0</title>
-        <sparkle:releaseNotesLink>https://github.com/yourusername/Nook/releases/tag/v0.0.0</sparkle:releaseNotesLink>
+        <title>Version 0.0.1</title>
+        <sparkle:releaseNotesLink>https://github.com/yourusername/Nook/releases/tag/v0.0.1</sparkle:releaseNotesLink>
         <pubDate>Mon, 06 Oct 2025 00:00:00 +0000</pubDate>
         <enclosure
-            url="https://github.com/nook-browser/Nook/releases/download/v0.0.0/Nook-1.0.0.dmg"
+            url="https://github.com/nook-browser/Nook/releases/download/v0.0.1/Nook-alpha.dmg"
             sparkle:version="100"
-            sparkle:shortVersionString="0.0.0"
+            sparkle:shortVersionString="0.0.1"
             type="application/octet-stream"/>
     </item>
 
