@@ -27,7 +27,7 @@
 ### Build from Source
 
 #### Prerequisites  
-- macOS 14+ (Sonoma or later)  
+- macOS 15.5+
 - [Xcode](https://developer.apple.com/xcode/) (to build from source)
 ```bash
 
