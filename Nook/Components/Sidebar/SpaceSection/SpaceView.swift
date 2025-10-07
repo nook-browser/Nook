@@ -55,6 +55,7 @@ struct SpaceView: View {
     @State private var lockScrollView: Bool = false
     @State private var refreshTrigger: UUID = UUID()
     @State private var folderChangeCount: Int = 0
+    @State private var isHovered: Bool = false
     
     let onActivateTab: (Tab) -> Void
     let onCloseTab: (Tab) -> Void
@@ -149,6 +150,9 @@ struct SpaceView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .init("TabFoldersDidChange"))) { _ in
             folderChangeCount += 1
+        }
+        .onHover { state in
+            isHovered = state
         }
       }
     
@@ -455,8 +459,7 @@ struct SpaceView: View {
 
     private var newTabButtonSectionWithClear: some View {
         VStack(spacing: 0) {
-            SpaceSeparator {
-                // Clear all regular tabs for this space
+            SpaceSeparator(isHovering: isHovered) {
                 browserManager.tabManager.clearRegularTabs(for: space.id)
             }
             .padding(.horizontal, 8)
