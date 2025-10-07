@@ -1,7 +1,7 @@
 # Nook
 *A fast, minimal browser with a sidebar-first design.*
 
-**A public alpha will be available soon. For now, you'll have to build from source.**
+[![Download for macOS](https://img.shields.io/badge/Download%20for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/nook-browser/nook/releases/download/v0.0.1/Nook-alpha.dmg)
 
 ![Image from Imgflip](https://github.com/user-attachments/assets/dbfe9e9c-82f5-4f59-a073-b86ea05e5f26)
 

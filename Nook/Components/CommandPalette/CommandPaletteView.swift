@@ -53,12 +53,9 @@ struct CommandPaletteView: View {
             Color.clear
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
-                .highPriorityGesture(
-                    TapGesture()
-                        .onEnded { _ in
-                            browserManager.closeCommandPalette(for: windowState)
-                        }
-                )
+                .onTapGesture {
+                    browserManager.closeCommandPalette(for: windowState)
+                }
                 .gesture(WindowDragGesture())
 
             GeometryReader { geometry in

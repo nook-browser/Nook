@@ -77,48 +77,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             .attributeDescriptor(forKeyword: kAEQuitReason)
         
         switch reason?.enumCodeValue {
-            case nil:
-            if browserManager?.settingsManager.askBeforeQuit ?? true {
-                // This probably means it's command-q
-                let header = AnyView(
-                    DialogHeader(
-                        icon: "questionmark.circle",
-                        title: "Quit Nook?",
-                    )
-                )
-                let footer = AnyView(
-                    DialogFooter(leftButton: DialogButton(text: "Quit, and don't ask again", variant: .secondary) { [weak self] in
-                        // Safely unwrap self
-                        guard let self = self else {
-                            sender.reply(toApplicationShouldTerminate: true)
-                            return
-                        }
-                        self.browserManager?.settingsManager.askBeforeQuit = false
-                        self.handletermination(sender: sender, shouldTerminate: true)
-                    }, rightButtons: [
-                        DialogButton(text: "Cancel", variant: .secondary) { [weak self] in
-                            // Safely unwrap self
-                            guard let self = self else {
-                                sender.reply(toApplicationShouldTerminate: true)
-                                return
-                            }
-                            self.browserManager?.dialogManager.closeDialog()
-                            self.handletermination(sender: sender, shouldTerminate: false)
-                        },
-                        DialogButton(text: "Quit", variant: .primary) {
-                            self.handletermination(sender: sender, shouldTerminate: true)
-                        }
-                    ])
-                )
-                browserManager?.dialogManager.showCustomContentDialog(
-                    header: header,
-                    content: EmptyView(),
-                    footer: footer
-                )
-            } else {
-                self.handletermination(sender: sender, shouldTerminate: true)
-            }
-            
+        case nil: self.handletermination(sender: sender, shouldTerminate: true)
 
         default:
             handletermination(sender: sender, shouldTerminate: true)

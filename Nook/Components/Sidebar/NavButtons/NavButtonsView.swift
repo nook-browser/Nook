@@ -121,6 +121,13 @@ struct NavButtonsView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2) {
+            if let window = NSApp.keyWindow {
+                window.performZoom(nil)
+            }
+        }
         .onAppear {
             tabWrapper.setContext(browserManager: browserManager, windowState: windowState)
             updateCurrentTab()
