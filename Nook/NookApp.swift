@@ -259,6 +259,13 @@ struct NookCommands: Commands {
         CommandGroup(replacing: .windowList) {}
         // Use the native Settings menu (no replacement of .appSettings)
 
+        // App Menu Section (under Nook)
+        CommandGroup(after: .appInfo) {
+            Button("Make Nook Default Browser") {
+                browserManager.setAsDefaultBrowser()
+            }
+        }
+
         // Edit Section
         CommandGroup(replacing: .undoRedo) {
             Button("Undo Close Tab") {

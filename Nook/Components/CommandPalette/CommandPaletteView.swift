@@ -52,9 +52,13 @@ struct CommandPaletteView: View {
         ZStack {
             Color.clear
                 .ignoresSafeArea()
-                .onTapGesture {
-                    browserManager.closeCommandPalette(for: windowState)
-                }
+                .contentShape(Rectangle())
+                .highPriorityGesture(
+                    TapGesture()
+                        .onEnded { _ in
+                            browserManager.closeCommandPalette(for: windowState)
+                        }
+                )
                 .gesture(WindowDragGesture())
 
             GeometryReader { geometry in

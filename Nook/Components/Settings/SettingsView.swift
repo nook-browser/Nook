@@ -61,7 +61,7 @@ struct SettingsView: View {
             }
             .tag(SettingsTabs.shortcuts)
 
-            if browserManager.settingsManager.experimentalExtensions {
+            if #available(macOS 15.5, *), browserManager.settingsManager.experimentalExtensions {
                 SettingsPane {
                     ExtensionsSettingsView()
                 }
@@ -1337,20 +1337,22 @@ struct AdvancedSettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SettingsSectionCard(
-                title: "Experimental Features",
-                subtitle: "Features in development"
-            ) {
-                Toggle(
-                    isOn: $browserManager.settingsManager.experimentalExtensions
+            if #available(macOS 15.5, *) {
+                SettingsSectionCard(
+                    title: "Experimental Features",
+                    subtitle: "Features in development"
                 ) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("EXPERIMENTAL: Enable Extension Support")
-                        Text(
-                            "Enable browser extension support. Extensions are experimental and may cause instability or security issues."
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Toggle(
+                        isOn: $browserManager.settingsManager.experimentalExtensions
+                    ) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("EXPERIMENTAL: Enable Extension Support")
+                            Text(
+                                "Enable browser extension support. Extensions are experimental and may cause instability or security issues."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }

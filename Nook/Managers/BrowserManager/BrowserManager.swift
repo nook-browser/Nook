@@ -12,6 +12,7 @@ import WebKit
 import OSLog
 import Combine
 import Sparkle
+import CoreServices
 
 @MainActor
 final class Persistence {
@@ -1116,12 +1117,21 @@ class BrowserManager: ObservableObject {
         let savedWidth = userDefaults.double(forKey: "sidebarWidth")
         let savedVisibility = userDefaults.bool(forKey: "sidebarVisible")
 
+        // Check if this is first launch (no saved width)
+        let isFirstLaunch = savedWidth == 0
+
         if savedWidth > 0 {
             savedSidebarWidth = savedWidth
             sidebarWidth = savedVisibility ? savedWidth : 0
+        } else {
+            // First launch: ensure sidebar is visible with default width
+            savedSidebarWidth = 250
+            sidebarWidth = 250
         }
         sidebarContentWidth = max(sidebarWidth - 16, 0)
-        isSidebarVisible = savedVisibility
+
+        // On first launch, default to visible sidebar
+        isSidebarVisible = isFirstLaunch ? true : savedVisibility
     }
 
     private func saveSidebarSettings() {
@@ -1418,11 +1428,11 @@ class BrowserManager: ObservableObject {
     // MARK: - Web Inspector
     func openWebInspector() {
         guard let currentTab = currentTabForActiveWindow(),
-              let activeWindowId = activeWindowState?.id else { 
+              let activeWindowId = activeWindowState?.id else {
             print("No current tab to inspect")
-            return 
+            return
         }
-        
+
         if #available(macOS 13.3, *) {
             // Use the WebView that's actually visible in the current window
             let webView: WKWebView
@@ -1431,7 +1441,7 @@ class BrowserManager: ObservableObject {
             } else {
                 webView = currentTab.activeWebView
             }
-            
+
             if webView.isInspectable {
                 DispatchQueue.main.async {
                     // Focus the webview and trigger context menu programmatically
@@ -1444,15 +1454,15 @@ class BrowserManager: ObservableObject {
             print("Web inspector requires macOS 13.3 or later")
         }
     }
-    
+
     private func presentInspectorContextMenu(for webView: WKWebView) {
         // Focus the webview first
         webView.window?.makeFirstResponder(webView)
-        
+
         // Create a right-click event at the center of the webview
         let bounds = webView.bounds
         let center = NSPoint(x: bounds.midX, y: bounds.midY)
-        
+
         let rightClickEvent = NSEvent.mouseEvent(
             with: .rightMouseDown,
             location: center,
@@ -1464,7 +1474,7 @@ class BrowserManager: ObservableObject {
             clickCount: 1,
             pressure: 1.0
         )
-        
+
         if let event = rightClickEvent {
             webView.rightMouseDown(with: event)
         }
@@ -2566,6 +2576,18 @@ extension BrowserManager {
 
     func installPendingUpdateIfAvailable() {
         appDelegate?.updaterController.checkForUpdates(nil)
+    }
+
+    // MARK: - Default Browser
+
+    /// Sets Nook as the default browser for HTTP and HTTPS schemes
+    func setAsDefaultBrowser() {
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier else {
+            return
+        }
+
+        LSSetDefaultHandlerForURLScheme("http" as CFString, bundleIdentifier as CFString)
+        LSSetDefaultHandlerForURLScheme("https" as CFString, bundleIdentifier as CFString)
     }
 }
 
