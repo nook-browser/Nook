@@ -52,6 +52,7 @@ struct CommandPaletteView: View {
         ZStack {
             Color.clear
                 .ignoresSafeArea()
+                .contentShape(Rectangle())
                 .onTapGesture {
                     browserManager.closeCommandPalette(for: windowState)
                 }

@@ -38,7 +38,7 @@ struct SpacesListItem: View {
                         // Fixed inner content size to avoid glyph cropping
                         Text(space.icon)
                             .font(.system(size: 14))
-                            .frame(width: 16, height: 16)
+                            .frame(width: 20, height: 20)
                     } else {
                         Image(systemName: space.icon)
                             .font(.system(size: 14))
