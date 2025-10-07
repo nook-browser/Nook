@@ -1668,14 +1668,14 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             return 
         }
         
-        // Check if this is likely an OAuth flow
+        // OAuth flows from extensions should open in tabs to share the same data store
+        // Miniwindows use separate data stores which breaks OAuth flows
         if let firstURL = configuration.tabURLs.first,
            isLikelyOAuthURL(firstURL) {
-            print("🔐 [DELEGATE] OAuth window detected, opening in miniwindow: \(firstURL.absoluteString)")
-            bm.externalMiniWindowManager.present(url: firstURL) { success, finalURL in
-                print("🔐 [DELEGATE] Extension OAuth flow completed: success=\(success), finalURL=\(finalURL?.absoluteString ?? "nil")")
-                // Note: Extension OAuth flows are handled differently, no need to reload original tab
-            }
+            print("🔐 [DELEGATE] Extension OAuth window detected, opening in new tab: \(firstURL.absoluteString)")
+            // Create a new tab in the current space with the same profile/data store
+            let newTab = bm.tabManager.createNewTab(url: firstURL.absoluteString, in: bm.tabManager.currentSpace)
+            bm.tabManager.setActiveTab(newTab)
 
             // Return a dummy window adapter for OAuth flows
             if windowAdapter == nil {

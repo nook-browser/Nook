@@ -116,7 +116,14 @@ final class ExternalMiniWindowManager {
             profile: profile,
             originName: profile?.name ?? "Default",
             targetSpaceResolver: { [weak browserManager] in
-                browserManager?.tabManager.currentSpace?.name ?? "Current Space"
+                // Try to get the current space, or fall back to the first available space
+                if let currentSpace = browserManager?.tabManager.currentSpace {
+                    return currentSpace.name
+                } else if let firstSpace = browserManager?.tabManager.spaces.first {
+                    return firstSpace.name
+                } else {
+                    return "Current Space"
+                }
             },
             adoptHandler: { [weak self] session in
                 self?.adopt(session: session)
@@ -130,7 +137,8 @@ final class ExternalMiniWindowManager {
             onClose: { [weak self] session in
                 session.cancelAuthDueToClose()
                 self?.sessions[session.id] = nil
-            }
+            },
+            gradientColorManager: browserManager.gradientColorManager
         )
 
         sessions[session.id] = SessionEntry(controller: controller)
@@ -140,8 +148,20 @@ final class ExternalMiniWindowManager {
 
     private func adopt(session: MiniWindowSession) {
         guard let browserManager else { return }
-        let newTab = browserManager.tabManager.createNewTab(url: session.currentURL.absoluteString, in: browserManager.tabManager.currentSpace)
+
+        // Find the target space - try current space first, then fall back to space name matching
+        let targetSpace = browserManager.tabManager.currentSpace ??
+                         browserManager.tabManager.spaces.first { $0.name == session.targetSpaceName } ??
+                         browserManager.tabManager.spaces.first
+
+        let newTab = browserManager.tabManager.createNewTab(url: session.currentURL.absoluteString, in: targetSpace)
         browserManager.tabManager.setActiveTab(newTab)
+
+        // If this is the first window opening, set this as the active space for the browser manager
+        if browserManager.tabManager.currentSpace == nil {
+            browserManager.tabManager.setActiveSpace(targetSpace)
+        }
+
         sessions[session.id]?.controller.close()
         sessions[session.id] = nil
     }
@@ -154,11 +174,13 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
     private let session: MiniWindowSession
     private let adoptAction: () -> Void
     private let onClose: (MiniWindowSession) -> Void
+    private let gradientColorManager: GradientColorManager
 
-    init(session: MiniWindowSession, adoptAction: @escaping () -> Void, onClose: @escaping (MiniWindowSession) -> Void) {
+    init(session: MiniWindowSession, adoptAction: @escaping () -> Void, onClose: @escaping (MiniWindowSession) -> Void, gradientColorManager: GradientColorManager) {
         self.session = session
         self.adoptAction = adoptAction
         self.onClose = onClose
+        self.gradientColorManager = gradientColorManager
 
         let contentView = MiniBrowserWindowView(
             session: session,
@@ -168,6 +190,7 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
                 onClose(session)
             }
         )
+        .environmentObject(gradientColorManager)
 
         let hostingController = NSHostingController(rootView: contentView)
         let window = NSWindow(

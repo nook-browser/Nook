@@ -2433,15 +2433,15 @@ extension Tab: WKUIDelegate {
     ) -> WKWebView? {
         guard let bm = browserManager else { return nil }
         
-        // Check if this is likely an OAuth popup or external window
+        // OAuth and signin flows should ALWAYS open in a new tab in the same profile/data store
+        // Miniwindows use separate data stores which breaks OAuth flows
         if let url = navigationAction.request.url,
            isLikelyOAuthOrExternalWindow(url: url, windowFeatures: windowFeatures) {
-            print("🪟 [Tab] Popup detected, opening in miniwindow: \(url.absoluteString)")
-            // Present in miniwindow with completion callback
-            bm.externalMiniWindowManager.present(url: url) { [weak self] success, finalURL in
-                self?.handleMiniWindowAuthCompletion(success: success, finalURL: finalURL)
-            }
-            return nil // Don't create a WebView, we're using the miniwindow
+            print("🔐 [Tab] OAuth/signin popup detected, opening in new tab: \(url.absoluteString)")
+            // Create a new tab in the same space with the same profile/data store
+            let newTab = bm.tabManager.createNewTab(url: url.absoluteString, in: bm.tabManager.currentSpace)
+            bm.tabManager.setActiveTab(newTab)
+            return nil // Don't create a WebView, we created a tab instead
         }
         
         // For regular popups, check if this should be redirected to Peek
