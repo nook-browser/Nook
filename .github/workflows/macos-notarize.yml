@@ -1,6 +1,5 @@
 name: macOS Build, Sign, & Notarize
 
-
 on:
   push:
     tags:
@@ -13,31 +12,44 @@ jobs:
     runs-on: macos-latest
     permissions:
       contents: write
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Import Developer ID certificate
+        id: import-cert
         run: |
-          echo "$APPLE_CERTIFICATE_P12_BASE64" | base64 --decode > signing_certificate.p12
-          security create-keychain -p "" build.keychain
-          security import signing_certificate.p12 -k ~/Library/Keychains/build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          security list-keychains -d user -s ~/Library/Keychains/build.keychain
-          security unlock-keychain -p "" ~/Library/Keychains/build.keychain
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" ~/Library/Keychains/build.keychain
+          printf "%s" "$APPLE_CERTIFICATE_P12_BASE64" | base64 --decode > signing_certificate.p12
 
-      - name: Build app (Universal, fallback to arm64)
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+
+          security import signing_certificate.p12 \
+            -k build.keychain \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign
+
+          security list-keychains -d user -s build.keychain login.keychain
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" build.keychain
+
+          IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -n1 | awk '{print $2}')
+          echo "SIGNING_IDENTITY=$IDENTITY" >> $GITHUB_ENV
+
+          echo "Imported certificate and set up keychain successfully."
+
+      - name: Build app
         run: |
           set -e
           mkdir -p build
-          
           echo "Attempting universal build (arm64 + x86_64)..."
           if ! xcodebuild -scheme Nook -configuration Release -arch arm64 -arch x86_64 -derivedDataPath build; then
-            echo "❌ Universal build failed, retrying Apple Silicon only..."
+            echo "Universal build failed, retrying Apple Silicon only..."
             xcodebuild -scheme Nook -configuration Release -arch arm64 -derivedDataPath build
           fi
-          
           cp -R "build/Build/Products/Release/Nook.app" ./Nook.app
+
       - name: Codesign app
         run: |
           codesign --deep --force --verify --verbose \
@@ -47,20 +59,22 @@ jobs:
             "Nook.app"
 
       - name: Verify code signature
-        run: codesign --verify --deep --strict --verbose=2 "Nook.app"
+        run: |
+          codesign --verify --deep --strict --verbose=2 "Nook.app"
+          spctl --assess --type execute --verbose "Nook.app"
 
       - name: Notarize app
         env:
-          NOTARYTOOL_PROFILE: "nook-notary"
+          NOTARY_PROFILE: "nook-notary"
         run: |
-          xcrun notarytool store-credentials "$NOTARYTOOL_PROFILE" \
+          xcrun notarytool store-credentials "$NOTARY_PROFILE" \
             --apple-id "$APPLE_ID" \
             --team-id "$APPLE_TEAM_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD"
 
           zip -r Nook.zip "Nook.app"
           xcrun notarytool submit "Nook.zip" \
-            --keychain-profile "$NOTARYTOOL_PROFILE" \
+            --keychain-profile "$NOTARY_PROFILE" \
             --wait
 
       - name: Staple notarization ticket
@@ -68,12 +82,15 @@ jobs:
 
       - name: Create DMG
         run: |
-          hdiutil create -volname "Nook" -srcfolder "Nook.app" -ov -format UDZO "Nook.dmg"
+          VERSION=${GITHUB_REF#refs/tags/}
+          hdiutil create -volname "Nook ${VERSION}" \
+            -srcfolder "Nook.app" \
+            -ov -format UDZO "Nook-${VERSION}.dmg"
 
       - name: Upload DMG to release assets
         uses: softprops/action-gh-release@v2
         with:
-          files: Nook.dmg
+          files: Nook-*.dmg
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -86,7 +103,7 @@ jobs:
             exit 0
           fi
           VERSION=${GITHUB_REF#refs/tags/}
-          DMG_URL="https://github.com/${{ github.repository }}/releases/download/${VERSION}/Nook.dmg"
+          DMG_URL="https://github.com/${{ github.repository }}/releases/download/${VERSION}/Nook-${VERSION}.dmg"
           DATE=$(date -R)
           SHORT_VERSION=${VERSION#v}
 
@@ -95,7 +112,7 @@ jobs:
             <title>Version ${SHORT_VERSION}</title>
             <sparkle:releaseNotesLink>https://github.com/${{ github.repository }}/releases/tag/${VERSION}</sparkle:releaseNotesLink>
             <pubDate>${DATE}</pubDate>
-            <enclosure url="${DMG_URL}" sparkle:version="${SHORT_VERSION}" length="$(stat -f%z Nook.dmg)" type="application/octet-stream"/>
+            <enclosure url="${DMG_URL}" sparkle:version="${SHORT_VERSION}" length="$(stat -f%z Nook-${VERSION}.dmg)" type="application/octet-stream"/>
           </item>
           EOF
           )
