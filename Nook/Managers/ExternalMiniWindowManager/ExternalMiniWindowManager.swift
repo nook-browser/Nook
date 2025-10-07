@@ -158,8 +158,8 @@ final class ExternalMiniWindowManager {
         browserManager.tabManager.setActiveTab(newTab)
 
         // If this is the first window opening, set this as the active space for the browser manager
-        if browserManager.tabManager.currentSpace == nil {
-            browserManager.tabManager.setActiveSpace(targetSpace)
+        if browserManager.tabManager.currentSpace == nil, let space = targetSpace {
+            browserManager.tabManager.setActiveSpace(space)
         }
 
         sessions[session.id]?.controller.close()
