@@ -1191,7 +1191,9 @@ class TabManager: ObservableObject {
 
         // Remove all regular tabs for this space
         for tab in tabs {
-            removeTab(tab.id)
+            if(tab.id != self.currentTab?.id) {
+                removeTab(tab.id)
+            }
         }
 
         persistSnapshot()
