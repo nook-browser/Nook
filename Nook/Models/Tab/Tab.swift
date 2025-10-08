@@ -287,15 +287,19 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     
     /// Inject Web Store script after navigation completes
     private func injectWebStoreScriptIfNeeded(for url: URL, in webView: WKWebView) {
+        // Only inject if experimental extensions are enabled
+        guard let browserManager = browserManager,
+              browserManager.settingsManager.experimentalExtensions else {
+            return
+        }
+        
         guard BrowserConfiguration.isChromeWebStore(url) else { return }
         
         // Ensure message handler is registered (remove old handler first to avoid duplicates)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "nookWebStore")
         
-        if let browserManager = browserManager {
-            webStoreHandler = WebStoreScriptHandler(browserManager: browserManager)
-            webView.configuration.userContentController.add(webStoreHandler!, name: "nookWebStore")
-        }
+        webStoreHandler = WebStoreScriptHandler(browserManager: browserManager)
+        webView.configuration.userContentController.add(webStoreHandler!, name: "nookWebStore")
         
         // Get the script source from bundle
         guard let script = BrowserConfiguration.webStoreInjectorScript() else { return }
@@ -399,15 +403,16 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         _webView?.configuration.userContentController.add(self, name: "historyStateDidChange")
         _webView?.configuration.userContentController.add(self, name: "NookIdentity")
         
-        // Add Web Store integration handler (retained in Tab instance)
-        if let browserManager = browserManager {
+        // Add Web Store integration handler (only if experimental extensions are enabled)
+        if let browserManager = browserManager,
+           browserManager.settingsManager.experimentalExtensions {
             webStoreHandler = WebStoreScriptHandler(browserManager: browserManager)
             _webView?.configuration.userContentController.add(webStoreHandler!, name: "nookWebStore")
-        }
-        
-        // Inject Web Store script at setup time if already on Chrome Web Store
-        if BrowserConfiguration.isChromeWebStore(url), let script = BrowserConfiguration.webStoreInjectorScript() {
-            _webView?.configuration.userContentController.addUserScript(script)
+            
+            // Inject Web Store script at setup time if already on Chrome Web Store
+            if BrowserConfiguration.isChromeWebStore(url), let script = BrowserConfiguration.webStoreInjectorScript() {
+                _webView?.configuration.userContentController.addUserScript(script)
+            }
         }
 
         _webView?.customUserAgent =
