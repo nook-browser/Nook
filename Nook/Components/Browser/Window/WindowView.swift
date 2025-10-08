@@ -59,11 +59,11 @@ struct WindowView: View {
                                 .environmentObject(browserManager)
                                 .environmentObject(windowState)
                         case .windowVStack:
-                            VStack(spacing: 0) {
-                                WebsiteLoadingIndicator()
-                                WebsiteView()
+                            ZStack(alignment: .top) {
+                                WebsiteLoadingIndicator().zIndex(100).offset(y: windowState.isFullScreen ? 0 : -8).allowsHitTesting(false)
+                                WebsiteView().zIndex(50)
                             }
-                            .padding(.bottom, 8)
+                            .padding(.vertical, windowState.isFullScreen ? 0 : 8)
                             .zIndex(2000)
 
                         }
