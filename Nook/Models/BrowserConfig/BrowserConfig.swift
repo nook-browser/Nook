@@ -167,4 +167,42 @@ class BrowserConfiguration {
 
     private init() {}
     
+    // MARK: - Chrome Web Store Integration
+    
+    /// Get the Web Store injector script
+    static func webStoreInjectorScript() -> WKUserScript? {
+        guard let scriptPath = Bundle.main.path(forResource: "WebStoreInjector", ofType: "js"),
+              let scriptSource = try? String(contentsOfFile: scriptPath) else {
+            return nil
+        }
+        
+        return WKUserScript(
+            source: scriptSource,
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: true
+        )
+    }
+    
+    /// Check if URL is a Chrome Web Store page
+    static func isChromeWebStore(_ url: URL) -> Bool {
+        let host = url.host?.lowercased() ?? ""
+        let path = url.path.lowercased()
+        
+        // Check for Chrome Web Store
+        if host.contains("chrome.google.com") && path.contains("webstore") {
+            return true
+        }
+        
+        // Check for new Chrome Web Store
+        if host.contains("chromewebstore.google.com") {
+            return true
+        }
+        
+        // Check for Microsoft Edge Add-ons
+        if host.contains("microsoftedge.microsoft.com") && path.contains("addons") {
+            return true
+        }
+        
+        return false
+    }
 }
