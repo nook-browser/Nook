@@ -70,6 +70,9 @@ struct WebsiteView: View {
                         .background(shouldShowSplit ? Color.clear : Color(nsColor: .windowBackgroundColor))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .clipShape(RoundedRectangle(cornerRadius: {
+                            if windowState.isFullScreen {
+                                return 0
+                            }
                             if #available(macOS 26.0, *) {
                                 return 12
                             } else {
@@ -89,8 +92,8 @@ struct WebsiteView: View {
                         // Restore visual margins around the web content card
                         // - Keep webview flush with the sidebar when visible (left or right)
                         // - Add margins when the sidebar is hidden
-                        .padding(.trailing, windowState.isSidebarVisible && browserManager.settingsManager.sidebarPosition == .right ? 0 : 8)
-                        .padding(.leading, windowState.isSidebarVisible && browserManager.settingsManager.sidebarPosition == .left ? 0 : 8)
+                        .padding(.trailing, windowState.isFullScreen ? 0 : (windowState.isSidebarVisible && browserManager.settingsManager.sidebarPosition == .right ? 0 : 8))
+                        .padding(.leading, windowState.isFullScreen ? 0 : (windowState.isSidebarVisible && browserManager.settingsManager.sidebarPosition == .left ? 0 : 8))
                     }
                     .contextMenu {
                         // Divider + close buttons overlay when split is active
