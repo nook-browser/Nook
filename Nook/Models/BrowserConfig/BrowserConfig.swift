@@ -54,7 +54,7 @@ class BrowserConfiguration {
         config.allowsAirPlayForMediaPlayback = true
         
         // User agent for better compatibility
-        config.applicationNameForUserAgent = "Version/17.4.1 Safari/605.1.15"
+        config.applicationNameForUserAgent = "Version/26.0.1 Safari/605.1.15"
 
         // Web inspector will be enabled per-webview using isInspectable property
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
@@ -100,7 +100,7 @@ class BrowserConfiguration {
         config.allowsAirPlayForMediaPlayback = true
 
         // User agent for better compatibility (mirror default config)
-        config.applicationNameForUserAgent = "Version/17.4.1 Safari/605.1.15"
+        config.applicationNameForUserAgent = "Version/26.0.1 Safari/605.1.15"
 
         // Cache/perf optimizations mirroring profile-scoped variant
         config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
@@ -148,7 +148,7 @@ class BrowserConfiguration {
         config.allowsAirPlayForMediaPlayback = true
 
         // User agent for better compatibility (mirror default config)
-        config.applicationNameForUserAgent = "Version/17.4.1 Safari/605.1.15"
+        config.applicationNameForUserAgent = "Version/26.0.1 Safari/605.1.15"
         
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
 
