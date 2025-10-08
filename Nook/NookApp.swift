@@ -51,6 +51,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     weak var browserManager: BrowserManager?
     private let urlEventClass = AEEventClass(kInternetEventClass)
     private let urlEventID = AEEventID(kAEGetURL)
+    private var mouseEventMonitor: Any?
 
     // Sparkle updater controller
     lazy var updaterController: SPUStandardUpdaterController = {
@@ -64,6 +65,37 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             forEventClass: urlEventClass,
             andEventID: urlEventID
         )
+        
+        mouseEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .otherMouseDown) { [weak self] event in
+                    guard let self = self, let manager = self.browserManager else { return event }
+                    
+                    switch event.buttonNumber {
+                    case 2:
+                        manager.openCommandPalette()
+                    case 3:
+                        guard
+                            let windowState = manager.activeWindowState,
+                            let currentTab = manager.currentTabForActiveWindow(),
+                            let webView = manager.getWebView(for: currentTab.id, in: windowState.id)
+                        else {
+                            return event
+                        }
+
+                        webView.goBack()
+                    case 4:
+                        guard
+                            let windowState = manager.activeWindowState,
+                            let currentTab = manager.currentTabForActiveWindow(),
+                            let webView = manager.getWebView(for: currentTab.id, in: windowState.id)
+                        else {
+                            return event
+                        }
+                        webView.goForward()
+                    default:
+                        break
+                    }
+                    return event
+                }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
