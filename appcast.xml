@@ -1,33 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
+<rss version="2.0"
+     xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
      xmlns:dc="http://purl.org/dc/elements/1.1/">
 
 <channel>
-    <title>Nook App Updates</title>
-    <link>https://nook-browser.github.io/Nook/appcast.xml</link>
-    <description>Latest versions of the Nook browser.</description>
-    <language>en</language>
+  <title>Nook App Updates</title>
+  <link>https://nook-browser.github.io/Nook/appcast.xml</link>
+  <description>Latest versions of the Nook browser.</description>
+  <language>en</language>
 
-    <item>
-        <title>Version 1.0.1</title>
-        <sparkle:releaseNotesLink>https://github.com/nook-browser/Nook/releases/tag/v1.0.1</sparkle:releaseNotesLink>
-        <pubDate>TUE, 06 Oct 2025 00:00:00 +0000</pubDate>
-        <enclosure
-            url="https://github.com/nook-browser/Nook/releases/download/v1.0.1/Nook-V1.0.1.dmg"
-            sparkle:version="100"
-            sparkle:shortVersionString="0.0.1"
-            type="application/octet-stream"/>
-    </item>
-     <item>
-        <title>Version 1.0.2</title>
-        <sparkle:releaseNotesLink>https://github.com/nook-browser/Nook/releases/tag/v1.0.2</sparkle:releaseNotesLink>
-        <pubDate>TUE, 06 Oct 2025 17:00:00 +0000</pubDate>
-        <enclosure
-            url="https://github.com/nook-browser/Nook/releases/download/v1.0.2/Nook-V1.0.2.dmg"
-            sparkle:version="102"
-            sparkle:shortVersionString="1.0.2"
-            type="application/octet-stream"/>
-    </item>
+  <item>
+    <title>Version 1.0.2</title>
+    <sparkle:releaseNotesLink>https://github.com/nook-browser/Nook/releases/tag/v1.0.2</sparkle:releaseNotesLink>
+    <pubDate>Tue, 06 Oct 2025 17:00:00 +0000</pubDate>
+    <enclosure
+      url="https://github.com/nook-browser/Nook/releases/download/v1.0.2/Nook-v1.0.2.dmg"
+      sparkle:version="102"
+      sparkle:shortVersionString="1.0.2"
+      type="application/octet-stream"/>
+  </item>
 
+  <item>
+    <title>Version 1.0.1</title>
+    <sparkle:releaseNotesLink>https://github.com/nook-browser/Nook/releases/tag/v1.0.1</sparkle:releaseNotesLink>
+    <pubDate>Tue, 06 Oct 2025 00:00:00 +0000</pubDate>
+    <enclosure
+      url="https://github.com/nook-browser/Nook/releases/download/v1.0.1/Nook-v1.0.1.dmg"
+      sparkle:version="101"
+      sparkle:shortVersionString="1.0.1"
+      type="application/octet-stream"/>
+  </item>
 </channel>
 </rss>
