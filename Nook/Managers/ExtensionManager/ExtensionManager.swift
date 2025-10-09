@@ -55,8 +55,11 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     deinit {
         NotificationCenter.default.removeObserver(self)
 
+        // Capture state for cleanup before we tear down references
+        let contexts = extensionContexts
+        let controller = extensionController
+
         // MEMORY LEAK FIX: Clean up all extension contexts and break circular references
-        extensionContexts.removeAll()
         tabAdapters.removeAll()
         actionAnchors.removeAll()
 
@@ -69,13 +72,16 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         // Clean up window adapter
         windowAdapter = nil
 
-        // Unload extension controller
-        if let controller = extensionController {
-            for (_, context) in extensionContexts {
-                try? controller.unload(context)
+        // Unload extension controller contexts asynchronously on the main actor
+        if let controller {
+            Task { @MainActor in
+                for (_, context) in contexts {
+                    try? await controller.unload(context)
+                }
             }
         }
         extensionController = nil
+        extensionContexts.removeAll()
 
         print("🧹 [ExtensionManager] Cleaned up all extension resources")
     }
