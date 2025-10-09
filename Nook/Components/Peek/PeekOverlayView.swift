@@ -68,10 +68,14 @@ struct PeekOverlayView: View {
 
             // Fallback: observe explicit activation notifications to bypass blocked @Published delivery
             activateObserver = NotificationCenter.default.addObserver(forName: .peekDidActivate, object: nil, queue: .main) { _ in
-                presentPeek()
+                Task { @MainActor in
+                    presentPeek()
+                }
             }
             deactivateObserver = NotificationCenter.default.addObserver(forName: .peekDidDeactivate, object: nil, queue: .main) { _ in
-                dismissPeek()
+                Task { @MainActor in
+                    dismissPeek()
+                }
             }
         }
         .onDisappear {
