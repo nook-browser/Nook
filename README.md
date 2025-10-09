@@ -1,3 +1,20 @@
+<div align="center">
+  <img width="270" height="270" src="/assets/icon.png" alt="Nook Logo">
+  <h1><b>Nook</b></h1>
+  <p>
+    A fast, minimal browser with a sidebar-first design for macOS.
+    <br>
+  </p>
+</div>
+
+<p align="center">
+  <a href="https://www.apple.com/macos/"><img src="https://badgen.net/badge/macOS/15.5+/blue" alt="macOS 15.5+"></a>
+  <a href="https://swift.org/"><img src="https://badgen.net/badge/Swift/6/orange" alt="Swift"></a>
+  <a href="./LICENSE"><img src="https://badgen.net/badge/License/GPL-3.0/green" alt="GPL-3.0"></a>
+</p>
+
+---
+
 # Nook
 *A fast, minimal browser with a sidebar-first design.*
 
@@ -46,3 +63,4 @@ Join our Discord to help with development: https://discord.gg/J3XfPvg7Fs
 
 ### LICENSES
 With the exception of third-party libraries in Nook/ThirdParty, all code is under the GPL 3.0 License. The relevant third-party code is licensed per-folder under a variety of free, open-source software licenses.
+
