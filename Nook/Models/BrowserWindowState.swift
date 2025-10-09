@@ -85,13 +85,13 @@ class BrowserWindowState: ObservableObject {
     var window: NSWindow?
     
     @objc private func windowDidEnterFullScreen(_ notification: Notification) {
-        if let notificationWindow = notification.object as? NSWindow {
+        if notification.object is NSWindow {
             isFullScreen = true
         }
     }
-    
+
     @objc private func windowDidExitFullScreen(_ notification: Notification) {
-        if let notificationWindow = notification.object as? NSWindow {
+        if notification.object is NSWindow {
             isFullScreen = false
         }
     }
