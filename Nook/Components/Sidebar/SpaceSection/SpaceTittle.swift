@@ -111,10 +111,12 @@ struct SpaceTitle: View {
                 } label: {
                     Label("Create Folder", systemImage: "folder.badge.plus")
                 }
-                Button(role: .destructive) {
-                    deleteSpace()
-                } label: {
-                    Label("Delete Space", systemImage: "trash")
+                if canDeleteSpace {
+                    Button(role: .destructive) {
+                        deleteSpace()
+                    } label: {
+                        Label("Delete Space", systemImage: "trash")
+                    }
                 }
             } label: {
                 ZStack {
@@ -179,11 +181,13 @@ struct SpaceTitle: View {
             } label : {
                 Label("New Folder", systemImage: "folder.badge.plus")
             }
-            Divider()
-            Button(role: .destructive) {
-                deleteSpace()
-            } label: {
-                Label("Delete Space", systemImage: "trash")
+            if canDeleteSpace {
+                Divider()
+                Button(role: .destructive) {
+                    deleteSpace()
+                } label: {
+                    Label("Delete Space", systemImage: "trash")
+                }
             }
         }
     }
@@ -199,6 +203,10 @@ struct SpaceTitle: View {
     }
     private var textColor: Color {
         return colorScheme == .dark ? AppColors.sidebarTextLight : AppColors.sidebarTextDark
+    }
+
+    private var canDeleteSpace: Bool {
+        browserManager.tabManager.spaces.count > 1
     }
 
     // MARK: - Actions

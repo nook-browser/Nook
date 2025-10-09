@@ -2027,6 +2027,28 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             print("")
         }
     }
+    
+    // MARK: - Chrome Web Store Integration
+    
+    /// Install extension from Chrome Web Store by extension ID
+    func installFromWebStore(extensionId: String, completionHandler: @escaping (Result<InstalledExtension, ExtensionError>) -> Void) {
+        WebStoreDownloader.downloadExtension(extensionId: extensionId) { [weak self] result in
+            guard let self = self else { return }
+            
+            switch result {
+            case .success(let zipURL):
+                // Install the downloaded extension
+                self.installExtension(from: zipURL) { installResult in
+                    // Clean up temporary file
+                    try? FileManager.default.removeItem(at: zipURL)
+                    completionHandler(installResult)
+                }
+                
+            case .failure(let error):
+                completionHandler(.failure(.installationFailed(error.localizedDescription)))
+            }
+        }
+    }
 }
 
 // MARK: - Weak View Reference Helper

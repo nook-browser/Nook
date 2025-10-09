@@ -122,11 +122,13 @@ struct SidebarView: View {
                     } label: {
                         Label("Edit Theme Color", systemImage: "paintpalette")
                     }
-                    Divider()
-                    Button(role: .destructive) {
-                        browserManager.tabManager.removeSpace(browserManager.tabManager.currentSpace!.id)
-                    } label: {
-                        Label("Delete Space", systemImage: "trash")
+                    if browserManager.tabManager.spaces.count > 1 {
+                        Divider()
+                        Button(role: .destructive) {
+                            browserManager.tabManager.removeSpace(browserManager.tabManager.currentSpace!.id)
+                        } label: {
+                            Label("Delete Space", systemImage: "trash")
+                        }
                     }
                 }
         }
@@ -176,6 +178,10 @@ struct SidebarView: View {
                     .conditionalWindowDrag()
                     .frame(minHeight: 40)
                     .zIndex(0)
+                    .onTapGesture(count: 2) {
+                        // Double-tap to open command palette for new tab
+                        browserManager.openCommandPalette()
+                    }
             }
 
 
@@ -210,6 +216,7 @@ struct SidebarView: View {
                         NavButton(iconName: "archivebox", disabled: false, action: {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 windowState.isSidebarMenuVisible = true
+                                windowState.isSidebarAIChatVisible = false
                                 let previousWidth = windowState.sidebarWidth
                                 windowState.savedSidebarWidth = previousWidth
                                 let newWidth: CGFloat = 400
@@ -230,7 +237,20 @@ struct SidebarView: View {
                         DownloadIndicator()
                             .offset(x: 12, y: -12)
                     }
-
+                    
+                    if browserManager.settingsManager.showAIAssistant {
+                        NavButton(iconName: "sparkles", disabled: false, action: {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                windowState.isSidebarAIChatVisible = true
+                                windowState.isSidebarMenuVisible = false
+                                let previousWidth = windowState.sidebarWidth
+                                windowState.savedSidebarWidth = previousWidth
+                                let newWidth: CGFloat = 400
+                                windowState.sidebarWidth = newWidth
+                                windowState.sidebarContentWidth = max(newWidth - 16, 0)
+                            }
+                        })
+                    }
 
                     Spacer()
                 }
@@ -257,14 +277,24 @@ struct SidebarView: View {
         .animation(
             shouldAnimate ? .easeInOut(duration: 0.18) : nil,
             value: essentialsCount)
+        .onTapGesture(count: 2) {
+            // Double-tap to open command palette for new tab
+            browserManager.openCommandPalette()
+        }
         
         let finalContent = ZStack {
-                if !windowState.isSidebarMenuVisible {
-                    content
-                        .transition(.scale(scale: 0.9))
-                } else {
+                if windowState.isSidebarAIChatVisible {
+                    SidebarAIChat()
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                        .environmentObject(browserManager)
+                        .environmentObject(windowState)
+                        .environment(browserManager.settingsManager)
+                } else if windowState.isSidebarMenuVisible {
                     SidebarMenu()
                         .transition(.move(edge: .leading).combined(with: .opacity))
+                } else {
+                    content
+                        .transition(.scale(scale: 0.9))
                 }
             }
             .frame(width: effectiveWidth)
@@ -308,6 +338,10 @@ struct SidebarView: View {
         }
         .frame(width: effectiveWidth)
         .padding()
+        .onTapGesture(count: 2) {
+            // Double-tap to open command palette for new tab
+            browserManager.openCommandPalette()
+        }
     }
 
     private var spacesPageView: some View {

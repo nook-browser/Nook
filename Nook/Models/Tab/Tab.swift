@@ -123,7 +123,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     private var hasAddedCoreAudioListener = false
     private var profileAwaitCancellable: AnyCancellable?
     
-
+    // Web Store integration
+    private var webStoreHandler: WebStoreScriptHandler?
     
     // MARK: - Tab State
     var isUnloaded: Bool {
@@ -282,6 +283,37 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         }
     }
 
+    // MARK: - Chrome Web Store Integration
+    
+    /// Inject Web Store script after navigation completes
+    private func injectWebStoreScriptIfNeeded(for url: URL, in webView: WKWebView) {
+        // Only inject if experimental extensions are enabled
+        guard let browserManager = browserManager,
+              browserManager.settingsManager.experimentalExtensions else {
+            return
+        }
+        
+        guard BrowserConfiguration.isChromeWebStore(url) else { return }
+        
+        // Ensure message handler is registered (remove old handler first to avoid duplicates)
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "nookWebStore")
+        
+        webStoreHandler = WebStoreScriptHandler(browserManager: browserManager)
+        webView.configuration.userContentController.add(webStoreHandler!, name: "nookWebStore")
+        
+        // Get the script source from bundle
+        guard let script = BrowserConfiguration.webStoreInjectorScript() else { return }
+        
+        // Inject with slight delay to ensure DOM is ready
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            webView.evaluateJavaScript(script.source) { _, error in
+                if let error = error {
+                    print("[Tab] Web Store script injection failed: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
     // MARK: - WebView Setup
 
     private func setupWebView() {
@@ -359,6 +391,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "backgroundColor_\(id.uuidString)")
         _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "historyStateDidChange")
         _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "NookIdentity")
+        _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "nookWebStore")
         
         // Add handlers
         _webView?.configuration.userContentController.add(self, name: "linkHover")
@@ -369,9 +402,21 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         _webView?.configuration.userContentController.add(self, name: "backgroundColor_\(id.uuidString)")
         _webView?.configuration.userContentController.add(self, name: "historyStateDidChange")
         _webView?.configuration.userContentController.add(self, name: "NookIdentity")
+        
+        // Add Web Store integration handler (only if experimental extensions are enabled)
+        if let browserManager = browserManager,
+           browserManager.settingsManager.experimentalExtensions {
+            webStoreHandler = WebStoreScriptHandler(browserManager: browserManager)
+            _webView?.configuration.userContentController.add(webStoreHandler!, name: "nookWebStore")
+            
+            // Inject Web Store script at setup time if already on Chrome Web Store
+            if BrowserConfiguration.isChromeWebStore(url), let script = BrowserConfiguration.webStoreInjectorScript() {
+                _webView?.configuration.userContentController.addUserScript(script)
+            }
+        }
 
         _webView?.customUserAgent =
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15"
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0.1 Safari/605.1.15"
 
         _webView?.setValue(false, forKey: "drawsBackground")
 
@@ -1949,6 +1994,9 @@ extension Tab: WKNavigationDelegate {
                 ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
             }
             browserManager?.syncTabAcrossWindows(self.id)
+            
+            // CHROME WEB STORE INTEGRATION: Inject script after navigation
+            injectWebStoreScriptIfNeeded(for: newURL, in: webView)
         }
 
         // CRITICAL: Update navigation state after back/forward navigation
@@ -2500,7 +2548,7 @@ extension Tab: WKUIDelegate {
         newWebView.configuration.userContentController.add(newTab, name: "NookIdentity")
         
         // Set custom user agent
-        newWebView.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15"
+        newWebView.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0.1 Safari/605.1.15"
         
         // Configure preferences
         newWebView.configuration.preferences.isFraudulentWebsiteWarningEnabled = true

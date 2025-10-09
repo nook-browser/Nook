@@ -686,6 +686,9 @@ class TabManager: ObservableObject {
     }
 
     func removeSpace(_ id: UUID) {
+        guard spaces.count > 1 else {
+            return
+        }
         guard let idx = spaces.firstIndex(where: { $0.id == id }) else {
             return
         }
@@ -1643,6 +1646,7 @@ class TabManager: ObservableObject {
             print("No space to place unpinned tab")
             return
         }
+        moved.isPinned = false
         moved.spaceId = sid
         var arr = tabsBySpace[sid] ?? []
         arr.insert(moved, at: 0)

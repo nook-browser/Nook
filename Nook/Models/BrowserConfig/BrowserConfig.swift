@@ -54,7 +54,7 @@ class BrowserConfiguration {
         config.allowsAirPlayForMediaPlayback = true
         
         // User agent for better compatibility
-        config.applicationNameForUserAgent = "Version/17.4.1 Safari/605.1.15"
+        config.applicationNameForUserAgent = "Version/26.0.1 Safari/605.1.15"
 
         // Web inspector will be enabled per-webview using isInspectable property
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
@@ -100,7 +100,7 @@ class BrowserConfiguration {
         config.allowsAirPlayForMediaPlayback = true
 
         // User agent for better compatibility (mirror default config)
-        config.applicationNameForUserAgent = "Version/17.4.1 Safari/605.1.15"
+        config.applicationNameForUserAgent = "Version/26.0.1 Safari/605.1.15"
 
         // Cache/perf optimizations mirroring profile-scoped variant
         config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
@@ -148,7 +148,7 @@ class BrowserConfiguration {
         config.allowsAirPlayForMediaPlayback = true
 
         // User agent for better compatibility (mirror default config)
-        config.applicationNameForUserAgent = "Version/17.4.1 Safari/605.1.15"
+        config.applicationNameForUserAgent = "Version/26.0.1 Safari/605.1.15"
         
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
 
@@ -167,4 +167,42 @@ class BrowserConfiguration {
 
     private init() {}
     
+    // MARK: - Chrome Web Store Integration
+    
+    /// Get the Web Store injector script
+    static func webStoreInjectorScript() -> WKUserScript? {
+        guard let scriptPath = Bundle.main.path(forResource: "WebStoreInjector", ofType: "js"),
+              let scriptSource = try? String(contentsOfFile: scriptPath) else {
+            return nil
+        }
+        
+        return WKUserScript(
+            source: scriptSource,
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: true
+        )
+    }
+    
+    /// Check if URL is a Chrome Web Store page
+    static func isChromeWebStore(_ url: URL) -> Bool {
+        let host = url.host?.lowercased() ?? ""
+        let path = url.path.lowercased()
+        
+        // Check for Chrome Web Store
+        if host.contains("chrome.google.com") && path.contains("webstore") {
+            return true
+        }
+        
+        // Check for new Chrome Web Store
+        if host.contains("chromewebstore.google.com") {
+            return true
+        }
+        
+        // Check for Microsoft Edge Add-ons
+        if host.contains("microsoftedge.microsoft.com") && path.contains("addons") {
+            return true
+        }
+        
+        return false
+    }
 }

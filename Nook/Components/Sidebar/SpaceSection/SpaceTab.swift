@@ -151,6 +151,14 @@ struct SpaceTab: View {
             Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) }
             label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
             Divider()
+            if !tab.isPinned && !tab.isSpacePinned {
+                Button(action: {
+                    browserManager.tabManager.pinTab(tab)
+                }) {
+                    Label("Pin to Favorites", systemImage: "pin")
+                }
+                Divider()
+            }
             if tab.hasAudioContent || tab.isAudioMuted {
                 Button(action: onMute) {
                     Label(tab.isAudioMuted ? "Unmute Audio" : "Mute Audio",
