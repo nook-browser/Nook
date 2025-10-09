@@ -291,7 +291,7 @@ struct SidebarView: View {
                         .transition(.move(edge: .leading).combined(with: .opacity))
                 } else {
                     content
-                        .transition(.scale(scale: 0.9))
+                        .transition(.blur)
                 }
             }
             .frame(width: effectiveWidth)
@@ -394,6 +394,7 @@ struct SidebarView: View {
         }
     }
 
+    // this seems to be unused?
     private var spacesHStack: some View {
         LazyHStack(spacing: 0) {
             ForEach(visibleSpaceIndices, id: \.self) { spaceIndex in
