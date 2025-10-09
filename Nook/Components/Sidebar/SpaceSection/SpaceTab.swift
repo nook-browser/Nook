@@ -130,9 +130,7 @@ struct SpaceTab: View {
         .buttonStyle(PlainButtonStyle())
         .contentShape(RoundedRectangle(cornerRadius: 12))
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.05)) {
-                isHovering = hovering
-            }
+            isHovering = hovering
         }
         .background(
             Group {
@@ -151,6 +149,14 @@ struct SpaceTab: View {
             Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) }
             label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
             Divider()
+            if !tab.isPinned && !tab.isSpacePinned {
+                Button(action: {
+                    browserManager.tabManager.pinTab(tab)
+                }) {
+                    Label("Pin to Favorites", systemImage: "pin")
+                }
+                Divider()
+            }
             if tab.hasAudioContent || tab.isAudioMuted {
                 Button(action: onMute) {
                     Label(tab.isAudioMuted ? "Unmute Audio" : "Mute Audio",
@@ -189,7 +195,6 @@ struct SpaceTab: View {
                 Label("Close Tab", systemImage: "xmark.circle")
             }
         }
-        .shadow(color: isActive ? shadowColor : Color.clear, radius: isActive ? 1 : 0, y: 2)
     }
 
     private var isActive: Bool {

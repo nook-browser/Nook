@@ -457,7 +457,17 @@ class BrowserManager: ObservableObject {
     }
 
     func refreshGradientsForSpace(_ space: Space, animate: Bool) {
-        for (_, state) in windowStates where state.currentSpaceId == space.id {
+        for (_, state) in windowStates {
+            var matchesSpace = state.currentSpaceId == space.id
+            if !matchesSpace,
+               state.currentSpaceId == nil,
+               let activeSpaceId = tabManager.currentSpace?.id,
+               activeSpaceId == space.id {
+                state.currentSpaceId = space.id
+                state.activeGradient = space.gradient
+                matchesSpace = true
+            }
+            guard matchesSpace else { continue }
             updateGradient(for: state, to: space.gradient, animate: animate && activeWindowState?.id == state.id)
         }
     }
@@ -565,6 +575,13 @@ class BrowserManager: ObservableObject {
             self,
             selector: #selector(handleTabUnloadTimeoutChange),
             name: .tabUnloadTimeoutChanged,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleApplicationDidBecomeActive),
+            name: NSApplication.didBecomeActiveNotification,
             object: nil
         )
 
@@ -1146,6 +1163,15 @@ class BrowserManager: ObservableObject {
     @objc private func handleTabUnloadTimeoutChange(_ notification: Notification) {
         if let timeout = notification.userInfo?["timeout"] as? TimeInterval {
             compositorManager.setUnloadTimeout(timeout)
+        }
+    }
+
+    @objc private func handleApplicationDidBecomeActive(_ notification: Notification) {
+        guard !gradientColorManager.isEditing else { return }
+        if let activeWindowState {
+            gradientColorManager.setImmediate(activeWindowState.activeGradient)
+        } else if let gradient = tabManager.currentSpace?.gradient {
+            gradientColorManager.setImmediate(gradient)
         }
     }
     
@@ -1919,6 +1945,13 @@ class BrowserManager: ObservableObject {
         sidebarContentWidth = windowState.sidebarContentWidth
         isSidebarVisible = windowState.isSidebarVisible
         urlBarFrame = windowState.urlBarFrame
+        if let csId = windowState.currentSpaceId,
+           let space = tabManager.spaces.first(where: { $0.id == csId }) {
+            windowState.activeGradient = space.gradient
+        } else if let activeSpace = tabManager.currentSpace {
+            windowState.currentSpaceId = activeSpace.id
+            windowState.activeGradient = activeSpace.gradient
+        }
         gradientColorManager.setImmediate(windowState.activeGradient)
         splitManager.refreshPublishedState(for: windowState.id)
         isCommandPaletteVisible = windowState.isCommandPaletteVisible
