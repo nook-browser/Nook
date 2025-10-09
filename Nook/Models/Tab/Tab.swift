@@ -1445,7 +1445,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             updateBackgroundColor(from: webView)
         } else if (keyPath == "canGoBack" || keyPath == "canGoForward"), let webView = object as? WKWebView {
             // Real-time navigation state updates from KVO observers
-            print("🔄 [Tab] KVO navigation state change for \(name): \(keyPath) = \(webView.canGoBack), \(webView.canGoForward)")
+            let observedKeyPath = keyPath ?? "<unknown>"
+            print("🔄 [Tab] KVO navigation state change for \(name): \(observedKeyPath) = \(webView.canGoBack), \(webView.canGoForward)")
             updateNavigationState()
         } else {
             super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
@@ -2521,9 +2522,7 @@ extension Tab: WKUIDelegate {
         newWebView.allowsMagnification = true
         
         // Set the owning tab reference
-        if let fv = newWebView as? FocusableWKWebView {
-            fv.owningTab = newTab
-        }
+        newWebView.owningTab = newTab
         
         // Store the webView in the new tab
         newTab._webView = newWebView
