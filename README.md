@@ -13,21 +13,21 @@
   <a href="./LICENSE"><img src="https://badgen.net/badge/License/GPL-3.0/green" alt="GPL-3.0"></a>
 </p>
 
----
+<p align="center">
+  <a href="https://github.com/nook-browser/Nook/stargazers"><img src="https://img.shields.io/github/stars/nook-browser/Nook?style=social" alt="GitHub stars"></a>
+  <a href="https://github.com/nook-browser/Nook/network/members"><img src="https://img.shields.io/github/forks/nook-browser/Nook?style=social" alt="GitHub forks"></a>
+  <a href="https://github.com/nook-browser/Nook/pulls"><img src="https://img.shields.io/github/issues-pr/nook-browser/Nook" alt="Open pull requests"></a>
+  <a href="https://github.com/nook-browser/Nook/issues"><img src="https://img.shields.io/github/issues/nook-browser/Nook" alt="Open issues"></a>
+  <a href="https://github.com/nook-browser/Nook/graphs/contributors"><img src="https://img.shields.io/github/contributors/nook-browser/Nook" alt="Contributors"></a>
+</p>
 
-# Nook
-*A fast, minimal browser with a sidebar-first design.*
+<p align="center">
+  <a href="https://github.com/nook-browser/nook/releases/download/v1.0.2/Nook-v1.0.2.dmg"><img src="https://img.shields.io/badge/Download%20for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS"></a>
+</p>
 
-[![Download for macOS](https://img.shields.io/badge/Download%20for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/nook-browser/nook/releases/download/v1.0.2/Nook-v1.0.2.dmg)
-
-![Image from Imgflip](https://github.com/user-attachments/assets/dbfe9e9c-82f5-4f59-a073-b86ea05e5f26)
-
-[![Stars](https://img.shields.io/github/stars/nook-browser/Nook?style=social)](https://github.com/nook-browser/Nook/stargazers)
-[![Forks](https://img.shields.io/github/forks/nook-browser/Nook?style=social)](https://github.com/nook-browser/Nook/network/members)
-[![Pull Requests](https://img.shields.io/github/issues-pr/nook-browser/Nook)](https://github.com/nook-browser/Nook/pulls)
-[![Issues](https://img.shields.io/github/issues/nook-browser/Nook)](https://github.com/nook-browser/Nook/issues)
-[![Contributors](https://img.shields.io/github/contributors/nook-browser/Nook)](https://github.com/nook-browser/Nook/graphs/contributors)
-[![License](https://img.shields.io/github/license/nook-browser/Nook)](./LICENSE)
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/dbfe9e9c-82f5-4f59-a073-b86ea05e5f26" alt="Nook screenshot">
+</p>
 
 ---
 
