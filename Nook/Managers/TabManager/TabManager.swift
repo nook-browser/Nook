@@ -471,7 +471,7 @@ class TabManager: ObservableObject {
 
     deinit {
         // MEMORY LEAK FIX: Clean up all tab references and break potential cycles
-        Task { @MainActor in
+        MainActor.assumeIsolated {
             tabsBySpace.removeAll()
             spacePinnedTabs.removeAll()
             foldersBySpace.removeAll()
@@ -481,9 +481,9 @@ class TabManager: ObservableObject {
             currentTab = nil
             currentSpace = nil
             browserManager = nil
-
-            print("🧹 [TabManager] Cleaned up all tab resources")
         }
+
+        print("🧹 [TabManager] Cleaned up all tab resources")
     }
 
     // MARK: - Convenience
