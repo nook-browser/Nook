@@ -130,7 +130,9 @@ struct SpaceTab: View {
         .buttonStyle(PlainButtonStyle())
         .contentShape(RoundedRectangle(cornerRadius: 12))
         .onHover { hovering in
-            isHovering = hovering
+            withAnimation(.easeInOut(duration: 0.05)) {
+                isHovering = hovering
+            }
         }
         .background(
             Group {
@@ -148,6 +150,10 @@ struct SpaceTab: View {
             label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
             Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) }
             label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
+            
+            Button { browserManager.duplicateCurrentTab() }
+            label: { Label("Duplicate Tab", systemImage: "doc.on.doc") }
+            
             Divider()
             if !tab.isPinned && !tab.isSpacePinned {
                 Button(action: {
@@ -195,6 +201,7 @@ struct SpaceTab: View {
                 Label("Close Tab", systemImage: "xmark.circle")
             }
         }
+        .shadow(color: isActive ? shadowColor : Color.clear, radius: isActive ? 1 : 0, y: 2)
     }
 
     private var isActive: Bool {

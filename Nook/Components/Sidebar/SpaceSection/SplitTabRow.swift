@@ -116,7 +116,7 @@ private struct SplitHalfTab: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(PlainButtonStyle())
-            .onHover { hovering in isHovering = hovering }
+            .onHover { hovering in withAnimation(.easeInOut(duration: 0.15)) { isHovering = hovering } }
             .contextMenu {
                 Button("Close Tab", action: onClose)
             }

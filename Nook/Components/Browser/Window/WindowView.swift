@@ -16,7 +16,11 @@ struct WindowView: View {
     // Calculate webview Y offset (where the web content starts)
     private var webViewYOffset: CGFloat {
         // Approximate Y offset for web content start (nav bar + URL bar + padding)
-        return 20  // Accounts for navigation area height
+        if browserManager.settingsManager.topBarAddressView {
+            return 44  // Top bar height
+        } else {
+            return 20  // Accounts for navigation area height
+        }
     }
 
     // To reverse the sidebar and window, for left/right switching
@@ -50,48 +54,70 @@ struct WindowView: View {
                         .disabled(browserManager.tabManager.currentSpace == nil)
                     }
 
-                // Main content flush: sidebar touches left edge; webview touches sidebar
-                HStack(spacing: 0) {
-                    ForEach(sortedSidebarItems, id: \.self) { item in
-                        switch item {
-                        case .sidebar:
-                            SidebarView()
-                                .environmentObject(browserManager)
-                                .environmentObject(windowState)
-                        case .windowVStack:
-                            VStack(spacing: 0) {
-                                WebsiteLoadingIndicator()
-                                WebsiteView()
+                // Top bar when enabled
+                if browserManager.settingsManager.topBarAddressView {
+                    VStack(spacing: 0) {
+                        TopBarView()
+                            .environmentObject(browserManager)
+                            .environmentObject(windowState)
+                            .background(Color.clear)
+                        
+                        // Main content flush: sidebar touches left edge; webview touches sidebar
+                        HStack(spacing: 0) {
+                            ForEach(sortedSidebarItems, id: \.self) { item in
+                                switch item {
+                                case .sidebar:
+                                    SidebarView()
+                                        .environmentObject(browserManager)
+                                        .environmentObject(windowState)
+                                case .windowVStack:
+                                    VStack(spacing: 0) {
+                                        WebsiteLoadingIndicator()
+                                        WebsiteView()
+                                    }
+                                    .padding(.bottom, 8)
+                                    .zIndex(2000)
+
+                                }
                             }
-                            .padding(.bottom, 8)
-                            .zIndex(2000)
 
                         }
                     }
+                    
+                    // TopBar Command Palette overlay
+                    TopBarCommandPalette()
+                        .environmentObject(browserManager)
+                        .environmentObject(windowState)
+                        .zIndex(3000)
+                } else {
+                    // Main content flush: sidebar touches left edge; webview touches sidebar
+                    HStack(spacing: 0) {
+                        ForEach(sortedSidebarItems, id: \.self) { item in
+                            switch item {
+                            case .sidebar:
+                                SidebarView()
+                                    .environmentObject(browserManager)
+                                    .environmentObject(windowState)
+                            case .windowVStack:
+                                VStack(spacing: 0) {
+                                    WebsiteLoadingIndicator()
+                                    WebsiteView()
+                                }
+                                .padding(.bottom, 8)
+                                .zIndex(2000)
 
-                }
-                // Overlay the resize handle spanning the sidebar/webview boundary
-                .overlay(alignment: browserManager.settingsManager.sidebarPosition == .left ? .topLeading : .topTrailing) {
-                    if windowState.isSidebarVisible {
-                        // Calculate dynamic webview height based on window size
-                        let dynamicWebViewHeight = geometry.size.height - 40  // Subtract navigation area
+                            }
+                        }
 
-                        // Position to span 14pts into sidebar and 2pts into web content (moved 6pts left)
-                        SidebarResizeView()
-                            .frame(height: dynamicWebViewHeight)  // Dynamic height based on window size
-                            .offset(
-                                x: browserManager.settingsManager.sidebarPosition == .left ? windowState.sidebarWidth : -windowState.sidebarWidth,
-                                y: webViewYOffset
-                            )  // Position to match webview
-                            .zIndex(2000)  // Higher z-index to ensure it's above all other elements
-                            .environmentObject(windowState)
-                            .border(Color.red, width: 10)
                     }
                 }
 
                 // Mini command palette anchored exactly to URL bar's top-left
-                MiniCommandPaletteOverlay()
-                    .environmentObject(windowState)
+                // Only show when topbar is disabled
+                if !browserManager.settingsManager.topBarAddressView {
+                    MiniCommandPaletteOverlay()
+                        .environmentObject(windowState)
+                }
 
                 // Hover-reveal Sidebar overlay (slides in over web content)
                 SidebarHoverOverlayView()
@@ -166,6 +192,25 @@ struct WindowView: View {
                         .padding(10)
                     }
                     Spacer()
+                }
+            }
+            // Overlay the resize handle spanning the sidebar/webview boundary
+            .overlay(alignment: browserManager.settingsManager.sidebarPosition == .left ? .topLeading : .topTrailing) {
+                if windowState.isSidebarVisible {
+                    // Calculate dynamic webview height based on window size
+                    let topBarHeight: CGFloat = browserManager.settingsManager.topBarAddressView ? 44 : 0
+                    let dynamicWebViewHeight = geometry.size.height - 40 - topBarHeight  // Subtract navigation area and top bar
+
+                    // Position to span 14pts into sidebar and 2pts into web content (moved 6pts left)
+                    SidebarResizeView()
+                        .frame(height: dynamicWebViewHeight)  // Dynamic height based on window size
+                        .offset(
+                            x: browserManager.settingsManager.sidebarPosition == .left ? windowState.sidebarWidth : -windowState.sidebarWidth,
+                            y: webViewYOffset
+                        )  // Position to match webview
+                        .zIndex(2000)  // Higher z-index to ensure it's above all other elements
+                        .environmentObject(windowState)
+                        .border(Color.red, width: 10)
                 }
             }
             // Named coordinate space for geometry preferences
@@ -251,9 +296,10 @@ private struct MiniCommandPaletteOverlay: View {
                 let hasFrame = barFrame.width > 1 && barFrame.height > 1
                 // Match sidebar's internal 8pt padding when geometry is unavailable
                 let fallbackX: CGFloat = 8
+                let topBarHeight: CGFloat = browserManager.settingsManager.topBarAddressView ? 44 : 0
                 let fallbackY: CGFloat =
                     8 /* sidebar top padding */ + 30 /* nav bar */
-                    + 8 /* vstack spacing */
+                    + 8 /* vstack spacing */ + topBarHeight
                 let anchorX = hasFrame ? barFrame.minX : fallbackX
                 let anchorY = hasFrame ? barFrame.minY : fallbackY
                 // let width = hasFrame ? barFrame.width : browserManager.sidebarWidth

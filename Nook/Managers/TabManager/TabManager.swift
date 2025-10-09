@@ -686,6 +686,9 @@ class TabManager: ObservableObject {
     }
 
     func removeSpace(_ id: UUID) {
+        guard spaces.count > 1 else {
+            return
+        }
         guard let idx = spaces.firstIndex(where: { $0.id == id }) else {
             return
         }
@@ -1108,16 +1111,24 @@ class TabManager: ObservableObject {
         }
         let sid = targetSpace?.id
         
-        // Get the next index for this space
+        // Get existing tabs and increment their indices to make room for new tab at top
         let existingTabs = sid.flatMap { tabsBySpace[$0] } ?? []
-        let nextIndex = (existingTabs.map { $0.index }.max() ?? -1) + 1
-        
+        let incrementedTabs = existingTabs.map { tab in
+            tab.index += 1
+            return tab
+        }
+
+        // Update the tabs array with incremented indices
+        if let sid = sid {
+            setTabs(incrementedTabs, for: sid)
+        }
+
         let newTab = Tab(
             url: validURL,
             name: "New Tab",
             favicon: "globe",
             spaceId: sid,
-            index: nextIndex,
+            index: 0, // New tabs get index 0 to appear at top
             browserManager: browserManager
         )
         addTab(newTab)

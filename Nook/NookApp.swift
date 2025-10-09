@@ -51,6 +51,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     weak var browserManager: BrowserManager?
     private let urlEventClass = AEEventClass(kInternetEventClass)
     private let urlEventID = AEEventID(kAEGetURL)
+    private var mouseEventMonitor: Any?
 
     // Sparkle updater controller
     lazy var updaterController: SPUStandardUpdaterController = {
@@ -64,6 +65,37 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             forEventClass: urlEventClass,
             andEventID: urlEventID
         )
+        
+        mouseEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .otherMouseDown) { [weak self] event in
+                    guard let self = self, let manager = self.browserManager else { return event }
+                    
+                    switch event.buttonNumber {
+                    case 2:
+                        manager.openCommandPalette()
+                    case 3:
+                        guard
+                            let windowState = manager.activeWindowState,
+                            let currentTab = manager.currentTabForActiveWindow(),
+                            let webView = manager.getWebView(for: currentTab.id, in: windowState.id)
+                        else {
+                            return event
+                        }
+
+                        webView.goBack()
+                    case 4:
+                        guard
+                            let windowState = manager.activeWindowState,
+                            let currentTab = manager.currentTabForActiveWindow(),
+                            let webView = manager.getWebView(for: currentTab.id, in: windowState.id)
+                        else {
+                            return event
+                        }
+                        webView.goForward()
+                    default:
+                        break
+                    }
+                    return event
+                }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -482,10 +514,13 @@ struct BackgroundWindowModifier: NSViewRepresentable {
                 window.isReleasedWhenClosed = false
                 // window.isMovableByWindowBackground = true // Disabled - use SwiftUI-based window drag system instead
                 window.isMovable = true
-                window.styleMask = [
-                    .titled, .closable, .miniaturizable, .resizable,
-                    .fullSizeContentView,
-                ]
+                window.styleMask.insert(.fullSizeContentView)
+                var styleMask: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+                // Without this, we get the error "NSWindowStyleMaskFullScreen cleared on a window outside of a full screen transition."
+                if window.styleMask.contains(.fullScreen) {
+                    styleMask.insert(.fullScreen)
+                }
+                window.styleMask = styleMask
 
                 window.standardWindowButton(.closeButton)?.isHidden = true
                 window.standardWindowButton(.zoomButton)?.isHidden = true
@@ -500,3 +535,4 @@ struct BackgroundWindowModifier: NSViewRepresentable {
 
     }
 }
+

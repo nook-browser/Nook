@@ -20,7 +20,11 @@ class SettingsManager {
     private let debugToggleUpdateNotificationKey = "settings.debugToggleUpdateNotification"
     private let askBeforeQuitKey = "settings.askBeforeQuit"
     private let sidebarPositionKey = "settings.sidebarPosition"
+    private let topBarAddressViewKey = "settings.topBarAddressView"
     private let experimentalExtensionsKey = "settings.experimentalExtensions"
+    private let geminiApiKeyKey = "settings.geminiApiKey"
+    private let geminiModelKey = "settings.geminiModel"
+    private let showAIAssistantKey = "settings.showAIAssistant"
     var currentSettingsTab: SettingsTabs = .general
 
     // Stored properties
@@ -76,6 +80,12 @@ class SettingsManager {
             userDefaults.set(sidebarPosition.rawValue, forKey: sidebarPositionKey)
         }
     }
+    
+    var topBarAddressView: Bool {
+        didSet {
+            userDefaults.set(topBarAddressView, forKey: topBarAddressViewKey)
+        }
+    }
 
     var debugToggleUpdateNotification: Bool {
         didSet {
@@ -86,6 +96,24 @@ class SettingsManager {
     var experimentalExtensions: Bool {
         didSet {
             userDefaults.set(experimentalExtensions, forKey: experimentalExtensionsKey)
+        }
+    }
+
+    var geminiApiKey: String {
+        didSet {
+            userDefaults.set(geminiApiKey, forKey: geminiApiKeyKey)
+        }
+    }
+
+    var geminiModel: GeminiModel {
+        didSet {
+            userDefaults.set(geminiModel.rawValue, forKey: geminiModelKey)
+        }
+    }
+
+    var showAIAssistant: Bool {
+        didSet {
+            userDefaults.set(showAIAssistant, forKey: showAIAssistantKey)
         }
     }
 
@@ -101,7 +129,11 @@ class SettingsManager {
             debugToggleUpdateNotificationKey: false,
             askBeforeQuitKey: true,
             sidebarPositionKey: SidebarPosition.left.rawValue,
-            experimentalExtensionsKey: false
+            topBarAddressViewKey: false,
+            experimentalExtensionsKey: false,
+            geminiApiKeyKey: "",
+            geminiModelKey: GeminiModel.flash.rawValue,
+            showAIAssistantKey: true
         ])
 
         // Initialize properties from UserDefaults
@@ -124,7 +156,34 @@ class SettingsManager {
         self.debugToggleUpdateNotification = userDefaults.bool(forKey: debugToggleUpdateNotificationKey)
         self.askBeforeQuit = userDefaults.bool(forKey: askBeforeQuitKey)
         self.sidebarPosition = SidebarPosition(rawValue: userDefaults.string(forKey: sidebarPositionKey) ?? "left") ?? SidebarPosition.left
+        self.topBarAddressView = userDefaults.bool(forKey: topBarAddressViewKey)
         self.experimentalExtensions = userDefaults.bool(forKey: experimentalExtensionsKey)
+        self.geminiApiKey = userDefaults.string(forKey: geminiApiKeyKey) ?? ""
+        self.geminiModel = GeminiModel(rawValue: userDefaults.string(forKey: geminiModelKey) ?? GeminiModel.flash.rawValue) ?? .flash
+        self.showAIAssistant = userDefaults.bool(forKey: showAIAssistantKey)
+    }
+}
+
+// MARK: - Gemini Model
+
+public enum GeminiModel: String, CaseIterable, Identifiable {
+    case flash = "gemini-flash-latest"
+    case pro = "gemini-2.5-pro"
+    
+    public var id: String { rawValue }
+    
+    var displayName: String {
+        switch self {
+        case .flash: return "Gemini Flash (Fast)"
+        case .pro: return "Gemini 2.5 Pro (Advanced)"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .flash: return "Fast responses, great for quick questions"
+        case .pro: return "Most capable model, best for complex analysis"
+        }
     }
 }
 

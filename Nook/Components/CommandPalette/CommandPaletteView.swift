@@ -58,116 +58,119 @@ struct CommandPaletteView: View {
                 }
                 .gesture(WindowDragGesture())
 
-            GeometryReader { geometry in
+            VStack {
+                Spacer()
                 HStack {
                     Spacer()
-
-                    VStack(spacing: 6) {
-                        // Input field - fixed at top of box
-                        HStack(spacing: 15) {
-                            Image(
-                                systemName: isLikelyURL(text)
-                                    ? "globe" : "magnifyingglass"
-                            )
-                            .font(.system(size: 14, weight: .regular))
-                            .foregroundStyle(isDark ? .white : .black)
-
-                            TextField("Search or enter URL...", text: $text)
-                                .textFieldStyle(.plain)
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(
-                                    text.isEmpty
-                                        ? isDark
-                                            ? .white.opacity(0.25)
-                                            : .black.opacity(0.25)
-                                        : isDark
-                                            ? .white.opacity(0.9)
-                                            : .black.opacity(0.9)
-
+                    VStack {
+                        VStack(alignment: .center,spacing: 6) {
+                            // Input field - fixed at top of box
+                            HStack(spacing: 15) {
+                                Image(
+                                    systemName: isLikelyURL(text)
+                                        ? "globe" : "magnifyingglass"
                                 )
-                                .tint(gradientColorManager.primaryColor)
-                                .focused($isSearchFocused)
-                                .onKeyPress(.return) {
-                                    handleReturn()
-                                    return .handled
-                                }
-                                .onKeyPress(.upArrow) {
-                                    navigateSuggestions(direction: -1)
-                                    return .handled
-                                }
-                                .onKeyPress(.downArrow) {
-                                    navigateSuggestions(direction: 1)
-                                    return .handled
-                                }
-                                .onChange(of: text) { _, newValue in
-                                    selectedSuggestionIndex = -1
-                                    searchManager.searchSuggestions(
-                                        for: newValue
+                                .font(.system(size: 14, weight: .regular))
+                                .foregroundStyle(isDark ? .white : .black)
+
+                                TextField("Search or enter URL...", text: $text)
+                                    .textFieldStyle(.plain)
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundColor(
+                                        text.isEmpty
+                                            ? isDark
+                                                ? .white.opacity(0.25)
+                                                : .black.opacity(0.25)
+                                            : isDark
+                                                ? .white.opacity(0.9)
+                                                : .black.opacity(0.9)
+
                                     )
-                                    if windowState.commandPalettePrefilledText
-                                        != newValue
-                                    {
-                                        windowState
-                                            .commandPalettePrefilledText =
-                                            newValue
+                                    .tint(gradientColorManager.primaryColor)
+                                    .focused($isSearchFocused)
+                                    .onKeyPress(.return) {
+                                        handleReturn()
+                                        return .handled
                                     }
-                                }
-                        }
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 8)
+                                    .onKeyPress(.upArrow) {
+                                        navigateSuggestions(direction: -1)
+                                        return .handled
+                                    }
+                                    .onKeyPress(.downArrow) {
+                                        navigateSuggestions(direction: 1)
+                                        return .handled
+                                    }
+                                    .onChange(of: text) { _, newValue in
+                                        selectedSuggestionIndex = -1
+                                        searchManager.searchSuggestions(
+                                            for: newValue
+                                        )
+                                        if windowState.commandPalettePrefilledText
+                                            != newValue
+                                        {
+                                            windowState
+                                                .commandPalettePrefilledText =
+                                                newValue
+                                        }
+                                    }
+                            }
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 8)
 
-                        // Separator
-                        if !searchManager.suggestions.isEmpty {
-                            RoundedRectangle(cornerRadius: 100)
-                                .fill(
-                                    isDark
-                                        ? Color.white.opacity(0.4)
-                                        : Color.black.opacity(0.4)
+                            // Separator
+                            if !searchManager.suggestions.isEmpty {
+                                RoundedRectangle(cornerRadius: 100)
+                                    .fill(
+                                        isDark
+                                            ? Color.white.opacity(0.4)
+                                            : Color.black.opacity(0.4)
+                                    )
+                                    .frame(height: 0.5)
+                                    .frame(maxWidth: .infinity)
+
+                            }
+
+                            // Suggestions - expand the box downward
+                            if !searchManager.suggestions.isEmpty {
+                                let suggestions = searchManager.suggestions
+                                CommandPaletteSuggestionsListView(
+                                    suggestions: suggestions,
+                                    selectedIndex: $selectedSuggestionIndex,
+                                    hoveredIndex: $hoveredSuggestionIndex,
+                                    onSelect: { suggestion in
+                                        selectSuggestion(suggestion)
+                                    }
                                 )
-                                .frame(height: 0.5)
-                                .frame(maxWidth: .infinity)
-
+                            }
                         }
-
-                        // Suggestions - expand the box downward
-                        if !searchManager.suggestions.isEmpty {
-                            let suggestions = searchManager.suggestions
-                            CommandPaletteSuggestionsListView(
-                                suggestions: suggestions,
-                                selectedIndex: $selectedSuggestionIndex,
-                                hoveredIndex: $hoveredSuggestionIndex,
-                                onSelect: { suggestion in
-                                    selectSuggestion(suggestion)
-                                }
-                            )
-                        }
+                        .padding(10)
+                        .frame(maxWidth: .infinity)
+                        .frame(width: effectiveCommandPaletteWidth)
+                        .background(.thickMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(
+                                    Color.white.opacity(isDark ? 0.3 : 0.6),
+                                    lineWidth: 0.5
+                                )
+                        )
+                        .shadow(color: .black.opacity(0.4), radius: 50, x: 0, y: 4)
+                        .animation(
+                            .easeInOut(duration: 0.15),
+                            value: searchManager.suggestions.count
+                        )
+                        Spacer()
+                            .border(.red)
                     }
-                    .padding(10)
-                    .frame(maxWidth: .infinity)
-                    .frame(width: effectiveCommandPaletteWidth)
-                    .background(.thickMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(
-                                Color.white.opacity(isDark ? 0.3 : 0.6),
-                                lineWidth: 0.5
-                            )
-                    )
-                    .shadow(color: .black.opacity(0.4), radius: 50, x: 0, y: 4)
-                    .animation(
-                        .easeInOut(duration: 0.15),
-                        value: searchManager.suggestions.count
-                    )
-                    .alignmentGuide(.top) { _ in -geometry.size.height / 2 }
                     .frame(
-                        maxWidth: .infinity,
-                        maxHeight: .infinity,
-                        alignment: .top
+                        width: effectiveCommandPaletteWidth,
+                        height: 328
                     )
 
                     Spacer()
                 }
+                Spacer()
             }
 
         }

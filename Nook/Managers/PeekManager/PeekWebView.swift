@@ -166,5 +166,52 @@ struct PeekWebView: NSViewRepresentable {
             // Let normal navigation proceed within the peek
             decisionHandler(.allow)
         }
+
+        // MARK: - File Upload Support
+        func webView(
+            _ webView: WKWebView,
+            runOpenPanelWith parameters: WKOpenPanelParameters,
+            initiatedByFrame frame: WKFrameInfo,
+            completionHandler: @escaping ([URL]?) -> Void
+        ) {
+
+            let openPanel = NSOpenPanel()
+            openPanel.allowsMultipleSelection = parameters.allowsMultipleSelection
+            openPanel.canChooseDirectories = parameters.allowsDirectories
+            openPanel.canChooseFiles = true
+            openPanel.resolvesAliases = true
+            openPanel.title = "Choose File"
+            openPanel.prompt = "Choose"
+
+
+            // Ensure we're on the main thread for UI operations
+            DispatchQueue.main.async {
+                if let window = webView.window {
+                    // Present as sheet if we have a window
+                    openPanel.beginSheetModal(for: window) { response in
+                        print("📁 [PeekWebView] Open panel sheet completed with response: \(response)")
+                        if response == .OK {
+                            print("📁 [PeekWebView] User selected files: \(openPanel.urls.map { $0.lastPathComponent })")
+                            completionHandler(openPanel.urls)
+                        } else {
+                            print("📁 [PeekWebView] User cancelled file selection")
+                            completionHandler(nil)
+                        }
+                    }
+                } else {
+                    // Fall back to modal presentation
+                    openPanel.begin { response in
+                        print("📁 [PeekWebView] Open panel modal completed with response: \(response)")
+                        if response == .OK {
+                            print("📁 [PeekWebView] User selected files: \(openPanel.urls.map { $0.lastPathComponent })")
+                            completionHandler(openPanel.urls)
+                        } else {
+                            print("📁 [PeekWebView] User cancelled file selection")
+                            completionHandler(nil)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
