@@ -145,15 +145,20 @@ struct SidebarView: View {
             && !browserManager.isTransitioningProfile
 
         let content = VStack(spacing: 8) {
-
-            HStack(spacing: 2) {
-                NavButtonsView(effectiveSidebarWidth: effectiveWidth)
-            }
-            .padding(.horizontal, 8)
-            .frame(height: 30)
-
-            URLBarView()
+            // Only show navigation buttons if top bar address view is disabled
+            if !browserManager.settingsManager.topBarAddressView {
+                HStack(spacing: 2) {
+                    NavButtonsView(effectiveSidebarWidth: effectiveWidth)
+                }
                 .padding(.horizontal, 8)
+                .frame(height: 30)
+            }
+
+            // Only show URL bar in sidebar if top bar address view is disabled
+            if !browserManager.settingsManager.topBarAddressView {
+                URLBarView()
+                    .padding(.horizontal, 8)
+            }
             // Container to support PinnedGrid slide transitions without clipping
             ZStack {
                 PinnedGrid(

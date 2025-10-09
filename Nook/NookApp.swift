@@ -482,10 +482,7 @@ struct BackgroundWindowModifier: NSViewRepresentable {
                 window.isReleasedWhenClosed = false
                 // window.isMovableByWindowBackground = true // Disabled - use SwiftUI-based window drag system instead
                 window.isMovable = true
-                window.styleMask = [
-                    .titled, .closable, .miniaturizable, .resizable,
-                    .fullSizeContentView,
-                ]
+                window.styleMask.insert(.fullSizeContentView)
 
                 window.standardWindowButton(.closeButton)?.isHidden = true
                 window.standardWindowButton(.zoomButton)?.isHidden = true
@@ -500,3 +497,4 @@ struct BackgroundWindowModifier: NSViewRepresentable {
 
     }
 }
+
