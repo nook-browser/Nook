@@ -79,7 +79,7 @@ static char kIslandTemplate[] = {
 
 // ARM64 is not supported by this shim. Provide a minimal template so the code compiles.
 #define kOriginalInstructionsSize 32
-static char kIslandTemplate[] = { 0x00 };
+static char kIslandTemplate[] __attribute__((unused)) = { 0x00 };
 
 #endif
 
@@ -393,6 +393,9 @@ allocateBranchIsland(
         int                allocateHigh,
         void *originalFunctionAddress)
 {
+#if defined(__arm64__) || defined(__aarch64__)
+    (void)originalFunctionAddress;
+#endif
     assert( island );
     
     mach_error_t    err = err_none;
