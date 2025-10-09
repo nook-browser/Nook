@@ -25,7 +25,7 @@ struct GradientEditorView: View {
         }
         .padding(16)
         .onAppear { if selectedNodeID == nil { selectedNodeID = gradient.nodes.first?.id } }
-        .onChange(of: gradient) { newValue in
+        .onChange(of: gradient) { _, newValue in
             // Scrubbing should be immediate to avoid animation token races
             gradientColorManager.setImmediate(newValue)
         }

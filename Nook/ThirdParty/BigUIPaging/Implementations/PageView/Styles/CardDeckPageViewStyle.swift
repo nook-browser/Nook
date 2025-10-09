@@ -61,10 +61,10 @@ struct CardDeckPageView: View {
         .task {
             makePages(from: configuration.selection.wrappedValue)
         }
-        .onChange(of: selectedIndex) { newValue in
+        .onChange(of: selectedIndex) { _, newValue in
             configuration.selection.wrappedValue = pages[newValue].value
         }
-        .onChange(of: configuration.selection.wrappedValue) { newValue in
+        .onChange(of: configuration.selection.wrappedValue) { _, newValue in
             makePages(from: newValue)
             self.dragProgress = 0.0
         }

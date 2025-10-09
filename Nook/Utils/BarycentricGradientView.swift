@@ -63,7 +63,7 @@ struct BarycentricGradientView: View, Animatable {
             previousCount = c
             activationProgress = 1.0
         }
-        .onChange(of: gradient) { _ in
+        .onChange(of: gradient) {
             let currentCount = max(1, min(3, gradient.sortedNodes.count))
             if currentCount != previousCount {
                 previousCount = currentCount
