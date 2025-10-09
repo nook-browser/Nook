@@ -159,15 +159,14 @@ struct SpaceView: View {
     private var mainContentContainer: some View {
         ScrollViewReader { proxy in
             GeometryReader { geometry in
-                let contentWidth = resolvedContentWidth(measuredOuterWidth: geometry.size.width)
                 ZStack {
                     ScrollView(.vertical, showsIndicators: false) {
                         VStack(spacing: 8) {
                             pinnedTabsSection
                             newTabButtonSectionWithClear
-                            regularTabsList(maxWidth: contentWidth)
+                            regularTabsList
                         }
-                        .frame(minWidth: 0, maxWidth: contentWidth, alignment: .leading)
+                        .frame(minWidth: 0, maxWidth: innerWidth, alignment: .leading)
                         .coordinateSpace(name: "ScrollSpace")
                     }
                     .contentShape(Rectangle())
@@ -469,10 +468,10 @@ struct SpaceView: View {
         }
     }
     
-    private func regularTabsList(maxWidth: CGFloat) -> some View {
+    private var regularTabsList: some View {
         VStack(spacing: 2) {
             if !tabs.isEmpty {
-                regularTabsContent(maxWidth: maxWidth)
+                regularTabsContent
             } else {
                 emptyRegularTabsDropTarget
             }
@@ -480,7 +479,7 @@ struct SpaceView: View {
         .animation(.easeInOut(duration: 0.15), value: tabs.count)
     }
     
-    private func regularTabsContent(maxWidth: CGFloat) -> some View {
+    private var regularTabsContent: some View {
         VStack(spacing: 2) {
             let currentTabs = tabs
             let split = splitManager
@@ -502,7 +501,7 @@ struct SpaceView: View {
                 .conditionalWindowDrag()
                 .frame(height: 100)
         }
-        .frame(minWidth: 0, maxWidth: maxWidth, alignment: .leading)
+        .frame(minWidth: 0, maxWidth: innerWidth, alignment: .leading)
         .contentShape(Rectangle())
         .padding(.top, 8)
         .onDrop(
@@ -514,22 +513,6 @@ struct SpaceView: View {
                 tabManager: browserManager.tabManager
             )
         )
-    }
-    
-    private func resolvedContentWidth(measuredOuterWidth: CGFloat) -> CGFloat {
-        let measuredContentWidth = max(measuredOuterWidth - 16, 0)
-        let candidateWidths: [CGFloat] = [
-            innerWidth,
-            measuredContentWidth,
-            max(windowState.sidebarContentWidth, 0),
-            max(browserManager.sidebarContentWidth, 0)
-        ]
-        let resolved = candidateWidths.max() ?? 0
-        if resolved > 0 {
-            return resolved
-        }
-        // Default sidebar content width when no measurements are ready yet.
-        return 234
     }
     
     private func splitTabsView(currentTabs: [Tab], leftIdx: Int, rightIdx: Int) -> some View {

@@ -18,10 +18,13 @@ struct SpaceGradientBackgroundView: View {
     }
 
     var body: some View {
-        BarycentricGradientView(gradient: gradient)
-            .opacity(max(0.0, min(1.0, gradient.opacity)))
-            .allowsHitTesting(false) // Entire background should not intercept input
-            .ignoresSafeArea()
+        ZStack {
+            // Always use BarycentricGradientView for active window - it handles 1-3 colors smoothly
+            // For inactive windows, also use Barycentric since spaces only have 1-3 colors max
+            BarycentricGradientView(gradient: gradient)
+        }
+        .opacity(max(0.0, min(1.0, gradient.opacity)))
+        .allowsHitTesting(false) // Entire background should not intercept input
     }
 
     private func stops() -> [Gradient.Stop] {

@@ -479,7 +479,7 @@ final class DitheredGradientRenderer: ObservableObject {
             DispatchQueue.main.async { self?.image = img }
         }
         workItem = item
-        DispatchQueue.global(qos: .userInitiated).async(execute: item)
+        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.02, execute: item)
     }
 
     private func cacheKey(gradient: SpaceGradient, size: CGSize) -> String {
