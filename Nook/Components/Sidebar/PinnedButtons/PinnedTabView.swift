@@ -27,7 +27,7 @@ struct PinnedTabView: View {
     // Stroke overlay tunables
     private let strokeThickness: CGFloat = 2.5   // ring thickness
     private let faviconScale: CGFloat = 10.0      // favicon scale to fit the ring
-    private let faviconBlur: CGFloat = 80.0      // blur applied to favicon
+    private let faviconBlur: CGFloat = 40.0      // blur applied to favicon (reduced from 80 to prevent artifacts)
 
     var body: some View {
         Button(action: action) {
@@ -35,7 +35,6 @@ struct PinnedTabView: View {
                 RoundedRectangle(cornerRadius: corner, style: .continuous)
                     .fill(backgroundColor)
                     .animation(.easeInOut(duration: 0.2), value: isHovered)
-                    .shadow(color: shadowColor, radius: 1, y: 2)
 
                 tabIcon
                     .resizable()
@@ -45,15 +44,11 @@ struct PinnedTabView: View {
                     .frame(width: iconSize, height: iconSize)
                     .padding(.vertical, innerPadding)
 
-                // Favicon-based stroke overlay
+                // Simple stroke overlay without blur
                 if isActive {
-                    faviconStrokeOverlay(
-                        corner: corner,
-                        thickness: strokeThickness,
-                        scale: faviconScale,
-                        blur: faviconBlur
-                    )
-                    .allowsHitTesting(false)
+                    RoundedRectangle(cornerRadius: corner, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.3), lineWidth: strokeThickness)
+                        .allowsHitTesting(false)
                 }
             }
             .frame(maxWidth: .infinity)

@@ -147,15 +147,20 @@ struct SidebarView: View {
             && !browserManager.isTransitioningProfile
 
         let content = VStack(spacing: 8) {
-
-            HStack(spacing: 2) {
-                NavButtonsView(effectiveSidebarWidth: effectiveWidth)
-            }
-            .padding(.horizontal, 8)
-            .frame(height: 30)
-
-            URLBarView()
+            // Only show navigation buttons if top bar address view is disabled
+            if !browserManager.settingsManager.topBarAddressView {
+                HStack(spacing: 2) {
+                    NavButtonsView(effectiveSidebarWidth: effectiveWidth)
+                }
                 .padding(.horizontal, 8)
+                .frame(height: 30)
+            }
+
+            // Only show URL bar in sidebar if top bar address view is disabled
+            if !browserManager.settingsManager.topBarAddressView {
+                URLBarView()
+                    .padding(.horizontal, 8)
+            }
             // Container to support PinnedGrid slide transitions without clipping
             ZStack {
                 PinnedGrid(
@@ -178,10 +183,6 @@ struct SidebarView: View {
                     .conditionalWindowDrag()
                     .frame(minHeight: 40)
                     .zIndex(0)
-                    .onTapGesture(count: 2) {
-                        // Double-tap to open command palette for new tab
-                        browserManager.openCommandPalette()
-                    }
             }
 
 
@@ -277,10 +278,6 @@ struct SidebarView: View {
         .animation(
             shouldAnimate ? .easeInOut(duration: 0.18) : nil,
             value: essentialsCount)
-        .onTapGesture(count: 2) {
-            // Double-tap to open command palette for new tab
-            browserManager.openCommandPalette()
-        }
         
         let finalContent = ZStack {
                 if windowState.isSidebarAIChatVisible {
@@ -338,10 +335,6 @@ struct SidebarView: View {
         }
         .frame(width: effectiveWidth)
         .padding()
-        .onTapGesture(count: 2) {
-            // Double-tap to open command palette for new tab
-            browserManager.openCommandPalette()
-        }
     }
 
     private var spacesPageView: some View {

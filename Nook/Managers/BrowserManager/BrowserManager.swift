@@ -457,7 +457,17 @@ class BrowserManager: ObservableObject {
     }
 
     func refreshGradientsForSpace(_ space: Space, animate: Bool) {
-        for (_, state) in windowStates where state.currentSpaceId == space.id {
+        for (_, state) in windowStates {
+            var matchesSpace = state.currentSpaceId == space.id
+            if !matchesSpace,
+               state.currentSpaceId == nil,
+               let activeSpaceId = tabManager.currentSpace?.id,
+               activeSpaceId == space.id {
+                state.currentSpaceId = space.id
+                state.activeGradient = space.gradient
+                matchesSpace = true
+            }
+            guard matchesSpace else { continue }
             updateGradient(for: state, to: space.gradient, animate: animate && activeWindowState?.id == state.id)
         }
     }
@@ -565,6 +575,13 @@ class BrowserManager: ObservableObject {
             self,
             selector: #selector(handleTabUnloadTimeoutChange),
             name: .tabUnloadTimeoutChanged,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleApplicationDidBecomeActive),
+            name: NSApplication.didBecomeActiveNotification,
             object: nil
         )
 
@@ -865,7 +882,13 @@ class BrowserManager: ObservableObject {
             commandPalettePrefilledText = ""
         }
     }
-
+    
+    func toggleTopBarAddressView() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            settingsManager.topBarAddressView.toggle()
+        }
+    }
+    
     func toggleCommandPalette() {
         if let target = activeWindowState {
             if target.isCommandPaletteVisible {
@@ -944,6 +967,51 @@ class BrowserManager: ObservableObject {
         }
         let newTab = tabManager.createNewTab(in: targetSpace)
         selectTab(newTab, in: windowState)
+    }
+    
+    func duplicateCurrentTab() {
+        print("🔧 [BrowserManager] duplicateCurrentTab called")
+        guard let currentTab = currentTabForActiveWindow() else { 
+            print("🔧 [BrowserManager] No current tab found")
+            return 
+        }
+        print("🔧 [BrowserManager] Current tab: \(currentTab.name) - \(currentTab.url)")
+        
+        // Get the current space for the active window
+        let targetSpace = activeWindowState?.currentSpaceId.flatMap { id in
+            tabManager.spaces.first(where: { $0.id == id })
+        } ?? tabManager.currentSpace
+        
+        // Get the current tab's index to place the duplicate below it
+        let currentTabIndex = tabManager.tabs.firstIndex(where: { $0.id == currentTab.id }) ?? 0
+        let insertIndex = currentTabIndex + 1
+        
+        // Create a new tab with the same URL and name
+        let newTab = Tab(
+            url: currentTab.url,
+            name: currentTab.name,
+            favicon: "globe", // Will be updated by fetchAndSetFavicon
+            spaceId: targetSpace?.id,
+            index: 0, // Will be set correctly after insertion
+            browserManager: self
+        )
+        
+        // Add the tab to the current space (it will be added at the end)
+        tabManager.addTab(newTab)
+        
+        // Now move it to the correct position (right below the current tab)
+        if let spaceId = targetSpace?.id {
+            tabManager.reorderRegular(newTab, in: spaceId, to: insertIndex)
+        }
+        
+        // Set as active tab in the current window
+        if let windowState = activeWindowState {
+            selectTab(newTab, in: windowState)
+        } else {
+            selectTab(newTab)
+        }
+        
+        print("🔧 [BrowserManager] Duplicated tab created: \(newTab.name) - \(newTab.url) at index \(insertIndex)")
     }
 
     func closeCurrentTab() {
@@ -1146,6 +1214,15 @@ class BrowserManager: ObservableObject {
     @objc private func handleTabUnloadTimeoutChange(_ notification: Notification) {
         if let timeout = notification.userInfo?["timeout"] as? TimeInterval {
             compositorManager.setUnloadTimeout(timeout)
+        }
+    }
+
+    @objc private func handleApplicationDidBecomeActive(_ notification: Notification) {
+        guard !gradientColorManager.isEditing else { return }
+        if let activeWindowState {
+            gradientColorManager.setImmediate(activeWindowState.activeGradient)
+        } else if let gradient = tabManager.currentSpace?.gradient {
+            gradientColorManager.setImmediate(gradient)
         }
     }
     
@@ -1919,6 +1996,13 @@ class BrowserManager: ObservableObject {
         sidebarContentWidth = windowState.sidebarContentWidth
         isSidebarVisible = windowState.isSidebarVisible
         urlBarFrame = windowState.urlBarFrame
+        if let csId = windowState.currentSpaceId,
+           let space = tabManager.spaces.first(where: { $0.id == csId }) {
+            windowState.activeGradient = space.gradient
+        } else if let activeSpace = tabManager.currentSpace {
+            windowState.currentSpaceId = activeSpace.id
+            windowState.activeGradient = activeSpace.gradient
+        }
         gradientColorManager.setImmediate(windowState.activeGradient)
         splitManager.refreshPublishedState(for: windowState.id)
         isCommandPaletteVisible = windowState.isCommandPaletteVisible

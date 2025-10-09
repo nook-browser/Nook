@@ -20,6 +20,7 @@ class SettingsManager {
     private let debugToggleUpdateNotificationKey = "settings.debugToggleUpdateNotification"
     private let askBeforeQuitKey = "settings.askBeforeQuit"
     private let sidebarPositionKey = "settings.sidebarPosition"
+    private let topBarAddressViewKey = "settings.topBarAddressView"
     private let experimentalExtensionsKey = "settings.experimentalExtensions"
     private let geminiApiKeyKey = "settings.geminiApiKey"
     private let geminiModelKey = "settings.geminiModel"
@@ -79,6 +80,12 @@ class SettingsManager {
             userDefaults.set(sidebarPosition.rawValue, forKey: sidebarPositionKey)
         }
     }
+    
+    var topBarAddressView: Bool {
+        didSet {
+            userDefaults.set(topBarAddressView, forKey: topBarAddressViewKey)
+        }
+    }
 
     var debugToggleUpdateNotification: Bool {
         didSet {
@@ -122,6 +129,7 @@ class SettingsManager {
             debugToggleUpdateNotificationKey: false,
             askBeforeQuitKey: true,
             sidebarPositionKey: SidebarPosition.left.rawValue,
+            topBarAddressViewKey: false,
             experimentalExtensionsKey: false,
             geminiApiKeyKey: "",
             geminiModelKey: GeminiModel.flash.rawValue,
@@ -148,6 +156,7 @@ class SettingsManager {
         self.debugToggleUpdateNotification = userDefaults.bool(forKey: debugToggleUpdateNotificationKey)
         self.askBeforeQuit = userDefaults.bool(forKey: askBeforeQuitKey)
         self.sidebarPosition = SidebarPosition(rawValue: userDefaults.string(forKey: sidebarPositionKey) ?? "left") ?? SidebarPosition.left
+        self.topBarAddressView = userDefaults.bool(forKey: topBarAddressViewKey)
         self.experimentalExtensions = userDefaults.bool(forKey: experimentalExtensionsKey)
         self.geminiApiKey = userDefaults.string(forKey: geminiApiKeyKey) ?? ""
         self.geminiModel = GeminiModel(rawValue: userDefaults.string(forKey: geminiModelKey) ?? GeminiModel.flash.rawValue) ?? .flash

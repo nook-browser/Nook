@@ -233,6 +233,20 @@ struct GeneralSettingsView: View {
                                 .pickerStyle(.menu)
                                 .frame(width: 220)
                             }
+                            
+                            Toggle(
+                                isOn: $browserManager.settingsManager
+                                    .topBarAddressView
+                            ) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Top Bar Address View")
+                                    Text(
+                                        "Show address bar and navigation buttons at the top of the window"
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+                            }.frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
 
