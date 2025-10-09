@@ -1175,9 +1175,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         guard !isMonitoringNativeAudio else { return }
         isMonitoringNativeAudio = true
         
-        audioMonitoringTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.checkNativeAudioActivity()
-        }
+        audioMonitoringTimer = Timer.scheduledTimer(timeInterval: 1.0, target: self, selector: #selector(handleNativeAudioMonitoringTimer(_:)), userInfo: nil, repeats: true)
         
         setupAudioSessionNotifications()
     }
@@ -1249,6 +1247,10 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             hasAddedCoreAudioListener = false
             audioDeviceListenerProc = nil
         }
+    }
+    
+    @objc private func handleNativeAudioMonitoringTimer(_ timer: Timer) {
+        checkNativeAudioActivity()
     }
     
     private func checkNativeAudioActivity() {
