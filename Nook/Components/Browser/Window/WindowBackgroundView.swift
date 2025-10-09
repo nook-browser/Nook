@@ -15,40 +15,28 @@ struct WindowBackgroundView: View {
             if #available(macOS 26.0, *) {
                 if browserManager.settingsManager.isLiquidGlassEnabled {
                     Rectangle()
-                        .fill(Color.clear)
-                        .blur(radius: 40)
+                        .fill(.ultraThinMaterial)
                         .glassEffect(in: .rect(cornerRadius: 0))
-                        .clipped()
                 } else {
-                    BlurEffectView(
-                        material: browserManager.settingsManager
-                            .currentMaterial,
-                        state: .active
-                    )
-                    .overlay(
-                        Color.black.opacity(0.25)
-                            .blendMode(.darken)
-                    )
+                    Rectangle()
+                        .fill(.regularMaterial)
+                        .overlay(
+                            Color.black.opacity(0.15)
+                        )
                 }
             } else {
                 if browserManager.settingsManager.isLiquidGlassEnabled {
                     Rectangle()
-                        .fill(.clear)
-                        .background(.thinMaterial)  // Use thinMaterial for liquid glass effect for better compatability
-                        .blur(radius: 40)
-                        .clipped()
+                        .fill(.thinMaterial)
                 } else {
-                    BlurEffectView(
-                        material: browserManager.settingsManager
-                            .currentMaterial,
-                        state: .active
-                    )
-                    .overlay(
-                        Color.black.opacity(0.25)
-                            .blendMode(.darken)
-                    )
+                    Rectangle()
+                        .fill(.regularMaterial)
+                        .overlay(
+                            Color.black.opacity(0.15)
+                        )
                 }
-            }        }
+            }
+        }
         .backgroundDraggable()
     }
 }

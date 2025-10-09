@@ -16,6 +16,7 @@ class KeyboardShortcutManager: ObservableObject {
     private let shortcutsVersionKey = "keyboard.shortcuts.version"
     private let currentVersion = 3 // Increment when adding new shortcuts
 
+
     var shortcuts: [KeyboardShortcut] = []
     weak var browserManager: BrowserManager?
 
@@ -32,7 +33,6 @@ class KeyboardShortcutManager: ObservableObject {
 
     private func loadShortcuts() {
         let savedVersion = userDefaults.integer(forKey: shortcutsVersionKey)
-        print("🔧 [KeyboardShortcutManager] Loading shortcuts. Saved version: \(savedVersion), Current version: \(currentVersion)")
         
         // Load from UserDefaults or use defaults
         if let data = userDefaults.data(forKey: shortcutsKey),
@@ -85,6 +85,7 @@ class KeyboardShortcutManager: ObservableObject {
         
         if needsUpdate {
             saveShortcuts()
+            print("🔧 [KeyboardShortcutManager] Updated shortcuts with new additions")
         }
     }
 
