@@ -945,6 +945,51 @@ class BrowserManager: ObservableObject {
         let newTab = tabManager.createNewTab(in: targetSpace)
         selectTab(newTab, in: windowState)
     }
+    
+    func duplicateCurrentTab() {
+        print("🔧 [BrowserManager] duplicateCurrentTab called")
+        guard let currentTab = currentTabForActiveWindow() else { 
+            print("🔧 [BrowserManager] No current tab found")
+            return 
+        }
+        print("🔧 [BrowserManager] Current tab: \(currentTab.name) - \(currentTab.url)")
+        
+        // Get the current space for the active window
+        let targetSpace = activeWindowState?.currentSpaceId.flatMap { id in
+            tabManager.spaces.first(where: { $0.id == id })
+        } ?? tabManager.currentSpace
+        
+        // Get the current tab's index to place the duplicate below it
+        let currentTabIndex = tabManager.tabs.firstIndex(where: { $0.id == currentTab.id }) ?? 0
+        let insertIndex = currentTabIndex + 1
+        
+        // Create a new tab with the same URL and name
+        let newTab = Tab(
+            url: currentTab.url,
+            name: currentTab.name,
+            favicon: "globe", // Will be updated by fetchAndSetFavicon
+            spaceId: targetSpace?.id,
+            index: 0, // Will be set correctly after insertion
+            browserManager: self
+        )
+        
+        // Add the tab to the current space (it will be added at the end)
+        tabManager.addTab(newTab)
+        
+        // Now move it to the correct position (right below the current tab)
+        if let spaceId = targetSpace?.id {
+            tabManager.reorderRegular(newTab, in: spaceId, to: insertIndex)
+        }
+        
+        // Set as active tab in the current window
+        if let windowState = activeWindowState {
+            selectTab(newTab, in: windowState)
+        } else {
+            selectTab(newTab)
+        }
+        
+        print("🔧 [BrowserManager] Duplicated tab created: \(newTab.name) - \(newTab.url) at index \(insertIndex)")
+    }
 
     func closeCurrentTab() {
         if let activeWindow = activeWindowState,

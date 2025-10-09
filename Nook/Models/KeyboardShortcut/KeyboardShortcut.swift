@@ -48,6 +48,7 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
     case goToTab7 = "go_to_tab_7"
     case goToTab8 = "go_to_tab_8"
     case goToLastTab = "go_to_last_tab"
+    case duplicateTab = "duplicate_tab"
 
     // Space Management
     case nextSpace = "next_space"
@@ -87,6 +88,7 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
         case .goToTab7: return "Go to Tab 7"
         case .goToTab8: return "Go to Tab 8"
         case .goToLastTab: return "Go to Last Tab"
+        case .duplicateTab: return "Duplicate Tab"
         case .nextSpace: return "Next Space"
         case .previousSpace: return "Previous Space"
         case .newWindow: return "New Window"
@@ -106,7 +108,7 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
         switch self {
         case .goBack, .goForward, .refresh, .clearCookiesAndRefresh:
             return .navigation
-        case .newTab, .closeTab, .undoCloseTab, .nextTab, .previousTab, .goToTab1, .goToTab2, .goToTab3, .goToTab4, .goToTab5, .goToTab6, .goToTab7, .goToTab8, .goToLastTab:
+        case .newTab, .closeTab, .undoCloseTab, .nextTab, .previousTab, .goToTab1, .goToTab2, .goToTab3, .goToTab4, .goToTab5, .goToTab6, .goToTab7, .goToTab8, .goToLastTab, .duplicateTab:
             return .tabs
         case .nextSpace, .previousSpace:
             return .spaces
@@ -223,6 +225,7 @@ extension KeyboardShortcut {
             KeyboardShortcut(action: .goToTab7, keyCombination: KeyCombination(key: "7", modifiers: [.command])),
             KeyboardShortcut(action: .goToTab8, keyCombination: KeyCombination(key: "8", modifiers: [.command])),
             KeyboardShortcut(action: .goToLastTab, keyCombination: KeyCombination(key: "9", modifiers: [.command])),
+            KeyboardShortcut(action: .duplicateTab, keyCombination: KeyCombination(key: "d", modifiers: [.option])),
 
             // Space Management
             KeyboardShortcut(action: .nextSpace, keyCombination: KeyCombination(key: "]", modifiers: [.command, .control])),
