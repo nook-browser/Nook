@@ -122,11 +122,13 @@ struct SidebarView: View {
                     } label: {
                         Label("Edit Theme Color", systemImage: "paintpalette")
                     }
-                    Divider()
-                    Button(role: .destructive) {
-                        browserManager.tabManager.removeSpace(browserManager.tabManager.currentSpace!.id)
-                    } label: {
-                        Label("Delete Space", systemImage: "trash")
+                    if browserManager.tabManager.spaces.count > 1 {
+                        Divider()
+                        Button(role: .destructive) {
+                            browserManager.tabManager.removeSpace(browserManager.tabManager.currentSpace!.id)
+                        } label: {
+                            Label("Delete Space", systemImage: "trash")
+                        }
                     }
                 }
         }
