@@ -45,7 +45,12 @@ final class WebStoreScriptHandler: NSObject, WKScriptMessageHandler {
                     
                     if let webView = message.webView {
                         do {
-                            try await webView.callAsyncJavaScript(script, arguments: [:], in: nil, contentWorld: .page)
+                            _ = try await webView.callAsyncJavaScript(
+                                script,
+                                arguments: [:],
+                                in: nil,
+                                contentWorld: .page
+                            )
                         } catch {
                             print("❌ Failed to dispatch install completion event: \(error)")
                         }
