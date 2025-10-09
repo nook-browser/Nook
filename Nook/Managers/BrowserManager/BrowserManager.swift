@@ -20,9 +20,9 @@ final class Persistence {
     let container: ModelContainer
 
     // MARK: - Constants
-    nonisolated(unsafe) private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "Persistence")
-    nonisolated(unsafe) private static let storeFileName = "default.store"
-    nonisolated(unsafe) private static let backupPrefix = "default_backup_"
+    nonisolated private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "Persistence")
+    nonisolated private static let storeFileName = "default.store"
+    nonisolated private static let backupPrefix = "default_backup_"
     // Backups now use a directory per snapshot: default_backup_<timestamp>/
     
     static let schema = Schema([
@@ -2161,7 +2161,6 @@ class BrowserManager: ObservableObject {
         // Copy configuration from the original tab's web view if it exists
         if let originalWebView = tab.webView {
             configuration.websiteDataStore = originalWebView.configuration.websiteDataStore
-            configuration.processPool = originalWebView.configuration.processPool
             // CRITICAL: Copy all preferences including PiP settings
             configuration.preferences = originalWebView.configuration.preferences
             configuration.defaultWebpagePreferences = originalWebView.configuration.defaultWebpagePreferences
@@ -2181,7 +2180,6 @@ class BrowserManager: ObservableObject {
             preferences.allowsContentJavaScript = true
             configuration.defaultWebpagePreferences = preferences
             
-            configuration.preferences.javaScriptEnabled = true
             configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
             configuration.mediaTypesRequiringUserActionForPlayback = []
             configuration.allowsAirPlayForMediaPlayback = true
@@ -2382,7 +2380,7 @@ class BrowserManager: ObservableObject {
     
     /// Validate and fix window states after tab/space mutations
     func validateWindowStates() {
-        for (windowId, windowState) in windowStates {
+        for (_, windowState) in windowStates {
             var needsUpdate = false
             
             // Check if current tab still exists
