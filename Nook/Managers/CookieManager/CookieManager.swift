@@ -57,7 +57,7 @@ class CookieManager: ObservableObject {
         if let httpCookie = httpCookies.first(where: { 
             $0.name == cookie.name && $0.domain == cookie.domain && $0.path == cookie.path 
         }) {
-            dataStore.httpCookieStore.delete(httpCookie)
+            await dataStore.httpCookieStore.delete(httpCookie)
         }
         await loadCookies() // Refresh the list
     }
@@ -67,7 +67,7 @@ class CookieManager: ObservableObject {
         let domainCookies = httpCookies.filter { $0.domain == domain || $0.domain == ".\(domain)" }
         
         for cookie in domainCookies {
-            dataStore.httpCookieStore.delete(cookie)
+            await dataStore.httpCookieStore.delete(cookie)
         }
         
         await loadCookies() // Refresh the list
@@ -77,7 +77,7 @@ class CookieManager: ObservableObject {
         let httpCookies = await dataStore.httpCookieStore.allCookies()
         
         for cookie in httpCookies {
-            dataStore.httpCookieStore.delete(cookie)
+            await dataStore.httpCookieStore.delete(cookie)
         }
         
         await loadCookies() // Refresh the list
@@ -91,7 +91,7 @@ class CookieManager: ObservableObject {
         }
         
         for cookie in expiredCookies {
-            dataStore.httpCookieStore.delete(cookie)
+            await dataStore.httpCookieStore.delete(cookie)
         }
         
         await loadCookies() // Refresh the list
@@ -108,7 +108,7 @@ class CookieManager: ObservableObject {
             if let httpCookie = httpCookies.first(where: { 
                 $0.name == cookieInfo.name && $0.domain == cookieInfo.domain && $0.path == cookieInfo.path 
             }) {
-                dataStore.httpCookieStore.delete(httpCookie)
+                await dataStore.httpCookieStore.delete(httpCookie)
             }
         }
         
@@ -124,7 +124,7 @@ class CookieManager: ObservableObject {
             if let httpCookie = httpCookies.first(where: { 
                 $0.name == cookieInfo.name && $0.domain == cookieInfo.domain && $0.path == cookieInfo.path 
             }) {
-                dataStore.httpCookieStore.delete(httpCookie)
+                await dataStore.httpCookieStore.delete(httpCookie)
             }
         }
         
@@ -136,7 +136,7 @@ class CookieManager: ObservableObject {
         let thirdPartyCookies = httpCookies.filter { $0.domain.hasPrefix(".") }
         
         for cookie in thirdPartyCookies {
-            dataStore.httpCookieStore.delete(cookie)
+            await dataStore.httpCookieStore.delete(cookie)
         }
         
         await loadCookies()
