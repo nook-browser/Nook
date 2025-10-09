@@ -882,7 +882,13 @@ class BrowserManager: ObservableObject {
             commandPalettePrefilledText = ""
         }
     }
-
+    
+    func toggleTopBarAddressView() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            settingsManager.topBarAddressView.toggle()
+        }
+    }
+    
     func toggleCommandPalette() {
         if let target = activeWindowState {
             if target.isCommandPaletteVisible {

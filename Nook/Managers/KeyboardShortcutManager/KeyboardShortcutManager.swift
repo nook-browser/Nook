@@ -13,6 +13,8 @@ import SwiftUI
 class KeyboardShortcutManager: ObservableObject {
     private let userDefaults = UserDefaults.standard
     private let shortcutsKey = "keyboard.shortcuts"
+    private let shortcutsVersionKey = "keyboard.shortcuts.version"
+    private let currentVersion = 2 // Increment when adding new shortcuts
 
     var shortcuts: [KeyboardShortcut] = []
     weak var browserManager: BrowserManager?
@@ -29,13 +31,42 @@ class KeyboardShortcutManager: ObservableObject {
     // MARK: - Persistence
 
     private func loadShortcuts() {
+        let savedVersion = userDefaults.integer(forKey: shortcutsVersionKey)
+        
         // Load from UserDefaults or use defaults
         if let data = userDefaults.data(forKey: shortcutsKey),
            let decoded = try? JSONDecoder().decode([KeyboardShortcut].self, from: data) {
             self.shortcuts = decoded
+            
+            // Check if we need to merge new shortcuts
+            if savedVersion < currentVersion {
+                mergeWithDefaults()
+                userDefaults.set(currentVersion, forKey: shortcutsVersionKey)
+            }
         } else {
             self.shortcuts = KeyboardShortcut.defaultShortcuts
+            userDefaults.set(currentVersion, forKey: shortcutsVersionKey)
             saveShortcuts()
+        }
+    }
+    
+    private func mergeWithDefaults() {
+        let defaultShortcuts = KeyboardShortcut.defaultShortcuts
+        var needsUpdate = false
+        
+        for defaultShortcut in defaultShortcuts {
+            // Check if this shortcut already exists
+            if !shortcuts.contains(where: { $0.action == defaultShortcut.action }) {
+                // Add missing shortcut
+                shortcuts.append(defaultShortcut)
+                needsUpdate = true
+                print("🔧 [KeyboardShortcutManager] Added missing shortcut: \(defaultShortcut.action.displayName)")
+            }
+        }
+        
+        if needsUpdate {
+            saveShortcuts()
+            print("🔧 [KeyboardShortcutManager] Updated shortcuts with new additions")
         }
     }
 
@@ -141,6 +172,9 @@ class KeyboardShortcutManager: ObservableObject {
                 browserManager.selectTabByIndexInActiveWindow(tabIndex - 1)
             case .goToLastTab:
                 browserManager.selectLastTabInActiveWindow()
+            case .toggleTopBarAddressView:
+                print("🔧 [KeyboardShortcutManager] Executing toggleTopBarAddressView")
+                browserManager.toggleTopBarAddressView()
 
             // Space Management
             case .nextSpace:

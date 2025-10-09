@@ -530,6 +530,7 @@ struct BackgroundWindowModifier: NSViewRepresentable {
                 window.isReleasedWhenClosed = false
                 // window.isMovableByWindowBackground = true // Disabled - use SwiftUI-based window drag system instead
                 window.isMovable = true
+                window.styleMask.insert(.fullSizeContentView)
                 var styleMask: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
                 // Without this, we get the error "NSWindowStyleMaskFullScreen cleared on a window outside of a full screen transition."
                 if window.styleMask.contains(.fullScreen) {
@@ -550,3 +551,4 @@ struct BackgroundWindowModifier: NSViewRepresentable {
 
     }
 }
+
