@@ -230,6 +230,8 @@ class KeyboardShortcutManager: ObservableObject {
                 browserManager.copyCurrentURL()
             case .expandAllFolders:
                 browserManager.expandAllFoldersInSidebar()
+            case .toggleTopBarAddressView:
+                browserManager.toggleTopBarAddressView()
             }
 
             NotificationCenter.default.post(
