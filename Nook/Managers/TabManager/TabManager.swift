@@ -686,6 +686,9 @@ class TabManager: ObservableObject {
     }
 
     func removeSpace(_ id: UUID) {
+        guard spaces.count > 1 else {
+            return
+        }
         guard let idx = spaces.firstIndex(where: { $0.id == id }) else {
             return
         }

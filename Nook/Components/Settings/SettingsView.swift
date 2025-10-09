@@ -271,6 +271,67 @@ struct GeneralSettingsView: View {
                             .frame(width: 220)
                         }
                     }
+                    
+                    SettingsSectionCard(
+                        title: "AI Assistant",
+                        subtitle: "Configure AI chat powered by Gemini"
+                    ) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(alignment: .firstTextBaseline) {
+                                Text("Enable AI Assistant")
+                                Spacer()
+                                Toggle("", isOn: $browserManager.settingsManager.showAIAssistant)
+                                    .labelsHidden()
+                            }
+                            
+                            if browserManager.settingsManager.showAIAssistant {
+                                Divider().opacity(0.4)
+                                
+                                HStack(alignment: .firstTextBaseline) {
+                                    Text("Gemini API Key")
+                                    Spacer()
+                                    SecureField("Enter API Key", text: $browserManager.settingsManager.geminiApiKey)
+                                        .textFieldStyle(.roundedBorder)
+                                        .frame(width: 220)
+                                }
+                                
+                                Text("Get your API key from Google AI Studio")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                
+                                Link("Get API Key →", destination: URL(string: "https://aistudio.google.com/apikey")!)
+                                    .font(.caption)
+                                
+                                Divider().opacity(0.4)
+                                
+                                HStack(alignment: .firstTextBaseline) {
+                                    Text("Model")
+                                    Spacer()
+                                    Picker(
+                                        "Model",
+                                        selection: $browserManager.settingsManager.geminiModel
+                                    ) {
+                                        ForEach(GeminiModel.allCases) { model in
+                                            VStack(alignment: .leading) {
+                                                Text(model.displayName)
+                                                Text(model.description)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                            .tag(model)
+                                        }
+                                    }
+                                    .labelsHidden()
+                                    .pickerStyle(.menu)
+                                    .frame(width: 220)
+                                }
+                                
+                                Text(browserManager.settingsManager.geminiModel.description)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
 
                     SettingsSectionCard(
                         title: "Performance",

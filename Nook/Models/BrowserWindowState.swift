@@ -43,6 +43,9 @@ class BrowserWindowState: ObservableObject {
     /// Whether the sidebar menu is visible in this window
     var isSidebarMenuVisible: Bool = false
     
+    /// Whether the AI chat panel is visible in this window
+    var isSidebarAIChatVisible: Bool = false
+    
     /// Whether the command palette is visible in this window
     var isCommandPaletteVisible: Bool = false
     
@@ -75,12 +78,42 @@ class BrowserWindowState: ObservableObject {
 
     /// Gradient currently displayed for this window's active space
     var activeGradient: SpaceGradient = .default
+    
+    var isFullScreen: Bool = false
 
     /// Reference to the actual NSWindow for this window state
     var window: NSWindow?
+    
+    @objc private func windowDidEnterFullScreen(_ notification: Notification) {
+        if let notificationWindow = notification.object as? NSWindow {
+            isFullScreen = true
+        }
+    }
+    
+    @objc private func windowDidExitFullScreen(_ notification: Notification) {
+        if let notificationWindow = notification.object as? NSWindow {
+            isFullScreen = false
+        }
+    }
 
     init(id: UUID = UUID()) {
         self.id = id
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowDidEnterFullScreen),
+            name: NSWindow.didEnterFullScreenNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowDidExitFullScreen),
+            name: NSWindow.didExitFullScreenNotification,
+            object: nil
+        )
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
     
     /// Increment the compositor version to trigger UI updates
