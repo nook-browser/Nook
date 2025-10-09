@@ -191,7 +191,7 @@ mach_override_ptr(
     (void)overrideFunctionAddress;
     (void)originalFunctionReentryIsland;
     return err_cannot_override; // not supported on ARM64
-#endif
+#else
     
     // this addresses overriding such functions as AudioOutputUnitStart()
     // test with modified DefaultOutputUnit project
@@ -366,6 +366,7 @@ mach_override_ptr(
     }
 
     return err;
+#endif
 }
 
 /*******************************************************************************
