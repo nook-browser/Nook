@@ -14,7 +14,8 @@ class KeyboardShortcutManager: ObservableObject {
     private let userDefaults = UserDefaults.standard
     private let shortcutsKey = "keyboard.shortcuts"
     private let shortcutsVersionKey = "keyboard.shortcuts.version"
-    private let currentVersion = 2 // Increment when adding new shortcuts
+    private let currentVersion = 3 // Increment when adding new shortcuts
+
 
     var shortcuts: [KeyboardShortcut] = []
     weak var browserManager: BrowserManager?
@@ -37,16 +38,26 @@ class KeyboardShortcutManager: ObservableObject {
         if let data = userDefaults.data(forKey: shortcutsKey),
            let decoded = try? JSONDecoder().decode([KeyboardShortcut].self, from: data) {
             self.shortcuts = decoded
+            print("🔧 [KeyboardShortcutManager] Loaded \(shortcuts.count) shortcuts from UserDefaults")
             
             // Check if we need to merge new shortcuts
             if savedVersion < currentVersion {
+                print("🔧 [KeyboardShortcutManager] Version mismatch, merging defaults")
                 mergeWithDefaults()
                 userDefaults.set(currentVersion, forKey: shortcutsVersionKey)
             }
         } else {
+            print("🔧 [KeyboardShortcutManager] No saved shortcuts, using defaults")
             self.shortcuts = KeyboardShortcut.defaultShortcuts
             userDefaults.set(currentVersion, forKey: shortcutsVersionKey)
             saveShortcuts()
+        }
+        
+        // Print all loaded shortcuts for debugging
+        for shortcut in shortcuts {
+            if shortcut.action == .duplicateTab {
+                print("🔧 [KeyboardShortcutManager] Found duplicateTab shortcut: \(shortcut.keyCombination.displayString) - Enabled: \(shortcut.isEnabled)")
+            }
         }
     }
     
@@ -54,13 +65,21 @@ class KeyboardShortcutManager: ObservableObject {
         let defaultShortcuts = KeyboardShortcut.defaultShortcuts
         var needsUpdate = false
         
+        // Force add duplicateTab shortcut if it doesn't exist
+        if let duplicateTabShortcut = defaultShortcuts.first(where: { $0.action == .duplicateTab }) {
+            if !shortcuts.contains(where: { $0.action == .duplicateTab }) {
+                shortcuts.append(duplicateTabShortcut)
+                needsUpdate = true
+                print("🔧 [KeyboardShortcutManager] Force added duplicateTab shortcut")
+            }
+        }
+        
         for defaultShortcut in defaultShortcuts {
             // Check if this shortcut already exists
             if !shortcuts.contains(where: { $0.action == defaultShortcut.action }) {
                 // Add missing shortcut
                 shortcuts.append(defaultShortcut)
                 needsUpdate = true
-                print("🔧 [KeyboardShortcutManager] Added missing shortcut: \(defaultShortcut.action.displayName)")
             }
         }
         
@@ -131,8 +150,14 @@ class KeyboardShortcutManager: ObservableObject {
     // MARK: - Shortcut Execution
 
     func executeShortcut(_ event: NSEvent) -> Bool {
+        let key = event.charactersIgnoringModifiers?.lowercased() ?? ""
+        let modifiers = event.modifierFlags
+        print("🔧 [KeyboardShortcutManager] Key pressed: '\(key)' with modifiers: \(modifiers)")
+        
         for shortcut in shortcuts where shortcut.isEnabled {
+            print("🔧 [KeyboardShortcutManager] Checking shortcut: \(shortcut.action.displayName) - \(shortcut.keyCombination.displayString)")
             if shortcut.keyCombination.matches(event) {
+                print("🔧 [KeyboardShortcutManager] Match found! Executing: \(shortcut.action.displayName)")
                 executeAction(shortcut.action)
                 return true
             }
@@ -172,9 +197,9 @@ class KeyboardShortcutManager: ObservableObject {
                 browserManager.selectTabByIndexInActiveWindow(tabIndex - 1)
             case .goToLastTab:
                 browserManager.selectLastTabInActiveWindow()
-            case .toggleTopBarAddressView:
-                print("🔧 [KeyboardShortcutManager] Executing toggleTopBarAddressView")
-                browserManager.toggleTopBarAddressView()
+            case .duplicateTab:
+                print("🔧 [KeyboardShortcutManager] Executing duplicateTab")
+                browserManager.duplicateCurrentTab()
 
             // Space Management
             case .nextSpace:
