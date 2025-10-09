@@ -2587,7 +2587,55 @@ extension Tab: WKUIDelegate {
         alert.runModal()
         completionHandler()
     }
-    
+
+    // MARK: - File Upload Support
+    public func webView(
+        _ webView: WKWebView,
+        runOpenPanelWith parameters: WKOpenPanelParameters,
+        initiatedByFrame frame: WKFrameInfo,
+        completionHandler: @escaping ([URL]?) -> Void
+    ) {
+
+
+        let openPanel = NSOpenPanel()
+        openPanel.allowsMultipleSelection = parameters.allowsMultipleSelection
+        openPanel.canChooseDirectories = parameters.allowsDirectories
+        openPanel.canChooseFiles = true
+        openPanel.resolvesAliases = true
+        openPanel.title = "Choose File"
+        openPanel.prompt = "Choose"
+
+
+        // Ensure we're on the main thread for UI operations
+        DispatchQueue.main.async {
+            if let window = webView.window {
+                // Present as sheet if we have a window
+                openPanel.beginSheetModal(for: window) { response in
+                    print("📁 [Tab] Open panel sheet completed with response: \(response)")
+                    if response == .OK {
+                        print("📁 [Tab] User selected files: \(openPanel.urls.map { $0.lastPathComponent })")
+                        completionHandler(openPanel.urls)
+                    } else {
+                        print("📁 [Tab] User cancelled file selection")
+                        completionHandler(nil)
+                    }
+                }
+            } else {
+                // Fall back to modal presentation
+                openPanel.begin { response in
+                    print("📁 [Tab] Open panel modal completed with response: \(response)")
+                    if response == .OK {
+                        print("📁 [Tab] User selected files: \(openPanel.urls.map { $0.lastPathComponent })")
+                        completionHandler(openPanel.urls)
+                    } else {
+                        print("📁 [Tab] User cancelled file selection")
+                        completionHandler(nil)
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: - Full-Screen Video Support
     @available(macOS 10.15, *)
     public func webView(
