@@ -1646,6 +1646,7 @@ class TabManager: ObservableObject {
             print("No space to place unpinned tab")
             return
         }
+        moved.isPinned = false
         moved.spaceId = sid
         var arr = tabsBySpace[sid] ?? []
         arr.insert(moved, at: 0)
