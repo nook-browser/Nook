@@ -507,22 +507,6 @@ struct BackgroundWindowModifier: NSViewRepresentable {
         let view = NSView()
         DispatchQueue.main.async {
             if let window = view.window {
-                // Only configure the window if it hasn't been configured already
-                // Check if the window is already in the desired state to avoid conflicts
-                let desiredStyleMask: NSWindow.StyleMask = [
-                    .titled, .closable, .miniaturizable, .resizable,
-                    .fullSizeContentView,
-                ]
-                
-                // Only set style mask if it's different from current state
-                if window.styleMask != desiredStyleMask {
-                    // Check if window is in fullscreen mode to avoid the error
-                    let isInFullScreen = window.styleMask.contains(.fullScreen)
-                    if !isInFullScreen {
-                        window.styleMask = desiredStyleMask
-                    }
-                }
-                
                 window.toolbar?.isVisible = false
                 window.titlebarAppearsTransparent = true
                 window.backgroundColor = .clear

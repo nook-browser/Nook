@@ -183,10 +183,6 @@ struct SidebarView: View {
                     .conditionalWindowDrag()
                     .frame(minHeight: 40)
                     .zIndex(0)
-                    .onTapGesture(count: 2) {
-                        // Double-tap to open command palette for new tab
-                        browserManager.openCommandPalette()
-                    }
             }
 
 
@@ -282,10 +278,6 @@ struct SidebarView: View {
         .animation(
             shouldAnimate ? .easeInOut(duration: 0.18) : nil,
             value: essentialsCount)
-        .onTapGesture(count: 2) {
-            // Double-tap to open command palette for new tab
-            browserManager.openCommandPalette()
-        }
         
         let finalContent = ZStack {
                 if windowState.isSidebarAIChatVisible {
@@ -343,10 +335,6 @@ struct SidebarView: View {
         }
         .frame(width: effectiveWidth)
         .padding()
-        .onTapGesture(count: 2) {
-            // Double-tap to open command palette for new tab
-            browserManager.openCommandPalette()
-        }
     }
 
     private var spacesPageView: some View {
