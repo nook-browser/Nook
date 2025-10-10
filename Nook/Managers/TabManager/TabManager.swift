@@ -2245,13 +2245,7 @@ extension TabManager {
         spacesLoaded = true
     }
 
-    nonisolated func reattachBrowserManager(_ bm: BrowserManager) {
-        Task { @MainActor in
-            await _reattachBrowserManager(bm)
-        }
-    }
-    
-    private func _reattachBrowserManager(_ bm: BrowserManager) async {
+    func reattachBrowserManager(_ bm: BrowserManager) {
         self.browserManager = bm
         let spacePinned = currentSpace.flatMap { spacePinnedTabs(for: $0.id) } ?? []
         for t in (self.pinnedTabs + spacePinned + self.tabs) {
@@ -2273,7 +2267,12 @@ extension TabManager {
                 self.currentTab = match
             }
         }
-        if let ct = self.currentTab { _ = ct.webView }
+        if let ct = self.currentTab {
+            _ = ct.webView
+            bm.compositorManager.updateTabVisibility(currentTabId: ct.id)
+        } else {
+            bm.compositorManager.updateTabVisibility(currentTabId: nil)
+        }
         // Inform the extension controller about existing tabs and the active tab
         if #available(macOS 15.5, *) {
             for t in (self.pinnedTabs + spacePinned + self.tabs) where t.didNotifyOpenToExtensions == false {

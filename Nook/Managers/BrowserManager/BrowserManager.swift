@@ -541,7 +541,6 @@ class BrowserManager: ObservableObject {
         self.compositorManager.browserManager = self
         self.splitManager.browserManager = self
         self.compositorManager.setUnloadTimeout(self.settingsManager.tabUnloadTimeout)
-        self.tabManager.browserManager = self
         self.tabManager.reattachBrowserManager(self)
         bindTabManagerUpdates()
         if #available(macOS 15.5, *), let mgr = self.extensionManager {
