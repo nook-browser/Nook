@@ -163,7 +163,6 @@ struct SidebarSectionDropDelegateSimple: DropDelegate {
             DispatchQueue.main.async {
                 self.draggedItem = uuid
                 self.onDropEntered?()
-                haptic(.alignment)
             }
         }
     }
