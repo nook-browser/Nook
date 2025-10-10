@@ -24,9 +24,12 @@ struct TabCompositorView: NSViewRepresentable {
 
         // Only add the current tab's webView to avoid WKWebView conflicts
         guard let currentTabId = windowState.currentTabId,
-              let currentTab = browserManager.tabsForDisplay(in: windowState).first(where: { $0.id == currentTabId }),
-              !currentTab.isUnloaded else {
+              let currentTab = browserManager.tabsForDisplay(in: windowState).first(where: { $0.id == currentTabId }) else {
             return
+        }
+
+        if currentTab.isUnloaded {
+            currentTab.loadWebViewIfNeeded()
         }
         
         // Create a window-specific web view for this tab
