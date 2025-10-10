@@ -580,6 +580,17 @@ class BrowserManager: ObservableObject {
             guard let enabled = note.userInfo?["enabled"] as? Bool else { return }
             self?.trackingProtectionManager.setEnabled(enabled)
         }
+
+        NotificationCenter.default.addObserver(
+            forName: .sessionPersistenceChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            guard
+                let enabled = note.userInfo?["enabled"] as? Bool
+            else { return }
+            self?.handleSessionPersistenceToggle(enabled: enabled)
+        }
     }
 
     private func bindTabManagerUpdates() {
@@ -596,6 +607,11 @@ class BrowserManager: ObservableObject {
                 self?.objectWillChange.send()
             }
             .store(in: &cancellables)
+    }
+
+    @MainActor
+    private func handleSessionPersistenceToggle(enabled: Bool) {
+        tabManager.handleSessionPersistenceChanged(enabled: enabled)
     }
 
     // MARK: - OAuth Assist Controls

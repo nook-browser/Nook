@@ -217,6 +217,20 @@ struct GeneralSettingsView: View {
                                     .foregroundStyle(.secondary)
                                 }
                             }.frame(maxWidth: .infinity, alignment: .leading)
+
+                            Toggle(
+                                isOn: $browserManager.settingsManager
+                                    .restoreSessionOnLaunch
+                            ) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Restore Session on Launch")
+                                    Text(
+                                        "Reopen tabs and spaces from your last session when Nook starts"
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+                            }.frame(maxWidth: .infinity, alignment: .leading)
                             HStack(alignment: .firstTextBaseline) {
                                 Text("Sidebar Position")
                                 Spacer()

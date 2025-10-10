@@ -19,6 +19,7 @@ class SettingsManager {
     private let blockXSTKey = "settings.blockCrossSiteTracking"
     private let debugToggleUpdateNotificationKey = "settings.debugToggleUpdateNotification"
     private let askBeforeQuitKey = "settings.askBeforeQuit"
+    private let restoreSessionOnLaunchKey = "settings.restoreSessionOnLaunch"
     private let sidebarPositionKey = "settings.sidebarPosition"
     private let topBarAddressViewKey = "settings.topBarAddressView"
     private let experimentalExtensionsKey = "settings.experimentalExtensions"
@@ -72,6 +73,17 @@ class SettingsManager {
     var askBeforeQuit: Bool {
         didSet {
             userDefaults.set(askBeforeQuit, forKey: askBeforeQuitKey)
+        }
+    }
+
+    var restoreSessionOnLaunch: Bool {
+        didSet {
+            userDefaults.set(restoreSessionOnLaunch, forKey: restoreSessionOnLaunchKey)
+            NotificationCenter.default.post(
+                name: .sessionPersistenceChanged,
+                object: nil,
+                userInfo: ["enabled": restoreSessionOnLaunch]
+            )
         }
     }
     
@@ -128,6 +140,7 @@ class SettingsManager {
             blockXSTKey: false,
             debugToggleUpdateNotificationKey: false,
             askBeforeQuitKey: true,
+            restoreSessionOnLaunchKey: true,
             sidebarPositionKey: SidebarPosition.left.rawValue,
             topBarAddressViewKey: false,
             experimentalExtensionsKey: false,
@@ -155,6 +168,7 @@ class SettingsManager {
         self.blockCrossSiteTracking = userDefaults.bool(forKey: blockXSTKey)
         self.debugToggleUpdateNotification = userDefaults.bool(forKey: debugToggleUpdateNotificationKey)
         self.askBeforeQuit = userDefaults.bool(forKey: askBeforeQuitKey)
+        self.restoreSessionOnLaunch = userDefaults.object(forKey: restoreSessionOnLaunchKey) as? Bool ?? true
         self.sidebarPosition = SidebarPosition(rawValue: userDefaults.string(forKey: sidebarPositionKey) ?? "left") ?? SidebarPosition.left
         self.topBarAddressView = userDefaults.bool(forKey: topBarAddressViewKey)
         self.experimentalExtensions = userDefaults.bool(forKey: experimentalExtensionsKey)
@@ -191,4 +205,5 @@ public enum GeminiModel: String, CaseIterable, Identifiable {
 extension Notification.Name {
     static let tabUnloadTimeoutChanged = Notification.Name("tabUnloadTimeoutChanged")
     static let blockCrossSiteTrackingChanged = Notification.Name("blockCrossSiteTrackingChanged")
+    static let sessionPersistenceChanged = Notification.Name("sessionPersistenceChanged")
 }

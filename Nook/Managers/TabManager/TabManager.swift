@@ -400,6 +400,28 @@ import OSLog
         }
         return .storageFailure
     }
+
+    // MARK: - Maintenance
+    func clearAllSnapshots() async {
+        let ctx = ModelContext(container)
+        ctx.autosaveEnabled = false
+        do {
+            let tabs = try ctx.fetch(FetchDescriptor<TabEntity>())
+            tabs.forEach { ctx.delete($0) }
+            let folders = try ctx.fetch(FetchDescriptor<FolderEntity>())
+            folders.forEach { ctx.delete($0) }
+            let spaces = try ctx.fetch(FetchDescriptor<SpaceEntity>())
+            spaces.forEach { ctx.delete($0) }
+            let states = try ctx.fetch(FetchDescriptor<TabsStateEntity>())
+            states.forEach { ctx.delete($0) }
+            try ctx.save()
+            latestGeneration &+= 1
+            lastBackupJSON = nil
+            Self.log.notice("[clear] Cleared all persisted tab snapshots")
+        } catch {
+            Self.log.error("[clear] Failed to clear snapshots: \(String(describing: error), privacy: .public)")
+        }
+    }
 }
 
 @MainActor
@@ -1831,6 +1853,15 @@ class TabManager: ObservableObject {
     // MARK: - SwiftData load/save
 
     private func loadFromStore() {
+        if let bm = browserManager,
+           bm.settingsManager.restoreSessionOnLaunch == false {
+            bootstrapFreshSession()
+            Task.detached { [weak self] in
+                guard let self else { return }
+                await self.persistence.clearAllSnapshots()
+            }
+            return
+        }
         do {
             // Spaces
             let spaceEntities = try context.fetch(
@@ -2032,12 +2063,15 @@ class TabManager: ObservableObject {
 
     public nonisolated func persistSnapshot() {
         Task { [weak self] in
-            _ = await self?.persistSnapshotAwaitingResult()
+            guard let self else { return }
+            guard await self.sessionPersistenceEnabled() else { return }
+            _ = await self.persistSnapshotAwaitingResult()
         }
     }
 
     // Returns true if atomic path succeeded; false if fallback was used or stale
     public nonisolated func persistSnapshotAwaitingResult() async -> Bool {
+        guard await sessionPersistenceEnabled() else { return false }
         // Build snapshot and capture a generation on MainActor
         let payload: (PersistenceActor.Snapshot, Int)? = await MainActor.run { [weak self] in
             guard let strong = self else { return nil }
@@ -2163,6 +2197,39 @@ class TabManager: ObservableObject {
 }
 
 extension TabManager {
+    nonisolated private func sessionPersistenceEnabled() async -> Bool {
+        await MainActor.run { [weak self] in
+            self?.browserManager?.settingsManager.restoreSessionOnLaunch ?? true
+        }
+    }
+
+    @MainActor
+    func handleSessionPersistenceChanged(enabled: Bool) {
+        if enabled {
+            persistSnapshot()
+        } else {
+            Task.detached { [weak self] in
+                guard let self else { return }
+                await self.persistence.clearAllSnapshots()
+            }
+        }
+    }
+
+    @MainActor
+    private func bootstrapFreshSession() {
+        spaces.removeAll()
+        spacePinnedTabs.removeAll()
+        tabsBySpace.removeAll()
+        foldersBySpace.removeAll()
+        pinnedByProfile.removeAll()
+        pendingPinnedWithoutProfile.removeAll()
+        currentSpace = nil
+        currentTab = nil
+
+        let defaultSpace = ensureDefaultSpaceIfNeeded()
+        _ = createNewTab(url: "https://www.google.com", in: defaultSpace)
+    }
+
     nonisolated func reattachBrowserManager(_ bm: BrowserManager) {
         Task { @MainActor in
             await _reattachBrowserManager(bm)
