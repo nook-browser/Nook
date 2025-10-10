@@ -474,6 +474,19 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     
 
     // MARK: - Tab Actions
+    /// Lightweight cleanup invoked during application termination to release WebKit resources
+    /// without mutating tab collections or posting additional UI events.
+    func prepareForTerminationCleanup() {
+        hasPiPActive = false
+        performComprehensiveWebViewCleanup()
+        stopNativeAudioMonitoring()
+        hasPlayingVideo = false
+        hasVideoContent = false
+        hasPlayingAudio = false
+        hasAudioContent = false
+        isAudioMuted = false
+    }
+
     func closeTab() {
         print("Closing tab: \(self.name)")
 

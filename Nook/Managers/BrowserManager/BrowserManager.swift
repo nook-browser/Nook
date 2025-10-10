@@ -309,6 +309,7 @@ private extension BrowserManager.ProfileSwitchContext {
 
 @MainActor
 class BrowserManager: ObservableObject {
+    private static let quitLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "BrowserManager.QuitFlow")
     // Legacy global state - kept for backward compatibility during transition
     @Published var sidebarWidth: CGFloat = 250
     @Published var sidebarContentWidth: CGFloat = 234
@@ -375,11 +376,14 @@ class BrowserManager: ObservableObject {
 
     var externalMiniWindowManager = ExternalMiniWindowManager()
     @Published var peekManager = PeekManager()
-    
+
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
     var isSwitchingProfile: Bool = false
     private var cancellables: Set<AnyCancellable> = []
+    private var quitInProgress = false
+    private var quitPrepared = false
+    private var quitUICleanupPerformed = false
     
     // Compositor container view
     func setCompositorContainerView(_ view: NSView?, for windowId: UUID) {
@@ -1024,6 +1028,7 @@ class BrowserManager: ObservableObject {
     // MARK: - Dialog Methods
     
     func showQuitDialog() {
+        guard !quitInProgress else { return }
         if settingsManager.askBeforeQuit {
             dialogManager.showQuitDialog(
                 onAlwaysQuit: {
@@ -1154,18 +1159,60 @@ class BrowserManager: ObservableObject {
     }
     
     private func quitApplication() {
-        // Clean up all tabs before terminating
-        cleanupAllTabs()
-        NSApplication.shared.terminate(nil)
+        guard !quitInProgress else { return }
+        quitInProgress = true
+        Task { @MainActor in
+            await self.prepareForQuitIfNeeded()
+            NSApp.sendAction(#selector(NSApplication.terminate(_:)), to: nil, from: self)
+        }
     }
     
-    func cleanupAllTabs() {
-        print("🔄 [BrowserManager] Cleaning up all tabs")
-        let allTabs = tabManager.pinnedTabs + tabManager.tabs
-        
+    @MainActor
+    func prepareForQuitIfNeeded(includeUICleanup: Bool = true) async {
+        if !quitInProgress {
+            quitInProgress = true
+        }
+
+        if quitPrepared {
+            if includeUICleanup && !quitUICleanupPerformed {
+                cleanupAllTabs()
+            }
+            return
+        }
+
+        let totalTabs = tabManager.allTabs().count
+        BrowserManager.quitLog.info("Preparing for termination; totalTabs=\(totalTabs, privacy: .public)")
+
+        let persistSucceeded = await tabManager.persistSnapshotAwaitingResult()
+        BrowserManager.quitLog.info("Tab state persistence result: \(persistSucceeded ? "atomic" : "best-effort")")
+
+        do {
+            try modelContext.save()
+            BrowserManager.quitLog.info("Model context save completed before quit.")
+        } catch {
+            BrowserManager.quitLog.error("Model context save failed before quit: \(String(describing: error), privacy: .public)")
+        }
+
+        if includeUICleanup && !quitUICleanupPerformed {
+            cleanupAllTabs()
+        }
+
+        quitPrepared = true
+    }
+
+    @MainActor
+    var hasPreparedForQuit: Bool {
+        quitPrepared
+    }
+    
+    @MainActor
+    private func cleanupAllTabs() {
+        quitUICleanupPerformed = true
+        BrowserManager.quitLog.info("Performing UI cleanup for all tabs before quit.")
+        let allTabs = tabManager.allTabs()
+
         for tab in allTabs {
-            print("🔄 [BrowserManager] Cleaning up tab: \(tab.name)")
-            tab.closeTab()
+            tab.prepareForTerminationCleanup()
         }
     }
 
