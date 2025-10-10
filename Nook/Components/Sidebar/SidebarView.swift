@@ -518,16 +518,34 @@ struct SidebarView: View {
         let dialog = SpaceEditDialog(
             space: targetSpace,
             mode: mode,
-            spaceName: $editingSpaceName,
-            spaceIcon: $editingSpaceIcon,
             onSave: { newName, newIcon in
-                targetSpace.icon = newIcon
-                browserManager.tabManager.renameSpace(
-                    spaceId: targetSpace.id,
-                    newName: newName
-                )
-                browserManager.tabManager.persistSnapshot()
-                browserManager.dialogManager.closeDialog()
+                let spaceId = targetSpace.id
+
+                do {
+                    if newIcon != targetSpace.icon {
+                        try browserManager.tabManager.updateSpaceIcon(
+                            spaceId: spaceId,
+                            icon: newIcon
+                        )
+                    }
+                    else{
+                        print("nothing new, \(newIcon) -> \(targetSpace.icon)")
+                    }
+
+                    if newName != targetSpace.name {
+                        try browserManager.tabManager.renameSpace(
+                            spaceId: spaceId,
+                            newName: newName
+                        )
+                    }
+                    else{
+                        print("nothing new")
+                    }
+
+                    browserManager.dialogManager.closeDialog()
+                } catch {
+                    print("⚠️ Failed to update space \(spaceId.uuidString):", error)
+                }
             },
             onCancel: {
                 browserManager.dialogManager.closeDialog()

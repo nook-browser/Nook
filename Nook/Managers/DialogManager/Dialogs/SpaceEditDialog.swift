@@ -18,8 +18,8 @@ struct SpaceEditDialog: DialogProtocol {
     private let originalSpaceName: String
     private let originalSpaceIcon: String
 
-    @Binding private var spaceName: String
-    @Binding private var spaceIcon: String
+    @State private var spaceName: String
+    @State private var spaceIcon: String
 
     private let onSaveChanges: (String, String) -> Void
     private let onCancelChanges: () -> Void
@@ -27,16 +27,14 @@ struct SpaceEditDialog: DialogProtocol {
     init(
         space: Space,
         mode: Mode,
-        spaceName: Binding<String>,
-        spaceIcon: Binding<String>,
         onSave: @escaping (String, String) -> Void,
         onCancel: @escaping () -> Void
     ) {
         self.mode = mode
         self.originalSpaceName = MainActor.assumeIsolated { space.name }
         self.originalSpaceIcon = MainActor.assumeIsolated { space.icon }
-        self._spaceName = spaceName
-        self._spaceIcon = spaceIcon
+        self.spaceName = MainActor.assumeIsolated { space.name }
+        self.spaceIcon = MainActor.assumeIsolated { space.icon }
         self.onSaveChanges = onSave
         self.onCancelChanges = onCancel
     }
