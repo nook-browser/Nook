@@ -148,7 +148,7 @@ struct SettingsTabItem: View {
 
 struct GeneralSettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @FocusState private var startupURLFocused: Bool
+    @State private var startupURLFocused = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
@@ -216,12 +216,9 @@ struct GeneralSettingsView: View {
                                     )
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
-                            }
+                                }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .onChange(of: browserManager.settingsManager.restoreSessionOnLaunch) { isOn in
-                                if isOn { startupURLFocused = false }
-                            }
 
                             Toggle(
                                 isOn: $browserManager.settingsManager
@@ -235,7 +232,14 @@ struct GeneralSettingsView: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                 }
-                            }.frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .onChange(of: browserManager.settingsManager.restoreSessionOnLaunch) { isOn in
+                                if isOn, startupURLFocused {
+                                    NSApp.keyWindow?.makeFirstResponder(nil)
+                                    startupURLFocused = false
+                                }
+                            }
                             
                             HStack(alignment: .firstTextBaseline) {
                                 Text("Startup Behavior")
@@ -254,28 +258,35 @@ struct GeneralSettingsView: View {
                             }
                             .disabled(browserManager.settingsManager.restoreSessionOnLaunch)
                             .onChange(of: browserManager.settingsManager.startupTabMode) { _ in
-                                startupURLFocused = false
+                                if startupURLFocused {
+                                    NSApp.keyWindow?.makeFirstResponder(nil)
+                                    startupURLFocused = false
+                                }
                             }
                             
                             if browserManager.settingsManager.startupTabMode == .customURL {
                                 HStack(alignment: .firstTextBaseline) {
                                     Text("Startup Page URL")
                                     Spacer()
-                                    TextField(
-                                        "example.com",
-                                        text: $browserManager.settingsManager.startupTabURL
+                                    StartupURLTextField(
+                                        text: $browserManager.settingsManager.startupTabURL,
+                                        placeholder: "example.com",
+                                        isDisabled: browserManager.settingsManager.restoreSessionOnLaunch,
+                                        onCommit: {
+                                            let trimmed = browserManager.settingsManager.startupTabURL
+                                                .trimmingCharacters(in: .whitespacesAndNewlines)
+                                            browserManager.settingsManager.startupTabURL = trimmed
+                                        },
+                                        onFocusChange: { focused in
+                                            startupURLFocused = focused
+                                            if !focused {
+                                                let trimmed = browserManager.settingsManager.startupTabURL
+                                                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                                                browserManager.settingsManager.startupTabURL = trimmed
+                                            }
+                                        }
                                     )
-                                    .textFieldStyle(.roundedBorder)
                                     .frame(width: 220)
-                                    .focused($startupURLFocused)
-                                    .submitLabel(.done)
-                                    .onSubmit {
-                                        let trimmed = browserManager.settingsManager.startupTabURL
-                                            .trimmingCharacters(in: .whitespacesAndNewlines)
-                                        browserManager.settingsManager.startupTabURL = trimmed
-                                        startupURLFocused = false
-                                    }
-                                    .disabled(browserManager.settingsManager.restoreSessionOnLaunch)
                                 }
                                 
                                 Text("Used when Restore Session on Launch is off. Leave blank to use \(SettingsManager.defaultStartupURL).")
@@ -1667,6 +1678,71 @@ struct SettingsPlaceholderView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.vertical, 20)
+    }
+}
+
+private struct StartupURLTextField: NSViewRepresentable {
+    @Binding var text: String
+    var placeholder: String
+    var isDisabled: Bool
+    var onCommit: (() -> Void)?
+    var onFocusChange: ((Bool) -> Void)?
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+
+    func makeNSView(context: Context) -> NSTextField {
+        let field = NSTextField(string: text)
+        field.placeholderString = placeholder
+        field.bezelStyle = .roundedBezel
+        field.isBordered = true
+        field.focusRingType = .default
+        field.delegate = context.coordinator
+        return field
+    }
+
+    func updateNSView(_ nsView: NSTextField, context: Context) {
+        if nsView.placeholderString != placeholder {
+            nsView.placeholderString = placeholder
+        }
+        if nsView.stringValue != text {
+            nsView.stringValue = text
+        }
+        let enabled = !isDisabled
+        if nsView.isEnabled != enabled {
+            nsView.isEnabled = enabled
+            if !enabled {
+                nsView.resignFirstResponder()
+            }
+        }
+        context.coordinator.parent = self
+    }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var parent: StartupURLTextField
+
+        init(parent: StartupURLTextField) {
+            self.parent = parent
+        }
+
+        func controlTextDidBeginEditing(_ obj: Notification) {
+            parent.onFocusChange?(true)
+        }
+
+        func controlTextDidChange(_ obj: Notification) {
+            guard let field = obj.object as? NSTextField else { return }
+            parent.text = field.stringValue
+        }
+
+        func controlTextDidEndEditing(_ obj: Notification) {
+            guard let field = obj.object as? NSTextField else { return }
+            let trimmed = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            parent.text = trimmed
+            field.stringValue = trimmed
+            parent.onFocusChange?(false)
+            parent.onCommit?()
+        }
     }
 }
 
