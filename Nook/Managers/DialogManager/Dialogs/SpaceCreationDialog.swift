@@ -8,99 +8,91 @@
 import AppKit
 import SwiftUI
 
-struct SpaceCreationDialog: DialogProtocol {
-    @Binding var spaceName: String
-    @Binding var spaceIcon: String
-    let onSave: () -> Void
-    let onCancel: () -> Void
-    let onClose: () -> Void
+struct SpaceCreationDialog: View {
+    @State private var spaceName: String
+    @State private var spaceIcon: String
 
-    @State private var isCreating: Bool = false
+    let onCreate: (String, String) -> Void
+    let onCancel: () -> Void
 
     init(
-        spaceName: Binding<String>,
-        spaceIcon: Binding<String>,
-        onSave: @escaping () -> Void,
-        onCancel: @escaping () -> Void,
-        onClose: @escaping () -> Void = {}
+        initialName: String = "",
+        initialIcon: String = "",
+        onCreate: @escaping (String, String) -> Void,
+        onCancel: @escaping () -> Void
     ) {
-        self._spaceName = spaceName
-        self._spaceIcon = spaceIcon
-        self.onSave = onSave
+        _spaceName = State(initialValue: initialName)
+        _spaceIcon = State(initialValue: initialIcon)
+        self.onCreate = onCreate
         self.onCancel = onCancel
-        self.onClose = onClose
     }
 
-    @ViewBuilder
-    func header() -> some View {
-        HStack {
-            Spacer()
-            VStack(spacing: 16) {
-                ZStack {
-                    Circle()
-                        .fill(Color.accentColor.opacity(0.1))
-                        .frame(width: 48, height: 48)
+    var body: some View {
+        StandardDialog(
+            header: {
+                HStack {
+                    Spacer()
+                    VStack(spacing: 16) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.accentColor.opacity(0.1))
+                                .frame(width: 48, height: 48)
 
-                    Image(systemName: "folder.badge.plus")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(Color.accentColor)
+                            Image(systemName: "folder.badge.plus")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(Color.accentColor)
+                        }
+
+                        VStack(spacing: 4) {
+                            Text("Create a New Space")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(.primary)
+
+                            Text("Organize your tabs into a new space")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                    }
+                    Spacer()
                 }
+                .padding(.top, 8)
+            },
+            content: {
+                SpaceCreationContent(
+                    spaceName: $spaceName,
+                    spaceIcon: $spaceIcon
+                )
+            },
+            footer: {
+                HStack(spacing: 12) {
+                    Spacer()
 
-                VStack(spacing: 4) {
-                    Text("Create a New Space")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.primary)
+                    HStack(spacing: 8) {
+                        NookButton.createButton(
+                            text: "Cancel",
+                            variant: .secondary,
+                            action: onCancel,
+                            keyboardShortcut: .escape
+                        )
 
-                    Text("Organize your tabs into a new space")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
+                        NookButton.createButton(
+                            text: "Create Space",
+                            iconName: "plus",
+                            variant: .primary,
+                            action: handleCreate,
+                            keyboardShortcut: .return
+                        )
+                    }
                 }
+                .padding(.top, 8)
             }
-            Spacer()
-        }
-        .padding(.top, 8)
-    }
-
-    @ViewBuilder
-    func content() -> some View {
-        SpaceCreationContent(
-            spaceName: $spaceName,
-            spaceIcon: $spaceIcon
         )
     }
 
-    @ViewBuilder
-    func footer() -> some View {
-        HStack(spacing: 12) {
-            Spacer()
-
-            HStack(spacing: 8) {
-                NookButton.createButton(
-                    text: "Cancel",
-                    variant: .secondary,
-                    action: onCancel,
-                    keyboardShortcut: .escape
-                )
-
-                NookButton.createButton(
-                    text: "Create Space",
-                    iconName: "plus",
-                    variant: .primary,
-                    action: handleSave,
-                    keyboardShortcut: .return
-                )
-            }
-        }
-        .padding(.top, 8)
-    }
-
-    private func handleSave() {
-        onSave()
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            onClose()
-        }
+    private func handleCreate() {
+        let trimmedName = spaceName.trimmingCharacters(in: .whitespacesAndNewlines)
+        onCreate(trimmedName, spaceIcon)
     }
 }
 

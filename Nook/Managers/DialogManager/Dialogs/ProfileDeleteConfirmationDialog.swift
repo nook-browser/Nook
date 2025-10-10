@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct ProfileDeleteConfirmationDialog: DialogProtocol {
+struct ProfileDeleteConfirmationDialog: View {
     let profileName: String
     let profileIcon: String
     let spacesCount: Int
@@ -16,17 +16,22 @@ struct ProfileDeleteConfirmationDialog: DialogProtocol {
     let onDelete: () -> Void
     let onCancel: () -> Void
 
-    @ViewBuilder
-    func header() -> some View {
-        DialogHeader(
-            icon: "trash",
-            title: "Delete Profile",
-            subtitle: "This action cannot be undone"
+    var body: some View {
+        StandardDialog(
+            header: {
+                DialogHeader(
+                    icon: "trash",
+                    title: "Delete Profile",
+                    subtitle: "This action cannot be undone"
+                )
+            },
+            content: { content },
+            footer: { footer }
         )
     }
 
     @ViewBuilder
-    func content() -> some View {
+    private var content: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Image(systemName: profileIcon)
@@ -63,10 +68,25 @@ struct ProfileDeleteConfirmationDialog: DialogProtocol {
     }
 
     @ViewBuilder
-    func footer() -> some View {
-        DialogFooter(rightButtons: [
-            DialogButton(text: "Cancel", variant: .secondary, action: onCancel),
-            DialogButton(text: "Delete Profile", iconName: "trash", variant: isLastProfile ? .secondary : .destructive, action: { if !isLastProfile { onDelete() } })
-        ])
+    private var footer: some View {
+        DialogFooter(
+            rightButtons: [
+                DialogButton(
+                    text: "Cancel",
+                    variant: .secondary,
+                    action: onCancel
+                ),
+                DialogButton(
+                    text: "Delete Profile",
+                    iconName: "trash",
+                    variant: isLastProfile ? .secondary : .destructive,
+                    action: {
+                        if !isLastProfile {
+                            onDelete()
+                        }
+                    }
+                )
+            ]
+        )
     }
 }

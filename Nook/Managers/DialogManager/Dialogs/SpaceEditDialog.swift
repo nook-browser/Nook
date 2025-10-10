@@ -8,7 +8,7 @@
 import AppKit
 import SwiftUI
 
-struct SpaceEditDialog: DialogProtocol {
+struct SpaceEditDialog: View {
     enum Mode {
         case rename
         case icon
@@ -18,8 +18,8 @@ struct SpaceEditDialog: DialogProtocol {
     private let originalSpaceName: String
     private let originalSpaceIcon: String
 
-    @State private var spaceName: String = ""
-    @State private var spaceIcon: String = ""
+    @State private var spaceName: String
+    @State private var spaceIcon: String
 
     private let onSaveChanges: (String, String) -> Void
     private let onCancelChanges: () -> Void
@@ -30,53 +30,43 @@ struct SpaceEditDialog: DialogProtocol {
         onSave: @escaping (String, String) -> Void,
         onCancel: @escaping () -> Void
     ) {
+        let name = MainActor.assumeIsolated { space.name }
+        let icon = MainActor.assumeIsolated { space.icon }
         self.mode = mode
-        self.originalSpaceName = MainActor.assumeIsolated { space.name }
-        self.originalSpaceIcon = MainActor.assumeIsolated { space.icon }
+        self.originalSpaceName = name
+        self.originalSpaceIcon = icon
+        _spaceName = State(initialValue: name)
+        _spaceIcon = State(initialValue: icon)
         self.onSaveChanges = onSave
         self.onCancelChanges = onCancel
     }
 
-    @ViewBuilder
-    func header() -> some View {
-        var iconName: String {
-            switch mode {
-            case .rename: "pencil"
-            case .icon: "face.smiling"
-            }
-        }
-        var title: String {
-            switch mode {
-            case .rename: "Rename Space"
-            case .icon: "Change Space Icon"
-            }
-        }
+    var body: some View {
+        StandardDialog(
+            header: { headerView },
+            content: {
+                SpaceEditContent(
+                    spaceName: $spaceName,
+                    spaceIcon: $spaceIcon,
+                    originalIcon: originalSpaceIcon,
+                    mode: mode
+                )
+            },
+            footer: { footerView }
+        )
+    }
 
+    @ViewBuilder
+    private var headerView: some View {
         DialogHeader(
-            icon: iconName,
-            title: title,
+            icon: "pencil",
+            title: "Edit",
             subtitle: originalSpaceName
         )
     }
 
     @ViewBuilder
-    func content() -> some View {
-        SpaceEditContent(
-            spaceName: Binding(
-                get: { spaceName },
-                set: { spaceName = $0 }
-            ),
-            spaceIcon: Binding(
-                get: { spaceIcon },
-                set: { spaceIcon = $0 }
-            ),
-            originalIcon: originalSpaceIcon,
-            mode: mode
-        )
-    }
-
-    @ViewBuilder
-    func footer() -> some View {
+    private var footerView: some View {
         let trimmed = spaceName.trimmingCharacters(in: .whitespacesAndNewlines)
         let effectiveName = trimmed.isEmpty ? originalSpaceName : trimmed
         let iconValue = spaceIcon.isEmpty ? originalSpaceIcon : spaceIcon

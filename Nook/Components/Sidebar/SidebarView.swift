@@ -10,10 +10,6 @@ struct SidebarView: View {
     @State private var activeSpaceIndex: Int = 0
     @State private var currentScrollID: Int? = nil
     @State private var hasTriggeredHaptic = false
-    @State private var spaceName = ""
-    @State private var spaceIcon = ""
-    @State private var editingSpaceName = ""
-    @State private var editingSpaceIcon = ""
     @State private var sidebarDraggedItem: UUID? = nil
     @State private var activeTabRefreshTrigger: Bool = false
     
@@ -454,37 +450,27 @@ struct SidebarView: View {
     }
     
     private func showSpaceCreationDialog() {
-        let dialog = SpaceCreationDialog(
-            spaceName: $spaceName,
-            spaceIcon: $spaceIcon,
-            onSave: {
-                // Create the space with the name from dialog
-                let newSpace = browserManager.tabManager.createSpace(
-                    name: spaceName.isEmpty ? "New Space" : spaceName,
-                    icon: spaceIcon.isEmpty ? "✨" : spaceIcon
-                )
-                
-                // Update the active space index to the newly created space
-                if let targetIndex = browserManager.tabManager.spaces.firstIndex(where: { $0.id == newSpace.id }) {
-                    activeSpaceIndex = targetIndex
+        browserManager.dialogManager.showDialog(
+            SpaceCreationDialog(
+                onCreate: { name, icon in
+                    let finalName = name.isEmpty ? "New Space" : name
+                    let finalIcon = icon.isEmpty ? "✨" : icon
+                    let newSpace = browserManager.tabManager.createSpace(
+                        name: finalName,
+                        icon: finalIcon
+                    )
+
+                    if let targetIndex = browserManager.tabManager.spaces.firstIndex(where: { $0.id == newSpace.id }) {
+                        activeSpaceIndex = targetIndex
+                    }
+
+                    browserManager.dialogManager.closeDialog()
+                },
+                onCancel: {
+                    browserManager.dialogManager.closeDialog()
                 }
-                // Reset form
-                spaceName = ""
-                spaceIcon = ""
-            },
-            onCancel: {
-                browserManager.dialogManager.closeDialog()
-                
-                // Reset form
-                spaceName = ""
-                spaceIcon = ""
-            },
-            onClose: {
-                browserManager.dialogManager.closeDialog()
-            }
+            )
         )
-        
-        browserManager.dialogManager.showDialog(dialog)
     }
     
     private func makeSpaceView(for space: Space, index: Int) -> some View {
@@ -511,48 +497,39 @@ struct SidebarView: View {
     
     private func showSpaceEditDialog(mode: SpaceEditDialog.Mode) {
         guard let targetSpace = resolveCurrentSpace() else { return }
-        
-        editingSpaceName = targetSpace.name
-        editingSpaceIcon = targetSpace.icon
-        
-        let dialog = SpaceEditDialog(
-            space: targetSpace,
-            mode: mode,
-            onSave: { newName, newIcon in
-                let spaceId = targetSpace.id
 
-                do {
-                    if newIcon != targetSpace.icon {
-                        try browserManager.tabManager.updateSpaceIcon(
-                            spaceId: spaceId,
-                            icon: newIcon
-                        )
-                    }
-                    else{
-                        print("nothing new, \(newIcon) -> \(targetSpace.icon)")
-                    }
+        browserManager.dialogManager.showDialog(
+            SpaceEditDialog(
+                space: targetSpace,
+                mode: mode,
+                onSave: { newName, newIcon in
+                    let spaceId = targetSpace.id
 
-                    if newName != targetSpace.name {
-                        try browserManager.tabManager.renameSpace(
-                            spaceId: spaceId,
-                            newName: newName
-                        )
-                    }
-                    else{
-                        print("nothing new")
-                    }
+                    do {
+                        if newIcon != targetSpace.icon {
+                            try browserManager.tabManager.updateSpaceIcon(
+                                spaceId: spaceId,
+                                icon: newIcon
+                            )
+                        }
 
+                        if newName != targetSpace.name {
+                            try browserManager.tabManager.renameSpace(
+                                spaceId: spaceId,
+                                newName: newName
+                            )
+                        }
+
+                        browserManager.dialogManager.closeDialog()
+                    } catch {
+                        print("⚠️ Failed to update space \(spaceId.uuidString):", error)
+                    }
+                },
+                onCancel: {
                     browserManager.dialogManager.closeDialog()
-                } catch {
-                    print("⚠️ Failed to update space \(spaceId.uuidString):", error)
                 }
-            },
-            onCancel: {
-                browserManager.dialogManager.closeDialog()
-            }
+            )
         )
-        
-        browserManager.dialogManager.showDialog(dialog)
     }
     
     private func resolveCurrentSpace() -> Space? {

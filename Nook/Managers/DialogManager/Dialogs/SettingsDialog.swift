@@ -7,41 +7,50 @@
 
 import SwiftUI
 
-struct SettingsDialog: DialogProtocol {
-    @Binding var autoSave: Bool
-    @Binding var notifications: Bool
-    @Binding var theme: String
-    @Binding var fontSize: Double
-    let onSave: () -> Void
+struct SettingsDialog: View {
+    @State private var autoSave: Bool
+    @State private var notifications: Bool
+    @State private var theme: String
+    @State private var fontSize: Double
+
+    let onSave: (Bool, Bool, String, Double) -> Void
     let onCancel: () -> Void
-    
+
     init(
-        autoSave: Binding<Bool>,
-        notifications: Binding<Bool>,
-        theme: Binding<String>,
-        fontSize: Binding<Double>,
-        onSave: @escaping () -> Void,
+        autoSave: Bool,
+        notifications: Bool,
+        theme: String,
+        fontSize: Double,
+        onSave: @escaping (Bool, Bool, String, Double) -> Void,
         onCancel: @escaping () -> Void
     ) {
-        self._autoSave = autoSave
-        self._notifications = notifications
-        self._theme = theme
-        self._fontSize = fontSize
+        _autoSave = State(initialValue: autoSave)
+        _notifications = State(initialValue: notifications)
+        _theme = State(initialValue: theme)
+        _fontSize = State(initialValue: fontSize)
         self.onSave = onSave
         self.onCancel = onCancel
     }
-    
+
+    var body: some View {
+        StandardDialog(
+            header: { header },
+            content: { content },
+            footer: { footer }
+        )
+    }
+
     @ViewBuilder
-    func header() -> some View {
+    private var header: some View {
         DialogHeader(
             icon: "gear",
             title: "Settings",
             subtitle: "Customize your Nook experience"
         )
     }
-    
+
     @ViewBuilder
-    func content() -> some View {
+    private var content: some View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Theme")
@@ -71,9 +80,9 @@ struct SettingsDialog: DialogProtocol {
             }
         }
     }
-    
+
     @ViewBuilder
-    func footer() -> some View {
+    private var footer: some View {
         DialogFooter(
             rightButtons: [
                 DialogButton(
@@ -85,10 +94,11 @@ struct SettingsDialog: DialogProtocol {
                     text: "Save Settings",
                     iconName: "checkmark",
                     variant: .primary,
-                    action: onSave
+                    action: {
+                        onSave(autoSave, notifications, theme, fontSize)
+                    }
                 )
             ]
         )
     }
-} 
-
+}

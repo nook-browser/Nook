@@ -23,7 +23,7 @@ final class BasicAuthDialogModel {
     }
 }
 
-struct BasicAuthDialog: DialogProtocol {
+struct BasicAuthDialog: View {
     @Bindable var model: BasicAuthDialogModel
     let onSubmit: (String, String, Bool) -> Void
     let onCancel: () -> Void
@@ -34,8 +34,16 @@ struct BasicAuthDialog: DialogProtocol {
         self.onCancel = onCancel
     }
 
+    var body: some View {
+        StandardDialog(
+            header: { header },
+            content: { content },
+            footer: { footer }
+        )
+    }
+
     @ViewBuilder
-    func header() -> some View {
+    private var header: some View {
         DialogHeader(
             icon: "lock.circle",
             title: "Authentication Required",
@@ -44,7 +52,7 @@ struct BasicAuthDialog: DialogProtocol {
     }
 
     @ViewBuilder
-    func content() -> some View {
+    private var content: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("User name")
@@ -78,7 +86,7 @@ struct BasicAuthDialog: DialogProtocol {
     }
 
     @ViewBuilder
-    func footer() -> some View {
+    private var footer: some View {
         HStack(spacing: 12) {
             Spacer()
             NookButton.createButton(
