@@ -10,17 +10,15 @@ struct SidebarView: View {
     @State private var activeSpaceIndex: Int = 0
     @State private var currentScrollID: Int? = nil
     @State private var hasTriggeredHaptic = false
-    @State private var spaceName = ""
-    @State private var spaceIcon = ""
     @State private var sidebarDraggedItem: UUID? = nil
     @State private var activeTabRefreshTrigger: Bool = false
-
+    
     // Downloads Menu Hover
     @State private var isMenuButtonHovered = false
     @State private var isDownloadsHovered = false
     @State private var showDownloadsMenu = false
     @State private var animateDownloadsMenu: Bool = false
-
+    
     private var shouldShowDownloads: Bool {
         isMenuButtonHovered || isDownloadsHovered
     }
@@ -28,34 +26,34 @@ struct SidebarView: View {
     var forceVisible: Bool = false
     // Override the width for overlay use; falls back to BrowserManager width
     var forcedWidth: CGFloat? = nil
-
+    
     private var effectiveWidth: CGFloat {
         forcedWidth ?? windowState.sidebarWidth
     }
-
+    
     private var availableContentWidth: CGFloat {
         effectiveWidth - 16 // Account for horizontal padding
     }
-
+    
     private var targetScrollPosition: Int {
         if let currentSpaceId = windowState.currentSpaceId,
-            let index = browserManager.tabManager.spaces.firstIndex(where: {
-                $0.id == currentSpaceId
-            })
+           let index = browserManager.tabManager.spaces.firstIndex(where: {
+               $0.id == currentSpaceId
+           })
         {
             return index
         }
         return 0
     }
-
+    
     private var visibleSpaceIndices: [Int] {
         let totalSpaces = browserManager.tabManager.spaces.count
-
+        
         guard totalSpaces > 0 else { return [] }
-
+        
         // Ensure activeSpaceIndex is within bounds
         let safeActiveIndex = min(max(activeSpaceIndex, 0), totalSpaces - 1)
-
+        
         // If the activeSpaceIndex is out of bounds, update it
         if activeSpaceIndex != safeActiveIndex {
             print(
@@ -65,9 +63,9 @@ struct SidebarView: View {
                 self.activeSpaceIndex = safeActiveIndex
             }
         }
-
+        
         var indices: [Int] = []
-
+        
         if safeActiveIndex == 0 {
             // First space: show [0, 1]
             indices.append(0)
@@ -84,13 +82,13 @@ struct SidebarView: View {
             indices.append(safeActiveIndex)
             indices.append(safeActiveIndex + 1)
         }
-
+        
         print(
             "🔍 visibleSpaceIndices - activeSpaceIndex: \(activeSpaceIndex), safeIndex: \(safeActiveIndex), totalSpaces: \(totalSpaces), result: \(indices)"
         )
         return indices
     }
-
+    
     private func hideMenuAfterDelay() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             if !isMenuButtonHovered, !isDownloadsHovered {
@@ -101,22 +99,40 @@ struct SidebarView: View {
             }
         }
     }
-
+    
     var body: some View {
         if windowState.isSidebarVisible || forceVisible {
             sidebarContent
                 .contextMenu {
+                    Menu {
+                        ForEach(SidebarPosition.allCases) { position in
+                            
+                            Toggle(isOn: Binding(get: {
+                                return browserManager.settingsManager.sidebarPosition == position
+                            }, set: { Value in
+                                browserManager.settingsManager.sidebarPosition = position
+                            })) {
+                                Label(position.displayName, systemImage: position.icon)
+                            }
+                        }
+                    } label: {
+                        Label("Sidebar Position", systemImage: browserManager.settingsManager.sidebarPosition.icon)
+                    }
+                    
+                    Divider()
+                    
                     Button {
-                        // TODO: Implement space icon change ouside of SpaceTitle
+                        showSpaceEditDialog(mode: .rename)
+                    } label: {
+                        Label("Rename Space", systemImage: "square.and.pencil")
+                    }
+                    
+                    Button {
+                        showSpaceEditDialog(mode: .icon)
                     } label: {
                         Label("Change Space Icon", systemImage: "pencil")
                     }
-
-                    Button {
-                        // TODO: Implement space renaming outside of SpaceTitle
-                    } label: {
-                        Label("Rename Space", systemImage: "face.smiling")
-                    }
+                    
                     Button {
                         browserManager.showGradientEditor()
                     } label: {
@@ -133,19 +149,19 @@ struct SidebarView: View {
                 }
         }
     }
-
+    
     private var sidebarContent: some View {
         let effectiveProfileId =
-            windowState.currentProfileId ?? browserManager.currentProfile?.id
+        windowState.currentProfileId ?? browserManager.currentProfile?.id
         let essentialsCount =
-            effectiveProfileId.map {
-                browserManager.tabManager.essentialTabs(for: $0).count
-            } ?? 0
-
+        effectiveProfileId.map {
+            browserManager.tabManager.essentialTabs(for: $0).count
+        } ?? 0
+        
         let shouldAnimate =
-            (browserManager.activeWindowState?.id == windowState.id)
-            && !browserManager.isTransitioningProfile
-
+        (browserManager.activeWindowState?.id == windowState.id)
+        && !browserManager.isTransitioningProfile
+        
         let content = VStack(spacing: 8) {
             // Only show navigation buttons if top bar address view is disabled
             if !browserManager.settingsManager.topBarAddressView {
@@ -155,7 +171,7 @@ struct SidebarView: View {
                 .padding(.horizontal, 8)
                 .frame(height: 30)
             }
-
+            
             // Only show URL bar in sidebar if top bar address view is disabled
             if !browserManager.settingsManager.topBarAddressView {
                 URLBarView()
@@ -167,16 +183,16 @@ struct SidebarView: View {
                     width: availableContentWidth,
                     profileId: effectiveProfileId
                 )
-                    .environmentObject(browserManager)
-                    .environmentObject(windowState)
+                .environmentObject(browserManager)
+                .environmentObject(windowState)
             }
             .padding(.horizontal, 8)
             .modifier(FallbackDropBelowEssentialsModifier())
-
+            
             ZStack {
                 spacesScrollView
                     .zIndex(1)
-
+                
                 // Bottom spacer for window dragging - overlay that doesn't compete for space
                 Color.clear
                     .contentShape(Rectangle())
@@ -184,8 +200,8 @@ struct SidebarView: View {
                     .frame(minHeight: 40)
                     .zIndex(0)
             }
-
-
+            
+            
             if showDownloadsMenu {
                 SidebarMenuHoverDownloads(
                     isVisible: animateDownloadsMenu
@@ -200,7 +216,7 @@ struct SidebarView: View {
                     }
                 }
             }
-
+            
             // Update notification overlay
             SidebarUpdateNotification(downloadsMenuVisible: showDownloadsMenu)
                 .environmentObject(browserManager)
@@ -208,7 +224,7 @@ struct SidebarView: View {
                 .environment(browserManager.settingsManager)
                 .padding(.horizontal, 8)
                 .padding(.bottom, 8)
-
+            
             // MARK: - Bottom
             ZStack {
                 // Left side icons - anchored to left
@@ -234,7 +250,7 @@ struct SidebarView: View {
                                 hideMenuAfterDelay()
                             }
                         }
-
+                        
                         DownloadIndicator()
                             .offset(x: 12, y: -12)
                     }
@@ -252,19 +268,19 @@ struct SidebarView: View {
                             }
                         })
                     }
-
+                    
                     Spacer()
                 }
-
+                
                 // Center content - space indicators
                 SpacesList()
                     .environmentObject(browserManager)
                     .environmentObject(windowState)
-
+                
                 // Right side icons - anchored to right
                 HStack {
                     Spacer()
-
+                    
                     NavButton(iconName: "plus", disabled: false, action: {
                         showSpaceCreationDialog()
                     })
@@ -272,12 +288,12 @@ struct SidebarView: View {
             }
             .padding(.horizontal, 8)
         }
-        .padding(.top, 8)
-        .padding(.bottom, 8)
-        .frame(width: effectiveWidth)
-        .animation(
-            shouldAnimate ? .easeInOut(duration: 0.18) : nil,
-            value: essentialsCount)
+            .padding(.top, 8)
+            .padding(.bottom, 8)
+            .frame(width: effectiveWidth)
+            .animation(
+                shouldAnimate ? .easeInOut(duration: 0.18) : nil,
+                value: essentialsCount)
         
         let finalContent = ZStack {
                 if windowState.isSidebarAIChatVisible {
@@ -293,18 +309,31 @@ struct SidebarView: View {
                     content
                         .transition(.blur)
                 }
+            if windowState.isSidebarAIChatVisible {
+                SidebarAIChat()
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+                    .environmentObject(browserManager)
+                    .environmentObject(windowState)
+                    .environment(browserManager.settingsManager)
+            } else if windowState.isSidebarMenuVisible {
+                SidebarMenu()
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+            } else {
+                content
+                    .transition(.scale(scale: 0.9))
             }
+        }
             .frame(width: effectiveWidth)
-
+        
         return finalContent
     }
-
+    
     private var spacesScrollView: some View {
         ZStack {
             spacesContent
         }
     }
-
+    
     private var spacesContent: some View {
         Group {
             if browserManager.tabManager.spaces.isEmpty {
@@ -314,7 +343,7 @@ struct SidebarView: View {
             }
         }
     }
-
+    
     private var emptyStateView: some View {
         VStack(spacing: 16) {
             Image(systemName: "square.grid.2x2")
@@ -336,7 +365,7 @@ struct SidebarView: View {
         .frame(width: effectiveWidth)
         .padding()
     }
-
+    
     private var spacesPageView: some View {
         let spaces = browserManager.tabManager.spaces
         return PageView(selection: $activeSpaceIndex) {
@@ -366,14 +395,14 @@ struct SidebarView: View {
             }
             let space = browserManager.tabManager.spaces[newIndex]
             print("🎯 Page changed to space: \(space.name) (index: \(newIndex))")
-
+            
             // Trigger haptic feedback
             let impact = NSHapticFeedbackManager.defaultPerformer
             impact.perform(.alignment, performanceTime: .default)
-
+            
             // Activate the space - BigUIPaging ensures newIndex is always valid
             browserManager.setActiveSpace(space, in: windowState)
-
+            
             // Force hit testing refresh after a short delay
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 // This helps ensure proper hit testing after page transition
@@ -395,6 +424,7 @@ struct SidebarView: View {
     }
 
     // this seems to be unused?
+    
     private var spacesHStack: some View {
         LazyHStack(spacing: 0) {
             ForEach(visibleSpaceIndices, id: \.self) { spaceIndex in
@@ -427,47 +457,37 @@ struct SidebarView: View {
         }
         .scrollTargetLayout()
     }
-
+    
     func scrollToSpace(_ space: Space, proxy: ScrollViewProxy) {
         withAnimation(.easeInOut(duration: 0.25)) {
             proxy.scrollTo(space.id, anchor: .center)
         }
     }
-
+    
     private func showSpaceCreationDialog() {
-        let dialog = SpaceCreationDialog(
-            spaceName: $spaceName,
-            spaceIcon: $spaceIcon,
-            onSave: {
-                // Create the space with the name from dialog
-                let newSpace = browserManager.tabManager.createSpace(
-                    name: spaceName.isEmpty ? "New Space" : spaceName,
-                    icon: spaceIcon.isEmpty ? "✨" : spaceIcon
-                )
+        browserManager.dialogManager.showDialog(
+            SpaceCreationDialog(
+                onCreate: { name, icon in
+                    let finalName = name.isEmpty ? "New Space" : name
+                    let finalIcon = icon.isEmpty ? "✨" : icon
+                    let newSpace = browserManager.tabManager.createSpace(
+                        name: finalName,
+                        icon: finalIcon
+                    )
 
-                // Update the active space index to the newly created space
-                if let targetIndex = browserManager.tabManager.spaces.firstIndex(where: { $0.id == newSpace.id }) {
-                    activeSpaceIndex = targetIndex
+                    if let targetIndex = browserManager.tabManager.spaces.firstIndex(where: { $0.id == newSpace.id }) {
+                        activeSpaceIndex = targetIndex
+                    }
+
+                    browserManager.dialogManager.closeDialog()
+                },
+                onCancel: {
+                    browserManager.dialogManager.closeDialog()
                 }
-                // Reset form
-                spaceName = ""
-                spaceIcon = ""
-            },
-            onCancel: {
-                browserManager.dialogManager.closeDialog()
-
-                // Reset form
-                spaceName = ""
-                spaceIcon = ""
-            },
-            onClose: {
-                browserManager.dialogManager.closeDialog()
-            }
+            )
         )
-
-        browserManager.dialogManager.showDialog(dialog)
     }
-
+    
     private func makeSpaceView(for space: Space, index: Int) -> some View {
         VStack(spacing: 0) {
             SpaceView(
@@ -488,6 +508,58 @@ struct SidebarView: View {
         }
         .frame(width: effectiveWidth, alignment: .leading)
         .tag(index)
+    }
+    
+    private func showSpaceEditDialog(mode: SpaceEditDialog.Mode) {
+        guard let targetSpace = resolveCurrentSpace() else { return }
+
+        browserManager.dialogManager.showDialog(
+            SpaceEditDialog(
+                space: targetSpace,
+                mode: mode,
+                onSave: { newName, newIcon in
+                    let spaceId = targetSpace.id
+
+                    do {
+                        if newIcon != targetSpace.icon {
+                            try browserManager.tabManager.updateSpaceIcon(
+                                spaceId: spaceId,
+                                icon: newIcon
+                            )
+                        }
+
+                        if newName != targetSpace.name {
+                            try browserManager.tabManager.renameSpace(
+                                spaceId: spaceId,
+                                newName: newName
+                            )
+                        }
+
+                        browserManager.dialogManager.closeDialog()
+                    } catch {
+                        print("⚠️ Failed to update space \(spaceId.uuidString):", error)
+                    }
+                },
+                onCancel: {
+                    browserManager.dialogManager.closeDialog()
+                }
+            )
+        )
+    }
+    
+    private func resolveCurrentSpace() -> Space? {
+        if let current = browserManager.tabManager.currentSpace {
+            return current
+        }
+        if let currentId = windowState.currentSpaceId {
+            return browserManager.tabManager.spaces.first { $0.id == currentId }
+        }
+        return browserManager.tabManager.spaces.first
+    }
+    
+    private func updateSidebarPosition(_ position: SidebarPosition) {
+        guard browserManager.settingsManager.sidebarPosition != position else { return }
+        browserManager.settingsManager.sidebarPosition = position
     }
 }
 

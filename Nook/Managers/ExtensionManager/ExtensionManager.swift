@@ -1522,30 +1522,39 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         let reqHosts = requestedMatches.map { String(describing: $0) }.sorted()
         let optHosts = optionalMatches.map { String(describing: $0) }.sorted()
 
-        bm.showCustomContentDialog(
-            header: AnyView(DialogHeader(icon: "puzzlepiece.extension", title: "Extension Permissions", subtitle: nil)),
-            content: ExtensionPermissionView(
-                extensionName: extensionDisplayName,
-                requestedPermissions: reqPerms,
-                optionalPermissions: optPerms,
-                requestedHostPermissions: reqHosts,
-                optionalHostPermissions: optHosts,
-                onGrant: { selectedPerms, selectedHosts in
-                    // Map strings back using string description matching across both requested and optional
-                    let allPerms = requestedPermissions.union(optionalPermissions)
-                    let allHosts = requestedMatches.union(optionalMatches)
-                    let grantedPermissions = Set(allPerms.filter { selectedPerms.contains(String(describing: $0)) })
-                    let grantedMatches = Set(allHosts.filter { selectedHosts.contains(String(describing: $0)) })
-                    bm.closeDialog()
-                    onDecision(grantedPermissions, grantedMatches)
+        bm.showDialog {
+            StandardDialog(
+                header: {
+                    DialogHeader(
+                        icon: "puzzlepiece.extension",
+                        title: "Extension Permissions",
+                        subtitle: nil
+                    )
                 },
-                onDeny: {
-                    bm.closeDialog()
-                    onCancel()
-                }
-            ),
-            footer: AnyView(EmptyView())
-        )
+                content: {
+                    ExtensionPermissionView(
+                        extensionName: extensionDisplayName,
+                        requestedPermissions: reqPerms,
+                        optionalPermissions: optPerms,
+                        requestedHostPermissions: reqHosts,
+                        optionalHostPermissions: optHosts,
+                        onGrant: { selectedPerms, selectedHosts in
+                            let allPerms = requestedPermissions.union(optionalPermissions)
+                            let allHosts = requestedMatches.union(optionalMatches)
+                            let grantedPermissions = Set(allPerms.filter { selectedPerms.contains(String(describing: $0)) })
+                            let grantedMatches = Set(allHosts.filter { selectedHosts.contains(String(describing: $0)) })
+                            bm.closeDialog()
+                            onDecision(grantedPermissions, grantedMatches)
+                        },
+                        onDeny: {
+                            bm.closeDialog()
+                            onCancel()
+                        }
+                    )
+                },
+                footer: { EmptyView() }
+            )
+        }
     }
 
     // Delegate entry point for permission requests from extensions at runtime

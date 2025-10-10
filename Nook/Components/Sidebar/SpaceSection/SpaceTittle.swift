@@ -225,10 +225,14 @@ struct SpaceTitle: View {
     private func commitRename() {
         let newName = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
         if !newName.isEmpty, newName != space.name {
-            browserManager.tabManager.renameSpace(
-                spaceId: space.id,
-                newName: newName
-            )
+            do {
+                try browserManager.tabManager.renameSpace(
+                    spaceId: space.id,
+                    newName: newName
+                )
+            } catch {
+                print("⚠️ Failed to rename space \(space.id.uuidString):", error)
+            }
         }
         isRenaming = false
         nameFieldFocused = false

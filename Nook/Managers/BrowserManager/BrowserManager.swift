@@ -1039,33 +1039,12 @@ class BrowserManager: ObservableObject {
 
     }
     
-    func showCustomDialog<Header: View, Body: View, Footer: View>(
-        header: Header,
-        body: Body,
-        footer: Footer
-    ) {
-        dialogManager.showDialog(header: header, body: body, footer: footer)
+    func showDialog<Content: View>(_ dialog: Content) {
+        dialogManager.showDialog(dialog)
     }
-    
-    func showCustomDialog<Body: View, Footer: View>(
-        body: Body,
-        footer: Footer
-    ) {
-        dialogManager.showDialog(body: body, footer: footer)
-    }
-    
-    func showCustomDialog<Body: View>(
-        body: Body
-    ) {
-        dialogManager.showDialog(body: body)
-    }
-    
-    func showCustomContentDialog<Content: View>(
-        header: AnyView?,
-        content: Content,
-        footer: AnyView?
-    ) {
-        dialogManager.showCustomContentDialog(header: header, content: content, footer: footer)
+
+    func showDialog<Content: View>(@ViewBuilder builder: () -> Content) {
+        dialogManager.showDialog(builder: builder)
     }
     
     // MARK: - Appearance / Gradient Editing
@@ -1076,22 +1055,27 @@ class BrowserManager: ObservableObject {
 
     func showGradientEditor() {
         guard let space = tabManager.currentSpace else {
-            // Consistent in-app dialog when no space is available
-            let header = AnyView(
-                DialogHeader(
-                    icon: "paintpalette",
-                    title: "No Space Available",
-                    subtitle: "Create a space to customize its gradient."
-                )
-            )
-            let footer = AnyView(
-                DialogFooter(rightButtons: [
-                    DialogButton(text: "OK", variant: .primary) { [weak self] in
-                        self?.closeDialog()
+            dialogManager.showDialog {
+                StandardDialog(
+                    header: {
+                        DialogHeader(
+                            icon: "paintpalette",
+                            title: "No Space Available",
+                            subtitle: "Create a space to customize its gradient."
+                        )
+                    },
+                    content: {
+                        Color.clear.frame(height: 0)
+                    },
+                    footer: {
+                        DialogFooter(rightButtons: [
+                            DialogButton(text: "OK", variant: .primary) { [weak self] in
+                                self?.closeDialog()
+                            }
+                        ])
                     }
-                ])
-            )
-            showCustomContentDialog(header: header, content: Color.clear.frame(height: 0), footer: footer)
+                )
+            }
             return
         }
 
@@ -1101,50 +1085,44 @@ class BrowserManager: ObservableObject {
             set: { draft.value = $0 }
         )
 
-        // Compact dialog: remove header icon/title to save vertical space
-        let header: AnyView? = nil
-
-        let content = GradientEditorView(gradient: binding)
-            .environmentObject(self.gradientColorManager)
-
-        let footer = AnyView(
-            DialogFooter(
-                leftButton: DialogButton(
-                    text: "Cancel",
-                    variant: .secondary,
-                    action: { [weak self] in
-                        // Restore background to the saved gradient for this space
-                        self?.gradientColorManager.endInteractivePreview()
-                        self?.gradientColorManager.transition(to: space.gradient, duration: 0.25)
-                        self?.refreshGradientsForSpace(space, animate: true)
-                        self?.closeDialog()
-                    }
-                ),
-                rightButtons: [
-                    DialogButton(
-                        text: "Save",
-                        iconName: "checkmark",
-                        variant: .primary,
-                        action: { [weak self] in
-                            // Commit draft to the current space and persist
-                            space.gradient = draft.value
-                            // End interactive editing then morph to the committed gradient
-                            self?.gradientColorManager.endInteractivePreview()
-                            self?.gradientColorManager.transition(to: draft.value, duration: 0.35)
-                            self?.refreshGradientsForSpace(space, animate: true)
-                            self?.tabManager.persistSnapshot()
-                            self?.closeDialog()
-                        }
+        dialogManager.showDialog {
+            StandardDialog(
+                header: { EmptyView() },
+                content: {
+                    GradientEditorView(gradient: binding)
+                        .environmentObject(self.gradientColorManager)
+                },
+                footer: {
+                    DialogFooter(
+                        leftButton: DialogButton(
+                            text: "Cancel",
+                            variant: .secondary,
+                            action: { [weak self] in
+                                self?.gradientColorManager.endInteractivePreview()
+                                self?.gradientColorManager.transition(to: space.gradient, duration: 0.25)
+                                self?.refreshGradientsForSpace(space, animate: true)
+                                self?.closeDialog()
+                            }
+                        ),
+                        rightButtons: [
+                            DialogButton(
+                                text: "Save",
+                                iconName: "checkmark",
+                                variant: .primary,
+                                action: { [weak self] in
+                                    space.gradient = draft.value
+                                    self?.gradientColorManager.endInteractivePreview()
+                                    self?.gradientColorManager.transition(to: draft.value, duration: 0.35)
+                                    self?.refreshGradientsForSpace(space, animate: true)
+                                    self?.tabManager.persistSnapshot()
+                                    self?.closeDialog()
+                                }
+                            )
+                        ]
                     )
-                ]
+                }
             )
-        )
-
-        showCustomContentDialog(
-            header: header,
-            content: content,
-            footer: footer
-        )
+        }
     }
 
     func closeDialog() {
@@ -1712,10 +1690,28 @@ class BrowserManager: ObservableObject {
                 try await migrateCacheToCurrentProfile()
                 if Task.isCancelled { self.resetMigrationState(); return }
                 await clearSharedDataAfterMigration()
-                let header = AnyView(DialogHeader(icon: "checkmark.seal", title: "Migration Complete", subtitle: currentProfile?.name ?? ""))
-                let body = AnyView(Text("Your shared data has been migrated to the current profile.").font(.body))
-                let footer = AnyView(DialogFooter(rightButtons: [DialogButton(text: "OK", variant: .primary) { self.dialogManager.closeDialog() }]))
-                self.dialogManager.showCustomContentDialog(header: header, content: body, footer: footer)
+                self.dialogManager.showDialog {
+                    StandardDialog(
+                        header: {
+                            DialogHeader(
+                                icon: "checkmark.seal",
+                                title: "Migration Complete",
+                                subtitle: currentProfile?.name ?? ""
+                            )
+                        },
+                        content: {
+                            Text("Your shared data has been migrated to the current profile.")
+                                .font(.body)
+                        },
+                        footer: {
+                            DialogFooter(rightButtons: [
+                                DialogButton(text: "OK", variant: .primary) { [weak self] in
+                                    self?.dialogManager.closeDialog()
+                                }
+                            ])
+                        }
+                    )
+                }
             } catch is CancellationError {
                 self.resetMigrationState()
             } catch {
@@ -1747,20 +1743,56 @@ class BrowserManager: ObservableObject {
         // Fallback to default/first profile
         if let first = profileManager.profiles.first { Task { await switchToProfile(first, context: .recovery) } }
         // Show dialog
-        let header = AnyView(DialogHeader(icon: "exclamationmark.triangle", title: "Profile Error", subtitle: profile?.name ?? ""))
-        let body = AnyView(Text("An error occurred while performing a profile operation. Your session has been switched to a safe profile.").font(.body))
-        let footer = AnyView(DialogFooter(rightButtons: [DialogButton(text: "OK", variant: .primary) { self.dialogManager.closeDialog() }]))
-        dialogManager.showCustomContentDialog(header: header, content: body, footer: footer)
+        dialogManager.showDialog {
+            StandardDialog(
+                header: {
+                    DialogHeader(
+                        icon: "exclamationmark.triangle",
+                        title: "Profile Error",
+                        subtitle: profile?.name ?? ""
+                    )
+                },
+                content: {
+                    Text("An error occurred while performing a profile operation. Your session has been switched to a safe profile.")
+                        .font(.body)
+                },
+                footer: {
+                    DialogFooter(rightButtons: [
+                        DialogButton(text: "OK", variant: .primary) { [weak self] in
+                            self?.dialogManager.closeDialog()
+                        }
+                    ])
+                }
+            )
+        }
     }
 
     // MARK: - Profile Deletion Coordinator
     func deleteProfile(_ profile: Profile) {
         // Avoid deleting the last profile
         guard profileManager.profiles.count > 1 else {
-            let header = AnyView(DialogHeader(icon: "exclamationmark.triangle", title: "Cannot Delete Last Profile", subtitle: profile.name))
-            let body = AnyView(Text("At least one profile must remain.").font(.body))
-            let footer = AnyView(DialogFooter(rightButtons: [DialogButton(text: "OK", variant: .primary) { self.dialogManager.closeDialog() }]))
-            dialogManager.showCustomContentDialog(header: header, content: body, footer: footer)
+            dialogManager.showDialog {
+                StandardDialog(
+                    header: {
+                        DialogHeader(
+                            icon: "exclamationmark.triangle",
+                            title: "Cannot Delete Last Profile",
+                            subtitle: profile.name
+                        )
+                    },
+                    content: {
+                        Text("At least one profile must remain.")
+                            .font(.body)
+                    },
+                    footer: {
+                        DialogFooter(rightButtons: [
+                            DialogButton(text: "OK", variant: .primary) { [weak self] in
+                                self?.dialogManager.closeDialog()
+                            }
+                        ])
+                    }
+                )
+            }
             return
         }
         Task { @MainActor in
@@ -1778,10 +1810,28 @@ class BrowserManager: ObservableObject {
             // Delete from manager
             let ok = self.profileManager.deleteProfile(profile)
             if !ok {
-                let header = AnyView(DialogHeader(icon: "exclamationmark.triangle", title: "Couldn't Delete Profile", subtitle: profile.name))
-                let body = AnyView(Text("An error occurred while saving changes. Please try again.").font(.body))
-                let footer = AnyView(DialogFooter(rightButtons: [DialogButton(text: "OK", variant: .primary) { self.dialogManager.closeDialog() }]))
-                self.dialogManager.showCustomContentDialog(header: header, content: body, footer: footer)
+                self.dialogManager.showDialog {
+                    StandardDialog(
+                        header: {
+                            DialogHeader(
+                                icon: "exclamationmark.triangle",
+                                title: "Couldn't Delete Profile",
+                                subtitle: profile.name
+                            )
+                        },
+                        content: {
+                            Text("An error occurred while saving changes. Please try again.")
+                                .font(.body)
+                        },
+                        footer: {
+                            DialogFooter(rightButtons: [
+                                DialogButton(text: "OK", variant: .primary) { [weak self] in
+                                    self?.dialogManager.closeDialog()
+                                }
+                            ])
+                        }
+                    )
+                }
             }
         }
     }
