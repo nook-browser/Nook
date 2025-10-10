@@ -299,13 +299,13 @@ struct SidebarView: View {
             
             if windowState.isSidebarAIChatVisible {
                 SidebarAIChat()
-                    .transition(.move(edge: .leading).combined(with: .opacity))
+                    .transition(.move(edge: browserManager.settingsManager.sidebarPosition == .left ? .leading : .trailing).combined(with: .opacity))
                     .environmentObject(browserManager)
                     .environmentObject(windowState)
                     .environment(browserManager.settingsManager)
             } else if windowState.isSidebarMenuVisible {
                 SidebarMenu()
-                    .transition(.move(edge: .leading).combined(with: .opacity))
+                    .transition(.move(edge: browserManager.settingsManager.sidebarPosition == .left ? .leading : .trailing).combined(with: .opacity))
             } else {
                 content
                     .transition(.blur)
