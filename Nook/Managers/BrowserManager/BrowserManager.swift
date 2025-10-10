@@ -1889,6 +1889,12 @@ class BrowserManager: ObservableObject {
             windowState.currentProfileId = space.profileId ?? currentProfile?.id
             windowState.activeGradient = space.gradient
         }
+
+        if let initialTab = tabManager.currentTab {
+            compositorManager.loadTab(initialTab)
+            compositorManager.updateTabVisibility(for: windowState)
+            windowState.refreshCompositor()
+        }
         
         windowStates[windowState.id] = windowState
         setActiveWindowState(windowState)
