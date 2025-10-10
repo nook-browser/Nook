@@ -521,21 +521,12 @@ struct SidebarView: View {
             spaceName: $editingSpaceName,
             spaceIcon: $editingSpaceIcon,
             onSave: { newName, newIcon in
-                let didChangeIcon = newIcon != targetSpace.icon
-                
-                if didChangeIcon {
-                    targetSpace.icon = newIcon
-                }
-                
-                if newName != targetSpace.name {
-                    browserManager.tabManager.renameSpace(
-                        spaceId: targetSpace.id,
-                        newName: newName
-                    )
-                } else if didChangeIcon {
-                    browserManager.tabManager.persistSnapshot()
-                }
-                
+                targetSpace.icon = newIcon
+                browserManager.tabManager.renameSpace(
+                    spaceId: targetSpace.id,
+                    newName: newName
+                )
+                browserManager.tabManager.persistSnapshot()
                 browserManager.dialogManager.closeDialog()
             },
             onCancel: {

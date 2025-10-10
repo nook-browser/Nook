@@ -78,18 +78,6 @@ struct SpaceEditDialog: DialogProtocol {
         let effectiveName = trimmed.isEmpty ? originalSpaceName : trimmed
         let iconValue = spaceIcon.isEmpty ? originalSpaceIcon : spaceIcon
 
-        let nameChanged = effectiveName != originalSpaceName
-        let iconChanged = iconValue != originalSpaceIcon
-        let hasChanges = nameChanged || iconChanged
-
-        let canSave: Bool
-        switch mode {
-        case .rename:
-            canSave = hasChanges && !trimmed.isEmpty
-        case .icon:
-            canSave = hasChanges
-        }
-
         return AnyView(
             DialogFooter(
                 rightButtons: [
@@ -101,9 +89,8 @@ struct SpaceEditDialog: DialogProtocol {
                     DialogButton(
                         text: "Save Changes",
                         iconName: "checkmark",
-                        variant: canSave ? .primary : .secondary,
+                        variant: .primary,
                         action: {
-                            guard canSave else { return }
                             onSaveChanges(effectiveName, iconValue)
                         }
                     )
@@ -218,3 +205,4 @@ private struct SpaceIconView: View {
         }
     }
 }
+
