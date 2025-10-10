@@ -22,7 +22,7 @@ final class ProfileManager: ObservableObject {
     // MARK: - Loading
     func loadProfiles() {
         do {
-            var descriptor = FetchDescriptor<ProfileEntity>(
+            let descriptor = FetchDescriptor<ProfileEntity>(
                 sortBy: [SortDescriptor(\.index, order: .forward)]
             )
             let entities = try context.fetch(descriptor)

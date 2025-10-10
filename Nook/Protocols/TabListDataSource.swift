@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 
 /// Protocol to bridge between AppKit table view and Tab management system
+@MainActor
 protocol TabListDataSource {
     /// The current list of tabs to display
     var tabs: [Tab] { get }

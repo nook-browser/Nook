@@ -25,7 +25,6 @@ class BrowserConfiguration {
         config.defaultWebpagePreferences = preferences
 
         // Core WebKit preferences for extensions
-        config.preferences.javaScriptEnabled = true
         config.preferences.javaScriptCanOpenWindowsAutomatically = true
 
         // Media settings
@@ -78,7 +77,6 @@ class BrowserConfiguration {
         config.defaultWebpagePreferences = preferences
 
         // Core WebKit preferences for extensions
-        config.preferences.javaScriptEnabled = true
         config.preferences.javaScriptCanOpenWindowsAutomatically = true
 
         // Media settings
@@ -126,7 +124,6 @@ class BrowserConfiguration {
         config.defaultWebpagePreferences = preferences
 
         // Core WebKit preferences for extensions
-        config.preferences.javaScriptEnabled = true
         config.preferences.javaScriptCanOpenWindowsAutomatically = true
 
         // Media settings
@@ -172,7 +169,7 @@ class BrowserConfiguration {
     /// Get the Web Store injector script
     static func webStoreInjectorScript() -> WKUserScript? {
         guard let scriptPath = Bundle.main.path(forResource: "WebStoreInjector", ofType: "js"),
-              let scriptSource = try? String(contentsOfFile: scriptPath) else {
+              let scriptSource = try? String(contentsOfFile: scriptPath, encoding: .utf8) else {
             return nil
         }
         
