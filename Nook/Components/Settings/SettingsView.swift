@@ -148,6 +148,7 @@ struct SettingsTabItem: View {
 
 struct GeneralSettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @FocusState private var startupURLFocused: Bool
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
@@ -215,8 +216,12 @@ struct GeneralSettingsView: View {
                                     )
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
-                                }
-                            }.frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .onChange(of: browserManager.settingsManager.restoreSessionOnLaunch) { isOn in
+                                if isOn { startupURLFocused = false }
+                            }
 
                             Toggle(
                                 isOn: $browserManager.settingsManager
@@ -248,6 +253,9 @@ struct GeneralSettingsView: View {
                                 .frame(width: 220)
                             }
                             .disabled(browserManager.settingsManager.restoreSessionOnLaunch)
+                            .onChange(of: browserManager.settingsManager.startupTabMode) { _ in
+                                startupURLFocused = false
+                            }
                             
                             if browserManager.settingsManager.startupTabMode == .customURL {
                                 HStack(alignment: .firstTextBaseline) {
@@ -259,6 +267,14 @@ struct GeneralSettingsView: View {
                                     )
                                     .textFieldStyle(.roundedBorder)
                                     .frame(width: 220)
+                                    .focused($startupURLFocused)
+                                    .submitLabel(.done)
+                                    .onSubmit {
+                                        let trimmed = browserManager.settingsManager.startupTabURL
+                                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                                        browserManager.settingsManager.startupTabURL = trimmed
+                                        startupURLFocused = false
+                                    }
                                     .disabled(browserManager.settingsManager.restoreSessionOnLaunch)
                                 }
                                 
