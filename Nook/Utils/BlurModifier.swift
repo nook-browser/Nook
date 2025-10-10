@@ -32,7 +32,7 @@ extension AnyTransition {
 
     static func blur(
         intensity: CGFloat = 5,
-        scale: CGFloat = 0.8
+        scale: CGFloat = 0.95
     ) -> AnyTransition {
         .scale(scale: scale)
             .combined(
