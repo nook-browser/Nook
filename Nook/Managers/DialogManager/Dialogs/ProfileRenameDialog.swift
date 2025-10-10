@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct ProfileRenameDialog: View {
+struct ProfileRenameDialog: DialogPresentable {
     let originalProfileName: String
     let originalProfileIcon: String
 
@@ -35,16 +35,7 @@ struct ProfileRenameDialog: View {
         self.onCancel = onCancel
     }
 
-    var body: some View {
-        StandardDialog(
-            header: { header },
-            content: { content },
-            footer: { footer }
-        )
-    }
-
-    @ViewBuilder
-    private var header: some View {
+    func dialogHeader() -> DialogHeader {
         DialogHeader(
             icon: "square.and.pencil",
             title: "Rename Profile",
@@ -53,7 +44,7 @@ struct ProfileRenameDialog: View {
     }
 
     @ViewBuilder
-    private var content: some View {
+    func dialogContent() -> some View {
         let trimmed = profileName.trimmingCharacters(in: .whitespacesAndNewlines)
         let isDuplicate = trimmed.lowercased() != originalProfileName.lowercased() && !isNameAvailable(trimmed)
 
@@ -86,14 +77,13 @@ struct ProfileRenameDialog: View {
         }
     }
 
-    @ViewBuilder
-    private var footer: some View {
+    func dialogFooter() -> DialogFooter {
         let trimmed = profileName.trimmingCharacters(in: .whitespacesAndNewlines)
         let changed = trimmed != originalProfileName || profileIcon != originalProfileIcon
         let isValid = !trimmed.isEmpty && (trimmed.lowercased() == originalProfileName.lowercased() || isNameAvailable(trimmed))
         let canSave = changed && isValid
 
-        DialogFooter(
+        return DialogFooter(
             rightButtons: [
                 DialogButton(
                     text: "Cancel",
@@ -104,10 +94,9 @@ struct ProfileRenameDialog: View {
                     text: "Save Settings",
                     iconName: "checkmark",
                     variant: .primary,
+                    isEnabled: canSave,
                     action: {
-                        if canSave {
-                            onSave(trimmed, profileIcon)
-                        }
+                        onSave(trimmed, profileIcon)
                     }
                 )
             ]

@@ -8,7 +8,7 @@
 import AppKit
 import SwiftUI
 
-struct SpaceEditDialog: View {
+struct SpaceEditDialog: DialogPresentable {
     enum Mode {
         case rename
         case icon
@@ -41,37 +41,42 @@ struct SpaceEditDialog: View {
         self.onCancelChanges = onCancel
     }
 
-    var body: some View {
-        StandardDialog(
-            header: { headerView },
-            content: {
-                SpaceEditContent(
-                    spaceName: $spaceName,
-                    spaceIcon: $spaceIcon,
-                    originalIcon: originalSpaceIcon,
-                    mode: mode
-                )
-            },
-            footer: { footerView }
-        )
-    }
+    func dialogHeader() -> DialogHeader {
+        let iconName: String
+        let title: String
 
-    @ViewBuilder
-    private var headerView: some View {
-        DialogHeader(
-            icon: "pencil",
-            title: "Edit",
+        switch mode {
+        case .rename:
+            iconName = "pencil"
+            title = "Rename Space"
+        case .icon:
+            iconName = "face.smiling"
+            title = "Change Space Icon"
+        }
+
+        return DialogHeader(
+            icon: iconName,
+            title: title,
             subtitle: originalSpaceName
         )
     }
 
     @ViewBuilder
-    private var footerView: some View {
+    func dialogContent() -> some View {
+        SpaceEditContent(
+            spaceName: $spaceName,
+            spaceIcon: $spaceIcon,
+            originalIcon: originalSpaceIcon,
+            mode: mode
+        )
+    }
+
+    func dialogFooter() -> DialogFooter {
         let trimmed = spaceName.trimmingCharacters(in: .whitespacesAndNewlines)
         let effectiveName = trimmed.isEmpty ? originalSpaceName : trimmed
         let iconValue = spaceIcon.isEmpty ? originalSpaceIcon : spaceIcon
 
-        DialogFooter(
+        return DialogFooter(
             rightButtons: [
                 DialogButton(
                     text: "Cancel",

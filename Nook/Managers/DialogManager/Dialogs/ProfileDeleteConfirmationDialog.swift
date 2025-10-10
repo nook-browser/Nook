@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct ProfileDeleteConfirmationDialog: View {
+struct ProfileDeleteConfirmationDialog: DialogPresentable {
     let profileName: String
     let profileIcon: String
     let spacesCount: Int
@@ -16,22 +16,16 @@ struct ProfileDeleteConfirmationDialog: View {
     let onDelete: () -> Void
     let onCancel: () -> Void
 
-    var body: some View {
-        StandardDialog(
-            header: {
-                DialogHeader(
-                    icon: "trash",
-                    title: "Delete Profile",
-                    subtitle: "This action cannot be undone"
-                )
-            },
-            content: { content },
-            footer: { footer }
+    func dialogHeader() -> DialogHeader {
+        DialogHeader(
+            icon: "trash",
+            title: "Delete Profile",
+            subtitle: "This action cannot be undone"
         )
     }
 
     @ViewBuilder
-    private var content: some View {
+    func dialogContent() -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Image(systemName: profileIcon)
@@ -67,8 +61,7 @@ struct ProfileDeleteConfirmationDialog: View {
         }
     }
 
-    @ViewBuilder
-    private var footer: some View {
+    func dialogFooter() -> DialogFooter {
         DialogFooter(
             rightButtons: [
                 DialogButton(
@@ -80,11 +73,8 @@ struct ProfileDeleteConfirmationDialog: View {
                     text: "Delete Profile",
                     iconName: "trash",
                     variant: isLastProfile ? .secondary : .destructive,
-                    action: {
-                        if !isLastProfile {
-                            onDelete()
-                        }
-                    }
+                    isEnabled: !isLastProfile,
+                    action: onDelete
                 )
             ]
         )

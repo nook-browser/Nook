@@ -8,7 +8,7 @@
 import AppKit
 import SwiftUI
 
-struct SpaceCreationDialog: View {
+struct SpaceCreationDialog: DialogPresentable {
     @State private var spaceName: String
     @State private var spaceIcon: String
 
@@ -25,66 +25,39 @@ struct SpaceCreationDialog: View {
         self.onCancel = onCancel
     }
 
-    var body: some View {
-        StandardDialog(
-            header: {
-                HStack {
-                    Spacer()
-                    VStack(spacing: 16) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.accentColor.opacity(0.1))
-                                .frame(width: 48, height: 48)
+    func dialogHeader() -> DialogHeader {
+        DialogHeader(
+            icon: "folder.badge.plus",
+            title: "Create a New Space",
+            subtitle: "Organize your tabs into a new space"
+        )
+    }
 
-                            Image(systemName: "folder.badge.plus")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(Color.accentColor)
-                        }
+    @ViewBuilder
+    func dialogContent() -> some View {
+        SpaceCreationContent(
+            spaceName: $spaceName,
+            spaceIcon: $spaceIcon
+        )
+    }
 
-                        VStack(spacing: 4) {
-                            Text("Create a New Space")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(.primary)
-
-                            Text("Organize your tabs into a new space")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
-                        }
-                    }
-                    Spacer()
-                }
-                .padding(.top, 8)
-            },
-            content: {
-                SpaceCreationContent(
-                    spaceName: $spaceName,
-                    spaceIcon: $spaceIcon
+    func dialogFooter() -> DialogFooter {
+        DialogFooter(
+            rightButtons: [
+                DialogButton(
+                    text: "Cancel",
+                    variant: .secondary,
+                    keyboardShortcut: .escape,
+                    action: onCancel
+                ),
+                DialogButton(
+                    text: "Create Space",
+                    iconName: "plus",
+                    variant: .primary,
+                    keyboardShortcut: .return,
+                    action: handleCreate
                 )
-            },
-            footer: {
-                HStack(spacing: 12) {
-                    Spacer()
-
-                    HStack(spacing: 8) {
-                        NookButton.createButton(
-                            text: "Cancel",
-                            variant: .secondary,
-                            action: onCancel,
-                            keyboardShortcut: .escape
-                        )
-
-                        NookButton.createButton(
-                            text: "Create Space",
-                            iconName: "plus",
-                            variant: .primary,
-                            action: handleCreate,
-                            keyboardShortcut: .return
-                        )
-                    }
-                }
-                .padding(.top, 8)
-            }
+            ]
         )
     }
 

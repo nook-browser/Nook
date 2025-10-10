@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct SettingsDialog: View {
+struct SettingsDialog: DialogPresentable {
     @State private var autoSave: Bool
     @State private var notifications: Bool
     @State private var theme: String
@@ -32,16 +32,7 @@ struct SettingsDialog: View {
         self.onCancel = onCancel
     }
 
-    var body: some View {
-        StandardDialog(
-            header: { header },
-            content: { content },
-            footer: { footer }
-        )
-    }
-
-    @ViewBuilder
-    private var header: some View {
+    func dialogHeader() -> DialogHeader {
         DialogHeader(
             icon: "gear",
             title: "Settings",
@@ -50,7 +41,7 @@ struct SettingsDialog: View {
     }
 
     @ViewBuilder
-    private var content: some View {
+    func dialogContent() -> some View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Theme")
@@ -81,8 +72,7 @@ struct SettingsDialog: View {
         }
     }
 
-    @ViewBuilder
-    private var footer: some View {
+    func dialogFooter() -> DialogFooter {
         DialogFooter(
             rightButtons: [
                 DialogButton(

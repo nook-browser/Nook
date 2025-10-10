@@ -23,27 +23,22 @@ final class BasicAuthDialogModel {
     }
 }
 
-struct BasicAuthDialog: View {
+struct BasicAuthDialog: DialogPresentable {
     @Bindable var model: BasicAuthDialogModel
     let onSubmit: (String, String, Bool) -> Void
     let onCancel: () -> Void
 
-    init(model: BasicAuthDialogModel, onSubmit: @escaping (String, String, Bool) -> Void, onCancel: @escaping () -> Void) {
+    init(
+        model: BasicAuthDialogModel,
+        onSubmit: @escaping (String, String, Bool) -> Void,
+        onCancel: @escaping () -> Void
+    ) {
         self.model = model
         self.onSubmit = onSubmit
         self.onCancel = onCancel
     }
 
-    var body: some View {
-        StandardDialog(
-            header: { header },
-            content: { content },
-            footer: { footer }
-        )
-    }
-
-    @ViewBuilder
-    private var header: some View {
+    func dialogHeader() -> DialogHeader {
         DialogHeader(
             icon: "lock.circle",
             title: "Authentication Required",
@@ -52,7 +47,7 @@ struct BasicAuthDialog: View {
     }
 
     @ViewBuilder
-    private var content: some View {
+    func dialogContent() -> some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("User name")
@@ -85,27 +80,29 @@ struct BasicAuthDialog: View {
         .padding(.horizontal, 4)
     }
 
-    @ViewBuilder
-    private var footer: some View {
-        HStack(spacing: 12) {
-            Spacer()
-            NookButton.createButton(
-                text: "Cancel",
-                variant: .secondary,
-                action: onCancel,
-                keyboardShortcut: .escape
-            )
-            NookButton(
-                text: "Sign In",
-                iconName: "arrow.right.circle",
-                variant: .primary,
-                action: {
-                    onSubmit(model.username, model.password, model.rememberCredential)
-                },
-                keyboardShortcut: .return
-            )
-            .disabled(model.username.isEmpty || model.password.isEmpty)
-        }
-        .padding(.top, 8)
+    func dialogFooter() -> DialogFooter {
+        let canSubmit = !model.username.isEmpty && !model.password.isEmpty
+
+        return DialogFooter(
+            rightButtons: [
+                DialogButton(
+                    text: "Cancel",
+                    variant: .secondary,
+                    keyboardShortcut: .escape,
+                    action: onCancel
+                ),
+                DialogButton(
+                    text: "Sign In",
+                    iconName: "arrow.right.circle",
+                    variant: .primary,
+                    keyboardShortcut: .return,
+                    isEnabled: canSubmit,
+                    action: {
+                        onSubmit(model.username, model.password, model.rememberCredential)
+                    }
+                )
+            ]
+        )
     }
 }
+

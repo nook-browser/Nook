@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct ProfileCreationDialog: View {
+struct ProfileCreationDialog: DialogPresentable {
     @State private var profileName: String
     @State private var profileIcon: String
 
@@ -29,45 +29,16 @@ struct ProfileCreationDialog: View {
         self.onCancel = onCancel
     }
 
-    var body: some View {
-        StandardDialog(
-            header: { header },
-            content: { content },
-            footer: { footer }
+    func dialogHeader() -> DialogHeader {
+        DialogHeader(
+            icon: "person.crop.circle.badge.plus",
+            title: "Create New Profile",
+            subtitle: "Switch between different browsing personas"
         )
     }
 
     @ViewBuilder
-    private var header: some View {
-        HStack(spacing: 0) {
-            VStack(spacing: 18) {
-                ZStack {
-                    Circle()
-                        .fill(Color.accentColor.opacity(0.1))
-                        .frame(width: 48, height: 48)
-
-                    Image(systemName: "person.crop.circle.badge.plus")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(Color.accentColor)
-                }
-
-                VStack(spacing: 4) {
-                    Text("Create New Profile")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.primary)
-
-                    Text("Switch between different browsing personas")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-            }
-            .padding(.top, 8)
-        }
-    }
-
-    @ViewBuilder
-    private var content: some View {
+    func dialogContent() -> some View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Profile Name")
@@ -99,24 +70,22 @@ struct ProfileCreationDialog: View {
         .padding(.horizontal, 4)
     }
 
-    @ViewBuilder
-    private var footer: some View {
-        HStack(spacing: 12) {
-            Spacer()
+    func dialogFooter() -> DialogFooter {
+        let trimmed = profileName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let canCreate = isNameAvailable(trimmed) && !trimmed.isEmpty
 
-            HStack(spacing: 8) {
-                NookButton.createButton(
+        return DialogFooter(
+            rightButtons: [
+                DialogButton(
                     text: "Cancel",
                     variant: .secondary,
-                    action: onCancel,
-                    keyboardShortcut: .escape
-                )
-
-                NookButton(
+                    keyboardShortcut: .escape,
+                    action: onCancel
+                ),
+                DialogButton(
                     text: "Create Profile",
                     iconName: "plus",
                     variant: .primary,
-                    action: handleCreate,
                     keyboardShortcut: .return,
                     animationType: .custom("checkmark"),
                     shadowStyle: .subtle,
@@ -126,12 +95,14 @@ struct ProfileCreationDialog: View {
                         borderColor: Color.white,
                         shadowColor: Color.gray,
                         shadowOffset: CGSize(width: 0, height: 5)
-                    )
+                    ),
+                    isEnabled: canCreate,
+                    action: {
+                        handleCreate()
+                    }
                 )
-                .disabled(!isNameAvailable(profileName.trimmingCharacters(in: .whitespacesAndNewlines)))
-            }
-        }
-        .padding(.top, 8)
+            ]
+        )
     }
 
     private func handleCreate() {

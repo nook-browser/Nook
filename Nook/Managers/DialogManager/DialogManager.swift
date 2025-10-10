@@ -79,6 +79,24 @@ class DialogManager {
     }
 }
 
+protocol DialogPresentable: View {
+    associatedtype DialogContent: View
+
+    @ViewBuilder func dialogHeader() -> DialogHeader
+    @ViewBuilder func dialogContent() -> DialogContent
+    @ViewBuilder func dialogFooter() -> DialogFooter
+}
+
+extension DialogPresentable {
+    var body: some View {
+        StandardDialog(
+            header: { dialogHeader() },
+            content: { dialogContent() },
+            footer: { dialogFooter() }
+        )
+    }
+}
+
 // MARK: - Dialog Surfaces
 
 struct DialogCard<Content: View>: View {
@@ -202,8 +220,13 @@ struct DialogFooter: View {
                     text: leftButton.text,
                     iconName: leftButton.iconName,
                     variant: leftButton.variant,
-                    action: leftButton.action
+                    action: leftButton.action,
+                    keyboardShortcut: leftButton.keyboardShortcut,
+                    animationType: leftButton.animationType,
+                    shadowStyle: leftButton.shadowStyle,
+                    customColors: leftButton.customColors
                 )
+                .disabled(!leftButton.isEnabled)
             }
 
             Spacer()
@@ -215,8 +238,13 @@ struct DialogFooter: View {
                         text: button.text,
                         iconName: button.iconName,
                         variant: button.variant,
-                        action: button.action
+                        action: button.action,
+                        keyboardShortcut: button.keyboardShortcut,
+                        animationType: button.animationType,
+                        shadowStyle: button.shadowStyle,
+                        customColors: button.customColors
                     )
+                    .disabled(!button.isEnabled)
                 }
             }
         }
@@ -228,17 +256,32 @@ struct DialogButton {
     let iconName: String?
     let variant: NookButton.Variant
     let action: () -> Void
+    let keyboardShortcut: KeyEquivalent?
+    let animationType: NookButton.AnimationType
+    let shadowStyle: NookButton.ShadowStyle
+    let customColors: NookButton.CustomColors?
+    let isEnabled: Bool
 
     init(
         text: String,
         iconName: String? = nil,
         variant: NookButton.Variant = .primary,
+        keyboardShortcut: KeyEquivalent? = nil,
+        animationType: NookButton.AnimationType = .none,
+        shadowStyle: NookButton.ShadowStyle = .subtle,
+        customColors: NookButton.CustomColors? = nil,
+        isEnabled: Bool = true,
         action: @escaping () -> Void
     ) {
         self.text = text
         self.iconName = iconName
         self.variant = variant
         self.action = action
+        self.keyboardShortcut = keyboardShortcut
+        self.animationType = animationType
+        self.shadowStyle = shadowStyle
+        self.customColors = customColors
+        self.isEnabled = isEnabled
     }
 }
 
