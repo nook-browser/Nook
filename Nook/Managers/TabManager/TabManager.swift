@@ -2241,7 +2241,15 @@ extension TabManager {
         currentTab = nil
 
         let defaultSpace = ensureDefaultSpaceIfNeeded()
-        _ = createNewTab(url: "https://www.google.com", in: defaultSpace)
+        let settings = browserManager?.settingsManager
+        switch settings?.startupTabMode ?? .customURL {
+        case .customURL:
+            let raw = (settings?.startupTabURL ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let urlString = raw.isEmpty ? SettingsManager.defaultStartupURL : raw
+            _ = createNewTab(url: urlString, in: defaultSpace)
+        case .none:
+            break
+        }
         spacesLoaded = true
     }
 

@@ -231,6 +231,43 @@ struct GeneralSettingsView: View {
                                     .foregroundStyle(.secondary)
                                 }
                             }.frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            HStack(alignment: .firstTextBaseline) {
+                                Text("Startup Behavior")
+                                Spacer()
+                                Picker(
+                                    "Startup Behavior",
+                                    selection: $browserManager.settingsManager.startupTabMode
+                                ) {
+                                    ForEach(StartupTabMode.allCases) { mode in
+                                        Text(mode.displayName).tag(mode)
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .frame(width: 220)
+                            }
+                            .disabled(browserManager.settingsManager.restoreSessionOnLaunch)
+                            
+                            if browserManager.settingsManager.startupTabMode == .customURL {
+                                HStack(alignment: .firstTextBaseline) {
+                                    Text("Startup Page URL")
+                                    Spacer()
+                                    TextField(
+                                        "example.com",
+                                        text: $browserManager.settingsManager.startupTabURL
+                                    )
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 220)
+                                    .disabled(browserManager.settingsManager.restoreSessionOnLaunch)
+                                }
+                                
+                                Text("Used when Restore Session on Launch is off. Leave blank to use \(SettingsManager.defaultStartupURL).")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .padding(.leading, 2)
+                            }
                             HStack(alignment: .firstTextBaseline) {
                                 Text("Sidebar Position")
                                 Spacer()

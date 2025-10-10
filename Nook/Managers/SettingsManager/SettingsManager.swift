@@ -8,6 +8,20 @@
 import AppKit
 import SwiftUI
 
+enum StartupTabMode: String, CaseIterable, Identifiable {
+    case customURL
+    case none
+    
+    var id: String { rawValue }
+    
+    var displayName: String {
+        switch self {
+        case .customURL: return "Open custom page"
+        case .none: return "Open empty window"
+        }
+    }
+}
+
 @Observable
 class SettingsManager {
     let keyboardShortcutManager = KeyboardShortcutManager()
@@ -20,6 +34,8 @@ class SettingsManager {
     private let debugToggleUpdateNotificationKey = "settings.debugToggleUpdateNotification"
     private let askBeforeQuitKey = "settings.askBeforeQuit"
     private let restoreSessionOnLaunchKey = "settings.restoreSessionOnLaunch"
+    private let startupTabModeKey = "settings.startupTabMode"
+    private let startupTabURLKey = "settings.startupTabURL"
     private let sidebarPositionKey = "settings.sidebarPosition"
     private let topBarAddressViewKey = "settings.topBarAddressView"
     private let experimentalExtensionsKey = "settings.experimentalExtensions"
@@ -128,6 +144,20 @@ class SettingsManager {
             userDefaults.set(showAIAssistant, forKey: showAIAssistantKey)
         }
     }
+    
+    static let defaultStartupURL = "https://www.google.com"
+    
+    var startupTabMode: StartupTabMode {
+        didSet {
+            userDefaults.set(startupTabMode.rawValue, forKey: startupTabModeKey)
+        }
+    }
+    
+    var startupTabURL: String {
+        didSet {
+            userDefaults.set(startupTabURL, forKey: startupTabURLKey)
+        }
+    }
 
     init() {
         // Register default values
@@ -141,6 +171,8 @@ class SettingsManager {
             debugToggleUpdateNotificationKey: false,
             askBeforeQuitKey: true,
             restoreSessionOnLaunchKey: true,
+            startupTabModeKey: StartupTabMode.customURL.rawValue,
+            startupTabURLKey: Self.defaultStartupURL,
             sidebarPositionKey: SidebarPosition.left.rawValue,
             topBarAddressViewKey: false,
             experimentalExtensionsKey: false,
@@ -175,6 +207,13 @@ class SettingsManager {
         self.geminiApiKey = userDefaults.string(forKey: geminiApiKeyKey) ?? ""
         self.geminiModel = GeminiModel(rawValue: userDefaults.string(forKey: geminiModelKey) ?? GeminiModel.flash.rawValue) ?? .flash
         self.showAIAssistant = userDefaults.bool(forKey: showAIAssistantKey)
+        if let rawMode = userDefaults.string(forKey: startupTabModeKey),
+           let mode = StartupTabMode(rawValue: rawMode) {
+            self.startupTabMode = mode
+        } else {
+            self.startupTabMode = .customURL
+        }
+        self.startupTabURL = userDefaults.string(forKey: startupTabURLKey) ?? Self.defaultStartupURL
     }
 }
 
@@ -207,3 +246,5 @@ extension Notification.Name {
     static let blockCrossSiteTrackingChanged = Notification.Name("blockCrossSiteTrackingChanged")
     static let sessionPersistenceChanged = Notification.Name("sessionPersistenceChanged")
 }
+
+// MARK: - Startup Tab
