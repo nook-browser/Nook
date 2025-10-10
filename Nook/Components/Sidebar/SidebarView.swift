@@ -296,6 +296,19 @@ struct SidebarView: View {
                 value: essentialsCount)
         
         let finalContent = ZStack {
+                if windowState.isSidebarAIChatVisible {
+                    SidebarAIChat()
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                        .environmentObject(browserManager)
+                        .environmentObject(windowState)
+                        .environment(browserManager.settingsManager)
+                } else if windowState.isSidebarMenuVisible {
+                    SidebarMenu()
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                } else {
+                    content
+                        .transition(.blur)
+                }
             if windowState.isSidebarAIChatVisible {
                 SidebarAIChat()
                     .transition(.move(edge: .leading).combined(with: .opacity))
@@ -409,6 +422,8 @@ struct SidebarView: View {
             activeTabRefreshTrigger.toggle()
         }
     }
+
+    // this seems to be unused?
     
     private var spacesHStack: some View {
         LazyHStack(spacing: 0) {
