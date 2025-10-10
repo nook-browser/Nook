@@ -217,7 +217,7 @@ struct GeneralSettingsView: View {
                             }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .onChange(of: browserManager.settingsManager.restoreSessionOnLaunch) { isOn in
+                            .onChange(of: browserManager.settingsManager.restoreSessionOnLaunch) { _, isOn in
                                 if isOn { startupURLFocused = false }
                             }
 
@@ -251,7 +251,7 @@ struct GeneralSettingsView: View {
                                 .frame(width: 220)
                             }
                             .disabled(browserManager.settingsManager.restoreSessionOnLaunch)
-                            .onChange(of: browserManager.settingsManager.startupTabMode) { _ in
+                            .onChange(of: browserManager.settingsManager.startupTabMode) {
                                 startupURLFocused = false
                             }
                             
