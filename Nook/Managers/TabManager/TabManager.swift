@@ -464,6 +464,7 @@ class TabManager: ObservableObject {
     private var pendingPinnedWithoutProfile: [Tab] = []
     // Space activation to resume after a deferred profile switch
     private var pendingSpaceActivation: UUID?
+    @Published private(set) var spacesLoaded: Bool = false
     
     // Essentials API - profile-filtered view of global pinned tabs
     var pinnedTabs: [Tab] {
@@ -1858,6 +1859,7 @@ class TabManager: ObservableObject {
     // MARK: - SwiftData load/save
 
     private func loadFromStore() {
+        spacesLoaded = false
         if let bm = browserManager,
            bm.settingsManager.restoreSessionOnLaunch == false {
             bootstrapFreshSession()
@@ -1865,6 +1867,7 @@ class TabManager: ObservableObject {
                 guard let self else { return }
                 await self.persistence.clearAllSnapshots()
             }
+            spacesLoaded = true
             return
         }
         do {
@@ -2059,8 +2062,10 @@ class TabManager: ObservableObject {
             }
             // If we assigned default profile to legacy pinned tabs, persist to capture migrations
             if __didAssignDefaultProfile { persistSnapshot() }
+            spacesLoaded = true
         } catch {
             print("SwiftData load error: \(error)")
+            spacesLoaded = true
         }
     }
 
@@ -2239,6 +2244,7 @@ extension TabManager {
 
         let defaultSpace = ensureDefaultSpaceIfNeeded()
         _ = createNewTab(url: "https://www.google.com", in: defaultSpace)
+        spacesLoaded = true
     }
 
     nonisolated func reattachBrowserManager(_ bm: BrowserManager) {
