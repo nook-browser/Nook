@@ -310,7 +310,6 @@ private extension BrowserManager.ProfileSwitchContext {
 @MainActor
 class BrowserManager: ObservableObject {
     private static let quitLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "BrowserManager.QuitFlow")
-    private static let compositorLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "BrowserManager.Compositor")
     // Legacy global state - kept for backward compatibility during transition
     @Published var sidebarWidth: CGFloat = 250
     @Published var sidebarContentWidth: CGFloat = 234
@@ -1861,7 +1860,6 @@ class BrowserManager: ObservableObject {
     
     /// Register a new window state
     func registerWindowState(_ windowState: BrowserWindowState) {
-        Self.compositorLog.debug("[register] Window=\(windowState.id, privacy: .public) sidebarWidth=\(self.sidebarWidth) tabsLoaded=\(self.tabManager.spacesLoaded)")
         // Initialize window state with current global state for backward compatibility
         windowState.sidebarWidth = sidebarWidth
         windowState.sidebarContentWidth = max(sidebarWidth - 16, 0)
@@ -1880,31 +1878,28 @@ class BrowserManager: ObservableObject {
             windowState.window = window
         }
         windowState.urlBarFrame = urlBarFrame
-        windowState.activeGradient = self.tabManager.currentSpace?.gradient ?? .default
-        windowState.currentProfileId = self.currentProfile?.id
+        windowState.activeGradient = tabManager.currentSpace?.gradient ?? .default
+        windowState.currentProfileId = currentProfile?.id
 
         // Set initial tab and space
-        windowState.currentTabId = self.tabManager.currentTab?.id
-        windowState.currentSpaceId = self.tabManager.currentSpace?.id
+        windowState.currentTabId = tabManager.currentTab?.id
+        windowState.currentSpaceId = tabManager.currentSpace?.id
         if let spaceId = windowState.currentSpaceId,
-           let space = self.tabManager.spaces.first(where: { $0.id == spaceId }) {
-            windowState.currentProfileId = space.profileId ?? self.currentProfile?.id
+           let space = tabManager.spaces.first(where: { $0.id == spaceId }) {
+            windowState.currentProfileId = space.profileId ?? currentProfile?.id
             windowState.activeGradient = space.gradient
         }
 
-        if let initialTab = self.tabManager.currentTab {
-            Self.compositorLog.debug("[register] Priming initial tab id=\(initialTab.id, privacy: .public) name=\(initialTab.name, privacy: .public) unloaded=\(initialTab.isUnloaded)")
-            self.compositorManager.loadTab(initialTab)
-            self.compositorManager.updateTabVisibility(for: windowState)
+        if let initialTab = tabManager.currentTab {
+            compositorManager.loadTab(initialTab)
+            compositorManager.updateTabVisibility(for: windowState)
             windowState.refreshCompositor()
-        } else {
-            Self.compositorLog.debug("[register] No initial tab available during window registration")
         }
         
         windowStates[windowState.id] = windowState
         setActiveWindowState(windowState)
         
-        Self.compositorLog.debug("[register] Set active window=\(windowState.id, privacy: .public) tab=\(String(describing: windowState.currentTabId?.uuidString), privacy: .public) space=\(String(describing: windowState.currentSpaceId?.uuidString), privacy: .public)")
+        print("🪟 [BrowserManager] Registered window state: \(windowState.id)")
     }
     
     /// MEMORY LEAK FIX: Comprehensive cleanup for a specific window
@@ -2105,7 +2100,6 @@ class BrowserManager: ObservableObject {
         // Note: No need to track tab display ownership - each window shows its own current tab
 
         // Load the tab in compositor if needed (reloads unloaded tabs)
-        Self.compositorLog.debug("[select] window=\(windowState.id, privacy: .public) tab=\(tab.id, privacy: .public) name=\(tab.name, privacy: .public) isUnloaded=\(tab.isUnloaded)")
         compositorManager.loadTab(tab)
         
         // Update tab visibility in compositor
@@ -2176,7 +2170,6 @@ class BrowserManager: ObservableObject {
     
     /// Refresh compositor for a specific window
     func refreshCompositor(for windowState: BrowserWindowState) {
-        Self.compositorLog.debug("[refreshCompositor] window=\(windowState.id, privacy: .public) currentTab=\(windowState.currentTabId?.uuidString ?? "nil", privacy: .public) compositorVersionBefore=\(windowState.compositorVersion)")
         windowState.refreshCompositor()
     }
     

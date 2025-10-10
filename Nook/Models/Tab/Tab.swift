@@ -13,11 +13,9 @@ import Foundation
 import Combine
 import SwiftUI
 import WebKit
-import OSLog
 
 @MainActor
 public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
-    private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "Tab")
     public let id: UUID
     var url: URL
     var name: String
@@ -355,14 +353,12 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     // MARK: - WebView Setup
 
     private func setupWebView() {
-        Self.log.debug("[setupWebView] tab=\(self.id, privacy: .public) name=\(self.name, privacy: .public) currentURL=\(self.url.absoluteString, privacy: .public) hasManager=\(self.browserManager != nil)")
         let resolvedProfile = resolveProfile()
         let configuration: WKWebViewConfiguration
         if let profile = resolvedProfile {
             configuration = BrowserConfiguration.shared.cacheOptimizedWebViewConfiguration(for: profile)
         } else {
             // Edge case: currentProfile not yet available. Delay creating WKWebView until it resolves.
-            Self.log.debug("[setupWebView] Deferring webView creation for tab=\(self.id, privacy: .public); awaiting profile resolution")
             if profileAwaitCancellable == nil {
                 print("[Tab] No profile resolved yet; deferring WebView creation and observing currentProfile…")
                 profileAwaitCancellable = browserManager?
@@ -590,7 +586,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
 
     func loadURL(_ newURL: URL) {
-        Self.log.debug("[loadURL] tab=\(self.id, privacy: .public) requesting=\(newURL.absoluteString, privacy: .public) hasWebView=\(self._webView != nil)")
         self.url = newURL
         loadingState = .didStartProvisionalNavigation
         
@@ -619,7 +614,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         Task { @MainActor in
             await fetchAndSetFavicon(for: newURL)
         }
-        Self.log.debug("[loadURL] tab=\(self.id, privacy: .public) issued navigation to=\(newURL.absoluteString, privacy: .public)")
     }
 
     func loadURL(_ urlString: String) {
@@ -1198,10 +1192,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     func loadWebViewIfNeeded() {
         if _webView == nil {
             print("🔄 [Tab] Loading webview for: \(name)")
-            Self.log.debug("[loadWebViewIfNeeded] Preparing new webView for tab=\(self.id, privacy: .public)" )
             setupWebView()
-        } else {
-            Self.log.debug("[loadWebViewIfNeeded] Reusing existing webView for tab=\(self.id, privacy: .public)")
         }
     }
     
