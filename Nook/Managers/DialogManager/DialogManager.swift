@@ -85,15 +85,26 @@ protocol DialogPresentable: View {
     @ViewBuilder func dialogHeader() -> DialogHeader
     @ViewBuilder func dialogContent() -> DialogContent
     @ViewBuilder func dialogFooter() -> DialogFooter
+    @ViewBuilder func dialogChrome(header: DialogHeader, content: DialogContent, footer: DialogFooter) -> AnyView
 }
 
 extension DialogPresentable {
-    var body: some View {
-        StandardDialog(
-            header: { dialogHeader() },
-            content: { dialogContent() },
-            footer: { dialogFooter() }
+    @ViewBuilder
+    func dialogChrome(header: DialogHeader, content: DialogContent, footer: DialogFooter) -> AnyView {
+        AnyView(
+            StandardDialog(
+                header: { header },
+                content: { content },
+                footer: { footer }
+            )
         )
+    }
+
+    var body: some View {
+        let header = dialogHeader()
+        let content = dialogContent()
+        let footer = dialogFooter()
+        return dialogChrome(header: header, content: content, footer: footer)
     }
 }
 
