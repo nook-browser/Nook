@@ -31,7 +31,7 @@ final class BasicAuthCredentialStore {
         guard !host.isEmpty else { return nil }
 
         #if canImport(Security)
-        var query: [String: Any] = [
+        let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: host,

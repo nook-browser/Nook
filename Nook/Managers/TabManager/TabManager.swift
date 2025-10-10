@@ -510,7 +510,7 @@ class TabManager: ObservableObject {
 
     deinit {
         // MEMORY LEAK FIX: Clean up all tab references and break potential cycles
-        Task { @MainActor in
+        MainActor.assumeIsolated {
             tabsBySpace.removeAll()
             spacePinnedTabs.removeAll()
             foldersBySpace.removeAll()
@@ -520,9 +520,9 @@ class TabManager: ObservableObject {
             currentTab = nil
             currentSpace = nil
             browserManager = nil
-
-            print("🧹 [TabManager] Cleaned up all tab resources")
         }
+
+        print("🧹 [TabManager] Cleaned up all tab resources")
     }
 
     // MARK: - Convenience
@@ -681,7 +681,7 @@ class TabManager: ObservableObject {
         // Add at end first, then reposition next to anchor if provided.
         addTab(newTab)
 
-        if let a = anchor, let sid = a.spaceId, var arr = tabsBySpace[sid] {
+        if let a = anchor, let sid = a.spaceId, let arr = tabsBySpace[sid] {
             // Find indices in current ordering
             if let anchorIndex = arr.firstIndex(where: { $0.id == a.id }),
                let newIndex = arr.firstIndex(where: { $0.id == newTab.id })
@@ -863,7 +863,7 @@ class TabManager: ObservableObject {
     }
 
     func renameFolder(_ folderId: UUID, newName: String) {
-        for (spaceId, folders) in foldersBySpace {
+        for (_, folders) in foldersBySpace {
             if let folder = folders.first(where: { $0.id == folderId }) {
                 folder.name = newName
                 // SwiftUI will automatically detect changes to @Published foldersBySpace
@@ -1376,7 +1376,7 @@ class TabManager: ObservableObject {
                 persistSnapshot()
             }
 
-        case (.folder(let fromFolderId), .essentials):
+        case (.folder(_), .essentials):
             // Move from folder to essentials
             guard browserManager?.currentProfile?.id != nil else { return }
             guard let originalSpaceId = tab.spaceId else { return }
@@ -1422,7 +1422,7 @@ class TabManager: ObservableObject {
             setSpacePinnedTabs(destination, for: spaceId)
             persistSnapshot()
 
-        case (.folder(let fromFolderId), .spaceRegular(let spaceId)):
+        case (.folder(_), .spaceRegular(let spaceId)):
             // Move from folder to regular space
             guard let originalSpaceId = tab.spaceId else { return }
 
@@ -2299,7 +2299,7 @@ extension TabManager {
             t.browserManager = bm
         }
         // Assign any pinned tabs that were loaded without a profile once currentProfile is known
-        if let pid = browserManager?.currentProfile?.id, !pendingPinnedWithoutProfile.isEmpty {
+        if browserManager?.currentProfile?.id != nil, !pendingPinnedWithoutProfile.isEmpty {
             // Set browserManager on those tabs
             for t in pendingPinnedWithoutProfile { t.browserManager = bm }
             withCurrentProfilePinnedArray { arr in
@@ -2639,7 +2639,7 @@ extension TabManager {
         guard let tabs = tabsBySpace[spaceId] else { return }
 
         // Find the current tab's index
-        guard let currentIndex = tabs.firstIndex(where: { $0.id == tab.id }) else { return }
+        guard tabs.firstIndex(where: { $0.id == tab.id }) != nil else { return }
 
         // Get all tabs below the current tab (higher index values)
         let tabsBelow = tabs.filter { $0.index > tab.index }
@@ -2664,7 +2664,6 @@ extension TabManager {
         // This is a copy of removeTab but without the tracking call
         let wasCurrent = (currentTab?.id == id)
         var removed: Tab?
-        var removedSpaceId: UUID?
         var removedIndexInCurrentSpace: Int?
 
         for space in spaces {
@@ -2673,7 +2672,6 @@ extension TabManager {
                 let i = spacePinned.firstIndex(where: { $0.id == id })
             {
                 if i < spacePinned.count { removed = spacePinned.remove(at: i) }
-                removedSpaceId = space.id
                 removedIndexInCurrentSpace =
                     (space.id == currentSpace?.id) ? i : nil
                 setSpacePinnedTabs(spacePinned, for: space.id)
@@ -2684,7 +2682,6 @@ extension TabManager {
                 let i = arr.firstIndex(where: { $0.id == id })
             {
                 if i < arr.count { removed = arr.remove(at: i) }
-                removedSpaceId = space.id
                 removedIndexInCurrentSpace =
                     (space.id == currentSpace?.id) ? i : nil
                 setTabs(arr, for: space.id)

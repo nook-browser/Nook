@@ -144,7 +144,7 @@ struct PrivacySettingsView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     // Activated: Block cross‑site tracking via content rules + iframe cookie shim
                     Toggle("Block Cross-Site Tracking", isOn: $browserManager.settingsManager.blockCrossSiteTracking)
-                        .onChange(of: browserManager.settingsManager.blockCrossSiteTracking) { enabled in
+                        .onChange(of: browserManager.settingsManager.blockCrossSiteTracking) { _, enabled in
                             browserManager.trackingProtectionManager.setEnabled(enabled)
                         }
 

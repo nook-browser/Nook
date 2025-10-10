@@ -1224,9 +1224,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         guard !isMonitoringNativeAudio else { return }
         isMonitoringNativeAudio = true
         
-        audioMonitoringTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.checkNativeAudioActivity()
-        }
+        audioMonitoringTimer = Timer.scheduledTimer(timeInterval: 1.0, target: self, selector: #selector(handleNativeAudioMonitoringTimer(_:)), userInfo: nil, repeats: true)
         
         setupAudioSessionNotifications()
     }
@@ -1298,6 +1296,10 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             hasAddedCoreAudioListener = false
             audioDeviceListenerProc = nil
         }
+    }
+    
+    @objc private func handleNativeAudioMonitoringTimer(_ timer: Timer) {
+        checkNativeAudioActivity()
     }
     
     private func checkNativeAudioActivity() {
@@ -1492,7 +1494,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             updateBackgroundColor(from: webView)
         } else if (keyPath == "canGoBack" || keyPath == "canGoForward"), let webView = object as? WKWebView {
             // Real-time navigation state updates from KVO observers
-            print("🔄 [Tab] KVO navigation state change for \(name): \(keyPath) = \(webView.canGoBack), \(webView.canGoForward)")
+            let observedKeyPath = keyPath ?? "<unknown>"
+            print("🔄 [Tab] KVO navigation state change for \(name): \(observedKeyPath) = \(webView.canGoBack), \(webView.canGoForward)")
             updateNavigationState()
         } else {
             super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
@@ -2597,9 +2600,7 @@ extension Tab: WKUIDelegate {
         newWebView.allowsMagnification = true
         
         // Set the owning tab reference
-        if let fv = newWebView as? FocusableWKWebView {
-            fv.owningTab = newTab
-        }
+        newWebView.owningTab = newTab
         
         // Store the webView in the new tab
         newTab._webView = newWebView

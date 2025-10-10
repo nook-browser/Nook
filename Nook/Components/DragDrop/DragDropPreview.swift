@@ -97,20 +97,23 @@ class MockTabManager: ObservableObject {
         print("🎯 Mock drag operation: \(operation.fromContainer) → \(operation.toContainer) at \(operation.toIndex)")
 #endif
         
+        guard let mockTab = mockTab(for: operation.tab.id) else {
+#if DEBUG
+            print("❌ Mock tab not found for drag operation: \(operation.tab.id)")
+#endif
+            return
+        }
+        
         // Mock implementation - just reorder within same container for now
         switch (operation.fromContainer, operation.toContainer) {
         case (.essentials, .essentials):
-            reorderGlobalPinned(operation.tab as! MockTab, to: operation.toIndex)
+            reorderGlobalPinned(mockTab, to: operation.toIndex)
             
-        case (.spacePinned(let spaceId), .spacePinned(let toSpaceId)):
-            if spaceId == toSpaceId {
-                reorderSpacePinned(operation.tab as! MockTab, in: spaceId, to: operation.toIndex)
-            }
+        case (.spacePinned(let spaceId), .spacePinned(let toSpaceId)) where spaceId == toSpaceId:
+            reorderSpacePinned(mockTab, in: spaceId, to: operation.toIndex)
             
-        case (.spaceRegular(let spaceId), .spaceRegular(let toSpaceId)):
-            if spaceId == toSpaceId {
-                reorderRegular(operation.tab as! MockTab, in: spaceId, to: operation.toIndex)
-            }
+        case (.spaceRegular(let spaceId), .spaceRegular(let toSpaceId)) where spaceId == toSpaceId:
+            reorderRegular(mockTab, in: spaceId, to: operation.toIndex)
             
         default:
 #if DEBUG
@@ -145,6 +148,23 @@ class MockTabManager: ObservableObject {
         tabs.insert(tab, at: clampedIndex)
         updateIndices(&tabs)
         regularTabs[spaceId] = tabs
+    }
+    
+    private func mockTab(for id: UUID) -> MockTab? {
+        if let tab = globalPinnedTabs.first(where: { $0.id == id }) {
+            return tab
+        }
+        for (_, tabs) in spacePinnedTabs {
+            if let tab = tabs.first(where: { $0.id == id }) {
+                return tab
+            }
+        }
+        for (_, tabs) in regularTabs {
+            if let tab = tabs.first(where: { $0.id == id }) {
+                return tab
+            }
+        }
+        return nil
     }
     
     private func updateIndices(_ tabs: inout [MockTab]) {
@@ -453,10 +473,10 @@ struct DragDropPreview: View {
                     Text("Debug Info:")
                         .font(.caption)
                         .fontWeight(.bold)
-                    Text("Is Dragging: \(dragManager.isDragging)")
-                    Text("Dragged Tab: \(dragManager.draggedTab?.name ?? "None")")
-                    Text("Insertion Index: \(dragManager.insertionIndex)")
-                    Text("Show Line: \(dragManager.showInsertionLine)")
+                    Text(#"Is Dragging: \#(dragManager.isDragging.description)"#)
+                    Text(#"Dragged Tab: \#(dragManager.draggedTab?.name ?? "None")"#)
+                    Text(#"Insertion Index: \#(dragManager.insertionIndex.description)"#)
+                    Text(#"Show Line: \#(dragManager.showInsertionLine.description)"#)
                 }
                 .font(.caption)
                 .foregroundColor(.secondary)
