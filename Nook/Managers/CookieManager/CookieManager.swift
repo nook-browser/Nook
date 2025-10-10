@@ -42,7 +42,7 @@ class CookieManager: ObservableObject {
     func loadCookies() async {
         isLoading = true
         
-        let httpCookies = await dataStore.httpCookieStore.allCookies()
+        let httpCookies = await dataStore.httpCookieStore.allCookiesAsync()
         let cookieInfos = httpCookies.map { CookieInfo(from: $0) }
         
         self.cookies = cookieInfos
@@ -52,46 +52,46 @@ class CookieManager: ObservableObject {
     
     func deleteCookie(_ cookie: CookieInfo) async {
         // Find the original HTTPCookie
-        let httpCookies = await dataStore.httpCookieStore.allCookies()
+        let httpCookies = await dataStore.httpCookieStore.allCookiesAsync()
         
         if let httpCookie = httpCookies.first(where: { 
             $0.name == cookie.name && $0.domain == cookie.domain && $0.path == cookie.path 
         }) {
-            dataStore.httpCookieStore.delete(httpCookie)
+            await dataStore.httpCookieStore.deleteCookieAsync(httpCookie)
         }
         await loadCookies() // Refresh the list
     }
     
     func deleteCookiesForDomain(_ domain: String) async {
-        let httpCookies = await dataStore.httpCookieStore.allCookies()
+        let httpCookies = await dataStore.httpCookieStore.allCookiesAsync()
         let domainCookies = httpCookies.filter { $0.domain == domain || $0.domain == ".\(domain)" }
         
         for cookie in domainCookies {
-            dataStore.httpCookieStore.delete(cookie)
+            await dataStore.httpCookieStore.deleteCookieAsync(cookie)
         }
         
         await loadCookies() // Refresh the list
     }
     
     func deleteAllCookies() async {
-        let httpCookies = await dataStore.httpCookieStore.allCookies()
+        let httpCookies = await dataStore.httpCookieStore.allCookiesAsync()
         
         for cookie in httpCookies {
-            dataStore.httpCookieStore.delete(cookie)
+            await dataStore.httpCookieStore.deleteCookieAsync(cookie)
         }
         
         await loadCookies() // Refresh the list
     }
     
     func deleteExpiredCookies() async {
-        let httpCookies = await dataStore.httpCookieStore.allCookies()
+        let httpCookies = await dataStore.httpCookieStore.allCookiesAsync()
         let expiredCookies = httpCookies.filter { cookie in
             guard let expiresDate = cookie.expiresDate else { return false }
             return expiresDate < Date()
         }
         
         for cookie in expiredCookies {
-            dataStore.httpCookieStore.delete(cookie)
+            await dataStore.httpCookieStore.deleteCookieAsync(cookie)
         }
         
         await loadCookies() // Refresh the list
@@ -100,7 +100,7 @@ class CookieManager: ObservableObject {
     // MARK: - Privacy-Compliant Cookie Management
     
     func deleteHighRiskCookies() async {
-        let httpCookies = await dataStore.httpCookieStore.allCookies()
+        let httpCookies = await dataStore.httpCookieStore.allCookiesAsync()
         let cookieInfos = httpCookies.map { CookieInfo(from: $0) }
         let highRiskCookies = cookieInfos.filter { $0.privacyRisk == .high }
         
@@ -108,7 +108,7 @@ class CookieManager: ObservableObject {
             if let httpCookie = httpCookies.first(where: { 
                 $0.name == cookieInfo.name && $0.domain == cookieInfo.domain && $0.path == cookieInfo.path 
             }) {
-                dataStore.httpCookieStore.delete(httpCookie)
+                await dataStore.httpCookieStore.deleteCookieAsync(httpCookie)
             }
         }
         
@@ -116,7 +116,7 @@ class CookieManager: ObservableObject {
     }
     
     func deleteNonCompliantCookies() async {
-        let httpCookies = await dataStore.httpCookieStore.allCookies()
+        let httpCookies = await dataStore.httpCookieStore.allCookiesAsync()
         let cookieInfos = httpCookies.map { CookieInfo(from: $0) }
         let nonCompliantCookies = cookieInfos.filter { !$0.complianceIssues.isEmpty }
         
@@ -124,7 +124,7 @@ class CookieManager: ObservableObject {
             if let httpCookie = httpCookies.first(where: { 
                 $0.name == cookieInfo.name && $0.domain == cookieInfo.domain && $0.path == cookieInfo.path 
             }) {
-                dataStore.httpCookieStore.delete(httpCookie)
+                await dataStore.httpCookieStore.deleteCookieAsync(httpCookie)
             }
         }
         
@@ -132,11 +132,11 @@ class CookieManager: ObservableObject {
     }
     
     func deleteThirdPartyCookies() async {
-        let httpCookies = await dataStore.httpCookieStore.allCookies()
+        let httpCookies = await dataStore.httpCookieStore.allCookiesAsync()
         let thirdPartyCookies = httpCookies.filter { $0.domain.hasPrefix(".") }
         
         for cookie in thirdPartyCookies {
-            dataStore.httpCookieStore.delete(cookie)
+            await dataStore.httpCookieStore.deleteCookieAsync(cookie)
         }
         
         await loadCookies()
@@ -259,5 +259,27 @@ extension CookieManager {
         details["Expires"] = cookie.expirationStatus
         
         return details
+    }
+}
+
+// MARK: - Async WKHTTPCookieStore Bridging
+
+extension WKHTTPCookieStore {
+    /// Async wrapper for `getAllCookies` that bridges the completion-handler API into Swift concurrency.
+    func allCookiesAsync() async -> [HTTPCookie] {
+        await withCheckedContinuation { continuation in
+            self.getAllCookies { cookies in
+                continuation.resume(returning: cookies)
+            }
+        }
+    }
+    
+    /// Async wrapper for `delete(_:completionHandler:)` to make each deletion awaitable.
+    func deleteCookieAsync(_ cookie: HTTPCookie) async {
+        await withCheckedContinuation { continuation in
+            self.delete(cookie) {
+                continuation.resume()
+            }
+        }
     }
 }

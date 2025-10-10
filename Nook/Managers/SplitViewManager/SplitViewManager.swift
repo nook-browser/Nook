@@ -121,7 +121,6 @@ final class SplitViewManager: ObservableObject {
         var state = getSplitState(for: windowId)
         guard state.isSplit else { return }
         
-        let keepTabId = keep == .left ? state.leftTabId : state.rightTabId
         state.isSplit = false
         state.leftTabId = nil
         state.rightTabId = nil

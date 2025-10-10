@@ -47,9 +47,9 @@ struct ExampleGridToPageView: View {
                 .scenePadding()
             }
             // ...keep scroll view in sync with the PageView
-            .onChange(of: selection) { _ in
-                if isOpen == true && openedSelection != selection {
-                    scrollView.scrollTo(selection, anchor: .center)
+            .onChange(of: selection) { _, newSelection in
+                if isOpen == true && openedSelection != newSelection {
+                    scrollView.scrollTo(newSelection, anchor: .center)
                 }
             }
         }

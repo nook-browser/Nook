@@ -125,17 +125,17 @@ struct DitheredGradientView: View {
             .onAppear {
                 renderer.update(gradient: gradient, size: renderSize, scale: renderScale, allowDithering: !(gradientColorManager.isAnimating || gradientColorManager.isEditing))
             }
-            .onChange(of: gradient) { g in
+            .onChange(of: gradient) { _, g in
                 renderer.update(gradient: g, size: renderSize, scale: renderScale, allowDithering: !(gradientColorManager.isAnimating || gradientColorManager.isEditing))
             }
-            .onChange(of: logicalSize) { _ in
+            .onChange(of: logicalSize) {
                 renderer.update(gradient: gradient, size: renderSize, scale: renderScale, allowDithering: !(gradientColorManager.isAnimating || gradientColorManager.isEditing))
             }
-            .onChange(of: gradientColorManager.isAnimating) { anim in
+            .onChange(of: gradientColorManager.isAnimating) { _, anim in
                 // When animation toggles off, generate the high-quality image
                 renderer.update(gradient: gradient, size: renderSize, scale: renderScale, allowDithering: !(anim || gradientColorManager.isEditing))
             }
-            .onChange(of: gradientColorManager.isEditing) { editing in
+            .onChange(of: gradientColorManager.isEditing) { _, editing in
                 renderer.update(gradient: gradient, size: renderSize, scale: renderScale, allowDithering: !(gradientColorManager.isAnimating || editing))
             }
         }

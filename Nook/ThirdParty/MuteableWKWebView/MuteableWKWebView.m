@@ -40,7 +40,7 @@ static SetMuteFunc sMuteFunc = NULL;
     self.mute = isMuted ? _WKMediaAudioMuted : _WKMediaNoneMuted;
 }
 
-NSString *symbolName() {
+static NSString *symbolName(void) {
     if( sSymbolName ) return sSymbolName;
     
     static BOOL isFirst = YES;
@@ -52,7 +52,7 @@ NSString *symbolName() {
     return sSymbolName;
 }
 
-SetMuteFunc getSetMuteFunc() {
+static SetMuteFunc getSetMuteFunc(void) {
     if( sMuteFunc ) return sMuteFunc;
     
     static BOOL isFirst = YES;

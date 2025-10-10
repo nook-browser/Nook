@@ -55,7 +55,7 @@ struct WebsiteView: View {
     var body: some View {
         ZStack() {
             Group {
-                if let currentTab = browserManager.currentTab(for: windowState) {
+                if browserManager.currentTab(for: windowState) != nil {
                     GeometryReader { proxy in
                         TabCompositorWrapper(
                             browserManager: browserManager,
@@ -513,8 +513,6 @@ struct TabWebViewWrapper: NSViewRepresentable {
     @Binding var isCommandPressed: Bool
 
     func makeNSView(context: Context) -> WKWebView {
-        let webView = tab.webView
-        
         // Set up link hover callback
         tab.onLinkHover = { [self] href in
             DispatchQueue.main.async {
