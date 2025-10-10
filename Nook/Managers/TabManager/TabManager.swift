@@ -47,6 +47,8 @@ import OSLog
         let currentURLString: String?
         let canGoBack: Bool
         let canGoForward: Bool
+        let faviconData: Data?
+        let faviconCacheKey: String?
     }
 
     struct SnapshotFolder: Codable {
@@ -218,6 +220,8 @@ import OSLog
             e.currentURLString = t.currentURLString
             e.canGoBack = t.canGoBack
             e.canGoForward = t.canGoForward
+            e.faviconData = t.faviconData
+            e.faviconCacheKey = t.faviconCacheKey
         } else {
             let e = TabEntity(
                 id: t.id,
@@ -231,7 +235,9 @@ import OSLog
                 folderId: t.folderId,
                 currentURLString: t.currentURLString,
                 canGoBack: t.canGoBack,
-                canGoForward: t.canGoForward
+                canGoForward: t.canGoForward,
+                faviconData: t.faviconData,
+                faviconCacheKey: t.faviconCacheKey
             )
             ctx.insert(e)
         }
@@ -1846,6 +1852,7 @@ class TabManager: ObservableObject {
         // Restore navigation state
         t.canGoBack = e.canGoBack
         t.canGoForward = e.canGoForward
+        t.applyPersistedFavicon(data: e.faviconData, cacheKey: e.faviconCacheKey)
 
         return t
     }
@@ -2124,7 +2131,9 @@ class TabManager: ObservableObject {
                     folderId: t.folderId,
                     currentURLString: t.url.absoluteString,
                     canGoBack: t.canGoBack,
-                    canGoForward: t.canGoForward
+                    canGoForward: t.canGoForward,
+                    faviconData: t.faviconPNGData,
+                    faviconCacheKey: t.faviconCacheKey
                 ))
             }
         }
@@ -2146,7 +2155,9 @@ class TabManager: ObservableObject {
                     folderId: t.folderId,
                     currentURLString: t.url.absoluteString,
                     canGoBack: t.canGoBack,
-                    canGoForward: t.canGoForward
+                    canGoForward: t.canGoForward,
+                    faviconData: t.faviconPNGData,
+                    faviconCacheKey: t.faviconCacheKey
                 ))
             }
             // Regular tabs for this space
@@ -2165,7 +2176,9 @@ class TabManager: ObservableObject {
                     folderId: t.folderId,
                     currentURLString: t.url.absoluteString,
                     canGoBack: t.canGoBack,
-                    canGoForward: t.canGoForward
+                    canGoForward: t.canGoForward,
+                    faviconData: t.faviconPNGData,
+                    faviconCacheKey: t.faviconCacheKey
                 ))
             }
         }
