@@ -1153,7 +1153,7 @@ class TabManager: ObservableObject {
 
         let newTab = Tab(
             url: validURL,
-            name: "New Tab",
+            name: Tab.defaultDisplayName(for: validURL),
             favicon: "globe",
             spaceId: sid,
             index: 0, // New tabs get index 0 to appear at top
@@ -1185,7 +1185,7 @@ class TabManager: ObservableObject {
         let blankURL = URL(string: "about:blank") ?? URL(string: "https://example.com")!
         let newTab = Tab(
             url: blankURL,
-            name: "New Tab",
+            name: Tab.defaultDisplayName(for: blankURL),
             favicon: "globe",
             spaceId: sid,
             index: nextIndex,

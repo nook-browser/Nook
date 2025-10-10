@@ -181,10 +181,20 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     
 
     // MARK: - Initializers
+    static func defaultDisplayName(for url: URL) -> String {
+        if url.scheme == "about", url.absoluteString == "about:blank" {
+            return "New Tab"
+        }
+        if let host = url.host, !host.isEmpty {
+            return host
+        }
+        return url.absoluteString
+    }
+
     init(
         id: UUID = UUID(),
         url: URL = URL(string: "https://www.google.com")!,
-        name: String = "New Tab",
+        name: String? = nil,
         favicon: String = "globe",
         spaceId: UUID? = nil,
         index: Int = 0,
@@ -192,7 +202,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     ) {
         self.id = id
         self.url = url
-        self.name = name
+        self.name = name ?? Tab.defaultDisplayName(for: url)
         self.favicon = Image(systemName: favicon)
         self.spaceId = spaceId
         self.index = index
@@ -207,14 +217,14 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     public init(
         id: UUID = UUID(),
         url: URL = URL(string: "https://www.google.com")!,
-        name: String = "New Tab",
+        name: String? = nil,
         favicon: String = "globe",
         spaceId: UUID? = nil,
         index: Int = 0
     ) {
         self.id = id
         self.url = url
-        self.name = name
+        self.name = name ?? Tab.defaultDisplayName(for: url)
         self.favicon = Image(systemName: favicon)
         self.spaceId = spaceId
         self.index = index
