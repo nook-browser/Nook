@@ -272,6 +272,7 @@ struct GeneralSettingsView: View {
                                             .trimmingCharacters(in: .whitespacesAndNewlines)
                                         browserManager.settingsManager.startupTabURL = trimmed
                                         startupURLFocused = false
+                                        NSApp.keyWindow?.makeFirstResponder(nil)
                                     }
                                     .disabled(browserManager.settingsManager.restoreSessionOnLaunch)
                                 }
@@ -358,6 +359,10 @@ struct GeneralSettingsView: View {
                                     SecureField("Enter API Key", text: $browserManager.settingsManager.geminiApiKey)
                                         .textFieldStyle(.roundedBorder)
                                         .frame(width: 220)
+                                        .submitLabel(.done)
+                                        .onSubmit {
+                                            NSApp.keyWindow?.makeFirstResponder(nil)
+                                        }
                                 }
                                 
                                 Text("Get your API key from Google AI Studio")
@@ -461,13 +466,19 @@ struct GeneralSettingsView: View {
             }
             .contentShape(Rectangle())
             .gesture(
-                TapGesture().onEnded { startupURLFocused = false },
+                TapGesture().onEnded {
+                    NSApp.keyWindow?.makeFirstResponder(nil)
+                    startupURLFocused = false
+                },
                 including: .gesture
             )
         }
         .contentShape(Rectangle())
         .gesture(
-            TapGesture().onEnded { startupURLFocused = false },
+            TapGesture().onEnded {
+                NSApp.keyWindow?.makeFirstResponder(nil)
+                startupURLFocused = false
+            },
             including: .gesture
         )
         .frame(minHeight: 480)
@@ -1154,6 +1165,10 @@ struct ShortcutsSettingsView: View {
                 TextField("Search shortcuts...", text: $searchText)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 240)
+                    .submitLabel(.done)
+                    .onSubmit {
+                        NSApp.keyWindow?.makeFirstResponder(nil)
+                    }
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
