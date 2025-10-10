@@ -2044,20 +2044,31 @@ class TabManager: ObservableObject {
             // If no tabs exist, create a default tab with Google.com
             if self.currentTab == nil {
                 let settings = browserManager?.settingsManager
-                switch settings?.startupTabMode ?? .customURL {
+                let mode = settings?.startupTabMode ?? .customURL
+                print("[startup] loadFromStore fallback triggered; mode=\(mode.rawValue) rawURL=\(settings?.startupTabURL ?? "nil") restore=\(settings?.restoreSessionOnLaunch ?? true)")
+                switch mode {
                 case .customURL:
                     let raw = (settings?.startupTabURL ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                     let urlString = raw.isEmpty ? SettingsManager.defaultStartupURL : raw
-                    print("🆕 [TabManager] No tabs found, creating startup tab for \(urlString)")
+                    print("[startup] Creating fallback tab for URL=\(urlString)")
                     let defaultTab = createNewTab(url: urlString, in: currentSpace)
                     self.currentTab = defaultTab
                 case .none:
-                    print("🆕 [TabManager] No startup tab requested; leaving window empty")
+                    print("[startup] Mode=none; leaving session empty")
                     self.currentTab = nil
+                }
+            } else {
+                if let current = self.currentTab {
+                    print("[startup] Existing currentTab=\(current.name) id=\(current.id)")
                 }
             }
 
-            if let ct = self.currentTab { _ = ct.webView }
+            if let ct = self.currentTab {
+                print("[startup] Prewarming webView for currentTab id=\(ct.id)")
+                _ = ct.webView
+            } else {
+                print("[startup] No current tab after loadFromStore")
+            }
             print(
                 "Current Space: \(currentSpace?.name ?? "None"), Tab: \(currentTab?.name ?? "None")"
             )
@@ -2251,13 +2262,16 @@ extension TabManager {
 
         let defaultSpace = ensureDefaultSpaceIfNeeded()
         let settings = browserManager?.settingsManager
-        switch settings?.startupTabMode ?? .customURL {
+        let mode = settings?.startupTabMode ?? .customURL
+        print("[startup] bootstrapFreshSession mode=\(mode.rawValue) rawURL=\(settings?.startupTabURL ?? "nil") restore=\(settings?.restoreSessionOnLaunch ?? true)")
+        switch mode {
         case .customURL:
             let raw = (settings?.startupTabURL ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let urlString = raw.isEmpty ? SettingsManager.defaultStartupURL : raw
+            print("[startup] Creating fresh-session tab for URL=\(urlString)")
             _ = createNewTab(url: urlString, in: defaultSpace)
         case .none:
-            break
+            print("[startup] Fresh session will start empty")
         }
         spacesLoaded = true
     }
