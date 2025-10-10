@@ -152,11 +152,9 @@ struct GeneralSettingsView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
-            // Hero card
             SettingsHeroCard()
                 .frame(width: 320, height: 420)
 
-            // Right side stacked cards
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     SettingsSectionCard(
