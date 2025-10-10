@@ -459,7 +459,17 @@ struct GeneralSettingsView: View {
                 }
                 .padding(.trailing, 4)
             }
+            .contentShape(Rectangle())
+            .gesture(
+                TapGesture().onEnded { startupURLFocused = false },
+                including: .gesture
+            )
         }
+        .contentShape(Rectangle())
+        .gesture(
+            TapGesture().onEnded { startupURLFocused = false },
+            including: .gesture
+        )
         .frame(minHeight: 480)
     }
 }
