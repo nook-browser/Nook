@@ -25,6 +25,7 @@ class SettingsManager {
     private let geminiApiKeyKey = "settings.geminiApiKey"
     private let geminiModelKey = "settings.geminiModel"
     private let showAIAssistantKey = "settings.showAIAssistant"
+    private let borderlessKey = "settings.borderless"
     var currentSettingsTab: SettingsTabs = .general
 
     // Stored properties
@@ -116,6 +117,12 @@ class SettingsManager {
             userDefaults.set(showAIAssistant, forKey: showAIAssistantKey)
         }
     }
+    
+    var borderless: Bool {
+        didSet {
+            userDefaults.set(borderless, forKey: borderlessKey)
+        }
+    }
 
     init() {
         // Register default values
@@ -133,7 +140,8 @@ class SettingsManager {
             experimentalExtensionsKey: false,
             geminiApiKeyKey: "",
             geminiModelKey: GeminiModel.flash.rawValue,
-            showAIAssistantKey: true
+            showAIAssistantKey: true,
+            borderlessKey: false
         ])
 
         // Initialize properties from UserDefaults
@@ -161,6 +169,7 @@ class SettingsManager {
         self.geminiApiKey = userDefaults.string(forKey: geminiApiKeyKey) ?? ""
         self.geminiModel = GeminiModel(rawValue: userDefaults.string(forKey: geminiModelKey) ?? GeminiModel.flash.rawValue) ?? .flash
         self.showAIAssistant = userDefaults.bool(forKey: showAIAssistantKey)
+        self.borderless = userDefaults.bool(forKey: borderlessKey)
     }
 }
 
