@@ -521,8 +521,14 @@ class BrowserManager: ObservableObject {
         let initialProfile = self.profileManager.profiles.first
         self.currentProfile = initialProfile
 
-        self.tabManager = TabManager(browserManager: nil, context: modelContext)
         self.settingsManager = SettingsManager()
+        self.tabManager = TabManager(
+            browserManager: nil,
+            context: modelContext,
+            startupMode: self.settingsManager.startupTabMode,
+            startupURL: self.settingsManager.startupTabURL,
+            restoreSessionEnabled: self.settingsManager.restoreSessionOnLaunch
+        )
         self.dialogManager = DialogManager()
         self.downloadManager = DownloadManager.shared
         self.authenticationManager = AuthenticationManager()

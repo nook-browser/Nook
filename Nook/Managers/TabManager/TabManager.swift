@@ -488,11 +488,23 @@ class TabManager: ObservableObject {
 
     // Currently active tab
     private(set) var currentTab: Tab?
+    private let initialStartupMode: StartupTabMode
+    private let initialStartupURL: String
+    private let initialRestoreSession: Bool
 
-    init(browserManager: BrowserManager? = nil, context: ModelContext) {
+    init(
+        browserManager: BrowserManager? = nil,
+        context: ModelContext,
+        startupMode: StartupTabMode,
+        startupURL: String,
+        restoreSessionEnabled: Bool
+    ) {
         self.browserManager = browserManager
         self.context = context
         self.persistence = PersistenceActor(container: context.container)
+        self.initialStartupMode = startupMode
+        self.initialStartupURL = startupURL
+        self.initialRestoreSession = restoreSessionEnabled
         loadFromStore()
     }
 
@@ -1858,8 +1870,8 @@ class TabManager: ObservableObject {
 
     private func loadFromStore() {
         spacesLoaded = false
-        if let bm = browserManager,
-           bm.settingsManager.restoreSessionOnLaunch == false {
+        let restoreEnabled = browserManager?.settingsManager.restoreSessionOnLaunch ?? initialRestoreSession
+        if restoreEnabled == false {
             bootstrapFreshSession()
             Task.detached { [weak self] in
                 guard let self else { return }
@@ -2044,11 +2056,13 @@ class TabManager: ObservableObject {
             // If no tabs exist, create a default tab with Google.com
             if self.currentTab == nil {
                 let settings = browserManager?.settingsManager
-                let mode = settings?.startupTabMode ?? .customURL
-                print("[startup] loadFromStore fallback triggered; mode=\(mode.rawValue) rawURL=\(settings?.startupTabURL ?? "nil") restore=\(settings?.restoreSessionOnLaunch ?? true)")
+                let mode = settings?.startupTabMode ?? initialStartupMode
+                let rawURL = settings?.startupTabURL ?? initialStartupURL
+                let restore = settings?.restoreSessionOnLaunch ?? initialRestoreSession
+                print("[startup] loadFromStore fallback triggered; mode=\(mode.rawValue) rawURL=\(rawURL) restore=\(restore)")
                 switch mode {
                 case .customURL:
-                    let raw = (settings?.startupTabURL ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                    let raw = rawURL.trimmingCharacters(in: .whitespacesAndNewlines)
                     let urlString = raw.isEmpty ? SettingsManager.defaultStartupURL : raw
                     print("[startup] Creating fallback tab for URL=\(urlString)")
                     let defaultTab = createNewTab(url: urlString, in: currentSpace)
@@ -2262,11 +2276,13 @@ extension TabManager {
 
         let defaultSpace = ensureDefaultSpaceIfNeeded()
         let settings = browserManager?.settingsManager
-        let mode = settings?.startupTabMode ?? .customURL
-        print("[startup] bootstrapFreshSession mode=\(mode.rawValue) rawURL=\(settings?.startupTabURL ?? "nil") restore=\(settings?.restoreSessionOnLaunch ?? true)")
+        let mode = settings?.startupTabMode ?? initialStartupMode
+        let rawURL = settings?.startupTabURL ?? initialStartupURL
+        let restore = settings?.restoreSessionOnLaunch ?? initialRestoreSession
+        print("[startup] bootstrapFreshSession mode=\(mode.rawValue) rawURL=\(rawURL) restore=\(restore)")
         switch mode {
         case .customURL:
-            let raw = (settings?.startupTabURL ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let raw = rawURL.trimmingCharacters(in: .whitespacesAndNewlines)
             let urlString = raw.isEmpty ? SettingsManager.defaultStartupURL : raw
             print("[startup] Creating fresh-session tab for URL=\(urlString)")
             _ = createNewTab(url: urlString, in: defaultSpace)

@@ -26,34 +26,34 @@ enum StartupTabMode: String, CaseIterable, Identifiable {
 class SettingsManager {
     let keyboardShortcutManager = KeyboardShortcutManager()
     private let userDefaults = UserDefaults.standard
-    private let materialKey = "settings.currentMaterialRaw"
-    private let searchEngineKey = "settings.searchEngine"
-    private let liquidGlassKey = "settings.isLiquidGlassEnabled"
-    private let tabUnloadTimeoutKey = "settings.tabUnloadTimeout"
-    private let blockXSTKey = "settings.blockCrossSiteTracking"
-    private let debugToggleUpdateNotificationKey = "settings.debugToggleUpdateNotification"
-    private let askBeforeQuitKey = "settings.askBeforeQuit"
-    private let restoreSessionOnLaunchKey = "settings.restoreSessionOnLaunch"
-    private let startupTabModeKey = "settings.startupTabMode"
-    private let startupTabURLKey = "settings.startupTabURL"
-    private let sidebarPositionKey = "settings.sidebarPosition"
-    private let topBarAddressViewKey = "settings.topBarAddressView"
-    private let experimentalExtensionsKey = "settings.experimentalExtensions"
-    private let geminiApiKeyKey = "settings.geminiApiKey"
-    private let geminiModelKey = "settings.geminiModel"
-    private let showAIAssistantKey = "settings.showAIAssistant"
+    private static let materialKey = "settings.currentMaterialRaw"
+    private static let searchEngineKey = "settings.searchEngine"
+    private static let liquidGlassKey = "settings.isLiquidGlassEnabled"
+    private static let tabUnloadTimeoutKey = "settings.tabUnloadTimeout"
+    private static let blockXSTKey = "settings.blockCrossSiteTracking"
+    private static let debugToggleUpdateNotificationKey = "settings.debugToggleUpdateNotification"
+    private static let askBeforeQuitKey = "settings.askBeforeQuit"
+    private static let restoreSessionOnLaunchKey = "settings.restoreSessionOnLaunch"
+    private static let startupTabModeKey = "settings.startupTabMode"
+    private static let startupTabURLKey = "settings.startupTabURL"
+    private static let sidebarPositionKey = "settings.sidebarPosition"
+    private static let topBarAddressViewKey = "settings.topBarAddressView"
+    private static let experimentalExtensionsKey = "settings.experimentalExtensions"
+    private static let geminiApiKeyKey = "settings.geminiApiKey"
+    private static let geminiModelKey = "settings.geminiModel"
+    private static let showAIAssistantKey = "settings.showAIAssistant"
     var currentSettingsTab: SettingsTabs = .general
 
     // Stored properties
     var isLiquidGlassEnabled: Bool {
         didSet {
-            userDefaults.set(isLiquidGlassEnabled, forKey: liquidGlassKey)
+            userDefaults.set(isLiquidGlassEnabled, forKey: Self.liquidGlassKey)
         }
     }
 
     var currentMaterialRaw: Int {
         didSet {
-            userDefaults.set(currentMaterialRaw, forKey: materialKey)
+            userDefaults.set(currentMaterialRaw, forKey: Self.materialKey)
         }
     }
 
@@ -67,13 +67,13 @@ class SettingsManager {
 
     var searchEngine: SearchProvider {
         didSet {
-            userDefaults.set(searchEngine.rawValue, forKey: searchEngineKey)
+            userDefaults.set(searchEngine.rawValue, forKey: Self.searchEngineKey)
         }
     }
     
     var tabUnloadTimeout: TimeInterval {
         didSet {
-            userDefaults.set(tabUnloadTimeout, forKey: tabUnloadTimeoutKey)
+            userDefaults.set(tabUnloadTimeout, forKey: Self.tabUnloadTimeoutKey)
             // Notify compositor manager of timeout change
             NotificationCenter.default.post(name: .tabUnloadTimeoutChanged, object: nil, userInfo: ["timeout": tabUnloadTimeout])
         }
@@ -81,20 +81,20 @@ class SettingsManager {
 
     var blockCrossSiteTracking: Bool {
         didSet {
-            userDefaults.set(blockCrossSiteTracking, forKey: blockXSTKey)
+            userDefaults.set(blockCrossSiteTracking, forKey: Self.blockXSTKey)
             NotificationCenter.default.post(name: .blockCrossSiteTrackingChanged, object: nil, userInfo: ["enabled": blockCrossSiteTracking])
         }
     }
     
     var askBeforeQuit: Bool {
         didSet {
-            userDefaults.set(askBeforeQuit, forKey: askBeforeQuitKey)
+            userDefaults.set(askBeforeQuit, forKey: Self.askBeforeQuitKey)
         }
     }
 
     var restoreSessionOnLaunch: Bool {
         didSet {
-            userDefaults.set(restoreSessionOnLaunch, forKey: restoreSessionOnLaunchKey)
+            userDefaults.set(restoreSessionOnLaunch, forKey: Self.restoreSessionOnLaunchKey)
             NotificationCenter.default.post(
                 name: .sessionPersistenceChanged,
                 object: nil,
@@ -105,88 +105,99 @@ class SettingsManager {
     
     var sidebarPosition: SidebarPosition {
         didSet {
-            userDefaults.set(sidebarPosition.rawValue, forKey: sidebarPositionKey)
+            userDefaults.set(sidebarPosition.rawValue, forKey: Self.sidebarPositionKey)
         }
     }
     
     var topBarAddressView: Bool {
         didSet {
-            userDefaults.set(topBarAddressView, forKey: topBarAddressViewKey)
+            userDefaults.set(topBarAddressView, forKey: Self.topBarAddressViewKey)
         }
     }
 
     var debugToggleUpdateNotification: Bool {
         didSet {
-            userDefaults.set(debugToggleUpdateNotification, forKey: debugToggleUpdateNotificationKey)
+            userDefaults.set(debugToggleUpdateNotification, forKey: Self.debugToggleUpdateNotificationKey)
         }
     }
 
     var experimentalExtensions: Bool {
         didSet {
-            userDefaults.set(experimentalExtensions, forKey: experimentalExtensionsKey)
+            userDefaults.set(experimentalExtensions, forKey: Self.experimentalExtensionsKey)
         }
     }
 
     var geminiApiKey: String {
         didSet {
-            userDefaults.set(geminiApiKey, forKey: geminiApiKeyKey)
+            userDefaults.set(geminiApiKey, forKey: Self.geminiApiKeyKey)
         }
     }
 
     var geminiModel: GeminiModel {
         didSet {
-            userDefaults.set(geminiModel.rawValue, forKey: geminiModelKey)
+            userDefaults.set(geminiModel.rawValue, forKey: Self.geminiModelKey)
         }
     }
 
     var showAIAssistant: Bool {
         didSet {
-            userDefaults.set(showAIAssistant, forKey: showAIAssistantKey)
+            userDefaults.set(showAIAssistant, forKey: Self.showAIAssistantKey)
         }
     }
     
     static let defaultStartupURL = "https://www.google.com"
+
+    static func persistedStartupConfiguration(defaults: UserDefaults = .standard) -> (mode: StartupTabMode, url: String) {
+        let rawMode = defaults.string(forKey: Self.startupTabModeKey)
+        let mode = rawMode.flatMap(StartupTabMode.init(rawValue:)) ?? .customURL
+        let url = defaults.string(forKey: Self.startupTabURLKey) ?? defaultStartupURL
+        return (mode, url)
+    }
+
+    static func persistedRestoreSessionFlag(defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: Self.restoreSessionOnLaunchKey) as? Bool ?? true
+    }
     
     var startupTabMode: StartupTabMode {
         didSet {
-            userDefaults.set(startupTabMode.rawValue, forKey: startupTabModeKey)
+            userDefaults.set(startupTabMode.rawValue, forKey: Self.startupTabModeKey)
         }
     }
     
     var startupTabURL: String {
         didSet {
-            userDefaults.set(startupTabURL, forKey: startupTabURLKey)
+            userDefaults.set(startupTabURL, forKey: Self.startupTabURLKey)
         }
     }
 
     init() {
         // Register default values
         userDefaults.register(defaults: [
-            materialKey: NSVisualEffectView.Material.hudWindow.rawValue,
-            liquidGlassKey: false,
-            searchEngineKey: SearchProvider.google.rawValue,
+            Self.materialKey: NSVisualEffectView.Material.hudWindow.rawValue,
+            Self.liquidGlassKey: false,
+            Self.searchEngineKey: SearchProvider.google.rawValue,
             // Default tab unload timeout: 60 minutes
-            tabUnloadTimeoutKey: 3600.0,
-            blockXSTKey: false,
-            debugToggleUpdateNotificationKey: false,
-            askBeforeQuitKey: true,
-            restoreSessionOnLaunchKey: true,
-            startupTabModeKey: StartupTabMode.customURL.rawValue,
-            startupTabURLKey: Self.defaultStartupURL,
-            sidebarPositionKey: SidebarPosition.left.rawValue,
-            topBarAddressViewKey: false,
-            experimentalExtensionsKey: false,
-            geminiApiKeyKey: "",
-            geminiModelKey: GeminiModel.flash.rawValue,
-            showAIAssistantKey: true
+            Self.tabUnloadTimeoutKey: 3600.0,
+            Self.blockXSTKey: false,
+            Self.debugToggleUpdateNotificationKey: false,
+            Self.askBeforeQuitKey: true,
+            Self.restoreSessionOnLaunchKey: true,
+            Self.startupTabModeKey: StartupTabMode.customURL.rawValue,
+            Self.startupTabURLKey: Self.defaultStartupURL,
+            Self.sidebarPositionKey: SidebarPosition.left.rawValue,
+            Self.topBarAddressViewKey: false,
+            Self.experimentalExtensionsKey: false,
+            Self.geminiApiKeyKey: "",
+            Self.geminiModelKey: GeminiModel.flash.rawValue,
+            Self.showAIAssistantKey: true
         ])
 
         // Initialize properties from UserDefaults
         // This will use the registered defaults if no value is set
-        self.currentMaterialRaw = userDefaults.integer(forKey: materialKey)
-        self.isLiquidGlassEnabled = userDefaults.bool(forKey: liquidGlassKey)
+        self.currentMaterialRaw = userDefaults.integer(forKey: Self.materialKey)
+        self.isLiquidGlassEnabled = userDefaults.bool(forKey: Self.liquidGlassKey)
 
-        if let rawEngine = userDefaults.string(forKey: searchEngineKey),
+        if let rawEngine = userDefaults.string(forKey: Self.searchEngineKey),
            let provider = SearchProvider(rawValue: rawEngine)
         {
             self.searchEngine = provider
@@ -196,24 +207,24 @@ class SettingsManager {
         }
         
         // Initialize tab unload timeout
-        self.tabUnloadTimeout = userDefaults.double(forKey: tabUnloadTimeoutKey)
-        self.blockCrossSiteTracking = userDefaults.bool(forKey: blockXSTKey)
-        self.debugToggleUpdateNotification = userDefaults.bool(forKey: debugToggleUpdateNotificationKey)
-        self.askBeforeQuit = userDefaults.bool(forKey: askBeforeQuitKey)
-        self.restoreSessionOnLaunch = userDefaults.object(forKey: restoreSessionOnLaunchKey) as? Bool ?? true
-        self.sidebarPosition = SidebarPosition(rawValue: userDefaults.string(forKey: sidebarPositionKey) ?? "left") ?? SidebarPosition.left
-        self.topBarAddressView = userDefaults.bool(forKey: topBarAddressViewKey)
-        self.experimentalExtensions = userDefaults.bool(forKey: experimentalExtensionsKey)
-        self.geminiApiKey = userDefaults.string(forKey: geminiApiKeyKey) ?? ""
-        self.geminiModel = GeminiModel(rawValue: userDefaults.string(forKey: geminiModelKey) ?? GeminiModel.flash.rawValue) ?? .flash
-        self.showAIAssistant = userDefaults.bool(forKey: showAIAssistantKey)
-        if let rawMode = userDefaults.string(forKey: startupTabModeKey),
+        self.tabUnloadTimeout = userDefaults.double(forKey: Self.tabUnloadTimeoutKey)
+        self.blockCrossSiteTracking = userDefaults.bool(forKey: Self.blockXSTKey)
+        self.debugToggleUpdateNotification = userDefaults.bool(forKey: Self.debugToggleUpdateNotificationKey)
+        self.askBeforeQuit = userDefaults.bool(forKey: Self.askBeforeQuitKey)
+        self.restoreSessionOnLaunch = userDefaults.object(forKey: Self.restoreSessionOnLaunchKey) as? Bool ?? true
+        self.sidebarPosition = SidebarPosition(rawValue: userDefaults.string(forKey: Self.sidebarPositionKey) ?? "left") ?? SidebarPosition.left
+        self.topBarAddressView = userDefaults.bool(forKey: Self.topBarAddressViewKey)
+        self.experimentalExtensions = userDefaults.bool(forKey: Self.experimentalExtensionsKey)
+        self.geminiApiKey = userDefaults.string(forKey: Self.geminiApiKeyKey) ?? ""
+        self.geminiModel = GeminiModel(rawValue: userDefaults.string(forKey: Self.geminiModelKey) ?? GeminiModel.flash.rawValue) ?? .flash
+        self.showAIAssistant = userDefaults.bool(forKey: Self.showAIAssistantKey)
+        if let rawMode = userDefaults.string(forKey: Self.startupTabModeKey),
            let mode = StartupTabMode(rawValue: rawMode) {
             self.startupTabMode = mode
         } else {
             self.startupTabMode = .customURL
         }
-        self.startupTabURL = userDefaults.string(forKey: startupTabURLKey) ?? Self.defaultStartupURL
+        self.startupTabURL = userDefaults.string(forKey: Self.startupTabURLKey) ?? Self.defaultStartupURL
     }
 }
 
