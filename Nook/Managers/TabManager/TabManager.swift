@@ -2043,9 +2043,18 @@ class TabManager: ObservableObject {
             
             // If no tabs exist, create a default tab with Google.com
             if self.currentTab == nil {
-                print("🆕 [TabManager] No tabs found, creating default Google tab")
-                let defaultTab = createNewTab(url: "https://www.google.com", in: currentSpace)
-                self.currentTab = defaultTab
+                let settings = browserManager?.settingsManager
+                switch settings?.startupTabMode ?? .customURL {
+                case .customURL:
+                    let raw = (settings?.startupTabURL ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                    let urlString = raw.isEmpty ? SettingsManager.defaultStartupURL : raw
+                    print("🆕 [TabManager] No tabs found, creating startup tab for \(urlString)")
+                    let defaultTab = createNewTab(url: urlString, in: currentSpace)
+                    self.currentTab = defaultTab
+                case .none:
+                    print("🆕 [TabManager] No startup tab requested; leaving window empty")
+                    self.currentTab = nil
+                }
             }
 
             if let ct = self.currentTab { _ = ct.webView }
