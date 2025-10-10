@@ -19,11 +19,22 @@ struct SidebarResizeView: View {
 
     var body: some View {
         ZStack {
+            // Visual feedback line - positioned within sidebar area
+            if isHovering && !isResizing {
+                RoundedRectangle(cornerRadius: 1) // Rounded ends (half of width)
+                    .fill(Color.accentColor)
+                    .frame(width: 2)
+                    .frame(maxHeight: .infinity)
+                    .offset(x: browserManager.settingsManager.sidebarPosition == .left ? -6 : 6) // Positioned within sidebar area (14pts into sidebar - 1pt for centering)
+                    .animation(.easeInOut(duration: 0.15), value: isHovering)
+            }
             // Hit detection area - 16pt wide spanning the sidebar boundary
             Rectangle()
                 .fill(Color.clear)
-                .frame(width: 3)
-                .contentShape(Rectangle())
+                .frame(width: 12)
+                .contentShape(.interaction, .rect)
+                .padding(.vertical, 40)
+                .offset(x: browserManager.settingsManager.sidebarPosition == .left ? -8 : 8)
                 .onHover { hovering in
                     guard windowState.isSidebarVisible else { return }
 
@@ -74,17 +85,7 @@ struct SidebarResizeView: View {
                                 NSCursor.arrow.set()
                             }
                         }
-                ).offset(x: browserManager.settingsManager.sidebarPosition == .left ? 0 : 2)
-
-            // Visual feedback line - positioned within sidebar area
-            if isHovering && !isResizing {
-                RoundedRectangle(cornerRadius: 1) // Rounded ends (half of width)
-                    .fill(Color.accentColor)
-                    .frame(width: 2)
-                    .frame(maxHeight: .infinity)
-                    .offset(x: browserManager.settingsManager.sidebarPosition == .left ? -6 : 6) // Positioned within sidebar area (14pts into sidebar - 1pt for centering)
-                    .animation(.easeInOut(duration: 0.15), value: isHovering)
-            }
+                )
         }
         .frame(width: 3)
     }
