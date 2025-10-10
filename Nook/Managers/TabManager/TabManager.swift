@@ -493,9 +493,7 @@ class TabManager: ObservableObject {
         self.browserManager = browserManager
         self.context = context
         self.persistence = PersistenceActor(container: context.container)
-        Task { @MainActor in
-            loadFromStore()
-        }
+        loadFromStore()
     }
 
     deinit {
