@@ -152,7 +152,7 @@ struct DialogHeader: View {
     }
     
     var body: some View {
-        VStack(spacing: 16) {
+        HStack(spacing: 16) {
             // Icon with modern styling
             ZStack {
                 Circle()
@@ -164,7 +164,7 @@ struct DialogHeader: View {
                     .foregroundStyle(Color.accentColor)
             }
             
-            VStack(spacing: 4) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.primary)
@@ -173,9 +173,9 @@ struct DialogHeader: View {
                     Text(subtitle)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
                 }
             }
+            .multilineTextAlignment(.leading)
         }
         .padding(.top, 8)
     }
@@ -217,6 +217,85 @@ struct DialogFooter: View {
         }
     }
 }
+
+#if DEBUG
+private struct DialogManagerPreviewSurface: View {
+    @State private var analyticsEnabled: Bool = true
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color.black.opacity(0.45), Color.blue.opacity(0.35)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 24) {
+                DialogHeader(
+                    icon: "sparkles",
+                    title: "Sample Dialog",
+                    subtitle: "Use this preview to adjust spacing, typography, and surfaces"
+                )
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Keep Nook feeling fast by sharing anonymous performance metrics.")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
+
+                    Text("We never collect your browsing history or personal data. You can opt out at any time from Settings → Privacy.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Toggle(isOn: $analyticsEnabled) {
+                        Label("Share anonymous analytics", systemImage: analyticsEnabled ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .toggleStyle(.switch)
+                }
+
+                DialogFooter(
+                    leftButton: DialogButton(
+                        text: "Privacy Policy",
+                        iconName: "link",
+                        variant: .secondary,
+                        action: {}
+                    ),
+                    rightButtons: [
+                        DialogButton(
+                            text: "Not Now",
+                            variant: .secondary,
+                            action: {}
+                        ),
+                        DialogButton(
+                            text: "Enable",
+                            iconName: "checkmark",
+                            variant: .primary,
+                            action: {}
+                        )
+                    ]
+                )
+            }
+            .padding(24)
+            .frame(maxWidth: 420, alignment: .leading)
+            .background(Color(.windowBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.white.opacity(0.2))
+            )
+            .shadow(color: Color.black.opacity(0.2), radius: 20, y: 12)
+            .padding(32)
+        }
+    }
+}
+
+#Preview("Dialog Example") {
+    DialogManagerPreviewSurface()
+        .environmentObject(GradientColorManager())
+}
+#endif
 
 struct DialogButton {
     let text: String

@@ -23,6 +23,13 @@ public enum SidebarPosition: String, CaseIterable, Identifiable {
       case .right: return "Right"
       }
     }
+    
+    var icon: String {
+      switch self {
+      case .left: return "sidebar.left"
+      case .right: return "sidebar.right"
+      }
+    }
 }
 
 struct SidebarMenu: View {
