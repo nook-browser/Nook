@@ -34,6 +34,7 @@ class SettingsManager {
     private let webSearchEngineKey = "settings.webSearchEngine"
     private let webSearchMaxResultsKey = "settings.webSearchMaxResults"
     private let webSearchContextSizeKey = "settings.webSearchContextSize"
+    private let borderlessKey = "settings.borderless"
     var currentSettingsTab: SettingsTabs = .general
 
     // Stored properties
@@ -62,7 +63,7 @@ class SettingsManager {
             userDefaults.set(searchEngine.rawValue, forKey: searchEngineKey)
         }
     }
-    
+
     var tabUnloadTimeout: TimeInterval {
         didSet {
             userDefaults.set(tabUnloadTimeout, forKey: tabUnloadTimeoutKey)
@@ -77,19 +78,19 @@ class SettingsManager {
             NotificationCenter.default.post(name: .blockCrossSiteTrackingChanged, object: nil, userInfo: ["enabled": blockCrossSiteTracking])
         }
     }
-    
+
     var askBeforeQuit: Bool {
         didSet {
             userDefaults.set(askBeforeQuit, forKey: askBeforeQuitKey)
         }
     }
-    
+
     var sidebarPosition: SidebarPosition {
         didSet {
             userDefaults.set(sidebarPosition.rawValue, forKey: sidebarPositionKey)
         }
     }
-    
+
     var topBarAddressView: Bool {
         didSet {
             userDefaults.set(topBarAddressView, forKey: topBarAddressViewKey)
@@ -123,6 +124,12 @@ class SettingsManager {
     var showAIAssistant: Bool {
         didSet {
             userDefaults.set(showAIAssistant, forKey: showAIAssistantKey)
+        }
+    }
+
+    var borderless: Bool {
+        didSet {
+            userDefaults.set(borderless, forKey: borderlessKey)
         }
     }
 
@@ -205,7 +212,8 @@ class SettingsManager {
             webSearchEnabledKey: false,
             webSearchEngineKey: "auto",
             webSearchMaxResultsKey: 5,
-            webSearchContextSizeKey: "medium"
+            webSearchContextSizeKey: "medium",
+            borderlessKey: false
         ])
 
         // Initialize properties from UserDefaults
@@ -221,7 +229,7 @@ class SettingsManager {
             // Fallback to google if the stored value is somehow invalid
             self.searchEngine = .google
         }
-        
+
         // Initialize tab unload timeout
         self.tabUnloadTimeout = userDefaults.double(forKey: tabUnloadTimeoutKey)
         self.blockCrossSiteTracking = userDefaults.bool(forKey: blockXSTKey)
@@ -242,6 +250,7 @@ class SettingsManager {
         self.webSearchEngine = userDefaults.string(forKey: webSearchEngineKey) ?? "auto"
         self.webSearchMaxResults = userDefaults.integer(forKey: webSearchMaxResultsKey)
         self.webSearchContextSize = userDefaults.string(forKey: webSearchContextSizeKey) ?? "medium"
+        self.borderless = userDefaults.bool(forKey: borderlessKey)
     }
 }
 
@@ -251,9 +260,9 @@ public enum AIProvider: String, CaseIterable, Identifiable {
     case gemini = "gemini"
     case openRouter = "openrouter"
     case ollama = "ollama"
-    
+
     public var id: String { rawValue }
-    
+
     var displayName: String {
         switch self {
         case .gemini: return "Google Gemini"
@@ -261,7 +270,7 @@ public enum AIProvider: String, CaseIterable, Identifiable {
         case .ollama: return "Ollama (Local)"
         }
     }
-    
+
     var isRecommended: Bool {
         return false
     }
@@ -272,23 +281,23 @@ public enum AIProvider: String, CaseIterable, Identifiable {
 public enum GeminiModel: String, CaseIterable, Identifiable {
     case flash = "gemini-flash-latest"
     case pro = "gemini-2.5-pro"
-    
+
     public var id: String { rawValue }
-    
+
     var displayName: String {
         switch self {
         case .flash: return "Gemini Flash"
         case .pro: return "Gemini 2.5 Pro"
         }
     }
-    
+
     var description: String {
         switch self {
         case .flash: return "Fast responses, great for quick questions"
         case .pro: return "Most capable model, best for complex analysis"
         }
     }
-    
+
     var icon: String {
         switch self {
         case .flash: return "bolt.fill"
@@ -311,9 +320,9 @@ public enum OpenRouterModel: String, CaseIterable, Identifiable {
     case gpt5mini = "openai/gpt-5-mini"
     case gpt5 = "openai/gpt-5"
 
-    
+
     public var id: String { rawValue }
-    
+
     var displayName: String {
         switch self {
         case .deepseekChatV31: return "DeepSeek Chat V3.1 (Free)"

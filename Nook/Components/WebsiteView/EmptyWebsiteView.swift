@@ -21,6 +21,9 @@ struct EmptyWebsiteView: View {
                         if windowState.isFullScreen {
                             return 0
                         }
+                        if browserManager.settingsManager.borderless {
+                            return 0
+                        }
                         if #available(macOS 26.0, *) {
                             return 12
                         } else {
