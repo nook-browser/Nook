@@ -38,10 +38,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     // Global favicon cache shared across profiles by design to increase hit rate
     // and reduce duplicate downloads. Favicons are cached persistently to survive app restarts.
     private static var faviconCache: [String: SwiftUI.Image] = [:]
-    private static let faviconCacheQueue = DispatchQueue(label: "favicon.cache", attributes: .concurrent)
     private static let faviconCacheLock = NSLock()
-    
-    // Persistent cache storage
     private static let faviconCacheDirectory: URL = {
         let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
         let faviconDir = cacheDir.appendingPathComponent("FaviconCache")
@@ -129,14 +126,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     // Favicon persistence
     private(set) var faviconPNGData: Data?
     private(set) var faviconCacheKey: String?
-    private static var faviconCache: [String: SwiftUI.Image] = [:]
-    private static let faviconCacheLock = NSLock()
-    private static let faviconCacheDirectory: URL = {
-        let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-        let dir = cacheDir.appendingPathComponent("NookFavicons")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir
-    }()
     
     // MARK: - Tab State
     var isUnloaded: Bool {
