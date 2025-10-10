@@ -30,9 +30,12 @@ class BrowserWindowState: ObservableObject {
     
     /// Sidebar width for this window
     var sidebarWidth: CGFloat = 250
-    
+
     /// Last non-zero sidebar width so we can restore when toggling visibility
     var savedSidebarWidth: CGFloat = 250
+
+    /// Width for the AI assistant sidebar when visible
+    var aiSidebarWidth: CGFloat = 350
     
     /// Usable width for sidebar content (excludes padding)
     var sidebarContentWidth: CGFloat = 234

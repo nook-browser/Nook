@@ -255,20 +255,6 @@ struct SidebarView: View {
                             .offset(x: 12, y: -12)
                     }
                     
-                    if browserManager.settingsManager.showAIAssistant {
-                        NavButton(iconName: "sparkles", disabled: false, action: {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                windowState.isSidebarAIChatVisible = true
-                                windowState.isSidebarMenuVisible = false
-                                let previousWidth = windowState.sidebarWidth
-                                windowState.savedSidebarWidth = previousWidth
-                                let newWidth: CGFloat = 400
-                                windowState.sidebarWidth = newWidth
-                                windowState.sidebarContentWidth = max(newWidth - 16, 0)
-                            }
-                        })
-                    }
-                    
                     Spacer()
                 }
                 
@@ -296,14 +282,7 @@ struct SidebarView: View {
                 value: essentialsCount)
         
         let finalContent = ZStack {
-            
-            if windowState.isSidebarAIChatVisible {
-                SidebarAIChat()
-                    .transition(.move(edge: browserManager.settingsManager.sidebarPosition == .left ? .leading : .trailing).combined(with: .opacity))
-                    .environmentObject(browserManager)
-                    .environmentObject(windowState)
-                    .environment(browserManager.settingsManager)
-            } else if windowState.isSidebarMenuVisible {
+            if windowState.isSidebarMenuVisible {
                 SidebarMenu()
                     .transition(.move(edge: browserManager.settingsManager.sidebarPosition == .left ? .leading : .trailing).combined(with: .opacity))
             } else {

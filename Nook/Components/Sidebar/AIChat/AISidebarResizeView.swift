@@ -1,13 +1,13 @@
 //
-//  SidebarResizeView.swift
+//  AISidebarResizeView.swift
 //  Nook
 //
-//  Created by Maciek Bagiński on 30/07/2025.
+//  Resize handle for the AI assistant sidebar
 //
 
 import SwiftUI
 
-struct SidebarResizeView: View {
+struct AISidebarResizeView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var windowState: BrowserWindowState
     @State private var isResizing = false
@@ -20,16 +20,16 @@ struct SidebarResizeView: View {
     private let minWidth: CGFloat = 260
     private let maxWidth: CGFloat = 520
 
-    private var sitsOnRight: Bool {
-        browserManager.settingsManager.sidebarPosition == .right
+    private var aiSitsOnRight: Bool {
+        browserManager.settingsManager.sidebarPosition == .left
     }
 
     private var indicatorOffset: CGFloat {
-        sitsOnRight ? 3 : -3
+        aiSitsOnRight ? -3 : 3
     }
 
     private var hitAreaOffset: CGFloat {
-        sitsOnRight ? 5 : -5
+        aiSitsOnRight ? -5 : 5
     }
 
     var body: some View {
@@ -52,7 +52,7 @@ struct SidebarResizeView: View {
                 .offset(x: hitAreaOffset)
                 .contentShape(.interaction, .rect)
                 .onHover { hovering in
-                    guard windowState.isSidebarVisible else { return }
+                    guard windowState.isSidebarAIChatVisible else { return }
 
                     isHovering = hovering
 
@@ -65,26 +65,26 @@ struct SidebarResizeView: View {
                 .gesture(
                     DragGesture(minimumDistance: 0, coordinateSpace: .global)
                         .onChanged { value in
-                            guard windowState.isSidebarVisible else { return }
+                            guard windowState.isSidebarAIChatVisible else { return }
 
                             if !isResizing {
                                 guard dragLockManager.startDrag(ownerID: dragSessionID) else {
-                                    print("🚫 [SidebarResizeView] Resize drag blocked - \(dragLockManager.debugInfo)")
+                                    print("🚫 [AISidebarResizeView] Resize drag blocked - \(dragLockManager.debugInfo)")
                                     return
                                 }
 
-                                startingWidth = windowState.sidebarWidth
+                                startingWidth = windowState.aiSidebarWidth
                                 startingMouseX = value.startLocation.x
                                 isResizing = true
                                 NSCursor.resizeLeftRight.set()
                             }
 
                             let currentMouseX = value.location.x
-                            let mouseMovement = sitsOnRight ? (startingMouseX - currentMouseX) : (currentMouseX - startingMouseX)
+                            let mouseMovement = aiSitsOnRight ? (startingMouseX - currentMouseX) : (currentMouseX - startingMouseX)
                             let newWidth = startingWidth + mouseMovement
                             let clampedWidth = max(minWidth, min(maxWidth, newWidth))
 
-                            browserManager.updateSidebarWidth(clampedWidth, for: windowState)
+                            windowState.aiSidebarWidth = clampedWidth
                         }
                         .onEnded { _ in
                             isResizing = false

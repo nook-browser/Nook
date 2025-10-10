@@ -70,7 +70,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
     var body: some View {
         VStack(spacing: 0) {
             // Window controls area (for macOS traffic lights)
-            if browserManager.settingsManager.sidebarPosition == .left {
+            if browserManager.settingsManager.sidebarPosition == .right {
                 HStack {
                     MacButtonsView()
                         .frame(width: 70, height: 20)
@@ -85,9 +85,6 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                     NavButton(iconName: "arrow.backward", disabled: false, action: {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             windowState.isSidebarAIChatVisible = false
-                            let restoredWidth = windowState.savedSidebarWidth
-                            windowState.sidebarWidth = restoredWidth
-                            windowState.sidebarContentWidth = max(restoredWidth - 16, 0)
                         }
                     })
                     
@@ -640,4 +637,3 @@ struct MessageBubble: View {
         }
     }
 }
-

@@ -788,6 +788,26 @@ class BrowserManager: ObservableObject {
         }
         saveSidebarSettings()
     }
+
+    func toggleAISidebar() {
+        guard settingsManager.showAIAssistant else { return }
+        if let windowState = activeWindowState {
+            toggleAISidebar(for: windowState)
+        }
+    }
+
+    func toggleAISidebar(for windowState: BrowserWindowState) {
+        guard settingsManager.showAIAssistant else { return }
+
+        withAnimation(.easeInOut(duration: 0.2)) {
+            if windowState.isSidebarAIChatVisible {
+                windowState.isSidebarAIChatVisible = false
+            } else {
+                windowState.isSidebarAIChatVisible = true
+                windowState.isSidebarMenuVisible = false
+            }
+        }
+    }
     
     // MARK: - Sidebar width access for overlays
     /// Returns the last saved sidebar width (used when sidebar is collapsed to size hover overlay)

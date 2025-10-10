@@ -16,7 +16,7 @@ struct EmptyWebsiteView: View {
         GeometryReader { proxy in
             ZStack {
                 // Match the exact background and styling of the real webview
-                Color(nsColor: .windowBackgroundColor)
+                Color(nsColor: .windowBackgroundColor).opacity(0.2)
                     .clipShape(RoundedRectangle(cornerRadius: {
                         if windowState.isFullScreen {
                             return 0
