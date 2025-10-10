@@ -31,66 +31,64 @@ struct SettingsDialog: DialogProtocol {
         self.onCancel = onCancel
     }
     
-    var header: AnyView {
-        AnyView(
-            DialogHeader(
-                icon: "gear",
-                title: "Settings",
-                subtitle: "Customize your Nook experience"
-            )
+    @ViewBuilder
+    func header() -> some View {
+        DialogHeader(
+            icon: "gear",
+            title: "Settings",
+            subtitle: "Customize your Nook experience"
         )
     }
     
-    var content: AnyView {
-        AnyView(
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Theme")
-                        .font(.system(size: 14, weight: .medium))
-                    Picker("Theme", selection: $theme) {
-                        Text("Light").tag("light")
-                        Text("Dark").tag("dark")
-                        Text("Auto").tag("auto")
-                    }
-                    .pickerStyle(.segmented)
+    @ViewBuilder
+    func content() -> some View {
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Theme")
+                    .font(.system(size: 14, weight: .medium))
+                Picker("Theme", selection: $theme) {
+                    Text("Light").tag("light")
+                    Text("Dark").tag("dark")
+                    Text("Auto").tag("auto")
                 }
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Font Size")
-                        .font(.system(size: 14, weight: .medium))
-                    HStack {
-                        Slider(value: $fontSize, in: 12...20, step: 1)
-                        Text("\(Int(fontSize))")
-                            .font(.system(size: 12))
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                VStack(alignment: .leading, spacing: 12) {
-                    Toggle("Auto-save tabs", isOn: $autoSave)
-                    Toggle("Enable notifications", isOn: $notifications)
+                .pickerStyle(.segmented)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Font Size")
+                    .font(.system(size: 14, weight: .medium))
+                HStack {
+                    Slider(value: $fontSize, in: 12...20, step: 1)
+                    Text("\(Int(fontSize))")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
                 }
             }
-        )
+
+            VStack(alignment: .leading, spacing: 12) {
+                Toggle("Auto-save tabs", isOn: $autoSave)
+                Toggle("Enable notifications", isOn: $notifications)
+            }
+        }
     }
     
-    var footer: AnyView {
-        AnyView(
-            DialogFooter(
-                rightButtons: [
-                    DialogButton(
-                        text: "Cancel",
-                        variant: .secondary,
-                        action: onCancel
-                    ),
-                    DialogButton(
-                        text: "Save Settings",
-                        iconName: "checkmark",
-                        variant: .primary,
-                        action: onSave
-                    )
-                ]
-            )
+    @ViewBuilder
+    func footer() -> some View {
+        DialogFooter(
+            rightButtons: [
+                DialogButton(
+                    text: "Cancel",
+                    variant: .secondary,
+                    action: onCancel
+                ),
+                DialogButton(
+                    text: "Save Settings",
+                    iconName: "checkmark",
+                    variant: .primary,
+                    action: onSave
+                )
+            ]
         )
     }
 } 
+

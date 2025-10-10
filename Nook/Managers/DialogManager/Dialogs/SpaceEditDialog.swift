@@ -18,8 +18,8 @@ struct SpaceEditDialog: DialogProtocol {
     private let originalSpaceName: String
     private let originalSpaceIcon: String
 
-    @State private var spaceName: String
-    @State private var spaceIcon: String
+    @State private var spaceName: String = ""
+    @State private var spaceIcon: String = ""
 
     private let onSaveChanges: (String, String) -> Void
     private let onCancelChanges: () -> Void
@@ -33,67 +33,70 @@ struct SpaceEditDialog: DialogProtocol {
         self.mode = mode
         self.originalSpaceName = MainActor.assumeIsolated { space.name }
         self.originalSpaceIcon = MainActor.assumeIsolated { space.icon }
-        self.spaceName = MainActor.assumeIsolated { space.name }
-        self.spaceIcon = MainActor.assumeIsolated { space.icon }
         self.onSaveChanges = onSave
         self.onCancelChanges = onCancel
     }
 
-    var header: AnyView {
-        let iconName: String
-        let title: String
-        switch mode {
-        case .rename:
-            iconName = "pencil"
-            title = "Rename Space"
-        case .icon:
-            iconName = "face.smiling"
-            title = "Change Space Icon"
+    @ViewBuilder
+    func header() -> some View {
+        var iconName: String {
+            switch mode {
+            case .rename: "pencil"
+            case .icon: "face.smiling"
+            }
+        }
+        var title: String {
+            switch mode {
+            case .rename: "Rename Space"
+            case .icon: "Change Space Icon"
+            }
         }
 
-        return AnyView(
-            DialogHeader(
-                icon: iconName,
-                title: title,
-                subtitle: originalSpaceName
-            )
+        DialogHeader(
+            icon: iconName,
+            title: title,
+            subtitle: originalSpaceName
         )
     }
 
-    var content: AnyView {
-        AnyView(
-            SpaceEditContent(
-                spaceName: $spaceName,
-                spaceIcon: $spaceIcon,
-                originalIcon: originalSpaceIcon,
-                mode: mode
-            )
+    @ViewBuilder
+    func content() -> some View {
+        SpaceEditContent(
+            spaceName: Binding(
+                get: { spaceName },
+                set: { spaceName = $0 }
+            ),
+            spaceIcon: Binding(
+                get: { spaceIcon },
+                set: { spaceIcon = $0 }
+            ),
+            originalIcon: originalSpaceIcon,
+            mode: mode
         )
     }
 
-    var footer: AnyView {
+    @ViewBuilder
+    func footer() -> some View {
         let trimmed = spaceName.trimmingCharacters(in: .whitespacesAndNewlines)
         let effectiveName = trimmed.isEmpty ? originalSpaceName : trimmed
         let iconValue = spaceIcon.isEmpty ? originalSpaceIcon : spaceIcon
 
-        return AnyView(
-            DialogFooter(
-                rightButtons: [
-                    DialogButton(
-                        text: "Cancel",
-                        variant: .secondary,
-                        action: onCancelChanges
-                    ),
-                    DialogButton(
-                        text: "Save Changes",
-                        iconName: "checkmark",
-                        variant: .primary,
-                        action: {
-                            onSaveChanges(effectiveName, iconValue)
-                        }
-                    )
-                ]
-            )
+        DialogFooter(
+            rightButtons: [
+                DialogButton(
+                    text: "Cancel",
+                    variant: .secondary,
+                    action: onCancelChanges
+                ),
+                DialogButton(
+                    text: "Save Changes",
+                    iconName: "checkmark",
+                    variant: .primary,
+                    action: {
+                        onSaveChanges(effectiveName, iconValue)
+                    }
+                )
+            ]
         )
     }
 }
@@ -148,12 +151,6 @@ private struct SpaceEditContent: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
-            }
-
-            if mode == .icon {
-                Text("Tip: You can also rename the space while you're here.")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
             }
         }
         .padding(.horizontal, 4)

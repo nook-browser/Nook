@@ -31,72 +31,68 @@ struct SpaceCreationDialog: DialogProtocol {
         self.onClose = onClose
     }
 
-    var header: AnyView {
-        AnyView(
-            HStack {
-                Spacer()
-                VStack(spacing: 16) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.accentColor.opacity(0.1))
-                            .frame(width: 48, height: 48)
+    @ViewBuilder
+    func header() -> some View {
+        HStack {
+            Spacer()
+            VStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(Color.accentColor.opacity(0.1))
+                        .frame(width: 48, height: 48)
 
-                        Image(systemName: "folder.badge.plus")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(Color.accentColor)
-                    }
-
-                    VStack(spacing: 4) {
-                        Text("Create a New Space")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(.primary)
-
-                        Text("Organize your tabs into a new space")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
+                    Image(systemName: "folder.badge.plus")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
                 }
-                Spacer()
-            }
-            .padding(.top, 8)
 
+                VStack(spacing: 4) {
+                    Text("Create a New Space")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.primary)
+
+                    Text("Organize your tabs into a new space")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            Spacer()
+        }
+        .padding(.top, 8)
+    }
+
+    @ViewBuilder
+    func content() -> some View {
+        SpaceCreationContent(
+            spaceName: $spaceName,
+            spaceIcon: $spaceIcon
         )
     }
 
-    var content: AnyView {
-        AnyView(
-            SpaceCreationContent(
-                spaceName: $spaceName,
-                spaceIcon: $spaceIcon
-            )
-        )
-    }
+    @ViewBuilder
+    func footer() -> some View {
+        HStack(spacing: 12) {
+            Spacer()
 
-    var footer: AnyView {
-        AnyView(
-            HStack(spacing: 12) {
-                Spacer()
+            HStack(spacing: 8) {
+                NookButton.createButton(
+                    text: "Cancel",
+                    variant: .secondary,
+                    action: onCancel,
+                    keyboardShortcut: .escape
+                )
 
-                HStack(spacing: 8) {
-                    NookButton.createButton(
-                        text: "Cancel",
-                        variant: .secondary,
-                        action: onCancel,
-                        keyboardShortcut: .escape
-                    )
-
-                    NookButton.createButton(
-                        text: "Create Space",
-                        iconName: "plus",
-                        variant: .primary,
-                        action: handleSave,
-                        keyboardShortcut: .return
-                    )
-                }
+                NookButton.createButton(
+                    text: "Create Space",
+                    iconName: "plus",
+                    variant: .primary,
+                    action: handleSave,
+                    keyboardShortcut: .return
+                )
             }
-            .padding(.top, 8)
-        )
+        }
+        .padding(.top, 8)
     }
 
     private func handleSave() {
@@ -169,3 +165,4 @@ struct SpaceCreationContent: View {
         }
     }
 }
+

@@ -37,102 +37,90 @@ struct ProfileCreationDialog: DialogProtocol {
         self.onClose = onClose
     }
 
-    var header: AnyView {
-        AnyView(
-            HStack(spacing: 0) {
-                VStack(spacing: 18) {
-                    // Icon with modern styling
-                    ZStack {
-                        Circle()
-                            .fill(Color.accentColor.opacity(0.1))
-                            .frame(width: 48, height: 48)
-                        
-                        Image(systemName: "person.crop.circle.badge.plus")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(Color.accentColor)
-                    }
-                    
-                    VStack(spacing: 4) {
-                        Text("Create New Profile")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(.primary)
-                        
-                        Text("Switch between different browsing personas")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
+    func header() -> some View {
+        HStack(spacing: 0) {
+            VStack(spacing: 18) {
+                // Icon with modern styling
+                ZStack {
+                    Circle()
+                        .fill(Color.accentColor.opacity(0.1))
+                        .frame(width: 48, height: 48)
+                    Image(systemName: "person.crop.circle.badge.plus")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
                 }
-                .padding(.top, 8)
-            })
-    }
-
-    var content: AnyView {
-        AnyView(
-            VStack(alignment: .leading, spacing: 20) {
-                // Profile Name Section
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Profile Name")
-                        .font(.system(size: 13, weight: .semibold))
+                VStack(spacing: 4) {
+                    Text("Create New Profile")
+                        .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(.primary)
-                    
-                    NookTextField(
-                        text: $profileName, 
-                        placeholder: "Enter profile name", 
-                        variant: .default, 
-                        iconName: "person"
-                    )
-                }
-                
-                // Profile Icon Section
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Profile Icon")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.primary)
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Choose an icon to represent this profile")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.secondary)
-                        
-                        SimpleIconPicker(selectedIcon: $profileIcon)
-                    }
-                }
-            }
-            .padding(.horizontal, 4)
-        )
-    }
-
-    var footer: AnyView {
-        AnyView(
-            HStack(spacing: 12) {
-                Spacer()
-                
-                HStack(spacing: 8) {
-                    NookButton.createButton(
-                        text: "Cancel",
-                        variant: .secondary,
-                        action: onCancel,
-                        keyboardShortcut: .escape
-                    )
-                    
-                    NookButton(
-                        text: "Create Profile  ",
-                        iconName: "plus",
-                        variant: .primary,
-                        action: {
-                            print("Custom button tapped")
-                            handleSave()
-                        },
-                        keyboardShortcut: .space,
-                        animationType: .custom("checkmark"),
-                        shadowStyle: .subtle,
-                        customColors: NookButton.CustomColors(backgroundColor: Color.accentColor, textColor: Color.primary, borderColor: Color.white, shadowColor: Color.gray, shadowOffset: CGSize(width: 0, height: 5)),
-                    )
+                    Text("Switch between different browsing personas")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
                 }
             }
             .padding(.top, 8)
-        )
+        }
+    }
+
+    func content() -> some View {
+        VStack(alignment: .leading, spacing: 20) {
+            // Profile Name Section
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Profile Name")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+                NookTextField(
+                    text: $profileName,
+                    placeholder: "Enter profile name",
+                    variant: .default,
+                    iconName: "person"
+                )
+            }
+            // Profile Icon Section
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Profile Icon")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Choose an icon to represent this profile")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    SimpleIconPicker(selectedIcon: $profileIcon)
+                }
+            }
+        }
+        .padding(.horizontal, 4)
+    }
+
+    func footer() -> some View {
+        HStack(spacing: 12) {
+            Spacer()
+            HStack(spacing: 8) {
+                NookButton.createButton(
+                    text: "Cancel",
+                    variant: .secondary,
+                    action: onCancel,
+                    keyboardShortcut: .escape
+                )
+                NookButton(
+                    text: "Create Profile  ",
+                    iconName: "plus",
+                    variant: .primary,
+                    action: {
+                        print("Custom button tapped")
+                        handleSave()
+                    },
+                    keyboardShortcut: .space,
+                    animationType: .custom("checkmark"),
+                    shadowStyle: .subtle,
+                    customColors: NookButton.CustomColors(
+                        backgroundColor: Color.accentColor, textColor: Color.primary, borderColor: Color.white, shadowColor: Color.gray, shadowOffset: CGSize(width: 0, height: 5)
+                    )
+                )
+            }
+        }
+        .padding(.top, 8)
     }
     
     private func handleSave() {
@@ -210,9 +198,9 @@ struct DialogPreviewContainer: View {
     let dialog: ProfileCreationDialog
     var body: some View {
         VStack(spacing: 24) {
-            dialog.header
-            dialog.content
-            dialog.footer
+            dialog.header()
+            dialog.content()
+            dialog.footer()
         }
         .padding()
         .background(

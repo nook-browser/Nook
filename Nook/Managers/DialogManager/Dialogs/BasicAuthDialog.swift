@@ -34,73 +34,70 @@ struct BasicAuthDialog: DialogProtocol {
         self.onCancel = onCancel
     }
 
-    var header: AnyView {
-        AnyView(
-            DialogHeader(
-                icon: "lock.circle",
-                title: "Authentication Required",
-                subtitle: "The server \(model.host) is requesting credentials."
+    @ViewBuilder
+    func header() -> some View {
+        DialogHeader(
+            icon: "lock.circle",
+            title: "Authentication Required",
+            subtitle: "The server \(model.host) is requesting credentials."
+        )
+    }
+
+    @ViewBuilder
+    func content() -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("User name")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+                NookTextField(
+                    text: $model.username,
+                    placeholder: "Enter user name",
+                    iconName: "person"
+                )
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Password")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+                SecureField("Enter password", text: $model.password)
+                    .textFieldStyle(PlainTextFieldStyle())
+                    .padding(.vertical, 12)
+                    .padding(.horizontal, 16)
+                    .background(Color.primary.opacity(0.05))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+
+            Toggle(isOn: $model.rememberCredential) {
+                Text("Remember for this site")
+            }
+            .toggleStyle(.switch)
+        }
+        .padding(.horizontal, 4)
+    }
+
+    @ViewBuilder
+    func footer() -> some View {
+        HStack(spacing: 12) {
+            Spacer()
+            NookButton.createButton(
+                text: "Cancel",
+                variant: .secondary,
+                action: onCancel,
+                keyboardShortcut: .escape
             )
-        )
-    }
-
-    var content: AnyView {
-        AnyView(
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("User name")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.primary)
-                    NookTextField(
-                        text: $model.username,
-                        placeholder: "Enter user name",
-                        iconName: "person"
-                    )
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Password")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.primary)
-                    SecureField("Enter password", text: $model.password)
-                        .textFieldStyle(PlainTextFieldStyle())
-                        .padding(.vertical, 12)
-                        .padding(.horizontal, 16)
-                        .background(Color.primary.opacity(0.05))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-
-                Toggle(isOn: $model.rememberCredential) {
-                    Text("Remember for this site")
-                }
-                .toggleStyle(.switch)
-            }
-            .padding(.horizontal, 4)
-        )
-    }
-
-    var footer: AnyView {
-        AnyView(
-            HStack(spacing: 12) {
-                Spacer()
-                NookButton.createButton(
-                    text: "Cancel",
-                    variant: .secondary,
-                    action: onCancel,
-                    keyboardShortcut: .escape
-                )
-                NookButton(
-                    text: "Sign In",
-                    iconName: "arrow.right.circle",
-                    variant: .primary,
-                    action: {
-                        onSubmit(model.username, model.password, model.rememberCredential)
-                    },
-                    keyboardShortcut: .return
-                )
-                .disabled(model.username.isEmpty || model.password.isEmpty)
-            }
-            .padding(.top, 8)
-        )
+            NookButton(
+                text: "Sign In",
+                iconName: "arrow.right.circle",
+                variant: .primary,
+                action: {
+                    onSubmit(model.username, model.password, model.rememberCredential)
+                },
+                keyboardShortcut: .return
+            )
+            .disabled(model.username.isEmpty || model.password.isEmpty)
+        }
+        .padding(.top, 8)
     }
 }

@@ -123,9 +123,9 @@ class DialogManager {
     
     func showDialog<T: DialogProtocol>(_ dialog: T) {
         showCustomDialog(
-            header: dialog.header,
-            content: dialog.content,
-            footer: dialog.footer
+            header: AnyView(dialog.header()),
+            content: dialog.content(),
+            footer: AnyView(dialog.footer())
         )
     }
 }
@@ -133,9 +133,18 @@ class DialogManager {
 // MARK: - Dialog Protocol
 
 protocol DialogProtocol {
-    var header: AnyView { get }
-    var content: AnyView { get }
-    var footer: AnyView { get }
+    associatedtype Header: View
+    associatedtype Content: View
+    associatedtype Footer: View
+
+    @ViewBuilder
+    func header() -> Header
+
+    @ViewBuilder
+    func content() -> Content
+
+    @ViewBuilder
+    func footer() -> Footer
 }
 
 // MARK: - Dialog Components
@@ -150,7 +159,6 @@ struct DialogHeader: View {
         self.title = title
         self.subtitle = subtitle
     }
-    
     var body: some View {
         HStack(spacing: 16) {
             // Icon with modern styling
@@ -315,3 +323,4 @@ struct DialogButton {
         self.action = action
     }
 }
+
