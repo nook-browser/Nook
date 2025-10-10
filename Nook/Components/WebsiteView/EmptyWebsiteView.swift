@@ -21,6 +21,9 @@ struct EmptyWebsiteView: View {
                         if windowState.isFullScreen {
                             return 0
                         }
+                        if browserManager.settingsManager.borderless {
+                            return 0
+                        }
                         if #available(macOS 26.0, *) {
                             return 12
                         } else {
@@ -40,8 +43,8 @@ struct EmptyWebsiteView: View {
                 }
             }
             // Match the exact same padding/margins as the real webview
-            .padding(.trailing, windowState.isFullScreen ? 0 : (windowState.isSidebarVisible && browserManager.settingsManager.sidebarPosition == .right ? 0 : 8))
-            .padding(.leading, windowState.isFullScreen ? 0 : (windowState.isSidebarVisible && browserManager.settingsManager.sidebarPosition == .left ? 0 : 8))
+            .padding(.trailing, (windowState.isFullScreen || browserManager.settingsManager.borderless) ? 0 : (windowState.isSidebarVisible && browserManager.settingsManager.sidebarPosition == .right ? 0 : 8))
+            .padding(.leading, (windowState.isFullScreen || browserManager.settingsManager.borderless) ? 0 : (windowState.isSidebarVisible && browserManager.settingsManager.sidebarPosition == .left ? 0 : 8))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }

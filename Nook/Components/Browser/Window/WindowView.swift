@@ -75,7 +75,7 @@ struct WindowView: View {
                                         WebsiteLoadingIndicator()
                                         WebsiteView()
                                     }
-                                    .padding(.bottom, 8)
+                                    .padding(.bottom, browserManager.settingsManager.borderless ? 0 : 8)
                                     .zIndex(2000)
 
                                 }
@@ -100,10 +100,12 @@ struct WindowView: View {
                                     .environmentObject(windowState)
                             case .windowVStack:
                                 VStack(spacing: 0) {
-                                    WebsiteLoadingIndicator()
+                                    if !(windowState.isFullScreen || browserManager.settingsManager.borderless) {
+                                        WebsiteLoadingIndicator()
+                                    }
                                     WebsiteView()
                                 }
-                                .padding(.bottom, 8)
+                                .padding(.bottom, browserManager.settingsManager.borderless ? 0 : 8)
                                 .zIndex(2000)
 
                             }

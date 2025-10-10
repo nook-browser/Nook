@@ -197,6 +197,22 @@ struct GeneralSettingsView: View {
                                 .foregroundStyle(.secondary)
                             }
                         }
+                        
+                        Divider().opacity(0.4)
+                        
+                        Toggle(
+                            isOn: $browserManager.settingsManager
+                                .borderless
+                        ) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Borderless")
+                                Text(
+                                    "Remove the window border for a cleaner look"
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
+                        }
                     }
                     
                     SettingsSectionCard(
