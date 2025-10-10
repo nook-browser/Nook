@@ -16,13 +16,11 @@ struct SpaceCreationDialog: View {
     let onCancel: () -> Void
 
     init(
-        initialName: String = "",
-        initialIcon: String = "",
         onCreate: @escaping (String, String) -> Void,
         onCancel: @escaping () -> Void
     ) {
-        _spaceName = State(initialValue: initialName)
-        _spaceIcon = State(initialValue: initialIcon)
+        _spaceName = State(initialValue: "")
+        _spaceIcon = State(initialValue: "")
         self.onCreate = onCreate
         self.onCancel = onCancel
     }
