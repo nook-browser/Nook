@@ -1873,7 +1873,7 @@ class TabManager: ObservableObject {
         let restoreEnabled = browserManager?.settingsManager.restoreSessionOnLaunch ?? initialRestoreSession
         if restoreEnabled == false {
             bootstrapFreshSession()
-            Task.detached { [weak self] in
+            Task(priority: .userInitiated) { [weak self] in
                 guard let self else { return }
                 await self.persistence.clearAllSnapshots()
             }
@@ -2256,7 +2256,7 @@ extension TabManager {
         if enabled {
             persistSnapshot()
         } else {
-            Task.detached { [weak self] in
+            Task(priority: .userInitiated) { [weak self] in
                 guard let self else { return }
                 await self.persistence.clearAllSnapshots()
             }
