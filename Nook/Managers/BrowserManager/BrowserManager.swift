@@ -597,7 +597,9 @@ class BrowserManager: ObservableObject {
             guard
                 let enabled = note.userInfo?["enabled"] as? Bool
             else { return }
-            self?.handleSessionPersistenceToggle(enabled: enabled)
+            Task { @MainActor [weak self] in
+                self?.handleSessionPersistenceToggle(enabled: enabled)
+            }
         }
     }
 
