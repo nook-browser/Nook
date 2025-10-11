@@ -14,7 +14,9 @@ struct SettingsView: View {
     @Environment(GradientColorManager.self) private var gradientColorManager
 
     var body: some View {
-        TabView(selection: $browserManager.settingsManager.currentSettingsTab) {
+        @Bindable var bindableBrowserManager = browserManager
+        
+        TabView(selection: $bindableBrowserManager.settingsManager.currentSettingsTab) {
             SettingsPane {
                 GeneralSettingsView()
             }
@@ -150,6 +152,7 @@ struct GeneralSettingsView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
+            @Bindable var bindableBrowserManager = browserManager
             // Hero card
             SettingsHeroCard()
                 .frame(width: 320, height: 420)
@@ -166,7 +169,7 @@ struct GeneralSettingsView: View {
                             Spacer()
                             Picker(
                                 "Background Material",
-                                selection: $browserManager.settingsManager
+                                selection: $bindableBrowserManager.settingsManager
                                     .currentMaterialRaw
                             ) {
                                 ForEach(materials, id: \.value.rawValue) {
@@ -184,7 +187,7 @@ struct GeneralSettingsView: View {
                         Divider().opacity(0.4)
 
                         Toggle(
-                            isOn: $browserManager.settingsManager
+                            isOn: $bindableBrowserManager.settingsManager
                                 .isLiquidGlassEnabled
                         ) {
                             VStack(alignment: .leading, spacing: 2) {
@@ -204,7 +207,7 @@ struct GeneralSettingsView: View {
                     ) {
                         VStack(alignment: .leading, spacing: 16) {
                             Toggle(
-                                isOn: $browserManager.settingsManager
+                                isOn: $bindableBrowserManager.settingsManager
                                     .askBeforeQuit
                             ) {
                                 VStack(alignment: .leading, spacing: 2) {
@@ -221,7 +224,7 @@ struct GeneralSettingsView: View {
                                 Spacer()
                                 Picker(
                                     "Sidebar Position",
-                                    selection: $browserManager.settingsManager
+                                    selection: $bindableBrowserManager.settingsManager
                                         .sidebarPosition
                                 ) {
                                     ForEach(SidebarPosition.allCases) { provider in
@@ -234,7 +237,7 @@ struct GeneralSettingsView: View {
                             }
                             
                             Toggle(
-                                isOn: $browserManager.settingsManager
+                                isOn: $bindableBrowserManager.settingsManager
                                     .topBarAddressView
                             ) {
                                 VStack(alignment: .leading, spacing: 2) {
@@ -258,7 +261,7 @@ struct GeneralSettingsView: View {
                             Spacer()
                             Picker(
                                 "Search Engine",
-                                selection: $browserManager.settingsManager
+                                selection: $bindableBrowserManager.settingsManager
                                     .searchEngine
                             ) {
                                 ForEach(SearchProvider.allCases) { provider in
@@ -279,7 +282,7 @@ struct GeneralSettingsView: View {
                             HStack(alignment: .firstTextBaseline) {
                                 Text("Enable AI Assistant")
                                 Spacer()
-                                Toggle("", isOn: $browserManager.settingsManager.showAIAssistant)
+                                Toggle("", isOn: $bindableBrowserManager.settingsManager.showAIAssistant)
                                     .labelsHidden()
                             }
                             
@@ -289,7 +292,7 @@ struct GeneralSettingsView: View {
                                 HStack(alignment: .firstTextBaseline) {
                                     Text("Gemini API Key")
                                     Spacer()
-                                    SecureField("Enter API Key", text: $browserManager.settingsManager.geminiApiKey)
+                                    SecureField("Enter API Key", text: $bindableBrowserManager.settingsManager.geminiApiKey)
                                         .textFieldStyle(.roundedBorder)
                                         .frame(width: 220)
                                 }
@@ -308,7 +311,7 @@ struct GeneralSettingsView: View {
                                     Spacer()
                                     Picker(
                                         "Model",
-                                        selection: $browserManager.settingsManager.geminiModel
+                                        selection: $bindableBrowserManager.settingsManager.geminiModel
                                     ) {
                                         ForEach(GeminiModel.allCases) { model in
                                             VStack(alignment: .leading) {
@@ -406,6 +409,8 @@ struct ProfilesSettingsView: View {
     @State private var profileToDelete: Profile? = nil
 
     var body: some View {
+        @Bindable var bindableBrowserManager = browserManager
+        
         VStack(alignment: .leading, spacing: 16) {
             // Profiles list and actions
             SettingsSectionCard(
@@ -1403,6 +1408,8 @@ struct AdvancedSettingsView: View {
     @Environment(BrowserManager.self) private var browserManager
 
     var body: some View {
+        @Bindable var bindableBrowserManager = browserManager
+        
         VStack(alignment: .leading, spacing: 16) {
             if #available(macOS 15.5, *) {
                 SettingsSectionCard(
@@ -1410,7 +1417,7 @@ struct AdvancedSettingsView: View {
                     subtitle: "Features in development"
                 ) {
                     Toggle(
-                        isOn: $browserManager.settingsManager.experimentalExtensions
+                        isOn: $bindableBrowserManager.settingsManager.experimentalExtensions
                     ) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("EXPERIMENTAL: Enable Extension Support")
@@ -1430,7 +1437,7 @@ struct AdvancedSettingsView: View {
                 subtitle: "Development and debugging features"
             ) {
                 Toggle(
-                    isOn: $browserManager.settingsManager.debugToggleUpdateNotification
+                    isOn: $bindableBrowserManager.settingsManager.debugToggleUpdateNotification
                 ) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Show Update Notification")

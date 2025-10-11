@@ -9,7 +9,7 @@ import Foundation
 import Combine
 import SwiftUI
 
-class ImportManager: ObservableObject {
+class ImportManager {
     
     func importArcSidebarData() async -> ArcImportResult {
         
