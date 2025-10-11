@@ -8,7 +8,7 @@ import AppKit
 struct GradientEditorView: View {
     @Binding var gradient: SpaceGradient
     @State private var selectedNodeID: UUID?
-    @EnvironmentObject var gradientColorManager: GradientColorManager
+    @Environment(GradientColorManager.self) private var gradientColorManager
 
     // No throttling: update in real time
 

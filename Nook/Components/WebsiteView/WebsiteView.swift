@@ -45,9 +45,9 @@ struct LinkStatusBar: View {
 }
 
 struct WebsiteView: View {
-    @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
-    @EnvironmentObject var splitManager: SplitViewManager
+    @Environment(BrowserManager.self) private var browserManager
+    @Environment(BrowserWindowState.self) private var windowState
+    @Environment(SplitViewManager.self) private var splitManager
     @State private var hoveredLink: String?
     @State private var isCommandPressed: Bool = false
     @State private var isDropTargeted: Bool = false
@@ -84,9 +84,9 @@ struct WebsiteView: View {
                         .overlay(alignment: .top) {
                             if shouldShowSplit {
                                 SplitControlsOverlay()
-                                    .environmentObject(browserManager)
-                                    .environmentObject(splitManager)
-                                    .environmentObject(windowState)
+                                    .environment(browserManager)
+                                    .environment(splitManager)
+                                    .environment(windowState)
                             }
                         }
                     }
@@ -112,7 +112,7 @@ struct WebsiteView: View {
                     if let assist = browserManager.oauthAssist,
                        browserManager.currentTab(for: windowState)?.id == assist.tabId {
                         OAuthAssistBanner(host: assist.host)
-                            .environmentObject(browserManager)
+                            .environment(browserManager)
                             .animation(.spring(response: 0.5, dampingFraction: 0.8), value: browserManager.oauthAssist)
                             .padding(10)
                     }
@@ -413,9 +413,9 @@ private extension WebsiteView {
 
 // MARK: - Split Controls Overlay
 private struct SplitControlsOverlay: View {
-    @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var splitManager: SplitViewManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserManager.self) private var browserManager
+    @Environment(SplitViewManager.self) private var splitManager
+    @Environment(BrowserWindowState.self) private var windowState
 
     @State private var dragOffset: CGFloat = 0
 

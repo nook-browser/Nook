@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct NavButton: View {
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserManager.self) private var browserManager
     @Environment(\.colorScheme) var colorScheme
     var iconName: String
     var disabled: Bool

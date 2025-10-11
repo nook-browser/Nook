@@ -8,9 +8,10 @@
 import Foundation
 import AppKit
 import SwiftUI
+import Observation
 
 @Observable
-class KeyboardShortcutManager: ObservableObject {
+class KeyboardShortcutManager {
     private let userDefaults = UserDefaults.standard
     private let shortcutsKey = "keyboard.shortcuts"
     private let shortcutsVersionKey = "keyboard.shortcuts.version"

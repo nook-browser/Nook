@@ -10,7 +10,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct SidebarMenuDownloadsTab: View {
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserManager.self) private var browserManager
     @State private var isHovering: Bool = false
     @State private var text: String = ""
     @FocusState private var isSearchFocused: Bool

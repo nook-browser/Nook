@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct RefreshButton: View {
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserManager.self) private var browserManager
     @Environment(\.colorScheme) var colorScheme
     var disabled: Bool
     var action: (() -> Void)?

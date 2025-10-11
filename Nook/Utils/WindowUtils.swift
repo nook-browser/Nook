@@ -40,7 +40,7 @@ private struct BackgroundDraggableModifier<G: Gesture>: ViewModifier {
 }
 
 private struct ConditionalWindowDragModifier: ViewModifier {
-    @StateObject private var dragLockManager = DragLockManager.shared
+    @State private var dragLockManager = DragLockManager.shared
 
     func body(content: Content) -> some View {
         content

@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct OAuthAssistBanner: View {
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserManager.self) private var browserManager
 
     let host: String
 

@@ -4,7 +4,7 @@ import SwiftUI
 // Custom horizontal slider with a sine-wave track and vertical white thumb
 struct GrainSlider: View {
     @Binding var value: Double
-    @StateObject private var dragLockManager = DragLockManager.shared
+    @State private var dragLockManager = DragLockManager.shared
     @State private var dragSessionID: String = UUID().uuidString
     @State private var isDragging = false // 0...1
 

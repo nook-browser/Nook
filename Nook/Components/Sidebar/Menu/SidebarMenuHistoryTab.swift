@@ -32,7 +32,7 @@ enum TimeRange: String, CaseIterable {
 }
 
 struct SidebarMenuHistoryTab: View {
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserManager.self) private var browserManager
     @State private var isHovering: Bool = false
     @State private var text: String = ""
     @FocusState private var isSearchFocused: Bool

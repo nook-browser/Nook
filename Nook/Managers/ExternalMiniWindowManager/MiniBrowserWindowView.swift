@@ -85,6 +85,6 @@ private struct WindowAccessor: NSViewRepresentable {
         adoptHandler: { _ in }
     )
     MiniBrowserWindowView(session: session, adoptAction: {}, dismissAction: {})
-        .environmentObject(GradientColorManager())
+        .environment(GradientColorManager())
 }
 #endif

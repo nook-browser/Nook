@@ -10,7 +10,7 @@ struct SpaceSeparator: View {
     var isHovering: Bool = false
     let onClear: () -> Void
     @State private var isClearHovered: Bool = false
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserManager.self) private var browserManager
 
     var body: some View {
         HStack {

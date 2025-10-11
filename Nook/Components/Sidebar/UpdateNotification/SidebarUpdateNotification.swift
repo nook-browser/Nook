@@ -8,8 +8,8 @@
 import SwiftUI
 
 struct SidebarUpdateNotification: View {
-    @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserManager.self) private var browserManager
+    @Environment(BrowserWindowState.self) private var windowState
     @Environment(SettingsManager.self) var settingsManager
     let downloadsMenuVisible: Bool
     @State private var isVisible: Bool = false

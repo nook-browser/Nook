@@ -7,30 +7,32 @@
 
 import SwiftUI
 import AppKit
+import Observation
 
 @MainActor
-class TabDragManager: ObservableObject {
+@Observable
+class TabDragManager {
     // MARK: - Shared Instance
     static let shared = TabDragManager()
     
     // MARK: - Drag State
-    @Published var isDragging: Bool = false {
+    var isDragging: Bool = false {
         didSet {
             print("🔥🔥🔥 [TabDragManager] isDragging changed: \(oldValue) -> \(isDragging)")
         }
     }
-    @Published var draggedTab: Tab?
-    @Published var draggedTabOriginalIndex: Int = -1
-    @Published var draggedTabOriginalContainer: DragContainer = .none
+    var draggedTab: Tab?
+    var draggedTabOriginalIndex: Int = -1
+    var draggedTabOriginalContainer: DragContainer = .none
     
     // MARK: - Drop Target State
-    @Published var dropTarget: DragContainer = .none
-    @Published var insertionIndex: Int = -1
-    @Published var insertionSpaceId: UUID?
+    var dropTarget: DragContainer = .none
+    var insertionIndex: Int = -1
+    var insertionSpaceId: UUID?
     
     // MARK: - Visual Feedback
-    @Published var showInsertionLine: Bool = false
-    @Published var insertionLineFrame: CGRect = .zero
+    var showInsertionLine: Bool = false
+    var insertionLineFrame: CGRect = .zero
     
     // MARK: - Haptics
     private var lastHapticIndex: Int = -1

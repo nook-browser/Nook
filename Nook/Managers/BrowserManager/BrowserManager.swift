@@ -10,9 +10,9 @@ import SwiftData
 import AppKit
 import WebKit
 import OSLog
-import Combine
 import Sparkle
 import CoreServices
+import Observation
 
 @MainActor
 final class Persistence {
@@ -309,30 +309,31 @@ private extension BrowserManager.ProfileSwitchContext {
 
 
 @MainActor
-class BrowserManager: ObservableObject {
+@Observable
+class BrowserManager {
     // Legacy global state - kept for backward compatibility during transition
-    @Published var sidebarWidth: CGFloat = 250
-    @Published var sidebarContentWidth: CGFloat = 234
-    @Published var isSidebarVisible: Bool = true
-    @Published var isCommandPaletteVisible: Bool = false
+    var sidebarWidth: CGFloat = 250
+    var sidebarContentWidth: CGFloat = 234
+    var isSidebarVisible: Bool = true
+    var isCommandPaletteVisible: Bool = false
     // Mini palette shown when clicking the URL bar
-    @Published var isMiniCommandPaletteVisible: Bool = false
-    @Published var didCopyURL: Bool = false
-    @Published var commandPalettePrefilledText: String = ""
-    @Published var shouldNavigateCurrentTab: Bool = false
+    var isMiniCommandPaletteVisible: Bool = false
+    var didCopyURL: Bool = false
+    var commandPalettePrefilledText: String = ""
+    var shouldNavigateCurrentTab: Bool = false
     // Frame of the URL bar within the window; used to anchor the mini palette precisely
-    @Published var urlBarFrame: CGRect = .zero
-    @Published var currentProfile: Profile?
+    var urlBarFrame: CGRect = .zero
+    var currentProfile: Profile?
     // Indicates an in-progress animated profile transition for coordinating UI
-    @Published var isTransitioningProfile: Bool = false
+    var isTransitioningProfile: Bool = false
     // Migration state
-    @Published var migrationProgress: MigrationProgress?
-    @Published var isMigrationInProgress: Bool = false
+    var migrationProgress: MigrationProgress?
+    var isMigrationInProgress: Bool = false
 
     // Tab closure undo notification
-    @Published var showTabClosureToast: Bool = false
-    @Published var tabClosureToastCount: Int = 0
-    @Published var updateAvailability: UpdateAvailability?
+    var showTabClosureToast: Bool = false
+    var tabClosureToastCount: Int = 0
+    var updateAvailability: UpdateAvailability?
 
 
     // MARK: - Window State Management
@@ -375,12 +376,11 @@ class BrowserManager: ObservableObject {
     var importManager: ImportManager
 
     var externalMiniWindowManager = ExternalMiniWindowManager()
-    @Published var peekManager = PeekManager()
+    var peekManager = PeekManager()
     
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
     var isSwitchingProfile: Bool = false
-    private var cancellables: Set<AnyCancellable> = []
     
     // Compositor container view
     func setCompositorContainerView(_ view: NSView?, for windowId: UUID) {
@@ -501,38 +501,55 @@ class BrowserManager: ObservableObject {
         let tabId: UUID
         let timestamp: Date
     }
-    @Published var oauthAssist: OAuthAssist?
+    var oauthAssist: OAuthAssist?
     private var oauthAssistCooldown: [String: Date] = [:]
 
     init() {
         // Phase 1: initialize all stored properties
-        self.modelContext = Persistence.shared.container.mainContext
-        if #available(macOS 15.5, *) {
-            self.extensionManager = ExtensionManager.shared
-        } else {
-            self.extensionManager = nil
-        }
-        self.profileManager = ProfileManager(context: modelContext)
-        // Ensure at least one profile exists and set current immediately for manager initialization
-        self.profileManager.ensureDefaultProfile()
-        let initialProfile = self.profileManager.profiles.first
-        self.currentProfile = initialProfile
+        let context = Persistence.shared.container.mainContext
+        let extensionManager: ExtensionManager? = {
+            if #available(macOS 15.5, *) {
+                return ExtensionManager.shared
+            } else {
+                return nil
+            }
+        }()
+        let profileManager = ProfileManager(context: context)
+        profileManager.ensureDefaultProfile()
+        let initialProfile = profileManager.profiles.first
+        let tabManager = TabManager(browserManager: nil, context: context)
+        let settingsManager = SettingsManager()
+        let dialogManager = DialogManager()
+        let downloadManager = DownloadManager.shared
+        let authenticationManager = AuthenticationManager()
+        let historyManager = HistoryManager(context: context, profileId: initialProfile?.id)
+        let cookieManager = CookieManager(dataStore: initialProfile?.dataStore)
+        let cacheManager = CacheManager(dataStore: initialProfile?.dataStore)
+        let compositorManager = TabCompositorManager()
+        let splitManager = SplitViewManager()
+        let gradientColorManager = GradientColorManager()
+        let trackingProtectionManager = TrackingProtectionManager()
+        let findManager = FindManager()
+        let importManager = ImportManager()
 
-        self.tabManager = TabManager(browserManager: nil, context: modelContext)
-        self.settingsManager = SettingsManager()
-        self.dialogManager = DialogManager()
-        self.downloadManager = DownloadManager.shared
-        self.authenticationManager = AuthenticationManager()
-        // Initialize managers with current profile context for isolation
-        self.historyManager = HistoryManager(context: modelContext, profileId: initialProfile?.id)
-        self.cookieManager = CookieManager(dataStore: initialProfile?.dataStore)
-        self.cacheManager = CacheManager(dataStore: initialProfile?.dataStore)
-        self.compositorManager = TabCompositorManager()
-        self.splitManager = SplitViewManager()
-        self.gradientColorManager = GradientColorManager()
-        self.trackingProtectionManager = TrackingProtectionManager()
-        self.findManager = FindManager()
-        self.importManager = ImportManager()
+        self.modelContext = context
+        self.extensionManager = extensionManager
+        self.profileManager = profileManager
+        self.tabManager = tabManager
+        self.settingsManager = settingsManager
+        self.dialogManager = dialogManager
+        self.downloadManager = downloadManager
+        self.authenticationManager = authenticationManager
+        self.historyManager = historyManager
+        self.cookieManager = cookieManager
+        self.cacheManager = cacheManager
+        self.compositorManager = compositorManager
+        self.splitManager = splitManager
+        self.gradientColorManager = gradientColorManager
+        self.trackingProtectionManager = trackingProtectionManager
+        self.findManager = findManager
+        self.importManager = importManager
+        self.currentProfile = initialProfile
 
         // Phase 2: wire dependencies and perform side effects (safe to use self)
         self.compositorManager.browserManager = self
@@ -540,7 +557,6 @@ class BrowserManager: ObservableObject {
         self.compositorManager.setUnloadTimeout(self.settingsManager.tabUnloadTimeout)
         self.tabManager.browserManager = self
         self.tabManager.reattachBrowserManager(self)
-        bindTabManagerUpdates()
         if #available(macOS 15.5, *), let mgr = self.extensionManager {
             // Attach extension manager BEFORE any WKWebView is created so content scripts can inject
             mgr.attach(browserManager: self)
@@ -558,7 +574,6 @@ class BrowserManager: ObservableObject {
         
         self.externalMiniWindowManager.attach(browserManager: self)
         self.peekManager.attach(browserManager: self)
-        bindPeekManagerUpdates()
         self.authenticationManager.attach(browserManager: self)
         // Migrate legacy history entries (with nil profile) to default profile to avoid cross-profile leakage
         self.migrateUnassignedDataToDefaultProfile()
@@ -582,21 +597,6 @@ class BrowserManager: ObservableObject {
         }
     }
 
-    private func bindTabManagerUpdates() {
-        tabManager.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-    }
-
-    private func bindPeekManagerUpdates() {
-        peekManager.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-    }
 
     // MARK: - OAuth Assist Controls
     func maybeShowOAuthAssist(for url: URL, in tab: Tab) {
@@ -1072,8 +1072,9 @@ class BrowserManager: ObservableObject {
     }
     
     // MARK: - Appearance / Gradient Editing
-    private final class GradientDraft: ObservableObject {
-        @Published var value: SpaceGradient
+    @Observable
+    final class GradientDraft {
+        var value: SpaceGradient
         init(_ value: SpaceGradient) { self.value = value }
     }
 
@@ -1114,7 +1115,7 @@ class BrowserManager: ObservableObject {
                 header: { EmptyView() },
                 content: {
                     GradientEditorView(gradient: binding)
-                        .environmentObject(self.gradientColorManager)
+                        .environment(self.gradientColorManager)
                 },
                 footer: {
                     DialogFooter(
@@ -1700,7 +1701,7 @@ class BrowserManager: ObservableObject {
         }
     }
 
-    @Published var migrationTask: Task<Void, Never>? = nil
+    var migrationTask: Task<Void, Never>? = nil
 
     func startMigrationToCurrentProfile() {
         guard isMigrationInProgress == false else { return }
@@ -2586,7 +2587,7 @@ class BrowserManager: ObservableObject {
         newWindow.contentView = NSHostingView(rootView: ContentView()
             .background(BackgroundWindowModifier())
             .ignoresSafeArea(.all)
-            .environmentObject(self))
+            .environment(self))
         newWindow.title = "Nook"
         newWindow.minSize = NSSize(width: 470, height: 382)
         newWindow.contentMinSize = NSSize(width: 470, height: 382)

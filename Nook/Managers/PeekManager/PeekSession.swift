@@ -8,9 +8,11 @@
 import Foundation
 import WebKit
 import SwiftUI
+import Observation
 
 @MainActor
-class PeekSession: ObservableObject, Identifiable {
+@Observable
+class PeekSession: Identifiable {
     let id = UUID()
     let sourceTabId: UUID?
     let sourceURL: URL?
@@ -18,11 +20,11 @@ class PeekSession: ObservableObject, Identifiable {
     let windowId: UUID
     let sourceProfileId: UUID?
 
-    @Published var currentURL: URL
-    @Published var title: String
-    @Published var isLoading: Bool = true
-    @Published var estimatedProgress: Double = 0
-    @Published var toolbarColor: NSColor?
+    var currentURL: URL
+    var title: String
+    var isLoading: Bool = true
+    var estimatedProgress: Double = 0
+    var toolbarColor: NSColor?
 
     init(
         targetURL: URL,

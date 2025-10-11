@@ -9,7 +9,7 @@ import SwiftUI
 import WebKit
 
 struct CacheManagementView: View {
-    @StateObject private var cacheManager = CacheManager()
+    @State private var cacheManager = CacheManager()
     @State private var searchText: String = ""
     @State private var selectedFilter: CacheFilter = .all
     @State private var selectedSort: CacheSortOption = .domain

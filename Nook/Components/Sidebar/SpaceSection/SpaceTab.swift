@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct SpaceTab: View {
-    @ObservedObject var tab: Tab
+    var tab: Tab
     var action: () -> Void
     var onClose: () -> Void
     var onMute: () -> Void
@@ -16,11 +16,12 @@ struct SpaceTab: View {
     @State private var isCloseHovering: Bool = false
     @State private var isSpeakerHovering: Bool = false
     @FocusState private var isTextFieldFocused: Bool
-    @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserManager.self) private var browserManager
+    @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.colorScheme) var colorScheme
 
     var body: some View {
+        @Bindable var tab = tab
         Button(action: {
             if isCurrentTab {
                 print("🔄 [SpaceTab] Starting rename for tab '\(tab.name)' in window \(windowState.id)")

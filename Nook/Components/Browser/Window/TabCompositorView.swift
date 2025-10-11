@@ -1,10 +1,11 @@
 import SwiftUI
 import AppKit
 import WebKit
+import Observation
 
 struct TabCompositorView: NSViewRepresentable {
     let browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
     
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
@@ -50,7 +51,8 @@ struct TabCompositorView: NSViewRepresentable {
 
 // MARK: - Tab Compositor Manager
 @MainActor
-class TabCompositorManager: ObservableObject {
+@Observable
+final class TabCompositorManager {
     private var unloadTimers: [UUID: Timer] = [:]
     private var lastAccessTimes: [UUID: Date] = [:]
     

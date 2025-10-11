@@ -62,7 +62,7 @@ import SwiftUI
 /// button.triggerAnimation()
 /// ```
 struct NookButton: View {
-    @EnvironmentObject var gradientColorManager: GradientColorManager
+    @Environment(GradientColorManager.self) private var gradientColorManager
 
     // MARK: - Types
     
