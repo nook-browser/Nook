@@ -303,14 +303,28 @@ struct SidebarView: View {
     
     private var spacesContent: some View {
         Group {
-            if browserManager.tabManager.spaces.isEmpty {
+            if !browserManager.tabManager.spacesLoaded {
+                spacesLoadingView
+            } else if browserManager.tabManager.spaces.isEmpty {
                 emptyStateView
             } else {
                 spacesPageView
             }
         }
     }
-    
+
+    private var spacesLoadingView: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+                .controlSize(.small)
+            Text("Loading spaces…")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .frame(width: effectiveWidth)
+        .padding(.top, 32)
+    }
+
     private var emptyStateView: some View {
         VStack(spacing: 16) {
             Image(systemName: "square.grid.2x2")

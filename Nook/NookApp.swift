@@ -52,6 +52,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     private let urlEventClass = AEEventClass(kInternetEventClass)
     private let urlEventID = AEEventID(kAEGetURL)
     private var mouseEventMonitor: Any?
+    private var terminationCleanupPending = false
+    private var terminationTimeoutTask: Task<Void, Never>?
+    private let quitTerminationTimeoutNanoseconds: UInt64 = 5_000_000_000
 
     // Sparkle updater controller
     lazy var updaterController: SPUStandardUpdaterController = {
@@ -104,71 +107,63 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     
     // Prefer async termination path to avoid MainActor deadlocks
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        let reason = NSAppleEventManager.shared()
+        let reasonDescriptor = NSAppleEventManager.shared()
             .currentAppleEvent?
             .attributeDescriptor(forKeyword: kAEQuitReason)
-        
-        switch reason?.enumCodeValue {
-        case nil: self.handletermination(sender: sender, shouldTerminate: true)
+        let reasonCode = reasonDescriptor?.enumCodeValue ?? FourCharCode(0)
+        let askBeforeQuit = browserManager?.settingsManager.askBeforeQuit ?? false
+        let tabCount = browserManager?.tabManager.allTabs().count ?? 0
 
-        default:
-            handletermination(sender: sender, shouldTerminate: true)
+        AppDelegate.log.info("applicationShouldTerminate invoked; reasonCode=\(reasonCode, privacy: .public); askBeforeQuit=\(askBeforeQuit, privacy: .public); tabCount=\(tabCount, privacy: .public)")
+
+        guard let manager = browserManager else {
+            AppDelegate.log.info("No browser manager attached; returning terminateNow")
+            return .terminateNow
         }
-        
+
+        if manager.hasPreparedForQuit {
+            AppDelegate.log.info("Quit preparation already completed; returning terminateNow")
+            return .terminateNow
+        }
+
+        if terminationCleanupPending {
+            AppDelegate.log.info("Termination cleanup already pending; returning terminateLater")
+            return .terminateLater
+        }
+
+        terminationCleanupPending = true
+        terminationTimeoutTask?.cancel()
+        terminationTimeoutTask = nil
+
+        let application = sender
+
+        Task.detached { [weak self] in
+            guard let self = self else { return }
+            await manager.prepareForQuitIfNeeded(includeUICleanup: false)
+            await MainActor.run {
+                AppDelegate.log.info("Termination cleanup finished; replying true")
+                application.reply(toApplicationShouldTerminate: true)
+                self.terminationCleanupPending = false
+                self.terminationTimeoutTask?.cancel()
+                self.terminationTimeoutTask = nil
+            }
+        }
+
+        terminationTimeoutTask = Task.detached { [weak self] in
+            guard let self = self else { return }
+            try? await Task.sleep(nanoseconds: self.quitTerminationTimeoutNanoseconds)
+            await MainActor.run {
+                guard self.terminationCleanupPending else { return }
+                AppDelegate.log.error("Termination cleanup timeout; replying true to avoid hang")
+                self.terminationCleanupPending = false
+                application.reply(toApplicationShouldTerminate: true)
+                self.terminationTimeoutTask?.cancel()
+                self.terminationTimeoutTask = nil
+            }
+        }
+
+        AppDelegate.log.info("applicationShouldTerminate returning .terminateLater (cleanup pending)")
         return .terminateLater
-    }
-    
-    private func handletermination(sender: NSApplication, shouldTerminate: Bool) {
-        AppDelegate.log.info("applicationShouldTerminate: returning terminateLater and starting async persistence")
-    
-        Task { @MainActor in
-            guard shouldTerminate else {
-                sender.reply(toApplicationShouldTerminate: false)
-                return
-            }
-            
-            // Minimal fallback if BrowserManager is unavailable
-            guard let manager = browserManager else {
-                // Attempt a best-effort save via shared persistence container
-                do {
-                    let ctx = Persistence.shared.container.mainContext
-                    try ctx.save()
-                    AppDelegate.log.info("Fallback save without BrowserManager succeeded")
-                } catch {
-                    AppDelegate.log.error("Fallback save without BrowserManager failed: \(String(describing: error))")
-                }
-                sender.reply(toApplicationShouldTerminate: true)
-                return
-            }
-            
-            let overallStart = CFAbsoluteTimeGetCurrent()
-            AppDelegate.log.info("Termination task started on MainActor")
-
-            // Phase 1: Atomic snapshot persistence (non-throwing Bool)
-            let persistStart = CFAbsoluteTimeGetCurrent()
-            let atomic: Bool = await manager.tabManager.persistSnapshotAwaitingResult()
-            let pdt = CFAbsoluteTimeGetCurrent() - persistStart
-            AppDelegate.log.info("Atomic persistence \(atomic ? "succeeded" : "did not run; fallback used") in \(String(format: "%.3f", pdt))s")
-
-            // Phase 2: Ensure SwiftData changes are committed
-            let contextSaveStart = CFAbsoluteTimeGetCurrent()
-            do {
-                try manager.modelContext.save()
-                let sdt = CFAbsoluteTimeGetCurrent() - contextSaveStart
-                AppDelegate.log.info("Context save completed in \(String(format: "%.3f", sdt))s")
-            } catch {
-                let sdt = CFAbsoluteTimeGetCurrent() - contextSaveStart
-                AppDelegate.log.error("Context save failed in \(String(format: "%.3f", sdt))s: \(String(describing: error))")
-            }
-
-            // Phase 3: Graceful cleanup
-            manager.cleanupAllTabs()
-            AppDelegate.log.info("Cleanup completed; WKWebView processes terminated")
-
-            let total = CFAbsoluteTimeGetCurrent() - overallStart
-            AppDelegate.log.info("Termination task finished in \(String(format: "%.3f", total))s; replying to terminate")
-            sender.reply(toApplicationShouldTerminate: true)
-        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {

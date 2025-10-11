@@ -147,14 +147,13 @@ struct SettingsTabItem: View {
 
 struct GeneralSettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @FocusState private var startupURLFocused: Bool
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
-            // Hero card
             SettingsHeroCard()
                 .frame(width: 320, height: 420)
 
-            // Right side stacked cards
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     SettingsSectionCard(
@@ -214,8 +213,75 @@ struct GeneralSettingsView: View {
                                     )
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
+                            }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .onChange(of: browserManager.settingsManager.restoreSessionOnLaunch) { _, isOn in
+                                if isOn { startupURLFocused = false }
+                            }
+
+                            Toggle(
+                                isOn: $browserManager.settingsManager
+                                    .restoreSessionOnLaunch
+                            ) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Restore Session on Launch")
+                                    Text(
+                                        "Reopen tabs and spaces from your last session when Nook starts"
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                                 }
                             }.frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            HStack(alignment: .firstTextBaseline) {
+                                Text("Startup Behavior")
+                                Spacer()
+                                Picker(
+                                    "Startup Behavior",
+                                    selection: $browserManager.settingsManager.startupTabMode
+                                ) {
+                                    ForEach(StartupTabMode.allCases) { mode in
+                                        Text(mode.displayName).tag(mode)
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .frame(width: 220)
+                            }
+                            .disabled(browserManager.settingsManager.restoreSessionOnLaunch)
+                            .onChange(of: browserManager.settingsManager.startupTabMode) {
+                                startupURLFocused = false
+                            }
+                            
+                            if browserManager.settingsManager.startupTabMode == .customURL {
+                                HStack(alignment: .firstTextBaseline) {
+                                    Text("Startup Page URL")
+                                    Spacer()
+                                    TextField(
+                                        "example.com",
+                                        text: $browserManager.settingsManager.startupTabURL
+                                    )
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 220)
+                                    .focused($startupURLFocused)
+                                    .submitLabel(.done)
+                                    .onSubmit {
+                                        let trimmed = browserManager.settingsManager.startupTabURL
+                                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                                        browserManager.settingsManager.startupTabURL = trimmed
+                                        startupURLFocused = false
+                                        NSApp.keyWindow?.makeFirstResponder(nil)
+                                    }
+                                    .disabled(browserManager.settingsManager.restoreSessionOnLaunch)
+                                }
+                                
+                                Text("Used when Restore Session on Launch is off. Leave blank to use \(SettingsManager.defaultStartupURL).")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .padding(.leading, 2)
+                            }
                             HStack(alignment: .firstTextBaseline) {
                                 Text("Sidebar Position")
                                 Spacer()
@@ -292,6 +358,10 @@ struct GeneralSettingsView: View {
                                     SecureField("Enter API Key", text: $browserManager.settingsManager.geminiApiKey)
                                         .textFieldStyle(.roundedBorder)
                                         .frame(width: 220)
+                                        .submitLabel(.done)
+                                        .onSubmit {
+                                            NSApp.keyWindow?.makeFirstResponder(nil)
+                                        }
                                 }
                                 
                                 Text("Get your API key from Google AI Studio")
@@ -393,7 +463,23 @@ struct GeneralSettingsView: View {
                 }
                 .padding(.trailing, 4)
             }
+            .contentShape(Rectangle())
+            .gesture(
+                TapGesture().onEnded {
+                    NSApp.keyWindow?.makeFirstResponder(nil)
+                    startupURLFocused = false
+                },
+                including: .gesture
+            )
         }
+        .contentShape(Rectangle())
+        .gesture(
+            TapGesture().onEnded {
+                NSApp.keyWindow?.makeFirstResponder(nil)
+                startupURLFocused = false
+            },
+            including: .gesture
+        )
         .frame(minHeight: 480)
     }
 }
@@ -1071,6 +1157,10 @@ struct ShortcutsSettingsView: View {
                 TextField("Search shortcuts...", text: $searchText)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 240)
+                    .submitLabel(.done)
+                    .onSubmit {
+                        NSApp.keyWindow?.makeFirstResponder(nil)
+                    }
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
