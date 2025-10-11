@@ -29,8 +29,6 @@
 		564997BC2E9B111000D89F78 /* Exceptions for "UI" folder in "Nook" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Buttons/NavButtons/ControlButtons.swift,
-				Buttons/NavButtons/DoubleClickView.swift,
 				Buttons/NavButtons/NavButton.swift,
 			);
 			target = 7F8340FB2E37F39400674A5D /* Nook */;

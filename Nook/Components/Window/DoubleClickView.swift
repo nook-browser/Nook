@@ -2,8 +2,11 @@
 //  DoubleClickView.swift
 //  Nook
 //
-//  Created by Maciek Bagiński on 30/07/2025.
-//  Updated by Aether Aurelia on 11/10/2025.
+//  Created by Aether Aurelia on 11/10/2025.
+//
+//  A view that detects double-clicks without delaying single clicks.
+//  Uses NSClickGestureRecognizer with delaysPrimaryMouseButtonEvents = false
+//  to avoid interfering with button taps and other interactive elements.
 //
 
 import SwiftUI
