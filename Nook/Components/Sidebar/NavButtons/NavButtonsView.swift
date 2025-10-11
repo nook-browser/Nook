@@ -70,7 +70,7 @@ struct NavButtonsView: View {
             })
 
             if browserManager.settingsManager.showAIAssistant {
-                NavButton(iconName: "sparkles", disabled: false, action: {
+                NavButton(iconName: "sparkle", disabled: false, action: {
                     browserManager.toggleAISidebar(for: windowState)
                 })
             }

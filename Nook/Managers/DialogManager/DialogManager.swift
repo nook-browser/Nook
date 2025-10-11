@@ -44,7 +44,7 @@ class DialogManager {
             StandardDialog(
                 header: {
                     DialogHeader(
-                        icon: "sparkles",
+                        icon: "xmark.circle",
                         title: "Are you sure you want to quit Nook?",
                         subtitle: "You may lose unsaved work in your tabs."
                     )

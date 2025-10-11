@@ -211,7 +211,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                                 .padding(.top, 60)
                             } else if messages.isEmpty {
                                 VStack(spacing: 12) {
-                                    Image(systemName: "sparkles")
+                                    Image(systemName: "sparkle")
                                         .font(.system(size: 32))
                                         .foregroundStyle(.white.opacity(0.3))
                                     
