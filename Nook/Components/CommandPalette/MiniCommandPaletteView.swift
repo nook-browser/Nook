@@ -17,9 +17,9 @@ import SwiftUI
 import SwiftUI
 
 struct MiniCommandPaletteView: View {
-    @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
-    @EnvironmentObject var gradientColorManager: GradientColorManager
+    @Environment(BrowserManager.self) private var browserManager
+    @Environment(BrowserWindowState.self) private var windowState
+    @Environment(GradientColorManager.self) private var gradientColorManager
     @State private var searchManager = SearchManager()
     @Environment(\.colorScheme) var colorScheme
 

@@ -190,7 +190,7 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
                 onClose(session)
             }
         )
-        .environmentObject(gradientColorManager)
+        .environment(gradientColorManager)
 
         let hostingController = NSHostingController(rootView: contentView)
         let window = NSWindow(

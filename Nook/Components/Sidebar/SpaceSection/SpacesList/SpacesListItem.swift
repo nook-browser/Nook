@@ -7,8 +7,8 @@
 import SwiftUI
 
 struct SpacesListItem: View {
-    @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserManager.self) private var browserManager
+    @Environment(BrowserWindowState.self) private var windowState
     var space: Space
     var isActive: Bool
     var compact: Bool
@@ -104,7 +104,7 @@ struct SpacesListItem: View {
                 onSelect: { _ in },
                 compact: true
             )
-            .environmentObject(browserManager)
+            .environment(browserManager)
 
             Divider()
             Button("Change Icon...") {

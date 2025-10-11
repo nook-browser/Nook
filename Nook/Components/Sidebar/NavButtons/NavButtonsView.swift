@@ -44,8 +44,8 @@ class ObservableTabWrapper: ObservableObject {
 }
 
 struct NavButtonsView: View {
-    @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserManager.self) private var browserManager
+    @Environment(BrowserWindowState.self) private var windowState
     var effectiveSidebarWidth: CGFloat?
     @StateObject private var tabWrapper = ObservableTabWrapper()
     @State private var isMenuHovered = false

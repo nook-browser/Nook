@@ -11,7 +11,7 @@ import WebKit
 struct NavigationHistoryContextMenu: View {
     let historyType: HistoryType
     let windowState: BrowserWindowState
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserManager.self) private var browserManager
     @State private var historyItems: [NavigationHistoryContextMenuItem] = []
     @State private var refreshID = UUID()
 

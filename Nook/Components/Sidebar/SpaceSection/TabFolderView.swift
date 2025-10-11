@@ -29,8 +29,8 @@ struct TabFolderView: View {
     @State private var isDropTargeted: Bool = false
     @State private var dropPreviewIndex: Int? = nil
 
-    @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserManager.self) private var browserManager
+    @Environment(BrowserWindowState.self) private var windowState
   
 
     // Get tabs in this folder

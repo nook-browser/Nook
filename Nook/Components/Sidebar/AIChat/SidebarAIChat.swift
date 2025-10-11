@@ -37,8 +37,8 @@ struct OllamaModel: Identifiable, Equatable {
 }
 
 struct SidebarAIChat: View {
-    @EnvironmentObject var windowState: BrowserWindowState
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserWindowState.self) private var windowState
+    @Environment(BrowserManager.self) private var browserManager
     @Environment(SettingsManager.self) var settingsManager
     
     @State private var messageText: String = ""

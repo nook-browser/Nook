@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct SpaceProfileDropdown: View {
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserManager.self) private var browserManager
 
     let currentProfileId: UUID
     let onProfileSelected: (UUID) -> Void

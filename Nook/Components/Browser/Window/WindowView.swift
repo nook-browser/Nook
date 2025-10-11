@@ -275,8 +275,8 @@ private struct ProfileSwitchToastView: View {
 
 // MARK: - Mini Command Palette Overlay (above sidebar and webview)
 private struct MiniCommandPaletteOverlay: View {
-    @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserManager.self) private var browserManager
+    @Environment(BrowserWindowState.self) private var windowState
 
     var body: some View {
         let isActiveWindow =

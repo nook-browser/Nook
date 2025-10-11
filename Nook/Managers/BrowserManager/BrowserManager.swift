@@ -1117,7 +1117,7 @@ class BrowserManager {
                 header: { EmptyView() },
                 content: {
                     GradientEditorView(gradient: binding)
-                        .environmentObject(self.gradientColorManager)
+                        .environment(self.gradientColorManager)
                 },
                 footer: {
                     DialogFooter(
@@ -2589,7 +2589,7 @@ class BrowserManager {
         newWindow.contentView = NSHostingView(rootView: ContentView()
             .background(BackgroundWindowModifier())
             .ignoresSafeArea(.all)
-            .environmentObject(self))
+            .environment(self))
         newWindow.title = "Nook"
         newWindow.minSize = NSSize(width: 470, height: 382)
         newWindow.contentMinSize = NSSize(width: 470, height: 382)

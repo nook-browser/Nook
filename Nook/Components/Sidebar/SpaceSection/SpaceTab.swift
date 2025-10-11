@@ -16,8 +16,8 @@ struct SpaceTab: View {
     @State private var isCloseHovering: Bool = false
     @State private var isSpeakerHovering: Bool = false
     @FocusState private var isTextFieldFocused: Bool
-    @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserManager.self) private var browserManager
+    @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.colorScheme) var colorScheme
 
     var body: some View {

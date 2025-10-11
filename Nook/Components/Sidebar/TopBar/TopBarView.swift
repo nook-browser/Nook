@@ -8,8 +8,8 @@
 import SwiftUI
 
 struct TopBarView: View {
-    @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserManager.self) private var browserManager
+    @Environment(BrowserWindowState.self) private var windowState
     @StateObject private var tabWrapper = ObservableTabWrapper()
     @State private var isHovering: Bool = false
 

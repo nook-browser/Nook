@@ -369,6 +369,6 @@ private struct DialogManagerPreviewSurface: View {
 
 #Preview("Dialog Example") {
     DialogManagerPreviewSurface()
-        .environmentObject(GradientColorManager())
+        .environment(GradientColorManager())
 }
 #endif

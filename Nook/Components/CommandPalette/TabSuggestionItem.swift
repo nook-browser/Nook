@@ -13,7 +13,7 @@ struct TabSuggestionItem: View {
     
     @State private var isHovered: Bool = false
     @Environment(\.colorScheme) var colorScheme
-    @EnvironmentObject var gradientColorManager: GradientColorManager
+    @Environment(GradientColorManager.self) private var gradientColorManager
     
     var body: some View {
         let isDark = colorScheme == .dark

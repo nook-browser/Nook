@@ -4,7 +4,7 @@ import SwiftUI
 // Controls global opacity of the gradient layer
 struct TransparencySlider: View {
     @Binding var gradient: SpaceGradient
-    @EnvironmentObject var gradientColorManager: GradientColorManager
+    @Environment(GradientColorManager.self) private var gradientColorManager
     @State private var localOpacity: Double = 1.0
 
     var body: some View {

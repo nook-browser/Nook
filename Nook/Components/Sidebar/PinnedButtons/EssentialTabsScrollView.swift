@@ -11,7 +11,7 @@ struct EssentialTabsScrollView: View {
     let width: CGFloat
     let currentSpaceScrollID: Binding<UUID?>
     let visibleSpaceIndices: [Int]
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserManager.self) private var browserManager
     
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {

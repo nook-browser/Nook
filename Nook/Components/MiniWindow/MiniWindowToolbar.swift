@@ -10,7 +10,7 @@ import AppKit
 
 struct MiniWindowToolbar: View {
     @Environment(\.colorScheme) private var colorScheme
-    @EnvironmentObject var gradientColorManager: GradientColorManager
+    @Environment(GradientColorManager.self) private var gradientColorManager
     private var fallbackBackgroundNSColor: NSColor {
         NSColor(hex: colorScheme == .dark ? "#242424" : "#EDEDED") ?? (colorScheme == .dark ? .black : .white)
     }

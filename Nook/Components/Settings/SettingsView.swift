@@ -10,8 +10,8 @@ import SwiftUI
 
 // MARK: - Settings Root (Native macOS Settings)
 struct SettingsView: View {
-    @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var gradientColorManager: GradientColorManager
+    @Environment(BrowserManager.self) private var browserManager
+    @Environment(GradientColorManager.self) private var gradientColorManager
 
     var body: some View {
         TabView(selection: $browserManager.settingsManager.currentSettingsTab) {
@@ -146,7 +146,7 @@ struct SettingsTabItem: View {
 // MARK: - General Settings
 
 struct GeneralSettingsView: View {
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserManager.self) private var browserManager
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
@@ -401,7 +401,7 @@ struct GeneralSettingsView: View {
 // MARK: - Placeholder Settings Views
 
 struct ProfilesSettingsView: View {
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserManager.self) private var browserManager
     @State private var profileToRename: Profile? = nil
     @State private var profileToDelete: Profile? = nil
 
@@ -478,7 +478,7 @@ struct ProfilesSettingsView: View {
 
                 // Migration controls appear under the profile list
                 MigrationControls()
-                    .environmentObject(browserManager)
+                    .environment(browserManager)
 
                 Divider().opacity(0.4)
 
@@ -771,7 +771,7 @@ struct ProfilesSettingsView: View {
     }
 
     private struct SpaceAssignmentRowView: View {
-        @EnvironmentObject var browserManager: BrowserManager
+        @Environment(BrowserManager.self) private var browserManager
         let space: Space
 
         var body: some View {
@@ -797,7 +797,7 @@ struct ProfilesSettingsView: View {
                         .font(.subheadline)
                     HStack(spacing: 6) {
                         SpaceProfileBadge(space: space, size: .compact)
-                            .environmentObject(browserManager)
+                            .environment(browserManager)
                         Text(currentProfileName)
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -838,7 +838,7 @@ struct ProfilesSettingsView: View {
                         onSelect: { _ in },
                         compact: true
                     )
-                    .environmentObject(browserManager)
+                    .environment(browserManager)
                 } label: {
                     Label("Change", systemImage: "person.crop.circle")
                         .labelStyle(.titleAndIcon)
@@ -879,7 +879,7 @@ struct ProfilesSettingsView: View {
 
 // MARK: - Migration Controls
 private struct MigrationControls: View {
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserManager.self) private var browserManager
     @State private var legacySummary: BrowserManager.LegacyDataSummary? = nil
     @State private var lastDetectionDate: Date? = nil
     @State private var showingCancelConfirm: Bool = false
@@ -1009,7 +1009,7 @@ private struct MigrationControls: View {
 }
 
 struct ShortcutsSettingsView: View {
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserManager.self) private var browserManager
     @State private var searchText = ""
     @State private var selectedCategory: ShortcutCategory? = nil
 
@@ -1240,7 +1240,7 @@ private struct CategoryFilterChip: View {
 }
 
 struct ExtensionsSettingsView: View {
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserManager.self) private var browserManager
     @State private var showingInstallDialog = false
 
     var body: some View {
@@ -1283,7 +1283,7 @@ struct ExtensionsSettingsView: View {
                                     id: \.id
                                 ) { ext in
                                     ExtensionRowView(extension: ext)
-                                        .environmentObject(browserManager)
+                                        .environment(browserManager)
                                 }
                             }
                             .padding(.vertical)
@@ -1324,7 +1324,7 @@ struct ExtensionsSettingsView: View {
 
 struct ExtensionRowView: View {
     let `extension`: InstalledExtension
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserManager.self) private var browserManager
 
     var body: some View {
         HStack(spacing: 12) {
@@ -1400,7 +1400,7 @@ struct ExtensionRowView: View {
 }
 
 struct AdvancedSettingsView: View {
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserManager.self) private var browserManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -1514,7 +1514,7 @@ struct SettingsSectionCard<Content: View>: View {
 }
 
 struct SettingsHeroCard: View {
-    @EnvironmentObject var gradientColorManager: GradientColorManager
+    @Environment(GradientColorManager.self) private var gradientColorManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {

@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SpaceTitle: View {
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserManager.self) private var browserManager
     @Environment(\.colorScheme) var colorScheme
 
     let space: Space
@@ -93,7 +93,7 @@ struct SpaceTitle: View {
                     currentProfileId: space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID(),
                     onProfileSelected: { assignProfile($0) }
                 )
-                .environmentObject(browserManager)
+                .environment(browserManager)
                 Divider()
                 Button {
                     startRenaming()
@@ -210,7 +210,7 @@ struct SpaceTitle: View {
                 currentProfileId: space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID(),
                 onProfileSelected: { assignProfile($0) }
             )
-            .environmentObject(browserManager)
+            .environment(browserManager)
             Divider()
             Button {
                 createFolder()

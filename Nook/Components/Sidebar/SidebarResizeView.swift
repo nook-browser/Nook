@@ -8,8 +8,8 @@
 import SwiftUI
 
 struct SidebarResizeView: View {
-    @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserManager.self) private var browserManager
+    @Environment(BrowserWindowState.self) private var windowState
     @State private var isResizing = false
     @State private var isHovering = false
     @State private var startingWidth: CGFloat = 0

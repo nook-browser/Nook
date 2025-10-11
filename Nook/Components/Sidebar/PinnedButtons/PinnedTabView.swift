@@ -15,7 +15,7 @@ struct PinnedTabView: View {
     var isActive: Bool
     var action: () -> Void
 
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserManager.self) private var browserManager
     @Environment(\.colorScheme) var colorScheme
     @State private var isHovered: Bool = false
 

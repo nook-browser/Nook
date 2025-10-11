@@ -9,7 +9,7 @@ import SwiftUI
 import WebKit
 
 struct PrivacySettingsView: View {
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserManager.self) private var browserManager
     @StateObject private var cookieManager = CookieManager()
     @StateObject private var cacheManager = CacheManager()
     @State private var showingCookieManager = false
@@ -451,5 +451,5 @@ struct PrivacySettingsView: View {
 
 #Preview {
     PrivacySettingsView()
-        .environmentObject(BrowserManager())
+        .environment(BrowserManager())
 }
