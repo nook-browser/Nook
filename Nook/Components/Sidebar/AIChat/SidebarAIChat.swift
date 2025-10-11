@@ -69,15 +69,6 @@ To enhance the web browsing experience by providing intelligent, context-aware s
     
     var body: some View {
         VStack(spacing: 0) {
-            // Window controls area (for macOS traffic lights)
-            if browserManager.settingsManager.sidebarPosition == .right {
-                HStack {
-                    MacButtonsView()
-                        .frame(width: 70, height: 20)
-                    Spacer()
-                }
-            }
-            
             VStack(spacing: 0) {
                 // Header
                 HStack(spacing: 8) {
@@ -137,7 +128,6 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                     .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 8)
-                .padding(.vertical, 12)
                 
                 // API Key input section
                 if showApiKeyInput {
@@ -285,6 +275,8 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                 .cornerRadius(12)
             }
         }
+        .padding(.top, 8)
+        .padding(.bottom, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             apiKeyInput = settingsManager.geminiApiKey
