@@ -7,18 +7,17 @@
 
 import Foundation
 import SwiftUI
-import Observation
+import Combine
 
 @MainActor
-@Observable
-public class TabFolder: NSObject, Identifiable {
+public class TabFolder: NSObject, Identifiable, ObservableObject {
     public let id: UUID
-    var name: String
+    @Published var name: String
     var spaceId: UUID
-    var isOpen: Bool = false
-    var icon: String = "folder"
-    var index: Int
-    var color: NSColor
+    @Published var isOpen: Bool = false
+    @Published var icon: String = "folder"
+    @Published var index: Int
+    @Published var color: NSColor
 
     init(
         id: UUID = UUID(),

@@ -10,16 +10,14 @@ import WebKit
 import SwiftData
 import AppKit
 import SwiftUI
-import Observation
 
 @available(macOS 15.4, *)
 @MainActor
-@Observable
-final class ExtensionManager: NSObject, WKWebExtensionControllerDelegate {
+final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControllerDelegate {
     static let shared = ExtensionManager()
     
-    var installedExtensions: [InstalledExtension] = []
-    var isExtensionSupportAvailable: Bool = false
+    @Published var installedExtensions: [InstalledExtension] = []
+    @Published var isExtensionSupportAvailable: Bool = false
     // Scope note: Installed/enabled state is global across profiles; extension storage/state
     // (chrome.storage, cookies, etc.) is isolated per-profile via profile-specific data stores.
     
