@@ -20,14 +20,18 @@ struct TopBarView: View {
                 .frame(width: 70)
             
             // Left: Sidebar toggle button
-            NavButton(iconName: browserManager.settingsManager.sidebarPosition == .left ? "sidebar.left" : "sidebar.right", disabled: false, action: {
+            Button("Toggle Sidebar", systemImage: browserManager.settingsManager.sidebarPosition == .left ? "sidebar.left" : "sidebar.right") {
                 browserManager.toggleSidebar(for: windowState)
-            })
+            }
+            .labelStyle(.iconOnly)
+            .buttonStyle(NavButtonStyle())
 
             if browserManager.settingsManager.showAIAssistant {
-                NavButton(iconName: "sparkle", disabled: false, action: {
+                Button("Toggle AI Assistant", systemImage: "sparkle") {
                     browserManager.toggleAISidebar(for: windowState)
-                })
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(NavButtonStyle())
             }
             
             Spacer()
@@ -36,31 +40,31 @@ struct TopBarView: View {
             HStack(spacing: 12) {
                 // Navigation controls
                 HStack(spacing: 4) {
-                    NavButton(
-                        iconName: "arrow.backward",
-                        disabled: !tabWrapper.canGoBack,
-                        action: goBack
-                    )
-                    .contextMenu {
-                        NavigationHistoryContextMenu(
-                            historyType: .back,
-                            windowState: windowState
-                        )
-                    }
-                    
-                    NavButton(
-                        iconName: "arrow.forward",
-                        disabled: !tabWrapper.canGoForward,
-                        action: goForward
-                    )
-                    .contextMenu {
-                        NavigationHistoryContextMenu(
-                            historyType: .forward,
-                            windowState: windowState
-                        )
-                    }
-                    
-                    RefreshButton(action: refreshCurrentTab)
+                    Button("Go Back", systemImage: "arrow.backward", action: goBack)
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(NavButtonStyle())
+                        .disabled(!tabWrapper.canGoBack)
+                        .contextMenu {
+                            NavigationHistoryContextMenu(
+                                historyType: .back,
+                                windowState: windowState
+                            )
+                        }
+
+                    Button("Go Forward", systemImage: "arrow.forward", action: goForward)
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(NavButtonStyle())
+                        .disabled(!tabWrapper.canGoForward)
+                        .contextMenu {
+                            NavigationHistoryContextMenu(
+                                historyType: .forward,
+                                windowState: windowState
+                            )
+                        }
+
+                    Button("Reload", systemImage: "arrow.clockwise", action: refreshCurrentTab)
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(NavButtonStyle())
                 }
                 
                 // URL bar

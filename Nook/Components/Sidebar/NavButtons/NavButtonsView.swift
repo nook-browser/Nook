@@ -65,14 +65,18 @@ struct NavButtonsView: View {
                     .frame(width: 70)
             }
 
-            NavButton(iconName: sidebarOnLeft ? "sidebar.left" : "sidebar.right", disabled: false, action: {
+            Button("Toggle Sidebar", systemImage: sidebarOnLeft ? "sidebar.left" : "sidebar.right") {
                 browserManager.toggleSidebar(for: windowState)
-            })
+            }
+            .labelStyle(.iconOnly)
+            .buttonStyle(NavButtonStyle())
 
             if browserManager.settingsManager.showAIAssistant {
-                NavButton(iconName: "sparkle", disabled: false, action: {
+                Button("Toggle AI Assistant", systemImage: "sparkle") {
                     browserManager.toggleAISidebar(for: windowState)
-                })
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(NavButtonStyle())
             }
 
             Spacer()
@@ -85,28 +89,27 @@ struct NavButtonsView: View {
                     )
                 } else {
                     HStack(alignment: .center, spacing: 8) {
-                        NavButton(
-                            iconName: "arrow.backward",
-                            disabled: !tabWrapper.canGoBack,
-                            action: goBack
-                        )
-                        .contextMenu {
-                            NavigationHistoryContextMenu(
-                                historyType: .back,
-                                windowState: windowState
-                            )
-                        }
-                        NavButton(
-                            iconName: "arrow.forward",
-                            disabled: !tabWrapper.canGoForward,
-                            action: goForward
-                        )
-                        .contextMenu {
-                            NavigationHistoryContextMenu(
-                                historyType: .forward,
-                                windowState: windowState
-                            )
-                        }
+                        Button("Go Back", systemImage: "arrow.backward", action: goBack)
+                            .labelStyle(.iconOnly)
+                            .buttonStyle(NavButtonStyle())
+                            .disabled(!tabWrapper.canGoBack)
+                            .contextMenu {
+                                NavigationHistoryContextMenu(
+                                    historyType: .back,
+                                    windowState: windowState
+                                )
+                            }
+
+                        Button("Go Forward", systemImage: "arrow.forward", action: goForward)
+                            .labelStyle(.iconOnly)
+                            .buttonStyle(NavButtonStyle())
+                            .disabled(!tabWrapper.canGoForward)
+                            .contextMenu {
+                                NavigationHistoryContextMenu(
+                                    historyType: .forward,
+                                    windowState: windowState
+                                )
+                            }
                     }
 
                     if shouldCollapseRefresh {
@@ -118,7 +121,9 @@ struct NavButtonsView: View {
                 }
 
                 if !shouldCollapseRefresh {
-                    RefreshButton(action: refreshCurrentTab)
+                    Button("Reload", systemImage: "arrow.clockwise", action: refreshCurrentTab)
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(NavButtonStyle())
                 }
 
                 if !sidebarOnLeft {

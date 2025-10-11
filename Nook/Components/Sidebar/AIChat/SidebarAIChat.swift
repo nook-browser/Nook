@@ -186,11 +186,13 @@ To enhance the web browsing experience by providing intelligent, context-aware s
         }
         .safeAreaInset(edge: .top, content: {
             HStack(spacing: 8) {
-                NavButton(iconName: "xmark", disabled: false, action: {
+                Button("Close", systemImage: "xmark") {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         windowState.isSidebarAIChatVisible = false
                     }
-                })
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(NavButtonStyle())
                 
                 if !messages.isEmpty{
                     Text("Ask Nook")
@@ -201,13 +203,17 @@ To enhance the web browsing experience by providing intelligent, context-aware s
 
                 Spacer()
 
-                NavButton(iconName: "gearshape", disabled: false, action: {
+                Button("Settings", systemImage: "gearshape") {
                     showApiKeyDialog()
-                })
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(NavButtonStyle())
 
-                NavButton(iconName: "trash", disabled: false, action: {
+                Button("Clear Messages", systemImage: "trash") {
                     showClearMessagesDialog()
-                })
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(NavButtonStyle())
                 .disabled(messages.isEmpty)
             }
             .padding(.horizontal, 8)

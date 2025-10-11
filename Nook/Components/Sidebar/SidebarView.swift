@@ -230,7 +230,7 @@ struct SidebarView: View {
                 // Left side icons - anchored to left
                 HStack {
                     ZStack {
-                        NavButton(iconName: "archivebox", disabled: false, action: {
+                        Button("Menu", systemImage: "archivebox") {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 windowState.isSidebarMenuVisible = true
                                 windowState.isSidebarAIChatVisible = false
@@ -240,7 +240,9 @@ struct SidebarView: View {
                                 windowState.sidebarWidth = newWidth
                                 windowState.sidebarContentWidth = max(newWidth - 16, 0)
                             }
-                        })
+                        }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(NavButtonStyle())
                         .onHover { isHovered in
                             isMenuButtonHovered = isHovered
                             if isHovered {
@@ -266,10 +268,12 @@ struct SidebarView: View {
                 // Right side icons - anchored to right
                 HStack {
                     Spacer()
-                    
-                    NavButton(iconName: "plus", disabled: false, action: {
+
+                    Button("New Space", systemImage: "plus") {
                         showSpaceCreationDialog()
-                    })
+                    }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(NavButtonStyle())
                 }
             }
             .padding(.horizontal, 8)
