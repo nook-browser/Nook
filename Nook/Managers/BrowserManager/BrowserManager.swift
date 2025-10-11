@@ -554,6 +554,7 @@ class BrowserManager: ObservableObject {
         }
         self.trackingProtectionManager.attach(browserManager: self)
         self.trackingProtectionManager.setEnabled(self.settingsManager.blockCrossSiteTracking)
+        
         self.externalMiniWindowManager.attach(browserManager: self)
         self.peekManager.attach(browserManager: self)
         bindPeekManagerUpdates()

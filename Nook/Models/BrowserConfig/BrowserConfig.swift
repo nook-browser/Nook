@@ -12,6 +12,8 @@ import WebKit
 class BrowserConfiguration {
     static let shared = BrowserConfiguration()
     
+    private init() {}
+    
     lazy var webViewConfiguration: WKWebViewConfiguration = {
         let config = WKWebViewConfiguration()
 
@@ -108,7 +110,6 @@ class BrowserConfiguration {
         
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
 
-
         return config
     }
 
@@ -164,8 +165,6 @@ class BrowserConfiguration {
         config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
         return config
     }
-
-    private init() {}
     
     // MARK: - Chrome Web Store Integration
     
