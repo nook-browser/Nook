@@ -23,84 +23,86 @@ final class BasicAuthDialogModel {
     }
 }
 
-struct BasicAuthDialog: DialogProtocol {
+struct BasicAuthDialog: DialogPresentable {
     @Bindable var model: BasicAuthDialogModel
     let onSubmit: (String, String, Bool) -> Void
     let onCancel: () -> Void
 
-    init(model: BasicAuthDialogModel, onSubmit: @escaping (String, String, Bool) -> Void, onCancel: @escaping () -> Void) {
+    init(
+        model: BasicAuthDialogModel,
+        onSubmit: @escaping (String, String, Bool) -> Void,
+        onCancel: @escaping () -> Void
+    ) {
         self.model = model
         self.onSubmit = onSubmit
         self.onCancel = onCancel
     }
 
-    var header: AnyView {
-        AnyView(
-            DialogHeader(
-                icon: "lock.circle",
-                title: "Authentication Required",
-                subtitle: "The server \(model.host) is requesting credentials."
-            )
+    func dialogHeader() -> DialogHeader {
+        DialogHeader(
+            icon: "lock.circle",
+            title: "Authentication Required",
+            subtitle: "The server \(model.host) is requesting credentials."
         )
     }
 
-    var content: AnyView {
-        AnyView(
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("User name")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.primary)
-                    NookTextField(
-                        text: $model.username,
-                        placeholder: "Enter user name",
-                        iconName: "person"
-                    )
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Password")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.primary)
-                    SecureField("Enter password", text: $model.password)
-                        .textFieldStyle(PlainTextFieldStyle())
-                        .padding(.vertical, 12)
-                        .padding(.horizontal, 16)
-                        .background(Color.primary.opacity(0.05))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-
-                Toggle(isOn: $model.rememberCredential) {
-                    Text("Remember for this site")
-                }
-                .toggleStyle(.switch)
+    @ViewBuilder
+    func dialogContent() -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("User name")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+                NookTextField(
+                    text: $model.username,
+                    placeholder: "Enter user name",
+                    iconName: "person"
+                )
             }
-            .padding(.horizontal, 4)
-        )
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Password")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+                SecureField("Enter password", text: $model.password)
+                    .textFieldStyle(PlainTextFieldStyle())
+                    .padding(.vertical, 12)
+                    .padding(.horizontal, 16)
+                    .background(Color.primary.opacity(0.05))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+
+            Toggle(isOn: $model.rememberCredential) {
+                Text("Remember for this site")
+            }
+            .toggleStyle(.switch)
+        }
+        .padding(.horizontal, 4)
     }
 
-    var footer: AnyView {
-        AnyView(
-            HStack(spacing: 12) {
-                Spacer()
-                NookButton.createButton(
+    func dialogFooter() -> DialogFooter {
+        let canSubmit = !model.username.isEmpty && !model.password.isEmpty
+
+        return DialogFooter(
+            rightButtons: [
+                DialogButton(
                     text: "Cancel",
                     variant: .secondary,
-                    action: onCancel,
-                    keyboardShortcut: .escape
-                )
-                NookButton(
+                    keyboardShortcut: .escape,
+                    action: onCancel
+                ),
+                DialogButton(
                     text: "Sign In",
                     iconName: "arrow.right.circle",
                     variant: .primary,
+                    keyboardShortcut: .return,
+                    isEnabled: canSubmit,
                     action: {
                         onSubmit(model.username, model.password, model.rememberCredential)
-                    },
-                    keyboardShortcut: .return
+                    }
                 )
-                .disabled(model.username.isEmpty || model.password.isEmpty)
-            }
-            .padding(.top, 8)
+            ]
         )
     }
 }
+

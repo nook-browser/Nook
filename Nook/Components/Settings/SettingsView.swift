@@ -403,10 +403,6 @@ struct GeneralSettingsView: View {
 
 struct ProfilesSettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @State private var creatingName: String = ""
-    @State private var creatingIcon: String = "person.crop.circle"
-    @State private var renamingName: String = ""
-    @State private var renamingIcon: String = "person.crop.circle"
     @State private var profileToRename: Profile? = nil
     @State private var profileToDelete: Profile? = nil
 
@@ -581,71 +577,65 @@ struct ProfilesSettingsView: View {
 
     // MARK: - Actions
     private func showCreateDialog() {
-        creatingName = ""
-        creatingIcon = "person.crop.circle"
-        let dialog = ProfileCreationDialog(
-            profileName: $creatingName,
-            profileIcon: $creatingIcon,
-            isNameAvailable: { proposed in
-                let trimmed = proposed.trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                )
-                guard !trimmed.isEmpty else { return false }
-                return !browserManager.profileManager.profiles.contains {
-                    $0.name.caseInsensitiveCompare(trimmed) == .orderedSame
+        browserManager.dialogManager.showDialog(
+            ProfileCreationDialog(
+                isNameAvailable: { proposed in
+                    let trimmed = proposed.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                    guard !trimmed.isEmpty else { return false }
+                    return !browserManager.profileManager.profiles.contains {
+                        $0.name.caseInsensitiveCompare(trimmed) == .orderedSame
+                    }
+                },
+                onCreate: { name, icon in
+                    let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmed.isEmpty else { return }
+                    let safeIcon = icon.isEmpty ? "person.crop.circle" : icon
+                    let created = browserManager.profileManager.createProfile(
+                        name: trimmed,
+                        icon: safeIcon
+                    )
+                    Task { await browserManager.switchToProfile(created) }
+                    browserManager.dialogManager.closeDialog()
+                },
+                onCancel: {
+                    browserManager.dialogManager.closeDialog()
                 }
-            },
-            onSave: {
-                let trimmed = creatingName.trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                )
-                guard !trimmed.isEmpty else { return }
-                let safeIcon =
-                    creatingIcon.isEmpty ? "person.crop.circle" : creatingIcon
-                let created = browserManager.profileManager.createProfile(
-                    name: trimmed,
-                    icon: safeIcon
-                )
-                Task { await browserManager.switchToProfile(created) }
-            },
-            onCancel: { browserManager.dialogManager.closeDialog() },
-            onClose: { browserManager.dialogManager.closeDialog() }
+            )
         )
-        browserManager.dialogManager.showDialog(dialog)
     }
 
     private func startRename(_ profile: Profile) {
         profileToRename = profile
-        renamingName = profile.name
-        renamingIcon = profile.icon
-        let dialog = ProfileRenameDialog(
-            originalProfile: profile,
-            profileName: $renamingName,
-            profileIcon: $renamingIcon,
-            isNameAvailable: { proposed in
-                let trimmed = proposed.trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                )
-                return !browserManager.profileManager.profiles.contains {
-                    $0.id != profile.id
-                        && $0.name.caseInsensitiveCompare(trimmed)
-                            == .orderedSame
+        browserManager.dialogManager.showDialog(
+            ProfileRenameDialog(
+                originalProfile: profile,
+                isNameAvailable: { proposed in
+                    let trimmed = proposed.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                    return !browserManager.profileManager.profiles.contains {
+                        $0.id != profile.id
+                            && $0.name.caseInsensitiveCompare(trimmed)
+                                == .orderedSame
+                    }
+                },
+                onSave: { newName, newIcon in
+                    guard let target = profileToRename else {
+                        browserManager.dialogManager.closeDialog()
+                        return
+                    }
+                    target.name = newName
+                    target.icon = newIcon
+                    browserManager.profileManager.persistProfiles()
+                    browserManager.dialogManager.closeDialog()
+                },
+                onCancel: {
+                    browserManager.dialogManager.closeDialog()
                 }
-            },
-            onSave: {
-                guard let p = profileToRename else { return }
-                let trimmed = renamingName.trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                )
-                guard !trimmed.isEmpty else { return }
-                p.name = trimmed
-                p.icon = renamingIcon
-                browserManager.profileManager.persistProfiles()
-                browserManager.dialogManager.closeDialog()
-            },
-            onCancel: { browserManager.dialogManager.closeDialog() }
+            )
         )
-        browserManager.dialogManager.showDialog(dialog)
     }
 
     private func startDelete(_ profile: Profile) {
@@ -673,76 +663,79 @@ struct ProfilesSettingsView: View {
     }
 
     private func showDataManagement(for profile: Profile) {
-        let header = AnyView(
-            DialogHeader(
-                icon: "internaldrive",
-                title: "Manage Data",
-                subtitle: "Profile data management"
-            )
-        )
-        let content = VStack(alignment: .leading, spacing: 12) {
-            Text("Each profile maintains its own isolated website data store.")
-            Text("Privacy tools are available under the Privacy tab.")
-                .foregroundStyle(.secondary)
-        }
-        let footer = AnyView(
-            DialogFooter(rightButtons: [
-                DialogButton(text: "Close", variant: .primary) {
-                    browserManager.dialogManager.closeDialog()
+        browserManager.dialogManager.showDialog {
+            StandardDialog(
+                header: {
+                    DialogHeader(
+                        icon: "internaldrive",
+                        title: "Manage Data",
+                        subtitle: "Profile data management"
+                    )
+                },
+                content: {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Each profile maintains its own isolated website data store.")
+                        Text("Privacy tools are available under the Privacy tab.")
+                            .foregroundStyle(.secondary)
+                    }
+                },
+                footer: {
+                    DialogFooter(rightButtons: [
+                        DialogButton(text: "Close", variant: .primary) {
+                            browserManager.dialogManager.closeDialog()
+                        }
+                    ])
                 }
-            ])
-        )
-        browserManager.dialogManager.showCustomContentDialog(
-            header: header,
-            content: AnyView(content),
-            footer: footer
-        )
+            )
+        }
     }
 
     private func showExportPlaceholder() {
-        let header = AnyView(
-            DialogHeader(
-                icon: "square.and.arrow.up",
-                title: "Export Profile",
-                subtitle: "Coming soon"
-            )
-        )
-        let body = AnyView(Text("Profile export is not yet implemented."))
-        let footer = AnyView(
-            DialogFooter(rightButtons: [
-                DialogButton(text: "OK", variant: .primary) {
-                    browserManager.dialogManager.closeDialog()
+        browserManager.dialogManager.showDialog {
+            StandardDialog(
+                header: {
+                    DialogHeader(
+                        icon: "square.and.arrow.up",
+                        title: "Export Profile",
+                        subtitle: "Coming soon"
+                    )
+                },
+                content: {
+                    Text("Profile export is not yet implemented.")
+                },
+                footer: {
+                    DialogFooter(rightButtons: [
+                        DialogButton(text: "OK", variant: .primary) {
+                            browserManager.dialogManager.closeDialog()
+                        }
+                    ])
                 }
-            ])
-        )
-        browserManager.dialogManager.showCustomContentDialog(
-            header: header,
-            content: body,
-            footer: footer
-        )
+            )
+        }
     }
 
     private func showImportPlaceholder() {
-        let header = AnyView(
-            DialogHeader(
-                icon: "square.and.arrow.down",
-                title: "Import Profile",
-                subtitle: "Coming soon"
-            )
-        )
-        let body = AnyView(Text("Profile import is not yet implemented."))
-        let footer = AnyView(
-            DialogFooter(rightButtons: [
-                DialogButton(text: "OK", variant: .primary) {
-                    browserManager.dialogManager.closeDialog()
+        browserManager.dialogManager.showDialog {
+            StandardDialog(
+                header: {
+                    DialogHeader(
+                        icon: "square.and.arrow.down",
+                        title: "Import Profile",
+                        subtitle: "Coming soon"
+                    )
+                },
+                content: {
+                    Text("Profile import is not yet implemented.")
+                },
+                footer: {
+                    DialogFooter(rightButtons: [
+                        DialogButton(text: "OK", variant: .primary) {
+                            browserManager.dialogManager.closeDialog()
+                        }
+                    ])
                 }
-            ])
-        )
-        browserManager.dialogManager.showCustomContentDialog(
-            header: header,
-            content: body,
-            footer: footer
-        )
+            )
+        }
     }
 
     // MARK: - Space assignment helpers and views
