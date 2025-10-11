@@ -247,28 +247,26 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                     }
                 HStack{
                     
-                    Picker("Select Model", selection: Binding(get: {
-                        settingsManager.geminiModel
-                    }, set: { model, Transaction in
-                        settingsManager.geminiModel = model
-                    })) {
+                    Menu(settingsManager.geminiModel.displayName) {
                         ForEach(GeminiModel.allCases) { model in
-                            Label(model.displayName, systemImage: model.icon)
+                            Toggle(isOn: Binding(get: {
+                                return settingsManager.geminiModel == model
+                            }, set: { Value in
+                                settingsManager.geminiModel = model
+                            })) {
+                                Label(model.displayName, systemImage: model.icon)
+                            }
                         }
-                    } currentValueLabel: {
-                        Text(settingsManager.geminiModel.displayName)
                     }
-                    .labelsHidden()
+                Spacer()
                     
-                    Spacer()
-                    
-                    Button(action: sendMessage) {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 24))
-                            .foregroundStyle(messageText.isEmpty ? .white.opacity(0.3) : .white.opacity(0.9))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(messageText.isEmpty || isLoading || !hasApiKey)
+                Button(action: sendMessage) {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(messageText.isEmpty ? .white.opacity(0.3) : .white.opacity(0.9))
+                }
+                .buttonStyle(.plain)
+                .disabled(messageText.isEmpty || isLoading || !hasApiKey)
                     
                 }
             }
