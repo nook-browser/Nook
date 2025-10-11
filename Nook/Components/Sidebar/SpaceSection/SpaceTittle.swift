@@ -14,8 +14,6 @@ struct SpaceTitle: View {
     @FocusState private var nameFieldFocused: Bool
     @FocusState private var emojiFieldFocused: Bool
     @State private var isEllipsisHovering: Bool = false
-    @State private var isDropHovering: Bool = false
-    @State private var dropDraggedItem: UUID?
     
     @StateObject private var emojiManager = EmojiPickerManager()
 
@@ -137,40 +135,6 @@ struct SpaceTitle: View {
             .buttonStyle(PlainButtonStyle())
         }
         // Match tabs' internal left/right padding so text aligns
-        .overlay {
-            if browserManager.tabManager.spacePinnedTabs(for: space.id).isEmpty {
-                Color.clear
-                    .contentShape(RoundedRectangle(cornerRadius: 12))
-                    .onDrop(
-                        of: [.text],
-                        delegate: SidebarSectionDropDelegateSimple(
-                            itemsCount: {
-                                browserManager.tabManager.spacePinnedTabs(for: space.id).count
-                            },
-                            draggedItem: $dropDraggedItem,
-                            targetSection: .spacePinned(space.id),
-                            tabManager: browserManager.tabManager,
-                            targetIndex: nil,
-                            onDropEntered: {
-                                withAnimation(.easeInOut(duration: 0.15)) {
-                                    NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
-                                    isDropHovering = true
-                                }
-                            },
-                            onDropCompleted: {
-                                withAnimation(.easeInOut(duration: 0.15)) {
-                                    isDropHovering = false
-                                }
-                            },
-                            onDropExited: {
-                                withAnimation(.easeInOut(duration: 0.15)) {
-                                    isDropHovering = false
-                                }
-                            }
-                        )
-                    )
-            }
-        }
         .padding(.horizontal, 10)
         .frame(height: 40)
         .frame(maxWidth: .infinity)
@@ -231,7 +195,7 @@ struct SpaceTitle: View {
     //MARK: - Colors
     
     private var hoverColor: Color {
-        if isHovering || isDropHovering {
+        if isHovering {
             return colorScheme == .dark ? AppColors.spaceTabHoverLight : AppColors.spaceTabHoverDark
         } else {
             return .clear
