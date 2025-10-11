@@ -101,7 +101,7 @@ struct GradientCanvasEditor: View {
             }
             .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .onAppear { ensurePositions(width: width, height: height, center: center, radius: radius) }
-            .onChange(of: gradient.nodes.count) { _ in ensurePositions(width: width, height: height, center: center, radius: radius) }
+            .onChange(of: gradient.nodes.count) { ensurePositions(width: width, height: height, center: center, radius: radius) }
         }
         .frame(height: 300)
     }

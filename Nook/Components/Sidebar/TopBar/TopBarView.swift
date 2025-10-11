@@ -65,7 +65,7 @@ struct TopBarView: View {
                 
                 // URL bar
                 HStack(spacing: 8) {
-                    if let currentTab = browserManager.currentTab(for: windowState) {
+                    if browserManager.currentTab(for: windowState) != nil {
                         Image(systemName: "link")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(textColor)

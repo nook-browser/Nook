@@ -234,7 +234,7 @@ final class AuthenticationManager: NSObject {
                 manager.dialogManager.closeDialog()
                 finish(with: URLCredential(user: username, password: password, persistence: .forSession))
             },
-            onCancel: { [weak self] in
+            onCancel: {
                 NSApp.mainWindow?.makeFirstResponder(nil)
                 manager.dialogManager.closeDialog()
                 finish(with: nil)

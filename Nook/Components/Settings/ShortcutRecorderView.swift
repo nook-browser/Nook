@@ -64,10 +64,10 @@ struct ShortcutRecorderView: View {
         .onAppear {
             setupKeyMonitor()
         }
-        .onChange(of: recordingKey) { _ in
+        .onChange(of: recordingKey) {
             checkForConflicts()
         }
-        .onChange(of: recordingModifiers) { _ in
+        .onChange(of: recordingModifiers) {
             checkForConflicts()
         }
     }

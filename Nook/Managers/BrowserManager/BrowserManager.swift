@@ -20,18 +20,11 @@ final class Persistence {
     let container: ModelContainer
 
     // MARK: - Constants
-    private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "Persistence")
-    private static let storeFileName = "default.store"
-    private static let backupPrefix = "default_backup_"
+    nonisolated private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "Persistence")
+    nonisolated private static let storeFileName = "default.store"
+    nonisolated private static let backupPrefix = "default_backup_"
     // Backups now use a directory per snapshot: default_backup_<timestamp>/
     
-    private static let dateFormatter: DateFormatter = {
-        let fmt = DateFormatter()
-        fmt.calendar = Calendar(identifier: .gregorian)
-        fmt.locale = Locale(identifier: "en_US_POSIX")
-        fmt.dateFormat = "yyyy-MM-dd'T'HH-mm-ss"
-        return fmt
-    }()
     static let schema = Schema([
         SpaceEntity.self,
         ProfileEntity.self,
@@ -177,7 +170,7 @@ final class Persistence {
             let backupsRoot = Self.backupsDirectoryURL
 
             // Create a timestamped backup directory
-            let stamp = Self.dateFormatter.string(from: Date())
+            let stamp = Self.makeBackupTimestamp()
             let dirName = "\(Self.backupPrefix)\(stamp)"
             let backupDir = backupsRoot.appendingPathComponent(dirName, isDirectory: true)
             try fm.createDirectory(at: backupDir, withIntermediateDirectories: true)
@@ -267,6 +260,14 @@ final class Persistence {
         let walURL = URL(fileURLWithPath: base.path + "-wal")
         let shmURL = URL(fileURLWithPath: base.path + "-shm")
         return [walURL, shmURL]
+    }
+    
+    nonisolated private static func makeBackupTimestamp() -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd'T'HH-mm-ss"
+        return formatter.string(from: Date())
     }
 
     // Run a throwing closure on a background utility queue and block until it finishes
@@ -554,6 +555,7 @@ class BrowserManager: ObservableObject {
         }
         self.trackingProtectionManager.attach(browserManager: self)
         self.trackingProtectionManager.setEnabled(self.settingsManager.blockCrossSiteTracking)
+        
         self.externalMiniWindowManager.attach(browserManager: self)
         self.peekManager.attach(browserManager: self)
         bindPeekManagerUpdates()
@@ -574,7 +576,9 @@ class BrowserManager: ObservableObject {
             queue: .main
         ) { [weak self] note in
             guard let enabled = note.userInfo?["enabled"] as? Bool else { return }
-            self?.trackingProtectionManager.setEnabled(enabled)
+            Task { @MainActor [weak self] in
+                self?.trackingProtectionManager.setEnabled(enabled)
+            }
         }
     }
 
@@ -2195,7 +2199,6 @@ class BrowserManager: ObservableObject {
         // Copy configuration from the original tab's web view if it exists
         if let originalWebView = tab.webView {
             configuration.websiteDataStore = originalWebView.configuration.websiteDataStore
-            configuration.processPool = originalWebView.configuration.processPool
             // CRITICAL: Copy all preferences including PiP settings
             configuration.preferences = originalWebView.configuration.preferences
             configuration.defaultWebpagePreferences = originalWebView.configuration.defaultWebpagePreferences
@@ -2215,7 +2218,6 @@ class BrowserManager: ObservableObject {
             preferences.allowsContentJavaScript = true
             configuration.defaultWebpagePreferences = preferences
             
-            configuration.preferences.javaScriptEnabled = true
             configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
             configuration.mediaTypesRequiringUserActionForPlayback = []
             configuration.allowsAirPlayForMediaPlayback = true
@@ -2416,7 +2418,7 @@ class BrowserManager: ObservableObject {
     
     /// Validate and fix window states after tab/space mutations
     func validateWindowStates() {
-        for (windowId, windowState) in windowStates {
+        for (_, windowState) in windowStates {
             var needsUpdate = false
             
             // Check if current tab still exists

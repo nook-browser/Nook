@@ -37,7 +37,6 @@ struct SettingsView: View {
             }
             .tag(SettingsTabs.privacy)
 
-
             SettingsPane {
                 ProfilesSettingsView()
             }
@@ -86,7 +85,7 @@ struct SettingsView: View {
             .tag(SettingsTabs.advanced)
 
         }
-        .onChange(of: browserManager.settingsManager.experimentalExtensions) { experimentalEnabled in
+        .onChange(of: browserManager.settingsManager.experimentalExtensions) { _, experimentalEnabled in
             // If extensions are disabled and the current tab is extensions, switch to a valid tab
             if !experimentalEnabled && browserManager.settingsManager.currentSettingsTab == .extensions {
                 browserManager.settingsManager.currentSettingsTab = .advanced

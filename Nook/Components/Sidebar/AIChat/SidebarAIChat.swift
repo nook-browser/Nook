@@ -19,6 +19,23 @@ struct ChatMessage: Identifiable, Equatable {
     }
 }
 
+struct OllamaModel: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let size: Int64
+    let modifiedAt: String
+    
+    var displayName: String {
+        name
+    }
+    
+    var sizeFormatted: String {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: size)
+    }
+}
+
 struct SidebarAIChat: View {
     @EnvironmentObject var windowState: BrowserWindowState
     @EnvironmentObject var browserManager: BrowserManager
@@ -29,10 +46,21 @@ struct SidebarAIChat: View {
     @State private var isLoading: Bool = false
     @State private var showApiKeyInput: Bool = false
     @State private var apiKeyInput: String = ""
+    @State private var endpointInput: String = ""
+    @State private var modelInput: String = ""
+    @State private var ollamaModels: [OllamaModel] = []
+    @State private var isFetchingModels: Bool = false
     @FocusState private var isTextFieldFocused: Bool
     
     private var hasApiKey: Bool {
-        !settingsManager.geminiApiKey.isEmpty
+        switch settingsManager.aiProvider {
+        case .gemini:
+            return !settingsManager.geminiApiKey.isEmpty
+        case .openRouter:
+            return !settingsManager.openRouterApiKey.isEmpty
+        case .ollama:
+            return true // Ollama doesn't require an API key!!!! YAYYYYYYY
+        }
     }
     
     private let systemPrompt = """
@@ -69,44 +97,6 @@ To enhance the web browsing experience by providing intelligent, context-aware s
     
     var body: some View {
         VStack(spacing: 0) {
-            // API Key input section
-            if showApiKeyInput {
-                VStack(spacing: 8) {
-                    HStack(spacing: 8) {
-                        SecureField("Enter Gemini API Key", text: $apiKeyInput)
-                            .textFieldStyle(.plain)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.8))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 10)
-                            .background(.white.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                        
-                        Button(action: {
-                            settingsManager.geminiApiKey = apiKeyInput
-                            showApiKeyInput = false
-                            apiKeyInput = ""
-                        }) {
-                            Text("Save")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.black)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(.white.opacity(0.9))
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    
-                    Text("Get your API key from Google AI Studio")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.white.opacity(0.5))
-                }
-                .padding(.horizontal, 8)
-                .padding(.bottom, 8)
-                .transition(.move(edge: .top).combined(with: .opacity))
-            }
-            
             // Messages area
             ScrollViewReader { proxy in
                 ScrollView {
@@ -116,16 +106,16 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                                 Image(systemName: "key.fill")
                                     .font(.system(size: 32))
                                     .foregroundStyle(.white.opacity(0.3))
-                                
+
                                 Text("API Key Required")
                                     .font(.system(size: 14, weight: .semibold))
                                     .foregroundStyle(.white.opacity(0.8))
-                                
-                                Text("Add your Gemini API key to start chatting")
+
+                                Text("Add your API key to start chatting")
                                     .font(.system(size: 12))
                                     .foregroundStyle(.white.opacity(0.6))
                                     .multilineTextAlignment(.center)
-                                
+
                                 Button(action: {
                                     showApiKeyInput = true
                                 }) {
@@ -212,16 +202,238 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                         .foregroundStyle(.white.opacity(0.9))
                         .transition(.blur.animation(.smooth))
                 }
-                
+
                 Spacer()
-                
-                NavButton(iconName: "key", disabled: false, action: {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        
-                        showApiKeyInput.toggle()
+
+                Menu {
+                    Menu("Provider") {
+                        ForEach(AIProvider.allCases) { provider in
+                            Button(action: {
+                                settingsManager.aiProvider = provider
+                            }) {
+                                HStack {
+                                    Text(provider.displayName)
+                                    if settingsManager.aiProvider == provider {
+                                        Spacer()
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
                     }
-                })
-                
+
+                    Divider()
+
+                    Button {
+                        showApiKeyInput.toggle()
+                    } label: {
+                        Label("Settings", systemImage: "key")
+                    }
+
+                    Divider()
+
+                    Menu("Model") {
+                        switch settingsManager.aiProvider {
+                        case .gemini:
+                            ForEach(GeminiModel.allCases) { model in
+                                Button(action: {
+                                    settingsManager.geminiModel = model
+                                }) {
+                                    HStack {
+                                        Text(model.displayName)
+                                        if settingsManager.geminiModel == model {
+                                            Spacer()
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+                        case .openRouter:
+                            ForEach(OpenRouterModel.allCases) { model in
+                                Button(action: {
+                                    settingsManager.openRouterModel = model
+                                }) {
+                                    HStack {
+                                        Text(model.displayName)
+                                        if settingsManager.openRouterModel == model {
+                                            Spacer()
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+                        case .ollama:
+                            if isFetchingModels {
+                                HStack {
+                                    ProgressView()
+                                        .scaleEffect(0.7)
+                                    Text("Loading models...")
+                                }
+                            } else if ollamaModels.isEmpty {
+                                Button(action: {
+                                    Task {
+                                        await fetchOllamaModels()
+                                    }
+                                }) {
+                                    Text("Fetch Models")
+                                }
+                            } else {
+                                ForEach(ollamaModels) { model in
+                                    Button(action: {
+                                        settingsManager.ollamaModel = model.name
+                                    }) {
+                                        HStack {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(model.displayName)
+                                                Text(model.sizeFormatted)
+                                                    .font(.system(size: 10))
+                                                    .foregroundStyle(.white.opacity(0.5))
+                                            }
+                                            if settingsManager.ollamaModel == model.name {
+                                                Spacer()
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.white.opacity(0.9))
+                }
+                .menuStyle(.borderlessButton)
+
+                // API Key input section
+                if showApiKeyInput {
+                    VStack(spacing: 8) {
+                        switch settingsManager.aiProvider {
+                        case .gemini:
+                            VStack(spacing: 8) {
+                                HStack(spacing: 8) {
+                                    SecureField("Enter Gemini API Key", text: $apiKeyInput)
+                                        .textFieldStyle(.plain)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.8))
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 10)
+                                        .background(.white.opacity(0.1))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                                    Button(action: {
+                                        settingsManager.geminiApiKey = apiKeyInput
+                                        showApiKeyInput = false
+                                        apiKeyInput = ""
+                                    }) {
+                                        Text("Save")
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .foregroundColor(.black)
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 6)
+                                            .background(.white.opacity(0.9))
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+
+                                Text("Get your API key from Google AI Studio")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.white.opacity(0.5))
+                            }
+
+                        case .openRouter:
+                            VStack(spacing: 8) {
+                                HStack(spacing: 8) {
+                                    SecureField("Enter OpenRouter API Key", text: $apiKeyInput)
+                                        .textFieldStyle(.plain)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.8))
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 10)
+                                        .background(.white.opacity(0.1))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                                    Button(action: {
+                                        settingsManager.openRouterApiKey = apiKeyInput
+                                        showApiKeyInput = false
+                                        apiKeyInput = ""
+                                    }) {
+                                        Text("Save")
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .foregroundColor(.black)
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 6)
+                                            .background(.white.opacity(0.9))
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+
+                                Text("Get your API key from openrouter.ai")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.white.opacity(0.5))
+                            }
+
+                        case .ollama:
+                            VStack(spacing: 8) {
+                                HStack(spacing: 8) {
+                                    TextField("Ollama Endpoint", text: $endpointInput)
+                                        .textFieldStyle(.plain)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.8))
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 10)
+                                        .background(.white.opacity(0.1))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                                    Button(action: {
+                                        settingsManager.ollamaEndpoint = endpointInput
+                                        showApiKeyInput = false
+                                        Task {
+                                            await fetchOllamaModels()
+                                        }
+                                    }) {
+                                        Text("Save")
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .foregroundColor(.black)
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 6)
+                                            .background(.white.opacity(0.9))
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+
+                                if ollamaModels.isEmpty && !isFetchingModels {
+                                    Button(action: {
+                                        Task {
+                                            await fetchOllamaModels()
+                                        }
+                                    }) {
+                                        Text("Fetch Available Models")
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .foregroundColor(.black)
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 8)
+                                            .background(.white.opacity(0.9))
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+
+                                Text("Make sure Ollama is running locally")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.white.opacity(0.5))
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+
                 NavButton(iconName: "trash", disabled: false, action: {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         
@@ -246,18 +458,65 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                         sendMessage()
                     }
                 HStack{
-                    
-                    Menu(settingsManager.geminiModel.displayName) {
-                        ForEach(GeminiModel.allCases) { model in
-                            Toggle(isOn: Binding(get: {
-                                return settingsManager.geminiModel == model
-                            }, set: { Value in
-                                settingsManager.geminiModel = model
-                            })) {
-                                Label(model.displayName, systemImage: model.icon)
+
+                    switch settingsManager.aiProvider {
+                    case .gemini:
+                        Menu(settingsManager.geminiModel.displayName) {
+                            ForEach(GeminiModel.allCases) { model in
+                                Toggle(isOn: Binding(get: {
+                                    return settingsManager.geminiModel == model
+                                }, set: { Value in
+                                    settingsManager.geminiModel = model
+                                })) {
+                                    Label(model.displayName, systemImage: model.icon)
+                                }
                             }
                         }
+                    case .openRouter:
+                        Menu(settingsManager.openRouterModel.displayName) {
+                            ForEach(OpenRouterModel.allCases) { model in
+                                Button(action: {
+                                    settingsManager.openRouterModel = model
+                                }) {
+                                    HStack {
+                                        Text(model.displayName)
+                                        if settingsManager.openRouterModel == model {
+                                            Spacer()
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    case .ollama:
+                        if !ollamaModels.isEmpty {
+                            Menu(settingsManager.ollamaModel.isEmpty ? "Select Model" : settingsManager.ollamaModel) {
+                                ForEach(ollamaModels) { model in
+                                    Button(action: {
+                                        settingsManager.ollamaModel = model.name
+                                    }) {
+                                        HStack {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(model.displayName)
+                                                Text(model.sizeFormatted)
+                                                    .font(.system(size: 10))
+                                                    .foregroundStyle(.white.opacity(0.5))
+                                            }
+                                            if settingsManager.ollamaModel == model.name {
+                                                Spacer()
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            Text("No models")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.white.opacity(0.5))
+                        }
                     }
+
                 Spacer()
                     
                 Button(action: sendMessage) {
@@ -280,8 +539,102 @@ To enhance the web browsing experience by providing intelligent, context-aware s
         .safeAreaPadding(.bottom, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
-            apiKeyInput = settingsManager.geminiApiKey
+            updateInputFields()
             isTextFieldFocused = true
+            if settingsManager.aiProvider == .ollama {
+                Task {
+                    await fetchOllamaModels()
+                }
+            }
+        }
+        .onChange(of: settingsManager.aiProvider) { _, newProvider in
+            updateInputFields()
+            if newProvider == .ollama {
+                Task {
+                    await fetchOllamaModels()
+                }
+            }
+        }
+    }
+    
+    private func updateInputFields() {
+        switch settingsManager.aiProvider {
+        case .gemini:
+            apiKeyInput = settingsManager.geminiApiKey
+        case .openRouter:
+            apiKeyInput = settingsManager.openRouterApiKey
+        case .ollama:
+            endpointInput = settingsManager.ollamaEndpoint
+            modelInput = settingsManager.ollamaModel
+        }
+    }
+    
+    private func fetchOllamaModels() async {
+        await MainActor.run {
+            isFetchingModels = true
+        }
+        
+        do {
+            let endpoint = settingsManager.ollamaEndpoint
+            let url = URL(string: "\(endpoint)/api/tags")!
+            
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.timeoutInterval = 5.0
+            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse,
+                  httpResponse.statusCode == 200 else {
+                await MainActor.run {
+                    isFetchingModels = false
+                    ollamaModels = []
+                }
+                return
+            }
+            
+            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            
+            if let modelsArray = json?["models"] as? [[String: Any]] {
+                var fetchedModels: [OllamaModel] = []
+                
+                for modelDict in modelsArray {
+                    if let name = modelDict["name"] as? String,
+                       let size = modelDict["size"] as? Int64,
+                       let modifiedAt = modelDict["modified_at"] as? String {
+                        let model = OllamaModel(
+                            id: name,
+                            name: name,
+                            size: size,
+                            modifiedAt: modifiedAt
+                        )
+                        fetchedModels.append(model)
+                    }
+                }
+                
+                await MainActor.run {
+                    ollamaModels = fetchedModels.sorted { $0.name < $1.name }
+                    isFetchingModels = false
+                    
+                    // If no model is selected or the selected model isn't in the list, select the first one
+                    if !fetchedModels.isEmpty {
+                        if settingsManager.ollamaModel.isEmpty || !fetchedModels.contains(where: { $0.name == settingsManager.ollamaModel }) {
+                            settingsManager.ollamaModel = fetchedModels[0].name
+                        }
+                    }
+                }
+            } else {
+                await MainActor.run {
+                    isFetchingModels = false
+                    ollamaModels = []
+                }
+            }
+        } catch {
+            print("Failed to fetch Ollama models: \(error)")
+            await MainActor.run {
+                isFetchingModels = false
+                ollamaModels = []
+            }
         }
     }
     
@@ -303,25 +656,37 @@ To enhance the web browsing experience by providing intelligent, context-aware s
             let fullPrompt = pageContext + userPrompt
             
             do {
-                // Build conversation history for API
-                var conversationHistory: [[String: Any]] = []
+                let response: String
                 
-                // Add all previous messages (excluding the current user message for now)
-                for msg in messages.dropLast() {
-                    let role = msg.role == .user ? "user" : "model"
+                switch settingsManager.aiProvider {
+                case .gemini:
+                    // Build conversation history for Gemini API
+                    var conversationHistory: [[String: Any]] = []
+                    
+                    // Add all previous messages (excluding the current user message for now)
+                    for msg in messages.dropLast() {
+                        let role = msg.role == .user ? "user" : "model"
+                        conversationHistory.append([
+                            "role": role,
+                            "parts": [["text": msg.content]]
+                        ])
+                    }
+                    
+                    // Add the current user message with page context
                     conversationHistory.append([
-                        "role": role,
-                        "parts": [["text": msg.content]]
+                        "role": "user",
+                        "parts": [["text": fullPrompt]]
                     ])
+                    
+                    response = try await sendToGemini(conversationHistory: conversationHistory)
+                    
+                case .openRouter:
+                    response = try await sendToOpenRouter(userPrompt: fullPrompt)
+                    
+                case .ollama:
+                    response = try await sendToOllama(userPrompt: fullPrompt)
                 }
                 
-                // Add the current user message with page context
-                conversationHistory.append([
-                    "role": "user",
-                    "parts": [["text": fullPrompt]]
-                ])
-                
-                let response = try await sendToGemini(conversationHistory: conversationHistory)
                 await MainActor.run {
                     let assistantMessage = ChatMessage(role: .assistant, content: response, timestamp: Date())
                     messages.append(assistantMessage)
@@ -441,6 +806,111 @@ To enhance the web browsing experience by providing intelligent, context-aware s
         }
         
         throw NSError(domain: "GeminiAPI", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to parse response"])
+    }
+    
+    private func sendToOpenRouter(userPrompt: String) async throws -> String {
+        let apiKey = settingsManager.openRouterApiKey
+        let model = settingsManager.openRouterModel.rawValue
+        let url = URL(string: "https://openrouter.ai/api/v1/chat/completions")!
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        
+        // Build conversation history in OpenAI format
+        var messagesArray: [[String: String]] = []
+        
+        // Add system prompt
+        messagesArray.append([
+            "role": "system",
+            "content": systemPrompt
+        ])
+        
+        // Add conversation history (excluding the current user message)
+        for msg in messages.dropLast() {
+            let role = msg.role == .user ? "user" : "assistant"
+            messagesArray.append([
+                "role": role,
+                "content": msg.content
+            ])
+        }
+        
+        // Add current user prompt with page context
+        messagesArray.append([
+            "role": "user",
+            "content": userPrompt
+        ])
+        
+        let body: [String: Any] = [
+            "model": model,
+            "messages": messagesArray
+        ]
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw NSError(domain: "OpenRouterAPI", code: -1, userInfo: [NSLocalizedDescriptionKey: "API request failed"])
+        }
+        
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        
+        if let choices = json?["choices"] as? [[String: Any]],
+           let firstChoice = choices.first,
+           let message = firstChoice["message"] as? [String: Any],
+           let content = message["content"] as? String {
+            return content
+        }
+        
+        throw NSError(domain: "OpenRouterAPI", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to parse response"])
+    }
+    
+    private func sendToOllama(userPrompt: String) async throws -> String {
+        let endpoint = settingsManager.ollamaEndpoint
+        let model = settingsManager.ollamaModel
+        let url = URL(string: "\(endpoint)/api/generate")!
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // Build conversation context
+        var contextPrompt = systemPrompt + "\n\n"
+        
+        // Add conversation history (excluding the current user message)
+        for msg in messages.dropLast() {
+            let prefix = msg.role == .user ? "User: " : "Assistant: "
+            contextPrompt += "\(prefix)\(msg.content)\n\n"
+        }
+        
+        // Add current user prompt
+        contextPrompt += "User: \(userPrompt)"
+        
+        let body: [String: Any] = [
+            "model": model,
+            "prompt": contextPrompt,
+            "stream": false
+        ]
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw NSError(domain: "OllamaAPI", code: -1, userInfo: [NSLocalizedDescriptionKey: "API request failed. Make sure Ollama is running."])
+        }
+        
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        
+        if let responseText = json?["response"] as? String {
+            return responseText
+        }
+        
+        throw NSError(domain: "OllamaAPI", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to parse response"])
     }
 }
 

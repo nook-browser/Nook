@@ -25,6 +25,11 @@ class SettingsManager {
     private let geminiApiKeyKey = "settings.geminiApiKey"
     private let geminiModelKey = "settings.geminiModel"
     private let showAIAssistantKey = "settings.showAIAssistant"
+    private let aiProviderKey = "settings.aiProvider"
+    private let openRouterApiKeyKey = "settings.openRouterApiKey"
+    private let openRouterModelKey = "settings.openRouterModel"
+    private let ollamaEndpointKey = "settings.ollamaEndpoint"
+    private let ollamaModelKey = "settings.ollamaModel"
     var currentSettingsTab: SettingsTabs = .general
 
     // Stored properties
@@ -117,6 +122,36 @@ class SettingsManager {
         }
     }
 
+    var aiProvider: AIProvider {
+        didSet {
+            userDefaults.set(aiProvider.rawValue, forKey: aiProviderKey)
+        }
+    }
+
+    var openRouterApiKey: String {
+        didSet {
+            userDefaults.set(openRouterApiKey, forKey: openRouterApiKeyKey)
+        }
+    }
+
+    var openRouterModel: OpenRouterModel {
+        didSet {
+            userDefaults.set(openRouterModel.rawValue, forKey: openRouterModelKey)
+        }
+    }
+
+    var ollamaEndpoint: String {
+        didSet {
+            userDefaults.set(ollamaEndpoint, forKey: ollamaEndpointKey)
+        }
+    }
+
+    var ollamaModel: String {
+        didSet {
+            userDefaults.set(ollamaModel, forKey: ollamaModelKey)
+        }
+    }
+
     init() {
         // Register default values
         userDefaults.register(defaults: [
@@ -133,7 +168,12 @@ class SettingsManager {
             experimentalExtensionsKey: false,
             geminiApiKeyKey: "",
             geminiModelKey: GeminiModel.flash.rawValue,
-            showAIAssistantKey: true
+            showAIAssistantKey: true,
+            aiProviderKey: AIProvider.gemini.rawValue,
+            openRouterApiKeyKey: "",
+            openRouterModelKey: OpenRouterModel.gpt4o.rawValue,
+            ollamaEndpointKey: "http://localhost:11434",
+            ollamaModelKey: "llama3"
         ])
 
         // Initialize properties from UserDefaults
@@ -161,6 +201,29 @@ class SettingsManager {
         self.geminiApiKey = userDefaults.string(forKey: geminiApiKeyKey) ?? ""
         self.geminiModel = GeminiModel(rawValue: userDefaults.string(forKey: geminiModelKey) ?? GeminiModel.flash.rawValue) ?? .flash
         self.showAIAssistant = userDefaults.bool(forKey: showAIAssistantKey)
+        self.aiProvider = AIProvider(rawValue: userDefaults.string(forKey: aiProviderKey) ?? AIProvider.gemini.rawValue) ?? .gemini
+        self.openRouterApiKey = userDefaults.string(forKey: openRouterApiKeyKey) ?? ""
+        self.openRouterModel = OpenRouterModel(rawValue: userDefaults.string(forKey: openRouterModelKey) ?? OpenRouterModel.gpt4o.rawValue) ?? .gpt4o
+        self.ollamaEndpoint = userDefaults.string(forKey: ollamaEndpointKey) ?? "http://localhost:11434"
+        self.ollamaModel = userDefaults.string(forKey: ollamaModelKey) ?? "llama3"
+    }
+}
+
+// MARK: - AI Provider
+
+public enum AIProvider: String, CaseIterable, Identifiable {
+    case gemini = "gemini"
+    case openRouter = "openrouter"
+    case ollama = "ollama"
+    
+    public var id: String { rawValue }
+    
+    var displayName: String {
+        switch self {
+        case .gemini: return "Google Gemini"
+        case .openRouter: return "OpenRouter"
+        case .ollama: return "Ollama (Local)"
+        }
     }
 }
 
@@ -190,6 +253,39 @@ public enum GeminiModel: String, CaseIterable, Identifiable {
         switch self {
         case .flash: return "bolt.fill"
         case .pro: return "star.fill"
+        }
+    }
+}
+
+// MARK: - OpenRouter Model
+
+public enum OpenRouterModel: String, CaseIterable, Identifiable {
+    case deepseekChatV31 = "deepseek/deepseek-chat-v3.1:free"
+    case glm45air = "z-ai/glm-4.5-air:free"
+    case llama4scout = "meta-llama/llama-4-scout:free"
+    case llama4maverick = "meta-llama/llama-4-maverick:free"
+    case grok4fast = "openai/grok-4-fast"
+    case gpt4o = "openai/gpt-4o"
+    case claudesonnet45 = "anthropic/claude-sonnet-4.5"
+    case llama370b = "meta-llama/llama-3-70b-instruct"
+    case gpt5mini = "openai/gpt-5-mini"
+    case gpt5 = "openai/gpt-5"
+
+    
+    public var id: String { rawValue }
+    
+    var displayName: String {
+        switch self {
+        case .deepseekChatV31: return "DeepSeek Chat V3.1 (Free)"
+        case .glm45air: return "GLM 4.5 Air (Free)"
+        case .llama4scout: return "Llama 4 Scout (Free)"
+        case .llama4maverick: return "Llama 4 Maverick (Free)"
+        case .grok4fast: return "Grok 4 Fast"
+        case .gpt4o: return "GPT-4o"
+        case .claudesonnet45: return "Claude Sonnet 4.5"
+        case .llama370b: return "Llama 3 70B"
+        case .gpt5mini: return "GPT-5 Mini"
+        case .gpt5: return "GPT-5"
         }
     }
 }

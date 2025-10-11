@@ -15,7 +15,7 @@ struct URLBarView: View {
     var body: some View {
         ZStack {
             HStack(spacing: 8) {
-                    if let currentTab = browserManager.currentTab(for: windowState) {
+                    if browserManager.currentTab(for: windowState) != nil {
                         Text(
                             displayURL
                         )
