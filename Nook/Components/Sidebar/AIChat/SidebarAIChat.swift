@@ -93,7 +93,6 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                             showApiKeyInput.toggle()
                         }
                     })
-                    .disabled(messages.isEmpty)
                     
                     NavButton(iconName: "trash", disabled: false, action: {
                         withAnimation(.easeInOut(duration: 0.2)) {
@@ -228,7 +227,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                 
                 // Input area
                 HStack(spacing: 8) {
-                    
+                    // temporary, move later
                     Menu("Model") {
                         ForEach(GeminiModel.allCases) { model in
                             Button(action: {
