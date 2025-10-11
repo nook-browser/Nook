@@ -55,7 +55,7 @@ struct MiniWindowToolbar: View {
     private var shareButtonTintColor: NSColor {
         primaryTextNSColor
     }
-    @ObservedObject var session: MiniWindowSession
+    var session: MiniWindowSession
     let adoptAction: () -> Void
     var window: NSWindow?
     
@@ -271,7 +271,7 @@ private struct MiniWindowTrafficLights: NSViewRepresentable {
 // MARK: - Share Button Container
 
 private struct MiniWindowShareButtonContainer: View {
-    @ObservedObject var session: MiniWindowSession
+    var session: MiniWindowSession
     let backgroundColor: Color
     let borderColor: Color
     let tintColor: NSColor

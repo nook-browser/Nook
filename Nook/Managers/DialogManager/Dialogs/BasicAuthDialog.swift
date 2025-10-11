@@ -24,14 +24,16 @@ final class BasicAuthDialogModel {
 }
 
 struct BasicAuthDialog: DialogPresentable {
-    @Environment(BasicAuthDialogModel.self) var model
+    var model: BasicAuthDialogModel
     let onSubmit: (String, String, Bool) -> Void
     let onCancel: () -> Void
 
     init(
+        model: BasicAuthDialogModel,
         onSubmit: @escaping (String, String, Bool) -> Void,
         onCancel: @escaping () -> Void
     ) {
+        self.model = model
         self.onSubmit = onSubmit
         self.onCancel = onCancel
     }
@@ -46,6 +48,7 @@ struct BasicAuthDialog: DialogPresentable {
 
     @ViewBuilder
     func dialogContent() -> some View {
+        @Bindable var model = model
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("User name")

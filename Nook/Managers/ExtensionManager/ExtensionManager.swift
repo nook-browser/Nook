@@ -54,6 +54,7 @@ final class ExtensionManager: NSObject, WKWebExtensionControllerDelegate {
         }
     }
 
+    @MainActor
     deinit {
         NotificationCenter.default.removeObserver(self)
 

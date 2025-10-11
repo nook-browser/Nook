@@ -10,12 +10,8 @@ import WebKit
 import Observation
 
 struct PeekWebView: NSViewRepresentable {
-    @Environment(PeekSession.self) var session
+    var session: PeekSession
     weak var peekManager: PeekManager?
-
-    init(session: PeekSession) {
-        self._session = Bindable(session)
-    }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(session: session, peekManager: peekManager)

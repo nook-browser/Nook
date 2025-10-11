@@ -1123,7 +1123,7 @@ struct ShortcutsSettingsView: View {
 private struct CategorySection: View {
     let category: ShortcutCategory
     let shortcuts: [KeyboardShortcut]
-    @ObservedObject var shortcutManager: KeyboardShortcutManager
+    var shortcutManager: KeyboardShortcutManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1149,7 +1149,7 @@ private struct CategorySection: View {
 // MARK: - Shortcut Row
 private struct ShortcutRowView: View {
     let shortcut: KeyboardShortcut
-    @ObservedObject var shortcutManager: KeyboardShortcutManager
+    var shortcutManager: KeyboardShortcutManager
     @State private var localKeyCombination: KeyCombination
 
     init(shortcut: KeyboardShortcut, shortcutManager: KeyboardShortcutManager) {

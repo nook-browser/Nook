@@ -9,7 +9,7 @@ import SwiftUI
 import WebKit
 
 struct MiniWindowWebView: NSViewRepresentable {
-    @ObservedObject var session: MiniWindowSession
+    @Environment(MiniWindowSession.self) var session
 
     func makeCoordinator() -> Coordinator {
         Coordinator(session: session)

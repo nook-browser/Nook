@@ -1056,7 +1056,7 @@ class BrowserManager {
     
     // MARK: - Appearance / Gradient Editing
     @Observable
-    private final class GradientDraft {
+    final class GradientDraft {
         var value: SpaceGradient
         init(_ value: SpaceGradient) { self.value = value }
     }
