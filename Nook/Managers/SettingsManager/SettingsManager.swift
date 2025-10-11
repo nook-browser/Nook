@@ -170,6 +170,36 @@ class SettingsManager {
         }
     }
 
+    var aiProvider: AIProvider {
+        didSet {
+            userDefaults.set(aiProvider.rawValue, forKey: aiProviderKey)
+        }
+    }
+
+    var openRouterApiKey: String {
+        didSet {
+            userDefaults.set(openRouterApiKey, forKey: openRouterApiKeyKey)
+        }
+    }
+
+    var openRouterModel: OpenRouterModel {
+        didSet {
+            userDefaults.set(openRouterModel.rawValue, forKey: openRouterModelKey)
+        }
+    }
+
+    var ollamaEndpoint: String {
+        didSet {
+            userDefaults.set(ollamaEndpoint, forKey: ollamaEndpointKey)
+        }
+    }
+
+    var ollamaModel: String {
+        didSet {
+            userDefaults.set(ollamaModel, forKey: ollamaModelKey)
+        }
+    }
+
     init() {
         // Register default values
         userDefaults.register(defaults: [
@@ -238,8 +268,8 @@ public enum GeminiModel: String, CaseIterable, Identifiable {
     
     var displayName: String {
         switch self {
-        case .flash: return "Gemini Flash (Fast)"
-        case .pro: return "Gemini 2.5 Pro (Advanced)"
+        case .flash: return "Gemini Flash"
+        case .pro: return "Gemini 2.5 Pro"
         }
     }
     
@@ -247,6 +277,46 @@ public enum GeminiModel: String, CaseIterable, Identifiable {
         switch self {
         case .flash: return "Fast responses, great for quick questions"
         case .pro: return "Most capable model, best for complex analysis"
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .flash: return "bolt.fill"
+        case .pro: return "star.fill"
+        }
+    }
+}
+
+// MARK: - OpenRouter Model
+
+public enum OpenRouterModel: String, CaseIterable, Identifiable {
+    case deepseekChatV31 = "deepseek/deepseek-chat-v3.1:free"
+    case glm45air = "z-ai/glm-4.5-air:free"
+    case llama4scout = "meta-llama/llama-4-scout:free"
+    case llama4maverick = "meta-llama/llama-4-maverick:free"
+    case grok4fast = "openai/grok-4-fast"
+    case gpt4o = "openai/gpt-4o"
+    case claudesonnet45 = "anthropic/claude-sonnet-4.5"
+    case llama370b = "meta-llama/llama-3-70b-instruct"
+    case gpt5mini = "openai/gpt-5-mini"
+    case gpt5 = "openai/gpt-5"
+
+    
+    public var id: String { rawValue }
+    
+    var displayName: String {
+        switch self {
+        case .deepseekChatV31: return "DeepSeek Chat V3.1 (Free)"
+        case .glm45air: return "GLM 4.5 Air (Free)"
+        case .llama4scout: return "Llama 4 Scout (Free)"
+        case .llama4maverick: return "Llama 4 Maverick (Free)"
+        case .grok4fast: return "Grok 4 Fast"
+        case .gpt4o: return "GPT-4o"
+        case .claudesonnet45: return "Claude Sonnet 4.5"
+        case .llama370b: return "Llama 3 70B"
+        case .gpt5mini: return "GPT-5 Mini"
+        case .gpt5: return "GPT-5"
         }
     }
 }
