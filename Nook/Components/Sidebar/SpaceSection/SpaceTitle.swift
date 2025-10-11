@@ -153,6 +153,7 @@ struct SpaceTitle: View {
                             targetIndex: nil,
                             onDropEntered: {
                                 withAnimation(.easeInOut(duration: 0.15)) {
+                                    NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
                                     isDropHovering = true
                                 }
                             },
