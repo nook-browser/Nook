@@ -943,12 +943,13 @@ struct AISettingsDialog: View {
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(.primary)
 
-                        Picker("", selection: $settingsManager.aiProvider) {
+                        Picker("Provider Selector", selection: $settingsManager.aiProvider) {
                             ForEach(AIProvider.allCases) { provider in
                                 Text(provider.displayName).tag(provider)
                             }
                         }
                         .pickerStyle(.segmented)
+                        .labelsHidden()
                     }
 
                     Divider()
