@@ -65,6 +65,10 @@
             {
               "appearance" : "dark",
               "value" : 0.12
+            },
+            {
+              "appearance" : "tinted",
+              "value" : 0.1
             }
           ]
         }
