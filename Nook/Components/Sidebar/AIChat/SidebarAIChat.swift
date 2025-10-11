@@ -221,7 +221,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                                         .font(.system(size: 14, weight: .semibold))
                                         .foregroundStyle(.white.opacity(0.8))
                                     
-                                    Text("Questions about this page, or just curious? I'm here")
+                                    Text("Questions about this page, or just curious? I'm here.")
                                         .font(.system(size: 12))
                                         .foregroundStyle(.white.opacity(0.6))
                                         .multilineTextAlignment(.center)
