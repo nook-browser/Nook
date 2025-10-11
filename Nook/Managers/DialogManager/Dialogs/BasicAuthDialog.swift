@@ -24,16 +24,14 @@ final class BasicAuthDialogModel {
 }
 
 struct BasicAuthDialog: DialogPresentable {
-    @Bindable var model: BasicAuthDialogModel
+    @Environment(BasicAuthDialogModel.self) var model
     let onSubmit: (String, String, Bool) -> Void
     let onCancel: () -> Void
 
     init(
-        model: BasicAuthDialogModel,
         onSubmit: @escaping (String, String, Bool) -> Void,
         onCancel: @escaping () -> Void
     ) {
-        self.model = model
         self.onSubmit = onSubmit
         self.onCancel = onCancel
     }

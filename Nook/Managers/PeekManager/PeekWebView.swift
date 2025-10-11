@@ -10,7 +10,7 @@ import WebKit
 import Observation
 
 struct PeekWebView: NSViewRepresentable {
-    @Bindable var session: PeekSession
+    @Environment(PeekSession.self) var session
     weak var peekManager: PeekManager?
 
     init(session: PeekSession) {
