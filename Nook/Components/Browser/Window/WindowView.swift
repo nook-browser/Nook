@@ -23,18 +23,6 @@ struct WindowView: View {
         }
     }
 
-    // To reverse the sidebar and window, for left/right switching
-    enum SidebarItems: String, CaseIterable, Identifiable {
-        case sidebar,windowVStack
-
-        var id: String { self.rawValue }
-    }
-    @State private var sidebarItems: [SidebarItems] = [.sidebar, .windowVStack]
-    
-    private var sortedSidebarItems: [SidebarItems] {
-        browserManager.settingsManager.sidebarPosition == .left ? sidebarItems : sidebarItems.reversed()
-    }
-
     var body: some View {
         let isDark = colorScheme == .dark
         GeometryReader { geometry in
@@ -62,26 +50,7 @@ struct WindowView: View {
                             .environmentObject(windowState)
                             .background(Color.clear)
                         
-                        // Main content flush: sidebar touches left edge; webview touches sidebar
-                        HStack(spacing: 0) {
-                            ForEach(sortedSidebarItems, id: \.self) { item in
-                                switch item {
-                                case .sidebar:
-                                    SidebarView()
-                                        .environmentObject(browserManager)
-                                        .environmentObject(windowState)
-                                case .windowVStack:
-                                    VStack(spacing: 0) {
-                                        WebsiteLoadingIndicator()
-                                        WebsiteView()
-                                    }
-                                    .padding(.bottom, 8)
-                                    .zIndex(2000)
-
-                                }
-                            }
-
-                        }
+                        mainLayout
                     }
                     
                     // TopBar Command Palette overlay
@@ -90,26 +59,7 @@ struct WindowView: View {
                         .environmentObject(windowState)
                         .zIndex(3000)
                 } else {
-                    // Main content flush: sidebar touches left edge; webview touches sidebar
-                    HStack(spacing: 0) {
-                        ForEach(sortedSidebarItems, id: \.self) { item in
-                            switch item {
-                            case .sidebar:
-                                SidebarView()
-                                    .environmentObject(browserManager)
-                                    .environmentObject(windowState)
-                            case .windowVStack:
-                                VStack(spacing: 0) {
-                                    WebsiteLoadingIndicator()
-                                    WebsiteView()
-                                }
-                                .padding(.bottom, 8)
-                                .zIndex(2000)
-
-                            }
-                        }
-
-                    }
+                    mainLayout
                 }
 
                 // Mini command palette anchored exactly to URL bar's top-left
@@ -194,25 +144,6 @@ struct WindowView: View {
                     Spacer()
                 }
             }
-            // Overlay the resize handle spanning the sidebar/webview boundary
-            .overlay(alignment: browserManager.settingsManager.sidebarPosition == .left ? .topLeading : .topTrailing) {
-                if windowState.isSidebarVisible {
-                    // Calculate dynamic webview height based on window size
-                    let topBarHeight: CGFloat = browserManager.settingsManager.topBarAddressView ? 44 : 0
-                    let dynamicWebViewHeight = geometry.size.height - 40 - topBarHeight  // Subtract navigation area and top bar
-
-                    // Position to span 14pts into sidebar and 2pts into web content (moved 6pts left)
-                    SidebarResizeView()
-                        .frame(height: dynamicWebViewHeight)  // Dynamic height based on window size
-                        .offset(
-                            x: browserManager.settingsManager.sidebarPosition == .left ? windowState.sidebarWidth : -windowState.sidebarWidth,
-                            y: webViewYOffset
-                        )  // Position to match webview
-                        .zIndex(2000)  // Higher z-index to ensure it's above all other elements
-                        .environmentObject(windowState)
-                        .border(Color.red, width: 10)
-                }
-            }
             // Named coordinate space for geometry preferences
             .coordinateSpace(name: "WindowSpace")
             // Keep BrowserManager aware of URL bar frame in window space
@@ -233,6 +164,79 @@ struct WindowView: View {
             .environmentObject(browserManager.splitManager)
             .environmentObject(hoverSidebarManager)
         }
+    }
+
+    @ViewBuilder
+    private var mainLayout: some View {
+        let aiVisible = windowState.isSidebarAIChatVisible
+        let aiAppearsOnTrailingEdge = browserManager.settingsManager.sidebarPosition == .left
+
+        HStack(spacing: 0) {
+            if aiAppearsOnTrailingEdge {
+                sidebarColumn
+                websiteColumn
+                if aiVisible {
+                    aiSidebar
+                }
+            } else {
+                if aiVisible {
+                    aiSidebar
+                }
+                websiteColumn
+                sidebarColumn
+            }
+        }
+        .padding(.trailing, windowState.isFullScreen ? 0 : (windowState.isSidebarVisible && browserManager.settingsManager.sidebarPosition == .right ? 0 : aiVisible ? 0 : 8))
+        .padding(.leading, windowState.isFullScreen ? 0 : (windowState.isSidebarVisible && browserManager.settingsManager.sidebarPosition == .left ? 0 : aiVisible ? 0 : 8))
+    }
+
+    private var sidebarColumn: some View {
+        SidebarView()
+        // Overlay the resize handle spanning the sidebar/webview boundary
+        .overlay(alignment: browserManager.settingsManager.sidebarPosition == .left ? .trailing : .leading) {
+            if windowState.isSidebarVisible {
+                // Position to span 14pts into sidebar and 2pts into web content (moved 6pts left)
+                SidebarResizeView()
+                
+                    .frame(maxHeight: .infinity)
+                    .environmentObject(browserManager)
+                    .environmentObject(windowState)
+                    .zIndex(2000)  // Higher z-index to ensure it's above all other elements
+                    .environmentObject(windowState)
+            }
+        }
+            .environmentObject(browserManager)
+            .environmentObject(windowState)
+    }
+
+    private var websiteColumn: some View {
+        VStack(spacing: 0) {
+            WebsiteLoadingIndicator()
+            WebsiteView()
+        }
+        .padding(.bottom, 8)
+        .zIndex(2000)
+    }
+
+    @ViewBuilder
+    private var aiSidebar: some View {
+        let handleAlignment: Alignment = browserManager.settingsManager.sidebarPosition == .left ? .leading : .trailing
+
+        SidebarAIChat()
+            .frame(width: windowState.aiSidebarWidth)
+            .overlay(alignment: handleAlignment) {
+                AISidebarResizeView()
+                    .frame(maxHeight: .infinity)
+                    .environmentObject(browserManager)
+                    .environmentObject(windowState)
+            }
+            .transition(
+                .move(edge: browserManager.settingsManager.sidebarPosition == .left ? .trailing : .leading)
+                    .combined(with: .opacity)
+            )
+            .environmentObject(browserManager)
+            .environmentObject(windowState)
+            .environment(browserManager.settingsManager)
     }
 
 }

@@ -46,7 +46,11 @@ struct PinnedGrid: View {
                             itemsCount: { 0 },
                             draggedItem: $draggedItem,
                             targetSection: .essentials,
-                            tabManager: browserManager.tabManager
+                            tabManager: browserManager.tabManager,
+                            targetIndex: nil,
+                            onDropEntered: {
+                                NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                            }
                         )
                     )
             )
@@ -93,7 +97,11 @@ struct PinnedGrid: View {
                             itemsCount: { items.count },
                             draggedItem: $draggedItem,
                             targetSection: .essentials,
-                            tabManager: browserManager.tabManager
+                            tabManager: browserManager.tabManager,
+                            targetIndex: nil,
+                            onDropEntered: {
+                                NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                            }
                         )
                     )
                 }

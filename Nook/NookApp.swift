@@ -326,6 +326,13 @@ struct NookCommands: Commands {
                 browserManager.toggleSidebar()
             }
             .keyboardShortcut("s", modifiers: .command)
+
+            Button("Toggle AI Assistant") {
+                browserManager.toggleAISidebar()
+            }
+            .keyboardShortcut("a", modifiers: [.command, .shift])
+            .disabled(!browserManager.settingsManager.showAIAssistant)
+
             Button("Toggle Picture in Picture") {
                 browserManager.requestPiPForCurrentTabInActiveWindow()
             }
@@ -535,4 +542,3 @@ struct BackgroundWindowModifier: NSViewRepresentable {
 
     }
 }
-

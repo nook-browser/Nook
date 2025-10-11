@@ -70,8 +70,11 @@ struct CommandPaletteView: View {
                                     systemName: isLikelyURL(text)
                                         ? "globe" : "magnifyingglass"
                                 )
+                                .id(isLikelyURL(text) ? "globe" : "magnifyingglass")
+                                .transition(.blur(intensity: 2, scale: 0.6).animation(.smooth(duration: 0.3)))
                                 .font(.system(size: 14, weight: .regular))
                                 .foregroundStyle(isDark ? .white : .black)
+                                .frame(width: 15)
 
                                 TextField("Search or enter URL...", text: $text)
                                     .textFieldStyle(.plain)

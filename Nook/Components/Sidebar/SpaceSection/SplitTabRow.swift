@@ -13,58 +13,28 @@ struct SplitTabRow: View {
     @EnvironmentObject var windowState: BrowserWindowState
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Drop zone above the combined row → targets left tab index
-            Color.clear
-                .frame(height: 6)
-                .contentShape(Rectangle())
-                .onDrop(
-                    of: [.text],
-                    delegate: SidebarTabDropDelegateSimple(
-                        item: left,
-                        draggedItem: $draggedItem,
-                        targetSection: .spaceRegular(spaceId),
-                        tabManager: browserManager.tabManager
-                    )
-                )
-            
-            HStack(spacing: 1) {
-                SplitHalfTab(
-                    tab: left,
-                    side: .left,
-                    draggedItem: $draggedItem,
-                    onActivate: { onActivate(left) },
-                    onClose: { onClose(left) }
-                )
-                Rectangle()
-                    .fill(Color(nsColor: .separatorColor).opacity(0.6))
-                    .frame(width: 1, height: 24)
-                    .padding(.vertical, 4)
-                SplitHalfTab(
-                    tab: right,
-                    side: .right,
-                    draggedItem: $draggedItem,
-                    onActivate: { onActivate(right) },
-                    onClose: { onClose(right) }
-                )
-            }
-            .frame(height: 34)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            
-            // Drop zone below the combined row → targets right tab index
-            Color.clear
-                .frame(height: 6)
-                .contentShape(Rectangle())
-                .onDrop(
-                    of: [.text],
-                    delegate: SidebarTabDropDelegateSimple(
-                        item: right,
-                        draggedItem: $draggedItem,
-                        targetSection: .spaceRegular(spaceId),
-                        tabManager: browserManager.tabManager
-                    )
-                )
+        HStack(spacing: 1) {
+            SplitHalfTab(
+                tab: left,
+                side: .left,
+                draggedItem: $draggedItem,
+                onActivate: { onActivate(left) },
+                onClose: { onClose(left) }
+            )
+            Rectangle()
+                .fill(Color(nsColor: .separatorColor).opacity(0.6))
+                .frame(width: 1, height: 24)
+                .padding(.vertical, 4)
+            SplitHalfTab(
+                tab: right,
+                side: .right,
+                draggedItem: $draggedItem,
+                onActivate: { onActivate(right) },
+                onClose: { onClose(right) }
+            )
         }
+        .frame(height: 34)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .onReceive(NotificationCenter.default.publisher(for: .tabDragDidEnd)) { _ in
             draggedItem = nil
         }
@@ -122,7 +92,7 @@ private struct SplitHalfTab: View {
             }
         }
         .onTabDrag(tab.id, draggedItem: $draggedItem)
-        .opacity(draggedItem == tab.id ? 0.0 : 1.0)
+        .opacity(draggedItem == tab.id ? 0.25 : 1.0)
         .background(background)
         .onDrop(of: [.text], isTargeted: nil, perform: handleDrop)
     }
