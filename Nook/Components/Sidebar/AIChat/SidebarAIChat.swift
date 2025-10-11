@@ -6,16 +6,96 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct ChatMessage: Identifiable, Equatable {
     let id = UUID()
     let role: Role
     let content: String
     let timestamp: Date
+    var citations: [URLCitation] = []
+    var usedWebSearch: Bool = false
     
     enum Role {
         case user
         case assistant
+    }
+}
+
+struct URLCitation: Identifiable, Equatable, Codable {
+    let id = UUID()
+    let url: String
+    let title: String?
+    let content: String?
+    let startIndex: Int
+    let endIndex: Int
+    
+    var displayTitle: String {
+        title ?? url
+    }
+    
+    var domain: String {
+        if let urlObj = URL(string: url),
+           let host = urlObj.host {
+            return host.replacingOccurrences(of: "www.", with: "")
+        }
+        return url
+    }
+}
+
+struct WebSearchConfig {
+    var enabled: Bool = false
+    var engine: WebSearchEngine = .auto
+    var maxResults: Int = 5
+    var searchContextSize: SearchContextSize = .medium
+    var useOnlineSuffix: Bool = true // Use :online suffix as shortcut
+    
+    enum WebSearchEngine: String, CaseIterable, Identifiable {
+        case auto = "auto"
+        case native = "native"
+        case exa = "exa"
+        
+        var id: String { rawValue }
+        
+        var displayName: String {
+            switch self {
+            case .auto: return "Auto (Native if available)"
+            case .native: return "Native (Provider built-in)"
+            case .exa: return "Exa (External search)"
+            }
+        }
+        
+        var description: String {
+            switch self {
+            case .auto: return "Uses native search when available, falls back to Exa"
+            case .native: return "Always uses provider's built-in search"
+            case .exa: return "Always uses Exa search ($4/1000 results)"
+            }
+        }
+    }
+    
+    enum SearchContextSize: String, CaseIterable, Identifiable {
+        case low = "low"
+        case medium = "medium"
+        case high = "high"
+        
+        var id: String { rawValue }
+        
+        var displayName: String {
+            switch self {
+            case .low: return "Low"
+            case .medium: return "Medium"
+            case .high: return "High"
+            }
+        }
+        
+        var description: String {
+            switch self {
+            case .low: return "Minimal context, lower cost"
+            case .medium: return "Balanced context and cost"
+            case .high: return "Extensive context, higher cost"
+            }
+        }
     }
 }
 
@@ -46,6 +126,7 @@ struct SidebarAIChat: View {
     @State private var isLoading: Bool = false
     @State private var ollamaModels: [OllamaModel] = []
     @State private var isFetchingModels: Bool = false
+    @State private var webSearchConfig: WebSearchConfig = WebSearchConfig()
     @FocusState private var isTextFieldFocused: Bool
     
     private var hasApiKey: Bool {
@@ -129,18 +210,40 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                             .padding(.top, 60)
                         } else if messages.isEmpty {
                             VStack(spacing: 12) {
-                                Image(systemName: "sparkle")
+                                Image(systemName: webSearchConfig.enabled && (settingsManager.aiProvider == .openRouter || settingsManager.aiProvider == .gemini) ? "globe" : "sparkle")
                                     .font(.system(size: 32))
-                                    .foregroundStyle(.white.opacity(0.3))
+                                    .foregroundStyle(webSearchConfig.enabled && (settingsManager.aiProvider == .openRouter || settingsManager.aiProvider == .gemini) ? .green.opacity(0.6) : .white.opacity(0.3))
                                 
                                 Text("Ask Nook")
                                     .font(.system(size: 14, weight: .semibold))
                                     .foregroundStyle(.white.opacity(0.8))
                                 
-                                Text("Questions about this page, or just curious? I'm here.")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(.white.opacity(0.6))
-                                    .multilineTextAlignment(.center)
+                                if webSearchConfig.enabled && (settingsManager.aiProvider == .openRouter || settingsManager.aiProvider == .gemini) {
+                                    VStack(spacing: 6) {
+                                        Text("Questions about this page, or just curious? I'm here.")
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(.white.opacity(0.6))
+                                            .multilineTextAlignment(.center)
+                                        
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .font(.system(size: 10))
+                                                .foregroundStyle(.green.opacity(0.7))
+                                            Text("Web search enabled")
+                                                .font(.system(size: 11, weight: .medium))
+                                                .foregroundStyle(.green.opacity(0.7))
+                                        }
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 4)
+                                        .background(.green.opacity(0.12))
+                                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                                    }
+                                } else {
+                                    Text("Questions about this page, or just curious? I'm here.")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.white.opacity(0.6))
+                                        .multilineTextAlignment(.center)
+                                }
                             }
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .padding(.top, 60)
@@ -155,9 +258,16 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                             HStack(spacing: 8) {
                                 ProgressView()
                                     .scaleEffect(0.7)
-                                Text("Thinking...")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(.white.opacity(0.5))
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Thinking...")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(.white.opacity(0.5))
+                                    if webSearchConfig.enabled && (settingsManager.aiProvider == .openRouter || settingsManager.aiProvider == .gemini) {
+                                        Text("Searching the web...")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(.white.opacity(0.4))
+                                    }
+                                }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 12)
@@ -225,8 +335,8 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                     .onSubmit {
                         sendMessage()
                     }
-                HStack{
-
+                
+                HStack(spacing: 8) {
                     switch settingsManager.aiProvider {
                     case .gemini:
                         Menu(settingsManager.geminiModel.displayName) {
@@ -284,16 +394,102 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                                 .foregroundStyle(.white.opacity(0.5))
                         }
                     }
-
-                Spacer()
                     
-                Button(action: sendMessage) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 24))
-                        .foregroundStyle(messageText.isEmpty ? .white.opacity(0.3) : .white.opacity(0.9))
-                }
-                .buttonStyle(.plain)
-                .disabled(messageText.isEmpty || isLoading || !hasApiKey)
+                    // Web search toggle (for Gemini and OpenRouter)
+                    if settingsManager.aiProvider == .gemini || settingsManager.aiProvider == .openRouter {
+                        Button(action: {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                webSearchConfig.enabled.toggle()
+                            }
+                        }) {
+                            Image(systemName: webSearchConfig.enabled ? "globe.americas.fill" : "globe")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(webSearchConfig.enabled ? .green : .white.opacity(0.5))
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(webSearchConfig.enabled ? .green.opacity(0.15) : .white.opacity(0.08))
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .frame(height: 28)
+                        .frame(width: 36)
+                        .contextMenu {
+                            if webSearchConfig.enabled {
+                                Section("Search Engine") {
+                                    ForEach(WebSearchConfig.WebSearchEngine.allCases) { engine in
+                                        Button(action: {
+                                            webSearchConfig.engine = engine
+                                        }) {
+                                            HStack {
+                                                Text(engine.displayName)
+                                                if webSearchConfig.engine == engine {
+                                                    Spacer()
+                                                    Image(systemName: "checkmark")
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                Section("Context Size") {
+                                    ForEach(WebSearchConfig.SearchContextSize.allCases) { size in
+                                        Button(action: {
+                                            webSearchConfig.searchContextSize = size
+                                        }) {
+                                            HStack {
+                                                Text(size.displayName)
+                                                if webSearchConfig.searchContextSize == size {
+                                                    Spacer()
+                                                    Image(systemName: "checkmark")
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                Section("Max Results") {
+                                    Button(action: { webSearchConfig.maxResults = 3 }) {
+                                        HStack {
+                                            Text("3 results")
+                                            if webSearchConfig.maxResults == 3 {
+                                                Spacer()
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                    Button(action: { webSearchConfig.maxResults = 5 }) {
+                                        HStack {
+                                            Text("5 results")
+                                            if webSearchConfig.maxResults == 5 {
+                                                Spacer()
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                    Button(action: { webSearchConfig.maxResults = 10 }) {
+                                        HStack {
+                                            Text("10 results")
+                                            if webSearchConfig.maxResults == 10 {
+                                                Spacer()
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    Spacer()
+
+                    Button(action: sendMessage) {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundStyle(messageText.isEmpty ? .white.opacity(0.3) : .white.opacity(0.9))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(messageText.isEmpty || isLoading || !hasApiKey)
                     
                 }
             }
@@ -308,6 +504,13 @@ To enhance the web browsing experience by providing intelligent, context-aware s
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             isTextFieldFocused = true
+            
+            // Load web search config from settings
+            webSearchConfig.enabled = settingsManager.webSearchEnabled
+            webSearchConfig.engine = WebSearchConfig.WebSearchEngine(rawValue: settingsManager.webSearchEngine) ?? .auto
+            webSearchConfig.maxResults = settingsManager.webSearchMaxResults
+            webSearchConfig.searchContextSize = WebSearchConfig.SearchContextSize(rawValue: settingsManager.webSearchContextSize) ?? .medium
+            
             if settingsManager.aiProvider == .ollama {
                 Task {
                     await fetchOllamaModels()
@@ -320,6 +523,18 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                     await fetchOllamaModels()
                 }
             }
+        }
+        .onChange(of: webSearchConfig.enabled) { _, newValue in
+            settingsManager.webSearchEnabled = newValue
+        }
+        .onChange(of: webSearchConfig.engine) { _, newValue in
+            settingsManager.webSearchEngine = newValue.rawValue
+        }
+        .onChange(of: webSearchConfig.maxResults) { _, newValue in
+            settingsManager.webSearchMaxResults = newValue
+        }
+        .onChange(of: webSearchConfig.searchContextSize) { _, newValue in
+            settingsManager.webSearchContextSize = newValue.rawValue
         }
     }
 
@@ -469,7 +684,9 @@ To enhance the web browsing experience by providing intelligent, context-aware s
             let fullPrompt = pageContext + userPrompt
             
             do {
-                let response: String
+                var responseContent: String
+                var citations: [URLCitation] = []
+                var usedWebSearch = false
                 
                 switch settingsManager.aiProvider {
                 case .gemini:
@@ -491,17 +708,25 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                         "parts": [["text": fullPrompt]]
                     ])
                     
-                    response = try await sendToGemini(conversationHistory: conversationHistory)
+                    let result = try await sendToGemini(conversationHistory: conversationHistory)
+                    responseContent = result.content
+                    citations = result.citations
+                    usedWebSearch = webSearchConfig.enabled && !citations.isEmpty
                     
                 case .openRouter:
-                    response = try await sendToOpenRouter(userPrompt: fullPrompt)
+                    let result = try await sendToOpenRouter(userPrompt: fullPrompt)
+                    responseContent = result.content
+                    citations = result.citations
+                    usedWebSearch = webSearchConfig.enabled && !citations.isEmpty
                     
                 case .ollama:
-                    response = try await sendToOllama(userPrompt: fullPrompt)
+                    responseContent = try await sendToOllama(userPrompt: fullPrompt)
                 }
                 
                 await MainActor.run {
-                    let assistantMessage = ChatMessage(role: .assistant, content: response, timestamp: Date())
+                    var assistantMessage = ChatMessage(role: .assistant, content: responseContent, timestamp: Date())
+                    assistantMessage.citations = citations
+                    assistantMessage.usedWebSearch = usedWebSearch
                     messages.append(assistantMessage)
                     isLoading = false
                 }
@@ -578,7 +803,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
         return ""
     }
     
-    private func sendToGemini(conversationHistory: [[String: Any]]) async throws -> String {
+    private func sendToGemini(conversationHistory: [[String: Any]]) async throws -> (content: String, citations: [URLCitation]) {
         let apiKey = settingsManager.geminiApiKey
         let model = settingsManager.geminiModel.rawValue
         let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent")!
@@ -589,7 +814,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
         request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
         
         // Build conversation with system prompt and full history
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "system_instruction": [
                 "parts": [
                     ["text": systemPrompt]
@@ -597,6 +822,13 @@ To enhance the web browsing experience by providing intelligent, context-aware s
             ],
             "contents": conversationHistory
         ]
+        
+        // Add Google Search tool if web search is enabled
+        if webSearchConfig.enabled {
+            body["tools"] = [
+                ["google_search": [:]]
+            ]
+        }
         
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         
@@ -609,22 +841,76 @@ To enhance the web browsing experience by providing intelligent, context-aware s
         
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         
-        if let candidates = json?["candidates"] as? [[String: Any]],
-           let firstCandidate = candidates.first,
-           let content = firstCandidate["content"] as? [String: Any],
-           let parts = content["parts"] as? [[String: Any]],
-           let firstPart = parts.first,
-           let text = firstPart["text"] as? String {
-            return text
+        guard let candidates = json?["candidates"] as? [[String: Any]],
+              let firstCandidate = candidates.first,
+              let content = firstCandidate["content"] as? [String: Any],
+              let parts = content["parts"] as? [[String: Any]],
+              let firstPart = parts.first,
+              let text = firstPart["text"] as? String else {
+            throw NSError(domain: "GeminiAPI", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to parse response"])
         }
         
-        throw NSError(domain: "GeminiAPI", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to parse response"])
+        // Parse inline citations like [1](https://...), [2](https://...)
+        let citations = parseInlineCitations(from: text)
+        
+        return (text, citations)
     }
     
-    private func sendToOpenRouter(userPrompt: String) async throws -> String {
+    private func parseInlineCitations(from text: String) -> [URLCitation] {
+        var citations: [URLCitation] = []
+        let pattern = "\\[(\\d+)\\]\\((https?://[^)]+)\\)"
+        
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
+            return citations
+        }
+        
+        let range = NSRange(text.startIndex..., in: text)
+        let matches = regex.matches(in: text, options: [], range: range)
+        
+        for match in matches {
+            guard match.numberOfRanges >= 3,
+                  let urlRange = Range(match.range(at: 2), in: text),
+                  let fullRange = Range(match.range(at: 0), in: text) else {
+                continue
+            }
+            
+            let url = String(text[urlRange])
+            let startIndex = text.distance(from: text.startIndex, to: fullRange.lowerBound)
+            let endIndex = text.distance(from: text.startIndex, to: fullRange.upperBound)
+            
+            // Try to extract domain as title
+            var title: String? = nil
+            if let urlObj = URL(string: url),
+               let host = urlObj.host {
+                title = host.replacingOccurrences(of: "www.", with: "")
+            }
+            
+            let citation = URLCitation(
+                url: url,
+                title: title,
+                content: nil,
+                startIndex: startIndex,
+                endIndex: endIndex
+            )
+            
+            // Avoid duplicates
+            if !citations.contains(where: { $0.url == citation.url }) {
+                citations.append(citation)
+            }
+        }
+        
+        return citations
+    }
+    
+    private func sendToOpenRouter(userPrompt: String) async throws -> (content: String, citations: [URLCitation]) {
         let apiKey = settingsManager.openRouterApiKey
-        let model = settingsManager.openRouterModel.rawValue
+        var model = settingsManager.openRouterModel.rawValue
         let url = URL(string: "https://openrouter.ai/api/v1/chat/completions")!
+        
+        // Apply :online suffix if web search is enabled and using that method
+        if webSearchConfig.enabled && webSearchConfig.useOnlineSuffix {
+            model = "\(model):online"
+        }
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -655,30 +941,79 @@ To enhance the web browsing experience by providing intelligent, context-aware s
             "content": userPrompt
         ])
         
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": model,
             "messages": messagesArray
         ]
+        
+        // Add web search plugin configuration if enabled and not using :online suffix
+        if webSearchConfig.enabled && !webSearchConfig.useOnlineSuffix {
+            var webPlugin: [String: Any] = [
+                "id": "web",
+                "max_results": webSearchConfig.maxResults
+            ]
+            
+            // Only add engine if not auto
+            if webSearchConfig.engine != .auto {
+                webPlugin["engine"] = webSearchConfig.engine.rawValue
+            }
+            
+            body["plugins"] = [webPlugin]
+        }
+        
+        // Add web search options for context size (works with native search)
+        if webSearchConfig.enabled {
+            body["web_search_options"] = [
+                "search_context_size": webSearchConfig.searchContextSize.rawValue
+            ]
+        }
         
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            throw NSError(domain: "OpenRouterAPI", code: -1, userInfo: [NSLocalizedDescriptionKey: "API request failed"])
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NSError(domain: "OpenRouterAPI", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            let errorMessage = httpResponse.statusCode == 429 ? "Rate limit exceeded" : "API request failed"
+            throw NSError(domain: "OpenRouterAPI", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: errorMessage])
         }
         
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         
-        if let choices = json?["choices"] as? [[String: Any]],
-           let firstChoice = choices.first,
-           let message = firstChoice["message"] as? [String: Any],
-           let content = message["content"] as? String {
-            return content
+        guard let choices = json?["choices"] as? [[String: Any]],
+              let firstChoice = choices.first,
+              let message = firstChoice["message"] as? [String: Any],
+              let content = message["content"] as? String else {
+            throw NSError(domain: "OpenRouterAPI", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to parse response"])
         }
         
-        throw NSError(domain: "OpenRouterAPI", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to parse response"])
+        // Parse citations from annotations
+        var citations: [URLCitation] = []
+        if let annotations = message["annotations"] as? [[String: Any]] {
+            for annotation in annotations {
+                if let type = annotation["type"] as? String,
+                   type == "url_citation",
+                   let urlCitation = annotation["url_citation"] as? [String: Any],
+                   let url = urlCitation["url"] as? String,
+                   let startIndex = urlCitation["start_index"] as? Int,
+                   let endIndex = urlCitation["end_index"] as? Int {
+                    
+                    let citation = URLCitation(
+                        url: url,
+                        title: urlCitation["title"] as? String,
+                        content: urlCitation["content"] as? String,
+                        startIndex: startIndex,
+                        endIndex: endIndex
+                    )
+                    citations.append(citation)
+                }
+            }
+        }
+        
+        return (content, citations)
     }
     
     private func sendToOllama(userPrompt: String) async throws -> String {
@@ -727,9 +1062,11 @@ To enhance the web browsing experience by providing intelligent, context-aware s
     }
 }
 
+
 struct MessageBubble: View {
     let message: ChatMessage
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.openURL) var openURL
     
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -739,16 +1076,62 @@ struct MessageBubble: View {
             
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
                 if message.role == .assistant {
-                    // Render markdown for AI responses
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(Array(parseMarkdown(message.content).enumerated()), id: \.offset) { _, block in
-                            block
+                    VStack(alignment: .leading, spacing: 0) {
+                        // Web search indicator
+                        if message.usedWebSearch {
+                            HStack(spacing: 4) {
+                                Image(systemName: "globe")
+                                    .font(.system(size: 10, weight: .medium))
+                                Text("Web Search")
+                                    .font(.system(size: 10, weight: .medium))
+                                if !message.citations.isEmpty {
+                                    Text("• \(message.citations.count) \(message.citations.count == 1 ? "source" : "sources")")
+                                        .font(.system(size: 9, weight: .regular))
+                                }
+                            }
+                            .foregroundStyle(.white.opacity(0.5))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(.green.opacity(0.15))
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .padding(.horizontal, 12)
+                            .padding(.top, 10)
+                            .padding(.bottom, 6)
+                        }
+                        
+                        // Render markdown for AI responses
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(Array(parseMarkdown(message.content).enumerated()), id: \.offset) { _, block in
+                                block
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                        .padding(.horizontal, 12)
+                        .padding(.top, message.usedWebSearch ? 6 : 10)
+                        .padding(.bottom, message.citations.isEmpty ? 10 : 6)
+                        
+                        // Citations section
+                        if !message.citations.isEmpty {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Divider()
+                                    .padding(.horizontal, 12)
+                                
+                                Text("Sources")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(.white.opacity(0.5))
+                                    .padding(.horizontal, 12)
+                                
+                                VStack(spacing: 4) {
+                                    ForEach(message.citations) { citation in
+                                        CitationView(citation: citation)
+                                    }
+                                }
+                                .padding(.horizontal, 12)
+                            }
+                            .padding(.bottom, 10)
                         }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .textSelection(.enabled)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
                     .background(
                         RoundedRectangle(cornerRadius: 12)
                             .fill(.white.opacity(0.12))
@@ -914,6 +1297,64 @@ struct MessageBubble: View {
     }
 }
 
+// MARK: - Citation View
+
+struct CitationView: View {
+    let citation: URLCitation
+    @Environment(\.openURL) var openURL
+    @State private var isHovered = false
+    
+    var body: some View {
+        Button(action: {
+            if let url = URL(string: citation.url) {
+                openURL(url)
+            }
+        }) {
+            HStack(spacing: 6) {
+                Image(systemName: "link")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.4))
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(citation.domain)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white.opacity(isHovered ? 0.9 : 0.7))
+                        .lineLimit(1)
+                    
+                    if let title = citation.title, !title.isEmpty {
+                        Text(title)
+                            .font(.system(size: 10, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.5))
+                            .lineLimit(1)
+                    }
+                }
+                
+                Spacer()
+                
+                Image(systemName: "arrow.up.forward")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.white.opacity(isHovered ? 0.6 : 0.4))
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(.white.opacity(isHovered ? 0.12 : 0.08))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(.white.opacity(isHovered ? 0.2 : 0.0), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovered = hovering
+            }
+        }
+    }
+}
+
 // MARK: - AI Settings Dialog
 
 struct AISettingsDialog: View {
@@ -943,13 +1384,39 @@ struct AISettingsDialog: View {
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(.primary)
 
-                        Picker("Provider Selector", selection: $settingsManager.aiProvider) {
-                            ForEach(AIProvider.allCases) { provider in
-                                Text(provider.displayName).tag(provider)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(AIProvider.allCases) { provider in
+                                    Button(action: {
+                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                            settingsManager.aiProvider = provider
+                                        }
+                                    }) {
+                                        HStack(spacing: 6) {
+                                            if provider.isRecommended {
+                                                Image(systemName: "checkmark.seal.fill")
+                                                    .font(.system(size: 11))
+                                                    .foregroundStyle(.green)
+                                            }
+                                            Text(provider.displayName)
+                                                .font(.system(size: 12, weight: .medium))
+                                        }
+                                        .foregroundStyle(settingsManager.aiProvider == provider ? .primary : .secondary)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .fill(settingsManager.aiProvider == provider ? Color.accentColor.opacity(0.15) : Color.gray.opacity(0.1))
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .stroke(settingsManager.aiProvider == provider ? Color.accentColor : Color.clear, lineWidth: 1.5)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
                             }
                         }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
                     }
 
                     Divider()
@@ -971,7 +1438,7 @@ struct AISettingsDialog: View {
                         }
 
                     case .openRouter:
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 12) {
                             Text("OpenRouter API Key")
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(.primary)
@@ -982,6 +1449,93 @@ struct AISettingsDialog: View {
                             Text("Get your API key from [OpenRouter](https://openrouter.ai/keys)")
                                 .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
+                            
+                            Divider()
+                            
+                            // Web Search Settings
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Image(systemName: "globe")
+                                        .foregroundStyle(.blue)
+                                    Text("Web Search")
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(.primary)
+                                }
+                                
+                                Toggle(isOn: Binding(
+                                    get: { settingsManager.webSearchEnabled },
+                                    set: { settingsManager.webSearchEnabled = $0 }
+                                )) {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Enable Web Search")
+                                            .font(.system(size: 12))
+                                    }
+                                }
+                                
+                                if settingsManager.webSearchEnabled {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        // Search Engine Picker
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text("Search Engine")
+                                                .font(.system(size: 11, weight: .medium))
+                                                .foregroundStyle(.secondary)
+                                            
+                                            Picker("", selection: Binding(
+                                                get: { settingsManager.webSearchEngine },
+                                                set: { settingsManager.webSearchEngine = $0 }
+                                            )) {
+                                                Text("Auto").tag("auto")
+                                                Text("Native").tag("native")
+                                                Text("Exa").tag("exa")
+                                            }
+                                            .pickerStyle(.segmented)
+                                            
+                                            Text("Auto uses native when available, Exa costs $4/1000 results")
+                                                .font(.system(size: 9))
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        
+                                        // Context Size Picker
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text("Context Size")
+                                                .font(.system(size: 11, weight: .medium))
+                                                .foregroundStyle(.secondary)
+                                            
+                                            Picker("", selection: Binding(
+                                                get: { settingsManager.webSearchContextSize },
+                                                set: { settingsManager.webSearchContextSize = $0 }
+                                            )) {
+                                                Text("Low").tag("low")
+                                                Text("Medium").tag("medium")
+                                                Text("High").tag("high")
+                                            }
+                                            .pickerStyle(.segmented)
+                                            
+                                            Text("Affects how much search context is retrieved (impacts cost)")
+                                                .font(.system(size: 9))
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        
+                                        // Max Results Picker
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text("Max Results")
+                                                .font(.system(size: 11, weight: .medium))
+                                                .foregroundStyle(.secondary)
+                                            
+                                            Picker("", selection: Binding(
+                                                get: { settingsManager.webSearchMaxResults },
+                                                set: { settingsManager.webSearchMaxResults = $0 }
+                                            )) {
+                                                Text("3").tag(3)
+                                                Text("5").tag(5)
+                                                Text("10").tag(10)
+                                            }
+                                            .pickerStyle(.segmented)
+                                        }
+                                    }
+                                    .padding(.leading, 8)
+                                }
+                            }
                         }
 
                     case .ollama:
