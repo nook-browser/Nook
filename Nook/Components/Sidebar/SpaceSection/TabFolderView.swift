@@ -16,7 +16,7 @@ private func haptic(_ pattern: NSHapticFeedbackManager.FeedbackPattern = .alignm
 }
 
 struct TabFolderView: View {
-    @ObservedObject var folder: TabFolder
+    var folder: TabFolder
     let space: Space
     let onRename: () -> Void
     let onDelete: () -> Void

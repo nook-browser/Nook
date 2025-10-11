@@ -42,7 +42,7 @@ struct SplitTabRow: View {
 }
 
 private struct SplitHalfTab: View {
-    @ObservedObject var tab: Tab
+    var tab: Tab
     let side: SplitViewManager.Side
     @Binding var draggedItem: UUID?
     let onActivate: () -> Void
