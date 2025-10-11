@@ -337,7 +337,9 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                     browserManager.dialogManager.closeDialog()
                 }
             )
+            .environment(settingsManager)
         }
+        
     }
 
     private func showClearMessagesDialog() {
