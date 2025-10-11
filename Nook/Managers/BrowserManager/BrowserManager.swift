@@ -506,33 +506,50 @@ class BrowserManager {
 
     init() {
         // Phase 1: initialize all stored properties
-        self.modelContext = Persistence.shared.container.mainContext
-        if #available(macOS 15.5, *) {
-            self.extensionManager = ExtensionManager.shared
-        } else {
-            self.extensionManager = nil
-        }
-        self.profileManager = ProfileManager(context: modelContext)
-        // Ensure at least one profile exists and set current immediately for manager initialization
-        self.profileManager.ensureDefaultProfile()
-        let initialProfile = self.profileManager.profiles.first
-        self.currentProfile = initialProfile
+        let context = Persistence.shared.container.mainContext
+        let extensionManager: ExtensionManager? = {
+            if #available(macOS 15.5, *) {
+                return ExtensionManager.shared
+            } else {
+                return nil
+            }
+        }()
+        let profileManager = ProfileManager(context: context)
+        profileManager.ensureDefaultProfile()
+        let initialProfile = profileManager.profiles.first
+        let tabManager = TabManager(browserManager: nil, context: context)
+        let settingsManager = SettingsManager()
+        let dialogManager = DialogManager()
+        let downloadManager = DownloadManager.shared
+        let authenticationManager = AuthenticationManager()
+        let historyManager = HistoryManager(context: context, profileId: initialProfile?.id)
+        let cookieManager = CookieManager(dataStore: initialProfile?.dataStore)
+        let cacheManager = CacheManager(dataStore: initialProfile?.dataStore)
+        let compositorManager = TabCompositorManager()
+        let splitManager = SplitViewManager()
+        let gradientColorManager = GradientColorManager()
+        let trackingProtectionManager = TrackingProtectionManager()
+        let findManager = FindManager()
+        let importManager = ImportManager()
 
-        self.tabManager = TabManager(browserManager: nil, context: modelContext)
-        self.settingsManager = SettingsManager()
-        self.dialogManager = DialogManager()
-        self.downloadManager = DownloadManager.shared
-        self.authenticationManager = AuthenticationManager()
-        // Initialize managers with current profile context for isolation
-        self.historyManager = HistoryManager(context: modelContext, profileId: initialProfile?.id)
-        self.cookieManager = CookieManager(dataStore: initialProfile?.dataStore)
-        self.cacheManager = CacheManager(dataStore: initialProfile?.dataStore)
-        self.compositorManager = TabCompositorManager()
-        self.splitManager = SplitViewManager()
-        self.gradientColorManager = GradientColorManager()
-        self.trackingProtectionManager = TrackingProtectionManager()
-        self.findManager = FindManager()
-        self.importManager = ImportManager()
+        self.modelContext = context
+        self.extensionManager = extensionManager
+        self.profileManager = profileManager
+        self.tabManager = tabManager
+        self.settingsManager = settingsManager
+        self.dialogManager = dialogManager
+        self.downloadManager = downloadManager
+        self.authenticationManager = authenticationManager
+        self.historyManager = historyManager
+        self.cookieManager = cookieManager
+        self.cacheManager = cacheManager
+        self.compositorManager = compositorManager
+        self.splitManager = splitManager
+        self.gradientColorManager = gradientColorManager
+        self.trackingProtectionManager = trackingProtectionManager
+        self.findManager = findManager
+        self.importManager = importManager
+        self.currentProfile = initialProfile
 
         // Phase 2: wire dependencies and perform side effects (safe to use self)
         self.compositorManager.browserManager = self

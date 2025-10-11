@@ -180,11 +180,12 @@ class MockTabManager {
 // MARK: - Mock Tab View
 
 struct MockTabView: View {
-    @Environment(MockTab.self) private var tab
+    @Bindable private var tab: MockTab
     private let action: () -> Void
     @State private var isHovering: Bool = false
 
-    init(action: @escaping () -> Void = {}) {
+    init(tab: MockTab, action: @escaping () -> Void = {}) {
+        self._tab = Bindable(tab)
         self.action = action
     }
     
@@ -264,11 +265,12 @@ print("Pin \(tab.name) globally")
 // MARK: - Mock Pinned Tab View
 
 struct MockPinnedTabView: View {
-    @Environment(MockTab.self) private var tab
+    @Bindable private var tab: MockTab
     private let action: () -> Void
     @State private var isHovering: Bool = false
 
-    init(action: @escaping () -> Void = {}) {
+    init(tab: MockTab, action: @escaping () -> Void = {}) {
+        self._tab = Bindable(tab)
         self.action = action
     }
     
@@ -342,12 +344,11 @@ struct DragDropPreview: View {
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
                             ForEach(tabManager.globalPinnedTabs.indices, id: \.self) { index in
                                 let tab = tabManager.globalPinnedTabs[index]
-                                MockPinnedTabView(action: {
+                                MockPinnedTabView(tab: tab, action: {
 #if DEBUG
                                     print("Activated: \(tab.name)")
 #endif
                                 })
-                                .environment(tab)
                                 .onDrag {
                                     dragManager.startDrag(tab: convertToRealTab(tab), from: .essentials, at: index)
                                     return NSItemProvider(object: tab.id.uuidString as NSString)
@@ -402,7 +403,7 @@ struct DragDropPreview: View {
                                                 }
                                             }
                                             
-                                            MockTabView(action: {
+                                            MockTabView(tab: tab, action: {
 #if DEBUG
                                                 print("Activated: \(tab.name)")
 #endif
@@ -451,7 +452,7 @@ struct DragDropPreview: View {
                                                     }
                                             }
                                             
-                                            MockTabView(action: {
+                                            MockTabView(tab: tab, action: {
 #if DEBUG
                                                 print("Activated: \(tab.name)")
 #endif

@@ -1,4 +1,5 @@
 import SwiftUI
+import Observation
 import CoreGraphics
 import simd
 
@@ -457,8 +458,9 @@ private func drawLinearGradientCG(gradientNodes: [GradientNode], angle: Double, 
 }
 
 // MARK: - Renderer with caching and background generation
-final class DitheredGradientRenderer: ObservableObject {
-    @Published var image: CGImage?
+@Observable
+final class DitheredGradientRenderer {
+    var image: CGImage?
     private var workItem: DispatchWorkItem?
     private static var cache = NSCache<NSString, CGImage>()
 

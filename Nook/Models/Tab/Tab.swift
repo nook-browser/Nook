@@ -528,22 +528,24 @@ public final class Tab: NSObject, Identifiable, WKDownloadDelegate {
     
 
     
-    @MainActor deinit {
-        // MEMORY LEAK FIX: Ensure cleanup when tab is deallocated
-        // Note: We can't access main actor-isolated properties in deinit,
-        // but we can still clean up non-actor properties
-        
-        // Cancel any pending profile observation
-        profileAwaitCancellable?.cancel()
-        profileAwaitCancellable = nil
-        
-        // Clear theme color observers
-        themeColorObservedWebViews.removeAllObjects()
-        
-        // Note: stopNativeAudioMonitoring() is main actor-isolated and cannot be called from deinit
-        // The cleanup will be handled by the closeTab() method which is called before deinit
-        
-        print("🧹 [Tab] deinit cleanup completed for: \(name)")
+    deinit {
+        MainActor.assumeIsolated {
+            // MEMORY LEAK FIX: Ensure cleanup when tab is deallocated
+            // Note: We can't access main actor-isolated properties in deinit,
+            // but we can still clean up non-actor properties
+            
+            // Cancel any pending profile observation
+            profileAwaitCancellable?.cancel()
+            profileAwaitCancellable = nil
+            
+            // Clear theme color observers
+            themeColorObservedWebViews.removeAllObjects()
+            
+            // Note: stopNativeAudioMonitoring() is main actor-isolated and cannot be called from deinit
+            // The cleanup will be handled by the closeTab() method which is called before deinit
+            
+            print("🧹 [Tab] deinit cleanup completed for: \(name)")
+        }
     }
 
     func loadURL(_ newURL: URL) {

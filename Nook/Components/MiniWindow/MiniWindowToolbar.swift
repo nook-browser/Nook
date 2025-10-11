@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AppKit
+import Observation
 
 struct MiniWindowToolbar: View {
     @Environment(\.colorScheme) private var colorScheme
