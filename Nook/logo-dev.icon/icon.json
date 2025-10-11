@@ -1,7 +1,15 @@
 {
-  "fill" : {
-    "automatic-gradient" : "display-p3:0.20784,0.42353,0.93725,1.00000"
-  },
+  "fill-specializations" : [
+    {
+      "value" : {
+        "automatic-gradient" : "display-p3:0.20784,0.42353,0.93725,1.00000"
+      }
+    },
+    {
+      "appearance" : "dark",
+      "value" : "automatic"
+    }
+  ],
   "groups" : [
     {
       "blur-material" : 0.08,
@@ -16,10 +24,7 @@
             {
               "appearance" : "dark",
               "value" : {
-                "linear-gradient" : [
-                  "display-p3:0.82959,0.93311,0.70703,1.00000",
-                  "display-p3:0.68115,0.87158,0.46851,1.00000"
-                ]
+                "automatic-gradient" : "display-p3:0.20784,0.42353,0.93725,1.00000"
               }
             },
             {
@@ -53,7 +58,15 @@
           "glass" : false,
           "image-name" : "Grid.png",
           "name" : "Grid",
-          "opacity" : 0.2
+          "opacity-specializations" : [
+            {
+              "value" : 0.2
+            },
+            {
+              "appearance" : "dark",
+              "value" : 0.12
+            }
+          ]
         }
       ],
       "shadow" : {
