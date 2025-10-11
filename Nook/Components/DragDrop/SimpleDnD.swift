@@ -161,51 +161,12 @@ struct SidebarSectionDropDelegateSimple: DropDelegate {
             else { return }
 
             DispatchQueue.main.async {
-                self.draggedItem = uuid
-                self.onDropEntered?()
-            }
-        }
-    }
-
-    func validateDrop(info: DropInfo) -> Bool { true }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
-    }
-
-    func dropExited(info: DropInfo) {
-        finishDrop()
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        if case .folder = targetSection {
-            handleFolderDrop(info: info)
-        } else {
-            handleRegularDrop(info: info)
-        }
-        return true
-    }
-
-    private func handleRegularDrop(info: DropInfo) {
-        guard let provider = info.itemProviders(for: [.text]).first else {
-            finishDrop()
-            return
-        }
-        provider.loadObject(ofClass: NSString.self) { object, _ in
-            guard
-                let string = object as? String,
-                let uuid = UUID(uuidString: string)
-            else {
-                DispatchQueue.main.async {
-                    self.finishDrop()
-                }
-                return
-            }
-
-            DispatchQueue.main.async {
                 let all = tabManager.allTabs()
-                guard let from = all.first(where: { $0.id == uuid }) else {
-                    self.finishDrop()
+                guard let from = all.first(where: { $0.id == uuid }) else { return }
+
+                if case .folder = self.targetSection {
+                    self.draggedItem = uuid
+                    self.onDropEntered?()
                     return
                 }
 
@@ -224,10 +185,30 @@ struct SidebarSectionDropDelegateSimple: DropDelegate {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                     tabManager.handleDragOperation(op)
                 }
+                self.draggedItem = uuid
+                haptic(.alignment)
                 self.onDropCompleted?()
-                self.finishDrop()
             }
         }
+    }
+
+    func validateDrop(info: DropInfo) -> Bool { true }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func dropExited(info: DropInfo) {
+        finishDrop()
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        if case .folder = targetSection {
+            handleFolderDrop(info: info)
+        } else {
+            finishDrop()
+        }
+        return true
     }
 
     private func handleFolderDrop(info: DropInfo) {
