@@ -174,8 +174,8 @@ public enum GeminiModel: String, CaseIterable, Identifiable {
     
     var displayName: String {
         switch self {
-        case .flash: return "Gemini Flash"
-        case .pro: return "Gemini 2.5 Pro"
+        case .flash: return "Gemini Flash (Fast)"
+        case .pro: return "Gemini 2.5 Pro (Advanced)"
         }
     }
     
@@ -185,13 +185,6 @@ public enum GeminiModel: String, CaseIterable, Identifiable {
         case .pro: return "Most capable model, best for complex analysis"
         }
     }
-    
-    var icon: String {
-        switch self {
-        case .flash: return "bolt.fill"
-        case .pro: return "star.fill"
-        }
-    }
 }
 
 // MARK: - Notification Names
@@ -199,4 +192,3 @@ extension Notification.Name {
     static let tabUnloadTimeoutChanged = Notification.Name("tabUnloadTimeoutChanged")
     static let blockCrossSiteTrackingChanged = Notification.Name("blockCrossSiteTrackingChanged")
 }
-

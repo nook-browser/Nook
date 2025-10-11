@@ -23,12 +23,6 @@ struct TopBarView: View {
             NavButton(iconName: browserManager.settingsManager.sidebarPosition == .left ? "sidebar.left" : "sidebar.right", disabled: false, action: {
                 browserManager.toggleSidebar(for: windowState)
             })
-
-            if browserManager.settingsManager.showAIAssistant {
-                NavButton(iconName: "sparkle", disabled: false, action: {
-                    browserManager.toggleAISidebar(for: windowState)
-                })
-            }
             
             Spacer()
             

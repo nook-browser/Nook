@@ -69,12 +69,6 @@ struct NavButtonsView: View {
                 browserManager.toggleSidebar(for: windowState)
             })
 
-            if browserManager.settingsManager.showAIAssistant {
-                NavButton(iconName: "sparkle", disabled: false, action: {
-                    browserManager.toggleAISidebar(for: windowState)
-                })
-            }
-
             Spacer()
 
             HStack(alignment: .center, spacing: 8) {
