@@ -326,7 +326,6 @@ To enhance the web browsing experience by providing intelligent, context-aware s
     private func showApiKeyDialog() {
         browserManager.dialogManager.showDialog {
             AISettingsDialog(
-                settingsManager: settingsManager,
                 ollamaModels: ollamaModels,
                 isFetchingModels: isFetchingModels,
                 onFetchModels: {
@@ -917,7 +916,7 @@ struct MessageBubble: View {
 // MARK: - AI Settings Dialog
 
 struct AISettingsDialog: View {
-    @Bindable var settingsManager: SettingsManager
+    @Environment(SettingsManager.self) var settingsManager
     let ollamaModels: [OllamaModel]
     let isFetchingModels: Bool
     let onFetchModels: () -> Void
@@ -927,6 +926,7 @@ struct AISettingsDialog: View {
     @State private var endpointInput: String = ""
 
     var body: some View {
+        @Bindable var bindableSettingsManager = settingsManager
         StandardDialog(
             header: {
                 DialogHeader(
@@ -943,7 +943,7 @@ struct AISettingsDialog: View {
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(.primary)
 
-                        Picker("Provider Selector", selection: $settingsManager.aiProvider) {
+                        Picker("Provider Selector", selection: $bindableSettingsManager.aiProvider) {
                             ForEach(AIProvider.allCases) { provider in
                                 Text(provider.displayName).tag(provider)
                             }

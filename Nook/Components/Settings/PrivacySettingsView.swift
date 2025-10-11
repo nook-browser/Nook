@@ -17,6 +17,7 @@ struct PrivacySettingsView: View {
     @State private var isClearing = false
     
     var body: some View {
+        @Bindable var bindableBrowserManager = browserManager
         VStack(alignment: .leading, spacing: 20) {
             // Cookie Management Section
             VStack(alignment: .leading, spacing: 12) {
@@ -143,7 +144,7 @@ struct PrivacySettingsView: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     // Activated: Block cross‑site tracking via content rules + iframe cookie shim
-                    Toggle("Block Cross-Site Tracking", isOn: $browserManager.settingsManager.blockCrossSiteTracking)
+                    Toggle("Block Cross-Site Tracking", isOn: $bindableBrowserManager.settingsManager.blockCrossSiteTracking)
                         .onChange(of: browserManager.settingsManager.blockCrossSiteTracking) { _, enabled in
                             browserManager.trackingProtectionManager.setEnabled(enabled)
                         }
