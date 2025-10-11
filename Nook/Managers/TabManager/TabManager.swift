@@ -404,16 +404,6 @@ import OSLog
 
 @MainActor
 class TabManager: ObservableObject {
-    enum TabManagerError: LocalizedError {
-        case spaceNotFound(UUID)
-
-        var errorDescription: String? {
-            switch self {
-            case .spaceNotFound(let id):
-                return "Space with id \(id.uuidString) was not found."
-            }
-        }
-    }
     weak var browserManager: BrowserManager?
     private let context: ModelContext
     private let persistence: PersistenceActor
@@ -795,27 +785,16 @@ class TabManager: ObservableObject {
         }
     }
 
-    func renameSpace(spaceId: UUID, newName: String) throws {
-        guard let idx = spaces.firstIndex(where: { $0.id == spaceId }), idx < spaces.count else {
-            throw TabManagerError.spaceNotFound(spaceId)
+    func renameSpace(spaceId: UUID, newName: String) {
+        guard let idx = spaces.firstIndex(where: { $0.id == spaceId }) else {
+            return
         }
+
+        guard idx < spaces.count else { return }
         spaces[idx].name = newName
 
         if currentSpace?.id == spaceId {
             currentSpace?.name = newName
-        }
-
-        persistSnapshot()
-    }
-
-    func updateSpaceIcon(spaceId: UUID, icon: String) throws {
-        guard let idx = spaces.firstIndex(where: { $0.id == spaceId }), idx < spaces.count else {
-            throw TabManagerError.spaceNotFound(spaceId)
-        }
-        spaces[idx].icon = icon
-
-        if currentSpace?.id == spaceId {
-            currentSpace?.icon = icon
         }
 
         persistSnapshot()

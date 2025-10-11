@@ -17,40 +17,13 @@ struct SidebarResizeView: View {
     @StateObject private var dragLockManager = DragLockManager.shared
     @State private var dragSessionID: String = UUID().uuidString
 
-    private let minWidth: CGFloat = 260
-    private let maxWidth: CGFloat = 520
-
-    private var sitsOnRight: Bool {
-        browserManager.settingsManager.sidebarPosition == .right
-    }
-
-    private var indicatorOffset: CGFloat {
-        sitsOnRight ? 3 : -3
-    }
-
-    private var hitAreaOffset: CGFloat {
-        sitsOnRight ? 5 : -5
-    }
-
     var body: some View {
         ZStack {
-            if isHovering || isResizing {
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(Color.accentColor)
-                    .frame(width: 2)
-                    .frame(maxHeight: .infinity)
-                    .offset(x: indicatorOffset)
-                    .animation(.easeInOut(duration: 0.15), value: isResizing)
-                    .animation(.easeInOut(duration: 0.15), value: isHovering)
-                    .padding(.vertical, 30)
-            }
-
+            // Hit detection area - 16pt wide spanning the sidebar boundary
             Rectangle()
                 .fill(Color.clear)
-                .frame(width: 12)
-                .padding(.vertical, 30)
-                .offset(x: hitAreaOffset)
-                .contentShape(.interaction, .rect)
+                .frame(width: 3)
+                .contentShape(Rectangle())
                 .onHover { hovering in
                     guard windowState.isSidebarVisible else { return }
 
@@ -68,6 +41,7 @@ struct SidebarResizeView: View {
                             guard windowState.isSidebarVisible else { return }
 
                             if !isResizing {
+                                // Acquire drag lock before starting resize operation
                                 guard dragLockManager.startDrag(ownerID: dragSessionID) else {
                                     print("🚫 [SidebarResizeView] Resize drag blocked - \(dragLockManager.debugInfo)")
                                     return
@@ -79,15 +53,19 @@ struct SidebarResizeView: View {
                                 NSCursor.resizeLeftRight.set()
                             }
 
+                            // Use absolute mouse positions for true 1:1 tracking
                             let currentMouseX = value.location.x
-                            let mouseMovement = sitsOnRight ? (startingMouseX - currentMouseX) : (currentMouseX - startingMouseX)
+                            let mouseMovement = browserManager.settingsManager.sidebarPosition == .left ? (currentMouseX - startingMouseX) : (startingMouseX - currentMouseX)
                             let newWidth = startingWidth + mouseMovement
-                            let clampedWidth = max(minWidth, min(maxWidth, newWidth))
+                            let clampedWidth = max(170, min(400, newWidth))
 
                             browserManager.updateSidebarWidth(clampedWidth, for: windowState)
                         }
                         .onEnded { _ in
                             isResizing = false
+                            browserManager.saveSidebarWidthToDefaults()
+
+                            // Release drag lock when resize ends
                             dragLockManager.endDrag(ownerID: dragSessionID)
 
                             if isHovering {
@@ -96,7 +74,17 @@ struct SidebarResizeView: View {
                                 NSCursor.arrow.set()
                             }
                         }
-                )
+                ).offset(x: browserManager.settingsManager.sidebarPosition == .left ? 0 : 2)
+
+            // Visual feedback line - positioned within sidebar area
+            if isHovering && !isResizing {
+                RoundedRectangle(cornerRadius: 1) // Rounded ends (half of width)
+                    .fill(Color.accentColor)
+                    .frame(width: 2)
+                    .frame(maxHeight: .infinity)
+                    .offset(x: browserManager.settingsManager.sidebarPosition == .left ? -6 : 6) // Positioned within sidebar area (14pts into sidebar - 1pt for centering)
+                    .animation(.easeInOut(duration: 0.15), value: isHovering)
+            }
         }
         .frame(width: 3)
     }
