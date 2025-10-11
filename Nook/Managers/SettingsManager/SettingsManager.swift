@@ -30,6 +30,10 @@ class SettingsManager {
     private let openRouterModelKey = "settings.openRouterModel"
     private let ollamaEndpointKey = "settings.ollamaEndpoint"
     private let ollamaModelKey = "settings.ollamaModel"
+    private let webSearchEnabledKey = "settings.webSearchEnabled"
+    private let webSearchEngineKey = "settings.webSearchEngine"
+    private let webSearchMaxResultsKey = "settings.webSearchMaxResults"
+    private let webSearchContextSizeKey = "settings.webSearchContextSize"
     var currentSettingsTab: SettingsTabs = .general
 
     // Stored properties
@@ -152,6 +156,30 @@ class SettingsManager {
         }
     }
 
+    var webSearchEnabled: Bool {
+        didSet {
+            userDefaults.set(webSearchEnabled, forKey: webSearchEnabledKey)
+        }
+    }
+
+    var webSearchEngine: String {
+        didSet {
+            userDefaults.set(webSearchEngine, forKey: webSearchEngineKey)
+        }
+    }
+
+    var webSearchMaxResults: Int {
+        didSet {
+            userDefaults.set(webSearchMaxResults, forKey: webSearchMaxResultsKey)
+        }
+    }
+
+    var webSearchContextSize: String {
+        didSet {
+            userDefaults.set(webSearchContextSize, forKey: webSearchContextSizeKey)
+        }
+    }
+
     init() {
         // Register default values
         userDefaults.register(defaults: [
@@ -173,7 +201,11 @@ class SettingsManager {
             openRouterApiKeyKey: "",
             openRouterModelKey: OpenRouterModel.gpt4o.rawValue,
             ollamaEndpointKey: "http://localhost:11434",
-            ollamaModelKey: "llama3"
+            ollamaModelKey: "llama3",
+            webSearchEnabledKey: false,
+            webSearchEngineKey: "auto",
+            webSearchMaxResultsKey: 5,
+            webSearchContextSizeKey: "medium"
         ])
 
         // Initialize properties from UserDefaults
@@ -206,6 +238,10 @@ class SettingsManager {
         self.openRouterModel = OpenRouterModel(rawValue: userDefaults.string(forKey: openRouterModelKey) ?? OpenRouterModel.gpt4o.rawValue) ?? .gpt4o
         self.ollamaEndpoint = userDefaults.string(forKey: ollamaEndpointKey) ?? "http://localhost:11434"
         self.ollamaModel = userDefaults.string(forKey: ollamaModelKey) ?? "llama3"
+        self.webSearchEnabled = userDefaults.bool(forKey: webSearchEnabledKey)
+        self.webSearchEngine = userDefaults.string(forKey: webSearchEngineKey) ?? "auto"
+        self.webSearchMaxResults = userDefaults.integer(forKey: webSearchMaxResultsKey)
+        self.webSearchContextSize = userDefaults.string(forKey: webSearchContextSizeKey) ?? "medium"
     }
 }
 
@@ -224,6 +260,10 @@ public enum AIProvider: String, CaseIterable, Identifiable {
         case .openRouter: return "OpenRouter"
         case .ollama: return "Ollama (Local)"
         }
+    }
+    
+    var isRecommended: Bool {
+        return false
     }
 }
 
