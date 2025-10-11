@@ -47,8 +47,6 @@ import OSLog
         let currentURLString: String?
         let canGoBack: Bool
         let canGoForward: Bool
-        let faviconData: Data?
-        let faviconCacheKey: String?
     }
 
     struct SnapshotFolder: Codable {
@@ -220,8 +218,6 @@ import OSLog
             e.currentURLString = t.currentURLString
             e.canGoBack = t.canGoBack
             e.canGoForward = t.canGoForward
-            e.faviconData = t.faviconData
-            e.faviconCacheKey = t.faviconCacheKey
         } else {
             let e = TabEntity(
                 id: t.id,
@@ -235,9 +231,7 @@ import OSLog
                 folderId: t.folderId,
                 currentURLString: t.currentURLString,
                 canGoBack: t.canGoBack,
-                canGoForward: t.canGoForward,
-                faviconData: t.faviconData,
-                faviconCacheKey: t.faviconCacheKey
+                canGoForward: t.canGoForward
             )
             ctx.insert(e)
         }
@@ -406,28 +400,6 @@ import OSLog
         }
         return .storageFailure
     }
-
-    // MARK: - Maintenance
-    func clearAllSnapshots() async {
-        let ctx = ModelContext(container)
-        ctx.autosaveEnabled = false
-        do {
-            let tabs = try ctx.fetch(FetchDescriptor<TabEntity>())
-            tabs.forEach { ctx.delete($0) }
-            let folders = try ctx.fetch(FetchDescriptor<FolderEntity>())
-            folders.forEach { ctx.delete($0) }
-            let spaces = try ctx.fetch(FetchDescriptor<SpaceEntity>())
-            spaces.forEach { ctx.delete($0) }
-            let states = try ctx.fetch(FetchDescriptor<TabsStateEntity>())
-            states.forEach { ctx.delete($0) }
-            try ctx.save()
-            latestGeneration &+= 1
-            lastBackupJSON = nil
-            Self.log.notice("[clear] Cleared all persisted tab snapshots")
-        } catch {
-            Self.log.error("[clear] Failed to clear snapshots: \(String(describing: error), privacy: .public)")
-        }
-    }
 }
 
 @MainActor
@@ -474,7 +446,6 @@ class TabManager: ObservableObject {
     private var pendingPinnedWithoutProfile: [Tab] = []
     // Space activation to resume after a deferred profile switch
     private var pendingSpaceActivation: UUID?
-    @Published private(set) var spacesLoaded: Bool = false
     
     // Essentials API - profile-filtered view of global pinned tabs
     var pinnedTabs: [Tab] {
@@ -498,24 +469,14 @@ class TabManager: ObservableObject {
 
     // Currently active tab
     private(set) var currentTab: Tab?
-    private let initialStartupMode: StartupTabMode
-    private let initialStartupURL: String
-    private let initialRestoreSession: Bool
 
-    init(
-        browserManager: BrowserManager? = nil,
-        context: ModelContext,
-        startupMode: StartupTabMode,
-        startupURL: String,
-        restoreSessionEnabled: Bool
-    ) {
+    init(browserManager: BrowserManager? = nil, context: ModelContext) {
         self.browserManager = browserManager
         self.context = context
         self.persistence = PersistenceActor(container: context.container)
-        self.initialStartupMode = startupMode
-        self.initialStartupURL = startupURL
-        self.initialRestoreSession = restoreSessionEnabled
-        loadFromStore()
+        Task { @MainActor in
+            loadFromStore()
+        }
     }
 
     deinit {
@@ -1185,6 +1146,7 @@ class TabManager: ObservableObject {
 
         let newTab = Tab(
             url: validURL,
+            name: "New Tab",
             favicon: "globe",
             spaceId: sid,
             index: 0, // New tabs get index 0 to appear at top
@@ -1216,6 +1178,7 @@ class TabManager: ObservableObject {
         let blankURL = URL(string: "about:blank") ?? URL(string: "https://example.com")!
         let newTab = Tab(
             url: blankURL,
+            name: "New Tab",
             favicon: "globe",
             spaceId: sid,
             index: nextIndex,
@@ -1882,7 +1845,6 @@ class TabManager: ObservableObject {
         // Restore navigation state
         t.canGoBack = e.canGoBack
         t.canGoForward = e.canGoForward
-        t.applyPersistedFavicon(data: e.faviconData, cacheKey: e.faviconCacheKey)
 
         return t
     }
@@ -1890,17 +1852,6 @@ class TabManager: ObservableObject {
     // MARK: - SwiftData load/save
 
     private func loadFromStore() {
-        spacesLoaded = false
-        let restoreEnabled = browserManager?.settingsManager.restoreSessionOnLaunch ?? initialRestoreSession
-        if restoreEnabled == false {
-            bootstrapFreshSession()
-            Task(priority: .userInitiated) { [weak self] in
-                guard let self else { return }
-                await self.persistence.clearAllSnapshots()
-            }
-            spacesLoaded = true
-            return
-        }
         do {
             // Spaces
             let spaceEntities = try context.fetch(
@@ -2076,34 +2027,12 @@ class TabManager: ObservableObject {
             
             // If no tabs exist, create a default tab with Google.com
             if self.currentTab == nil {
-                let settings = browserManager?.settingsManager
-                let mode = settings?.startupTabMode ?? initialStartupMode
-                let rawURL = settings?.startupTabURL ?? initialStartupURL
-                let restore = settings?.restoreSessionOnLaunch ?? initialRestoreSession
-                print("[startup] loadFromStore fallback triggered; mode=\(mode.rawValue) rawURL=\(rawURL) restore=\(restore)")
-                switch mode {
-                case .customURL:
-                    let raw = rawURL.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let urlString = raw.isEmpty ? SettingsManager.defaultStartupURL : raw
-                    print("[startup] Creating fallback tab for URL=\(urlString)")
-                    let defaultTab = createNewTab(url: urlString, in: currentSpace)
-                    self.currentTab = defaultTab
-                case .none:
-                    print("[startup] Mode=none; leaving session empty")
-                    self.currentTab = nil
-                }
-            } else {
-                if let current = self.currentTab {
-                    print("[startup] Existing currentTab=\(current.name) id=\(current.id)")
-                }
+                print("🆕 [TabManager] No tabs found, creating default Google tab")
+                let defaultTab = createNewTab(url: "https://www.google.com", in: currentSpace)
+                self.currentTab = defaultTab
             }
 
-            if let ct = self.currentTab {
-                print("[startup] Prewarming webView for currentTab id=\(ct.id)")
-                _ = ct.webView
-            } else {
-                print("[startup] No current tab after loadFromStore")
-            }
+            if let ct = self.currentTab { _ = ct.webView }
             print(
                 "Current Space: \(currentSpace?.name ?? "None"), Tab: \(currentTab?.name ?? "None")"
             )
@@ -2115,10 +2044,8 @@ class TabManager: ObservableObject {
             }
             // If we assigned default profile to legacy pinned tabs, persist to capture migrations
             if __didAssignDefaultProfile { persistSnapshot() }
-            spacesLoaded = true
         } catch {
             print("SwiftData load error: \(error)")
-            spacesLoaded = true
         }
     }
 
@@ -2126,15 +2053,12 @@ class TabManager: ObservableObject {
 
     public nonisolated func persistSnapshot() {
         Task { [weak self] in
-            guard let self else { return }
-            guard await self.sessionPersistenceEnabled() else { return }
-            _ = await self.persistSnapshotAwaitingResult()
+            _ = await self?.persistSnapshotAwaitingResult()
         }
     }
 
     // Returns true if atomic path succeeded; false if fallback was used or stale
     public nonisolated func persistSnapshotAwaitingResult() async -> Bool {
-        guard await sessionPersistenceEnabled() else { return false }
         // Build snapshot and capture a generation on MainActor
         let payload: (PersistenceActor.Snapshot, Int)? = await MainActor.run { [weak self] in
             guard let strong = self else { return nil }
@@ -2187,9 +2111,7 @@ class TabManager: ObservableObject {
                     folderId: t.folderId,
                     currentURLString: t.url.absoluteString,
                     canGoBack: t.canGoBack,
-                    canGoForward: t.canGoForward,
-                    faviconData: t.faviconPNGData,
-                    faviconCacheKey: t.faviconCacheKey
+                    canGoForward: t.canGoForward
                 ))
             }
         }
@@ -2211,9 +2133,7 @@ class TabManager: ObservableObject {
                     folderId: t.folderId,
                     currentURLString: t.url.absoluteString,
                     canGoBack: t.canGoBack,
-                    canGoForward: t.canGoForward,
-                    faviconData: t.faviconPNGData,
-                    faviconCacheKey: t.faviconCacheKey
+                    canGoForward: t.canGoForward
                 ))
             }
             // Regular tabs for this space
@@ -2232,9 +2152,7 @@ class TabManager: ObservableObject {
                     folderId: t.folderId,
                     currentURLString: t.url.absoluteString,
                     canGoBack: t.canGoBack,
-                    canGoForward: t.canGoForward,
-                    faviconData: t.faviconPNGData,
-                    faviconCacheKey: t.faviconCacheKey
+                    canGoForward: t.canGoForward
                 ))
             }
         }
@@ -2266,54 +2184,13 @@ class TabManager: ObservableObject {
 }
 
 extension TabManager {
-    nonisolated private func sessionPersistenceEnabled() async -> Bool {
-        await MainActor.run { [weak self] in
-            self?.browserManager?.settingsManager.restoreSessionOnLaunch ?? true
+    nonisolated func reattachBrowserManager(_ bm: BrowserManager) {
+        Task { @MainActor in
+            await _reattachBrowserManager(bm)
         }
     }
-
-    @MainActor
-    func handleSessionPersistenceChanged(enabled: Bool) {
-        if enabled {
-            persistSnapshot()
-        } else {
-            Task(priority: .userInitiated) { [weak self] in
-                guard let self else { return }
-                await self.persistence.clearAllSnapshots()
-            }
-        }
-    }
-
-    @MainActor
-    private func bootstrapFreshSession() {
-        spaces.removeAll()
-        spacePinnedTabs.removeAll()
-        tabsBySpace.removeAll()
-        foldersBySpace.removeAll()
-        pinnedByProfile.removeAll()
-        pendingPinnedWithoutProfile.removeAll()
-        currentSpace = nil
-        currentTab = nil
-
-        let defaultSpace = ensureDefaultSpaceIfNeeded()
-        let settings = browserManager?.settingsManager
-        let mode = settings?.startupTabMode ?? initialStartupMode
-        let rawURL = settings?.startupTabURL ?? initialStartupURL
-        let restore = settings?.restoreSessionOnLaunch ?? initialRestoreSession
-        print("[startup] bootstrapFreshSession mode=\(mode.rawValue) rawURL=\(rawURL) restore=\(restore)")
-        switch mode {
-        case .customURL:
-            let raw = rawURL.trimmingCharacters(in: .whitespacesAndNewlines)
-            let urlString = raw.isEmpty ? SettingsManager.defaultStartupURL : raw
-            print("[startup] Creating fresh-session tab for URL=\(urlString)")
-            _ = createNewTab(url: urlString, in: defaultSpace)
-        case .none:
-            print("[startup] Fresh session will start empty")
-        }
-        spacesLoaded = true
-    }
-
-    func reattachBrowserManager(_ bm: BrowserManager) {
+    
+    private func _reattachBrowserManager(_ bm: BrowserManager) async {
         self.browserManager = bm
         let spacePinned = currentSpace.flatMap { spacePinnedTabs(for: $0.id) } ?? []
         for t in (self.pinnedTabs + spacePinned + self.tabs) {
@@ -2335,12 +2212,7 @@ extension TabManager {
                 self.currentTab = match
             }
         }
-        if let ct = self.currentTab {
-            _ = ct.webView
-            bm.compositorManager.updateTabVisibility(currentTabId: ct.id)
-        } else {
-            bm.compositorManager.updateTabVisibility(currentTabId: nil)
-        }
+        if let ct = self.currentTab { _ = ct.webView }
         // Inform the extension controller about existing tabs and the active tab
         if #available(macOS 15.5, *) {
             for t in (self.pinnedTabs + spacePinned + self.tabs) where t.didNotifyOpenToExtensions == false {

@@ -25,8 +25,6 @@ final class TabEntity {
     var currentURLString: String? // The actual current page URL (may differ from urlString after navigation)
     var canGoBack: Bool = false
     var canGoForward: Bool = false
-    var faviconData: Data?
-    var faviconCacheKey: String?
 
     init(
         id: UUID,
@@ -40,9 +38,7 @@ final class TabEntity {
         folderId: UUID? = nil,
         currentURLString: String? = nil,
         canGoBack: Bool = false,
-        canGoForward: Bool = false,
-        faviconData: Data? = nil,
-        faviconCacheKey: String? = nil
+        canGoForward: Bool = false
     ) {
         self.id = id
         self.urlString = urlString
@@ -58,8 +54,6 @@ final class TabEntity {
         self.currentURLString = currentURLString ?? urlString
         self.canGoBack = canGoBack
         self.canGoForward = canGoForward
-        self.faviconData = faviconData
-        self.faviconCacheKey = faviconCacheKey
     }
 }
 
