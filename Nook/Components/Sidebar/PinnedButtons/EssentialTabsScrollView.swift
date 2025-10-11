@@ -16,26 +16,21 @@ struct EssentialTabsScrollView: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: 0) {
-                ForEach(visibleSpaceIndices, id: \.self) { spaceIndex in
-                    // Add bounds checking to prevent index out of range crashes
-                    guard spaceIndex >= 0 && spaceIndex < browserManager.tabManager.spaces.count else {
-                        print("⚠️ Invalid space index in EssentialTabsScrollView: \(spaceIndex)")
-                        return EmptyView()
-                    }
-                    let space = browserManager.tabManager.spaces[spaceIndex]
-                    let boundaryInfo = getProfileBoundaryInfo(for: spaceIndex)
-                    
-                    if boundaryInfo.isProfileStart {
-                        // Show essential tabs at profile start
-                        PinnedGrid(width: width, profileId: boundaryInfo.profileId)
-                            .frame(width: width)
-                            .id(boundaryInfo.profileId)
+                ForEach(visibleSpaceIndices, id: \.self) { (spaceIndex: Int) in
+                    if browserManager.tabManager.spaces.indices.contains(spaceIndex) {
+                        let boundaryInfo = getProfileBoundaryInfo(for: spaceIndex)
+                        if boundaryInfo.isProfileStart {
+                            PinnedGrid(width: width, profileId: boundaryInfo.profileId)
+                                .frame(width: width)
+                                .id(boundaryInfo.profileId)
+                        } else {
+                            Color.clear
+                                .frame(width: width, height: 44)
+                        }
                     } else {
-                        // Empty space to maintain alignment with spaces ScrollView
-                        Color.clear
+                        EmptyView()
                             .frame(width: width, height: 44)
                     }
-                    return EmptyView()
                 }
             }
             .scrollTargetLayout()

@@ -23,6 +23,12 @@ struct TopBarView: View {
             NavButton(iconName: browserManager.settingsManager.sidebarPosition == .left ? "sidebar.left" : "sidebar.right", disabled: false, action: {
                 browserManager.toggleSidebar(for: windowState)
             })
+
+            if browserManager.settingsManager.showAIAssistant {
+                NavButton(iconName: "sparkle", disabled: false, action: {
+                    browserManager.toggleAISidebar(for: windowState)
+                })
+            }
             
             Spacer()
             
@@ -59,7 +65,7 @@ struct TopBarView: View {
                 
                 // URL bar
                 HStack(spacing: 8) {
-                    if let currentTab = browserManager.currentTab(for: windowState) {
+                    if browserManager.currentTab(for: windowState) != nil {
                         Image(systemName: "link")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(textColor)

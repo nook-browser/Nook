@@ -12,6 +12,8 @@ import WebKit
 class BrowserConfiguration {
     static let shared = BrowserConfiguration()
     
+    private init() {}
+    
     lazy var webViewConfiguration: WKWebViewConfiguration = {
         let config = WKWebViewConfiguration()
 
@@ -25,7 +27,6 @@ class BrowserConfiguration {
         config.defaultWebpagePreferences = preferences
 
         // Core WebKit preferences for extensions
-        config.preferences.javaScriptEnabled = true
         config.preferences.javaScriptCanOpenWindowsAutomatically = true
 
         // Media settings
@@ -78,7 +79,6 @@ class BrowserConfiguration {
         config.defaultWebpagePreferences = preferences
 
         // Core WebKit preferences for extensions
-        config.preferences.javaScriptEnabled = true
         config.preferences.javaScriptCanOpenWindowsAutomatically = true
 
         // Media settings
@@ -108,7 +108,6 @@ class BrowserConfiguration {
         
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
 
-
         return config
     }
 
@@ -126,7 +125,6 @@ class BrowserConfiguration {
         config.defaultWebpagePreferences = preferences
 
         // Core WebKit preferences for extensions
-        config.preferences.javaScriptEnabled = true
         config.preferences.javaScriptCanOpenWindowsAutomatically = true
 
         // Media settings
@@ -164,15 +162,13 @@ class BrowserConfiguration {
         config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
         return config
     }
-
-    private init() {}
     
     // MARK: - Chrome Web Store Integration
     
     /// Get the Web Store injector script
     static func webStoreInjectorScript() -> WKUserScript? {
         guard let scriptPath = Bundle.main.path(forResource: "WebStoreInjector", ofType: "js"),
-              let scriptSource = try? String(contentsOfFile: scriptPath) else {
+              let scriptSource = try? String(contentsOfFile: scriptPath, encoding: .utf8) else {
             return nil
         }
         

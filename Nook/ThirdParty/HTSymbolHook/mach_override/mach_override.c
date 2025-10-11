@@ -79,7 +79,7 @@ static char kIslandTemplate[] = {
 
 // ARM64 is not supported by this shim. Provide a minimal template so the code compiles.
 #define kOriginalInstructionsSize 32
-static char kIslandTemplate[] = { 0x00 };
+static char kIslandTemplate[] __attribute__((unused)) = { 0x00 };
 
 #endif
 
@@ -191,7 +191,7 @@ mach_override_ptr(
     (void)overrideFunctionAddress;
     (void)originalFunctionReentryIsland;
     return err_cannot_override; // not supported on ARM64
-#endif
+#else
     
     // this addresses overriding such functions as AudioOutputUnitStart()
     // test with modified DefaultOutputUnit project
@@ -366,6 +366,7 @@ mach_override_ptr(
     }
 
     return err;
+#endif
 }
 
 /*******************************************************************************
@@ -393,6 +394,9 @@ allocateBranchIsland(
         int                allocateHigh,
         void *originalFunctionAddress)
 {
+#if defined(__arm64__) || defined(__aarch64__)
+    (void)originalFunctionAddress;
+#endif
     assert( island );
     
     mach_error_t    err = err_none;

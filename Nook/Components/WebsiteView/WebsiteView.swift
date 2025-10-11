@@ -55,7 +55,7 @@ struct WebsiteView: View {
     var body: some View {
         ZStack() {
             Group {
-                if let currentTab = browserManager.currentTab(for: windowState) {
+                if browserManager.currentTab(for: windowState) != nil {
                     GeometryReader { proxy in
                         TabCompositorWrapper(
                             browserManager: browserManager,
@@ -89,11 +89,6 @@ struct WebsiteView: View {
                                     .environmentObject(windowState)
                             }
                         }
-                        // Restore visual margins around the web content card
-                        // - Keep webview flush with the sidebar when visible (left or right)
-                        // - Add margins when the sidebar is hidden
-                        .padding(.trailing, windowState.isFullScreen ? 0 : (windowState.isSidebarVisible && browserManager.settingsManager.sidebarPosition == .right ? 0 : 8))
-                        .padding(.leading, windowState.isFullScreen ? 0 : (windowState.isSidebarVisible && browserManager.settingsManager.sidebarPosition == .left ? 0 : 8))
                     }
                     .contextMenu {
                         // Divider + close buttons overlay when split is active
@@ -513,8 +508,6 @@ struct TabWebViewWrapper: NSViewRepresentable {
     @Binding var isCommandPressed: Bool
 
     func makeNSView(context: Context) -> WKWebView {
-        let webView = tab.webView
-        
         // Set up link hover callback
         tab.onLinkHover = { [self] href in
             DispatchQueue.main.async {

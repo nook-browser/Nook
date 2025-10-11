@@ -1,18 +1,26 @@
-# Nook
-*A fast, minimal browser with a sidebar-first design.*
+<div align="center">
+  <img width="230" height="230" src="/assets/icon.png" alt="Nook Logo">
+  <h1><b>Nook</b></h1>
+  <p>
+    A fast, minimal browser with a sidebar-first design for macOS.
+    <br>
+  </p>
+</div>
 
-[![Download for macOS](https://img.shields.io/badge/Download%20for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/nook-browser/nook/releases/download/v1.0.2/Nook-v1.0.2.dmg)
+<p align="center">
+  <a href="https://www.apple.com/macos/"><img src="https://badgen.net/badge/macOS/15.5+/blue" alt="macOS 15.5+"></a>
+  <a href="https://swift.org/"><img src="https://badgen.net/badge/Swift/6/orange" alt="Swift"></a>
+  <a href="./LICENSE"><img src="https://badgen.net/badge/License/GPL-3.0/green" alt="GPL-3.0"></a>
+    <a href="https://github.com/nook-browser/Nook/pulls"><img src="https://img.shields.io/github/issues-pr/nook-browser/Nook" alt="Open pull requests"></a>
+  <a href="https://github.com/nook-browser/Nook/issues"><img src="https://img.shields.io/github/issues/nook-browser/Nook" alt="Open issues"></a>
+  <a href="https://github.com/nook-browser/Nook/graphs/contributors"><img src="https://img.shields.io/github/contributors/nook-browser/Nook" alt="Contributors"></a>
+</p>
 
-![Image from Imgflip](https://github.com/user-attachments/assets/dbfe9e9c-82f5-4f59-a073-b86ea05e5f26)
 
-[![Stars](https://img.shields.io/github/stars/nook-browser/Nook?style=social)](https://github.com/nook-browser/Nook/stargazers)
-[![Forks](https://img.shields.io/github/forks/nook-browser/Nook?style=social)](https://github.com/nook-browser/Nook/network/members)
-[![Pull Requests](https://img.shields.io/github/issues-pr/nook-browser/Nook)](https://github.com/nook-browser/Nook/pulls)
-[![Issues](https://img.shields.io/github/issues/nook-browser/Nook)](https://github.com/nook-browser/Nook/issues)
-[![Contributors](https://img.shields.io/github/contributors/nook-browser/Nook)](https://github.com/nook-browser/Nook/graphs/contributors)
-[![License](https://img.shields.io/github/license/nook-browser/Nook)](./LICENSE)
+<p align="center">
+  <a href="https://github.com/nook-browser/nook/releases/download/v1.0.2/Nook-v1.0.2.dmg"><img src="https://img.shields.io/badge/Download%20for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS"></a>
+</p>
 
----
 
 ## Features  
 
@@ -20,11 +28,17 @@
 -  **Performance** – optimized with modern macOS APIs for speed and low memory use.  
 -  **Minimal, modern UI** – focused on content, not chrome.  
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/dbfe9e9c-82f5-4f59-a073-b86ea05e5f26" alt="Nook screenshot">
+</p>
+
 
 ## Getting Started  
+
+### Download
 [![Download for macOS](https://img.shields.io/badge/Download%20for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/nook-browser/nook/releases/download/v1.0.2/Nook-v1.0.2.dmg)
 
-### Build from Source
+### or, Build from Source
 
 #### Prerequisites  
 - macOS 15.5+
@@ -46,3 +60,4 @@ Join our Discord to help with development: https://discord.gg/J3XfPvg7Fs
 
 ### LICENSES
 With the exception of third-party libraries in Nook/ThirdParty, all code is under the GPL 3.0 License. The relevant third-party code is licensed per-folder under a variety of free, open-source software licenses.
+

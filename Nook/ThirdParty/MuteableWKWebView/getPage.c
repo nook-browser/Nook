@@ -17,10 +17,10 @@
 #error This file must be compiled without ARC
 #endif
 
-const char *pagePropertyName = "_page";
-const char *WKWebViewClassName = "WKWebView";
+static const char *pagePropertyName = "_page";
+static const char *WKWebViewClassName = "WKWebView";
 
-static bool checkPageProperty() {
+static bool checkPageProperty(void) {
     
     static bool foundPageProperty = false;
     if( foundPageProperty ) return true;
@@ -35,7 +35,7 @@ static bool checkPageProperty() {
     unsigned int c = 0;
     Ivar *ivarP = class_copyIvarList(classObj, &c);
     
-    for(int i = 0; i < c; i++) {
+    for(unsigned int i = 0; i < c; i++) {
         const char *ivarName = ivar_getName(ivarP[i]);
         if( strncmp(pagePropertyName, ivarName, 5) == 0 ) {
             foundPageProperty = true;

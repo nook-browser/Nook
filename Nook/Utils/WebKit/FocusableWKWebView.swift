@@ -1,5 +1,6 @@
 import AppKit
 import WebKit
+import UserNotifications
 
 // Simple subclass to ensure clicking a webview focuses its tab in the app state
 final class FocusableWKWebView: WKWebView {
@@ -56,12 +57,12 @@ final class FocusableWKWebView: WKWebView {
 
                 var customItems: [NSMenuItem] = []
 
-              if let href = info["href"] as? String, !href.isEmpty, let url = URL(string: href) {
+                  if let href = info["href"] as? String, !href.isEmpty, let url = URL(string: href) {
                     // Check if this is an external domain and we're not in a mini window
                     if let currentHost = self.owningTab?.url.host,
                        let newHost = url.host,
                        currentHost != newHost,
-                       let browserManager = self.owningTab?.browserManager {
+                       self.owningTab?.browserManager != nil {
 
                         let openPeekItem = NSMenuItem(
                             title: "Peek Link",
@@ -174,21 +175,36 @@ final class FocusableWKWebView: WKWebView {
     }
     
     private func showSaveSuccessNotification(for url: URL) {
-        let notification = NSUserNotification()
-        notification.title = "Image Saved"
-        notification.informativeText = "Saved to \(url.lastPathComponent)"
-        notification.soundName = NSUserNotificationDefaultSoundName
-        
-        NSUserNotificationCenter.default.deliver(notification)
+        postUserNotification(
+            title: "Image Saved",
+            message: "Saved to \(url.lastPathComponent)"
+        )
     }
 
     private func showSaveErrorNotification(error: Error) {
-        let notification = NSUserNotification()
-        notification.title = "Save Failed"
-        notification.informativeText = error.localizedDescription
-        notification.soundName = NSUserNotificationDefaultSoundName
-        
-        NSUserNotificationCenter.default.deliver(notification)
+        postUserNotification(
+            title: "Save Failed",
+            message: error.localizedDescription
+        )
+    }
+
+    private func postUserNotification(title: String, message: String) {
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body = message
+            content.sound = .default
+
+            let request = UNNotificationRequest(
+                identifier: "focusable-webview-\(UUID().uuidString)",
+                content: content,
+                trigger: UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
+            )
+            center.add(request, withCompletionHandler: nil)
+        }
     }
 
   @objc private func openLinkInPeek(_ sender: NSMenuItem) {

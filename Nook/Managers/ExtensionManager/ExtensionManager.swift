@@ -28,7 +28,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     private var optionsWindows: [String: NSWindow] = [:]
     // Stable adapters for tabs/windows used when notifying controller events
     private var tabAdapters: [UUID: ExtensionTabAdapter] = [:]
-    internal weak var windowAdapter: ExtensionWindowAdapter?
+    internal var windowAdapter: ExtensionWindowAdapter?
     private weak var browserManagerRef: BrowserManager?
     // Whether to auto-resize extension action popovers to content. Disabled per UX preference.
     private let shouldAutoSizeActionPopups: Bool = false
@@ -55,27 +55,35 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     deinit {
         NotificationCenter.default.removeObserver(self)
 
+        // Capture state for cleanup before we tear down references
+        let contexts = extensionContexts
+        let controller = extensionController
+
         // MEMORY LEAK FIX: Clean up all extension contexts and break circular references
-        extensionContexts.removeAll()
         tabAdapters.removeAll()
         actionAnchors.removeAll()
 
         // Close all options windows
         for (_, window) in optionsWindows {
-            window.close()
+            Task { @MainActor in
+                window.close()
+            }
         }
         optionsWindows.removeAll()
 
         // Clean up window adapter
         windowAdapter = nil
 
-        // Unload extension controller
-        if let controller = extensionController {
-            for (_, context) in extensionContexts {
-                try? controller.unload(context)
+        // Unload extension controller contexts asynchronously on the main actor
+        if let controller {
+            Task { @MainActor in
+                for (_, context) in contexts {
+                    try? controller.unload(context)
+                }
             }
         }
         extensionController = nil
+        extensionContexts.removeAll()
 
         print("🧹 [ExtensionManager] Cleaned up all extension resources")
     }
@@ -109,11 +117,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             extensionDataStore = getExtensionDataStore(for: pid)
         } else {
             // Fallback shared persistent store until a profile is assigned
-            if #available(macOS 15.4, *) {
-                extensionDataStore = WKWebsiteDataStore(forIdentifier: config.identifier!)
-            } else {
-                extensionDataStore = WKWebsiteDataStore.default()
-            }
+            extensionDataStore = WKWebsiteDataStore(forIdentifier: config.identifier!)
         }
         
         // Verify data store is properly initialized
@@ -133,12 +137,8 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         print("   World support (MAIN/ISOLATED): \(ExtensionUtils.isWorldInjectionSupported)")
         
         // Handle macOS 15.4+ ViewBridge issues with delayed delegate assignment
-        if #available(macOS 15.4, *) {
-            print("⚠️ Running on macOS 15.4+ - using delayed delegate assignment to avoid ViewBridge issues")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                controller.delegate = self
-            }
-        } else {
+        print("⚠️ Running on macOS 15.4+ - using delayed delegate assignment to avoid ViewBridge issues")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             controller.delegate = self
         }
         
@@ -146,7 +146,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         if #available(macOS 15.5, *) {
             sharedWebConfig.webExtensionController = controller
             
-            sharedWebConfig.preferences.javaScriptEnabled = true
+            sharedWebConfig.defaultWebpagePreferences.allowsContentJavaScript = true
             
             print("ExtensionManager: Configured shared WebView configuration with extension controller")
             
@@ -163,7 +163,8 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         
         print("ExtensionManager: Native WKWebExtensionController initialized and configured")
         print("   Controller ID: \(config.identifier?.uuidString ?? "none")")
-        print("   Data store: \(controller.configuration.defaultWebsiteDataStore)")
+        let dataStoreDescription = controller.configuration.defaultWebsiteDataStore.map { String(describing: $0) } ?? "nil"
+        print("   Data store: \(dataStoreDescription)")
     }
     
     
@@ -202,12 +203,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             return store
         }
         // Use a persistent store identified by the profile UUID for deterministic mapping when available
-        let store: WKWebsiteDataStore
-        if #available(macOS 15.4, *) {
-            store = WKWebsiteDataStore(forIdentifier: profileId)
-        } else {
-            store = WKWebsiteDataStore.default()
-        }
+        let store = WKWebsiteDataStore(forIdentifier: profileId)
         profileExtensionStores[profileId] = store
         print("🔧 [ExtensionManager] Created/loaded extension data store for profile=\(profileId.uuidString) (persistent=\(store.isPersistent))")
         return store
@@ -253,14 +249,14 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         for tab in allTabs {
             guard let webView = tab.webView else { continue }
             
-            if webView.configuration.webExtensionController !== controller {
-                print("  📝 Updating WebView for tab: \(tab.name)")
-                webView.configuration.webExtensionController = controller
-                updatedCount += 1
-                
-                webView.configuration.preferences.javaScriptEnabled = true
+                if webView.configuration.webExtensionController !== controller {
+                    print("  📝 Updating WebView for tab: \(tab.name)")
+                    webView.configuration.webExtensionController = controller
+                    updatedCount += 1
+                    
+                    webView.configuration.defaultWebpagePreferences.allowsContentJavaScript = true
+                }
             }
-        }
         
         print("✅ Updated \(updatedCount) existing WebViews with extension controller")
         
@@ -1077,12 +1073,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         
         if let webView = action.popupWebView {
             
-            if let assoc = action.associatedTab as? ExtensionTabAdapter {
-            } else {
-            }
-            if let active = windowAdapter?.activeTab(for: extensionContext) as? ExtensionTabAdapter {
-            }
-            
             // Ensure the WebView has proper configuration for extension resources
             if webView.configuration.webExtensionController == nil {
                 webView.configuration.webExtensionController = controller
@@ -1090,9 +1080,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             }
             
             // Enable inspection for debugging
-            if #available(macOS 13.3, *) {
-                webView.isInspectable = true
-            }
+            webView.isInspectable = true
             
             // Temporarily disable console helper to test if it's causing container errors
             // PopupConsole.shared.attach(to: webView)
@@ -1522,30 +1510,39 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         let reqHosts = requestedMatches.map { String(describing: $0) }.sorted()
         let optHosts = optionalMatches.map { String(describing: $0) }.sorted()
 
-        bm.showCustomContentDialog(
-            header: AnyView(DialogHeader(icon: "puzzlepiece.extension", title: "Extension Permissions", subtitle: nil)),
-            content: ExtensionPermissionView(
-                extensionName: extensionDisplayName,
-                requestedPermissions: reqPerms,
-                optionalPermissions: optPerms,
-                requestedHostPermissions: reqHosts,
-                optionalHostPermissions: optHosts,
-                onGrant: { selectedPerms, selectedHosts in
-                    // Map strings back using string description matching across both requested and optional
-                    let allPerms = requestedPermissions.union(optionalPermissions)
-                    let allHosts = requestedMatches.union(optionalMatches)
-                    let grantedPermissions = Set(allPerms.filter { selectedPerms.contains(String(describing: $0)) })
-                    let grantedMatches = Set(allHosts.filter { selectedHosts.contains(String(describing: $0)) })
-                    bm.closeDialog()
-                    onDecision(grantedPermissions, grantedMatches)
+        bm.showDialog {
+            StandardDialog(
+                header: {
+                    DialogHeader(
+                        icon: "puzzlepiece.extension",
+                        title: "Extension Permissions",
+                        subtitle: nil
+                    )
                 },
-                onDeny: {
-                    bm.closeDialog()
-                    onCancel()
-                }
-            ),
-            footer: AnyView(EmptyView())
-        )
+                content: {
+                    ExtensionPermissionView(
+                        extensionName: extensionDisplayName,
+                        requestedPermissions: reqPerms,
+                        optionalPermissions: optPerms,
+                        requestedHostPermissions: reqHosts,
+                        optionalHostPermissions: optHosts,
+                        onGrant: { selectedPerms, selectedHosts in
+                            let allPerms = requestedPermissions.union(optionalPermissions)
+                            let allHosts = requestedMatches.union(optionalMatches)
+                            let grantedPermissions = Set(allPerms.filter { selectedPerms.contains(String(describing: $0)) })
+                            let grantedMatches = Set(allHosts.filter { selectedHosts.contains(String(describing: $0)) })
+                            bm.closeDialog()
+                            onDecision(grantedPermissions, grantedMatches)
+                        },
+                        onDeny: {
+                            bm.closeDialog()
+                            onCancel()
+                        }
+                    )
+                },
+                footer: { EmptyView() }
+            )
+        }
     }
 
     // Delegate entry point for permission requests from extensions at runtime
@@ -1553,9 +1550,9 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     func webExtensionController(
         _ controller: WKWebExtensionController,
         promptForPermissions permissions: Set<WKWebExtension.Permission>,
-        in window: (any WKWebExtensionWindow)? ,
+        in tab: (any WKWebExtensionTab)?,
         for extensionContext: WKWebExtensionContext,
-        completionHandler: @escaping (Error?) -> Void
+        completionHandler: @escaping (Set<WKWebExtension.Permission>, Date?) -> Void
     ) {
         let displayName = extensionContext.webExtension.displayName ?? "Extension"
         presentPermissionPrompt(
@@ -1577,12 +1574,12 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                         for: m
                     )
                 }
-                completionHandler(nil)
+                completionHandler(grantedPerms, nil)
             },
             onCancel: {
                 for p in permissions { extensionContext.setPermissionStatus(.deniedExplicitly, for: p) }
                 for m in extensionContext.webExtension.requestedPermissionMatchPatterns { extensionContext.setPermissionStatus(.deniedExplicitly, for: m) }
-                completionHandler(nil)
+                completionHandler([], nil)
             }
         )
     }
@@ -1780,7 +1777,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         }
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.allowsBackForwardNavigationGestures = true
-        if #available(macOS 13.3, *) { webView.isInspectable = true }
+        webView.isInspectable = true
         // No navigation delegate needed for options page
 
         // Provide a lightweight alias to help extensions that only check `chrome`.
@@ -1926,9 +1923,9 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     func webExtensionController(
         _ controller: WKWebExtensionController,
         promptForPermissionMatchPatterns matchPatterns: Set<WKWebExtension.MatchPattern>,
-        in window: (any WKWebExtensionWindow)?,
+        in tab: (any WKWebExtensionTab)?,
         for extensionContext: WKWebExtensionContext,
-        completionHandler: @escaping (Error?) -> Void
+        completionHandler: @escaping (Set<WKWebExtension.MatchPattern>, Date?) -> Void
     ) {
         let displayName = extensionContext.webExtension.displayName ?? "Extension"
         presentPermissionPrompt(
@@ -1944,11 +1941,11 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                         for: m
                     )
                 }
-                completionHandler(nil)
+                completionHandler(grantedMatches, nil)
             },
             onCancel: {
                 for m in matchPatterns { extensionContext.setPermissionStatus(.deniedExplicitly, for: m) }
-                completionHandler(nil)
+                completionHandler([], nil)
             }
         )
     }
