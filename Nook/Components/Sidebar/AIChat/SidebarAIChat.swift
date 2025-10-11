@@ -74,7 +74,6 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                 HStack {
                     MacButtonsView()
                         .frame(width: 70, height: 20)
-                        .padding(8)
                     Spacer()
                 }
             }
@@ -82,15 +81,18 @@ To enhance the web browsing experience by providing intelligent, context-aware s
             VStack(spacing: 0) {
                 // Header
                 HStack(spacing: 8) {
-                    NavButton(iconName: "arrow.backward", disabled: false, action: {
+                    NavButton(iconName: "xmark", disabled: false, action: {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             windowState.isSidebarAIChatVisible = false
                         }
                     })
                     
-                    Text("AI Assistant")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.9))
+                    if !messages.isEmpty{
+                        Text("Ask Nook")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.9))
+                            .transition(.blur.animation(.smooth))
+                    }
                     
                     Spacer()
                 
@@ -215,11 +217,11 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                                         .font(.system(size: 32))
                                         .foregroundStyle(.white.opacity(0.3))
                                     
-                                    Text("Ask me anything")
+                                    Text("Ask Nook")
                                         .font(.system(size: 14, weight: .semibold))
                                         .foregroundStyle(.white.opacity(0.8))
                                     
-                                    Text("I can help you understand the current page or answer questions")
+                                    Text("Questions about this page, or just curious? I'm here")
                                         .font(.system(size: 12))
                                         .foregroundStyle(.white.opacity(0.6))
                                         .multilineTextAlignment(.center)
@@ -282,9 +284,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                 .background(.white.opacity(0.05))
                 .cornerRadius(12)
             }
-            .padding(8)
         }
-        .padding(8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             apiKeyInput = settingsManager.geminiApiKey
