@@ -10,8 +10,8 @@ import WebKit
 
 struct PrivacySettingsView: View {
     @Environment(BrowserManager.self) private var browserManager
-    @StateObject private var cookieManager = CookieManager()
-    @StateObject private var cacheManager = CacheManager()
+    @State private var cookieManager = CookieManager()
+    @State private var cacheManager = CacheManager()
     @State private var showingCookieManager = false
     @State private var showingCacheManager = false
     @State private var isClearing = false

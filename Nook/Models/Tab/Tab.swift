@@ -528,7 +528,7 @@ public final class Tab: NSObject, Identifiable, WKDownloadDelegate {
     
 
     
-    deinit {
+    @MainActor deinit {
         // MEMORY LEAK FIX: Ensure cleanup when tab is deallocated
         // Note: We can't access main actor-isolated properties in deinit,
         // but we can still clean up non-actor properties

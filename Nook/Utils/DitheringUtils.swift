@@ -92,7 +92,7 @@ fileprivate func cachedNSColor(hex: String) -> NSColor {
 // Uses a renderer to generate a dithered image off the main thread; falls back to SwiftUI gradient.
 struct DitheredGradientView: View {
     let gradient: SpaceGradient
-    @StateObject private var renderer = DitheredGradientRenderer()
+    @State private var renderer = DitheredGradientRenderer()
     @Environment(GradientColorManager.self) private var gradientColorManager
     @Environment(\.backingScale) private var backingScale
 

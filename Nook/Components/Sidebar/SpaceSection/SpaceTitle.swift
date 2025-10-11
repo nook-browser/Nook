@@ -17,7 +17,7 @@ struct SpaceTitle: View {
     @State private var isDropHovering: Bool = false
     @State private var dropDraggedItem: UUID?
     
-    @StateObject private var emojiManager = EmojiPickerManager()
+    @State private var emojiManager = EmojiPickerManager()
 
     var body: some View {
         HStack(spacing: 6) {
