@@ -37,7 +37,6 @@ struct SettingsView: View {
             }
             .tag(SettingsTabs.privacy)
 
-
             SettingsPane {
                 ProfilesSettingsView()
             }
