@@ -97,34 +97,114 @@ To enhance the web browsing experience by providing intelligent, context-aware s
     
     var body: some View {
         VStack(spacing: 0) {
-            // Window controls area (for macOS traffic lights)
-            if browserManager.settingsManager.sidebarPosition == .left {
-                HStack {
-                    MacButtonsView()
-                        .frame(width: 70, height: 20)
-                        .padding(8)
-                    Spacer()
+            // Messages area
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        if !hasApiKey && !showApiKeyInput {
+                            VStack(spacing: 12) {
+                                Image(systemName: "key.fill")
+                                    .font(.system(size: 32))
+                                    .foregroundStyle(.white.opacity(0.3))
+
+                                Text("API Key Required")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(.white.opacity(0.8))
+
+                                Text("Add your API key to start chatting")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.white.opacity(0.6))
+                                    .multilineTextAlignment(.center)
+
+                                Button(action: {
+                                    showApiKeyInput = true
+                                }) {
+                                    Text("Add API Key")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.black)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 8)
+                                        .background(.white.opacity(0.9))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .padding(.top, 60)
+                        } else if messages.isEmpty {
+                            VStack(spacing: 12) {
+                                Image(systemName: "sparkle")
+                                    .font(.system(size: 32))
+                                    .foregroundStyle(.white.opacity(0.3))
+                                
+                                Text("Ask Nook")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(.white.opacity(0.8))
+                                
+                                Text("Questions about this page, or just curious? I'm here.")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.white.opacity(0.6))
+                                    .multilineTextAlignment(.center)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .padding(.top, 60)
+                        } else {
+                            ForEach(messages) { message in
+                                MessageBubble(message: message)
+                                    .id(message.id)
+                            }
+                        }
+                        
+                        if isLoading {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                                Text("Thinking...")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.white.opacity(0.5))
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 12)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                }
+                .onChange(of: messages.count) { _, _ in
+                    if let last = messages.last {
+                        withAnimation {
+                            proxy.scrollTo(last.id, anchor: .bottom)
+                        }
+                    }
                 }
             }
-            
-            VStack(spacing: 0) {
-                // Header
-                HStack(spacing: 8) {
-                    NavButton(iconName: "arrow.backward", disabled: false, action: {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            windowState.isSidebarAIChatVisible = false
-                            let restoredWidth = windowState.savedSidebarWidth
-                            windowState.sidebarWidth = restoredWidth
-                            windowState.sidebarContentWidth = max(restoredWidth - 16, 0)
-                        }
-                    })
-                    
-                    Text("AI Assistant")
+            .mask{
+                VStack(spacing: 0){
+                    LinearGradient(stops: [.init(color: .black.opacity(0.2), location: 0.4), .init(color: .black, location: 1.0)], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 60)
+                    Color.black
+                    LinearGradient(colors: [.black, .black.opacity(0.2)], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 90)
+                }.ignoresSafeArea()
+            }
+        }
+        .safeAreaInset(edge: .top, content: {
+            HStack(spacing: 8) {
+                NavButton(iconName: "xmark", disabled: false, action: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        windowState.isSidebarAIChatVisible = false
+                    }
+                })
+                
+                if !messages.isEmpty{
+                    Text("Ask Nook")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.9))
-                    
-                    Spacer()
-                
+                        .transition(.blur.animation(.smooth))
+                }
+
+                Spacer()
+
                 Menu {
                     Menu("Provider") {
                         ForEach(AIProvider.allCases) { provider in
@@ -141,17 +221,17 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                             }
                         }
                     }
-                    
+
                     Divider()
-                    
+
                     Button {
                         showApiKeyInput.toggle()
                     } label: {
                         Label("Settings", systemImage: "key")
                     }
-                    
+
                     Divider()
-                    
+
                     Menu("Model") {
                         switch settingsManager.aiProvider {
                         case .gemini:
@@ -219,25 +299,13 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                             }
                         }
                     }
-                    
-                    Divider()
-                    
-                    Button {
-                        messages.removeAll()
-                    } label: {
-                        Label("Clear Chat", systemImage: "trash")
-                    }
-                    .disabled(messages.isEmpty)
                 } label: {
                     Image(systemName: "ellipsis.circle")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.7))
-                    }
-                    .buttonStyle(.plain)
+                        .font(.system(size: 20))
+                        .foregroundStyle(.white.opacity(0.9))
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 12)
-                
+                .menuStyle(.borderlessButton)
+
                 // API Key input section
                 if showApiKeyInput {
                     VStack(spacing: 8) {
@@ -253,7 +321,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                                         .padding(.vertical, 10)
                                         .background(.white.opacity(0.1))
                                         .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    
+
                                     Button(action: {
                                         settingsManager.geminiApiKey = apiKeyInput
                                         showApiKeyInput = false
@@ -269,12 +337,12 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                                     }
                                     .buttonStyle(.plain)
                                 }
-                                
+
                                 Text("Get your API key from Google AI Studio")
                                     .font(.system(size: 10))
                                     .foregroundStyle(.white.opacity(0.5))
                             }
-                            
+
                         case .openRouter:
                             VStack(spacing: 8) {
                                 HStack(spacing: 8) {
@@ -286,7 +354,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                                         .padding(.vertical, 10)
                                         .background(.white.opacity(0.1))
                                         .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    
+
                                     Button(action: {
                                         settingsManager.openRouterApiKey = apiKeyInput
                                         showApiKeyInput = false
@@ -302,12 +370,12 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                                     }
                                     .buttonStyle(.plain)
                                 }
-                                
+
                                 Text("Get your API key from openrouter.ai")
                                     .font(.system(size: 10))
                                     .foregroundStyle(.white.opacity(0.5))
                             }
-                            
+
                         case .ollama:
                             VStack(spacing: 8) {
                                 HStack(spacing: 8) {
@@ -319,7 +387,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                                         .padding(.vertical, 10)
                                         .background(.white.opacity(0.1))
                                         .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    
+
                                     Button(action: {
                                         settingsManager.ollamaEndpoint = endpointInput
                                         showApiKeyInput = false
@@ -337,7 +405,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                                     }
                                     .buttonStyle(.plain)
                                 }
-                                
+
                                 if ollamaModels.isEmpty && !isFetchingModels {
                                     Button(action: {
                                         Task {
@@ -354,7 +422,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                                     }
                                     .buttonStyle(.plain)
                                 }
-                                
+
                                 Text("Make sure Ollama is running locally")
                                     .font(.system(size: 10))
                                     .foregroundStyle(.white.opacity(0.5))
@@ -365,117 +433,110 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                     .padding(.bottom, 8)
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
-                
-                // Messages area
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(spacing: 12) {
-                                if !hasApiKey && !showApiKeyInput {
-                                VStack(spacing: 12) {
-                                    Image(systemName: "key.fill")
-                                        .font(.system(size: 32))
-                                        .foregroundStyle(.white.opacity(0.3))
-                                    
-                                    Text("API Key Required")
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundStyle(.white.opacity(0.8))
-                                    
-                                    Text("Add your Gemini API key to start chatting")
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.white.opacity(0.6))
-                                        .multilineTextAlignment(.center)
-                                    
-                                    Button(action: {
-                                        showApiKeyInput = true
-                                    }) {
-                                        Text("Add API Key")
-                                            .font(.system(size: 12, weight: .semibold))
-                                            .foregroundColor(.black)
-                                            .padding(.horizontal, 16)
-                                            .padding(.vertical, 8)
-                                            .background(.white.opacity(0.9))
-                                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .padding(.top, 60)
-                            } else if messages.isEmpty {
-                                VStack(spacing: 12) {
-                                    Image(systemName: "sparkles")
-                                        .font(.system(size: 32))
-                                        .foregroundStyle(.white.opacity(0.3))
-                                    
-                                    Text("Ask me anything")
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundStyle(.white.opacity(0.8))
-                                    
-                                    Text("I can help you understand the current page or answer questions")
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.white.opacity(0.6))
-                                        .multilineTextAlignment(.center)
-                                }
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .padding(.top, 60)
-                            } else {
-                                ForEach(messages) { message in
-                                    MessageBubble(message: message)
-                                        .id(message.id)
-                                }
-                            }
-                            
-                            if isLoading {
-                                HStack(spacing: 8) {
-                                    ProgressView()
-                                        .scaleEffect(0.7)
-                                    Text("Thinking...")
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.white.opacity(0.5))
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 12)
-                            }
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 8)
+
+                NavButton(iconName: "trash", disabled: false, action: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        
+                        messages.removeAll()
                     }
-                    .onChange(of: messages.count) { _, _ in
-                        if let last = messages.last {
-                            withAnimation {
-                                proxy.scrollTo(last.id, anchor: .bottom)
-                            }
-                        }
-                    }
-                }
-                
-                // Input area
-                HStack(spacing: 8) {
-                    TextField("Ask about this page...", text: $messageText, axis: .vertical)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white.opacity(0.9))
-                        .lineLimit(1...4)
-                        .focused($isTextFieldFocused)
-                        .onSubmit {
-                            sendMessage()
-                        }
-                    
-                    Button(action: sendMessage) {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 24))
-                            .foregroundStyle(messageText.isEmpty ? .white.opacity(0.3) : .white.opacity(0.9))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(messageText.isEmpty || isLoading || !hasApiKey)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(.white.opacity(0.05))
-                .cornerRadius(12)
+                })
+                .disabled(messages.isEmpty)
             }
-            .padding(8)
+            .padding(.horizontal, 8)
+        })
+        .safeAreaInset(edge: .bottom){
+            
+            // Input area
+            VStack(spacing: 8) {
+                TextField("Ask about this page...", text: $messageText, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.9))
+                    .lineLimit(1...4)
+                    .focused($isTextFieldFocused)
+                    .onSubmit {
+                        sendMessage()
+                    }
+                HStack{
+
+                    switch settingsManager.aiProvider {
+                    case .gemini:
+                        Menu(settingsManager.geminiModel.displayName) {
+                            ForEach(GeminiModel.allCases) { model in
+                                Toggle(isOn: Binding(get: {
+                                    return settingsManager.geminiModel == model
+                                }, set: { Value in
+                                    settingsManager.geminiModel = model
+                                })) {
+                                    Label(model.displayName, systemImage: model.icon)
+                                }
+                            }
+                        }
+                    case .openRouter:
+                        Menu(settingsManager.openRouterModel.displayName) {
+                            ForEach(OpenRouterModel.allCases) { model in
+                                Button(action: {
+                                    settingsManager.openRouterModel = model
+                                }) {
+                                    HStack {
+                                        Text(model.displayName)
+                                        if settingsManager.openRouterModel == model {
+                                            Spacer()
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    case .ollama:
+                        if !ollamaModels.isEmpty {
+                            Menu(settingsManager.ollamaModel.isEmpty ? "Select Model" : settingsManager.ollamaModel) {
+                                ForEach(ollamaModels) { model in
+                                    Button(action: {
+                                        settingsManager.ollamaModel = model.name
+                                    }) {
+                                        HStack {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(model.displayName)
+                                                Text(model.sizeFormatted)
+                                                    .font(.system(size: 10))
+                                                    .foregroundStyle(.white.opacity(0.5))
+                                            }
+                                            if settingsManager.ollamaModel == model.name {
+                                                Spacer()
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            Text("No models")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.white.opacity(0.5))
+                        }
+                    }
+
+                Spacer()
+                    
+                Button(action: sendMessage) {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(messageText.isEmpty ? .white.opacity(0.3) : .white.opacity(0.9))
+                }
+                .buttonStyle(.plain)
+                .disabled(messageText.isEmpty || isLoading || !hasApiKey)
+                    
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial)
+            .clipShape(.rect(cornerRadius: 12))
+            .padding(.horizontal, 8)
         }
-        .padding(8)
+        .safeAreaPadding(.top, 8)
+        .safeAreaPadding(.bottom, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             updateInputFields()
@@ -1039,4 +1100,3 @@ struct MessageBubble: View {
         }
     }
 }
-
