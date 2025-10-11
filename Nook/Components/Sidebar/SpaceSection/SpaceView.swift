@@ -64,7 +64,7 @@ struct SpaceView: View {
     let onMoveTabUp: (Tab) -> Void
     let onMoveTabDown: (Tab) -> Void
     let onMuteTab: (Tab) -> Void
-    @EnvironmentObject var splitManager: SplitViewManager
+    @Environment(SplitViewManager.self) private var splitManager
     
     private var outerWidth: CGFloat {
         let visibleWidth = windowState.sidebarWidth

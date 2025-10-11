@@ -50,7 +50,7 @@ private struct SplitHalfTab: View {
     
     @State private var isHovering: Bool = false
     @Environment(BrowserManager.self) private var browserManager
-    @EnvironmentObject var splitManager: SplitViewManager
+    @Environment(SplitViewManager.self) private var splitManager
     @Environment(BrowserWindowState.self) private var windowState
     
     var body: some View {

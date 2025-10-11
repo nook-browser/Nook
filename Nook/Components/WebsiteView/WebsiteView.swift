@@ -414,7 +414,7 @@ private extension WebsiteView {
 // MARK: - Split Controls Overlay
 private struct SplitControlsOverlay: View {
     @Environment(BrowserManager.self) private var browserManager
-    @EnvironmentObject var splitManager: SplitViewManager
+    @Environment(SplitViewManager.self) private var splitManager
     @Environment(BrowserWindowState.self) private var windowState
 
     @State private var dragOffset: CGFloat = 0
