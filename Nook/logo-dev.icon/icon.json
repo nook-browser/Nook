@@ -30,13 +30,19 @@
             {
               "appearance" : "tinted",
               "value" : {
-                "solid" : "display-p3:0.36620,0.68093,0.52321,1.00000"
+                "solid" : "display-p3:1.00000,1.00000,1.00000,1.00000"
               }
             }
           ],
           "glass" : true,
           "image-name" : "Light Mode.svg",
-          "name" : "Logo"
+          "name" : "Logo",
+          "opacity-specializations" : [
+            {
+              "appearance" : "tinted",
+              "value" : 1
+            }
+          ]
         }
       ],
       "shadow" : {
