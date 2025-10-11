@@ -69,190 +69,198 @@ To enhance the web browsing experience by providing intelligent, context-aware s
     
     var body: some View {
         VStack(spacing: 0) {
-            VStack(spacing: 0) {
-                // Header
-                HStack(spacing: 8) {
-                    NavButton(iconName: "xmark", disabled: false, action: {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            windowState.isSidebarAIChatVisible = false
+            // API Key input section
+            if showApiKeyInput {
+                VStack(spacing: 8) {
+                    HStack(spacing: 8) {
+                        SecureField("Enter Gemini API Key", text: $apiKeyInput)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.8))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(.white.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        
+                        Button(action: {
+                            settingsManager.geminiApiKey = apiKeyInput
+                            showApiKeyInput = false
+                            apiKeyInput = ""
+                        }) {
+                            Text("Save")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.black)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(.white.opacity(0.9))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
-                    })
-                    
-                    if !messages.isEmpty{
-                        Text("Ask Nook")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.9))
-                            .transition(.blur.animation(.smooth))
+                        .buttonStyle(.plain)
                     }
                     
-                    Spacer()
-                    
-                    NavButton(iconName: "key", disabled: false, action: {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            
-                            showApiKeyInput.toggle()
-                        }
-                    })
-                    
-                    NavButton(iconName: "trash", disabled: false, action: {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            
-                            messages.removeAll()
-                        }
-                    })
-                    .disabled(messages.isEmpty)
+                    Text("Get your API key from Google AI Studio")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.white.opacity(0.5))
                 }
                 .padding(.horizontal, 8)
-                
-                
-                // API Key input section
-                if showApiKeyInput {
-                    VStack(spacing: 8) {
-                        HStack(spacing: 8) {
-                            SecureField("Enter Gemini API Key", text: $apiKeyInput)
-                                .textFieldStyle(.plain)
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.white.opacity(0.8))
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 10)
-                                .background(.white.opacity(0.1))
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                            
-                            Button(action: {
-                                settingsManager.geminiApiKey = apiKeyInput
-                                showApiKeyInput = false
-                                apiKeyInput = ""
-                            }) {
-                                Text("Save")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(.black)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(.white.opacity(0.9))
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                .padding(.bottom, 8)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+            
+            // Messages area
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        if !hasApiKey && !showApiKeyInput {
+                            VStack(spacing: 12) {
+                                Image(systemName: "key.fill")
+                                    .font(.system(size: 32))
+                                    .foregroundStyle(.white.opacity(0.3))
+                                
+                                Text("API Key Required")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(.white.opacity(0.8))
+                                
+                                Text("Add your Gemini API key to start chatting")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.white.opacity(0.6))
+                                    .multilineTextAlignment(.center)
+                                
+                                Button(action: {
+                                    showApiKeyInput = true
+                                }) {
+                                    Text("Add API Key")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.black)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 8)
+                                        .background(.white.opacity(0.9))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .padding(.top, 60)
+                        } else if messages.isEmpty {
+                            VStack(spacing: 12) {
+                                Image(systemName: "sparkle")
+                                    .font(.system(size: 32))
+                                    .foregroundStyle(.white.opacity(0.3))
+                                
+                                Text("Ask Nook")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(.white.opacity(0.8))
+                                
+                                Text("Questions about this page, or just curious? I'm here.")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.white.opacity(0.6))
+                                    .multilineTextAlignment(.center)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .padding(.top, 60)
+                        } else {
+                            ForEach(messages) { message in
+                                MessageBubble(message: message)
+                                    .id(message.id)
+                            }
                         }
                         
-                        Text("Get your API key from Google AI Studio")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.white.opacity(0.5))
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 8)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                }
-                
-                // Messages area
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(spacing: 12) {
-                            if !hasApiKey && !showApiKeyInput {
-                                VStack(spacing: 12) {
-                                    Image(systemName: "key.fill")
-                                        .font(.system(size: 32))
-                                        .foregroundStyle(.white.opacity(0.3))
-                                    
-                                    Text("API Key Required")
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundStyle(.white.opacity(0.8))
-                                    
-                                    Text("Add your Gemini API key to start chatting")
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.white.opacity(0.6))
-                                        .multilineTextAlignment(.center)
-                                    
-                                    Button(action: {
-                                        showApiKeyInput = true
-                                    }) {
-                                        Text("Add API Key")
-                                            .font(.system(size: 12, weight: .semibold))
-                                            .foregroundColor(.black)
-                                            .padding(.horizontal, 16)
-                                            .padding(.vertical, 8)
-                                            .background(.white.opacity(0.9))
-                                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .padding(.top, 60)
-                            } else if messages.isEmpty {
-                                VStack(spacing: 12) {
-                                    Image(systemName: "sparkle")
-                                        .font(.system(size: 32))
-                                        .foregroundStyle(.white.opacity(0.3))
-                                    
-                                    Text("Ask Nook")
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundStyle(.white.opacity(0.8))
-                                    
-                                    Text("Questions about this page, or just curious? I'm here.")
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.white.opacity(0.6))
-                                        .multilineTextAlignment(.center)
-                                }
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .padding(.top, 60)
-                            } else {
-                                ForEach(messages) { message in
-                                    MessageBubble(message: message)
-                                        .id(message.id)
-                                }
+                        if isLoading {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                                Text("Thinking...")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.white.opacity(0.5))
                             }
-                            
-                            if isLoading {
-                                HStack(spacing: 8) {
-                                    ProgressView()
-                                        .scaleEffect(0.7)
-                                    Text("Thinking...")
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.white.opacity(0.5))
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 12)
-                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 12)
                         }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 8)
                     }
-                    .onChange(of: messages.count) { _, _ in
-                        if let last = messages.last {
-                            withAnimation {
-                                proxy.scrollTo(last.id, anchor: .bottom)
-                            }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                }
+                .onChange(of: messages.count) { _, _ in
+                    if let last = messages.last {
+                        withAnimation {
+                            proxy.scrollTo(last.id, anchor: .bottom)
                         }
                     }
                 }
-                
-                // Input area
-                HStack(spacing: 8) {
-                    // temporary, move later
-                    Menu("Model") {
-                        ForEach(GeminiModel.allCases) { model in
-                            Button(action: {
-                                settingsManager.geminiModel = model
-                            }) {
-                                HStack {
-                                    Text(model.displayName)
-                                    if settingsManager.geminiModel == model {
-                                        Spacer()
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
+            }
+            .mask{
+                VStack(spacing: 0){
+                    LinearGradient(stops: [.init(color: .black.opacity(0.2), location: 0.4), .init(color: .black, location: 1.0)], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 60)
+                    Color.black
+                    LinearGradient(colors: [.black, .black.opacity(0.2)], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 90)
+                }.ignoresSafeArea()
+            }
+        }
+        .safeAreaInset(edge: .top, content: {
+            HStack(spacing: 8) {
+                NavButton(iconName: "xmark", disabled: false, action: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        windowState.isSidebarAIChatVisible = false
                     }
+                })
+                
+                if !messages.isEmpty{
+                    Text("Ask Nook")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .transition(.blur.animation(.smooth))
+                }
+                
+                Spacer()
+                
+                NavButton(iconName: "key", disabled: false, action: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        
+                        showApiKeyInput.toggle()
+                    }
+                })
+                
+                NavButton(iconName: "trash", disabled: false, action: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        
+                        messages.removeAll()
+                    }
+                })
+                .disabled(messages.isEmpty)
+            }
+            .padding(.horizontal, 8)
+        })
+        .safeAreaInset(edge: .bottom){
+            
+            // Input area
+            VStack(spacing: 8) {
+                TextField("Ask about this page...", text: $messageText, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.9))
+                    .lineLimit(1...4)
+                    .focused($isTextFieldFocused)
+                    .onSubmit {
+                        sendMessage()
+                    }
+                HStack{
                     
-                    TextField("Ask about this page...", text: $messageText, axis: .vertical)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white.opacity(0.9))
-                        .lineLimit(1...4)
-                        .focused($isTextFieldFocused)
-                        .onSubmit {
-                            sendMessage()
+                    Picker("Select Model", selection: Binding(get: {
+                        settingsManager.geminiModel
+                    }, set: { model, Transaction in
+                        settingsManager.geminiModel = model
+                    })) {
+                        ForEach(GeminiModel.allCases) { model in
+                            Label(model.displayName, systemImage: model.icon)
                         }
+                    } currentValueLabel: {
+                        Text(settingsManager.geminiModel.displayName)
+                    }
+                    .labelsHidden()
+                    
+                    Spacer()
                     
                     Button(action: sendMessage) {
                         Image(systemName: "arrow.up.circle.fill")
@@ -261,16 +269,17 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                     }
                     .buttonStyle(.plain)
                     .disabled(messageText.isEmpty || isLoading || !hasApiKey)
+                    
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(.white.opacity(0.05))
-                .clipShape(.rect(cornerRadius: 12))
-                .padding(.horizontal, 8)
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial)
+            .clipShape(.rect(cornerRadius: 12))
+            .padding(.horizontal, 8)
         }
-        .padding(.top, 8)
-        .padding(.bottom, 8)
+        .safeAreaPadding(.top, 8)
+        .safeAreaPadding(.bottom, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             apiKeyInput = settingsManager.geminiApiKey
