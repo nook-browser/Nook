@@ -37,7 +37,6 @@ struct SpaceView: View {
     @EnvironmentObject var windowState: BrowserWindowState
     @EnvironmentObject var gradientColorManager: GradientColorManager
     @State private var draggedItem: UUID? = nil
-    @State private var spacePinnedPreviewIndex: Int? = nil
     @State private var dropPreviewIndex: Int? = nil
     @State private var dropPreviewSection: SidebarTargetSection? = nil
     @State private var canScrollUp: Bool = false
@@ -183,15 +182,6 @@ struct SpaceView: View {
                     } action: { oldBounds, newBounds in
                         updateScrollState(bounds: newBounds)
                     }
-                    .onDrop(
-                        of: [.text],
-                        delegate: SidebarSectionDropDelegateSimple(
-                            itemsCount: { tabs.count },
-                            draggedItem: $draggedItem,
-                            targetSection: .spaceRegular(space.id),
-                            tabManager: browserManager.tabManager
-                        )
-                    )
                     VStack {
                         if showTopArrow {
                             HStack {
@@ -280,12 +270,15 @@ struct SpaceView: View {
     
     private var pinnedTabsList: some View {
         let items = spacePinnedItems
+        let spacePinnedTabsFlat = browserManager.tabManager.spacePinnedTabs(for: space.id)
 
         return VStack(spacing: 0) {
-            ForEach(Array(items.enumerated()), id: \.element) { index, item in
-                // Dropzone above each item
-                pinnedDropzone(beforeIndex: index)
+            // Drop zone before first item
+            if !items.isEmpty {
+                pinnedDropSpacer(beforeIndex: 0, spacePinnedTabs: spacePinnedTabsFlat)
+            }
 
+            ForEach(Array(items.enumerated()), id: \.element) { index, item in
                 if let folderWithTabs = item as? FolderWithTabs {
                     TabFolderView(
                         folder: folderWithTabs.folder,
@@ -309,21 +302,30 @@ struct SpaceView: View {
                     ))
                 }
 
-                // Dropzone after the last item
-                if index == items.count - 1 {
-                    pinnedDropzone(beforeIndex: index + 1)
+                // Drop zone after each item (except last)
+                if index < items.count - 1 {
+                    pinnedDropSpacer(beforeIndex: index + 1, spacePinnedTabs: spacePinnedTabsFlat)
                 }
             }
+
+            // Drop zone after last item
+            if !items.isEmpty {
+                pinnedDropSpacer(beforeIndex: spacePinnedTabsFlat.count, spacePinnedTabs: spacePinnedTabsFlat)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .animation(.easeInOut(duration: 0.25), value: items.count)
         .contentShape(Rectangle())
         .onDrop(
             of: [.text],
             delegate: SidebarSectionDropDelegateSimple(
-                itemsCount: { browserManager.tabManager.spacePinnedTabs(for: space.id).count },
+                itemsCount: {
+                    browserManager.tabManager.spacePinnedTabs(for: space.id).count
+                },
                 draggedItem: $draggedItem,
                 targetSection: .spacePinned(space.id),
-                tabManager: browserManager.tabManager
+                tabManager: browserManager.tabManager,
+                targetIndex: nil,
             )
         )
     }
@@ -341,6 +343,42 @@ struct SpaceView: View {
                 Color.clear
                     .preference(key: TabPositionPreferenceKey.self, value: [tab.id: geometry.frame(in: .named("ScrollSpace"))])
             }
+        )
+        .padding(.vertical, 12)
+        .padding(.vertical, -12)
+        .contentShape(.interaction, Rectangle())
+        .overlay(alignment: .top) {
+            // Drop indicator above tab
+            if dropPreviewIndex == tab.index && dropPreviewSection == .spacePinned(space.id) {
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(AppColors.textSecondary)
+                    .frame(height: 3)
+                    .padding(.horizontal, 8)
+                    .opacity(0.8)
+                    .offset(y: -6)
+                    .animation(.easeInOut(duration: 0.15), value: dropPreviewIndex)
+            }
+        }
+        .onDrop(
+            of: [.text],
+            delegate: SidebarSectionDropDelegateSimple(
+                itemsCount: { 0 },
+                draggedItem: $draggedItem,
+                targetSection: .spacePinned(space.id),
+                tabManager: browserManager.tabManager,
+                targetIndex: { tab.index },
+                onDropEntered: {
+                    dropPreviewIndex = tab.index
+                    dropPreviewSection = .spacePinned(space.id)
+                    NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                },
+                onDropExited: {
+                    if dropPreviewIndex == tab.index && dropPreviewSection == .spacePinned(space.id) {
+                        dropPreviewIndex = nil
+                        dropPreviewSection = nil
+                    }
+                }
+            )
         )
         .transition(.move(edge: .top).combined(with: .opacity))
         .contextMenu {
@@ -361,31 +399,13 @@ struct SpaceView: View {
             Button { onCloseTab(tab) } label: { Label("Close tab", systemImage: "xmark") }
         }
     }
-    
-    private var emptyPinnedDropTarget: some View {
-        Color.clear
-            .frame(height: spacerBaseHeight + dropZoneVerticalPadding * 2)
-            .padding(.vertical, -dropZoneVerticalPadding)
-            .contentShape(Rectangle())
-            .padding(.bottom, 4)
-            .onDrop(
-                of: [.text],
-                delegate: SidebarSectionDropDelegateSimple(
-                    itemsCount: { 0 },
-                    draggedItem: $draggedItem,
-                    targetSection: .spacePinned(space.id),
-                    tabManager: browserManager.tabManager
-                )
-            )
-    }
-    
+
     @ViewBuilder
-    private func pinnedDropzone(beforeIndex: Int) -> some View {
-        let isActive = dropPreviewIndex == beforeIndex && dropPreviewSection == .spacePinned(space.id)
+    private func pinnedDropSpacer(beforeIndex displayIndex: Int, spacePinnedTabs: [Tab]) -> some View {
+        let isActive = dropPreviewIndex == displayIndex && dropPreviewSection == .spacePinned(space.id)
 
         Color.clear
-            .frame(height: dropZoneBaseHeight + dropZoneVerticalPadding * 2)
-            .padding(.vertical, -dropZoneVerticalPadding)
+            .frame(height: 4)
             .contentShape(Rectangle())
             .overlay(alignment: .center) {
                 RoundedRectangle(cornerRadius: 1.5)
@@ -398,57 +418,28 @@ struct SpaceView: View {
             .onDrop(
                 of: [.text],
                 delegate: SidebarSectionDropDelegateSimple(
-                    itemsCount: { 0 },
+                    itemsCount: { spacePinnedTabs.count },
                     draggedItem: $draggedItem,
                     targetSection: .spacePinned(space.id),
                     tabManager: browserManager.tabManager,
-                    targetIndex: { spacePinnedInsertionIndex(before: beforeIndex) },
+                    targetIndex: {
+                        if displayIndex < spacePinnedTabs.count {
+                            return spacePinnedTabs[displayIndex].index
+                        } else {
+                            return spacePinnedTabs.isEmpty ? 0 : (spacePinnedTabs.last!.index + 1)
+                        }
+                    },
                     onDropEntered: {
-                        dropPreviewIndex = beforeIndex
+                        dropPreviewIndex = displayIndex
                         dropPreviewSection = .spacePinned(space.id)
                         NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
                     },
-                    onDropExited: {
-                        if dropPreviewIndex == beforeIndex && dropPreviewSection == .spacePinned(space.id) {
-                            dropPreviewIndex = nil
-                            dropPreviewSection = nil
-                        }
-                    }
-                )
-            )
-    }
-
-    @ViewBuilder
-    private func regularDropzone(beforeTab tab: Tab) -> some View {
-        let isActive = dropPreviewIndex == tab.index && dropPreviewSection == .spaceRegular(space.id)
-
-        Color.clear
-            .frame(height: dropZoneBaseHeight + dropZoneVerticalPadding * 2)
-            .padding(.vertical, -dropZoneVerticalPadding)
-            .contentShape(Rectangle())
-            .overlay(alignment: .center) {
-                RoundedRectangle(cornerRadius: 1.5)
-                    .fill(AppColors.textSecondary)
-                    .frame(height: isActive ? 3 : 0)
-                    .padding(.horizontal, 8)
-                    .opacity(isActive ? 0.8 : 0)
-                    .animation(.easeInOut(duration: 0.15), value: isActive)
-            }
-            .onDrop(
-                of: [.text],
-                delegate: SidebarSectionDropDelegateSimple(
-                    itemsCount: { 0 },
-                    draggedItem: $draggedItem,
-                    targetSection: .spaceRegular(space.id),
-                    tabManager: browserManager.tabManager,
-                    targetIndex: { tab.index },
-                    onDropEntered: {
-                        dropPreviewIndex = tab.index
-                        dropPreviewSection = .spaceRegular(space.id)
-                        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                    onDropCompleted: {
+                        dropPreviewIndex = nil
+                        dropPreviewSection = nil
                     },
                     onDropExited: {
-                        if dropPreviewIndex == tab.index && dropPreviewSection == .spaceRegular(space.id) {
+                        if dropPreviewIndex == displayIndex && dropPreviewSection == .spacePinned(space.id) {
                             dropPreviewIndex = nil
                             dropPreviewSection = nil
                         }
@@ -458,118 +449,108 @@ struct SpaceView: View {
     }
 
     @ViewBuilder
-    private func regularDropzone(afterTab tab: Tab) -> some View {
-        let afterIndex = tab.index + 1
-        let isActive = dropPreviewIndex == afterIndex && dropPreviewSection == .spaceRegular(space.id)
+    private func regularDropSpacer(beforeIndex displayIndex: Int, regularTabs: [Tab]) -> some View {
+        let isActive = dropPreviewIndex == displayIndex && dropPreviewSection == .spaceRegular(space.id)
 
-        Color.clear
-            .frame(height: dropZoneBaseHeight + dropZoneVerticalPadding * 2)
-            .padding(.vertical, -dropZoneVerticalPadding)
-            .contentShape(Rectangle())
-            .overlay(alignment: .center) {
-                RoundedRectangle(cornerRadius: 1.5)
-                    .fill(AppColors.textSecondary)
-                    .frame(height: isActive ? 3 : 0)
-                    .padding(.horizontal, 8)
-                    .opacity(isActive ? 0.8 : 0)
-                    .animation(.easeInOut(duration: 0.15), value: isActive)
-            }
-            .onDrop(
-                of: [.text],
-                delegate: SidebarSectionDropDelegateSimple(
-                    itemsCount: { 0 },
-                    draggedItem: $draggedItem,
-                    targetSection: .spaceRegular(space.id),
-                    tabManager: browserManager.tabManager,
-                    targetIndex: { tab.index + 1 },
-                    onDropEntered: {
-                        dropPreviewIndex = afterIndex
-                        dropPreviewSection = .spaceRegular(space.id)
-                        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
-                    },
-                    onDropExited: {
-                        if dropPreviewIndex == afterIndex && dropPreviewSection == .spaceRegular(space.id) {
+        ZStack {
+            Color.clear
+                .frame(height: 4)
+                .overlay(alignment: .center) {
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(AppColors.textSecondary)
+                        .frame(height: isActive ? 3 : 0)
+                        .padding(.horizontal, 8)
+                        .opacity(isActive ? 0.8 : 0)
+                        .animation(.easeInOut(duration: 0.15), value: isActive)
+                }
+
+            Color.clear
+                .frame(height: 28)
+                .contentShape(Rectangle())
+                .onDrop(
+                    of: [.text],
+                    delegate: SidebarSectionDropDelegateSimple(
+                        itemsCount: { regularTabs.count },
+                        draggedItem: $draggedItem,
+                        targetSection: .spaceRegular(space.id),
+                        tabManager: browserManager.tabManager,
+                        targetIndex: {
+                            if displayIndex < regularTabs.count {
+                                return regularTabs[displayIndex].index
+                            } else {
+                                return regularTabs.isEmpty ? 0 : (regularTabs.last!.index + 1)
+                            }
+                        },
+                        onDropEntered: {
+                            dropPreviewIndex = displayIndex
+                            dropPreviewSection = .spaceRegular(space.id)
+                            NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                        },
+                        onDropCompleted: {
                             dropPreviewIndex = nil
                             dropPreviewSection = nil
+                        },
+                        onDropExited: {
+                            if dropPreviewIndex == displayIndex && dropPreviewSection == .spaceRegular(space.id) {
+                                dropPreviewIndex = nil
+                                dropPreviewSection = nil
+                            }
                         }
-                    }
+                    )
                 )
-            )
+        }
+        .frame(height: 4)
     }
 
-    @ViewBuilder
-    private func spacePinnedSpacer(before displayIndex: Int) -> some View {
-        let isActive = spacePinnedPreviewIndex == displayIndex
+    private var emptyPinnedDropTarget: some View {
+        let isActive = dropPreviewIndex == 0 && dropPreviewSection == .spacePinned(space.id)
 
-        Color.clear
+        return Color.clear
             .frame(height: spacerBaseHeight + dropZoneVerticalPadding * 2)
             .padding(.vertical, -dropZoneVerticalPadding)
-            .contentShape(Rectangle())
+            .padding(.bottom, 4)
             .overlay(alignment: .center) {
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(AppColors.controlBackgroundHover)
-                    .frame(height: isActive ? 4 : 0)
+                // Visual indicator only
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(AppColors.textSecondary)
+                    .frame(height: isActive ? 3 : 0)
                     .padding(.horizontal, 8)
-                    .opacity(isActive ? 1 : 0)
-                    .animation(.easeInOut(duration: 0.12), value: isActive)
+                    .opacity(isActive ? 0.8 : 0)
+                    .animation(.easeInOut(duration: 0.15), value: isActive)
             }
-            .onDrop(
-                of: [.text],
-                delegate: SidebarSectionDropDelegateSimple(
-                    itemsCount: { 0 },
-                    draggedItem: $draggedItem,
-                    targetSection: .spacePinned(space.id),
-                    tabManager: browserManager.tabManager,
-                    targetIndex: { spacePinnedInsertionIndex(before: displayIndex) },
-                    onDropEntered: { spacePinnedPreviewIndex = displayIndex },
-                    onDropCompleted: { spacePinnedPreviewIndex = nil },
-                    onDropExited: {
-                        if spacePinnedPreviewIndex == displayIndex {
-                            spacePinnedPreviewIndex = nil
-                        }
-                    }
-                )
-            )
+            .overlay {
+                // Expanded invisible hit area for drops - doesn't affect layout
+                Color.clear
+                    .frame(height: 50)
+                    .contentShape(Rectangle())
+                    .allowsHitTesting(true)
+                    .onDrop(
+                        of: [.text],
+                        delegate: SidebarSectionDropDelegateSimple(
+                            itemsCount: { 0 },
+                            draggedItem: $draggedItem,
+                            targetSection: .spacePinned(space.id),
+                            tabManager: browserManager.tabManager,
+                            targetIndex: nil,
+                            onDropEntered: {
+                                dropPreviewIndex = 0
+                                dropPreviewSection = .spacePinned(space.id)
+                                NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                            },
+                            onDropCompleted: {
+                                dropPreviewIndex = nil
+                                dropPreviewSection = nil
+                            },
+                            onDropExited: {
+                                dropPreviewIndex = nil
+                                dropPreviewSection = nil
+                            }
+                        )
+                    )
+            }
     }
     
-    private func spacePinnedInsertionIndex(before displayIndex: Int) -> Int {
-        let all = browserManager.tabManager.spacePinnedTabs(for: space.id)
-        guard !all.isEmpty else { return 0 }
 
-        if displayIndex <= 0 { return 0 }
-        if displayIndex >= spacePinnedItems.count { return all.count }
-
-        let nextItem = spacePinnedItems[displayIndex]
-        if let anchor = spacePinnedAnchorIndex(for: nextItem, within: all) {
-            return max(0, min(anchor, all.count))
-        }
-
-        if displayIndex > 0 {
-            let previousItem = spacePinnedItems[displayIndex - 1]
-            if let previousAnchor = spacePinnedAnchorIndex(for: previousItem, within: all) {
-                return max(0, min(previousAnchor + 1, all.count))
-            }
-        }
-
-        return all.count
-    }
-    
-    private func spacePinnedAnchorIndex(for item: AnyHashable, within all: [Tab]) -> Int? {
-        if let tab = item as? Tab {
-            return tab.index
-        }
-        
-        if let folderWithTabs = item as? FolderWithTabs {
-            let tabs = all.filter { $0.folderId == folderWithTabs.folder.id }
-                .sorted { $0.index < $1.index }
-            if let first = tabs.first {
-                return first.index
-            }
-            return folderWithTabs.folder.index
-        }
-        
-        return nil
-    }
     
     private var newTabButtonSection: some View {
         NewTabButton()
@@ -653,9 +634,6 @@ struct SpaceView: View {
                 let left = currentTabs[leftIdx]
                 let right = currentTabs[rightIdx]
 
-                // Dropzone before the split row
-                regularDropzone(beforeTab: left)
-
                 SplitTabRow(
                     left: left,
                     right: right,
@@ -665,35 +643,33 @@ struct SpaceView: View {
                     onClose: onCloseTab
                 )
                 .environmentObject(browserManager)
-
-                // Dropzone after the split row
-                regularDropzone(afterTab: right)
             } else if idx == secondIdx {
                 EmptyView()
             } else {
-                // Dropzone before regular tab
-                regularDropzone(beforeTab: tab)
-
                 regularTabView(tab)
-
-                // Dropzone after last regular tab
-                if idx == currentTabs.count - 1 {
-                    regularDropzone(afterTab: tab)
-                }
             }
         }
     }
-    
+
     private func regularTabsView(currentTabs: [Tab]) -> some View {
-        ForEach(Array(currentTabs.enumerated()), id: \.element.id) { index, tab in
-            // Dropzone above each tab
-            regularDropzone(beforeTab: tab)
+        VStack(spacing: 0) {
+            // Drop zone before first tab
+            if !currentTabs.isEmpty {
+                regularDropSpacer(beforeIndex: 0, regularTabs: currentTabs)
+            }
 
-            regularTabView(tab)
+            ForEach(Array(currentTabs.enumerated()), id: \.element.id) { index, tab in
+                regularTabView(tab)
 
-            // Dropzone after the last tab
-            if index == currentTabs.count - 1 {
-                regularDropzone(afterTab: tab)
+                // Drop zone after each tab (except last)
+                if index < currentTabs.count - 1 {
+                    regularDropSpacer(beforeIndex: index + 1, regularTabs: currentTabs)
+                }
+            }
+
+            // Drop zone after last tab
+            if !currentTabs.isEmpty {
+                regularDropSpacer(beforeIndex: currentTabs.count, regularTabs: currentTabs)
             }
         }
     }
@@ -712,6 +688,9 @@ struct SpaceView: View {
                     .preference(key: TabPositionPreferenceKey.self, value: [tab.id: geometry.frame(in: .named("ScrollSpace"))])
             }
         )
+        .padding(.vertical, 12)
+        .padding(.vertical, -12)
+        .contentShape(.interaction, Rectangle())
         .transition(.move(edge: .top).combined(with: .opacity))
         .contextMenu {
             regularTabContextMenu(tab)
