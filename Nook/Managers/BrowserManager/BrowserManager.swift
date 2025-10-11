@@ -13,6 +13,7 @@ import OSLog
 import Combine
 import Sparkle
 import CoreServices
+import Observation
 
 @MainActor
 final class Persistence {
@@ -309,30 +310,31 @@ private extension BrowserManager.ProfileSwitchContext {
 
 
 @MainActor
-class BrowserManager: ObservableObject {
+@Observable
+class BrowserManager {
     // Legacy global state - kept for backward compatibility during transition
-    @Published var sidebarWidth: CGFloat = 250
-    @Published var sidebarContentWidth: CGFloat = 234
-    @Published var isSidebarVisible: Bool = true
-    @Published var isCommandPaletteVisible: Bool = false
+    var sidebarWidth: CGFloat = 250
+    var sidebarContentWidth: CGFloat = 234
+    var isSidebarVisible: Bool = true
+    var isCommandPaletteVisible: Bool = false
     // Mini palette shown when clicking the URL bar
-    @Published var isMiniCommandPaletteVisible: Bool = false
-    @Published var didCopyURL: Bool = false
-    @Published var commandPalettePrefilledText: String = ""
-    @Published var shouldNavigateCurrentTab: Bool = false
+    var isMiniCommandPaletteVisible: Bool = false
+    var didCopyURL: Bool = false
+    var commandPalettePrefilledText: String = ""
+    var shouldNavigateCurrentTab: Bool = false
     // Frame of the URL bar within the window; used to anchor the mini palette precisely
-    @Published var urlBarFrame: CGRect = .zero
-    @Published var currentProfile: Profile?
+    var urlBarFrame: CGRect = .zero
+    var currentProfile: Profile?
     // Indicates an in-progress animated profile transition for coordinating UI
-    @Published var isTransitioningProfile: Bool = false
+    var isTransitioningProfile: Bool = false
     // Migration state
-    @Published var migrationProgress: MigrationProgress?
-    @Published var isMigrationInProgress: Bool = false
+    var migrationProgress: MigrationProgress?
+    var isMigrationInProgress: Bool = false
 
     // Tab closure undo notification
-    @Published var showTabClosureToast: Bool = false
-    @Published var tabClosureToastCount: Int = 0
-    @Published var updateAvailability: UpdateAvailability?
+    var showTabClosureToast: Bool = false
+    var tabClosureToastCount: Int = 0
+    var updateAvailability: UpdateAvailability?
 
 
     // MARK: - Window State Management
@@ -375,7 +377,7 @@ class BrowserManager: ObservableObject {
     var importManager: ImportManager
 
     var externalMiniWindowManager = ExternalMiniWindowManager()
-    @Published var peekManager = PeekManager()
+    var peekManager = PeekManager()
     
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
@@ -501,7 +503,7 @@ class BrowserManager: ObservableObject {
         let tabId: UUID
         let timestamp: Date
     }
-    @Published var oauthAssist: OAuthAssist?
+    var oauthAssist: OAuthAssist?
     private var oauthAssistCooldown: [String: Date] = [:]
 
     init() {
@@ -1072,8 +1074,9 @@ class BrowserManager: ObservableObject {
     }
     
     // MARK: - Appearance / Gradient Editing
-    private final class GradientDraft: ObservableObject {
-        @Published var value: SpaceGradient
+    @Observable
+    private final class GradientDraft {
+        var value: SpaceGradient
         init(_ value: SpaceGradient) { self.value = value }
     }
 
@@ -1700,7 +1703,7 @@ class BrowserManager: ObservableObject {
         }
     }
 
-    @Published var migrationTask: Task<Void, Never>? = nil
+    var migrationTask: Task<Void, Never>? = nil
 
     func startMigrationToCurrentProfile() {
         guard isMigrationInProgress == false else { return }

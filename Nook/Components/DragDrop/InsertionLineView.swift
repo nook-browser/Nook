@@ -6,12 +6,13 @@
 //
 
 import SwiftUI
+import Observation
 
 struct InsertionLineView: View {
-    @ObservedObject var dragManager: TabDragManager
+    @Bindable var dragManager: TabDragManager
     
     init(dragManager: TabDragManager) {
-        self.dragManager = dragManager
+        self._dragManager = Bindable(dragManager)
     }
     
     var body: some View {
@@ -49,7 +50,11 @@ struct InsertionLineView: View {
 }
 
 struct InsertionLineModifier: ViewModifier {
-    let dragManager: TabDragManager
+    @Bindable var dragManager: TabDragManager
+    
+    init(dragManager: TabDragManager) {
+        self._dragManager = Bindable(dragManager)
+    }
     
     func body(content: Content) -> some View {
         ZStack {
