@@ -13,9 +13,11 @@ import Foundation
 import Combine
 import SwiftUI
 import WebKit
+import Observation
 
 @MainActor
-public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
+@Observable
+public final class Tab: NSObject, Identifiable, WKDownloadDelegate {
     public let id: UUID
     var url: URL
     var name: String
@@ -87,18 +89,18 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     var loadingState: LoadingState = .idle
 
-    @Published var canGoBack: Bool = false
-    @Published var canGoForward: Bool = false
+    var canGoBack: Bool = false
+    var canGoForward: Bool = false
     
     // MARK: - Video State
-    @Published var hasPlayingVideo: Bool = false
-    @Published var hasVideoContent: Bool = false  // Track if tab has any video content
-    @Published var hasPiPActive: Bool = false
+    var hasPlayingVideo: Bool = false
+    var hasVideoContent: Bool = false  // Track if tab has any video content
+    var hasPiPActive: Bool = false
     
     // MARK: - Audio State
-    @Published var hasPlayingAudio: Bool = false
-    @Published var isAudioMuted: Bool = false
-    @Published var hasAudioContent: Bool = false {
+    var hasPlayingAudio: Bool = false
+    var isAudioMuted: Bool = false
+    var hasAudioContent: Bool = false {
         didSet {
             if oldValue != hasAudioContent {
                 if hasAudioContent {
@@ -109,11 +111,11 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             }
         }
     }
-    @Published var pageBackgroundColor: NSColor? = nil
+    var pageBackgroundColor: NSColor? = nil
     
     // MARK: - Rename State
-    @Published var isRenaming: Bool = false
-    @Published var editingName: String = ""
+    var isRenaming: Bool = false
+    var editingName: String = ""
     
     // MARK: - Native Audio Monitoring
     private var audioDeviceListenerProc: AudioObjectPropertyListenerProc?
@@ -251,9 +253,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     private func updateNavigationState() {
         guard let webView = _webView else { return }
-
-        // Force UI update by notifying object will change
-        objectWillChange.send()
 
         let newCanGoBack = webView.canGoBack
         let newCanGoForward = webView.canGoForward

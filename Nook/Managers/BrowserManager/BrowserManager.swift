@@ -10,7 +10,6 @@ import SwiftData
 import AppKit
 import WebKit
 import OSLog
-import Combine
 import Sparkle
 import CoreServices
 import Observation
@@ -382,7 +381,6 @@ class BrowserManager {
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
     var isSwitchingProfile: Bool = false
-    private var cancellables: Set<AnyCancellable> = []
     
     // Compositor container view
     func setCompositorContainerView(_ view: NSView?, for windowId: UUID) {
@@ -542,7 +540,6 @@ class BrowserManager {
         self.compositorManager.setUnloadTimeout(self.settingsManager.tabUnloadTimeout)
         self.tabManager.browserManager = self
         self.tabManager.reattachBrowserManager(self)
-        bindTabManagerUpdates()
         if #available(macOS 15.5, *), let mgr = self.extensionManager {
             // Attach extension manager BEFORE any WKWebView is created so content scripts can inject
             mgr.attach(browserManager: self)
@@ -560,7 +557,6 @@ class BrowserManager {
         
         self.externalMiniWindowManager.attach(browserManager: self)
         self.peekManager.attach(browserManager: self)
-        bindPeekManagerUpdates()
         self.authenticationManager.attach(browserManager: self)
         // Migrate legacy history entries (with nil profile) to default profile to avoid cross-profile leakage
         self.migrateUnassignedDataToDefaultProfile()
@@ -584,21 +580,6 @@ class BrowserManager {
         }
     }
 
-    private func bindTabManagerUpdates() {
-        tabManager.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-    }
-
-    private func bindPeekManagerUpdates() {
-        peekManager.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-    }
 
     // MARK: - OAuth Assist Controls
     func maybeShowOAuthAssist(for url: URL, in tab: Tab) {
