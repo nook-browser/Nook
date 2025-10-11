@@ -325,17 +325,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             // Edge case: currentProfile not yet available. Delay creating WKWebView until it resolves.
             if profileAwaitCancellable == nil {
                 print("[Tab] No profile resolved yet; deferring WebView creation and observing currentProfile…")
-                profileAwaitCancellable = browserManager?
-                    .$currentProfile
-                    .receive(on: RunLoop.main)
-                    .sink { [weak self] value in
-                        guard let self = self else { return }
-                        if value != nil && self._webView == nil {
-                            self.profileAwaitCancellable?.cancel()
-                            self.profileAwaitCancellable = nil
-                            self.setupWebView()
-                        }
-                    }
+                observeProfileAvailability()
             }
             return
         }
@@ -461,6 +451,27 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         if let cp = browserManager?.currentProfile { return cp }
         // Final fallback to the default profile
         return browserManager?.profileManager.profiles.first
+    }
+
+    private func observeProfileAvailability() {
+        guard let browserManager = browserManager else { return }
+
+        withObservationTracking {
+            // Access the property to register observation
+            _ = browserManager.currentProfile
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                if self.browserManager?.currentProfile != nil && self._webView == nil {
+                    self.profileAwaitCancellable?.cancel()
+                    self.profileAwaitCancellable = nil
+                    self.setupWebView()
+                } else {
+                    // Re-register observation if profile is still nil
+                    self.observeProfileAvailability()
+                }
+            }
+        }
     }
 
     // Minimal hook to satisfy ExtensionManager: update extension controller on existing webView.
