@@ -28,6 +28,7 @@ struct NavMenuStyle: MenuStyle {
                 }
                 .allowsHitTesting(false)
             }
+            .opacity(isEnabled ? 1.0 : 0.5)
             .contentTransition(.symbolEffect(.replace.upUp.byLayer, options: .nonRepeating))
             .scaleEffect(isPressed && isEnabled ? 0.95 : 1.0)
             .animation(.easeInOut(duration: 0.1), value: isPressed)

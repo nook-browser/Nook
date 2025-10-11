@@ -19,11 +19,12 @@ struct NavButtonStyle: ButtonStyle {
             RoundedRectangle(cornerRadius: cornerRadius)
                 .fill(.primary.opacity(backgroundColorOpacity(isPressed: configuration.isPressed)))
                 .frame(width: size, height: size)
-            
+
             configuration.label
                 .foregroundStyle(.primary)
                 .font(.system(size: iconSize))
         }
+        .opacity(isEnabled ? 1.0 : 0.3)
         .contentTransition(.symbolEffect(.replace.upUp.byLayer, options: .nonRepeating))
         .scaleEffect(configuration.isPressed && isEnabled ? 0.95 : 1.0)
         .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
@@ -118,6 +119,7 @@ struct NavButtonStyle: ButtonStyle {
         }
         .buttonStyle(NavButtonStyle())
         .foregroundStyle(Color.primary)
+        .disabled(true)
     }
     .padding()
 }
