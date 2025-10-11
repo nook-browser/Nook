@@ -44,10 +44,6 @@ struct SidebarAIChat: View {
     @State private var messageText: String = ""
     @State private var messages: [ChatMessage] = []
     @State private var isLoading: Bool = false
-    @State private var showApiKeyInput: Bool = false
-    @State private var apiKeyInput: String = ""
-    @State private var endpointInput: String = ""
-    @State private var modelInput: String = ""
     @State private var ollamaModels: [OllamaModel] = []
     @State private var isFetchingModels: Bool = false
     @FocusState private var isTextFieldFocused: Bool
@@ -101,7 +97,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 12) {
-                        if !hasApiKey && !showApiKeyInput {
+                        if !hasApiKey {
                             VStack(spacing: 12) {
                                 Image(systemName: "key.fill")
                                     .font(.system(size: 32))
@@ -117,7 +113,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                                     .multilineTextAlignment(.center)
 
                                 Button(action: {
-                                    showApiKeyInput = true
+                                    showApiKeyDialog()
                                 }) {
                                     Text("Add API Key")
                                         .font(.system(size: 12, weight: .semibold))
@@ -205,240 +201,12 @@ To enhance the web browsing experience by providing intelligent, context-aware s
 
                 Spacer()
 
-                Menu {
-                    Menu("Provider") {
-                        ForEach(AIProvider.allCases) { provider in
-                            Button(action: {
-                                settingsManager.aiProvider = provider
-                            }) {
-                                HStack {
-                                    Text(provider.displayName)
-                                    if settingsManager.aiProvider == provider {
-                                        Spacer()
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Divider()
-
-                    Button {
-                        showApiKeyInput.toggle()
-                    } label: {
-                        Label("Settings", systemImage: "key")
-                    }
-
-                    Divider()
-
-                    Menu("Model") {
-                        switch settingsManager.aiProvider {
-                        case .gemini:
-                            ForEach(GeminiModel.allCases) { model in
-                                Button(action: {
-                                    settingsManager.geminiModel = model
-                                }) {
-                                    HStack {
-                                        Text(model.displayName)
-                                        if settingsManager.geminiModel == model {
-                                            Spacer()
-                                            Image(systemName: "checkmark")
-                                        }
-                                    }
-                                }
-                            }
-                        case .openRouter:
-                            ForEach(OpenRouterModel.allCases) { model in
-                                Button(action: {
-                                    settingsManager.openRouterModel = model
-                                }) {
-                                    HStack {
-                                        Text(model.displayName)
-                                        if settingsManager.openRouterModel == model {
-                                            Spacer()
-                                            Image(systemName: "checkmark")
-                                        }
-                                    }
-                                }
-                            }
-                        case .ollama:
-                            if isFetchingModels {
-                                HStack {
-                                    ProgressView()
-                                        .scaleEffect(0.7)
-                                    Text("Loading models...")
-                                }
-                            } else if ollamaModels.isEmpty {
-                                Button(action: {
-                                    Task {
-                                        await fetchOllamaModels()
-                                    }
-                                }) {
-                                    Text("Fetch Models")
-                                }
-                            } else {
-                                ForEach(ollamaModels) { model in
-                                    Button(action: {
-                                        settingsManager.ollamaModel = model.name
-                                    }) {
-                                        HStack {
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text(model.displayName)
-                                                Text(model.sizeFormatted)
-                                                    .font(.system(size: 10))
-                                                    .foregroundStyle(.white.opacity(0.5))
-                                            }
-                                            if settingsManager.ollamaModel == model.name {
-                                                Spacer()
-                                                Image(systemName: "checkmark")
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.white.opacity(0.9))
-                }
-                .menuStyle(.borderlessButton)
-
-                // API Key input section
-                if showApiKeyInput {
-                    VStack(spacing: 8) {
-                        switch settingsManager.aiProvider {
-                        case .gemini:
-                            VStack(spacing: 8) {
-                                HStack(spacing: 8) {
-                                    SecureField("Enter Gemini API Key", text: $apiKeyInput)
-                                        .textFieldStyle(.plain)
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.8))
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 10)
-                                        .background(.white.opacity(0.1))
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                                    Button(action: {
-                                        settingsManager.geminiApiKey = apiKeyInput
-                                        showApiKeyInput = false
-                                        apiKeyInput = ""
-                                    }) {
-                                        Text("Save")
-                                            .font(.system(size: 12, weight: .semibold))
-                                            .foregroundColor(.black)
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 6)
-                                            .background(.white.opacity(0.9))
-                                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-
-                                Text("Get your API key from Google AI Studio")
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(.white.opacity(0.5))
-                            }
-
-                        case .openRouter:
-                            VStack(spacing: 8) {
-                                HStack(spacing: 8) {
-                                    SecureField("Enter OpenRouter API Key", text: $apiKeyInput)
-                                        .textFieldStyle(.plain)
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.8))
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 10)
-                                        .background(.white.opacity(0.1))
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                                    Button(action: {
-                                        settingsManager.openRouterApiKey = apiKeyInput
-                                        showApiKeyInput = false
-                                        apiKeyInput = ""
-                                    }) {
-                                        Text("Save")
-                                            .font(.system(size: 12, weight: .semibold))
-                                            .foregroundColor(.black)
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 6)
-                                            .background(.white.opacity(0.9))
-                                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-
-                                Text("Get your API key from openrouter.ai")
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(.white.opacity(0.5))
-                            }
-
-                        case .ollama:
-                            VStack(spacing: 8) {
-                                HStack(spacing: 8) {
-                                    TextField("Ollama Endpoint", text: $endpointInput)
-                                        .textFieldStyle(.plain)
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.8))
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 10)
-                                        .background(.white.opacity(0.1))
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                                    Button(action: {
-                                        settingsManager.ollamaEndpoint = endpointInput
-                                        showApiKeyInput = false
-                                        Task {
-                                            await fetchOllamaModels()
-                                        }
-                                    }) {
-                                        Text("Save")
-                                            .font(.system(size: 12, weight: .semibold))
-                                            .foregroundColor(.black)
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 6)
-                                            .background(.white.opacity(0.9))
-                                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-
-                                if ollamaModels.isEmpty && !isFetchingModels {
-                                    Button(action: {
-                                        Task {
-                                            await fetchOllamaModels()
-                                        }
-                                    }) {
-                                        Text("Fetch Available Models")
-                                            .font(.system(size: 12, weight: .semibold))
-                                            .foregroundColor(.black)
-                                            .padding(.horizontal, 16)
-                                            .padding(.vertical, 8)
-                                            .background(.white.opacity(0.9))
-                                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-
-                                Text("Make sure Ollama is running locally")
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(.white.opacity(0.5))
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 8)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                }
+                NavButton(iconName: "gearshape", disabled: false, action: {
+                    showApiKeyDialog()
+                })
 
                 NavButton(iconName: "trash", disabled: false, action: {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        
-                        messages.removeAll()
-                    }
+                    showClearMessagesDialog()
                 })
                 .disabled(messages.isEmpty)
             }
@@ -539,7 +307,6 @@ To enhance the web browsing experience by providing intelligent, context-aware s
         .safeAreaPadding(.bottom, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
-            updateInputFields()
             isTextFieldFocused = true
             if settingsManager.aiProvider == .ollama {
                 Task {
@@ -548,7 +315,6 @@ To enhance the web browsing experience by providing intelligent, context-aware s
             }
         }
         .onChange(of: settingsManager.aiProvider) { _, newProvider in
-            updateInputFields()
             if newProvider == .ollama {
                 Task {
                     await fetchOllamaModels()
@@ -556,19 +322,66 @@ To enhance the web browsing experience by providing intelligent, context-aware s
             }
         }
     }
-    
-    private func updateInputFields() {
-        switch settingsManager.aiProvider {
-        case .gemini:
-            apiKeyInput = settingsManager.geminiApiKey
-        case .openRouter:
-            apiKeyInput = settingsManager.openRouterApiKey
-        case .ollama:
-            endpointInput = settingsManager.ollamaEndpoint
-            modelInput = settingsManager.ollamaModel
+
+    private func showApiKeyDialog() {
+        browserManager.dialogManager.showDialog {
+            AISettingsDialog(
+                settingsManager: settingsManager,
+                ollamaModels: ollamaModels,
+                isFetchingModels: isFetchingModels,
+                onFetchModels: {
+                    Task {
+                        await fetchOllamaModels()
+                    }
+                },
+                onClose: {
+                    browserManager.dialogManager.closeDialog()
+                }
+            )
         }
     }
-    
+
+    private func showClearMessagesDialog() {
+        browserManager.dialogManager.showDialog {
+            StandardDialog(
+                header: {
+                    DialogHeader(
+                        icon: "trash.fill",
+                        title: "Clear Chat History?",
+                        subtitle: "This will delete all messages in this conversation"
+                    )
+                },
+                content: {
+                    EmptyView()
+                },
+                footer: {
+                    DialogFooter(
+                        rightButtons: [
+                            DialogButton(
+                                text: "Cancel",
+                                variant: .secondary,
+                                action: {
+                                    browserManager.dialogManager.closeDialog()
+                                }
+                            ),
+                            DialogButton(
+                                text: "Clear",
+                                iconName: "trash",
+                                variant: .destructive,
+                                action: {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        messages.removeAll()
+                                    }
+                                    browserManager.dialogManager.closeDialog()
+                                }
+                            )
+                        ]
+                    )
+                }
+            )
+        }
+    }
+
     private func fetchOllamaModels() async {
         await MainActor.run {
             isFetchingModels = true
@@ -1097,6 +910,157 @@ struct MessageBubble: View {
             return attributed
         } catch {
             return AttributedString(text)
+        }
+    }
+}
+
+// MARK: - AI Settings Dialog
+
+struct AISettingsDialog: View {
+    @Bindable var settingsManager: SettingsManager
+    let ollamaModels: [OllamaModel]
+    let isFetchingModels: Bool
+    let onFetchModels: () -> Void
+    let onClose: () -> Void
+
+    @State private var apiKeyInput: String = ""
+    @State private var endpointInput: String = ""
+
+    var body: some View {
+        StandardDialog(
+            header: {
+                DialogHeader(
+                    icon: "key.fill",
+                    title: "AI Provider Settings",
+                    subtitle: "Configure your AI provider and API credentials"
+                )
+            },
+            content: {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Provider Selection
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Provider")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.primary)
+
+                        Picker("", selection: $settingsManager.aiProvider) {
+                            ForEach(AIProvider.allCases) { provider in
+                                Text(provider.displayName).tag(provider)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+
+                    Divider()
+
+                    // Provider-specific settings
+                    switch settingsManager.aiProvider {
+                    case .gemini:
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Gemini API Key")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.primary)
+
+                            SecureField("Enter your API key", text: $apiKeyInput)
+                                .textFieldStyle(.roundedBorder)
+
+                            Text("Get your API key from [Google AI Studio](https://aistudio.google.com/apikey)")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
+
+                    case .openRouter:
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("OpenRouter API Key")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.primary)
+
+                            SecureField("Enter your API key", text: $apiKeyInput)
+                                .textFieldStyle(.roundedBorder)
+
+                            Text("Get your API key from [OpenRouter](https://openrouter.ai/keys)")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
+
+                    case .ollama:
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Ollama Endpoint")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.primary)
+
+                            TextField("http://localhost:11434", text: $endpointInput)
+                                .textFieldStyle(.roundedBorder)
+
+                            if ollamaModels.isEmpty && !isFetchingModels {
+                                Button(action: onFetchModels) {
+                                    Label("Fetch Available Models", systemImage: "arrow.clockwise")
+                                        .font(.system(size: 12))
+                                }
+                            } else if isFetchingModels {
+                                HStack {
+                                    ProgressView()
+                                        .scaleEffect(0.7)
+                                    Text("Loading models...")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.secondary)
+                                }
+                            } else {
+                                Text("Found \(ollamaModels.count) model(s)")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Text("Make sure Ollama is running locally")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .padding(.horizontal, 4)
+            },
+            footer: {
+                DialogFooter(
+                    rightButtons: [
+                        DialogButton(
+                            text: "Cancel",
+                            variant: .secondary,
+                            action: onClose
+                        ),
+                        DialogButton(
+                            text: "Save",
+                            iconName: "checkmark",
+                            variant: .primary,
+                            action: {
+                                saveSettings()
+                                onClose()
+                            }
+                        )
+                    ]
+                )
+            }
+        )
+        .onAppear {
+            // Load current settings
+            switch settingsManager.aiProvider {
+            case .gemini:
+                apiKeyInput = settingsManager.geminiApiKey
+            case .openRouter:
+                apiKeyInput = settingsManager.openRouterApiKey
+            case .ollama:
+                endpointInput = settingsManager.ollamaEndpoint
+            }
+        }
+    }
+
+    private func saveSettings() {
+        switch settingsManager.aiProvider {
+        case .gemini:
+            settingsManager.geminiApiKey = apiKeyInput
+        case .openRouter:
+            settingsManager.openRouterApiKey = apiKeyInput
+        case .ollama:
+            settingsManager.ollamaEndpoint = endpointInput
         }
     }
 }
