@@ -10,7 +10,7 @@ import AppKit
 
 struct SidebarHoverOverlayView: View {
     @Environment(BrowserManager.self) private var browserManager
-    @EnvironmentObject var hoverManager: HoverSidebarManager
+    @Environment(HoverSidebarManager.self) private var hoverManager
     @Environment(BrowserWindowState.self) private var windowState
 
     private var overlayWidth: CGFloat {
