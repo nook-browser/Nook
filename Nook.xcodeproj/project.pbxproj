@@ -26,6 +26,15 @@
 			);
 			target = 7F8340FB2E37F39400674A5D /* Nook */;
 		};
+		564997BC2E9B111000D89F78 /* Exceptions for "UI" folder in "Nook" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Buttons/NavButtons/ControlButtons.swift,
+				Buttons/NavButtons/DoubleClickView.swift,
+				Buttons/NavButtons/NavButton.swift,
+			);
+			target = 7F8340FB2E37F39400674A5D /* Nook */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -35,6 +44,14 @@
 				2CAC4DD12E82457B00870189 /* Exceptions for "Nook" folder in "Nook" target */,
 			);
 			path = Nook;
+			sourceTree = "<group>";
+		};
+		564997BA2E9B10FF00D89F78 /* UI */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				564997BC2E9B111000D89F78 /* Exceptions for "UI" folder in "Nook" target */,
+			);
+			path = UI;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -55,6 +72,7 @@
 		7F8340F32E37F39400674A5D = {
 			isa = PBXGroup;
 			children = (
+				564997BA2E9B10FF00D89F78 /* UI */,
 				7F8340FD2E37F39400674A5D /* Products */,
 				2CAC4D282E82457B00870189 /* Nook */,
 			);

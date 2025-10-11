@@ -102,6 +102,7 @@ struct SidebarMenu: View {
                 }
                 .labelStyle(.iconOnly)
                 .buttonStyle(NavButtonStyle())
+                .foregroundStyle(Color.primary)
                 Spacer()
             }
             .padding(.leading, 8)
