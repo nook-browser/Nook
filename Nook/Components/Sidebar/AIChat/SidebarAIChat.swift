@@ -86,48 +86,25 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                     }
                     
                     Spacer()
-                
-                Menu {
-                    Button {
-                        showApiKeyInput.toggle()
-                    } label: {
-                        Label("API Key", systemImage: "key")
-                    }
                     
-                    Divider()
-                    
-                    Menu("Model") {
-                        ForEach(GeminiModel.allCases) { model in
-                            Button(action: {
-                                settingsManager.geminiModel = model
-                            }) {
-                                HStack {
-                                    Text(model.displayName)
-                                    if settingsManager.geminiModel == model {
-                                        Spacer()
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
+                    NavButton(iconName: "key", disabled: false, action: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            
+                            showApiKeyInput.toggle()
                         }
-                    }
-                    
-                    Divider()
-                    
-                    Button {
-                        messages.removeAll()
-                    } label: {
-                        Label("Clear Chat", systemImage: "trash")
-                    }
+                    })
                     .disabled(messages.isEmpty)
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.7))
-                    }
-                    .buttonStyle(.plain)
+                    
+                    NavButton(iconName: "trash", disabled: false, action: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            
+                            messages.removeAll()
+                        }
+                    })
+                    .disabled(messages.isEmpty)
                 }
                 .padding(.horizontal, 8)
+                
                 
                 // API Key input section
                 if showApiKeyInput {
@@ -171,7 +148,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: 12) {
-                                if !hasApiKey && !showApiKeyInput {
+                            if !hasApiKey && !showApiKeyInput {
                                 VStack(spacing: 12) {
                                     Image(systemName: "key.fill")
                                         .font(.system(size: 32))
@@ -251,6 +228,23 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                 
                 // Input area
                 HStack(spacing: 8) {
+                    
+                    Menu("Model") {
+                        ForEach(GeminiModel.allCases) { model in
+                            Button(action: {
+                                settingsManager.geminiModel = model
+                            }) {
+                                HStack {
+                                    Text(model.displayName)
+                                    if settingsManager.geminiModel == model {
+                                        Spacer()
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
                     TextField("Ask about this page...", text: $messageText, axis: .vertical)
                         .textFieldStyle(.plain)
                         .font(.system(size: 13, weight: .medium))
@@ -272,7 +266,8 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
                 .background(.white.opacity(0.05))
-                .cornerRadius(12)
+                .clipShape(.rect(cornerRadius: 12))
+                .padding(.horizontal, 8)
             }
         }
         .padding(.top, 8)

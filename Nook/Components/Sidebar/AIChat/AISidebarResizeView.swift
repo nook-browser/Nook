@@ -25,11 +25,11 @@ struct AISidebarResizeView: View {
     }
 
     private var indicatorOffset: CGFloat {
-        aiSitsOnRight ? -3 : 3
+        aiSitsOnRight ? 3 : -3
     }
 
     private var hitAreaOffset: CGFloat {
-        aiSitsOnRight ? -5 : 5
+        aiSitsOnRight ? 5 : -5
     }
 
     var body: some View {
