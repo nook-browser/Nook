@@ -257,13 +257,7 @@ struct SpaceView: View {
                         insertion: .opacity.combined(with: .scale(scale: 0.95, anchor: .top)).animation(.easeInOut(duration: 0.3)),
                         removal: .opacity.combined(with: .scale(scale: 0.95, anchor: .top)).animation(.easeInOut(duration: 0.2))
                     ))
-            } else {
-                emptyPinnedDropTarget
-                    .transition(.asymmetric(
-                        insertion: .opacity.animation(.easeInOut(duration: 0.2)),
-                        removal: .opacity.animation(.easeInOut(duration: 0.15))
-                    ))
-            }
+            } 
         }
         .animation(.easeInOut(duration: 0.25), value: hasSpacePinnedContent)
     }
@@ -347,18 +341,6 @@ struct SpaceView: View {
         .padding(.vertical, 12)
         .padding(.vertical, -12)
         .contentShape(.interaction, Rectangle())
-        .overlay(alignment: .top) {
-            // Drop indicator above tab
-            if dropPreviewIndex == tab.index && dropPreviewSection == .spacePinned(space.id) {
-                RoundedRectangle(cornerRadius: 1.5)
-                    .fill(AppColors.textSecondary)
-                    .frame(height: 3)
-                    .padding(.horizontal, 8)
-                    .opacity(0.8)
-                    .offset(y: -6)
-                    .animation(.easeInOut(duration: 0.15), value: dropPreviewIndex)
-            }
-        }
         .onDrop(
             of: [.text],
             delegate: SidebarSectionDropDelegateSimple(
@@ -501,57 +483,7 @@ struct SpaceView: View {
         }
         .frame(height: 4)
     }
-
-    private var emptyPinnedDropTarget: some View {
-        let isActive = dropPreviewIndex == 0 && dropPreviewSection == .spacePinned(space.id)
-
-        return Color.clear
-            .frame(height: spacerBaseHeight + dropZoneVerticalPadding * 2)
-            .padding(.vertical, -dropZoneVerticalPadding)
-            .padding(.bottom, 4)
-            .overlay(alignment: .center) {
-                // Visual indicator only
-                RoundedRectangle(cornerRadius: 1.5)
-                    .fill(AppColors.textSecondary)
-                    .frame(height: isActive ? 3 : 0)
-                    .padding(.horizontal, 8)
-                    .opacity(isActive ? 0.8 : 0)
-                    .animation(.easeInOut(duration: 0.15), value: isActive)
-            }
-            .overlay {
-                // Expanded invisible hit area for drops - doesn't affect layout
-                Color.clear
-                    .frame(height: 50)
-                    .contentShape(Rectangle())
-                    .allowsHitTesting(true)
-                    .onDrop(
-                        of: [.text],
-                        delegate: SidebarSectionDropDelegateSimple(
-                            itemsCount: { 0 },
-                            draggedItem: $draggedItem,
-                            targetSection: .spacePinned(space.id),
-                            tabManager: browserManager.tabManager,
-                            targetIndex: nil,
-                            onDropEntered: {
-                                dropPreviewIndex = 0
-                                dropPreviewSection = .spacePinned(space.id)
-                                NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
-                            },
-                            onDropCompleted: {
-                                dropPreviewIndex = nil
-                                dropPreviewSection = nil
-                            },
-                            onDropExited: {
-                                dropPreviewIndex = nil
-                                dropPreviewSection = nil
-                            }
-                        )
-                    )
-            }
-    }
-    
-
-    
+ 
     private var newTabButtonSection: some View {
         NewTabButton()
             .padding(.top, 8)
