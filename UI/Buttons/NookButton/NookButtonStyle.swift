@@ -34,7 +34,9 @@ struct NookButtonStyle: ButtonStyle {
         ZStack {
             // Main button content
             let contrastingShade = ((try? Garnish.contrastingShade(of: backgroundColor(), targetRatio: 3, direction: .preferLight, blendStyle: .strong)) ?? textColor)
-            let shadow = ((try? Garnish.contrastingShade(of: backgroundColor(), targetRatio: colorScheme == .dark ? 2 : 2)) ?? textColor)
+            let background = (backgroundColor().mix(with: contrastingShade, by: isHovering ? 0.2 : 0))
+            let shadow = ((try? Garnish.contrastingShade(of: backgroundColor(), targetRatio: 2)) ?? textColor)
+            let highlight =  ((try? Garnish.contrastingShade(of: backgroundColor(), targetRatio: 2, direction: .preferLight)) ?? textColor)
             
             configuration.label
                 .font(.body.weight(.semibold))
@@ -43,11 +45,7 @@ struct NookButtonStyle: ButtonStyle {
                 .padding(.horizontal, 12)
                 .background{
                     RoundedRectangle(cornerRadius: 14)
-                        .fill(((backgroundColor().mix(with: contrastingShade, by: isHovering ? 0.2 : 0))
-//                            .shadow(.inner(color: ((try? Garnish.contrastingShade(of: backgroundColor(), targetRatio: colorScheme == .dark ? 2.5 : 2, direction: .forceDark)) ?? textColor), radius: 2, y: -2))
-//                            .shadow(.inner(color: .white.opacity(0.4), radius: 2, y: 2))
-                        )
-                        )
+                        .fill(background)
                 }
               
                 .overlay(
@@ -56,9 +54,9 @@ struct NookButtonStyle: ButtonStyle {
                         .strokeBorder(
                             LinearGradient(
                                 colors: [
-                                    Color.white.opacity(1.0),
+                                    highlight,
                                     .clear,
-                                    Color.white.opacity(1.0)
+                                    highlight
                                 ],
                                 startPoint: .leading,
                                 endPoint: .trailing
