@@ -35,7 +35,7 @@ struct NookButtonStyle: ButtonStyle {
             // Main button content
             let contrastingShade = ((try? backgroundColor().contrastingShade()) ?? textColor)
             configuration.label
-                .font(.system(size: 12, weight: .semibold))
+                .font(.body.weight(.semibold))
                 .foregroundStyle(contrastingShade)
                 .padding(.vertical, 12)
                 .padding(.horizontal, 12)
@@ -95,7 +95,7 @@ struct NookButtonStyle: ButtonStyle {
         case .primary:
             return gradientColorManager.primaryColor
         case .secondary:
-            return Color.white.mix(with: .black, by: 0.3)
+            return Color.white.mix(with: .black, by: 0.8)
         case .destructive:
             return Color.red
         }
