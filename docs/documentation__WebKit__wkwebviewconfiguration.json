@@ -1,0 +1,3472 @@
+{
+  "schemaVersion": {
+    "major": 0,
+    "minor": 3,
+    "patch": 0
+  },
+  "metadata": {
+    "externalID": "c:objc(cs)WKWebViewConfiguration",
+    "role": "symbol",
+    "fragments": [
+      {
+        "text": "class",
+        "kind": "keyword"
+      },
+      {
+        "text": " ",
+        "kind": "text"
+      },
+      {
+        "kind": "identifier",
+        "text": "WKWebViewConfiguration"
+      }
+    ],
+    "modules": [
+      {
+        "name": "WebKit"
+      }
+    ],
+    "symbolKind": "class",
+    "navigatorTitle": [
+      {
+        "kind": "identifier",
+        "text": "WKWebViewConfiguration"
+      }
+    ],
+    "platforms": [
+      {
+        "unavailable": false,
+        "deprecated": false,
+        "beta": false,
+        "introducedAt": "8.0",
+        "name": "iOS"
+      },
+      {
+        "unavailable": false,
+        "deprecated": false,
+        "beta": false,
+        "introducedAt": "8.0",
+        "name": "iPadOS"
+      },
+      {
+        "unavailable": false,
+        "deprecated": false,
+        "beta": false,
+        "introducedAt": "13.1",
+        "name": "Mac Catalyst"
+      },
+      {
+        "unavailable": false,
+        "deprecated": false,
+        "beta": false,
+        "introducedAt": "10.10",
+        "name": "macOS"
+      },
+      {
+        "unavailable": false,
+        "deprecated": false,
+        "beta": false,
+        "introducedAt": "1.0",
+        "name": "visionOS"
+      }
+    ],
+    "title": "WKWebViewConfiguration",
+    "roleHeading": "Class"
+  },
+  "primaryContentSections": [
+    {
+      "declarations": [
+        {
+          "platforms": [
+            "iOS",
+            "iPadOS",
+            "Mac Catalyst",
+            "macOS",
+            "visionOS"
+          ],
+          "tokens": [
+            {
+              "text": "@",
+              "kind": "attribute"
+            },
+            {
+              "text": "MainActor",
+              "preciseIdentifier": "s:ScM",
+              "identifier": "doc://com.externally.resolved.symbol/s:ScM",
+              "kind": "attribute"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "class",
+              "kind": "keyword"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "WKWebViewConfiguration",
+              "kind": "identifier"
+            }
+          ],
+          "languages": [
+            "swift"
+          ]
+        }
+      ],
+      "kind": "declarations"
+    },
+    {
+      "content": [
+        {
+          "type": "heading",
+          "anchor": "overview",
+          "text": "Overview",
+          "level": 2
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "A ",
+              "type": "text"
+            },
+            {
+              "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration",
+              "isActive": true,
+              "type": "reference"
+            },
+            {
+              "text": " object provides information about how to configure a ",
+              "type": "text"
+            },
+            {
+              "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebView",
+              "isActive": true,
+              "type": "reference"
+            },
+            {
+              "text": " object. Use your configuration object to specify:",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "type": "unorderedList",
+          "items": [
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "The initial cookies to make available to your web content"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "text": "Handlers for any custom URL schemes your web content uses",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Settings for how to handle media content"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "text": "Information about how to manage selections within the web view",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "text": "Custom scripts to inject into the webpage",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "text": "Custom rules that determine how to render content",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "You create a ",
+              "type": "text"
+            },
+            {
+              "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration",
+              "isActive": true,
+              "type": "reference"
+            },
+            {
+              "text": " object in your code, configure its properties, and pass it to the initializer of your ",
+              "type": "text"
+            },
+            {
+              "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebView",
+              "isActive": true,
+              "type": "reference"
+            },
+            {
+              "text": " object. The web view incorporates your configuration settings only at creation time; you cannot change those settings dynamically later.",
+              "type": "text"
+            }
+          ]
+        }
+      ],
+      "kind": "content"
+    }
+  ],
+  "sections": [],
+  "identifier": {
+    "interfaceLanguage": "swift",
+    "url": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration"
+  },
+  "topicSections": [
+    {
+      "anchor": "Configuring-the-web-views-behavior",
+      "title": "Configuring the web view’s behavior",
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/websiteDataStore",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/userContentController",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/processPool",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/applicationNameForUserAgent",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/limitsNavigationsToAppBoundDomains",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/upgradeKnownHostsToHTTPS"
+      ]
+    },
+    {
+      "anchor": "Configuring-the-web-views-preferences",
+      "title": "Configuring the web view’s preferences",
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/preferences",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/defaultWebpagePreferences"
+      ]
+    },
+    {
+      "anchor": "Adding-handlers-for-custom-URL-schemes",
+      "title": "Adding handlers for custom URL schemes",
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/setURLSchemeHandler(_:forURLScheme:)",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/urlSchemeHandler(forURLScheme:)"
+      ]
+    },
+    {
+      "anchor": "Configuring-the-rendering-behavior",
+      "title": "Configuring the rendering behavior",
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/ignoresViewportScaleLimits",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/suppressesIncrementalRendering"
+      ]
+    },
+    {
+      "anchor": "Setting-media-playback-preferences",
+      "title": "Setting media playback preferences",
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/allowsInlineMediaPlayback",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/allowsAirPlayForMediaPlayback",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/allowsPictureInPictureMediaPlayback",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/mediaTypesRequiringUserActionForPlayback",
+        "doc://com.apple.webkit/documentation/WebKit/WKAudiovisualMediaTypes"
+      ]
+    },
+    {
+      "anchor": "Identifying-data-types",
+      "title": "Identifying data types",
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/dataDetectorTypes",
+        "doc://com.apple.webkit/documentation/WebKit/WKDataDetectorTypes"
+      ]
+    },
+    {
+      "anchor": "Setting-selection-granularity",
+      "title": "Setting selection granularity",
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/selectionGranularity",
+        "doc://com.apple.webkit/documentation/WebKit/WKSelectionGranularity"
+      ]
+    },
+    {
+      "anchor": "Selecting-user-interface-directionality",
+      "title": "Selecting user interface directionality",
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/userInterfaceDirectionPolicy",
+        "doc://com.apple.webkit/documentation/WebKit/WKUserInterfaceDirectionPolicy"
+      ]
+    },
+    {
+      "anchor": "Deprecated",
+      "title": "Deprecated",
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/mediaPlaybackAllowsAirPlay",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/requiresUserActionForMediaPlayback",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/mediaPlaybackRequiresUserAction"
+      ]
+    },
+    {
+      "generated": true,
+      "anchor": "Instance-Properties",
+      "title": "Instance Properties",
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/allowsInlinePredictions",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/showsSystemScreenTimeBlockingView",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/supportsAdaptiveImageGlyph",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/webExtensionController",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/writingToolsBehavior"
+      ]
+    }
+  ],
+  "relationshipsSections": [
+    {
+      "type": "inheritsFrom",
+      "title": "Inherits From",
+      "identifiers": [
+        "doc://com.externally.resolved.symbol/c:objc(cs)NSObject"
+      ],
+      "kind": "relationships"
+    },
+    {
+      "type": "conformsTo",
+      "title": "Conforms To",
+      "identifiers": [
+        "doc://com.externally.resolved.symbol/s:s7CVarArgP",
+        "doc://com.externally.resolved.symbol/s:s28CustomDebugStringConvertibleP",
+        "doc://com.externally.resolved.symbol/s:s23CustomStringConvertibleP",
+        "doc://com.externally.resolved.symbol/s:SQ",
+        "doc://com.externally.resolved.symbol/s:SH",
+        "doc://com.externally.resolved.symbol/c:objc(pl)NSCoding",
+        "doc://com.externally.resolved.symbol/c:objc(pl)NSCopying",
+        "doc://com.externally.resolved.symbol/c:objc(pl)NSObject",
+        "doc://com.externally.resolved.symbol/c:objc(pl)NSSecureCoding",
+        "doc://com.externally.resolved.symbol/s:s8SendableP"
+      ],
+      "kind": "relationships"
+    }
+  ],
+  "kind": "symbol",
+  "seeAlsoSections": [
+    {
+      "generated": true,
+      "anchor": "Web-view-configuration",
+      "title": "Web view configuration",
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/WKWindowFeatures",
+        "doc://com.apple.webkit/documentation/WebKit/WKProcessPool",
+        "doc://com.apple.webkit/documentation/WebKit/WKPreferences",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebpagePreferences"
+      ]
+    }
+  ],
+  "hierarchy": {
+    "paths": [
+      [
+        "doc://com.apple.documentation/documentation/technologies",
+        "doc://com.apple.webkit/documentation/WebKit"
+      ]
+    ]
+  },
+  "abstract": [
+    {
+      "type": "text",
+      "text": "A collection of properties that you use to initialize a web view."
+    }
+  ],
+  "variants": [
+    {
+      "traits": [
+        {
+          "interfaceLanguage": "swift"
+        }
+      ],
+      "paths": [
+        "/documentation/webkit/wkwebviewconfiguration"
+      ]
+    },
+    {
+      "traits": [
+        {
+          "interfaceLanguage": "occ"
+        }
+      ],
+      "paths": [
+        "/documentation/webkit/wkwebviewconfiguration"
+      ]
+    }
+  ],
+  "references": {
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/mediaPlaybackRequiresUserAction": {
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "mediaPlaybackRequiresUserAction",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "preciseIdentifier": "s:Sb",
+          "text": "Bool",
+          "kind": "typeIdentifier"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "text": "mediaPlaybackRequiresUserAction",
+          "kind": "identifier"
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol",
+      "role": "symbol",
+      "deprecated": true,
+      "title": "mediaPlaybackRequiresUserAction",
+      "url": "/documentation/webkit/wkwebviewconfiguration/mediaplaybackrequiresuseraction",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/mediaPlaybackRequiresUserAction",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Deprecated property."
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebView": {
+      "title": "WKWebView",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebView",
+      "type": "topic",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "WKWebView"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "WKWebView"
+        }
+      ],
+      "role": "symbol",
+      "url": "/documentation/webkit/wkwebview",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object that displays interactive web content, such as for an in-app browser."
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/webExtensionController": {
+      "role": "symbol",
+      "abstract": [],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "var"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "webExtensionController",
+          "kind": "identifier"
+        },
+        {
+          "kind": "text",
+          "text": ": "
+        },
+        {
+          "text": "WKWebExtensionController",
+          "preciseIdentifier": "c:objc(cs)WKWebExtensionController",
+          "kind": "typeIdentifier"
+        },
+        {
+          "text": "?",
+          "kind": "text"
+        }
+      ],
+      "url": "/documentation/webkit/wkwebviewconfiguration/webextensioncontroller",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "webExtensionController"
+        }
+      ],
+      "title": "webExtensionController",
+      "type": "topic",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/webExtensionController",
+      "kind": "symbol"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/processPool": {
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "processPool"
+        }
+      ],
+      "deprecated": true,
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/processPool",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "The object that coordinates the processes the web view uses to render its web content and execute scripts.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/webkit/wkwebviewconfiguration/processpool",
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "processPool"
+        },
+        {
+          "kind": "text",
+          "text": ": "
+        },
+        {
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(cs)WKProcessPool",
+          "text": "WKProcessPool"
+        }
+      ],
+      "role": "symbol",
+      "title": "processPool",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/websiteDataStore": {
+      "url": "/documentation/webkit/wkwebviewconfiguration/websitedatastore",
+      "role": "symbol",
+      "type": "topic",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/websiteDataStore",
+      "title": "websiteDataStore",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "var"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "websiteDataStore",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "preciseIdentifier": "c:objc(cs)WKWebsiteDataStore",
+          "text": "WKWebsiteDataStore",
+          "kind": "typeIdentifier"
+        }
+      ],
+      "kind": "symbol",
+      "navigatorTitle": [
+        {
+          "text": "websiteDataStore",
+          "kind": "identifier"
+        }
+      ],
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The object you use to get and set the site’s cookies and to track the cached data objects."
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/allowsPictureInPictureMediaPlayback": {
+      "title": "allowsPictureInPictureMediaPlayback",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/allowsPictureInPictureMediaPlayback",
+      "type": "topic",
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "allowsPictureInPictureMediaPlayback",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "text": "Bool",
+          "preciseIdentifier": "s:Sb",
+          "kind": "typeIdentifier"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "text": "allowsPictureInPictureMediaPlayback",
+          "kind": "identifier"
+        }
+      ],
+      "role": "symbol",
+      "url": "/documentation/webkit/wkwebviewconfiguration/allowspictureinpicturemediaplayback",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A Boolean value that indicates whether HTML5 videos can play Picture in Picture."
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/writingToolsBehavior": {
+      "url": "/documentation/webkit/wkwebviewconfiguration/writingtoolsbehavior",
+      "role": "symbol",
+      "type": "topic",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/writingToolsBehavior",
+      "title": "writingToolsBehavior",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "var"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "text": "writingToolsBehavior",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "preciseIdentifier": "c:@E@UIWritingToolsBehavior",
+          "text": "UIWritingToolsBehavior",
+          "kind": "typeIdentifier"
+        }
+      ],
+      "kind": "symbol",
+      "navigatorTitle": [
+        {
+          "text": "writingToolsBehavior",
+          "kind": "identifier"
+        }
+      ],
+      "abstract": []
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/allowsInlinePredictions": {
+      "url": "/documentation/webkit/wkwebviewconfiguration/allowsinlinepredictions",
+      "role": "symbol",
+      "type": "topic",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/allowsInlinePredictions",
+      "title": "allowsInlinePredictions",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "var"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "text": "allowsInlinePredictions",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "preciseIdentifier": "s:Sb",
+          "text": "Bool",
+          "kind": "typeIdentifier"
+        }
+      ],
+      "kind": "symbol",
+      "navigatorTitle": [
+        {
+          "text": "allowsInlinePredictions",
+          "kind": "identifier"
+        }
+      ],
+      "abstract": []
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/dataDetectorTypes": {
+      "abstract": [
+        {
+          "text": "The types of data detectors to apply to the web view’s content.",
+          "type": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/dataDetectorTypes",
+      "url": "/documentation/webkit/wkwebviewconfiguration/datadetectortypes",
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "dataDetectorTypes",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "text": "WKDataDetectorTypes",
+          "preciseIdentifier": "c:@E@WKDataDetectorTypes",
+          "kind": "typeIdentifier"
+        }
+      ],
+      "role": "symbol",
+      "kind": "symbol",
+      "type": "topic",
+      "navigatorTitle": [
+        {
+          "text": "dataDetectorTypes",
+          "kind": "identifier"
+        }
+      ],
+      "title": "dataDetectorTypes"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKAudiovisualMediaTypes": {
+      "type": "topic",
+      "abstract": [
+        {
+          "text": "The media types that require a user gesture to begin playing.",
+          "type": "text"
+        }
+      ],
+      "fragments": [
+        {
+          "text": "struct",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "WKAudiovisualMediaTypes",
+          "kind": "identifier"
+        }
+      ],
+      "url": "/documentation/webkit/wkaudiovisualmediatypes",
+      "title": "WKAudiovisualMediaTypes",
+      "navigatorTitle": [
+        {
+          "text": "WKAudiovisualMediaTypes",
+          "kind": "identifier"
+        }
+      ],
+      "role": "symbol",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKAudiovisualMediaTypes",
+      "kind": "symbol"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/supportsAdaptiveImageGlyph": {
+      "url": "/documentation/webkit/wkwebviewconfiguration/supportsadaptiveimageglyph",
+      "role": "symbol",
+      "type": "topic",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/supportsAdaptiveImageGlyph",
+      "title": "supportsAdaptiveImageGlyph",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "var"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "text": "supportsAdaptiveImageGlyph",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "preciseIdentifier": "s:Sb",
+          "text": "Bool",
+          "kind": "typeIdentifier"
+        }
+      ],
+      "kind": "symbol",
+      "navigatorTitle": [
+        {
+          "text": "supportsAdaptiveImageGlyph",
+          "kind": "identifier"
+        }
+      ],
+      "abstract": []
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/ignoresViewportScaleLimits": {
+      "role": "symbol",
+      "title": "ignoresViewportScaleLimits",
+      "url": "/documentation/webkit/wkwebviewconfiguration/ignoresviewportscalelimits",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A Boolean value that determines whether a web view allows scaling of the webpage."
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "var"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "ignoresViewportScaleLimits"
+        },
+        {
+          "kind": "text",
+          "text": ": "
+        },
+        {
+          "kind": "typeIdentifier",
+          "text": "Bool",
+          "preciseIdentifier": "s:Sb"
+        }
+      ],
+      "type": "topic",
+      "navigatorTitle": [
+        {
+          "text": "ignoresViewportScaleLimits",
+          "kind": "identifier"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/ignoresViewportScaleLimits"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/urlSchemeHandler(forURLScheme:)": {
+      "url": "/documentation/webkit/wkwebviewconfiguration/urlschemehandler(forurlscheme:)",
+      "role": "symbol",
+      "type": "topic",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/urlSchemeHandler(forURLScheme:)",
+      "title": "urlSchemeHandler(forURLScheme:)",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "func"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "urlSchemeHandler",
+          "kind": "identifier"
+        },
+        {
+          "text": "(",
+          "kind": "text"
+        },
+        {
+          "text": "forURLScheme",
+          "kind": "externalParam"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "preciseIdentifier": "s:SS",
+          "text": "String",
+          "kind": "typeIdentifier"
+        },
+        {
+          "kind": "text",
+          "text": ") -> (any "
+        },
+        {
+          "preciseIdentifier": "c:objc(pl)WKURLSchemeHandler",
+          "kind": "typeIdentifier",
+          "text": "WKURLSchemeHandler"
+        },
+        {
+          "kind": "text",
+          "text": ")?"
+        }
+      ],
+      "kind": "symbol",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "urlSchemeHandlerForURLScheme:"
+        }
+      ],
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Returns the currently registered handler object for the specified URL scheme."
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKSelectionGranularity": {
+      "deprecated": true,
+      "title": "WKSelectionGranularity",
+      "kind": "symbol",
+      "role": "symbol",
+      "fragments": [
+        {
+          "text": "enum",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "WKSelectionGranularity",
+          "kind": "identifier"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "The granularity with which the user can select and modify web view content.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/webkit/wkselectiongranularity",
+      "navigatorTitle": [
+        {
+          "text": "WKSelectionGranularity",
+          "kind": "identifier"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKSelectionGranularity",
+      "type": "topic"
+    },
+    "doc://com.apple.documentation/documentation/technologies": {
+      "identifier": "doc://com.apple.documentation/documentation/technologies",
+      "kind": "technologies",
+      "abstract": [
+        {
+          "text": "",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/technologies",
+      "role": "overview",
+      "title": "Technologies",
+      "type": "topic"
+    },
+    "doc://com.externally.resolved.symbol/c:objc(pl)NSCoding": {
+      "url": "/documentation/Foundation/NSCoding",
+      "kind": "symbol",
+      "identifier": "doc://com.externally.resolved.symbol/c:objc(pl)NSCoding",
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A protocol that enables an object to be encoded and decoded for archiving and distribution."
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "protocol"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "NSCoding"
+        }
+      ],
+      "type": "topic",
+      "title": "NSCoding"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWindowFeatures": {
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "WKWindowFeatures"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWindowFeatures",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Display-related attributes that a webpage requests for its window."
+        }
+      ],
+      "url": "/documentation/webkit/wkwindowfeatures",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "WKWindowFeatures"
+        }
+      ],
+      "role": "symbol",
+      "title": "WKWindowFeatures",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit": {
+      "identifier": "doc://com.apple.webkit/documentation/WebKit",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "Integrate web content seamlessly into your app, and customize content interactions to meet your app’s needs.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/webkit",
+      "role": "collection",
+      "title": "WebKit",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/suppressesIncrementalRendering": {
+      "role": "symbol",
+      "title": "suppressesIncrementalRendering",
+      "url": "/documentation/webkit/wkwebviewconfiguration/suppressesincrementalrendering",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A Boolean value that indicates whether the web view suppresses content rendering until the content is fully loaded into memory."
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "var"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "suppressesIncrementalRendering"
+        },
+        {
+          "kind": "text",
+          "text": ": "
+        },
+        {
+          "kind": "typeIdentifier",
+          "text": "Bool",
+          "preciseIdentifier": "s:Sb"
+        }
+      ],
+      "type": "topic",
+      "navigatorTitle": [
+        {
+          "text": "suppressesIncrementalRendering",
+          "kind": "identifier"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/suppressesIncrementalRendering"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKProcessPool": {
+      "title": "WKProcessPool",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKProcessPool",
+      "type": "topic",
+      "deprecated": true,
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "WKProcessPool"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "WKProcessPool"
+        }
+      ],
+      "role": "symbol",
+      "url": "/documentation/webkit/wkprocesspool",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "An opaque token that you use to run multiple web views in a single process.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKUserInterfaceDirectionPolicy": {
+      "url": "/documentation/webkit/wkuserinterfacedirectionpolicy",
+      "role": "symbol",
+      "type": "topic",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKUserInterfaceDirectionPolicy",
+      "title": "WKUserInterfaceDirectionPolicy",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "enum"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "WKUserInterfaceDirectionPolicy",
+          "kind": "identifier"
+        }
+      ],
+      "kind": "symbol",
+      "navigatorTitle": [
+        {
+          "text": "WKUserInterfaceDirectionPolicy",
+          "kind": "identifier"
+        }
+      ],
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The policy that determines the directionality of user interface elements in a web view."
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/upgradeKnownHostsToHTTPS": {
+      "url": "/documentation/webkit/wkwebviewconfiguration/upgradeknownhoststohttps",
+      "role": "symbol",
+      "type": "topic",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/upgradeKnownHostsToHTTPS",
+      "title": "upgradeKnownHostsToHTTPS",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "var"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "upgradeKnownHostsToHTTPS",
+          "kind": "identifier"
+        },
+        {
+          "kind": "text",
+          "text": ": "
+        },
+        {
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:Sb",
+          "text": "Bool"
+        }
+      ],
+      "kind": "symbol",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "upgradeKnownHostsToHTTPS"
+        }
+      ],
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A Boolean value that indicates whether the web view should automatically upgrade supported HTTP requests to HTTPS."
+        }
+      ]
+    },
+    "doc://com.externally.resolved.symbol/s:SQ": {
+      "identifier": "doc://com.externally.resolved.symbol/s:SQ",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A type that can be compared for value equality.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/Swift/Equatable",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "Equatable",
+          "kind": "identifier"
+        }
+      ],
+      "role": "symbol",
+      "title": "Equatable",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/requiresUserActionForMediaPlayback": {
+      "deprecated": true,
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A Boolean value that indicates whether HTML5 videos require the user to start playing them ("
+        },
+        {
+          "type": "codeVoice",
+          "code": "true"
+        },
+        {
+          "type": "text",
+          "text": ") or whether the videos play automatically ("
+        },
+        {
+          "code": "false",
+          "type": "codeVoice"
+        },
+        {
+          "type": "text",
+          "text": ")."
+        }
+      ],
+      "kind": "symbol",
+      "role": "symbol",
+      "url": "/documentation/webkit/wkwebviewconfiguration/requiresuseractionformediaplayback",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "requiresUserActionForMediaPlayback"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/requiresUserActionForMediaPlayback",
+      "title": "requiresUserActionForMediaPlayback",
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "requiresUserActionForMediaPlayback",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "preciseIdentifier": "s:Sb",
+          "text": "Bool",
+          "kind": "typeIdentifier"
+        }
+      ],
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/allowsAirPlayForMediaPlayback": {
+      "navigatorTitle": [
+        {
+          "text": "allowsAirPlayForMediaPlayback",
+          "kind": "identifier"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/allowsAirPlayForMediaPlayback",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A Boolean value that indicates whether the web view allows media playback over AirPlay."
+        }
+      ],
+      "url": "/documentation/webkit/wkwebviewconfiguration/allowsairplayformediaplayback",
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "text": "allowsAirPlayForMediaPlayback",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "text": "Bool",
+          "preciseIdentifier": "s:Sb",
+          "kind": "typeIdentifier"
+        }
+      ],
+      "role": "symbol",
+      "title": "allowsAirPlayForMediaPlayback",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration": {
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "WKWebViewConfiguration"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A collection of properties that you use to initialize a web view.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/webkit/wkwebviewconfiguration",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "WKWebViewConfiguration"
+        }
+      ],
+      "role": "symbol",
+      "title": "WKWebViewConfiguration",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKPreferences": {
+      "title": "WKPreferences",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKPreferences",
+      "type": "topic",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "WKPreferences"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "WKPreferences"
+        }
+      ],
+      "role": "symbol",
+      "url": "/documentation/webkit/wkpreferences",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "An object that encapsulates the standard behaviors to apply to websites.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/showsSystemScreenTimeBlockingView": {
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "showsSystemScreenTimeBlockingView",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:Sb",
+          "text": "Bool"
+        }
+      ],
+      "type": "topic",
+      "url": "/documentation/webkit/wkwebviewconfiguration/showssystemscreentimeblockingview",
+      "kind": "symbol",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/showsSystemScreenTimeBlockingView",
+      "title": "showsSystemScreenTimeBlockingView",
+      "role": "symbol",
+      "abstract": [],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "showsSystemScreenTimeBlockingView"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/userContentController": {
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "userContentController",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "preciseIdentifier": "c:objc(cs)WKUserContentController",
+          "text": "WKUserContentController",
+          "kind": "typeIdentifier"
+        }
+      ],
+      "type": "topic",
+      "url": "/documentation/webkit/wkwebviewconfiguration/usercontentcontroller",
+      "kind": "symbol",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/userContentController",
+      "title": "userContentController",
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The object that coordinates interactions between your app’s native code and the webpage’s scripts and other content."
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "text": "userContentController",
+          "kind": "identifier"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/setURLSchemeHandler(_:forURLScheme:)": {
+      "url": "/documentation/webkit/wkwebviewconfiguration/seturlschemehandler(_:forurlscheme:)",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/setURLSchemeHandler(_:forURLScheme:)",
+      "kind": "symbol",
+      "type": "topic",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "func"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "text": "setURLSchemeHandler",
+          "kind": "identifier"
+        },
+        {
+          "text": "((any ",
+          "kind": "text"
+        },
+        {
+          "kind": "typeIdentifier",
+          "text": "WKURLSchemeHandler",
+          "preciseIdentifier": "c:objc(pl)WKURLSchemeHandler"
+        },
+        {
+          "text": ")?, ",
+          "kind": "text"
+        },
+        {
+          "text": "forURLScheme",
+          "kind": "externalParam"
+        },
+        {
+          "kind": "text",
+          "text": ": "
+        },
+        {
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:SS",
+          "text": "String"
+        },
+        {
+          "text": ")",
+          "kind": "text"
+        }
+      ],
+      "role": "symbol",
+      "title": "setURLSchemeHandler(_:forURLScheme:)",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Registers an object to load resources associated with the specified URL scheme."
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "text": "setURLSchemeHandler:forURLScheme:",
+          "kind": "identifier"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKDataDetectorTypes": {
+      "type": "topic",
+      "fragments": [
+        {
+          "text": "struct",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "WKDataDetectorTypes",
+          "kind": "identifier"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKDataDetectorTypes",
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "text": "WKDataDetectorTypes",
+          "kind": "identifier"
+        }
+      ],
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The data detector types."
+        }
+      ],
+      "title": "WKDataDetectorTypes",
+      "url": "/documentation/webkit/wkdatadetectortypes"
+    },
+    "doc://com.externally.resolved.symbol/c:objc(cs)NSObject": {
+      "url": "/documentation/ObjectiveC/NSObject-swift.class",
+      "kind": "symbol",
+      "identifier": "doc://com.externally.resolved.symbol/c:objc(cs)NSObject",
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The root class of most Objective-C class hierarchies, from which subclasses inherit a basic interface to the runtime system and the ability to behave as Objective-C objects."
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "NSObject"
+        }
+      ],
+      "type": "topic",
+      "title": "NSObject"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/allowsInlineMediaPlayback": {
+      "title": "allowsInlineMediaPlayback",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/allowsInlineMediaPlayback",
+      "type": "topic",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "var"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "allowsInlineMediaPlayback"
+        },
+        {
+          "kind": "text",
+          "text": ": "
+        },
+        {
+          "kind": "typeIdentifier",
+          "text": "Bool",
+          "preciseIdentifier": "s:Sb"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "allowsInlineMediaPlayback"
+        }
+      ],
+      "role": "symbol",
+      "url": "/documentation/webkit/wkwebviewconfiguration/allowsinlinemediaplayback",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A Boolean value that indicates whether HTML5 videos play inline or use the native full-screen controller."
+        }
+      ]
+    },
+    "doc://com.externally.resolved.symbol/s:ScM": {
+      "identifier": "doc://com.externally.resolved.symbol/s:ScM",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A singleton actor whose executor is equivalent to the main dispatch queue."
+        }
+      ],
+      "url": "/documentation/Swift/MainActor",
+      "fragments": [
+        {
+          "kind": "attribute",
+          "text": "@globalActor"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "keyword",
+          "text": "final"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "keyword",
+          "text": "actor"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "MainActor"
+        }
+      ],
+      "role": "symbol",
+      "title": "MainActor",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/userInterfaceDirectionPolicy": {
+      "kind": "symbol",
+      "role": "symbol",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "var"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "text": "userInterfaceDirectionPolicy",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "preciseIdentifier": "c:@E@WKUserInterfaceDirectionPolicy",
+          "text": "WKUserInterfaceDirectionPolicy",
+          "kind": "typeIdentifier"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "text": "userInterfaceDirectionPolicy",
+          "kind": "identifier"
+        }
+      ],
+      "type": "topic",
+      "title": "userInterfaceDirectionPolicy",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/userInterfaceDirectionPolicy",
+      "url": "/documentation/webkit/wkwebviewconfiguration/userinterfacedirectionpolicy",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The directionality of user interface elements."
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/applicationNameForUserAgent": {
+      "navigatorTitle": [
+        {
+          "text": "applicationNameForUserAgent",
+          "kind": "identifier"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/applicationNameForUserAgent",
+      "title": "applicationNameForUserAgent",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "var"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "applicationNameForUserAgent"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "preciseIdentifier": "s:SS",
+          "text": "String",
+          "kind": "typeIdentifier"
+        },
+        {
+          "text": "?",
+          "kind": "text"
+        }
+      ],
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The app name that appears in the user agent string."
+        }
+      ],
+      "url": "/documentation/webkit/wkwebviewconfiguration/applicationnameforuseragent",
+      "kind": "symbol",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/limitsNavigationsToAppBoundDomains": {
+      "kind": "symbol",
+      "role": "symbol",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "var"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "limitsNavigationsToAppBoundDomains",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "text": "Bool",
+          "preciseIdentifier": "s:Sb",
+          "kind": "typeIdentifier"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "text": "limitsNavigationsToAppBoundDomains",
+          "kind": "identifier"
+        }
+      ],
+      "type": "topic",
+      "title": "limitsNavigationsToAppBoundDomains",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/limitsNavigationsToAppBoundDomains",
+      "url": "/documentation/webkit/wkwebviewconfiguration/limitsnavigationstoappbounddomains",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A Boolean value that indicates whether the web view limits navigation to pages within the app’s domain."
+        }
+      ]
+    },
+    "doc://com.externally.resolved.symbol/c:objc(pl)NSObject": {
+      "identifier": "doc://com.externally.resolved.symbol/c:objc(pl)NSObject",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "The group of methods that are fundamental to all Objective-C objects.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/ObjectiveC/NSObjectProtocol",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "NSObjectProtocol",
+          "kind": "identifier"
+        }
+      ],
+      "role": "symbol",
+      "title": "NSObjectProtocol",
+      "type": "topic"
+    },
+    "doc://com.externally.resolved.symbol/c:objc(pl)NSSecureCoding": {
+      "title": "NSSecureCoding",
+      "identifier": "doc://com.externally.resolved.symbol/c:objc(pl)NSSecureCoding",
+      "type": "topic",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "NSSecureCoding"
+        },
+        {
+          "kind": "text",
+          "text": " : "
+        },
+        {
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(pl)NSCoding",
+          "text": "NSCoding"
+        }
+      ],
+      "role": "symbol",
+      "url": "/documentation/Foundation/NSSecureCoding",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A protocol that enables encoding and decoding in a manner that is robust against object substitution attacks.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/defaultWebpagePreferences": {
+      "title": "defaultWebpagePreferences",
+      "navigatorTitle": [
+        {
+          "text": "defaultWebpagePreferences",
+          "kind": "identifier"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "The default preferences to use when loading and rendering content.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/webkit/wkwebviewconfiguration/defaultwebpagepreferences",
+      "type": "topic",
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "kind": "identifier",
+          "text": "defaultWebpagePreferences"
+        },
+        {
+          "kind": "text",
+          "text": ": "
+        },
+        {
+          "preciseIdentifier": "c:objc(cs)WKWebpagePreferences",
+          "kind": "typeIdentifier",
+          "text": "WKWebpagePreferences"
+        },
+        {
+          "text": "!",
+          "kind": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/defaultWebpagePreferences",
+      "kind": "symbol",
+      "role": "symbol"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/selectionGranularity": {
+      "navigatorTitle": [
+        {
+          "text": "selectionGranularity",
+          "kind": "identifier"
+        }
+      ],
+      "deprecated": true,
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/selectionGranularity",
+      "title": "selectionGranularity",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "var"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "text": "selectionGranularity",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "preciseIdentifier": "c:@E@WKSelectionGranularity",
+          "text": "WKSelectionGranularity",
+          "kind": "typeIdentifier"
+        }
+      ],
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The level of granularity with which the user can interactively select web view content."
+        }
+      ],
+      "url": "/documentation/webkit/wkwebviewconfiguration/selectiongranularity",
+      "kind": "symbol",
+      "type": "topic"
+    },
+    "doc://com.externally.resolved.symbol/c:objc(pl)NSCopying": {
+      "title": "NSCopying",
+      "identifier": "doc://com.externally.resolved.symbol/c:objc(pl)NSCopying",
+      "type": "topic",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "kind": "identifier",
+          "text": "NSCopying"
+        }
+      ],
+      "role": "symbol",
+      "url": "/documentation/Foundation/NSCopying",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A protocol that objects adopt to provide functional copies of themselves.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.externally.resolved.symbol/s:s8SendableP": {
+      "identifier": "doc://com.externally.resolved.symbol/s:s8SendableP",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A thread-safe type whose values can be shared across arbitrary concurrent contexts without introducing a risk of data races.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/Swift/Sendable",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "Sendable"
+        },
+        {
+          "kind": "text",
+          "text": " : "
+        },
+        {
+          "kind": "typeIdentifier",
+          "text": "SendableMetatype",
+          "preciseIdentifier": "s:s16SendableMetatypeP"
+        }
+      ],
+      "role": "symbol",
+      "title": "Sendable",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/preferences": {
+      "title": "preferences",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "preferences"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "The object that manages the preference-related settings for the web view.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/webkit/wkwebviewconfiguration/preferences",
+      "type": "topic",
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "preferences",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "preciseIdentifier": "c:objc(cs)WKPreferences",
+          "text": "WKPreferences",
+          "kind": "typeIdentifier"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/preferences",
+      "kind": "symbol",
+      "role": "symbol"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebpagePreferences": {
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "WKWebpagePreferences"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebpagePreferences",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object that specifies the behaviors to use when loading and rendering page content."
+        }
+      ],
+      "url": "/documentation/webkit/wkwebpagepreferences",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "WKWebpagePreferences"
+        }
+      ],
+      "role": "symbol",
+      "title": "WKWebpagePreferences",
+      "type": "topic"
+    },
+    "doc://com.externally.resolved.symbol/s:s7CVarArgP": {
+      "title": "CVarArg",
+      "identifier": "doc://com.externally.resolved.symbol/s:s7CVarArgP",
+      "type": "topic",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "CVarArg"
+        }
+      ],
+      "role": "symbol",
+      "url": "/documentation/Swift/CVarArg",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A type whose instances can be encoded, and appropriately passed, as elements of a C `va_list`.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.externally.resolved.symbol/s:s23CustomStringConvertibleP": {
+      "url": "/documentation/Swift/CustomStringConvertible",
+      "kind": "symbol",
+      "identifier": "doc://com.externally.resolved.symbol/s:s23CustomStringConvertibleP",
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A type with a customized textual representation."
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "protocol"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "CustomStringConvertible"
+        }
+      ],
+      "type": "topic",
+      "title": "CustomStringConvertible"
+    },
+    "doc://com.externally.resolved.symbol/s:s28CustomDebugStringConvertibleP": {
+      "title": "CustomDebugStringConvertible",
+      "identifier": "doc://com.externally.resolved.symbol/s:s28CustomDebugStringConvertibleP",
+      "type": "topic",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "CustomDebugStringConvertible"
+        }
+      ],
+      "role": "symbol",
+      "url": "/documentation/Swift/CustomDebugStringConvertible",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A type with a customized textual representation suitable for debugging purposes.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.externally.resolved.symbol/s:SH": {
+      "identifier": "doc://com.externally.resolved.symbol/s:SH",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A type that can be hashed into a `Hasher` to produce an integer hash value.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/Swift/Hashable",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "kind": "identifier",
+          "text": "Hashable"
+        },
+        {
+          "kind": "text",
+          "text": " : "
+        },
+        {
+          "kind": "typeIdentifier",
+          "text": "Equatable",
+          "preciseIdentifier": "s:SQ"
+        }
+      ],
+      "role": "symbol",
+      "title": "Hashable",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/mediaPlaybackAllowsAirPlay": {
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "mediaPlaybackAllowsAirPlay",
+          "kind": "identifier"
+        },
+        {
+          "kind": "text",
+          "text": ": "
+        },
+        {
+          "preciseIdentifier": "s:Sb",
+          "kind": "typeIdentifier",
+          "text": "Bool"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "mediaPlaybackAllowsAirPlay"
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol",
+      "role": "symbol",
+      "deprecated": true,
+      "title": "mediaPlaybackAllowsAirPlay",
+      "url": "/documentation/webkit/wkwebviewconfiguration/mediaplaybackallowsairplay",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/mediaPlaybackAllowsAirPlay",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Deprecated property."
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/mediaTypesRequiringUserActionForPlayback": {
+      "url": "/documentation/webkit/wkwebviewconfiguration/mediatypesrequiringuseractionforplayback",
+      "kind": "symbol",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/mediaTypesRequiringUserActionForPlayback",
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "mediaTypesRequiringUserActionForPlayback"
+        }
+      ],
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The media types that require a user gesture to begin playing."
+        }
+      ],
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "kind": "identifier",
+          "text": "mediaTypesRequiringUserActionForPlayback"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "kind": "typeIdentifier",
+          "text": "WKAudiovisualMediaTypes",
+          "preciseIdentifier": "c:@E@WKAudiovisualMediaTypes"
+        }
+      ],
+      "type": "topic",
+      "title": "mediaTypesRequiringUserActionForPlayback"
+    }
+  },
+  "variantOverrides": [
+    {
+      "traits": [
+        {
+          "interfaceLanguage": "occ"
+        }
+      ],
+      "patch": [
+        {
+          "value": "occ",
+          "path": "/identifier/interfaceLanguage",
+          "op": "replace"
+        },
+        {
+          "op": "replace",
+          "path": "/metadata/platforms",
+          "value": [
+            {
+              "deprecated": false,
+              "beta": false,
+              "unavailable": false,
+              "name": "iOS",
+              "introducedAt": "8.0"
+            },
+            {
+              "deprecated": false,
+              "unavailable": false,
+              "introducedAt": "8.0",
+              "beta": false,
+              "name": "iPadOS"
+            },
+            {
+              "deprecated": false,
+              "unavailable": false,
+              "introducedAt": "13.1",
+              "beta": false,
+              "name": "Mac Catalyst"
+            },
+            {
+              "deprecated": false,
+              "name": "macOS",
+              "beta": false,
+              "introducedAt": "10.10",
+              "unavailable": false
+            },
+            {
+              "deprecated": false,
+              "name": "visionOS",
+              "beta": false,
+              "introducedAt": "1.0",
+              "unavailable": false
+            }
+          ]
+        },
+        {
+          "op": "replace",
+          "path": "/metadata/roleHeading",
+          "value": "Class"
+        },
+        {
+          "op": "replace",
+          "path": "/metadata/title",
+          "value": "WKWebViewConfiguration"
+        },
+        {
+          "op": "replace",
+          "path": "/metadata/symbolKind",
+          "value": "class"
+        },
+        {
+          "op": "replace",
+          "path": "/metadata/fragments",
+          "value": [
+            {
+              "text": "WKWebViewConfiguration",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "op": "replace",
+          "path": "/metadata/navigatorTitle",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebViewConfiguration"
+            }
+          ]
+        },
+        {
+          "op": "replace",
+          "path": "/hierarchy",
+          "value": {
+            "paths": [
+              [
+                "doc://com.apple.documentation/documentation/technologies",
+                "doc://com.apple.webkit/documentation/WebKit"
+              ]
+            ]
+          }
+        },
+        {
+          "op": "replace",
+          "path": "/topicSections",
+          "value": [
+            {
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/websiteDataStore",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/userContentController",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/processPool",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/applicationNameForUserAgent",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/limitsNavigationsToAppBoundDomains",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/upgradeKnownHostsToHTTPS"
+              ],
+              "anchor": "Configuring-the-web-views-behavior",
+              "title": "Configuring the web view’s behavior"
+            },
+            {
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/preferences",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/defaultWebpagePreferences"
+              ],
+              "anchor": "Configuring-the-web-views-preferences",
+              "title": "Configuring the web view’s preferences"
+            },
+            {
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/setURLSchemeHandler(_:forURLScheme:)",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/urlSchemeHandler(forURLScheme:)"
+              ],
+              "anchor": "Adding-handlers-for-custom-URL-schemes",
+              "title": "Adding handlers for custom URL schemes"
+            },
+            {
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/ignoresViewportScaleLimits",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/suppressesIncrementalRendering"
+              ],
+              "anchor": "Configuring-the-rendering-behavior",
+              "title": "Configuring the rendering behavior"
+            },
+            {
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/allowsInlineMediaPlayback",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/allowsAirPlayForMediaPlayback",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/allowsPictureInPictureMediaPlayback",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/mediaTypesRequiringUserActionForPlayback",
+                "doc://com.apple.webkit/documentation/WebKit/WKAudiovisualMediaTypes"
+              ],
+              "anchor": "Setting-media-playback-preferences",
+              "title": "Setting media playback preferences"
+            },
+            {
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/dataDetectorTypes",
+                "doc://com.apple.webkit/documentation/WebKit/WKDataDetectorTypes"
+              ],
+              "anchor": "Identifying-data-types",
+              "title": "Identifying data types"
+            },
+            {
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/selectionGranularity",
+                "doc://com.apple.webkit/documentation/WebKit/WKSelectionGranularity"
+              ],
+              "anchor": "Setting-selection-granularity",
+              "title": "Setting selection granularity"
+            },
+            {
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/userInterfaceDirectionPolicy",
+                "doc://com.apple.webkit/documentation/WebKit/WKUserInterfaceDirectionPolicy"
+              ],
+              "anchor": "Selecting-user-interface-directionality",
+              "title": "Selecting user interface directionality"
+            },
+            {
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/mediaPlaybackAllowsAirPlay",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/requiresUserActionForMediaPlayback",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/mediaPlaybackRequiresUserAction"
+              ],
+              "anchor": "Deprecated",
+              "title": "Deprecated"
+            },
+            {
+              "generated": true,
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/allowsInlinePredictions",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/showsSystemScreenTimeBlockingView",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/supportsAdaptiveImageGlyph",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/webExtensionController",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/writingToolsBehavior"
+              ],
+              "anchor": "Instance-Properties",
+              "title": "Instance Properties"
+            }
+          ]
+        },
+        {
+          "op": "replace",
+          "path": "/relationshipsSections",
+          "value": [
+            {
+              "type": "inheritsFrom",
+              "kind": "relationships",
+              "identifiers": [
+                "doc://com.externally.resolved.symbol/c:objc(cs)NSObject"
+              ],
+              "title": "Inherits From"
+            },
+            {
+              "type": "conformsTo",
+              "kind": "relationships",
+              "identifiers": [
+                "doc://com.externally.resolved.symbol/c:objc(pl)NSCopying",
+                "doc://com.externally.resolved.symbol/c:objc(pl)NSSecureCoding"
+              ],
+              "title": "Conforms To"
+            }
+          ]
+        },
+        {
+          "op": "replace",
+          "path": "/seeAlsoSections",
+          "value": [
+            {
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/WKWindowFeatures",
+                "doc://com.apple.webkit/documentation/WebKit/WKProcessPool",
+                "doc://com.apple.webkit/documentation/WebKit/WKPreferences",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebpagePreferences"
+              ],
+              "title": "Web view configuration",
+              "anchor": "Web-view-configuration",
+              "generated": true
+            }
+          ]
+        },
+        {
+          "op": "replace",
+          "path": "/primaryContentSections/0",
+          "value": {
+            "kind": "declarations",
+            "declarations": [
+              {
+                "tokens": [
+                  {
+                    "kind": "keyword",
+                    "text": "@interface"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " "
+                  },
+                  {
+                    "kind": "identifier",
+                    "text": "WKWebViewConfiguration"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " : "
+                  },
+                  {
+                    "kind": "typeIdentifier",
+                    "preciseIdentifier": "c:objc(cs)NSObject",
+                    "identifier": "doc://com.externally.resolved.symbol/c:objc(cs)NSObject",
+                    "text": "NSObject"
+                  }
+                ],
+                "platforms": [
+                  "iOS",
+                  "iPadOS",
+                  "Mac Catalyst",
+                  "macOS",
+                  "visionOS"
+                ],
+                "languages": [
+                  "occ"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1mediaPlaybackRequiresUserAction/title",
+          "value": "mediaPlaybackRequiresUserAction"
+        },
+        {
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1mediaPlaybackRequiresUserAction/fragments",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "mediaPlaybackRequiresUserAction"
+            }
+          ]
+        },
+        {
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebView/title",
+          "value": "WKWebView"
+        },
+        {
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebView/fragments",
+          "value": [
+            {
+              "text": "WKWebView",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebView/navigatorTitle",
+          "value": [
+            {
+              "text": "WKWebView",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1webExtensionController/title",
+          "value": "webExtensionController"
+        },
+        {
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1webExtensionController/fragments",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "webExtensionController"
+            }
+          ]
+        },
+        {
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1processPool/title",
+          "value": "processPool"
+        },
+        {
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1processPool/fragments",
+          "value": [
+            {
+              "text": "processPool",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1websiteDataStore/title",
+          "value": "websiteDataStore"
+        },
+        {
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1websiteDataStore/fragments",
+          "value": [
+            {
+              "text": "websiteDataStore",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1allowsPictureInPictureMediaPlayback/title",
+          "value": "allowsPictureInPictureMediaPlayback"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "allowsPictureInPictureMediaPlayback",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1allowsPictureInPictureMediaPlayback/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "writingToolsBehavior",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1writingToolsBehavior/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "writingToolsBehavior"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1writingToolsBehavior/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "allowsInlinePredictions",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1allowsInlinePredictions/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "allowsInlinePredictions",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1allowsInlinePredictions/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "dataDetectorTypes",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1dataDetectorTypes/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "dataDetectorTypes",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1dataDetectorTypes/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "WKAudiovisualMediaTypes",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKAudiovisualMediaTypes/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKAudiovisualMediaTypes"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKAudiovisualMediaTypes/fragments"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "WKAudiovisualMediaTypes",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKAudiovisualMediaTypes/navigatorTitle"
+        },
+        {
+          "op": "replace",
+          "value": "supportsAdaptiveImageGlyph",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1supportsAdaptiveImageGlyph/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "supportsAdaptiveImageGlyph"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1supportsAdaptiveImageGlyph/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "ignoresViewportScaleLimits",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1ignoresViewportScaleLimits/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "ignoresViewportScaleLimits"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1ignoresViewportScaleLimits/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "urlSchemeHandlerForURLScheme:",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1urlSchemeHandler(forURLScheme:)/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "- ",
+              "kind": "text"
+            },
+            {
+              "text": "urlSchemeHandlerForURLScheme:",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1urlSchemeHandler(forURLScheme:)/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "WKSelectionGranularity",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKSelectionGranularity/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "WKSelectionGranularity",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKSelectionGranularity/fragments"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKSelectionGranularity"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKSelectionGranularity/navigatorTitle"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "@protocol",
+              "kind": "keyword"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "NSCoding",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.externally.resolved.symbol~1c:objc(pl)NSCoding/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "WKWindowFeatures",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWindowFeatures/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWindowFeatures"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWindowFeatures/fragments"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "WKWindowFeatures",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWindowFeatures/navigatorTitle"
+        },
+        {
+          "op": "replace",
+          "value": "suppressesIncrementalRendering",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1suppressesIncrementalRendering/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "suppressesIncrementalRendering",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1suppressesIncrementalRendering/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "WKProcessPool",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKProcessPool/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKProcessPool"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKProcessPool/fragments"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKProcessPool"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKProcessPool/navigatorTitle"
+        },
+        {
+          "op": "replace",
+          "value": "WKUserInterfaceDirectionPolicy",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKUserInterfaceDirectionPolicy/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKUserInterfaceDirectionPolicy"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKUserInterfaceDirectionPolicy/fragments"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKUserInterfaceDirectionPolicy"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKUserInterfaceDirectionPolicy/navigatorTitle"
+        },
+        {
+          "op": "replace",
+          "value": "upgradeKnownHostsToHTTPS",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1upgradeKnownHostsToHTTPS/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "upgradeKnownHostsToHTTPS",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1upgradeKnownHostsToHTTPS/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "requiresUserActionForMediaPlayback",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1requiresUserActionForMediaPlayback/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "requiresUserActionForMediaPlayback"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1requiresUserActionForMediaPlayback/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "allowsAirPlayForMediaPlayback",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1allowsAirPlayForMediaPlayback/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "allowsAirPlayForMediaPlayback",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1allowsAirPlayForMediaPlayback/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "WKWebViewConfiguration",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "WKWebViewConfiguration",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration/fragments"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebViewConfiguration"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration/navigatorTitle"
+        },
+        {
+          "op": "replace",
+          "value": "WKPreferences",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKPreferences/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "WKPreferences",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKPreferences/fragments"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "WKPreferences",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKPreferences/navigatorTitle"
+        },
+        {
+          "op": "replace",
+          "value": "showsSystemScreenTimeBlockingView",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1showsSystemScreenTimeBlockingView/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "showsSystemScreenTimeBlockingView",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1showsSystemScreenTimeBlockingView/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "userContentController",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1userContentController/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "userContentController",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1userContentController/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "setURLSchemeHandler:forURLScheme:",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1setURLSchemeHandler(_:forURLScheme:)/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "- ",
+              "kind": "text"
+            },
+            {
+              "text": "setURLSchemeHandler:forURLScheme:",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1setURLSchemeHandler(_:forURLScheme:)/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "WKDataDetectorTypes",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKDataDetectorTypes/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKDataDetectorTypes"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKDataDetectorTypes/fragments"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKDataDetectorTypes"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKDataDetectorTypes/navigatorTitle"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "kind": "keyword",
+              "text": "@interface"
+            },
+            {
+              "kind": "text",
+              "text": " "
+            },
+            {
+              "kind": "identifier",
+              "text": "NSObject"
+            }
+          ],
+          "path": "/references/doc:~1~1com.externally.resolved.symbol~1c:objc(cs)NSObject/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "allowsInlineMediaPlayback",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1allowsInlineMediaPlayback/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "allowsInlineMediaPlayback",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1allowsInlineMediaPlayback/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "userInterfaceDirectionPolicy",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1userInterfaceDirectionPolicy/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "userInterfaceDirectionPolicy",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1userInterfaceDirectionPolicy/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "applicationNameForUserAgent",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1applicationNameForUserAgent/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "applicationNameForUserAgent"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1applicationNameForUserAgent/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "limitsNavigationsToAppBoundDomains",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1limitsNavigationsToAppBoundDomains/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "limitsNavigationsToAppBoundDomains"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1limitsNavigationsToAppBoundDomains/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "NSObject",
+          "path": "/references/doc:~1~1com.externally.resolved.symbol~1c:objc(pl)NSObject/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "@protocol",
+              "kind": "keyword"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "NSObject",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.externally.resolved.symbol~1c:objc(pl)NSObject/fragments"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "@protocol",
+              "kind": "keyword"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "NSSecureCoding",
+              "kind": "identifier"
+            },
+            {
+              "text": " <",
+              "kind": "text"
+            },
+            {
+              "preciseIdentifier": "c:objc(pl)NSCoding",
+              "text": "NSCoding",
+              "kind": "typeIdentifier"
+            },
+            {
+              "text": ">",
+              "kind": "text"
+            }
+          ],
+          "path": "/references/doc:~1~1com.externally.resolved.symbol~1c:objc(pl)NSSecureCoding/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "defaultWebpagePreferences",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1defaultWebpagePreferences/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "defaultWebpagePreferences"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1defaultWebpagePreferences/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "selectionGranularity",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1selectionGranularity/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "selectionGranularity",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1selectionGranularity/fragments"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "kind": "keyword",
+              "text": "@protocol"
+            },
+            {
+              "kind": "text",
+              "text": " "
+            },
+            {
+              "kind": "identifier",
+              "text": "NSCopying"
+            }
+          ],
+          "path": "/references/doc:~1~1com.externally.resolved.symbol~1c:objc(pl)NSCopying/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "preferences",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1preferences/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "preferences"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1preferences/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "WKWebpagePreferences",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebpagePreferences/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "WKWebpagePreferences",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebpagePreferences/fragments"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "WKWebpagePreferences",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebpagePreferences/navigatorTitle"
+        },
+        {
+          "op": "replace",
+          "value": "mediaPlaybackAllowsAirPlay",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1mediaPlaybackAllowsAirPlay/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "mediaPlaybackAllowsAirPlay",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1mediaPlaybackAllowsAirPlay/fragments"
+        },
+        {
+          "op": "replace",
+          "value": "mediaTypesRequiringUserActionForPlayback",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1mediaTypesRequiringUserActionForPlayback/title"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "mediaTypesRequiringUserActionForPlayback",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1mediaTypesRequiringUserActionForPlayback/fragments"
+        }
+      ]
+    }
+  ],
+  "legalNotices": {
+    "copyright": "Copyright &copy; 2025 Apple Inc. All rights reserved.",
+    "termsOfUse": "https://www.apple.com/legal/internet-services/terms/site.html",
+    "privacyPolicy": "https://www.apple.com/privacy/privacy-policy"
+  }
+}

@@ -200,8 +200,6 @@ class KeyboardShortcutManager: ObservableObject {
             case .duplicateTab:
                 print("🔧 [KeyboardShortcutManager] Executing duplicateTab")
                 browserManager.duplicateCurrentTab()
-            case .toggleTopBarAddressView:
-                browserManager.toggleTopBarAddressView()
 
             // Space Management
             case .nextSpace:

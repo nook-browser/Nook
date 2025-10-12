@@ -61,12 +61,14 @@ class BrowserConfiguration {
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
 
         // Note: webExtensionController will be set by ExtensionManager during initialization
+        // or when specific configurations are needed for extension pages
 
         return config
     }()
 
     // MARK: - Cache-Optimized Configuration
     // Returns a fresh configuration each call to avoid cross-tab state sharing
+    @MainActor
     func cacheOptimizedWebViewConfiguration() -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
 
@@ -105,14 +107,23 @@ class BrowserConfiguration {
         // Cache/perf optimizations mirroring profile-scoped variant
         config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
         config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
-        
+
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
+
+        // CRITICAL: Set webExtensionController for webkit-extension:// URL support
+        // This fixes local extension page loading issues
+        if #available(macOS 15.4, *) {
+            if config.webExtensionController == nil {
+                config.webExtensionController = ExtensionManager.shared.nativeController
+            }
+        }
 
         return config
     }
 
     // MARK: - Profile-Aware Configurations
     // Create a fresh configuration using a profile-specific data store
+    @MainActor
     func webViewConfiguration(for profile: Profile) -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
 
@@ -150,16 +161,34 @@ class BrowserConfiguration {
         
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
 
+        // CRITICAL: Set webExtensionController for webkit-extension:// URL support
+        // This fixes local extension page loading issues
+        if #available(macOS 15.4, *) {
+            if config.webExtensionController == nil {
+                config.webExtensionController = ExtensionManager.shared.nativeController
+            }
+        }
+
         return config
     }
 
     // Returns a profile-scoped configuration with cache/perf optimizations applied
+    @MainActor
     func cacheOptimizedWebViewConfiguration(for profile: Profile) -> WKWebViewConfiguration {
         let config = webViewConfiguration(for: profile)
         // Enable aggressive caching and media capabilities (mirror default optimized config)
         config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
         config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
         config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
+
+        // CRITICAL: Ensure webExtensionController is set for webkit-extension:// URL support
+        // This fixes local extension page loading issues
+        if #available(macOS 15.4, *) {
+            if config.webExtensionController == nil {
+                config.webExtensionController = ExtensionManager.shared.nativeController
+            }
+        }
+
         return config
     }
     
