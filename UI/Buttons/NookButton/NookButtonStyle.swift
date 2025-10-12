@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Garnish
 
 struct NookButtonStyle: ButtonStyle {
     @Environment(\.colorScheme) var colorScheme
@@ -31,50 +32,55 @@ struct NookButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         ZStack {
-            // Shadow outline (bottom layer)
-            if shadowStyle != .none {
-                configuration.label
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.clear)
-                    .padding(.vertical, shadowStyle == .prominent ? 11 : 12)
-                    .padding(.horizontal, 12)
-                    .background(shadowBackgroundColor)
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(shadowStrokeColor, lineWidth: 1)
-                    )
-                    .offset(shadowOffset)
-            }
-
             // Main button content
+            let contrastingShade = ((try? backgroundColor().contrastingShade()) ?? textColor)
             configuration.label
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(textColor)
+                .foregroundStyle(contrastingShade)
                 .padding(.vertical, 12)
                 .padding(.horizontal, 12)
-                .background(backgroundColor(isPressed: configuration.isPressed))
+                .background{
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(((backgroundColor().mix(with: contrastingShade, by: isHovering ? 0.2 : 0))
+                            .shadow(.inner(color: ((try? Garnish.contrastingShade(of: backgroundColor(), targetRatio: 2.5)) ?? textColor), radius: 1, y: -1))
+                            .shadow(.inner(color: .white.opacity(0.4), radius: 1, y: 1))
+                        )
+                        )
+                }
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(borderColor, lineWidth: borderWidth)
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke((((try? Garnish.contrastingShade(of: backgroundColor(), targetRatio: 4)) ?? textColor)), lineWidth: borderWidth)
                 )
                 .overlay(
                     // Top and left borders (highlight)
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(
+                    RoundedRectangle(cornerRadius: 14)
+                        .strokeBorder(
                             LinearGradient(
                                 colors: [
-                                    Color.white.opacity(0.3),
-                                    Color.white.opacity(0.1)
+                                    Color.white.opacity(1.0),
+                                    .clear,
+                                    Color.white.opacity(1.0)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
                             lineWidth: 1
                         )
+                        .opacity(0.1)
+                        .blendMode(.plusLighter)
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .offset(y: configuration.isPressed ? 2 : 0)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .offset(y: configuration.isPressed ? 2 : isHovering ? 0.5 : 0)
+                .background{
+                    if shadowStyle != .none {
+                        ZStack{
+                            RoundedRectangle(cornerRadius: 14)
+                                .foregroundStyle(((try? Garnish.contrastingShade(of: backgroundColor(), targetRatio: 3.5)) ?? textColor))
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .offset(y: 2)
+                    }
+                }
         }
         .opacity(isEnabled ? 1.0 : 0.3)
         .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
@@ -84,14 +90,14 @@ struct NookButtonStyle: ButtonStyle {
         }
     }
 
-    private func backgroundColor(isPressed: Bool) -> Color {
+    private func backgroundColor() -> Color {
         switch variant {
         case .primary:
-            return isHovering ? gradientColorManager.primaryColor.opacity(0.8) : gradientColorManager.primaryColor
+            return gradientColorManager.primaryColor
         case .secondary:
-            return isHovering ? Color.primary.opacity(0.08) : Color.primary.opacity(0.05)
+            return Color.white.mix(with: .black, by: 0.3)
         case .destructive:
-            return isHovering ? Color.red.opacity(0.8) : Color.red
+            return Color.red
         }
     }
 
@@ -106,21 +112,12 @@ struct NookButtonStyle: ButtonStyle {
         }
     }
 
-    private var borderColor: Color {
-        switch variant {
-        case .primary, .destructive:
-            return Color.clear
-        case .secondary:
-            return isHovering ? Color.primary.opacity(0.2) : Color.primary.opacity(0.1)
-        }
-    }
-
     private var borderWidth: CGFloat {
         switch variant {
         case .primary, .destructive:
-            return 0
+            return 0.5
         case .secondary:
-            return 1
+            return 0.5
         }
     }
 
@@ -212,5 +209,7 @@ extension ButtonStyle where Self == NookButtonStyle {
         .disabled(true)
     }
     .padding()
+    .scaleEffect(3)
+    .frame(width: 390, height: 1000)
     .environmentObject(GradientColorManager())
 }

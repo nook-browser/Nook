@@ -1,5 +1,5 @@
 {
-  "originHash" : "ccaf047e1899acecebb40aabe971bd25c6b6afd753c4059a74ac1f246662d56f",
+  "originHash" : "6ca0fe6903cc172619ff37083cc5bf507007a139ffe7e779fb02fe36e85a59d9",
   "pins" : [
     {
       "identity" : "faviconfinder",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "9279f4371f4877ca302ba3bf1015f3f58ae4a56c",
         "version" : "5.1.4"
+      }
+    },
+    {
+      "identity" : "garnish",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Aeastr/Garnish",
+      "state" : {
+        "revision" : "31017c25a79848d51eb44e7801818afcc92b3345",
+        "version" : "0.0.3"
       }
     },
     {

@@ -87,15 +87,7 @@ struct ProfileCreationDialog: DialogPresentable {
                     iconName: "plus",
                     variant: .primary,
                     keyboardShortcut: .return,
-                    animationType: .custom("checkmark"),
-                    shadowStyle: .subtle,
-                    customColors: NookButton.CustomColors(
-                        backgroundColor: Color.accentColor,
-                        textColor: Color.primary,
-                        borderColor: Color.white,
-                        shadowColor: Color.gray,
-                        shadowOffset: CGSize(width: 0, height: 5)
-                    ),
+                    shadowStyle: .prominent,
                     isEnabled: canCreate,
                     action: {
                         handleCreate()

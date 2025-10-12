@@ -227,17 +227,17 @@ struct DialogFooter: View {
     var body: some View {
         HStack {
             if let leftButton = leftButton {
-                NookButton(
-                    text: leftButton.text,
-                    iconName: leftButton.iconName,
-                    variant: leftButton.variant,
-                    action: leftButton.action,
-                    keyboardShortcut: leftButton.keyboardShortcut,
-                    animationType: leftButton.animationType,
-                    shadowStyle: leftButton.shadowStyle,
-                    customColors: leftButton.customColors
-                )
-                .disabled(!leftButton.isEnabled)
+                if let iconName = leftButton.iconName {
+                    Button(leftButton.text, systemImage: iconName, action: leftButton.action)
+                        .buttonStyle(NookButtonStyle(variant: leftButton.variant, shadowStyle: leftButton.shadowStyle))
+                        .disabled(!leftButton.isEnabled)
+                        .modifier(OptionalKeyboardShortcut(shortcut: leftButton.keyboardShortcut))
+                } else {
+                    Button(leftButton.text, action: leftButton.action)
+                        .buttonStyle(NookButtonStyle(variant: leftButton.variant, shadowStyle: leftButton.shadowStyle))
+                        .disabled(!leftButton.isEnabled)
+                        .modifier(OptionalKeyboardShortcut(shortcut: leftButton.keyboardShortcut))
+                }
             }
 
             Spacer()
@@ -245,17 +245,18 @@ struct DialogFooter: View {
             HStack(spacing: 8) {
                 ForEach(rightButtons.indices, id: \.self) { index in
                     let button = rightButtons[index]
-                    NookButton(
-                        text: button.text,
-                        iconName: button.iconName,
-                        variant: button.variant,
-                        action: button.action,
-                        keyboardShortcut: button.keyboardShortcut,
-                        animationType: button.animationType,
-                        shadowStyle: button.shadowStyle,
-                        customColors: button.customColors
-                    )
-                    .disabled(!button.isEnabled)
+
+                    if let iconName = button.iconName {
+                        Button(button.text, systemImage: iconName, action: button.action)
+                            .buttonStyle(NookButtonStyle(variant: button.variant, shadowStyle: button.shadowStyle))
+                            .disabled(!button.isEnabled)
+                            .modifier(OptionalKeyboardShortcut(shortcut: button.keyboardShortcut))
+                    } else {
+                        Button(button.text, action: button.action)
+                            .buttonStyle(NookButtonStyle(variant: button.variant, shadowStyle: button.shadowStyle))
+                            .disabled(!button.isEnabled)
+                            .modifier(OptionalKeyboardShortcut(shortcut: button.keyboardShortcut))
+                    }
                 }
             }
         }
@@ -265,22 +266,18 @@ struct DialogFooter: View {
 struct DialogButton {
     let text: String
     let iconName: String?
-    let variant: NookButton.Variant
+    let variant: NookButtonStyle.Variant
     let action: () -> Void
     let keyboardShortcut: KeyEquivalent?
-    let animationType: NookButton.AnimationType
-    let shadowStyle: NookButton.ShadowStyle
-    let customColors: NookButton.CustomColors?
+    let shadowStyle: NookButtonStyle.ShadowStyle
     let isEnabled: Bool
 
     init(
         text: String,
         iconName: String? = nil,
-        variant: NookButton.Variant = .primary,
+        variant: NookButtonStyle.Variant = .primary,
         keyboardShortcut: KeyEquivalent? = nil,
-        animationType: NookButton.AnimationType = .none,
-        shadowStyle: NookButton.ShadowStyle = .subtle,
-        customColors: NookButton.CustomColors? = nil,
+        shadowStyle: NookButtonStyle.ShadowStyle = .subtle,
         isEnabled: Bool = true,
         action: @escaping () -> Void
     ) {
@@ -289,10 +286,20 @@ struct DialogButton {
         self.variant = variant
         self.action = action
         self.keyboardShortcut = keyboardShortcut
-        self.animationType = animationType
         self.shadowStyle = shadowStyle
-        self.customColors = customColors
         self.isEnabled = isEnabled
+    }
+}
+
+struct OptionalKeyboardShortcut: ViewModifier {
+    let shortcut: KeyEquivalent?
+
+    func body(content: Content) -> some View {
+        if let shortcut = shortcut {
+            content.keyboardShortcut(shortcut, modifiers: [])
+        } else {
+            content
+        }
     }
 }
 
