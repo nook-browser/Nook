@@ -12,7 +12,7 @@ class ObservableTabWrapper: ObservableObject {
     @Published var tab: Tab?
     weak var browserManager: BrowserManager?
     weak var windowState: BrowserWindowState?
-
+    
     var canGoBack: Bool {
         if let tab = tab,
            let browserManager = browserManager,
@@ -22,7 +22,7 @@ class ObservableTabWrapper: ObservableObject {
         }
         return tab?.canGoBack ?? false
     }
-
+    
     var canGoForward: Bool {
         if let tab = tab,
            let browserManager = browserManager,
@@ -32,11 +32,11 @@ class ObservableTabWrapper: ObservableObject {
         }
         return tab?.canGoForward ?? false
     }
-
+    
     func updateTab(_ newTab: Tab?) {
         tab = newTab
     }
-
+    
     func setContext(browserManager: BrowserManager, windowState: BrowserWindowState) {
         self.browserManager = browserManager
         self.windowState = windowState
@@ -49,7 +49,7 @@ struct NavButtonsView: View {
     var effectiveSidebarWidth: CGFloat?
     @StateObject private var tabWrapper = ObservableTabWrapper()
     @State private var isMenuHovered = false
-
+    
     var body: some View {
         let sidebarOnLeft = browserManager.settingsManager.sidebarPosition == .left
         let sidebarWidthForLayout = effectiveSidebarWidth ?? windowState.sidebarWidth
@@ -58,25 +58,31 @@ struct NavButtonsView: View {
         
         let shouldCollapseNavigation = sidebarWidthForLayout < navigationCollapseThreshold
         let shouldCollapseRefresh = sidebarWidthForLayout < refreshCollapseThreshold
-
+        
         HStack(spacing: 2) {
             if sidebarOnLeft {
                 MacButtonsView()
                     .frame(width: 70)
             }
-
-            NavButton(iconName: sidebarOnLeft ? "sidebar.left" : "sidebar.right", disabled: false, action: {
+            
+            Button("Toggle Sidebar", systemImage: sidebarOnLeft ? "sidebar.left" : "sidebar.right") {
                 browserManager.toggleSidebar(for: windowState)
-            })
-
-            if browserManager.settingsManager.showAIAssistant {
-                NavButton(iconName: "sparkle", disabled: false, action: {
-                    browserManager.toggleAISidebar(for: windowState)
-                })
             }
-
+            .labelStyle(.iconOnly)
+            .buttonStyle(NavButtonStyle())
+            .foregroundStyle(Color.primary)
+            
+            if browserManager.settingsManager.showAIAssistant {
+                Button("Toggle AI Assistant", systemImage: "sparkle") {
+                    browserManager.toggleAISidebar(for: windowState)
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(NavButtonStyle())
+                .foregroundStyle(Color.primary)
+            }
+            
             Spacer()
-
+            
             HStack(alignment: .center, spacing: 8) {
                 if shouldCollapseNavigation {
                     collapsedMenu(
@@ -85,30 +91,31 @@ struct NavButtonsView: View {
                     )
                 } else {
                     HStack(alignment: .center, spacing: 8) {
-                        NavButton(
-                            iconName: "arrow.backward",
-                            disabled: !tabWrapper.canGoBack,
-                            action: goBack
-                        )
-                        .contextMenu {
-                            NavigationHistoryContextMenu(
-                                historyType: .back,
-                                windowState: windowState
-                            )
-                        }
-                        NavButton(
-                            iconName: "arrow.forward",
-                            disabled: !tabWrapper.canGoForward,
-                            action: goForward
-                        )
-                        .contextMenu {
-                            NavigationHistoryContextMenu(
-                                historyType: .forward,
-                                windowState: windowState
-                            )
-                        }
+                        Button("Go Back", systemImage: "arrow.backward", action: goBack)
+                            .labelStyle(.iconOnly)
+                            .buttonStyle(NavButtonStyle())
+                            .foregroundStyle(Color.primary)
+                            .disabled(!tabWrapper.canGoBack)
+                            .contextMenu {
+                                NavigationHistoryContextMenu(
+                                    historyType: .back,
+                                    windowState: windowState
+                                )
+                            }
+                        
+                        Button("Go Forward", systemImage: "arrow.forward", action: goForward)
+                            .labelStyle(.iconOnly)
+                            .buttonStyle(NavButtonStyle())
+                            .foregroundStyle(Color.primary)
+                            .disabled(!tabWrapper.canGoForward)
+                            .contextMenu {
+                                NavigationHistoryContextMenu(
+                                    historyType: .forward,
+                                    windowState: windowState
+                                )
+                            }
                     }
-
+                    
                     if shouldCollapseRefresh {
                         collapsedMenu(
                             includeNavigation: false,
@@ -116,11 +123,15 @@ struct NavButtonsView: View {
                         )
                     }
                 }
-
+                
                 if !shouldCollapseRefresh {
-                    RefreshButton(action: refreshCurrentTab)
+                    Button("Reload", systemImage: "arrow.clockwise", action: refreshCurrentTab)
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(NavButtonStyle())
+                        .foregroundStyle(Color.primary)
+                        .foregroundStyle(Color.primary)
                 }
-
+                
                 if !sidebarOnLeft {
                     MacButtonsView()
                         .frame(width: 70)
@@ -128,12 +139,13 @@ struct NavButtonsView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .contentShape(Rectangle())
-        .onTapGesture(count: 2) {
-            if let window = NSApp.keyWindow {
-                window.performZoom(nil)
+        .background(
+            DoubleClickView {
+                if let window = NSApp.keyWindow {
+                    window.performZoom(nil)
+                }
             }
-        }
+        )
         .onAppear {
             tabWrapper.setContext(browserManager: browserManager, windowState: windowState)
             updateCurrentTab()
@@ -145,11 +157,11 @@ struct NavButtonsView: View {
             updateCurrentTab()
         }
     }
-
+    
     private func updateCurrentTab() {
         tabWrapper.updateTab(browserManager.currentTab(for: windowState))
     }
-
+    
     private func goBack() {
         if let tab = tabWrapper.tab,
            let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
@@ -158,7 +170,7 @@ struct NavButtonsView: View {
             tabWrapper.tab?.goBack()
         }
     }
-
+    
     private func goForward() {
         if let tab = tabWrapper.tab,
            let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
@@ -167,11 +179,11 @@ struct NavButtonsView: View {
             tabWrapper.tab?.goForward()
         }
     }
-
+    
     private func refreshCurrentTab() {
         tabWrapper.tab?.refresh()
     }
-
+    
     @ViewBuilder
     private func collapsedMenu(includeNavigation: Bool, includeRefresh: Bool) -> some View {
         if includeNavigation || includeRefresh {
@@ -181,13 +193,13 @@ struct NavButtonsView: View {
                         Label("Go Back", systemImage: "arrow.backward")
                     }
                     .disabled(!tabWrapper.canGoBack)
-
+                    
                     Button(action: goForward) {
                         Label("Go Forward", systemImage: "arrow.forward")
                     }
                     .disabled(!tabWrapper.canGoForward)
                 }
-
+                
                 if includeRefresh {
                     if includeNavigation {
                         Divider()

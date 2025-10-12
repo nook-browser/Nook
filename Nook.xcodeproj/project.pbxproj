@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		2C16A0262E87430B0070894B /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 2C16A0252E87430B0070894B /* Sparkle */; };
+		564997D82E9B24CC00D89F78 /* Garnish in Frameworks */ = {isa = PBXBuildFile; productRef = 564997D72E9B24CC00D89F78 /* Garnish */; };
 		7FAFC5DA2E3ADDCD009D7DC4 /* FaviconFinder in Frameworks */ = {isa = PBXBuildFile; productRef = 7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */; };
 /* End PBXBuildFile section */
 
@@ -26,6 +27,13 @@
 			);
 			target = 7F8340FB2E37F39400674A5D /* Nook */;
 		};
+		564997D22E9B125200D89F78 /* Exceptions for "UI" folder in "Nook" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Buttons/NavButtons/NavMenuStyle.swift,
+			);
+			target = 7F8340FB2E37F39400674A5D /* Nook */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -37,6 +45,14 @@
 			path = Nook;
 			sourceTree = "<group>";
 		};
+		564997D02E9B125200D89F78 /* UI */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				564997D22E9B125200D89F78 /* Exceptions for "UI" folder in "Nook" target */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -44,6 +60,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				564997D82E9B24CC00D89F78 /* Garnish in Frameworks */,
 				7FAFC5DA2E3ADDCD009D7DC4 /* FaviconFinder in Frameworks */,
 				2C16A0262E87430B0070894B /* Sparkle in Frameworks */,
 			);
@@ -56,6 +73,7 @@
 			isa = PBXGroup;
 			children = (
 				7F8340FD2E37F39400674A5D /* Products */,
+				564997D02E9B125200D89F78 /* UI */,
 				2CAC4D282E82457B00870189 /* Nook */,
 			);
 			sourceTree = "<group>";
@@ -85,11 +103,13 @@
 			);
 			fileSystemSynchronizedGroups = (
 				2CAC4D282E82457B00870189 /* Nook */,
+				564997D02E9B125200D89F78 /* UI */,
 			);
 			name = Nook;
 			packageProductDependencies = (
 				7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */,
 				2C16A0252E87430B0070894B /* Sparkle */,
+				564997D72E9B24CC00D89F78 /* Garnish */,
 			);
 			productName = Pulse;
 			productReference = 7F8340FC2E37F39400674A5D /* Nook.app */;
@@ -122,6 +142,7 @@
 			packageReferences = (
 				7FAFC5D82E3ADDCD009D7DC4 /* XCRemoteSwiftPackageReference "FaviconFinder" */,
 				2C16A0242E87430B0070894B /* XCRemoteSwiftPackageReference "Sparkle" */,
+				564997D62E9B24CC00D89F78 /* XCRemoteSwiftPackageReference "Garnish" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7F8340FD2E37F39400674A5D /* Products */;
@@ -399,6 +420,14 @@
 				minimumVersion = 2.8.0;
 			};
 		};
+		564997D62E9B24CC00D89F78 /* XCRemoteSwiftPackageReference "Garnish" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Aeastr/Garnish";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.0.4;
+			};
+		};
 		7FAFC5D82E3ADDCD009D7DC4 /* XCRemoteSwiftPackageReference "FaviconFinder" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/will-lumley/FaviconFinder";
@@ -414,6 +443,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 2C16A0242E87430B0070894B /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
+		};
+		564997D72E9B24CC00D89F78 /* Garnish */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 564997D62E9B24CC00D89F78 /* XCRemoteSwiftPackageReference "Garnish" */;
+			productName = Garnish;
 		};
 		7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */ = {
 			isa = XCSwiftPackageProductDependency;
