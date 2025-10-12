@@ -33,7 +33,7 @@ struct NookButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         ZStack {
             // Main button content
-            let contrastingShade = ((try? Garnish.contrastingShade(of: backgroundColor(), direction: .preferLight)) ?? textColor)
+            let contrastingShade = ((try? Garnish.contrastingShade(of: backgroundColor(), targetRatio: 3, direction: .preferLight, blendStyle: .strong)) ?? textColor)
             let shadow = ((try? Garnish.contrastingShade(of: backgroundColor(), targetRatio: 3.5, direction: .forceDark)) ?? textColor)
             configuration.label
                 .font(.body.weight(.semibold))
@@ -204,7 +204,14 @@ private struct ButtonPreviewSection: View {
 
     private func makeColorManager() -> GradientColorManager {
         let manager = GradientColorManager()
-        let gradient = SpaceGradient(id: UUID(), name: "Preview", primaryColor: color, nodes: [])
+#if canImport(AppKit)
+        let hex = color.toHexString(includeAlpha: true) ?? "#FFFFFFFF"
+#else
+        let hex = "#FFFFFFFF"
+#endif
+        let n1 = GradientNode(colorHex: hex, location: 0.0)
+        let n2 = GradientNode(colorHex: hex, location: 1.0)
+        let gradient = SpaceGradient(angle: 45.0, nodes: [n1, n2], grain: 0.05, opacity: 1.0)
         manager.setImmediate(gradient)
         return manager
     }
