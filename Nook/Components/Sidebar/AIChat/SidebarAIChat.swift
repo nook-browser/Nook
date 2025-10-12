@@ -183,16 +183,16 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                                 Image(systemName: "key.fill")
                                     .font(.system(size: 32))
                                     .foregroundStyle(.white.opacity(0.3))
-
+                                
                                 Text("API Key Required")
                                     .font(.system(size: 14, weight: .semibold))
                                     .foregroundStyle(.white.opacity(0.8))
-
+                                
                                 Text("Add your API key to start chatting")
                                     .font(.system(size: 12))
                                     .foregroundStyle(.white.opacity(0.6))
                                     .multilineTextAlignment(.center)
-
+                                
                                 Button(action: {
                                     showApiKeyDialog()
                                 }) {
@@ -296,11 +296,14 @@ To enhance the web browsing experience by providing intelligent, context-aware s
         }
         .safeAreaInset(edge: .top, content: {
             HStack(spacing: 8) {
-                NavButton(iconName: "xmark", disabled: false, action: {
+                Button("Close", systemImage: "xmark") {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         windowState.isSidebarAIChatVisible = false
                     }
-                })
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(NavButtonStyle())
+                .foregroundStyle(Color.primary)
                 
                 if !messages.isEmpty{
                     Text("Ask Nook")
@@ -308,16 +311,22 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                         .foregroundStyle(.white.opacity(0.9))
                         .transition(.blur.animation(.smooth))
                 }
-
+                
                 Spacer()
-
-                NavButton(iconName: "gearshape", disabled: false, action: {
+                
+                Button("Settings", systemImage: "gearshape") {
                     showApiKeyDialog()
-                })
-
-                NavButton(iconName: "trash", disabled: false, action: {
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(NavButtonStyle())
+                .foregroundStyle(Color.primary)
+                
+                Button("Clear Messages", systemImage: "trash") {
                     showClearMessagesDialog()
-                })
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(NavButtonStyle())
+                .foregroundStyle(Color.primary)
                 .disabled(messages.isEmpty)
             }
             .padding(.horizontal, 8)
@@ -537,7 +546,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
             settingsManager.webSearchContextSize = newValue.rawValue
         }
     }
-
+    
     private func showApiKeyDialog() {
         browserManager.dialogManager.showDialog {
             AISettingsDialog(
@@ -556,7 +565,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
         }
         
     }
-
+    
     private func showClearMessagesDialog() {
         browserManager.dialogManager.showDialog {
             StandardDialog(
@@ -583,7 +592,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                             DialogButton(
                                 text: "Clear",
                                 iconName: "trash",
-                                variant: .destructive,
+                                variant: .primary,
                                 action: {
                                     withAnimation(.easeInOut(duration: 0.2)) {
                                         messages.removeAll()
@@ -597,7 +606,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
             )
         }
     }
-
+    
     private func fetchOllamaModels() async {
         await MainActor.run {
             isFetchingModels = true
@@ -1364,10 +1373,10 @@ struct AISettingsDialog: View {
     let isFetchingModels: Bool
     let onFetchModels: () -> Void
     let onClose: () -> Void
-
+    
     @State private var apiKeyInput: String = ""
     @State private var endpointInput: String = ""
-
+    
     var body: some View {
         @Bindable var bindableSettingsManager = settingsManager
         StandardDialog(
@@ -1420,9 +1429,9 @@ struct AISettingsDialog: View {
                             }
                         }
                     }
-
+                    
                     Divider()
-
+                    
                     // Provider-specific settings
                     switch settingsManager.aiProvider {
                     case .gemini:
@@ -1430,24 +1439,24 @@ struct AISettingsDialog: View {
                             Text("Gemini API Key")
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(.primary)
-
+                            
                             SecureField("Enter your API key", text: $apiKeyInput)
                                 .textFieldStyle(.roundedBorder)
-
+                            
                             Text("Get your API key from [Google AI Studio](https://aistudio.google.com/apikey)")
                                 .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
                         }
-
+                        
                     case .openRouter:
                         VStack(alignment: .leading, spacing: 12) {
                             Text("OpenRouter API Key")
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(.primary)
-
+                            
                             SecureField("Enter your API key", text: $apiKeyInput)
                                 .textFieldStyle(.roundedBorder)
-
+                            
                             Text("Get your API key from [OpenRouter](https://openrouter.ai/keys)")
                                 .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
@@ -1539,16 +1548,16 @@ struct AISettingsDialog: View {
                                 }
                             }
                         }
-
+                        
                     case .ollama:
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Ollama Endpoint")
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(.primary)
-
+                            
                             TextField("http://localhost:11434", text: $endpointInput)
                                 .textFieldStyle(.roundedBorder)
-
+                            
                             if ollamaModels.isEmpty && !isFetchingModels {
                                 Button(action: onFetchModels) {
                                     Label("Fetch Available Models", systemImage: "arrow.clockwise")
@@ -1567,7 +1576,7 @@ struct AISettingsDialog: View {
                                     .font(.system(size: 11))
                                     .foregroundStyle(.secondary)
                             }
-
+                            
                             Text("Make sure Ollama is running locally")
                                 .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
@@ -1609,7 +1618,7 @@ struct AISettingsDialog: View {
             }
         }
     }
-
+    
     private func saveSettings() {
         switch settingsManager.aiProvider {
         case .gemini:

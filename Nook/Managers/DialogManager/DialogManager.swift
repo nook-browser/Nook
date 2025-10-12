@@ -68,7 +68,7 @@ class DialogManager {
                             DialogButton(
                                 text: "Quit",
                                 iconName: "arrowshape.turn.up.left.fill",
-                                variant: .destructive,
+                                variant: .primary,
                                 action: onQuit
                             )
                         ]
@@ -119,14 +119,14 @@ struct DialogCard<Content: View>: View {
 
     var body: some View {
         content
-            .padding(24)
+            .padding(16)
             .frame(maxWidth: 500, alignment: .leading)
             .background(Color(.windowBackgroundColor))
             .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
                     .stroke(Color.white.opacity(0.2))
             }
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
             .alwaysArrowCursor()
     }
 }
@@ -153,30 +153,29 @@ struct StandardDialog<Header: View, Content: View, Footer: View>: View {
 
     var body: some View {
         DialogCard {
-            VStack(alignment: .leading, spacing: sectionSpacingForActiveSections) {
+            VStack(alignment: .leading, spacing: 25) {
                 if let header {
+                    
                     header
                 }
-
+                
                 content
-
+                
                 if let footer {
-                    footer
+                    VStack(alignment: .leading, spacing: 15) {
+//                        Divider()
+                        footer
+                    }
                 }
+                
             }
         }
     }
 
-    private var sectionSpacingForActiveSections: CGFloat {
-        var count = 0
-        if header != nil { count += 1 }
-        count += 1 // content
-        if footer != nil { count += 1 }
-        return count > 1 ? sectionSpacing : 0
-    }
 }
 
 struct DialogHeader: View {
+    @EnvironmentObject var gradientColorManager: GradientColorManager
     let icon: String
     let title: String
     let subtitle: String?
@@ -190,12 +189,12 @@ struct DialogHeader: View {
         HStack(spacing: 16) {
             ZStack {
                 Circle()
-                    .fill(Color.accentColor.opacity(0.1))
+                    .fill(gradientColorManager.primaryColor.opacity(0.1))
                     .frame(width: 48, height: 48)
 
                 Image(systemName: icon)
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(gradientColorManager.primaryColor)
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -227,17 +226,17 @@ struct DialogFooter: View {
     var body: some View {
         HStack {
             if let leftButton = leftButton {
-                NookButton(
-                    text: leftButton.text,
-                    iconName: leftButton.iconName,
-                    variant: leftButton.variant,
-                    action: leftButton.action,
-                    keyboardShortcut: leftButton.keyboardShortcut,
-                    animationType: leftButton.animationType,
-                    shadowStyle: leftButton.shadowStyle,
-                    customColors: leftButton.customColors
-                )
-                .disabled(!leftButton.isEnabled)
+                if let iconName = leftButton.iconName {
+                    Button(leftButton.text, systemImage: iconName, action: leftButton.action)
+                        .buttonStyle(NookButtonStyle(variant: leftButton.variant, shadowStyle: leftButton.shadowStyle, role: nil))
+                        .disabled(!leftButton.isEnabled)
+                        .modifier(OptionalKeyboardShortcut(shortcut: leftButton.keyboardShortcut))
+                } else {
+                    Button(leftButton.text, action: leftButton.action)
+                        .buttonStyle(NookButtonStyle(variant: leftButton.variant, shadowStyle: leftButton.shadowStyle, role: nil))
+                        .disabled(!leftButton.isEnabled)
+                        .modifier(OptionalKeyboardShortcut(shortcut: leftButton.keyboardShortcut))
+                }
             }
 
             Spacer()
@@ -245,17 +244,18 @@ struct DialogFooter: View {
             HStack(spacing: 8) {
                 ForEach(rightButtons.indices, id: \.self) { index in
                     let button = rightButtons[index]
-                    NookButton(
-                        text: button.text,
-                        iconName: button.iconName,
-                        variant: button.variant,
-                        action: button.action,
-                        keyboardShortcut: button.keyboardShortcut,
-                        animationType: button.animationType,
-                        shadowStyle: button.shadowStyle,
-                        customColors: button.customColors
-                    )
-                    .disabled(!button.isEnabled)
+
+                    if let iconName = button.iconName {
+                        Button(button.text, systemImage: iconName, action: button.action)
+                            .buttonStyle(NookButtonStyle(variant: button.variant, shadowStyle: button.shadowStyle, role: nil))
+                            .disabled(!button.isEnabled)
+                            .modifier(OptionalKeyboardShortcut(shortcut: button.keyboardShortcut))
+                    } else {
+                        Button(button.text, action: button.action)
+                            .buttonStyle(NookButtonStyle(variant: button.variant, shadowStyle: button.shadowStyle, role: nil))
+                            .disabled(!button.isEnabled)
+                            .modifier(OptionalKeyboardShortcut(shortcut: button.keyboardShortcut))
+                    }
                 }
             }
         }
@@ -265,22 +265,18 @@ struct DialogFooter: View {
 struct DialogButton {
     let text: String
     let iconName: String?
-    let variant: NookButton.Variant
+    let variant: NookButtonStyle.Variant
     let action: () -> Void
     let keyboardShortcut: KeyEquivalent?
-    let animationType: NookButton.AnimationType
-    let shadowStyle: NookButton.ShadowStyle
-    let customColors: NookButton.CustomColors?
+    let shadowStyle: NookButtonStyle.ShadowStyle
     let isEnabled: Bool
 
     init(
         text: String,
         iconName: String? = nil,
-        variant: NookButton.Variant = .primary,
+        variant: NookButtonStyle.Variant = .primary,
         keyboardShortcut: KeyEquivalent? = nil,
-        animationType: NookButton.AnimationType = .none,
-        shadowStyle: NookButton.ShadowStyle = .subtle,
-        customColors: NookButton.CustomColors? = nil,
+        shadowStyle: NookButtonStyle.ShadowStyle = .subtle,
         isEnabled: Bool = true,
         action: @escaping () -> Void
     ) {
@@ -289,81 +285,79 @@ struct DialogButton {
         self.variant = variant
         self.action = action
         self.keyboardShortcut = keyboardShortcut
-        self.animationType = animationType
         self.shadowStyle = shadowStyle
-        self.customColors = customColors
         self.isEnabled = isEnabled
+    }
+}
+
+struct OptionalKeyboardShortcut: ViewModifier {
+    let shortcut: KeyEquivalent?
+
+    func body(content: Content) -> some View {
+        if let shortcut = shortcut {
+            content.keyboardShortcut(shortcut, modifiers: [])
+        } else {
+            content
+        }
     }
 }
 
 
 #if DEBUG
 private struct DialogManagerPreviewSurface: View {
-    @State private var analyticsEnabled: Bool = true
 
     var body: some View {
-        ZStack {
+        StandardDialog(
+            header: {
+                DialogHeader(
+                    icon: "sparkles",
+                    title: "Sample Dialog",
+                    subtitle: "Use this preview to adjust spacing, typography, and surfaces"
+                )
+            },
+            content: {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("This is placeholder body copy to demonstrate wrapping, spacing, and text styles in the dialog. Replace this with your own content.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 4)
+            },
+            footer: {
+                DialogFooter(
+                    leftButton: DialogButton(
+                        text: "Learn More",
+                        iconName: "book",
+                        variant: .secondary,
+                        action: {}
+                    ),
+                    rightButtons: [
+                        DialogButton(
+                            text: "Close",
+                            variant: .secondary,
+                            action: {}
+                        ),
+                        DialogButton(
+                            text: "OK",
+                            iconName: "checkmark",
+                            variant: .primary,
+                            action: {}
+                        )
+                    ]
+                )
+            }
+        )
+        .padding(32)
+        .shadow(color: Color.black.opacity(0.2), radius: 20, y: 12)
+        .background(
             LinearGradient(
                 colors: [Color.black.opacity(0.45), Color.blue.opacity(0.35)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
-
-            StandardDialog(
-                header: {
-                    DialogHeader(
-                        icon: "sparkles",
-                        title: "Sample Dialog",
-                        subtitle: "Use this preview to adjust spacing, typography, and surfaces"
-                    )
-                },
-                content: {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Keep Nook feeling fast by sharing anonymous performance metrics.")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.primary)
-
-                        Text("We never collect your browsing history or personal data. You can opt out at any time from Settings → Privacy.")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        Toggle(isOn: $analyticsEnabled) {
-                            Label("Share anonymous analytics", systemImage: analyticsEnabled ? "checkmark.circle.fill" : "circle")
-                                .font(.system(size: 12, weight: .medium))
-                        }
-                        .toggleStyle(.switch)
-                    }
-                    .padding(.horizontal, 4)
-                },
-                footer: {
-                    DialogFooter(
-                        leftButton: DialogButton(
-                            text: "Privacy Policy",
-                            iconName: "link",
-                            variant: .secondary,
-                            action: {}
-                        ),
-                        rightButtons: [
-                            DialogButton(
-                                text: "Not Now",
-                                variant: .secondary,
-                                action: {}
-                            ),
-                            DialogButton(
-                                text: "Enable",
-                                iconName: "checkmark",
-                                variant: .primary,
-                                action: {}
-                            )
-                        ]
-                    )
-                }
-            )
-            .padding(32)
-            .shadow(color: Color.black.opacity(0.2), radius: 20, y: 12)
-        }
+        )
     }
 }
 
@@ -372,3 +366,4 @@ private struct DialogManagerPreviewSurface: View {
         .environment(GradientColorManager())
 }
 #endif
+
