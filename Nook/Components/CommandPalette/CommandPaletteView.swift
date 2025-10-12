@@ -153,7 +153,7 @@ struct CommandPaletteView: View {
                         .frame(width: effectiveCommandPaletteWidth)
                         .universalGlassEffect(
                             .regular.tint(
-                                gradientColorManager.primaryColor.adjustedLuminance(by: colorScheme == .light ? 0.4 : 0.2).opacity( colorScheme == .light ? 0.2 : 0.55)
+                                gradientColorManager.primaryColor.adjustedLuminance(by: colorScheme == .light ? 0.4 : 0.2).opacity( colorScheme == .light ? 0.05 : 0.55)
                             ),
                             in: .rect(cornerRadius: 26))
                         .animation(
