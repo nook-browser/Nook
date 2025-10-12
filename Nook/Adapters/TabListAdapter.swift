@@ -1,22 +1,18 @@
 import Foundation
 import SwiftUI
 import AppKit
-import Combine
+import Observation
 
 /// Adapter for regular tabs in a space
 @MainActor
-class SpaceRegularTabListAdapter: TabListDataSource, ObservableObject {
+@Observable
+class SpaceRegularTabListAdapter: TabListDataSource {
     private let tabManager: TabManager
     let spaceId: UUID
-    private var cancellable: AnyCancellable?
-    
+
     init(tabManager: TabManager, spaceId: UUID) {
         self.tabManager = tabManager
         self.spaceId = spaceId
-        // Relay TabManager changes to table consumers
-        self.cancellable = tabManager.objectWillChange
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.objectWillChange.send() }
     }
     
     var tabs: [Tab] {
@@ -25,7 +21,6 @@ class SpaceRegularTabListAdapter: TabListDataSource, ObservableObject {
     }
     
     func moveTab(from sourceIndex: Int, to targetIndex: Int) {
-        objectWillChange.send()
         guard sourceIndex < tabs.count else { return }
         let tab = tabs[sourceIndex]
         tabManager.reorderRegular(tab, in: spaceId, to: targetIndex)
@@ -37,13 +32,11 @@ class SpaceRegularTabListAdapter: TabListDataSource, ObservableObject {
     }
     
     func closeTab(at index: Int) {
-        objectWillChange.send()
         guard index < tabs.count else { return }
         tabManager.removeTab(tabs[index].id)
     }
     
     func toggleMuteTab(at index: Int) {
-        objectWillChange.send()
         guard index < tabs.count else { return }
         let tab = tabs[index]
         if tab.hasAudioContent {
@@ -161,17 +154,14 @@ class SpaceRegularTabListAdapter: TabListDataSource, ObservableObject {
 
 /// Adapter for pinned tabs in a space
 @MainActor
-class SpacePinnedTabListAdapter: TabListDataSource, ObservableObject {
+@Observable
+class SpacePinnedTabListAdapter: TabListDataSource {
     private let tabManager: TabManager
     let spaceId: UUID
-    private var cancellable: AnyCancellable?
-    
+
     init(tabManager: TabManager, spaceId: UUID) {
         self.tabManager = tabManager
         self.spaceId = spaceId
-        self.cancellable = tabManager.objectWillChange
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.objectWillChange.send() }
     }
     
         var tabs: [Tab] {
@@ -179,7 +169,6 @@ class SpacePinnedTabListAdapter: TabListDataSource, ObservableObject {
     }
     
     func moveTab(from sourceIndex: Int, to targetIndex: Int) {
-        objectWillChange.send()
         guard sourceIndex < tabs.count else { return }
         let tab = tabs[sourceIndex]
         tabManager.reorderSpacePinned(tab, in: spaceId, to: targetIndex)
@@ -191,13 +180,11 @@ class SpacePinnedTabListAdapter: TabListDataSource, ObservableObject {
     }
     
     func closeTab(at index: Int) {
-        objectWillChange.send()
         guard index < tabs.count else { return }
         tabManager.removeTab(tabs[index].id)
     }
     
     func toggleMuteTab(at index: Int) {
-        objectWillChange.send()
         guard index < tabs.count else { return }
         let tab = tabs[index]
         if tab.hasAudioContent {
@@ -286,19 +273,13 @@ class SpacePinnedTabListAdapter: TabListDataSource, ObservableObject {
 
 /// Adapter for essential tabs
 @MainActor
-class EssentialTabListAdapter: TabListDataSource, ObservableObject {
+@Observable
+class EssentialTabListAdapter: TabListDataSource {
     private let tabManager: TabManager
-    private var cancellable: AnyCancellable?
-    
+
     init(tabManager: TabManager) {
         self.tabManager = tabManager
-        // Observe TabManager and relay to collection view
-        self.cancellable = tabManager.objectWillChange
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.objectWillChange.send() }
     }
-    
-    deinit { cancellable?.cancel() }
     
     var tabs: [Tab] {
         // Profile-aware essentials: returns pinned tabs for current profile only
@@ -306,7 +287,6 @@ class EssentialTabListAdapter: TabListDataSource, ObservableObject {
     }
     
     func moveTab(from sourceIndex: Int, to targetIndex: Int) {
-        objectWillChange.send()
         guard sourceIndex < tabs.count else { return }
         let tab = tabs[sourceIndex]
         tabManager.reorderEssential(tab, to: targetIndex)

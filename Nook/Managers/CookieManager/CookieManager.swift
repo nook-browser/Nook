@@ -8,16 +8,18 @@
 import Foundation
 import WebKit
 import SwiftUI
+import Observation
 
 @MainActor
-class CookieManager: ObservableObject {
+@Observable
+class CookieManager {
     // Active data store for cookie operations. Switchable per profile.
     private var dataStore: WKWebsiteDataStore
     // Optional profile context for diagnostics and profiling
     var currentProfileId: UUID?
-    @Published private(set) var cookies: [CookieInfo] = []
-    @Published private(set) var domainGroups: [DomainCookieGroup] = []
-    @Published private(set) var isLoading: Bool = false
+    private(set) var cookies: [CookieInfo] = []
+    private(set) var domainGroups: [DomainCookieGroup] = []
+    private(set) var isLoading: Bool = false
     
     init(dataStore: WKWebsiteDataStore? = nil) {
         self.dataStore = dataStore ?? WKWebsiteDataStore.default()

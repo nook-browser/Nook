@@ -9,14 +9,15 @@ import SwiftUI
 import WebKit
 
 struct PrivacySettingsView: View {
-    @EnvironmentObject var browserManager: BrowserManager
-    @StateObject private var cookieManager = CookieManager()
-    @StateObject private var cacheManager = CacheManager()
+    @Environment(BrowserManager.self) private var browserManager
+    @State private var cookieManager = CookieManager()
+    @State private var cacheManager = CacheManager()
     @State private var showingCookieManager = false
     @State private var showingCacheManager = false
     @State private var isClearing = false
     
     var body: some View {
+        @Bindable var bindableBrowserManager = browserManager
         VStack(alignment: .leading, spacing: 20) {
             // Cookie Management Section
             VStack(alignment: .leading, spacing: 12) {
@@ -143,7 +144,7 @@ struct PrivacySettingsView: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     // Activated: Block cross‑site tracking via content rules + iframe cookie shim
-                    Toggle("Block Cross-Site Tracking", isOn: $browserManager.settingsManager.blockCrossSiteTracking)
+                    Toggle("Block Cross-Site Tracking", isOn: $bindableBrowserManager.settingsManager.blockCrossSiteTracking)
                         .onChange(of: browserManager.settingsManager.blockCrossSiteTracking) { _, enabled in
                             browserManager.trackingProtectionManager.setEnabled(enabled)
                         }
@@ -451,5 +452,5 @@ struct PrivacySettingsView: View {
 
 #Preview {
     PrivacySettingsView()
-        .environmentObject(BrowserManager())
+        .environment(BrowserManager())
 }

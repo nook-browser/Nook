@@ -12,13 +12,13 @@ import AppKit
 @available(macOS 15.5, *)
 struct ExtensionActionView: View {
     let extensions: [InstalledExtension]
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserManager.self) private var browserManager
     
     var body: some View {
         HStack(spacing: 4) {
             ForEach(extensions.filter { $0.isEnabled }, id: \.id) { ext in
                 ExtensionActionButton(ext: ext)
-                    .environmentObject(browserManager)
+                    .environment(browserManager)
             }
         }
     }
@@ -27,8 +27,8 @@ struct ExtensionActionView: View {
 @available(macOS 15.5, *)
 struct ExtensionActionButton: View {
     let ext: InstalledExtension
-    @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserManager.self) private var browserManager
+    @Environment(BrowserWindowState.self) private var windowState
     
     var body: some View {
         Button(action: {

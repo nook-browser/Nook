@@ -117,8 +117,8 @@ struct OllamaModel: Identifiable, Equatable {
 }
 
 struct SidebarAIChat: View {
-    @EnvironmentObject var windowState: BrowserWindowState
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserWindowState.self) private var windowState
+    @Environment(BrowserManager.self) private var browserManager
     @Environment(SettingsManager.self) var settingsManager
     
     @State private var messageText: String = ""
@@ -550,7 +550,6 @@ To enhance the web browsing experience by providing intelligent, context-aware s
     private func showApiKeyDialog() {
         browserManager.dialogManager.showDialog {
             AISettingsDialog(
-                settingsManager: settingsManager,
                 ollamaModels: ollamaModels,
                 isFetchingModels: isFetchingModels,
                 onFetchModels: {
@@ -562,7 +561,9 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                     browserManager.dialogManager.closeDialog()
                 }
             )
+            .environment(settingsManager)
         }
+        
     }
     
     private func showClearMessagesDialog() {
@@ -1367,7 +1368,7 @@ struct CitationView: View {
 // MARK: - AI Settings Dialog
 
 struct AISettingsDialog: View {
-    @Bindable var settingsManager: SettingsManager
+    @Environment(SettingsManager.self) var settingsManager
     let ollamaModels: [OllamaModel]
     let isFetchingModels: Bool
     let onFetchModels: () -> Void
@@ -1377,6 +1378,7 @@ struct AISettingsDialog: View {
     @State private var endpointInput: String = ""
     
     var body: some View {
+        @Bindable var bindableSettingsManager = settingsManager
         StandardDialog(
             header: {
                 DialogHeader(

@@ -11,7 +11,7 @@ import WebKit
 struct NavigationHistoryMenu: View {
     let windowState: BrowserWindowState
     let historyType: HistoryType
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserManager.self) private var browserManager
     @State private var historyItems: [NavigationHistoryItem] = []
     @State private var isVisible = false
 

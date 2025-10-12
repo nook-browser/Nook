@@ -7,10 +7,11 @@
 
 import SwiftUI
 import AppKit
+import Observation
 
 struct MiniWindowToolbar: View {
     @Environment(\.colorScheme) private var colorScheme
-    @EnvironmentObject var gradientColorManager: GradientColorManager
+    @Environment(GradientColorManager.self) private var gradientColorManager
     private var fallbackBackgroundNSColor: NSColor {
         NSColor(hex: colorScheme == .dark ? "#242424" : "#EDEDED") ?? (colorScheme == .dark ? .black : .white)
     }
@@ -55,7 +56,7 @@ struct MiniWindowToolbar: View {
     private var shareButtonTintColor: NSColor {
         primaryTextNSColor
     }
-    @ObservedObject var session: MiniWindowSession
+    var session: MiniWindowSession
     let adoptAction: () -> Void
     var window: NSWindow?
     
@@ -271,7 +272,7 @@ private struct MiniWindowTrafficLights: NSViewRepresentable {
 // MARK: - Share Button Container
 
 private struct MiniWindowShareButtonContainer: View {
-    @ObservedObject var session: MiniWindowSession
+    var session: MiniWindowSession
     let backgroundColor: Color
     let borderColor: Color
     let tintColor: NSColor

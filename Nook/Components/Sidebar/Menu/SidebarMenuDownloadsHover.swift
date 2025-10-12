@@ -9,7 +9,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct SidebarMenuHoverDownloads: View {
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserManager.self) private var browserManager
     @State private var itemsVisible: [Bool] = []
     let isVisible: Bool
     private var prioritizedDownloads: [Download] {

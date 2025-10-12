@@ -1,18 +1,20 @@
 import Foundation
 import SwiftUI
+import Observation
 
 @MainActor
-final class GradientColorManager: ObservableObject {
-    @Published var displayGradient: SpaceGradient = .default
-    @Published private(set) var isEditing: Bool = false
-    @Published var isAnimating: Bool = false
-    @Published var isDark: Bool = false
+@Observable
+final class GradientColorManager {
+    var displayGradient: SpaceGradient = .default
+    private(set) var isEditing: Bool = false
+    var isAnimating: Bool = false
+    var isDark: Bool = false
     private var animationToken: UUID?
 
     // Animation state management
-    @Published var preferBarycentricDuringAnimation: Bool = false
-    @Published var activePrimaryNodeID: UUID? = nil
-    @Published var preferredPrimaryNodeID: UUID? = nil
+    var preferBarycentricDuringAnimation: Bool = false
+    var activePrimaryNodeID: UUID? = nil
+    var preferredPrimaryNodeID: UUID? = nil
 
     // MARK: - Immediate update (no animation)
     func setImmediate(_ gradient: SpaceGradient) {

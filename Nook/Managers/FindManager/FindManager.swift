@@ -7,15 +7,17 @@
 
 import Foundation
 import SwiftUI
+import Observation
 import WebKit
 
 @MainActor
-class FindManager: ObservableObject {
-    @Published var isFindBarVisible: Bool = false
-    @Published var searchText: String = ""
-    @Published var matchCount: Int = 0
-    @Published var currentMatchIndex: Int = 0
-    @Published var isSearching: Bool = false
+@Observable
+class FindManager {
+    var isFindBarVisible: Bool = false
+    var searchText: String = ""
+    var matchCount: Int = 0
+    var currentMatchIndex: Int = 0
+    var isSearching: Bool = false
     
     var currentTab: Tab?
     

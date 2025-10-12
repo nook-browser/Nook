@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ProfilePickerView: View {
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserManager.self) private var browserManager
 
     // Binding to the selected profile id (must always have a profile)
     @Binding var selectedProfileId: UUID

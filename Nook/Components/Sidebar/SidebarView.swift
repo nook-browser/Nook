@@ -4,8 +4,8 @@ import UniformTypeIdentifiers
 import Sparkle
 
 struct SidebarView: View {
-    @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserManager.self) private var browserManager
+    @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.tabDragManager) private var dragManager
     @State private var activeSpaceIndex: Int = 0
     @State private var currentScrollID: Int? = nil
@@ -183,8 +183,8 @@ struct SidebarView: View {
                     width: availableContentWidth,
                     profileId: effectiveProfileId
                 )
-                .environmentObject(browserManager)
-                .environmentObject(windowState)
+                .environment(browserManager)
+                .environment(windowState)
             }
             .padding(.horizontal, 8)
             .modifier(FallbackDropBelowEssentialsModifier())
@@ -219,8 +219,8 @@ struct SidebarView: View {
             
             // Update notification overlay
             SidebarUpdateNotification(downloadsMenuVisible: showDownloadsMenu)
-                .environmentObject(browserManager)
-                .environmentObject(windowState)
+                .environment(browserManager)
+                .environment(windowState)
                 .environment(browserManager.settingsManager)
                 .padding(.horizontal, 8)
                 .padding(.bottom, 8)
@@ -263,8 +263,8 @@ struct SidebarView: View {
                 
                 // Center content - space indicators
                 SpacesList()
-                    .environmentObject(browserManager)
-                    .environmentObject(windowState)
+                    .environment(browserManager)
+                    .environment(windowState)
                 
                 // Right side icons - anchored to right
                 HStack {
@@ -473,9 +473,9 @@ struct SidebarView: View {
                 onMoveTabDown: { browserManager.tabManager.moveTabDown($0.id) },
                 onMuteTab: { $0.toggleMute() }
             )
-            .environmentObject(browserManager)
-            .environmentObject(windowState)
-            .environmentObject(browserManager.splitManager)
+            .environment(browserManager)
+            .environment(windowState)
+            .environment(browserManager.splitManager)
             .id(space.id.uuidString + "-w\(Int(windowState.sidebarContentWidth))")
             Spacer()
         }

@@ -13,9 +13,11 @@ import Foundation
 import Combine
 import SwiftUI
 import WebKit
+import Observation
 
 @MainActor
-public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
+@Observable
+public final class Tab: NSObject, Identifiable, WKDownloadDelegate {
     public let id: UUID
     var url: URL
     var name: String
@@ -87,18 +89,18 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     var loadingState: LoadingState = .idle
 
-    @Published var canGoBack: Bool = false
-    @Published var canGoForward: Bool = false
+    var canGoBack: Bool = false
+    var canGoForward: Bool = false
     
     // MARK: - Video State
-    @Published var hasPlayingVideo: Bool = false
-    @Published var hasVideoContent: Bool = false  // Track if tab has any video content
-    @Published var hasPiPActive: Bool = false
+    var hasPlayingVideo: Bool = false
+    var hasVideoContent: Bool = false  // Track if tab has any video content
+    var hasPiPActive: Bool = false
     
     // MARK: - Audio State
-    @Published var hasPlayingAudio: Bool = false
-    @Published var isAudioMuted: Bool = false
-    @Published var hasAudioContent: Bool = false {
+    var hasPlayingAudio: Bool = false
+    var isAudioMuted: Bool = false
+    var hasAudioContent: Bool = false {
         didSet {
             if oldValue != hasAudioContent {
                 if hasAudioContent {
@@ -109,11 +111,11 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             }
         }
     }
-    @Published var pageBackgroundColor: NSColor? = nil
+    var pageBackgroundColor: NSColor? = nil
     
     // MARK: - Rename State
-    @Published var isRenaming: Bool = false
-    @Published var editingName: String = ""
+    var isRenaming: Bool = false
+    var editingName: String = ""
     
     // MARK: - Native Audio Monitoring
     private var audioDeviceListenerProc: AudioObjectPropertyListenerProc?
@@ -252,9 +254,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     private func updateNavigationState() {
         guard let webView = _webView else { return }
 
-        // Force UI update by notifying object will change
-        objectWillChange.send()
-
         let newCanGoBack = webView.canGoBack
         let newCanGoForward = webView.canGoForward
 
@@ -325,17 +324,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             // Edge case: currentProfile not yet available. Delay creating WKWebView until it resolves.
             if profileAwaitCancellable == nil {
                 print("[Tab] No profile resolved yet; deferring WebView creation and observing currentProfile…")
-                profileAwaitCancellable = browserManager?
-                    .$currentProfile
-                    .receive(on: RunLoop.main)
-                    .sink { [weak self] value in
-                        guard let self = self else { return }
-                        if value != nil && self._webView == nil {
-                            self.profileAwaitCancellable?.cancel()
-                            self.profileAwaitCancellable = nil
-                            self.setupWebView()
-                        }
-                    }
+                observeProfileAvailability()
             }
             return
         }
@@ -463,6 +452,27 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         return browserManager?.profileManager.profiles.first
     }
 
+    private func observeProfileAvailability() {
+        guard let browserManager = browserManager else { return }
+
+        withObservationTracking {
+            // Access the property to register observation
+            _ = browserManager.currentProfile
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                if self.browserManager?.currentProfile != nil && self._webView == nil {
+                    self.profileAwaitCancellable?.cancel()
+                    self.profileAwaitCancellable = nil
+                    self.setupWebView()
+                } else {
+                    // Re-register observation if profile is still nil
+                    self.observeProfileAvailability()
+                }
+            }
+        }
+    }
+
     // Minimal hook to satisfy ExtensionManager: update extension controller on existing webView.
     func applyWebViewConfigurationOverride(_ configuration: WKWebViewConfiguration) {
         guard let existing = _webView else { return }
@@ -519,21 +529,23 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     
     deinit {
-        // MEMORY LEAK FIX: Ensure cleanup when tab is deallocated
-        // Note: We can't access main actor-isolated properties in deinit,
-        // but we can still clean up non-actor properties
-        
-        // Cancel any pending profile observation
-        profileAwaitCancellable?.cancel()
-        profileAwaitCancellable = nil
-        
-        // Clear theme color observers
-        themeColorObservedWebViews.removeAllObjects()
-        
-        // Note: stopNativeAudioMonitoring() is main actor-isolated and cannot be called from deinit
-        // The cleanup will be handled by the closeTab() method which is called before deinit
-        
-        print("🧹 [Tab] deinit cleanup completed for: \(name)")
+        MainActor.assumeIsolated {
+            // MEMORY LEAK FIX: Ensure cleanup when tab is deallocated
+            // Note: We can't access main actor-isolated properties in deinit,
+            // but we can still clean up non-actor properties
+            
+            // Cancel any pending profile observation
+            profileAwaitCancellable?.cancel()
+            profileAwaitCancellable = nil
+            
+            // Clear theme color observers
+            themeColorObservedWebViews.removeAllObjects()
+            
+            // Note: stopNativeAudioMonitoring() is main actor-isolated and cannot be called from deinit
+            // The cleanup will be handled by the closeTab() method which is called before deinit
+            
+            print("🧹 [Tab] deinit cleanup completed for: \(name)")
+        }
     }
 
     func loadURL(_ newURL: URL) {

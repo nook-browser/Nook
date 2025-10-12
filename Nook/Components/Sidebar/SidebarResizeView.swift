@@ -8,13 +8,13 @@
 import SwiftUI
 
 struct SidebarResizeView: View {
-    @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserManager.self) private var browserManager
+    @Environment(BrowserWindowState.self) private var windowState
     @State private var isResizing = false
     @State private var isHovering = false
     @State private var startingWidth: CGFloat = 0
     @State private var startingMouseX: CGFloat = 0
-    @StateObject private var dragLockManager = DragLockManager.shared
+    @State private var dragLockManager = DragLockManager.shared
     @State private var dragSessionID: String = UUID().uuidString
 
     private let minWidth: CGFloat = 260

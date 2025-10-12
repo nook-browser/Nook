@@ -9,7 +9,7 @@ struct GradientCanvasEditor: View {
     @Binding var gradient: SpaceGradient
     @Binding var selectedNodeID: UUID?
     var showDitherOverlay: Bool = true
-    @EnvironmentObject var gradientColorManager: GradientColorManager
+    @Environment(GradientColorManager.self) private var gradientColorManager
 
     // ephemeral Y-positions (0...1) for visual placement only
     @State private var yPositions: [UUID: CGFloat] = [:]

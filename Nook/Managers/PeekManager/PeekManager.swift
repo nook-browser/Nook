@@ -8,11 +8,13 @@
 import SwiftUI
 import WebKit
 import AppKit
+import Observation
 
 @MainActor
-final class PeekManager: ObservableObject {
-    @Published var isActive: Bool = false
-    @Published var currentSession: PeekSession?
+@Observable
+final class PeekManager {
+    var isActive: Bool = false
+    var currentSession: PeekSession?
 
     weak var browserManager: BrowserManager?
     var webView: PeekWebView?
