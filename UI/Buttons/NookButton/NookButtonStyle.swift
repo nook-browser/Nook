@@ -19,6 +19,37 @@ struct NookButtonStyle: ButtonStyle {
 
     @State private var isHovering: Bool = false
 
+    // MARK: - Constants
+
+    private let cornerRadius: CGFloat = 14
+    private let verticalPadding: CGFloat = 12
+    private let horizontalPadding: CGFloat = 12
+
+    // Contrast ratios for color calculations
+    private let textContrastRatio: CGFloat = 3
+    private let shadowContrastRatio: CGFloat = 2
+    private let highlightContrastRatio: CGFloat = 2
+
+    // Hover and press effects
+    private let hoverMixAmount: CGFloat = 0.2
+    private let pressedOffset: CGFloat = 2
+    private let hoverOffset: CGFloat = 0.5
+
+    // Highlight opacity values
+    private let highlightOpacityDefault: CGFloat = 0.1
+    private let highlightOpacityHover: CGFloat = 0.15
+    private let highlightOpacityPressed: CGFloat = 0.07
+
+    // Stroke widths
+    private let highlightStrokeWidth: CGFloat = 2
+
+    // Disabled state
+    private let disabledOpacity: CGFloat = 0.3
+
+    // Animation durations
+    private let pressAnimationDuration: CGFloat = 0.1
+    private let hoverAnimationDuration: CGFloat = 0.15
+
     enum Variant {
         case secondary  // Regular button
         case primary    // Prominent button
@@ -30,117 +61,141 @@ struct NookButtonStyle: ButtonStyle {
         case prominent
     }
 
+    // MARK: - Body
+
     func makeBody(configuration: Configuration) -> some View {
         ZStack {
-            // Main button content
-            let contrastingShade = ((try? Garnish.contrastingShade(of: backgroundColor(), targetRatio: 3, direction: .preferLight, blendStyle: .strong)) ?? textColor)
-            let background = (backgroundColor().mix(with: contrastingShade, by: isHovering ? 0.2 : 0))
-            let shadow = ((try? Garnish.contrastingShade(of: backgroundColor(), targetRatio: 2)) ?? textColor)
-            let highlight =  ((try? Garnish.contrastingShade(of: backgroundColor(), targetRatio: 2, direction: .preferLight)) ?? textColor)
-            
+            // Calculate colors using Garnish for contrast
+            let baseColor = backgroundColor()
+            let contrastingShade = contrastingTextColor(for: baseColor)
+            let backgroundWithHover = baseColor.mix(with: contrastingShade, by: isHovering ? hoverMixAmount : 0)
+            let shadowColor = shadowColorForBackground(baseColor)
+            let highlightColor = highlightColorForBackground(baseColor)
+
+            // Main button label with background
             configuration.label
                 .font(.body.weight(.semibold))
                 .foregroundStyle(contrastingShade)
-                .padding(.vertical, 12)
-                .padding(.horizontal, 12)
-                .background{
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(background)
+                .padding(.vertical, verticalPadding)
+                .padding(.horizontal, horizontalPadding)
+                .background {
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .fill(backgroundWithHover)
                 }
-              
-                .overlay(
-                    Group{
-                    RoundedRectangle(cornerRadius: 14)
+                // Highlight border effect
+                .overlay {
+                    RoundedRectangle(cornerRadius: cornerRadius)
                         .strokeBorder(
                             LinearGradient(
-                                colors: [
-                                    highlight,
-                                    .clear,
-                                    highlight
-                                ],
+                                colors: [highlightColor, .clear, highlightColor],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             ),
-                            lineWidth: 2
+                            lineWidth: highlightStrokeWidth
                         )
-                        .opacity(!isEnabled ? 0 : configuration.isPressed ? 0.07 : isHovering ? 0.15 : 0.1)
+                        .opacity(highlightOpacity(isPressed: configuration.isPressed))
                         .blendMode(.plusLighter)
                 }
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .offset(y: configuration.isPressed ? 2 : isHovering ? 0.5 : 0)
-                .background{
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                // Press/hover offset for depth effect
+                .offset(y: verticalOffset(isPressed: configuration.isPressed))
+                // Shadow layer
+                .background {
                     if shadowStyle != .none && isEnabled {
-                        ZStack{
-                            RoundedRectangle(cornerRadius: 14)
-                                .foregroundStyle(shadow)
-                        }
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .offset(y: 2)
+                        RoundedRectangle(cornerRadius: cornerRadius)
+                            .foregroundStyle(shadowColor)
+                            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                            .offset(y: pressedOffset)
                     }
                 }
         }
         .compositingGroup()
-        .opacity(isEnabled ? 1.0 : 0.3)
-        .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
-        .animation(.easeInOut(duration: 0.15), value: isHovering)
+        .opacity(isEnabled ? 1.0 : disabledOpacity)
+        .animation(.easeInOut(duration: pressAnimationDuration), value: configuration.isPressed)
+        .animation(.easeInOut(duration: hoverAnimationDuration), value: isHovering)
         .onHover { hovering in
             isHovering = hovering
         }
     }
 
+    // MARK: - Helper Methods
+
+    /// Returns the contrasting text color for the given background
+    private func contrastingTextColor(for background: Color) -> Color {
+        (try? Garnish.contrastingShade(
+            of: background,
+            targetRatio: textContrastRatio,
+            direction: .preferLight,
+            blendStyle: .strong
+        )) ?? textColor
+    }
+
+    /// Returns the shadow color for the given background
+    private func shadowColorForBackground(_ background: Color) -> Color {
+        (try? Garnish.contrastingShade(
+            of: background,
+            targetRatio: shadowContrastRatio,
+            direction: .forceDark
+        )) ?? textColor
+    }
+
+    /// Returns the highlight color for the given background
+    private func highlightColorForBackground(_ background: Color) -> Color {
+        (try? Garnish.contrastingShade(
+            of: background,
+            targetRatio: highlightContrastRatio,
+            direction: .preferLight
+        )) ?? textColor
+    }
+
+    /// Returns the highlight opacity based on button state
+    private func highlightOpacity(isPressed: Bool) -> CGFloat {
+        if !isEnabled {
+            return 0
+        } else if isPressed {
+            return highlightOpacityPressed
+        } else if isHovering {
+            return highlightOpacityHover
+        } else {
+            return highlightOpacityDefault
+        }
+    }
+
+    /// Returns the vertical offset based on button state
+    private func verticalOffset(isPressed: Bool) -> CGFloat {
+        if isPressed {
+            return pressedOffset
+        } else if isHovering {
+            return hoverOffset
+        } else {
+            return 0
+        }
+    }
+
+    /// Returns the base background color based on variant and role
     private func backgroundColor() -> Color {
+        // Destructive role overrides variant colors
         if role == .destructive {
             return Color.red
         }
 
         switch variant {
         case .secondary:
-            return Color.white.mix(with: .black, by: 0.8)
+            // Neutral gray for secondary buttons
+            return Color.white.mix(with: .black, by: colorScheme == .dark ? 0.8 : 0.1)
         case .primary:
+            // Use accent color from gradient manager
             return gradientColorManager.primaryColor
         }
     }
 
+    /// Fallback text color when Garnish contrast calculation fails
     private var textColor: Color {
         switch variant {
         case .secondary:
             return Color.primary
         case .primary:
             return Color.white
-        }
-    }
-
-    private var shadowBackgroundColor: Color {
-        switch shadowStyle {
-        case .none:
-            return Color.clear
-        case .subtle:
-            return Color.clear
-        case .prominent:
-            return Color.gray
-        }
-    }
-
-    private var shadowStrokeColor: Color {
-        switch shadowStyle {
-        case .none:
-            return Color.clear
-        case .subtle:
-            return Color.black.opacity(0.3)
-        case .prominent:
-            return Color.white.opacity(1)
-        }
-    }
-
-    private var shadowOffset: CGSize {
-        switch shadowStyle {
-        case .none:
-            return CGSize.zero
-        case .subtle:
-            return CGSize(width: 0, height: 2)
-        case .prominent:
-            return CGSize(width: 0, height: 6)
         }
     }
 }
