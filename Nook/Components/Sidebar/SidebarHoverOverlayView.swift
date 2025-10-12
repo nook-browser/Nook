@@ -6,12 +6,14 @@
 //
 
 import SwiftUI
+import UniversalGlass
 import AppKit
 
 struct SidebarHoverOverlayView: View {
     @Environment(BrowserManager.self) private var browserManager
     @Environment(HoverSidebarManager.self) private var hoverManager
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(GradientColorManager.self) private var gradientColorManager
 
     private var overlayWidth: CGFloat {
         windowState.isSidebarVisible ? windowState.sidebarWidth : browserManager.getSavedSidebarWidth(for: windowState)
@@ -43,15 +45,12 @@ struct SidebarHoverOverlayView: View {
                         .environment(windowState)
                         .frame(width: overlayWidth)
                         .frame(maxHeight: .infinity)
-                        .background(BlurEffectView(material: .contentBackground, state: .active))
-                        .mask(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                                .stroke(.white.opacity(0.12), lineWidth: 1)
-                        )
+                        .universalGlassEffect(.regular.tint(gradientColorManager.primaryColor.mix(with: Color(.windowBackground), by: 0.8).opacity(0.7)), in: .rect(cornerRadius: cornerRadius))
+//                        .contentShape(.rect)
+                    
+//                        .universalGlassEffect(.regular.tint(Color(.black)), in: .rect(cornerRadius: cornerRadius))
                         // Force arrow cursor for the entire overlay region
                         .alwaysArrowCursor()
-                        .shadow(color: Color.black.opacity(0.14), radius: 14, x: 0, y: 0)
                         .padding(browserManager.settingsManager.sidebarPosition == .left ? .leading : .trailing, horizontalInset)
                         .padding(.vertical, verticalInset)
                         .transition(
