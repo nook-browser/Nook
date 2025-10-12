@@ -14,7 +14,6 @@ struct WindowBackgroundView: View {
     var body: some View {
         Rectangle()
             .fill(Color.clear)
-            .blur(radius: 40)
             .universalGlassEffect(in: .rect(cornerRadius: 0))
             .clipped()
         .backgroundDraggable()
