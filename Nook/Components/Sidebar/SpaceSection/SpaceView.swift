@@ -79,10 +79,6 @@ struct SpaceView: View {
         max(outerWidth - 16, 0)
     }
     
-    private let dropZoneVerticalPadding: CGFloat = 12
-    private let dropZoneBaseHeight: CGFloat = 6
-    private let spacerBaseHeight: CGFloat = 2
-    
     private var tabs: [Tab] {
         browserManager.tabManager.tabs(in: space)
     }
@@ -139,12 +135,7 @@ struct SpaceView: View {
         VStack(spacing: 4) {
             SpaceTitle(space: space)
 
-            if hasSpacePinnedContent || !tabs.isEmpty {
-                mainContentContainer
-            } else {
-                // Always show new tab button and separator even when empty
-                newTabButtonSectionWithClear
-            }
+            mainContentContainer
         }
         .padding(.horizontal, 8)
         .frame(minWidth: 0, maxWidth: outerWidth, alignment: .leading)
@@ -277,7 +268,6 @@ struct SpaceView: View {
                     TabFolderView(
                         folder: folderWithTabs.folder,
                         space: space,
-                        onRename: { renameFolder(folderWithTabs.folder) },
                         onDelete: { deleteFolder(folderWithTabs.folder) },
                         onAddTab: { addTabToFolder(folderWithTabs.folder) },
                         onActivateTab: { onActivateTab($0) }
@@ -648,26 +638,51 @@ struct SpaceView: View {
     }
     
     private var emptyRegularTabsDropTarget: some View {
-        ZStack { Color.clear.frame(height: 50) }
-            .padding(.top, 8)
-            .contentShape(Rectangle())
-            .onDrop(
-                of: [.text],
-                delegate: SidebarSectionDropDelegateSimple(
-                    itemsCount: { 0 },
-                    draggedItem: $draggedItem,
-                    targetSection: .spaceRegular(space.id),
-                    tabManager: browserManager.tabManager
-                )
+        let isActive = dropPreviewIndex == 0 && dropPreviewSection == .spaceRegular(space.id)
+
+        return ZStack {
+            Color.clear
+                .frame(minHeight: 100, maxHeight: .infinity)
+                .overlay(alignment: .top) {
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(AppColors.textSecondary)
+                        .frame(height: isActive ? 3 : 0)
+                        .padding(.horizontal, 8)
+                        .opacity(isActive ? 0.8 : 0)
+                        .animation(.easeInOut(duration: 0.15), value: isActive)
+                }
+        }
+        .padding(.top, 8)
+        .contentShape(Rectangle())
+        .onDrop(
+            of: [.text],
+            delegate: SidebarSectionDropDelegateSimple(
+                itemsCount: { 0 },
+                draggedItem: $draggedItem,
+                targetSection: .spaceRegular(space.id),
+                tabManager: browserManager.tabManager,
+                targetIndex: nil,
+                onDropEntered: {
+                    dropPreviewIndex = 0
+                    dropPreviewSection = .spaceRegular(space.id)
+                    NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                },
+                onDropCompleted: {
+                    dropPreviewIndex = nil
+                    dropPreviewSection = nil
+                },
+                onDropExited: {
+                    if dropPreviewIndex == 0 && dropPreviewSection == .spaceRegular(space.id) {
+                        dropPreviewIndex = nil
+                        dropPreviewSection = nil
+                    }
+                }
             )
+        )
     }
     
     // MARK: - Folder Management
-    
-    private func renameFolder(_ folder: TabFolder) {
-        print("Rename folder: \(folder.name)")
-    }
-    
+
     private func deleteFolder(_ folder: TabFolder) {
         browserManager.tabManager.deleteFolder(folder.id)
     }

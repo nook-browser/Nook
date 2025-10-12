@@ -18,7 +18,6 @@ private func haptic(_ pattern: NSHapticFeedbackManager.FeedbackPattern = .alignm
 struct TabFolderView: View {
     var folder: TabFolder
     let space: Space
-    let onRename: () -> Void
     let onDelete: () -> Void
     let onAddTab: () -> Void
     let onActivateTab: (Tab) -> Void
@@ -28,6 +27,9 @@ struct TabFolderView: View {
     @State private var draggedItem: UUID? = nil
     @State private var isDropTargeted: Bool = false
     @State private var dropPreviewIndex: Int? = nil
+    @State private var isRenaming: Bool = false
+    @State private var draftName: String = ""
+    @FocusState private var nameFieldFocused: Bool
 
     @Environment(BrowserManager.self) private var browserManager
     @Environment(BrowserWindowState.self) private var windowState
@@ -95,12 +97,33 @@ struct TabFolderView: View {
                 // Folder icon with animation
                 folderIconView
 
-                // Folder name
-                Text(folder.name)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(AppColors.textSecondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                // Folder name - editable
+                if isRenaming {
+                    TextField("", text: $draftName)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(AppColors.textSecondary)
+                        .textFieldStyle(PlainTextFieldStyle())
+                        .autocorrectionDisabled()
+                        .focused($nameFieldFocused)
+                        .onAppear {
+                            draftName = folder.name
+                            DispatchQueue.main.async {
+                                nameFieldFocused = true
+                            }
+                        }
+                        .onSubmit {
+                            commitRename()
+                        }
+                        .onExitCommand {
+                            cancelRename()
+                        }
+                } else {
+                    Text(folder.name)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(AppColors.textSecondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
 
                 Spacer()
 
@@ -115,9 +138,9 @@ struct TabFolderView: View {
                 }
 
                 // Context menu button
-                if isHovering {
+                if isHovering && !isRenaming {
                     Menu {
-                        Button(action: onRename) {
+                        Button(action: startRenaming) {
                             Label("Rename Folder", systemImage: "pencil")
                         }
                         Button(action: onAddTab) {
@@ -172,6 +195,12 @@ struct TabFolderView: View {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     folder.isOpen = false
                 }
+            }
+        }
+        .onChange(of: nameFieldFocused) { _, focused in
+            // When losing focus during rename, commit
+            if isRenaming && !focused {
+                commitRename()
             }
         }
     }
@@ -255,7 +284,7 @@ struct TabFolderView: View {
 
     private var folderContextMenu: some View {
         VStack {
-            Button(action: onRename) {
+            Button(action: startRenaming) {
                 Label("Rename Folder", systemImage: "pencil")
             }
             Button(action: onAddTab) {
@@ -398,5 +427,27 @@ struct TabFolderView: View {
     private func folderFallbackInsertionIndex(within all: [Tab]) -> Int {
         let clampedIndex = max(0, min(folder.index, all.count))
         return clampedIndex
+    }
+
+    // MARK: - Rename Actions
+
+    private func startRenaming() {
+        draftName = folder.name
+        isRenaming = true
+    }
+
+    private func cancelRename() {
+        isRenaming = false
+        draftName = folder.name
+        nameFieldFocused = false
+    }
+
+    private func commitRename() {
+        let newName = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !newName.isEmpty && newName != folder.name {
+            browserManager.tabManager.renameFolder(folder.id, newName: newName)
+        }
+        isRenaming = false
+        nameFieldFocused = false
     }
 }
