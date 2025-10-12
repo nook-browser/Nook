@@ -14,7 +14,6 @@ class SettingsManager {
     private let userDefaults = UserDefaults.standard
     private let materialKey = "settings.currentMaterialRaw"
     private let searchEngineKey = "settings.searchEngine"
-    private let liquidGlassKey = "settings.isLiquidGlassEnabled"
     private let tabUnloadTimeoutKey = "settings.tabUnloadTimeout"
     private let blockXSTKey = "settings.blockCrossSiteTracking"
     private let debugToggleUpdateNotificationKey = "settings.debugToggleUpdateNotification"
@@ -36,13 +35,6 @@ class SettingsManager {
     private let webSearchContextSizeKey = "settings.webSearchContextSize"
     private let showLinkStatusBarKey = "settings.showLinkStatusBar"
     var currentSettingsTab: SettingsTabs = .general
-
-    // Stored properties
-    var isLiquidGlassEnabled: Bool {
-        didSet {
-            userDefaults.set(isLiquidGlassEnabled, forKey: liquidGlassKey)
-        }
-    }
 
     var currentMaterialRaw: Int {
         didSet {
@@ -191,7 +183,6 @@ class SettingsManager {
         // Register default values
         userDefaults.register(defaults: [
             materialKey: NSVisualEffectView.Material.hudWindow.rawValue,
-            liquidGlassKey: false,
             searchEngineKey: SearchProvider.google.rawValue,
             // Default tab unload timeout: 60 minutes
             tabUnloadTimeoutKey: 3600.0,
@@ -219,7 +210,6 @@ class SettingsManager {
         // Initialize properties from UserDefaults
         // This will use the registered defaults if no value is set
         self.currentMaterialRaw = userDefaults.integer(forKey: materialKey)
-        self.isLiquidGlassEnabled = userDefaults.bool(forKey: liquidGlassKey)
 
         if let rawEngine = userDefaults.string(forKey: searchEngineKey),
            let provider = SearchProvider(rawValue: rawEngine)

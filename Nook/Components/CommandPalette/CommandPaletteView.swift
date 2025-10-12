@@ -7,6 +7,7 @@
 
 import AppKit
 import SwiftUI
+import UniversalGlass
 
 struct CommandPaletteView: View {
     @EnvironmentObject var browserManager: BrowserManager
@@ -149,16 +150,19 @@ struct CommandPaletteView: View {
                         .padding(10)
                         .frame(maxWidth: .infinity)
                         .frame(width: effectiveCommandPaletteWidth)
-                        .background(.thickMaterial)
+                        .universalGlassEffect(.regular, in: .rect(cornerRadius: 12))
                         .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(
-                                    Color.white.opacity(isDark ? 0.3 : 0.6),
-                                    lineWidth: 0.5
+                        .conditionally(if: !OSVersion.supportsGlassEffect, apply: { view in
+                            view
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(
+                                            Color.white.opacity(isDark ? 0.3 : 0.6),
+                                            lineWidth: 0.5
+                                        )
                                 )
-                        )
-                        .shadow(color: .black.opacity(0.4), radius: 50, x: 0, y: 4)
+                                .shadow(color: .black.opacity(0.4), radius: 50, x: 0, y: 4)
+                        })
                         .animation(
                             .easeInOut(duration: 0.15),
                             value: searchManager.suggestions.count
