@@ -42,14 +42,14 @@ struct NookButtonStyle: ButtonStyle {
                 .background{
                     RoundedRectangle(cornerRadius: 14)
                         .fill(((backgroundColor().mix(with: contrastingShade, by: isHovering ? 0.2 : 0))
-                            .shadow(.inner(color: ((try? Garnish.contrastingShade(of: backgroundColor(), targetRatio: 2.5)) ?? textColor), radius: 1, y: -1))
-                            .shadow(.inner(color: .white.opacity(0.4), radius: 1, y: 1))
+                            .shadow(.inner(color: ((try? Garnish.contrastingShade(of: backgroundColor(), targetRatio: 2.5)) ?? textColor), radius: 2, y: -2))
+                            .shadow(.inner(color: .white.opacity(0.4), radius: 2, y: 2))
                         )
                         )
                 }
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
-                        .stroke((((try? Garnish.contrastingShade(of: backgroundColor(), targetRatio: 4)) ?? textColor)), lineWidth: borderWidth)
+                        .stroke((((try? Garnish.contrastingShade(of: backgroundColor(), targetRatio: 4)) ?? textColor)), lineWidth: 1)
                 )
                 .overlay(
                     // Top and left borders (highlight)
@@ -61,12 +61,12 @@ struct NookButtonStyle: ButtonStyle {
                                     .clear,
                                     Color.white.opacity(1.0)
                                 ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+                                startPoint: .leading,
+                                endPoint: .trailing
                             ),
-                            lineWidth: 1
+                            lineWidth: 2
                         )
-                        .opacity(0.1)
+                        .opacity(0.07)
                         .blendMode(.plusLighter)
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 14))
@@ -109,15 +109,6 @@ struct NookButtonStyle: ButtonStyle {
             return Color.primary
         case .destructive:
             return Color.white
-        }
-    }
-
-    private var borderWidth: CGFloat {
-        switch variant {
-        case .primary, .destructive:
-            return 0.5
-        case .secondary:
-            return 0.5
         }
     }
 
