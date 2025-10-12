@@ -34,7 +34,8 @@ struct NookButtonStyle: ButtonStyle {
         ZStack {
             // Main button content
             let contrastingShade = ((try? Garnish.contrastingShade(of: backgroundColor(), targetRatio: 3, direction: .preferLight, blendStyle: .strong)) ?? textColor)
-            let shadow = ((try? Garnish.contrastingShade(of: backgroundColor(), targetRatio: 3.5, direction: .forceDark)) ?? textColor)
+            let shadow = ((try? Garnish.contrastingShade(of: backgroundColor(), targetRatio: colorScheme == .dark ? 2 : 2)) ?? textColor)
+            
             configuration.label
                 .font(.body.weight(.semibold))
                 .foregroundStyle(contrastingShade)
@@ -43,17 +44,14 @@ struct NookButtonStyle: ButtonStyle {
                 .background{
                     RoundedRectangle(cornerRadius: 14)
                         .fill(((backgroundColor().mix(with: contrastingShade, by: isHovering ? 0.2 : 0))
-                            .shadow(.inner(color: ((try? Garnish.contrastingShade(of: backgroundColor(), targetRatio: 2.5, direction: .forceDark)) ?? textColor), radius: 2, y: -2))
-                            .shadow(.inner(color: .white.opacity(0.4), radius: 2, y: 2))
+//                            .shadow(.inner(color: ((try? Garnish.contrastingShade(of: backgroundColor(), targetRatio: colorScheme == .dark ? 2.5 : 2, direction: .forceDark)) ?? textColor), radius: 2, y: -2))
+//                            .shadow(.inner(color: .white.opacity(0.4), radius: 2, y: 2))
                         )
                         )
                 }
+              
                 .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke((((try? Garnish.contrastingShade(of: backgroundColor(), targetRatio: 4, direction: .forceDark)) ?? textColor)), lineWidth: 1)
-                )
-                .overlay(
-                    // Top and left borders (highlight)
+                    Group{
                     RoundedRectangle(cornerRadius: 14)
                         .strokeBorder(
                             LinearGradient(
@@ -67,13 +65,14 @@ struct NookButtonStyle: ButtonStyle {
                             ),
                             lineWidth: 2
                         )
-                        .opacity(0.07)
+                        .opacity(!isEnabled ? 0 : configuration.isPressed ? 0.07 : isHovering ? 0.15 : 0.1)
                         .blendMode(.plusLighter)
+                }
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 .offset(y: configuration.isPressed ? 2 : isHovering ? 0.5 : 0)
                 .background{
-                    if shadowStyle != .none {
+                    if shadowStyle != .none && isEnabled {
                         ZStack{
                             RoundedRectangle(cornerRadius: 14)
                                 .foregroundStyle(shadow)
@@ -83,6 +82,7 @@ struct NookButtonStyle: ButtonStyle {
                     }
                 }
         }
+        .compositingGroup()
         .opacity(isEnabled ? 1.0 : 0.3)
         .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
         .animation(.easeInOut(duration: 0.15), value: isHovering)
