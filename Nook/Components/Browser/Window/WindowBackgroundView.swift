@@ -3,52 +3,20 @@
 //  Nook
 //
 //  Created by Maciek Bagiński on 30/07/2025.
+//  Updated by Aether Aurelia on 12/10/2025.
 //
 
 import SwiftUI
-
+import UniversalGlass
 struct WindowBackgroundView: View {
     @Environment(BrowserManager.self) private var browserManager
 
     var body: some View {
-        Group {
-            if #available(macOS 26.0, *) {
-                if browserManager.settingsManager.isLiquidGlassEnabled {
-                    Rectangle()
-                        .fill(Color.clear)
-                        .blur(radius: 40)
-                        .glassEffect(in: .rect(cornerRadius: 0))
-                        .clipped()
-                } else {
-                    BlurEffectView(
-                        material: browserManager.settingsManager
-                            .currentMaterial,
-                        state: .active
-                    )
-                    .overlay(
-                        Color.black.opacity(0.25)
-                            .blendMode(.darken)
-                    )
-                }
-            } else {
-                if browserManager.settingsManager.isLiquidGlassEnabled {
-                    Rectangle()
-                        .fill(.clear)
-                        .background(.thinMaterial)  // Use thinMaterial for liquid glass effect for better compatability
-                        .blur(radius: 40)
-                        .clipped()
-                } else {
-                    BlurEffectView(
-                        material: browserManager.settingsManager
-                            .currentMaterial,
-                        state: .active
-                    )
-                    .overlay(
-                        Color.black.opacity(0.25)
-                            .blendMode(.darken)
-                    )
-                }
-            }        }
+        Rectangle()
+            .fill(Color.clear)
+            .blur(radius: 40)
+            .universalGlassEffect(in: .rect(cornerRadius: 0))
+            .clipped()
         .backgroundDraggable()
     }
 }

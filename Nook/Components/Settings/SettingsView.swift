@@ -184,21 +184,6 @@ struct GeneralSettingsView: View {
                             .frame(width: 220)
                         }
 
-                        Divider().opacity(0.4)
-
-                        Toggle(
-                            isOn: $bindableBrowserManager.settingsManager
-                                .isLiquidGlassEnabled
-                        ) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Liquid Glass")
-                                Text(
-                                    "Enable frosted translucency for UI surfaces"
-                                )
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            }
-                        }
                     }
                     
                     SettingsSectionCard(

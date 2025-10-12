@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		2C16A0262E87430B0070894B /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 2C16A0252E87430B0070894B /* Sparkle */; };
 		564997D82E9B24CC00D89F78 /* Garnish in Frameworks */ = {isa = PBXBuildFile; productRef = 564997D72E9B24CC00D89F78 /* Garnish */; };
+		56C82BA92E9C2DB500DDD0D6 /* UniversalGlass in Frameworks */ = {isa = PBXBuildFile; productRef = 56C82BA82E9C2DB500DDD0D6 /* UniversalGlass */; };
 		7FAFC5DA2E3ADDCD009D7DC4 /* FaviconFinder in Frameworks */ = {isa = PBXBuildFile; productRef = 7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */; };
 /* End PBXBuildFile section */
 
@@ -61,6 +62,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				564997D82E9B24CC00D89F78 /* Garnish in Frameworks */,
+				56C82BA92E9C2DB500DDD0D6 /* UniversalGlass in Frameworks */,
 				7FAFC5DA2E3ADDCD009D7DC4 /* FaviconFinder in Frameworks */,
 				2C16A0262E87430B0070894B /* Sparkle in Frameworks */,
 			);
@@ -110,6 +112,7 @@
 				7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */,
 				2C16A0252E87430B0070894B /* Sparkle */,
 				564997D72E9B24CC00D89F78 /* Garnish */,
+				56C82BA82E9C2DB500DDD0D6 /* UniversalGlass */,
 			);
 			productName = Pulse;
 			productReference = 7F8340FC2E37F39400674A5D /* Nook.app */;
@@ -143,6 +146,7 @@
 				7FAFC5D82E3ADDCD009D7DC4 /* XCRemoteSwiftPackageReference "FaviconFinder" */,
 				2C16A0242E87430B0070894B /* XCRemoteSwiftPackageReference "Sparkle" */,
 				564997D62E9B24CC00D89F78 /* XCRemoteSwiftPackageReference "Garnish" */,
+				56C82BA72E9C2DB500DDD0D6 /* XCRemoteSwiftPackageReference "UniversalGlass" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7F8340FD2E37F39400674A5D /* Products */;
@@ -428,6 +432,14 @@
 				minimumVersion = 0.0.4;
 			};
 		};
+		56C82BA72E9C2DB500DDD0D6 /* XCRemoteSwiftPackageReference "UniversalGlass" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Aeastr/UniversalGlass";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
 		7FAFC5D82E3ADDCD009D7DC4 /* XCRemoteSwiftPackageReference "FaviconFinder" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/will-lumley/FaviconFinder";
@@ -448,6 +460,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 564997D62E9B24CC00D89F78 /* XCRemoteSwiftPackageReference "Garnish" */;
 			productName = Garnish;
+		};
+		56C82BA82E9C2DB500DDD0D6 /* UniversalGlass */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 56C82BA72E9C2DB500DDD0D6 /* XCRemoteSwiftPackageReference "UniversalGlass" */;
+			productName = UniversalGlass;
 		};
 		7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */ = {
 			isa = XCSwiftPackageProductDependency;
