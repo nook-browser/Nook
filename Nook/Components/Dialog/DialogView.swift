@@ -17,13 +17,13 @@ struct DialogView: View {
                 overlayBackground
                 dialogContent(dialog)
                     .transition(.asymmetric(
-                        insertion: .offset(y: 30).combined(with: .opacity),
-                        removal: .offset(y: -30).combined(with: .opacity)
+                        insertion: .offset(y: 30).combined(with: .blur(intensity: 3, scale: 1)),
+                        removal: .offset(y: -30).combined(with: .blur(intensity: 3, scale: 1))
                     ))
                     .zIndex(1)
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: browserManager.dialogManager.isVisible)
+        .animation(.bouncy(duration: 0.2, extraBounce: -0.1), value: browserManager.dialogManager.isVisible)
     }
 
     @ViewBuilder

@@ -174,7 +174,7 @@ struct NookButtonStyle: ButtonStyle {
         switch variant {
         case .secondary:
             // Neutral gray for secondary buttons
-            return Color.white.mix(with: .black, by: colorScheme == .dark ? 0.8 : 0.1)
+            return Color.white.mix(with: .black, by: colorScheme == .dark ? 0.8 : 0.06)
         case .primary:
             // Use accent color from gradient manager
             return gradientColorManager.primaryColor

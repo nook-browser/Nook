@@ -153,30 +153,29 @@ struct StandardDialog<Header: View, Content: View, Footer: View>: View {
 
     var body: some View {
         DialogCard {
-            VStack(alignment: .leading, spacing: sectionSpacingForActiveSections) {
+            VStack(alignment: .leading, spacing: 25) {
                 if let header {
+                    
                     header
                 }
-
+                
                 content
-
+                
                 if let footer {
-                    footer
+                    VStack(alignment: .leading, spacing: 15) {
+//                        Divider()
+                        footer
+                    }
                 }
+                
             }
         }
     }
 
-    private var sectionSpacingForActiveSections: CGFloat {
-        var count = 0
-        if header != nil { count += 1 }
-        count += 1 // content
-        if footer != nil { count += 1 }
-        return count > 1 ? sectionSpacing : 0
-    }
 }
 
 struct DialogHeader: View {
+    @EnvironmentObject var gradientColorManager: GradientColorManager
     let icon: String
     let title: String
     let subtitle: String?
@@ -190,12 +189,12 @@ struct DialogHeader: View {
         HStack(spacing: 16) {
             ZStack {
                 Circle()
-                    .fill(Color.accentColor.opacity(0.1))
+                    .fill(gradientColorManager.primaryColor.opacity(0.1))
                     .frame(width: 48, height: 48)
 
                 Image(systemName: icon)
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(gradientColorManager.primaryColor)
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -306,7 +305,6 @@ struct OptionalKeyboardShortcut: ViewModifier {
 
 #if DEBUG
 private struct DialogManagerPreviewSurface: View {
-    @State private var analyticsEnabled: Bool = true
 
     var body: some View {
         StandardDialog(
@@ -319,39 +317,29 @@ private struct DialogManagerPreviewSurface: View {
             },
             content: {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Keep Nook feeling fast by sharing anonymous performance metrics.")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.primary)
-                    
-                    Text("We never collect your browsing history or personal data. You can opt out at any time from Settings → Privacy.")
+                    Text("This is placeholder body copy to demonstrate wrapping, spacing, and text styles in the dialog. Replace this with your own content.")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    
-                    Toggle(isOn: $analyticsEnabled) {
-                        Label("Share anonymous analytics", systemImage: analyticsEnabled ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 12, weight: .medium))
-                    }
-                    .toggleStyle(.switch)
                 }
                 .padding(.horizontal, 4)
             },
             footer: {
                 DialogFooter(
                     leftButton: DialogButton(
-                        text: "Privacy Policy",
-                        iconName: "link",
+                        text: "Learn More",
+                        iconName: "book",
                         variant: .secondary,
                         action: {}
                     ),
                     rightButtons: [
                         DialogButton(
-                            text: "Not Now",
+                            text: "Close",
                             variant: .secondary,
                             action: {}
                         ),
                         DialogButton(
-                            text: "Enable",
+                            text: "OK",
                             iconName: "checkmark",
                             variant: .primary,
                             action: {}
@@ -378,3 +366,4 @@ private struct DialogManagerPreviewSurface: View {
         .environmentObject(GradientColorManager())
 }
 #endif
+
