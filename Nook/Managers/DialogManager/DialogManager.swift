@@ -119,14 +119,14 @@ struct DialogCard<Content: View>: View {
 
     var body: some View {
         content
-            .padding(24)
+            .padding(16)
             .frame(maxWidth: 500, alignment: .leading)
             .background(Color(.windowBackgroundColor))
             .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
                     .stroke(Color.white.opacity(0.2))
             }
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
             .alwaysArrowCursor()
     }
 }
@@ -309,68 +309,67 @@ private struct DialogManagerPreviewSurface: View {
     @State private var analyticsEnabled: Bool = true
 
     var body: some View {
-        ZStack {
+        StandardDialog(
+            header: {
+                DialogHeader(
+                    icon: "sparkles",
+                    title: "Sample Dialog",
+                    subtitle: "Use this preview to adjust spacing, typography, and surfaces"
+                )
+            },
+            content: {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Keep Nook feeling fast by sharing anonymous performance metrics.")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    
+                    Text("We never collect your browsing history or personal data. You can opt out at any time from Settings → Privacy.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    
+                    Toggle(isOn: $analyticsEnabled) {
+                        Label("Share anonymous analytics", systemImage: analyticsEnabled ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .toggleStyle(.switch)
+                }
+                .padding(.horizontal, 4)
+            },
+            footer: {
+                DialogFooter(
+                    leftButton: DialogButton(
+                        text: "Privacy Policy",
+                        iconName: "link",
+                        variant: .secondary,
+                        action: {}
+                    ),
+                    rightButtons: [
+                        DialogButton(
+                            text: "Not Now",
+                            variant: .secondary,
+                            action: {}
+                        ),
+                        DialogButton(
+                            text: "Enable",
+                            iconName: "checkmark",
+                            variant: .primary,
+                            action: {}
+                        )
+                    ]
+                )
+            }
+        )
+        .padding(32)
+        .shadow(color: Color.black.opacity(0.2), radius: 20, y: 12)
+        .background(
             LinearGradient(
                 colors: [Color.black.opacity(0.45), Color.blue.opacity(0.35)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
-
-            StandardDialog(
-                header: {
-                    DialogHeader(
-                        icon: "sparkles",
-                        title: "Sample Dialog",
-                        subtitle: "Use this preview to adjust spacing, typography, and surfaces"
-                    )
-                },
-                content: {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Keep Nook feeling fast by sharing anonymous performance metrics.")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.primary)
-
-                        Text("We never collect your browsing history or personal data. You can opt out at any time from Settings → Privacy.")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        Toggle(isOn: $analyticsEnabled) {
-                            Label("Share anonymous analytics", systemImage: analyticsEnabled ? "checkmark.circle.fill" : "circle")
-                                .font(.system(size: 12, weight: .medium))
-                        }
-                        .toggleStyle(.switch)
-                    }
-                    .padding(.horizontal, 4)
-                },
-                footer: {
-                    DialogFooter(
-                        leftButton: DialogButton(
-                            text: "Privacy Policy",
-                            iconName: "link",
-                            variant: .secondary,
-                            action: {}
-                        ),
-                        rightButtons: [
-                            DialogButton(
-                                text: "Not Now",
-                                variant: .secondary,
-                                action: {}
-                            ),
-                            DialogButton(
-                                text: "Enable",
-                                iconName: "checkmark",
-                                variant: .primary,
-                                action: {}
-                            )
-                        ]
-                    )
-                }
-            )
-            .padding(32)
-            .shadow(color: Color.black.opacity(0.2), radius: 20, y: 12)
-        }
+        )
     }
 }
 

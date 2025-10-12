@@ -25,11 +25,6 @@ struct NookButtonStyle: ButtonStyle {
     private let verticalPadding: CGFloat = 12
     private let horizontalPadding: CGFloat = 12
 
-    // Contrast ratios for color calculations
-    private let textContrastRatio: CGFloat = 3
-    private let shadowContrastRatio: CGFloat = 2
-    private let highlightContrastRatio: CGFloat = 2
-
     // Hover and press effects
     private let hoverMixAmount: CGFloat = 0.2
     private let pressedOffset: CGFloat = 2
@@ -45,10 +40,6 @@ struct NookButtonStyle: ButtonStyle {
 
     // Disabled state
     private let disabledOpacity: CGFloat = 0.3
-
-    // Animation durations
-    private let pressAnimationDuration: CGFloat = 0.1
-    private let hoverAnimationDuration: CGFloat = 0.15
 
     enum Variant {
         case secondary  // Regular button
@@ -111,11 +102,12 @@ struct NookButtonStyle: ButtonStyle {
         }
         .compositingGroup()
         .opacity(isEnabled ? 1.0 : disabledOpacity)
-        .animation(.easeInOut(duration: pressAnimationDuration), value: configuration.isPressed)
-        .animation(.easeInOut(duration: hoverAnimationDuration), value: isHovering)
+        .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
+        .animation(.easeInOut(duration: 0.15), value: isHovering)
         .onHover { hovering in
             isHovering = hovering
         }
+        .padding(.bottom, isEnabled ? 2 : 0)
     }
 
     // MARK: - Helper Methods
@@ -124,7 +116,7 @@ struct NookButtonStyle: ButtonStyle {
     private func contrastingTextColor(for background: Color) -> Color {
         (try? Garnish.contrastingShade(
             of: background,
-            targetRatio: textContrastRatio,
+            targetRatio: 2,
             direction: .preferLight,
             blendStyle: .strong
         )) ?? textColor
@@ -134,7 +126,7 @@ struct NookButtonStyle: ButtonStyle {
     private func shadowColorForBackground(_ background: Color) -> Color {
         (try? Garnish.contrastingShade(
             of: background,
-            targetRatio: shadowContrastRatio,
+            targetRatio: 1.5,
             direction: .forceDark
         )) ?? textColor
     }
@@ -143,7 +135,7 @@ struct NookButtonStyle: ButtonStyle {
     private func highlightColorForBackground(_ background: Color) -> Color {
         (try? Garnish.contrastingShade(
             of: background,
-            targetRatio: highlightContrastRatio,
+            targetRatio: 2,
             direction: .preferLight
         )) ?? textColor
     }
@@ -275,6 +267,7 @@ private struct ButtonPreviewSection: View {
                 print("Create")
             }
             .buttonStyle(.nookButtonProminent)
+            .background(.red)
 
             Button("Cancel") {
                 print("Cancel")
