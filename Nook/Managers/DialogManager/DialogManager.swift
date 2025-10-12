@@ -68,7 +68,7 @@ class DialogManager {
                             DialogButton(
                                 text: "Quit",
                                 iconName: "arrowshape.turn.up.left.fill",
-                                variant: .destructive,
+                                variant: .primary,
                                 action: onQuit
                             )
                         ]
@@ -229,12 +229,12 @@ struct DialogFooter: View {
             if let leftButton = leftButton {
                 if let iconName = leftButton.iconName {
                     Button(leftButton.text, systemImage: iconName, action: leftButton.action)
-                        .buttonStyle(NookButtonStyle(variant: leftButton.variant, shadowStyle: leftButton.shadowStyle))
+                        .buttonStyle(NookButtonStyle(variant: leftButton.variant, shadowStyle: leftButton.shadowStyle, role: nil))
                         .disabled(!leftButton.isEnabled)
                         .modifier(OptionalKeyboardShortcut(shortcut: leftButton.keyboardShortcut))
                 } else {
                     Button(leftButton.text, action: leftButton.action)
-                        .buttonStyle(NookButtonStyle(variant: leftButton.variant, shadowStyle: leftButton.shadowStyle))
+                        .buttonStyle(NookButtonStyle(variant: leftButton.variant, shadowStyle: leftButton.shadowStyle, role: nil))
                         .disabled(!leftButton.isEnabled)
                         .modifier(OptionalKeyboardShortcut(shortcut: leftButton.keyboardShortcut))
                 }
@@ -248,12 +248,12 @@ struct DialogFooter: View {
 
                     if let iconName = button.iconName {
                         Button(button.text, systemImage: iconName, action: button.action)
-                            .buttonStyle(NookButtonStyle(variant: button.variant, shadowStyle: button.shadowStyle))
+                            .buttonStyle(NookButtonStyle(variant: button.variant, shadowStyle: button.shadowStyle, role: nil))
                             .disabled(!button.isEnabled)
                             .modifier(OptionalKeyboardShortcut(shortcut: button.keyboardShortcut))
                     } else {
                         Button(button.text, action: button.action)
-                            .buttonStyle(NookButtonStyle(variant: button.variant, shadowStyle: button.shadowStyle))
+                            .buttonStyle(NookButtonStyle(variant: button.variant, shadowStyle: button.shadowStyle, role: nil))
                             .disabled(!button.isEnabled)
                             .modifier(OptionalKeyboardShortcut(shortcut: button.keyboardShortcut))
                     }

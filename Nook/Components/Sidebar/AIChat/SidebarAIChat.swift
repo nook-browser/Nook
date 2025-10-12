@@ -376,7 +376,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                             DialogButton(
                                 text: "Clear",
                                 iconName: "trash",
-                                variant: .destructive,
+                                variant: .primary,
                                 action: {
                                     withAnimation(.easeInOut(duration: 0.2)) {
                                         messages.removeAll()
