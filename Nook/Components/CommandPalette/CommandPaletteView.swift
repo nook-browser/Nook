@@ -8,6 +8,7 @@
 import AppKit
 import SwiftUI
 import UniversalGlass
+import Garnish
 
 struct CommandPaletteView: View {
     @EnvironmentObject var browserManager: BrowserManager
@@ -150,19 +151,11 @@ struct CommandPaletteView: View {
                         .padding(10)
                         .frame(maxWidth: .infinity)
                         .frame(width: effectiveCommandPaletteWidth)
-                        .universalGlassEffect(.regular, in: .rect(cornerRadius: 26))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .conditionally(if: !OSVersion.supportsGlassEffect, apply: { view in
-                            view
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(
-                                            Color.white.opacity(isDark ? 0.3 : 0.6),
-                                            lineWidth: 0.5
-                                        )
-                                )
-                                .shadow(color: .black.opacity(0.4), radius: 50, x: 0, y: 4)
-                        })
+                        .universalGlassEffect(
+                            .regular.tint(
+                                gradientColorManager.primaryColor.adjustedLuminance(by: colorScheme == .light ? 0.4 : 0.2).opacity( colorScheme == .light ? 0.2 : 0.55)
+                            ),
+                            in: .rect(cornerRadius: 26))
                         .animation(
                             .easeInOut(duration: 0.15),
                             value: searchManager.suggestions.count
