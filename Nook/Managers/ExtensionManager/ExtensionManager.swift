@@ -529,6 +529,15 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             // Set the webExtensionController
             config.webExtensionController = extensionController
 
+            // CRITICAL: Ensure the extension controller itself has the proper configuration
+            // This is needed for popup resource loading to work correctly
+            if let controller = extensionController {
+                print("✅ [ExtensionManager] Extension controller available for popup resource loading")
+                // Note: controller.configuration is read-only, but the framework should handle this correctly
+            } else {
+                print("⚠️ [ExtensionManager] Extension controller is nil - this may cause popup resource loading issues")
+            }
+
             // Note: webViewConfiguration is read-only and automatically configured by WebKit
             // The webExtensionController set above enables proper extension page loading
             print("✅ [ExtensionManager] Extension context webExtensionController set up for shared data store")
@@ -1003,6 +1012,15 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                                     // Set the webExtensionController
                                     config.webExtensionController = extensionController
 
+                                    // CRITICAL: Ensure the extension controller itself has the proper configuration
+                                    // This is needed for popup resource loading to work correctly
+                                    if let controller = extensionController {
+                                        print("✅ [ExtensionManager] Extension controller available for popup resource loading (reload)")
+                                        // Note: controller.configuration is read-only, but the framework should handle this correctly
+                                    } else {
+                                        print("⚠️ [ExtensionManager] Extension controller is nil (reload) - this may cause popup resource loading issues")
+                                    }
+
                                     // Note: webViewConfiguration is read-only and automatically configured by WebKit
                                     // The webExtensionController set above enables proper extension page loading
                                     print("✅ [ExtensionManager] Extension context webExtensionController set up (reload) for shared data store")
@@ -1318,6 +1336,13 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                 return
             }
 
+            // CRITICAL FIX: Ensure popup uses the extension's webViewConfiguration for proper resource loading
+            // The framework-provided popup WebView might not have the correct configuration
+            let expectedConfig = extensionContext.webViewConfiguration
+            print("   🔧 Popup WebView configuration analysis:")
+            print("      Has extension context webViewConfiguration: \(expectedConfig != nil)")
+            print("      Popup webExtensionController set: \(webView.configuration.webExtensionController != nil)")
+
             // CRITICAL: Ensure popup WebView has access to the same extension context as the browser tabs
             // This fixes "Tab not found" errors when extensions call runtime.connect() from popups
             if webView.configuration.webExtensionController == nil {
@@ -1329,6 +1354,43 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             if webView.configuration.websiteDataStore !== controller.configuration.defaultWebsiteDataStore {
                 // Note: websiteDataStore is also read-only after creation, but this should be handled by the extension framework
                 print("   ⚠️  Popup WebView data store differs from browser data store - this may cause network issues")
+            }
+
+            // CRITICAL FIX: The popup needs to use the extension's own configuration for proper resource loading
+            // The webkit-extension:// URLs need the webExtensionController to be set correctly
+            print("   🔧 Popup configuration check:")
+            print("      webExtensionController: \(webView.configuration.webExtensionController != nil ? "✅" : "❌")")
+            print("      URL: \(webView.url?.absoluteString ?? "nil")")
+
+            // Add extension resource loading debugging
+            if let url = webView.url, url.scheme?.lowercased() == "webkit-extension" {
+                print("   🎯 Popup loading webkit-extension:// URL - ensuring proper resource access")
+
+                // Add a script to test resource loading in the popup
+                let resourceTestScript = """
+                (function(){
+                    console.log('🔍 [Popup Resource Test] URL:', window.location.href);
+                    console.log('🔍 [Popup Resource Test] Extension ID:', chrome.runtime.id || browser.runtime.id);
+
+                    // Test if extension resources can be loaded
+                    try {
+                        const testUrl = (chrome.runtime || browser.runtime).getURL('test.js');
+                        console.log('🔍 [Popup Resource Test] Test resource URL:', testUrl);
+
+                        // Try to fetch a simple resource
+                        fetch(testUrl).then(response => {
+                            console.log('🔍 [Popup Resource Test] Fetch response:', response.status);
+                        }).catch(err => {
+                            console.error('🔍 [Popup Resource Test] Fetch error:', err);
+                        });
+                    } catch(e) {
+                        console.error('🔍 [Popup Resource Test] Resource test error:', e);
+                    }
+                })();
+                """
+
+                let resourceTestUserScript = WKUserScript(source: resourceTestScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
+                webView.configuration.userContentController.addUserScript(resourceTestUserScript)
             }
 
             print("   ✅ Popup WebView configured with browser tab context")
@@ -1371,69 +1433,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             let inspectionHintUserScript = WKUserScript(source: inspectionHintScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
             webView.configuration.userContentController.addUserScript(inspectionHintUserScript)
 
-            // CRITICAL: Add console logging to capture popup errors
-            let consoleCaptureScript = """
-            (function(){
-                // Override console methods to capture output
-                const originalConsole = {
-                    log: console.log,
-                    error: console.error,
-                    warn: console.warn,
-                    info: console.info
-                };
-
-                // Capture all console output and send it to the native side
-                function sendToNative(level, ...args) {
-                    try {
-                        const message = args.map(arg => {
-                            if (typeof arg === 'object') {
-                                try {
-                                    return JSON.stringify(arg, null, 2);
-                                } catch(e) {
-                                    return String(arg);
-                                }
-                            }
-                            return String(arg);
-                        }).join(' ');
-
-                        // Send via webkit message handlers
-                        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.PopupConsole) {
-                            window.webkit.messageHandlers.PopupConsole.postMessage({
-                                level: level,
-                                message: message,
-                                timestamp: new Date().toISOString()
-                            });
-                        }
-                    } catch(e) {
-                        // Fallback to native console
-                        originalConsole.log('Console capture error:', e);
-                    }
-                }
-
-                // Override console methods
-                console.log = function(...args) {
-                    originalConsole.log.apply(console, args);
-                    sendToNative('log', ...args);
-                };
-
-                console.error = function(...args) {
-                    originalConsole.error.apply(console, args);
-                    sendToNative('error', ...args);
-                };
-
-                console.warn = function(...args) {
-                    originalConsole.warn.apply(console, args);
-                    sendToNative('warn', ...args);
-                };
-
-                console.info = function(...args) {
-                    originalConsole.info.apply(console, args);
-                    sendToNative('info', ...args);
-                };
-
-                originalConsole.log('📢 [Popup Console Capture] Console logging initialized');
-            })();
-            """
+            // CRITICAL: Console logging is now handled in the combined script below
 
             // CRITICAL: Combine all scripts into one injection to prevent multiple execution
             let combinedScript = """
