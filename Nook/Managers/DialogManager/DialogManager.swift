@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Observation
+import UniversalGlass
 
 @MainActor
 @Observable
@@ -121,12 +122,7 @@ struct DialogCard<Content: View>: View {
         content
             .padding(16)
             .frame(maxWidth: 500, alignment: .leading)
-            .background(Color(.windowBackgroundColor))
-            .overlay {
-                RoundedRectangle(cornerRadius: 26, style: .continuous)
-                    .stroke(Color.white.opacity(0.2))
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .universalGlassEffect(.regular.tint(Color(.windowBackgroundColor).opacity(0.7)), in: .rect(cornerRadius: 26))
             .alwaysArrowCursor()
     }
 }
@@ -190,11 +186,12 @@ struct DialogHeader: View {
             ZStack {
                 Circle()
                     .fill(gradientColorManager.primaryColor.opacity(0.1))
+                    .universalGlassEffect(.clear.tint(gradientColorManager.primaryColor.opacity(0.2)))
                     .frame(width: 48, height: 48)
 
                 Image(systemName: icon)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(gradientColorManager.primaryColor)
+                    .font(.system(size: 25, weight: .semibold))
+                    .foregroundStyle(gradientColorManager.primaryColor).frame(width: 48, height: 48)
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -215,6 +212,8 @@ struct DialogHeader: View {
 }
 
 struct DialogFooter: View {
+    @Environment(\.colorScheme) var colorScheme
+    @Environment(GradientColorManager.self) var gradientColorManager
     let leftButton: DialogButton?
     let rightButtons: [DialogButton]
 
@@ -228,12 +227,27 @@ struct DialogFooter: View {
             if let leftButton = leftButton {
                 if let iconName = leftButton.iconName {
                     Button(leftButton.text, systemImage: iconName, action: leftButton.action)
-                        .buttonStyle(NookButtonStyle(variant: leftButton.variant, shadowStyle: leftButton.shadowStyle, role: nil))
+                        .buttonStyle(
+                            .universalGlass()
+                        )
+                        .conditionally(if: OSVersion.supportsGlassEffect){ View in
+                            View
+                                .tint(Color("plainBackgroundColor").opacity(colorScheme == .light ? 0.8 : 0.4))
+                        }
+                        .controlSize(.extraLarge)
+                    
                         .disabled(!leftButton.isEnabled)
                         .modifier(OptionalKeyboardShortcut(shortcut: leftButton.keyboardShortcut))
                 } else {
                     Button(leftButton.text, action: leftButton.action)
-                        .buttonStyle(NookButtonStyle(variant: leftButton.variant, shadowStyle: leftButton.shadowStyle, role: nil))
+                        .buttonStyle(
+                            .universalGlass()
+                        )
+                        .conditionally(if: OSVersion.supportsGlassEffect){ View in
+                            View
+                                .tint(Color("plainBackgroundColor").opacity(colorScheme == .light ? 0.8 : 0.4))
+                        }
+                        .controlSize(.extraLarge)
                         .disabled(!leftButton.isEnabled)
                         .modifier(OptionalKeyboardShortcut(shortcut: leftButton.keyboardShortcut))
                 }
@@ -247,12 +261,23 @@ struct DialogFooter: View {
 
                     if let iconName = button.iconName {
                         Button(button.text, systemImage: iconName, action: button.action)
-                            .buttonStyle(NookButtonStyle(variant: button.variant, shadowStyle: button.shadowStyle, role: nil))
+                            .buttonStyle(
+                                .universalGlassProminent()
+                            )
+                            .tint(gradientColorManager.primaryColor)
+                            .controlSize(.extraLarge)
                             .disabled(!button.isEnabled)
                             .modifier(OptionalKeyboardShortcut(shortcut: button.keyboardShortcut))
                     } else {
                         Button(button.text, action: button.action)
-                            .buttonStyle(NookButtonStyle(variant: button.variant, shadowStyle: button.shadowStyle, role: nil))
+                            .buttonStyle(
+                                .universalGlass()
+                            )
+                            .conditionally(if: OSVersion.supportsGlassEffect){ View in
+                                View
+                                    .tint(Color("plainBackgroundColor").opacity(colorScheme == .light ? 0.8 : 0.4))
+                            }
+                            .controlSize(.extraLarge)
                             .disabled(!button.isEnabled)
                             .modifier(OptionalKeyboardShortcut(shortcut: button.keyboardShortcut))
                     }
@@ -304,7 +329,7 @@ struct OptionalKeyboardShortcut: ViewModifier {
 
 
 #if DEBUG
-private struct DialogManagerPreviewSurface: View {
+struct DialogManagerPreviewSurface: View {
 
     var body: some View {
         StandardDialog(
@@ -349,13 +374,8 @@ private struct DialogManagerPreviewSurface: View {
             }
         )
         .padding(32)
-        .shadow(color: Color.black.opacity(0.2), radius: 20, y: 12)
         .background(
-            LinearGradient(
-                colors: [Color.black.opacity(0.45), Color.blue.opacity(0.35)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            Image("tulips").resizable().scaledToFill()
             .ignoresSafeArea()
         )
     }

@@ -69,36 +69,8 @@ struct NookButtonStyle: ButtonStyle {
                 .foregroundStyle(contrastingShade)
                 .padding(.vertical, verticalPadding)
                 .padding(.horizontal, horizontalPadding)
-                .background {
-                    RoundedRectangle(cornerRadius: cornerRadius)
-                        .fill(backgroundWithHover)
-                }
-                // Highlight border effect
-                .overlay {
-                    RoundedRectangle(cornerRadius: cornerRadius)
-                        .strokeBorder(
-                            LinearGradient(
-                                colors: [highlightColor, .clear, highlightColor],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            ),
-                            lineWidth: highlightStrokeWidth
-                        )
-                        .opacity(highlightOpacity(isPressed: configuration.isPressed))
-                        .blendMode(.plusLighter)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-                // Press/hover offset for depth effect
-                .offset(y: verticalOffset(isPressed: configuration.isPressed))
-                // Shadow layer
-                .background {
-                    if shadowStyle != .none && isEnabled {
-                        RoundedRectangle(cornerRadius: cornerRadius)
-                            .foregroundStyle(shadowColor)
-                            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-                            .offset(y: pressedOffset)
-                    }
-                }
+                .background(backgroundWithHover)
+                .clipShape(.rect(cornerRadius: cornerRadius))
         }
         .compositingGroup()
         .opacity(isEnabled ? 1.0 : disabledOpacity)
@@ -107,7 +79,6 @@ struct NookButtonStyle: ButtonStyle {
         .onHover { hovering in
             isHovering = hovering
         }
-        .padding(.bottom, isEnabled ? 2 : 0)
     }
 
     // MARK: - Helper Methods
@@ -174,7 +145,7 @@ struct NookButtonStyle: ButtonStyle {
         switch variant {
         case .secondary:
             // Neutral gray for secondary buttons
-            return Color.white.mix(with: .black, by: colorScheme == .dark ? 0.8 : 0.06)
+            return Color.white.mix(with: .black, by: colorScheme == .dark ? 0.8 : 0.06).opacity(0.7)
         case .primary:
             // Use accent color from gradient manager
             return gradientColorManager.primaryColor
@@ -291,4 +262,9 @@ private struct ButtonPreviewSection: View {
             .disabled(true)
         }
     }
+}
+
+#Preview("Dialog Example") {
+    DialogManagerPreviewSurface()
+        .environment(GradientColorManager())
 }

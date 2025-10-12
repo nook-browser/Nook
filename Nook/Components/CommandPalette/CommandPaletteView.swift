@@ -150,7 +150,7 @@ struct CommandPaletteView: View {
                         .padding(10)
                         .frame(maxWidth: .infinity)
                         .frame(width: effectiveCommandPaletteWidth)
-                        .universalGlassEffect(.regular, in: .rect(cornerRadius: 12))
+                        .universalGlassEffect(.regular, in: .rect(cornerRadius: 26))
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .conditionally(if: !OSVersion.supportsGlassEffect, apply: { view in
                             view
