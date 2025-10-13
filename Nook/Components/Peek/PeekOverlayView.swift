@@ -9,8 +9,8 @@ import SwiftUI
 import AppKit
 
 struct PeekOverlayView: View {
-    @Environment(BrowserManager.self) private var browserManager
-    @Environment(BrowserWindowState.self) private var windowState
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     @Environment(\.colorScheme) var colorScheme
         @State private var webView: PeekWebView?
     @State private var scale: CGFloat = 0.001

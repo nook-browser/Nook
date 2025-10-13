@@ -8,13 +8,13 @@
 import SwiftUI
 
 struct DragEnabledSidebarView: View {
-    @Environment(BrowserManager.self) private var browserManager
+    @EnvironmentObject var browserManager: BrowserManager
     private var dragManager = TabDragManager.shared
     
     var body: some View {
         SidebarView()
-            .environment(browserManager)
-            .environment(dragManager)
+            .environmentObject(browserManager)
+            .environmentObject(dragManager)
             .tabDragManager(dragManager)
     }
 }

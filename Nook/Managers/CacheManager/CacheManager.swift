@@ -8,18 +8,16 @@
 import Foundation
 import WebKit
 import SwiftUI
-import Observation
 
 @MainActor
-@Observable
-class CacheManager {
+class CacheManager: ObservableObject {
     // Active data store for cache operations. Switchable per profile.
     private var dataStore: WKWebsiteDataStore
     // Optional profile context for diagnostics and profiling
     var currentProfileId: UUID?
-    private(set) var cacheEntries: [CacheInfo] = []
-    private(set) var domainGroups: [DomainCacheGroup] = []
-    private(set) var isLoading: Bool = false
+    @Published private(set) var cacheEntries: [CacheInfo] = []
+    @Published private(set) var domainGroups: [DomainCacheGroup] = []
+    @Published private(set) var isLoading: Bool = false
     
     init(dataStore: WKWebsiteDataStore? = nil) {
         self.dataStore = dataStore ?? WKWebsiteDataStore.default()

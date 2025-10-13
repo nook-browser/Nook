@@ -8,8 +8,8 @@
 import SwiftUI
 
 struct URLBarView: View {
-    @Environment(BrowserManager.self) private var browserManager
-    @Environment(BrowserWindowState.self) private var windowState
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     @State private var isHovering: Bool = false
 
     var body: some View {
@@ -53,7 +53,7 @@ struct URLBarView: View {
                        let extensionManager = browserManager.extensionManager,
                        browserManager.settingsManager.experimentalExtensions {
                         ExtensionActionView(extensions: extensionManager.installedExtensions)
-                            .environment(browserManager)
+                            .environmentObject(browserManager)
                     }
                 }
                 .padding(.horizontal, 12)

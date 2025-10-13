@@ -1,5 +1,4 @@
 import SwiftUI
-import Observation
 
 /// A container view that manages navigation between related views.
 ///
@@ -108,7 +107,7 @@ public struct PageView<SelectionValue, Page>: View where SelectionValue: Hashabl
     let previous: (SelectionValue) -> SelectionValue?
     @ViewBuilder let pageContent: (SelectionValue) -> Page
     @State private var id = UUID()
-    @State private var values: ValueStore
+    @StateObject private var values: ValueStore
     
     /// Creates a new page view that computes its pages using closures to determine the next and previous
     /// page value.
@@ -127,7 +126,7 @@ public struct PageView<SelectionValue, Page>: View where SelectionValue: Hashabl
         self.next = next
         self.previous = previous
         self.pageContent = content
-        self._values = State(initialValue: ValueStore(next, previous))
+        self._values = StateObject(wrappedValue: ValueStore(next, previous))
     }
     
     @Environment(\.pageViewStyle) private var style
@@ -306,9 +305,7 @@ extension PageViewStyleConfiguration {
 extension PageView {
     
     /// A cache for next and previous values.
-    @MainActor
-    @Observable
-    class ValueStore {
+    @MainActor class ValueStore: ObservableObject {
         
         typealias Value = PageViewStyleConfiguration.Value
         

@@ -175,7 +175,7 @@ struct StandardDialog<Header: View, Content: View, Footer: View>: View {
 }
 
 struct DialogHeader: View {
-    @Environment(GradientColorManager.self) var gradientColorManager
+    @EnvironmentObject var gradientColorManager: GradientColorManager
     let icon: String
     let title: String
     let subtitle: String?
@@ -363,7 +363,7 @@ private struct DialogManagerPreviewSurface: View {
 
 #Preview("Dialog Example") {
     DialogManagerPreviewSurface()
-        .environment(GradientColorManager())
+        .environmentObject(GradientColorManager())
 }
 #endif
 

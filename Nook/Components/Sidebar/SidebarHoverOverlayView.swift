@@ -9,9 +9,9 @@ import SwiftUI
 import AppKit
 
 struct SidebarHoverOverlayView: View {
-    @Environment(BrowserManager.self) private var browserManager
-    @Environment(HoverSidebarManager.self) private var hoverManager
-    @Environment(BrowserWindowState.self) private var windowState
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var hoverManager: HoverSidebarManager
+    @EnvironmentObject var windowState: BrowserWindowState
 
     private var overlayWidth: CGFloat {
         windowState.isSidebarVisible ? windowState.sidebarWidth : browserManager.getSavedSidebarWidth(for: windowState)
@@ -39,8 +39,8 @@ struct SidebarHoverOverlayView: View {
 
                 if hoverManager.isOverlayVisible {
                     SidebarView(forceVisible: true, forcedWidth: overlayWidth)
-                        .environment(browserManager)
-                        .environment(windowState)
+                        .environmentObject(browserManager)
+                        .environmentObject(windowState)
                         .frame(width: overlayWidth)
                         .frame(maxHeight: .infinity)
                         .background(BlurEffectView(material: .contentBackground, state: .active))

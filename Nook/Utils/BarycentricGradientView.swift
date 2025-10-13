@@ -9,7 +9,8 @@ import AppKit
 // - Smoothly animates activation between counts (1<->2<->3) in Metal.
 struct BarycentricGradientView: View, Animatable {
     var gradient: SpaceGradient
-    @Environment(GradientColorManager.self) private var gradientColorManager
+    @EnvironmentObject private var gradientColorManager: GradientColorManager
+
     // Track transitions between color-count modes for smooth activation
     @State private var previousCount: Int = 0
     @State private var activationProgress: Double = 1.0

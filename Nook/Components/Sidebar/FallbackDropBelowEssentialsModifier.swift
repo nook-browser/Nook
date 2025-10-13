@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct FallbackDropBelowEssentialsModifier: ViewModifier {
-    @Environment(BrowserManager.self) private var browserManager
-    @Environment(BrowserWindowState.self) private var windowState
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     @State private var draggedItem: UUID? = nil
 
     func body(content: Content) -> some View {

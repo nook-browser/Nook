@@ -70,7 +70,7 @@ struct SpaceCreationDialog: DialogPresentable {
 struct SpaceCreationContent: View {
     @Binding var spaceName: String
     @Binding var spaceIcon: String
-    @State private var emojiManager = EmojiPickerManager()
+    @StateObject private var emojiManager = EmojiPickerManager()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {

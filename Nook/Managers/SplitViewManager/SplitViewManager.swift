@@ -1,20 +1,18 @@
 import SwiftUI
-import Observation
 
 @MainActor
-@Observable
-final class SplitViewManager {
+final class SplitViewManager: ObservableObject {
     enum Side { case left, right }
 
     // MARK: - State
-    var isSplit: Bool = false
-    var leftTabId: UUID? = nil
-    var rightTabId: UUID? = nil
-    private(set) var dividerFraction: CGFloat = 0.5 // 0.0 = all left, 1.0 = all right
+    @Published var isSplit: Bool = false
+    @Published var leftTabId: UUID? = nil
+    @Published var rightTabId: UUID? = nil
+    @Published private(set) var dividerFraction: CGFloat = 0.5 // 0.0 = all left, 1.0 = all right
 
     // Preview state during drag-over of the web content
-    var isPreviewActive: Bool = false
-    var previewSide: Side? = nil
+    @Published var isPreviewActive: Bool = false
+    @Published var previewSide: Side? = nil
 
     // Limits for divider movement
     let minFraction: CGFloat = 0.2
