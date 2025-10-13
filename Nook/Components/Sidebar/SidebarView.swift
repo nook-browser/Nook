@@ -224,7 +224,12 @@ struct SidebarView: View {
                 .environment(browserManager.settingsManager)
                 .padding(.horizontal, 8)
                 .padding(.bottom, 8)
-            
+
+            // Media controls - appears when media is actively playing
+            MediaControlsView()
+                .environmentObject(browserManager)
+                .environmentObject(windowState)
+
             // MARK: - Bottom
             ZStack {
                 // Left side icons - anchored to left
@@ -293,7 +298,7 @@ struct SidebarView: View {
                     .transition(.move(edge: browserManager.settingsManager.sidebarPosition == .left ? .leading : .trailing).combined(with: .opacity))
             } else {
                 content
-                    .transition(.blur)
+                    .transition(.opacity)
             }
         }
             .frame(width: effectiveWidth)
