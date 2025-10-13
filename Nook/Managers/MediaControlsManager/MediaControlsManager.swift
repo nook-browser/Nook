@@ -44,16 +44,10 @@ final class MediaControlsManager {
         }
         let allTabs = browserManager.tabManager.allTabs()
 
-        print("🎵 [MediaControls] Checking \(allTabs.count) tabs for active media")
-
         for tab in allTabs {
             let isMediaHost = isMediaHostURL(tab.url)
             let hasAudio = tab.hasPlayingAudio
             let hasVideo = tab.hasPlayingVideo
-
-            if isMediaHost || hasAudio || hasVideo {
-                print("🎵 [MediaControls] Tab: \(tab.url.host ?? "unknown") - isMediaHost: \(isMediaHost), hasAudio: \(hasAudio), hasVideo: \(hasVideo)")
-            }
 
             if isMediaHost && (hasAudio || hasVideo) {
                 print("✅ [MediaControls] Found active media tab: \(tab.url)")
