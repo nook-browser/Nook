@@ -64,22 +64,12 @@ class BrowserManager {
 
 
     // MARK: - Window State Management
-    /// Registry of all active window states
-    var windowStates: [UUID: BrowserWindowState] = [:]
-    
-    /// Note: Removed tabDisplayOwners - each window now shows its own current tab independently
-    
-    /// Window-specific web views: tabId -> windowId -> WKWebView
-    private var webViewsByTabAndWindow: [UUID: [UUID: WKWebView]] = [:]
-    private var isSyncingTab: Set<UUID> = [] // Prevent recursive sync calls
-    
-    /// Weak wrapper for NSView references stored per window
-    private struct WeakNSView { weak var view: NSView? }
-    /// Container views per window so the compositor can manage multiple windows safely
-    private var compositorContainerViews: [UUID: WeakNSView] = [:]
-    
-    /// The currently focused/active window state
-    var activeWindowState: BrowserWindowState?
+    var windowStateManager: WindowStateManager
+    var webViewCoordinator: WebViewCoordinator
+
+    /// Convenience accessors for common window state operations
+    var windowStates: [UUID: BrowserWindowState] { windowStateManager.windowStates }
+    var activeWindowState: BrowserWindowState? { windowStateManager.activeWindowState }
 
     /// Reference to the app delegate for Sparkle integration
     weak var appDelegate: AppDelegate?
@@ -111,31 +101,20 @@ class BrowserManager {
     
     // Compositor container view
     func setCompositorContainerView(_ view: NSView?, for windowId: UUID) {
-        if let view {
-            compositorContainerViews[windowId] = WeakNSView(view: view)
-        } else {
-            compositorContainerViews.removeValue(forKey: windowId)
-        }
+        windowStateManager.setCompositorContainer(view, for: windowId)
     }
-    
+
     func compositorContainerView(for windowId: UUID) -> NSView? {
-        if let view = compositorContainerViews[windowId]?.view {
-            return view
-        }
-        compositorContainerViews.removeValue(forKey: windowId)
-        return nil
+        return windowStateManager.getCompositorContainer(for: windowId)
     }
-    
+
     func removeCompositorContainerView(for windowId: UUID) {
-        compositorContainerViews.removeValue(forKey: windowId)
+        windowStateManager.removeCompositorContainer(for: windowId)
     }
     
     func removeWebViewFromContainers(_ webView: WKWebView) {
-        for (windowId, entry) in compositorContainerViews {
-            guard let container = entry.view else {
-                compositorContainerViews.removeValue(forKey: windowId)
-                continue
-            }
+        let containers = windowStateManager.getAllCompositorContainers()
+        for (_, container) in containers {
             for subview in container.subviews where subview === webView {
                 subview.removeFromSuperview()
             }
@@ -143,7 +122,7 @@ class BrowserManager {
     }
 
     func removeAllWebViews(for tab: Tab) {
-        guard let entries = webViewsByTabAndWindow.removeValue(forKey: tab.id) else { return }
+        let entries = webViewCoordinator.removeAllWebViews(for: tab.id)
         for (_, webView) in entries {
             tab.cleanupCloneWebView(webView)
             removeWebViewFromContainers(webView)
@@ -151,9 +130,14 @@ class BrowserManager {
     }
 
     private func enforceExclusiveAudio(for tab: Tab, activeWindowId: UUID, desiredMuteState: Bool? = nil) {
-        guard let clones = webViewsByTabAndWindow[tab.id] else { return }
+        let clones = webViewCoordinator.getAllWebViews(for: tab.id)
         let activeMute = desiredMuteState ?? tab.isAudioMuted
-        for (windowId, webView) in clones {
+        for webView in clones {
+            // Find which window this webView belongs to
+            let windowId = windowStateManager.getAllCompositorContainers().first(where: { _, container in
+                container.subviews.contains(webView)
+            })?.0
+
             if windowId == activeWindowId {
                 webView.isMuted = activeMute
             } else {
@@ -206,19 +190,7 @@ class BrowserManager {
     }
 
     func compositorContainers() -> [(UUID, NSView)] {
-        var result: [(UUID, NSView)] = []
-        var staleIdentifiers: [UUID] = []
-        for (windowId, entry) in compositorContainerViews {
-            if let view = entry.view {
-                result.append((windowId, view))
-            } else {
-                staleIdentifiers.append(windowId)
-            }
-        }
-        for id in staleIdentifiers {
-            compositorContainerViews.removeValue(forKey: id)
-        }
-        return result
+        return windowStateManager.getAllCompositorContainers()
     }
 
     // MARK: - OAuth Assist Banner
@@ -259,6 +231,10 @@ class BrowserManager {
         let findManager = FindManager()
         let importManager = ImportManager()
 
+        // Initialize window and webview managers
+        let windowStateManager = WindowStateManager()
+        let webViewCoordinator = WebViewCoordinator()
+
         self.modelContext = context
         self.extensionManager = extensionManager
         self.profileManager = profileManager
@@ -276,6 +252,8 @@ class BrowserManager {
         self.trackingProtectionManager = trackingProtectionManager
         self.findManager = findManager
         self.importManager = importManager
+        self.windowStateManager = windowStateManager
+        self.webViewCoordinator = webViewCoordinator
         self.currentProfile = initialProfile
 
         // Phase 2: wire dependencies and perform side effects (safe to use self)
@@ -1626,10 +1604,10 @@ class BrowserManager {
             windowState.currentProfileId = space.profileId ?? currentProfile?.id
             windowState.activeGradient = space.gradient
         }
-        
-        windowStates[windowState.id] = windowState
+
+        windowStateManager.register(windowState)
         setActiveWindowState(windowState)
-        
+
         print("🪟 [BrowserManager] Registered window state: \(windowState.id)")
     }
     
