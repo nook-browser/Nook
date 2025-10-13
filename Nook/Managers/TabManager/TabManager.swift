@@ -403,8 +403,7 @@ import OSLog
 }
 
 @MainActor
-@Observable
-class TabManager {
+class TabManager: ObservableObject {
     enum TabManagerError: LocalizedError {
         case spaceNotFound(UUID)
 
@@ -429,20 +428,20 @@ class TabManager {
     private let toastCooldown: TimeInterval = 2 * 60 * 60 // 2 hours in seconds
 
     // Spaces
-    public private(set) var spaces: [Space] = []
-    public private(set) var currentSpace: Space?
+    @Published public private(set) var spaces: [Space] = []
+    @Published public private(set) var currentSpace: Space?
 
     // Normal tabs per space
-    private var tabsBySpace: [UUID: [Tab]] = [:]
+    @Published private var tabsBySpace: [UUID: [Tab]] = [:]
 
     // Space-level pinned tabs per space
-    private var spacePinnedTabs: [UUID: [Tab]] = [:]
+    @Published private var spacePinnedTabs: [UUID: [Tab]] = [:]
 
     // Folders per space
-    private var foldersBySpace: [UUID: [TabFolder]] = [:]
+    @Published private var foldersBySpace: [UUID: [TabFolder]] = [:]
 
     // Global pinned (essentials), isolated per profile
-    private var pinnedByProfile: [UUID: [Tab]] = [:]
+    @Published private var pinnedByProfile: [UUID: [Tab]] = [:]
     // Pinned tabs encountered during load that have no profile assignment yet
     private var pendingPinnedWithoutProfile: [Tab] = []
     // Space activation to resume after a deferred profile switch

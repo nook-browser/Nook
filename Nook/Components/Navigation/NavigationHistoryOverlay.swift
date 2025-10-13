@@ -13,7 +13,7 @@ enum NavigationHistoryMenuType {
 }
 
 struct NavigationHistoryOverlay: View {
-    @Environment(BrowserManager.self) private var browserManager
+    @EnvironmentObject var browserManager: BrowserManager
     let windowState: BrowserWindowState
     @Binding var isPresented: Bool
     let menuType: NavigationHistoryMenuType
@@ -44,7 +44,7 @@ struct NavigationHistoryOverlay: View {
                                 windowState: windowState,
                                 historyType: .back
                             )
-                            .environment(browserManager)
+                            .environmentObject(browserManager)
                             .onAppear {
                                 // Menu is shown automatically
                             }
@@ -57,7 +57,7 @@ struct NavigationHistoryOverlay: View {
                                 windowState: windowState,
                                 historyType: .forward
                             )
-                            .environment(browserManager)
+                            .environmentObject(browserManager)
                             .onAppear {
                                 // Menu is shown automatically
                             }

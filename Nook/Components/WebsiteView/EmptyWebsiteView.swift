@@ -9,8 +9,8 @@ import SwiftUI
 
 struct EmptyWebsiteView: View {
     @Environment(\.colorScheme) var colorScheme
-    @Environment(BrowserManager.self) private var browserManager
-    @Environment(BrowserWindowState.self) private var windowState
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
 
     var body: some View {
         GeometryReader { proxy in

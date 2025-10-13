@@ -17,7 +17,7 @@ struct DraggableTabView<Content: View>: View {
 
     @State private var dragGesture = false
     @State private var dragOffset: CGSize = .zero
-    @State private var dragLockManager = DragLockManager.shared
+    @StateObject private var dragLockManager = DragLockManager.shared
     @State private var dragSessionID: String = UUID().uuidString
     
     init(

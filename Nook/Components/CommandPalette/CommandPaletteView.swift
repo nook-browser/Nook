@@ -9,9 +9,9 @@ import AppKit
 import SwiftUI
 
 struct CommandPaletteView: View {
-    @Environment(BrowserManager.self) private var browserManager
-    @Environment(BrowserWindowState.self) private var windowState
-    @Environment(GradientColorManager.self) private var gradientColorManager
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
+    @EnvironmentObject var gradientColorManager: GradientColorManager
     @State private var searchManager = SearchManager()
     @Environment(\.colorScheme) var colorScheme
 
@@ -248,7 +248,7 @@ struct CommandPaletteView: View {
 
     // MARK: - Suggestions List Subview
     private struct CommandPaletteSuggestionsListView: View {
-        @Environment(GradientColorManager.self) private var gradientColorManager
+        @EnvironmentObject var gradientColorManager: GradientColorManager
         let suggestions: [SearchManager.SearchSuggestion]
         @Binding var selectedIndex: Int
         @Binding var hoveredIndex: Int?

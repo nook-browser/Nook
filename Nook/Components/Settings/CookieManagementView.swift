@@ -9,7 +9,7 @@ import SwiftUI
 import WebKit
 
 struct CookieManagementView: View {
-    @State private var cookieManager = CookieManager()
+    @StateObject private var cookieManager = CookieManager()
     @State private var searchText: String = ""
     @State private var selectedFilter: CookieFilter = .all
     @State private var selectedSort: CookieSortOption = .domain

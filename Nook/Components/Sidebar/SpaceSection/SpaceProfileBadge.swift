@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct SpaceProfileBadge: View {
-    @Environment(BrowserManager.self) private var browserManager
+    @EnvironmentObject var browserManager: BrowserManager
 
     let space: Space
     var size: Size = .normal // .compact for tiny dots/icons

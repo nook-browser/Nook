@@ -6,8 +6,8 @@
 //
 
 import AppKit
+import Combine
 import SwiftUI
-import Observation
 
 class EmojiButton: NSButton {
     var onHover: ((Bool) -> Void)?
@@ -217,11 +217,10 @@ class EmojiPickerViewController: NSViewController {
     }
 }
 
-@Observable
-class EmojiPickerManager {
+class EmojiPickerManager: ObservableObject {
     var popover: NSPopover?
     weak var anchorView: NSView?
-    var selectedEmoji: String = ""
+    @Published var selectedEmoji: String = ""
 
     func toggle() {
         guard let anchorView = anchorView else { return }

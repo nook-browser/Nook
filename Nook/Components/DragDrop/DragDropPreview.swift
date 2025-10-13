@@ -7,17 +7,15 @@
 
 import SwiftUI
 import AppKit
-import Observation
 
 // MARK: - Mock Models
 
-@Observable
-class MockTab: Identifiable {
+class MockTab: Identifiable, ObservableObject {
     let id = UUID()
-    var name: String
-    var favicon: String
-    var index: Int
-    var spaceId: UUID?
+    @Published var name: String
+    @Published var favicon: String
+    @Published var index: Int
+    @Published var spaceId: UUID?
     var url: URL = URL(string: "https://example.com")!
     
     init(name: String, favicon: String, index: Int = 0, spaceId: UUID? = nil) {
@@ -42,13 +40,12 @@ struct MockSpace: Identifiable {
 // MARK: - Mock Tab Manager
 
 @MainActor
-@Observable
-class MockTabManager {
-    var globalPinnedTabs: [MockTab] = []
-    var spacePinnedTabs: [UUID: [MockTab]] = [:]
-    var regularTabs: [UUID: [MockTab]] = [:]
-    var spaces: [MockSpace] = []
-    var currentSpaceId: UUID?
+class MockTabManager: ObservableObject {
+    @Published var globalPinnedTabs: [MockTab] = []
+    @Published var spacePinnedTabs: [UUID: [MockTab]] = [:]
+    @Published var regularTabs: [UUID: [MockTab]] = [:]
+    @Published var spaces: [MockSpace] = []
+    @Published var currentSpaceId: UUID?
     
     var currentSpace: MockSpace? {
         spaces.first { $0.id == currentSpaceId }
@@ -180,14 +177,9 @@ class MockTabManager {
 // MARK: - Mock Tab View
 
 struct MockTabView: View {
-    @Bindable private var tab: MockTab
-    private let action: () -> Void
+    @ObservedObject var tab: MockTab
+    let action: () -> Void
     @State private var isHovering: Bool = false
-
-    init(tab: MockTab, action: @escaping () -> Void = {}) {
-        self._tab = Bindable(tab)
-        self.action = action
-    }
     
     var body: some View {
         Button(action: action) {
@@ -265,14 +257,9 @@ print("Pin \(tab.name) globally")
 // MARK: - Mock Pinned Tab View
 
 struct MockPinnedTabView: View {
-    @Bindable private var tab: MockTab
-    private let action: () -> Void
+    @ObservedObject var tab: MockTab
+    let action: () -> Void
     @State private var isHovering: Bool = false
-
-    init(tab: MockTab, action: @escaping () -> Void = {}) {
-        self._tab = Bindable(tab)
-        self.action = action
-    }
     
     var body: some View {
         Button(action: action) {
@@ -321,8 +308,8 @@ struct DropZoneView: View {
 // MARK: - Main Preview View
 
 struct DragDropPreview: View {
-    @State private var dragManager = TabDragManager()
-    @State private var tabManager = MockTabManager()
+    @StateObject private var dragManager = TabDragManager()
+    @StateObject private var tabManager = MockTabManager()
     
     var body: some View {
         TabDragContainerView(
@@ -344,11 +331,11 @@ struct DragDropPreview: View {
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
                             ForEach(tabManager.globalPinnedTabs.indices, id: \.self) { index in
                                 let tab = tabManager.globalPinnedTabs[index]
-                                MockPinnedTabView(tab: tab, action: {
+                                MockPinnedTabView(tab: tab) {
 #if DEBUG
                                     print("Activated: \(tab.name)")
 #endif
-                                })
+                                }
                                 .onDrag {
                                     dragManager.startDrag(tab: convertToRealTab(tab), from: .essentials, at: index)
                                     return NSItemProvider(object: tab.id.uuidString as NSString)
@@ -403,12 +390,11 @@ struct DragDropPreview: View {
                                                 }
                                             }
                                             
-                                            MockTabView(tab: tab, action: {
+                                            MockTabView(tab: tab) {
 #if DEBUG
                                                 print("Activated: \(tab.name)")
 #endif
-                                            })
-                                            .environment(tab)
+                                            }
                                             .onDrag {
                                                 dragManager.startDrag(tab: convertToRealTab(tab), from: .spacePinned(currentSpace.id), at: index)
                                                 return NSItemProvider(object: tab.id.uuidString as NSString)
@@ -452,12 +438,11 @@ struct DragDropPreview: View {
                                                     }
                                             }
                                             
-                                            MockTabView(tab: tab, action: {
+                                            MockTabView(tab: tab) {
 #if DEBUG
                                                 print("Activated: \(tab.name)")
 #endif
-                                            })
-                                            .environment(tab)
+                                            }
                                             .onDrag {
                                                 dragManager.startDrag(tab: convertToRealTab(tab), from: .spaceRegular(currentSpace.id), at: index)
                                                 return NSItemProvider(object: tab.id.uuidString as NSString)

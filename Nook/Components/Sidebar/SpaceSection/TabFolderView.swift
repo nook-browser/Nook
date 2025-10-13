@@ -16,7 +16,7 @@ private func haptic(_ pattern: NSHapticFeedbackManager.FeedbackPattern = .alignm
 }
 
 struct TabFolderView: View {
-    var folder: TabFolder
+    @ObservedObject var folder: TabFolder
     let space: Space
     let onRename: () -> Void
     let onDelete: () -> Void
@@ -29,8 +29,8 @@ struct TabFolderView: View {
     @State private var isDropTargeted: Bool = false
     @State private var dropPreviewIndex: Int? = nil
 
-    @Environment(BrowserManager.self) private var browserManager
-    @Environment(BrowserWindowState.self) private var windowState
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
   
 
     // Get tabs in this folder

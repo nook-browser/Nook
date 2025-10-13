@@ -33,9 +33,9 @@ struct TabPositionPreferenceKey: PreferenceKey {
 struct SpaceView: View {
     let space: Space
     let isActive: Bool
-    @Environment(BrowserManager.self) private var browserManager
-    @Environment(BrowserWindowState.self) private var windowState
-    @Environment(GradientColorManager.self) private var gradientColorManager
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
+    @EnvironmentObject var gradientColorManager: GradientColorManager
     @State private var draggedItem: UUID? = nil
     @State private var dropPreviewIndex: Int? = nil
     @State private var dropPreviewSection: SidebarTargetSection? = nil
@@ -64,7 +64,7 @@ struct SpaceView: View {
     let onMoveTabUp: (Tab) -> Void
     let onMoveTabDown: (Tab) -> Void
     let onMuteTab: (Tab) -> Void
-    @Environment(SplitViewManager.self) private var splitManager
+    @EnvironmentObject var splitManager: SplitViewManager
     
     private var outerWidth: CGFloat {
         let visibleWidth = windowState.sidebarWidth
@@ -282,8 +282,8 @@ struct SpaceView: View {
                         onAddTab: { addTabToFolder(folderWithTabs.folder) },
                         onActivateTab: { onActivateTab($0) }
                     )
-                    .environment(browserManager)
-                    .environment(windowState)
+                    .environmentObject(browserManager)
+                    .environmentObject(windowState)
                     .transition(.asymmetric(
                         insertion: .scale.combined(with: .opacity).animation(.easeInOut(duration: 0.3)),
                         removal: .scale.combined(with: .opacity).animation(.easeInOut(duration: 0.2))
@@ -574,7 +574,7 @@ struct SpaceView: View {
                     onActivate: onActivateTab,
                     onClose: onCloseTab
                 )
-                .environment(browserManager)
+                .environmentObject(browserManager)
             } else if idx == secondIdx {
                 EmptyView()
             } else {
