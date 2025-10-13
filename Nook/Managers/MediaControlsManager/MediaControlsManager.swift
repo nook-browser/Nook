@@ -55,7 +55,6 @@ final class MediaControlsManager {
             }
         }
 
-        print("❌ [MediaControls] No active media tab found")
         return nil
     }
 
