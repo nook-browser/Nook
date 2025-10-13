@@ -448,7 +448,6 @@ struct SpaceView: View {
 
             Color.clear
                 .frame(height: 28)
-                .contentShape(Rectangle())
                 .onDrop(
                     of: [.text],
                     delegate: SidebarSectionDropDelegateSimple(
