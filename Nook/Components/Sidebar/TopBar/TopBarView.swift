@@ -12,7 +12,7 @@ struct TopBarView: View {
     @EnvironmentObject var windowState: BrowserWindowState
     @StateObject private var tabWrapper = ObservableTabWrapper()
     @State private var isHovering: Bool = false
-
+    
     var body: some View {
         HStack(spacing: 8) {
             // Far left: Mac traffic light buttons
@@ -20,14 +20,20 @@ struct TopBarView: View {
                 .frame(width: 70)
             
             // Left: Sidebar toggle button
-            NavButton(iconName: browserManager.settingsManager.sidebarPosition == .left ? "sidebar.left" : "sidebar.right", disabled: false, action: {
+            Button("Toggle Sidebar", systemImage: browserManager.settingsManager.sidebarPosition == .left ? "sidebar.left" : "sidebar.right") {
                 browserManager.toggleSidebar(for: windowState)
-            })
-
+            }
+            .labelStyle(.iconOnly)
+            .buttonStyle(NavButtonStyle())
+            .foregroundStyle(Color.primary)
+            
             if browserManager.settingsManager.showAIAssistant {
-                NavButton(iconName: "sparkle", disabled: false, action: {
+                Button("Toggle AI Assistant", systemImage: "sparkle") {
                     browserManager.toggleAISidebar(for: windowState)
-                })
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(NavButtonStyle())
+                .foregroundStyle(Color.primary)
             }
             
             Spacer()
@@ -36,31 +42,34 @@ struct TopBarView: View {
             HStack(spacing: 12) {
                 // Navigation controls
                 HStack(spacing: 4) {
-                    NavButton(
-                        iconName: "arrow.backward",
-                        disabled: !tabWrapper.canGoBack,
-                        action: goBack
-                    )
-                    .contextMenu {
-                        NavigationHistoryContextMenu(
-                            historyType: .back,
-                            windowState: windowState
-                        )
-                    }
+                    Button("Go Back", systemImage: "arrow.backward", action: goBack)
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(NavButtonStyle())
+                        .foregroundStyle(Color.primary)
+                        .disabled(!tabWrapper.canGoBack)
+                        .contextMenu {
+                            NavigationHistoryContextMenu(
+                                historyType: .back,
+                                windowState: windowState
+                            )
+                        }
                     
-                    NavButton(
-                        iconName: "arrow.forward",
-                        disabled: !tabWrapper.canGoForward,
-                        action: goForward
-                    )
-                    .contextMenu {
-                        NavigationHistoryContextMenu(
-                            historyType: .forward,
-                            windowState: windowState
-                        )
-                    }
+                    Button("Go Forward", systemImage: "arrow.forward", action: goForward)
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(NavButtonStyle())
+                        .foregroundStyle(Color.primary)
+                        .disabled(!tabWrapper.canGoForward)
+                        .contextMenu {
+                            NavigationHistoryContextMenu(
+                                historyType: .forward,
+                                windowState: windowState
+                            )
+                        }
                     
-                    RefreshButton(action: refreshCurrentTab)
+                    Button("Reload", systemImage: "arrow.clockwise", action: refreshCurrentTab)
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(NavButtonStyle())
+                        .foregroundStyle(Color.primary)
                 }
                 
                 // URL bar
@@ -147,7 +156,7 @@ struct TopBarView: View {
     private func updateCurrentTab() {
         tabWrapper.updateTab(browserManager.currentTab(for: windowState))
     }
-
+    
     private func goBack() {
         if let tab = tabWrapper.tab,
            let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
@@ -156,7 +165,7 @@ struct TopBarView: View {
             tabWrapper.tab?.goBack()
         }
     }
-
+    
     private func goForward() {
         if let tab = tabWrapper.tab,
            let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
@@ -165,7 +174,7 @@ struct TopBarView: View {
             tabWrapper.tab?.goForward()
         }
     }
-
+    
     private func refreshCurrentTab() {
         tabWrapper.tab?.refresh()
     }

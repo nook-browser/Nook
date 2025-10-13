@@ -72,7 +72,7 @@ struct ProfileDeleteConfirmationDialog: DialogPresentable {
                 DialogButton(
                     text: "Delete Profile",
                     iconName: "trash",
-                    variant: isLastProfile ? .secondary : .destructive,
+                    variant: isLastProfile ? .secondary : .primary,
                     isEnabled: !isLastProfile,
                     action: onDelete
                 )

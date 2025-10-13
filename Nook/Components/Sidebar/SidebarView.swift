@@ -224,13 +224,18 @@ struct SidebarView: View {
                 .environment(browserManager.settingsManager)
                 .padding(.horizontal, 8)
                 .padding(.bottom, 8)
-            
+
+            // Media controls - appears when media is actively playing
+            MediaControlsView()
+                .environmentObject(browserManager)
+                .environmentObject(windowState)
+
             // MARK: - Bottom
             ZStack {
                 // Left side icons - anchored to left
                 HStack {
                     ZStack {
-                        NavButton(iconName: "archivebox", disabled: false, action: {
+                        Button("Menu", systemImage: "archivebox") {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 windowState.isSidebarMenuVisible = true
                                 windowState.isSidebarAIChatVisible = false
@@ -240,7 +245,10 @@ struct SidebarView: View {
                                 windowState.sidebarWidth = newWidth
                                 windowState.sidebarContentWidth = max(newWidth - 16, 0)
                             }
-                        })
+                        }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(NavButtonStyle())
+                        .foregroundStyle(Color.primary)
                         .onHover { isHovered in
                             isMenuButtonHovered = isHovered
                             if isHovered {
@@ -267,9 +275,12 @@ struct SidebarView: View {
                 HStack {
                     Spacer()
                     
-                    NavButton(iconName: "plus", disabled: false, action: {
+                    Button("New Space", systemImage: "plus") {
                         showSpaceCreationDialog()
-                    })
+                    }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(NavButtonStyle())
+                    .foregroundStyle(Color.primary)
                 }
             }
             .padding(.horizontal, 8)
@@ -287,7 +298,7 @@ struct SidebarView: View {
                     .transition(.move(edge: browserManager.settingsManager.sidebarPosition == .left ? .leading : .trailing).combined(with: .opacity))
             } else {
                 content
-                    .transition(.blur)
+                    .transition(.opacity)
             }
         }
             .frame(width: effectiveWidth)
@@ -389,7 +400,7 @@ struct SidebarView: View {
             activeTabRefreshTrigger.toggle()
         }
     }
-
+    
     // this seems to be unused?
     
     private var spacesHStack: some View {
@@ -441,11 +452,11 @@ struct SidebarView: View {
                         name: finalName,
                         icon: finalIcon
                     )
-
+                    
                     if let targetIndex = browserManager.tabManager.spaces.firstIndex(where: { $0.id == newSpace.id }) {
                         activeSpaceIndex = targetIndex
                     }
-
+                    
                     browserManager.dialogManager.closeDialog()
                 },
                 onCancel: {
@@ -479,14 +490,14 @@ struct SidebarView: View {
     
     private func showSpaceEditDialog(mode: SpaceEditDialog.Mode) {
         guard let targetSpace = resolveCurrentSpace() else { return }
-
+        
         browserManager.dialogManager.showDialog(
             SpaceEditDialog(
                 space: targetSpace,
                 mode: mode,
                 onSave: { newName, newIcon in
                     let spaceId = targetSpace.id
-
+                    
                     do {
                         if newIcon != targetSpace.icon {
                             try browserManager.tabManager.updateSpaceIcon(
@@ -494,14 +505,14 @@ struct SidebarView: View {
                                 icon: newIcon
                             )
                         }
-
+                        
                         if newName != targetSpace.name {
                             try browserManager.tabManager.renameSpace(
                                 spaceId: spaceId,
                                 newName: newName
                             )
                         }
-
+                        
                         browserManager.dialogManager.closeDialog()
                     } catch {
                         print("⚠️ Failed to update space \(spaceId.uuidString):", error)
