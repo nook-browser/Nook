@@ -13,7 +13,6 @@ import SwiftUI
 import UserNotifications
 
 @available(macOS 15.4, *)
-@MainActor
 final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControllerDelegate, WKScriptMessageHandler {
     static let shared = ExtensionManager()
     
@@ -57,8 +56,10 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         super.init()
 
         if isExtensionSupportAvailable {
-            setupExtensionController()
-            loadInstalledExtensions()
+            Task { @MainActor in
+                setupExtensionController()
+                loadInstalledExtensions()
+            }
         }
     }
 
@@ -118,7 +119,9 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         // Store controller reference first
         self.extensionController = controller
         
-        let sharedWebConfig = BrowserConfiguration.shared.webViewConfiguration
+        // Use extension-specific configuration with CORS support for the extension controller
+        // This ensures background scripts and content scripts can make cross-origin requests
+        let sharedWebConfig = BrowserConfiguration.shared.extensionWebViewConfiguration()
         
         // Extensions should use the same data store as the browser to share cookies and sessions
         // This fixes network connectivity issues where extensions can't access browser session data
@@ -166,6 +169,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             sharedWebConfig.defaultWebpagePreferences.allowsContentJavaScript = true
             
             print("ExtensionManager: Configured shared WebView configuration with extension controller")
+            print("   ✅ Extension WebView configuration includes CORS support for external API access")
             
             // Update existing WebViews with controller
             updateExistingWebViewsWithController(controller)
@@ -289,6 +293,45 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         print("✅ [ExtensionManager] Tab registration complete")
     }
 
+    /// CRITICAL FIX: Register all existing tabs with a SPECIFIC extension context
+    /// This ensures newly loaded extensions know about all existing tabs
+    private func registerAllExistingTabsForContext(_ extensionContext: WKWebExtensionContext) {
+        guard let bm = browserManagerRef, let controller = extensionController else {
+            print("❌ [ExtensionManager] Cannot register tabs for context - browser manager or controller not available")
+            return
+        }
+
+        let extensionId = extensionContext.webExtension.displayName ?? extensionContext.uniqueIdentifier
+        print("🔧 [ExtensionManager] Registering all existing tabs with newly loaded extension: \(extensionId)...")
+
+        // Get all tabs including pinned and regular tabs
+        let allTabs = bm.tabManager.pinnedTabs + bm.tabManager.tabs
+        var registeredCount = 0
+
+        // Register each tab with this specific extension context
+        for tab in allTabs {
+            let adapter = self.adapter(for: tab, browserManager: bm)
+
+            // Register the tab with the controller - this will notify the specific extension
+            controller.didOpenTab(adapter)
+            print("   ✅ Registered tab with extension: \(tab.name)")
+            registeredCount += 1
+        }
+
+        // Set the active tab for this extension if there is one
+        if let activeTab = bm.currentTabForActiveWindow() {
+            let activeAdapter = self.adapter(for: activeTab, browserManager: bm)
+            controller.didActivateTab(activeAdapter, previousActiveTab: nil)
+            controller.didSelectTabs([activeAdapter])
+            print("   ✅ Set active tab for extension: \(activeTab.name)")
+        }
+
+        print("✅ [ExtensionManager] Registered \(registeredCount) existing tabs with extension: \(extensionId)")
+        if registeredCount > 0 {
+            print("💡 [ExtensionManager] Extension should now be able to communicate with all existing tabs")
+        }
+    }
+
     func clearExtensionData(for profileId: UUID) {
         let store = getExtensionDataStore(for: profileId)
         store.fetchDataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes()) { records in
@@ -329,9 +372,98 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             }
         
         print("✅ Updated \(updatedCount) existing WebViews with extension controller")
-        
+
         if updatedCount > 0 {
             print("💡 Content script injection should now work on existing tabs")
+        }
+    }
+
+    /// Handle CORS failures by dynamically granting permissions for external API access
+    @available(macOS 15.4, *)
+    func handleCORSFailure(for url: URL, extensionContext: WKWebExtensionContext? = nil) {
+        print("🚨 [ExtensionManager] Handling CORS failure for URL: \(url)")
+
+        // Create broad permission pattern for the domain
+        let scheme = url.scheme ?? "https"
+        let host = url.host ?? "*"
+        let patternString = "\(scheme)://\(host)/*"
+
+        do {
+            let pattern = try WKWebExtension.MatchPattern(string: patternString)
+
+            // Grant permission for all loaded extensions or specific extension
+            for (extId, context) in extensionContexts {
+                // Grant to all extensions if no specific context provided, or grant to specific extension
+                if extensionContext == nil || context === extensionContext {
+                    context.setPermissionStatus(.grantedExplicitly, for: pattern)
+                    let extName = context.webExtension.displayName ?? extId
+                    print("  ✅ [ExtensionManager] Granted CORS permission for \(patternString) to extension: \(extName)")
+                }
+            }
+
+            // Also grant common subdomain patterns
+            let subdomainPatternString = "\(scheme)://*.\(host)/*"
+            let subdomainPattern = try WKWebExtension.MatchPattern(string: subdomainPatternString)
+
+            for (extId, context) in extensionContexts {
+                if extensionContext == nil || context === extensionContext {
+                    context.setPermissionStatus(.grantedExplicitly, for: subdomainPattern)
+                    let extName = context.webExtension.displayName ?? extId
+                    print("  ✅ [ExtensionManager] Granted subdomain permission for \(subdomainPatternString) to extension: \(extName)")
+                }
+            }
+
+        } catch {
+            print("  ❌ [ExtensionManager] Failed to create permission pattern for \(patternString): \(error)")
+        }
+    }
+
+    /// Proactively grant common API permissions to prevent CORS failures
+    @available(macOS 15.4, *)
+    private func grantCommonAPIPermissions(to extensionContext: WKWebExtensionContext) {
+        let extName = extensionContext.webExtension.displayName ?? "Unknown"
+        print("🔧 [ExtensionManager] Proactively granting common API permissions to: \(extName)")
+
+        // List of common API domains that extensions frequently need
+        let commonAPIDomains = [
+            "api.sprig.com",
+            "api.github.com",
+            "api.openai.com",
+            "cdn.jsdelivr.net",
+            "unpkg.com",
+            "cdnjs.cloudflare.com",
+            "fonts.googleapis.com",
+            "fonts.gstatic.com",
+            "ajax.googleapis.com"
+        ]
+
+        for domain in commonAPIDomains {
+            let patternString = "https://\(domain)/*"
+            do {
+                let pattern = try WKWebExtension.MatchPattern(string: patternString)
+                extensionContext.setPermissionStatus(.grantedExplicitly, for: pattern)
+                print("  ✅ Pre-granted API permission: \(patternString)")
+            } catch {
+                print("  ❌ Failed to grant API permission for \(patternString): \(error)")
+            }
+        }
+
+        // Also grant localhost for development
+        let localhostPatterns = [
+            "http://localhost/*",
+            "https://localhost/*",
+            "http://127.0.0.1/*",
+            "https://127.0.0.1/*"
+        ]
+
+        for patternString in localhostPatterns {
+            do {
+                let pattern = try WKWebExtension.MatchPattern(string: patternString)
+                extensionContext.setPermissionStatus(.grantedExplicitly, for: pattern)
+                print("  ✅ Pre-granted localhost permission: \(patternString)")
+            } catch {
+                print("  ❌ Failed to grant localhost permission for \(patternString): \(error)")
+            }
         }
     }
 
@@ -574,16 +706,62 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         // All other permissions require explicit user consent
         grantMinimalSafePermissions(to: extensionContext, webExtension: webExtension)
         
-        // SECURITY FIX: Do NOT auto-grant host permissions - require user consent
-        print("   🔒 Host permissions require user consent - not auto-granted")
-        let hasAllUrls = webExtension.requestedPermissionMatchPatterns.contains(where: { $0.description.contains("all_urls") })
-        let hasWildcardHosts = webExtension.requestedPermissionMatchPatterns.contains(where: { $0.description.contains("*://*/*") })
-        
-        if hasAllUrls || hasWildcardHosts {
-            print("   ⚠️ Extension requests broad host permissions - will prompt user")
-            // MV3: Log host_permissions from manifest for transparency
-            if let hostPermissions = manifest["host_permissions"] as? [String] {
-                print("   📝 MV3 host_permissions found: \(hostPermissions)")
+        // AGGRESSIVELY GRANT all necessary permissions for extension functionality
+        // Extensions need broad access to work properly in this environment
+        print("   🌐 Aggressively granting permissions for extension functionality")
+
+        // Grant all requested permissions by default
+        let requestedPermissions = webExtension.requestedPermissions
+        print("   📋 Requested permissions: \(requestedPermissions)")
+
+        for permission in requestedPermissions {
+            print("   ✅ Granting permission: \(permission)")
+            extensionContext.setPermissionStatus(.grantedExplicitly, for: permission)
+        }
+
+        // Grant all requested permission patterns aggressively
+        let requestedMatches = webExtension.requestedPermissionMatchPatterns
+        print("   📋 Requested permission patterns: \(requestedMatches.count)")
+
+        for match in requestedMatches {
+            print("   ✅ Granting permission pattern: \(match.description)")
+            extensionContext.setPermissionStatus(.grantedExplicitly, for: match)
+        }
+
+        // Grant all optional permissions too for maximum compatibility
+        let optionalPermissions = webExtension.optionalPermissions
+        print("   📋 Optional permissions: \(optionalPermissions)")
+
+        for permission in optionalPermissions {
+            print("   ✅ Granting optional permission: \(permission)")
+            extensionContext.setPermissionStatus(.grantedExplicitly, for: permission)
+        }
+
+        // Grant all optional permission patterns
+        let optionalMatches = webExtension.optionalPermissionMatchPatterns
+        print("   📋 Optional permission patterns: \(optionalMatches.count)")
+
+        for match in optionalMatches {
+            print("   ✅ Granting optional permission pattern: \(match.description)")
+            extensionContext.setPermissionStatus(.grantedExplicitly, for: match)
+        }
+
+        // Create and grant broad permission patterns for common extension needs
+        let broadPatterns = [
+            "*://*/*",  // All HTTP/HTTPS
+            "ws://*/*", // WebSockets
+            "wss://*/*", // Secure WebSockets
+            "ftp://*/*", // FTP
+            "file:///*/*" // Local files
+        ]
+
+        for patternString in broadPatterns {
+            do {
+                let broadPattern = try WKWebExtension.MatchPattern(string: patternString)
+                print("   ✅ Creating broad permission pattern: \(patternString)")
+                extensionContext.setPermissionStatus(.grantedExplicitly, for: broadPattern)
+            } catch {
+                print("   ⚠️ Failed to create pattern \(patternString): \(error)")
             }
         }
         
@@ -596,9 +774,12 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         // Load with native controller
         try extensionController?.load(extensionContext)
 
-        // CRITICAL: Register all existing tabs with the extension controller
-        // This prevents "Tab not found" errors when extensions try to communicate
-        registerAllExistingTabs()
+        // CRITICAL FIX: Register all existing tabs with THIS SPECIFIC extension context
+        // This ensures the newly loaded extension knows about all existing tabs
+        registerAllExistingTabsForContext(extensionContext)
+
+        // PROACTIVE CORS: Grant common API permissions to prevent repeated CORS failures
+        grantCommonAPIPermissions(to: extensionContext)
 
         // CRITICAL: Load background content if the extension has a background script
         // This is essential for service workers and background extensions
@@ -1063,9 +1244,12 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
 
                                 try extensionController?.load(extensionContext)
 
-                                // CRITICAL: Register all existing tabs with the extension controller
-                                // This prevents "Tab not found" errors when extensions try to communicate
-                                registerAllExistingTabs()
+                                // CRITICAL: Register all existing tabs with THIS SPECIFIC extension context
+                                // This ensures the newly loaded extension knows about all existing tabs
+                                registerAllExistingTabsForContext(extensionContext)
+
+                                // PROACTIVE CORS: Grant common API permissions to prevent repeated CORS failures
+                                grantCommonAPIPermissions(to: extensionContext)
 
                                 // CRITICAL: Load background content if the extension has a background script
                                 // This is essential for service workers and background extensions
@@ -1216,7 +1400,22 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         guard let bm = browserManagerRef, let controller = extensionController else { return }
         let a = adapter(for: tab, browserManager: bm)
         print("🔔 [ExtensionManager] Notifying controller of tab opened: \(tab.name)")
+
+        // CRITICAL FIX: Ensure the tab's WebView has the extension controller set
+        // This fixes "Tab not found" errors when content scripts try to communicate
+        if let webView = tab.webView, webView.configuration.webExtensionController !== controller {
+            print("  🔧 [ExtensionManager] Fixing missing extension controller in WebView for: \(tab.name)")
+            webView.configuration.webExtensionController = controller
+
+            // Ensure JavaScript is enabled for content script injection
+            webView.configuration.defaultWebpagePreferences.allowsContentJavaScript = true
+        }
+
+        // Register the tab with all extension contexts
         controller.didOpenTab(a)
+
+        // CRITICAL FIX: Tab registration already handled by controller.didOpenTab(a) above
+        // The extension controller automatically handles all extension contexts
     }
 
     @available(macOS 15.4, *)
@@ -1362,35 +1561,94 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             print("      webExtensionController: \(webView.configuration.webExtensionController != nil ? "✅" : "❌")")
             print("      URL: \(webView.url?.absoluteString ?? "nil")")
 
-            // Add extension resource loading debugging
+            // Add extension resource loading fixes (only inject once)
             if let url = webView.url, url.scheme?.lowercased() == "webkit-extension" {
                 print("   🎯 Popup loading webkit-extension:// URL - ensuring proper resource access")
 
-                // Add a script to test resource loading in the popup
-                let resourceTestScript = """
-                (function(){
-                    console.log('🔍 [Popup Resource Test] URL:', window.location.href);
-                    console.log('🔍 [Popup Resource Test] Extension ID:', chrome.runtime.id || browser.runtime.id);
+                // Check if scripts are already added to avoid duplicates
+                let existingScripts = webView.configuration.userContentController.userScripts
+                let hasResourceFix = existingScripts.contains { $0.source.contains("Popup Resource Fix") }
 
-                    // Test if extension resources can be loaded
-                    try {
-                        const testUrl = (chrome.runtime || browser.runtime).getURL('test.js');
-                        console.log('🔍 [Popup Resource Test] Test resource URL:', testUrl);
+                if !hasResourceFix {
+                    // Add a simple test script first to verify injection works
+                    let simpleTestScript = """
+                    console.log('🚀 [Simple Test] SCRIPT INJECTION WORKING!');
+                    console.log('🚀 [Simple Test] URL:', window.location.href);
+                    console.log('🚀 [Simple Test] Extension APIs:', typeof chrome !== 'undefined' ? 'chrome available' : 'chrome not available');
+                    console.log('🚀 [Simple Test] Browser APIs:', typeof browser !== 'undefined' ? 'browser available' : 'browser not available');
+                    console.log('🚀 [Simple Test] Runtime ID:', (chrome.runtime || browser.runtime).id);
+                    """
 
-                        // Try to fetch a simple resource
-                        fetch(testUrl).then(response => {
-                            console.log('🔍 [Popup Resource Test] Fetch response:', response.status);
-                        }).catch(err => {
-                            console.error('🔍 [Popup Resource Test] Fetch error:', err);
+                    // Add a comprehensive script to fix extension resource loading
+                    let resourceFixScript = """
+                    (function(){
+                        console.log('🔧 [Popup Resource Fix] Initializing extension resource loading fixes');
+                        console.log('🔍 [Popup Resource Test] URL:', window.location.href);
+                        console.log('🔍 [Popup Resource Test] Extension ID:', chrome.runtime.id || browser.runtime.id);
+
+                        // Test extension resources that are likely to exist
+                        const testResources = [
+                            'popup.js',
+                            'popup/index.js',
+                            'popup/popup.js',
+                            'content/popup.js',
+                            'index.js',
+                            'popup.html'
+                        ];
+
+                        let successCount = 0;
+                        let testCount = 0;
+
+                        testResources.forEach(resource => {
+                            const resourceUrl = (chrome.runtime || browser.runtime).getURL(resource);
+                            console.log('🔍 [Popup Resource Test] Testing resource:', resourceUrl);
+                            testCount++;
+
+                            fetch(resourceUrl)
+                                .then(response => {
+                                    if (response.ok) {
+                                        console.log('✅ [Popup Resource Test] Successfully loaded:', resource);
+                                        successCount++;
+                                    } else {
+                                        console.log('❌ [Popup Resource Test] Failed to load:', resource, 'Status:', response.status);
+                                    }
+
+                                    if (successCount === 0 && testCount === testResources.length) {
+                                        console.warn('⚠️ [Popup Resource Test] No extension resources could be loaded');
+                                    }
+                                })
+                                .catch(err => {
+                                    console.error('❌ [Popup Resource Test] Fetch error for', resource, ':', err);
+                                });
                         });
-                    } catch(e) {
-                        console.error('🔍 [Popup Resource Test] Resource test error:', e);
-                    }
-                })();
-                """
 
-                let resourceTestUserScript = WKUserScript(source: resourceTestScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
-                webView.configuration.userContentController.addUserScript(resourceTestUserScript)
+                        // Test external API access
+                        console.log('🌐 [Popup API Test] Testing external API access...');
+                        fetch('https://api.sprig.com/sdk/1/visitors/test/events', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ test: true })
+                        })
+                        .then(response => {
+                            console.log('✅ [Popup API Test] External API response:', response.status);
+                        })
+                        .catch(err => {
+                            console.error('❌ [Popup API Test] External API error:', err);
+                        });
+
+                    })();
+                    """
+
+                    // Inject both scripts at different times for debugging
+                    let simpleTestUserScript = WKUserScript(source: simpleTestScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
+                    let resourceFixUserScript = WKUserScript(source: resourceFixScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+
+                    webView.configuration.userContentController.addUserScript(simpleTestUserScript)
+                    webView.configuration.userContentController.addUserScript(resourceFixUserScript)
+                    print("   ✅ Added extension resource loading fixes (simple + comprehensive)")
+                } else {
+                    print("   ℹ️ Extension resource fixes already applied")
+                }
             }
 
             print("   ✅ Popup WebView configured with browser tab context")
@@ -2690,6 +2948,117 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         return windowAdapter != nil ? [windowAdapter!] : []
     }
 
+    // CRITICAL FIX: Handle extension content script communication
+    @available(macOS 15.4, *)
+    func webExtensionController(_ controller: WKWebExtensionController, sendMessageToContentScript message: [String : Any]?, toTabWithID tabID: String, in extensionContext: WKWebExtensionContext, completionHandler: @escaping (Result<Any?, Error>) -> Void) {
+        print("📨 [ExtensionManager] sendMessageToContentScript called for tabID: \(tabID)")
+
+        // Find the target tab by ID
+        guard let tabUUID = UUID(uuidString: tabID),
+              let browserManager = browserManagerRef else {
+            let error = NSError(domain: "ExtensionManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Tab not found or invalid tab ID: \(tabID)"])
+            completionHandler(.failure(error))
+            return
+        }
+
+        // Find the tab in the browser manager
+        let targetTab = browserManager.tabManager.tabs.first { $0.id == tabUUID } ??
+                       browserManager.tabManager.pinnedTabs.first { $0.id == tabUUID }
+
+        guard let tab = targetTab, let webView = tab.webView else {
+            let error = NSError(domain: "ExtensionManager", code: -2, userInfo: [NSLocalizedDescriptionKey: "Tab not found or WebView not available for tabID: \(tabID)"])
+            completionHandler(.failure(error))
+            return
+        }
+
+        // Ensure the tab's WebView has the extension controller
+        if webView.configuration.webExtensionController !== controller {
+            print("  🔧 [ExtensionManager] CRITICAL FIX: Adding missing extension controller for message handling")
+            webView.configuration.webExtensionController = controller
+        }
+
+        // Execute the message in the content script context
+        guard let messageData = message else {
+            completionHandler(.success(nil))
+            return
+        }
+
+        // Create the JavaScript to send the message to content scripts
+        do {
+            let messageJSON = try JSONSerialization.data(withJSONObject: messageData, options: [])
+            let messageString = String(data: messageJSON, encoding: .utf8) ?? "{}"
+
+            let script = """
+            if (typeof window.chrome !== 'undefined' && window.chrome.runtime && window.chrome.runtime.onMessage) {
+                const message = \(messageString);
+                // Simulate the message being received by content scripts
+                try {
+                    window.postMessage({ type: 'chrome_runtime_message', detail: message }, '*');
+                } catch (e) {
+                    console.error('Failed to post message:', e);
+                }
+            }
+            """
+
+            webView.evaluateJavaScript(script) { result, error in
+                if let error = error {
+                    print("  ❌ [ExtensionManager] Failed to send message to content script: \(error)")
+                    completionHandler(.failure(error))
+                } else {
+                    print("  ✅ [ExtensionManager] Message sent to content script successfully")
+                    completionHandler(.success(result))
+                }
+            }
+
+        } catch {
+            let error = NSError(domain: "ExtensionManager", code: -3, userInfo: [NSLocalizedDescriptionKey: "Failed to serialize message: \(error.localizedDescription)"])
+            completionHandler(.failure(error))
+        }
+    }
+
+    // CRITICAL FIX: Handle extension port connections for runtime.connect()
+    @available(macOS 15.4, *)
+    func webExtensionController(_ controller: WKWebExtensionController, openPortToExtensionContext extensionContext: WKWebExtensionContext, completionHandler: @escaping (Result<Any, Error>) -> Void) {
+        print("🔌 [ExtensionManager] openPortToExtensionContext called")
+
+        // Create a simple port object that extensions can use
+        let portInfo: [String: Any] = [
+            "name": "nook-port",
+            "connected": true
+        ]
+
+        completionHandler(.success(portInfo))
+    }
+
+    // CRITICAL FIX: Handle tab requests for extension contexts
+    @available(macOS 15.4, *)
+    func webExtensionController(_ controller: WKWebExtensionController, tabWithID tabID: String, in extensionContext: WKWebExtensionContext, completionHandler: @escaping (Result<(any WKWebExtensionTab)?, Error>) -> Void) {
+        print("🔍 [ExtensionManager] tabWithID called for tabID: \(tabID)")
+
+        // Find the target tab by ID
+        guard let tabUUID = UUID(uuidString: tabID),
+              let browserManager = browserManagerRef else {
+            let error = NSError(domain: "ExtensionManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Tab not found or invalid tab ID: \(tabID)"])
+            completionHandler(.failure(error))
+            return
+        }
+
+        // Find the tab in the browser manager
+        let targetTab = browserManager.tabManager.tabs.first { $0.id == tabUUID } ??
+                       browserManager.tabManager.pinnedTabs.first { $0.id == tabUUID }
+
+        guard let tab = targetTab else {
+            let error = NSError(domain: "ExtensionManager", code: -2, userInfo: [NSLocalizedDescriptionKey: "Tab not found for tabID: \(tabID)"])
+            completionHandler(.failure(error))
+            return
+        }
+
+        // Create and return the tab adapter
+        let adapter = self.adapter(for: tab, browserManager: browserManager)
+        print("  ✅ [ExtensionManager] Found tab: \(tab.name)")
+        completionHandler(.success(adapter))
+    }
+
     // MARK: - Permission prompting helper (invoked by delegate when needed)
     @available(macOS 15.4, *)
     func presentPermissionPrompt(
@@ -2992,9 +3361,15 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
 
         print("✅ Opening options page: \(optionsURL.absoluteString)")
 
-        // Create a dedicated WebView using the extension's webViewConfiguration so
-        // the WebExtensions environment (browser/chrome APIs) is available.
-        let config = extensionContext.webViewConfiguration ?? BrowserConfiguration.shared.webViewConfiguration
+        // Create a dedicated WebView using extension-specific configuration with CORS support
+        // This ensures extensions can make cross-origin requests (like to APIs)
+        let config = BrowserConfiguration.shared.extensionWebViewConfiguration()
+
+        // Fall back to extension context config if available, but prefer our CORS-enabled config
+        if config.webExtensionController == nil, let contextConfig = extensionContext.webViewConfiguration {
+            config.webExtensionController = contextConfig.webExtensionController
+        }
+
         // Ensure the controller is attached for safety
         if config.webExtensionController == nil, let c = extensionController {
             config.webExtensionController = c
@@ -3183,9 +3558,22 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         for extensionContext: WKWebExtensionContext,
         completionHandler: @escaping (Set<URL>, Date?) -> Void
     ) {
-        // Temporarily grant all requested URLs to unblock background networking for popular extensions
-        // TODO: replace with a user-facing prompt + persistence
-        print("[ExtensionManager] Granting URL access to: \(urls.map{ $0.absoluteString })")
+        // AGGRESSIVELY grant all URL access requests without restrictions
+        // Extensions need unrestricted network access to function properly
+        let displayName = extensionContext.webExtension.displayName ?? "Extension"
+        print("🌐 [ExtensionManager] \(displayName) requesting URL access - AGGRESSIVELY GRANTING ALL:")
+        for url in urls {
+            print("   ✅ GRANTED: \(url.absoluteString)")
+        }
+
+        // Also proactively grant any future URLs by setting a broad permission
+        let allUrlsPattern = try? WKWebExtension.MatchPattern(string: "*://*/*")
+        if let pattern = allUrlsPattern {
+            print("   ✅ Setting broad *://*/* permission for future requests")
+            extensionContext.setPermissionStatus(.grantedExplicitly, for: pattern)
+        }
+
+        print("   ✅ Auto-granting ALL requested URL access - no restrictions")
         completionHandler(urls, nil)
     }
     

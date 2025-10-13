@@ -93,7 +93,6 @@ struct SpaceView: View {
 
     private var folders: [TabFolder] {
         let folders = browserManager.tabManager.folders(for: space.id)
-        print("🔄 SpaceView.folders recomputed: \(folders.count) folders")
         return folders
     }
 
@@ -128,9 +127,7 @@ struct SpaceView: View {
         let sortedNonFolderTabs = nonFolderSpacePinnedTabs.sorted { $0.index < $1.index }
         items.append(contentsOf: sortedNonFolderTabs)
 
-        print("🔄 spacePinnedItems recomputed: \(items.count) items (folderChangeCount: \(folderChangeCount), folders: \(currentFolders.count))")
-        print("   - nonFolderSpacePinnedTabs: \(nonFolderSpacePinnedTabs.count)")
-        print("   - folderSpacePinnedTabs: \(folderSpacePinnedTabs.count)")
+        // Removed verbose logging
         return items
     }
     

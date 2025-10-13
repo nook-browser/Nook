@@ -1,0 +1,2382 @@
+{
+  "sections": [],
+  "metadata": {
+    "platforms": [
+      {
+        "introducedAt": "7.0",
+        "beta": false,
+        "name": "iOS"
+      },
+      {
+        "introducedAt": "7.0",
+        "beta": false,
+        "name": "iPadOS"
+      },
+      {
+        "introducedAt": "13.0",
+        "beta": false,
+        "name": "Mac Catalyst"
+      },
+      {
+        "introducedAt": "10.12",
+        "beta": false,
+        "name": "macOS"
+      },
+      {
+        "introducedAt": "1.0",
+        "beta": false,
+        "name": "visionOS"
+      }
+    ],
+    "externalID": "SafariServices",
+    "title": "Safari Services",
+    "roleHeading": "Framework",
+    "role": "collection",
+    "modules": [
+      {
+        "name": "Safari Services"
+      }
+    ],
+    "symbolKind": "module"
+  },
+  "primaryContentSections": [
+    {
+      "content": [
+        {
+          "level": 2,
+          "text": "Overview",
+          "anchor": "overview",
+          "type": "heading"
+        },
+        {
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "Use the Safari Services framework to integrate Safari behaviors into your iOS or macOS app, or to extend the behavior of Safari."
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "inlineContent": [
+            {
+              "text": "You can:",
+              "type": "text"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "type": "unorderedList",
+          "items": [
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Provide a user interface that is almost identical to the user interface that the Safari app provides. Users can browse the web in this view and then return to your app’s content. This view is more consistent with the Safari user interface than implementing your own custom browsing solution and can be done using fewer lines of code. (iOS)"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "text": "Add items to the user’s Safari Reading List. (iOS)",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Convert your existing Chrome, Firefox, or Edge extensions into a Safari web extension, or create a new Safari web extension that can work in other browsers. (iOS and macOS)"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Determine from your app whether your content blocker extension is loaded, and if it is, tell it to refresh its contents. (iOS and macOS)"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "text": "Implement Safari app extensions. Determine from your app whether a Safari app extension is loaded. (macOS)",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "text": "Allow the user to share cookies and website data between an app and Safari for a single sign-on (SSO) experience with  ",
+                      "type": "text"
+                    },
+                    {
+                      "isActive": true,
+                      "identifier": "doc://com.apple.documentation/documentation/AuthenticationServices/ASWebAuthenticationSession",
+                      "type": "reference"
+                    },
+                    {
+                      "text": ".",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "kind": "content"
+    }
+  ],
+  "hierarchy": {
+    "paths": [
+      [
+        "doc://com.apple.documentation/documentation/technologies"
+      ]
+    ]
+  },
+  "variants": [
+    {
+      "paths": [
+        "/documentation/safariservices"
+      ],
+      "traits": [
+        {
+          "interfaceLanguage": "swift"
+        }
+      ]
+    },
+    {
+      "paths": [
+        "/documentation/safariservices"
+      ],
+      "traits": [
+        {
+          "interfaceLanguage": "occ"
+        }
+      ]
+    }
+  ],
+  "kind": "symbol",
+  "topicSections": [
+    {
+      "title": "Safari web extensions",
+      "anchor": "Safari-web-extensions",
+      "identifiers": [
+        "doc://com.apple.safariservices/documentation/SafariServices/safari-web-extensions"
+      ]
+    },
+    {
+      "title": "Content blockers",
+      "anchor": "Content-blockers",
+      "identifiers": [
+        "doc://com.apple.safariservices/documentation/SafariServices/creating-a-content-blocker",
+        "doc://com.apple.safariservices/documentation/SafariServices/SFContentBlockerManager",
+        "doc://com.apple.safariservices/documentation/SafariServices/SFContentBlockerState"
+      ]
+    },
+    {
+      "title": "Safari app extensions",
+      "anchor": "Safari-app-extensions",
+      "identifiers": [
+        "doc://com.apple.safariservices/documentation/SafariServices/safari-app-extensions",
+        "doc://com.apple.safariservices/documentation/SafariServices/SFSafariExtension",
+        "doc://com.apple.safariservices/documentation/SafariServices/SFSafariApplication",
+        "doc://com.apple.safariservices/documentation/SafariServices/SFSafariWindow",
+        "doc://com.apple.safariservices/documentation/SafariServices/SFSafariPage",
+        "doc://com.apple.safariservices/documentation/SafariServices/SFSafariTab"
+      ]
+    },
+    {
+      "title": "Safari content in your app",
+      "anchor": "Safari-content-in-your-app",
+      "identifiers": [
+        "doc://com.apple.safariservices/documentation/SafariServices/SFSafariViewController",
+        "doc://com.apple.safariservices/documentation/SafariServices/SFAuthenticationSession/CompletionHandler",
+        "doc://com.apple.safariservices/documentation/SafariServices/importing-data-exported-from-safari"
+      ]
+    },
+    {
+      "title": "Associated domains",
+      "anchor": "Associated-domains",
+      "identifiers": [
+        "doc://com.apple.documentation/documentation/Xcode/supporting-associated-domains",
+        "doc://com.apple.safariservices/documentation/SafariServices/SFUniversalLink",
+        "doc://com.apple.documentation/documentation/BundleResources/Entitlements/com.apple.developer.associated-domains"
+      ]
+    },
+    {
+      "anchor": "Availability",
+      "title": "Availability",
+      "identifiers": [
+        "doc://com.apple.safariservices/documentation/SafariServices/SFSafariServicesAvailable(_:)",
+        "doc://com.apple.safariservices/documentation/SafariServices/SFSafariServicesVersion"
+      ]
+    },
+    {
+      "anchor": "Safari-Reading-List",
+      "title": "Safari Reading List",
+      "identifiers": [
+        "doc://com.apple.safariservices/documentation/SafariServices/SSReadingList",
+        "doc://com.apple.safariservices/documentation/SafariServices/SSReadingListErrorDomain",
+        "doc://com.apple.safariservices/documentation/SafariServices/SSReadingListErrorCode",
+        "doc://com.apple.safariservices/documentation/SafariServices/SSReadingListError"
+      ]
+    },
+    {
+      "anchor": "Home-Screen-bookmarks",
+      "title": "Home Screen bookmarks",
+      "identifiers": [
+        "doc://com.apple.safariservices/documentation/SafariServices/SFAddToHomeScreenActivityItem"
+      ]
+    },
+    {
+      "anchor": "Miscellaneous-errors",
+      "title": "Miscellaneous errors",
+      "identifiers": [
+        "doc://com.apple.safariservices/documentation/SafariServices/SFError",
+        "doc://com.apple.safariservices/documentation/SafariServices/SFErrorCode",
+        "doc://com.apple.safariservices/documentation/SafariServices/SFErrorDomain"
+      ]
+    },
+    {
+      "anchor": "Deprecated",
+      "title": "Deprecated",
+      "identifiers": [
+        "doc://com.apple.safariservices/documentation/SafariServices/deprecated-symbols"
+      ]
+    },
+    {
+      "anchor": "Classes",
+      "generated": true,
+      "title": "Classes",
+      "identifiers": [
+        "doc://com.apple.safariservices/documentation/SafariServices/SFSafariSettings"
+      ]
+    }
+  ],
+  "abstract": [
+    {
+      "text": "Enable web views and services in your app.",
+      "type": "text"
+    }
+  ],
+  "identifier": {
+    "interfaceLanguage": "swift",
+    "url": "doc://com.apple.safariservices/documentation/SafariServices"
+  },
+  "schemaVersion": {
+    "major": 0,
+    "minor": 3,
+    "patch": 0
+  },
+  "references": {
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_DEPRECATED_MAC_SAFARI": {
+      "kind": "symbol",
+      "title": "SF_DEPRECATED_MAC_SAFARI",
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_DEPRECATED_MAC_SAFARI"
+        }
+      ],
+      "url": "/documentation/safariservices/sf_deprecated_mac_safari",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_DEPRECATED_MAC_SAFARI",
+      "abstract": [],
+      "role": "symbol",
+      "type": "topic"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_10_1": {
+      "type": "topic",
+      "title": "SF_CLASS_AVAILABLE_MAC_SAFARI_10_1",
+      "role": "symbol",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_10_1",
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_CLASS_AVAILABLE_MAC_SAFARI_10_1"
+        }
+      ],
+      "kind": "symbol",
+      "url": "/documentation/safariservices/sf_class_available_mac_safari_10_1",
+      "abstract": []
+    },
+    "doc://com.apple.documentation/documentation/technologies": {
+      "identifier": "doc://com.apple.documentation/documentation/technologies",
+      "title": "Technologies",
+      "abstract": [
+        {
+          "type": "text",
+          "text": ""
+        }
+      ],
+      "role": "overview",
+      "type": "topic",
+      "kind": "technologies",
+      "url": "/documentation/technologies"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices": {
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices",
+      "title": "Safari Services",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Enable web views and services in your app."
+        }
+      ],
+      "role": "collection",
+      "type": "topic",
+      "kind": "symbol",
+      "url": "/documentation/safariservices"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_11_1": {
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_CLASS_AVAILABLE_MAC_SAFARI_11_1"
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol",
+      "abstract": [],
+      "role": "symbol",
+      "title": "SF_CLASS_AVAILABLE_MAC_SAFARI_11_1",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_11_1",
+      "url": "/documentation/safariservices/sf_class_available_mac_safari_11_1"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/importing-data-exported-from-safari": {
+      "type": "topic",
+      "kind": "article",
+      "abstract": [
+        {
+          "text": "Transfer bookmarks, saved passwords, and other information between browsers.",
+          "type": "text"
+        }
+      ],
+      "role": "article",
+      "title": "Importing data exported from Safari",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/importing-data-exported-from-safari",
+      "url": "/documentation/safariservices/importing-data-exported-from-safari"
+    },
+    "doc://com.apple.documentation/documentation/AuthenticationServices/ASWebAuthenticationSession": {
+      "url": "/documentation/AuthenticationServices/ASWebAuthenticationSession",
+      "identifier": "doc://com.apple.documentation/documentation/AuthenticationServices/ASWebAuthenticationSession",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "ASWebAuthenticationSession"
+        }
+      ],
+      "role": "symbol",
+      "title": "ASWebAuthenticationSession",
+      "abstract": [
+        {
+          "text": "A session that an app uses to authenticate a user through a web service.",
+          "type": "text"
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_10_0": {
+      "url": "/documentation/safariservices/sf_enum_available_mac_safari_10_0",
+      "kind": "symbol",
+      "type": "topic",
+      "title": "SF_ENUM_AVAILABLE_MAC_SAFARI_10_0",
+      "abstract": [],
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_10_0",
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_ENUM_AVAILABLE_MAC_SAFARI_10_0"
+        }
+      ],
+      "role": "symbol"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_18_4": {
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_ENUM_AVAILABLE_MAC_SAFARI_18_4"
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol",
+      "abstract": [],
+      "role": "symbol",
+      "title": "SF_ENUM_AVAILABLE_MAC_SAFARI_18_4",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_18_4",
+      "url": "/documentation/safariservices/sf_enum_available_mac_safari_18_4"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_11_1": {
+      "type": "topic",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_11_1",
+      "url": "/documentation/safariservices/sf_enum_available_mac_safari_11_1",
+      "role": "symbol",
+      "fragments": [
+        {
+          "text": "SF_ENUM_AVAILABLE_MAC_SAFARI_11_1",
+          "kind": "identifier"
+        }
+      ],
+      "title": "SF_ENUM_AVAILABLE_MAC_SAFARI_11_1",
+      "kind": "symbol",
+      "abstract": []
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_13_0": {
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_CLASS_AVAILABLE_MAC_SAFARI_13_0"
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol",
+      "abstract": [],
+      "role": "symbol",
+      "title": "SF_CLASS_AVAILABLE_MAC_SAFARI_13_0",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_13_0",
+      "url": "/documentation/safariservices/sf_class_available_mac_safari_13_0"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_10_1": {
+      "role": "symbol",
+      "title": "SF_ENUM_AVAILABLE_MAC_SAFARI_10_1",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_10_1",
+      "url": "/documentation/safariservices/sf_enum_available_mac_safari_10_1",
+      "fragments": [
+        {
+          "text": "SF_ENUM_AVAILABLE_MAC_SAFARI_10_1",
+          "kind": "identifier"
+        }
+      ],
+      "kind": "symbol",
+      "type": "topic",
+      "abstract": []
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SFErrorCode": {
+      "title": "SFError.Code",
+      "fragments": [
+        {
+          "text": "enum",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "Code",
+          "kind": "identifier"
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol",
+      "navigatorTitle": [
+        {
+          "text": "Code",
+          "kind": "identifier"
+        }
+      ],
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SFErrorCode",
+      "url": "/documentation/safariservices/sferrorcode",
+      "abstract": [
+        {
+          "text": "Messages that describe a content blocker or Safari app extension error.",
+          "type": "text"
+        }
+      ],
+      "role": "symbol"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_14_0": {
+      "abstract": [],
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_14_0",
+      "url": "/documentation/safariservices/sf_enum_available_mac_safari_14_0",
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_ENUM_AVAILABLE_MAC_SAFARI_14_0"
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol",
+      "role": "symbol",
+      "title": "SF_ENUM_AVAILABLE_MAC_SAFARI_14_0"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SFSafariPage": {
+      "navigatorTitle": [
+        {
+          "text": "SFSafariPage",
+          "kind": "identifier"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "A proxy for a Safari webpage.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/safariservices/sfsafaripage",
+      "role": "symbol",
+      "title": "SFSafariPage",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SFSafariPage",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "SFSafariPage",
+          "kind": "identifier"
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_18_4": {
+      "abstract": [],
+      "url": "/documentation/safariservices/sf_available_mac_safari_18_4",
+      "type": "topic",
+      "role": "symbol",
+      "fragments": [
+        {
+          "text": "SF_AVAILABLE_MAC_SAFARI_18_4",
+          "kind": "identifier"
+        }
+      ],
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_18_4",
+      "title": "SF_AVAILABLE_MAC_SAFARI_18_4",
+      "kind": "symbol"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_11_1": {
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_AVAILABLE_MAC_SAFARI_11_1"
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol",
+      "abstract": [],
+      "role": "symbol",
+      "title": "SF_AVAILABLE_MAC_SAFARI_11_1",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_11_1",
+      "url": "/documentation/safariservices/sf_available_mac_safari_11_1"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SFSafariViewController": {
+      "role": "symbol",
+      "title": "SFSafariViewController",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SFSafariViewController",
+      "url": "/documentation/safariservices/sfsafariviewcontroller",
+      "navigatorTitle": [
+        {
+          "text": "SFSafariViewController",
+          "kind": "identifier"
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "text": "SFSafariViewController",
+          "kind": "identifier"
+        }
+      ],
+      "kind": "symbol",
+      "type": "topic",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object that provides a visible standard interface for browsing the web."
+        }
+      ]
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_17_0": {
+      "kind": "symbol",
+      "url": "/documentation/safariservices/sf_class_available_mac_safari_17_0",
+      "title": "SF_CLASS_AVAILABLE_MAC_SAFARI_17_0",
+      "abstract": [],
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_17_0",
+      "fragments": [
+        {
+          "text": "SF_CLASS_AVAILABLE_MAC_SAFARI_17_0",
+          "kind": "identifier"
+        }
+      ],
+      "role": "symbol",
+      "type": "topic"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_12_0": {
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_AVAILABLE_MAC_SAFARI_12_0"
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol",
+      "abstract": [],
+      "role": "symbol",
+      "title": "SF_AVAILABLE_MAC_SAFARI_12_0",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_12_0",
+      "url": "/documentation/safariservices/sf_available_mac_safari_12_0"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SSReadingListErrorDomain": {
+      "title": "SSReadingListErrorDomain",
+      "role": "symbol",
+      "url": "/documentation/safariservices/ssreadinglisterrordomain",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The domain for Safari Reading List errors."
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "text": "SSReadingListErrorDomain",
+          "kind": "identifier"
+        }
+      ],
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SSReadingListErrorDomain",
+      "type": "topic",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "let"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "SSReadingListErrorDomain"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "preciseIdentifier": "s:SS",
+          "text": "String",
+          "kind": "typeIdentifier"
+        }
+      ]
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_18_4": {
+      "title": "SF_CLASS_AVAILABLE_MAC_SAFARI_18_4",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_18_4",
+      "kind": "symbol",
+      "url": "/documentation/safariservices/sf_class_available_mac_safari_18_4",
+      "fragments": [
+        {
+          "text": "SF_CLASS_AVAILABLE_MAC_SAFARI_18_4",
+          "kind": "identifier"
+        }
+      ],
+      "abstract": [],
+      "type": "topic",
+      "role": "symbol"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SFContentBlockerState": {
+      "url": "/documentation/safariservices/sfcontentblockerstate",
+      "kind": "symbol",
+      "role": "symbol",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SFContentBlockerState",
+      "title": "SFContentBlockerState",
+      "type": "topic",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "SFContentBlockerState"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "The state of a content blocker extension.",
+          "type": "text"
+        }
+      ],
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "kind": "identifier",
+          "text": "SFContentBlockerState"
+        }
+      ]
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_DEPRECATED_MAC_SAFARI_10_0_11_0": {
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_DEPRECATED_MAC_SAFARI_10_0_11_0",
+      "abstract": [],
+      "role": "symbol",
+      "title": "SF_DEPRECATED_MAC_SAFARI_10_0_11_0",
+      "url": "/documentation/safariservices/sf_deprecated_mac_safari_10_0_11_0",
+      "type": "topic",
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_DEPRECATED_MAC_SAFARI_10_0_11_0"
+        }
+      ],
+      "kind": "symbol"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SFSafariApplication": {
+      "url": "/documentation/safariservices/sfsafariapplication",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A proxy for the Safari app."
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "SFSafariApplication"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "text": "SFSafariApplication",
+          "kind": "identifier"
+        }
+      ],
+      "role": "symbol",
+      "title": "SFSafariApplication",
+      "type": "topic",
+      "kind": "symbol",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SFSafariApplication"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SFError": {
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A content blocker or Safari app extension error."
+        }
+      ],
+      "title": "SFError",
+      "kind": "symbol",
+      "type": "topic",
+      "role": "symbol",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "struct"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "SFError"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "SFError"
+        }
+      ],
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SFError",
+      "url": "/documentation/safariservices/sferror"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SSReadingListErrorCode": {
+      "kind": "symbol",
+      "type": "topic",
+      "title": "SSReadingListError.Code",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "enum"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "Code",
+          "kind": "identifier"
+        }
+      ],
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SSReadingListErrorCode",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Messages that describe a Safari Reading List error."
+        }
+      ],
+      "url": "/documentation/safariservices/ssreadinglisterrorcode",
+      "navigatorTitle": [
+        {
+          "text": "Code",
+          "kind": "identifier"
+        }
+      ],
+      "role": "symbol"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI": {
+      "type": "topic",
+      "kind": "symbol",
+      "url": "/documentation/safariservices/sf_enum_available_mac_safari",
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_ENUM_AVAILABLE_MAC_SAFARI"
+        }
+      ],
+      "abstract": [],
+      "role": "symbol",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI",
+      "title": "SF_ENUM_AVAILABLE_MAC_SAFARI"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SFSafariWindow": {
+      "kind": "symbol",
+      "navigatorTitle": [
+        {
+          "text": "SFSafariWindow",
+          "kind": "identifier"
+        }
+      ],
+      "type": "topic",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SFSafariWindow",
+      "abstract": [
+        {
+          "text": "A proxy for a Safari window.",
+          "type": "text"
+        }
+      ],
+      "role": "symbol",
+      "url": "/documentation/safariservices/sfsafariwindow",
+      "title": "SFSafariWindow",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "SFSafariWindow",
+          "kind": "identifier"
+        }
+      ]
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SFSafariServicesAvailable(_:)": {
+      "type": "topic",
+      "role": "symbol",
+      "url": "/documentation/safariservices/sfsafariservicesavailable(_:)",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SFSafariServicesAvailable(_:)",
+      "fragments": [
+        {
+          "text": "func",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "SFSafariServicesAvailable",
+          "kind": "identifier"
+        },
+        {
+          "text": "(",
+          "kind": "text"
+        },
+        {
+          "text": "SFSafariServicesVersion",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:@E@SFSafariServicesVersion"
+        },
+        {
+          "text": ") -> ",
+          "kind": "text"
+        },
+        {
+          "text": "Bool",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:Sb"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "Indicates whether a given version of Safari services is available.",
+          "type": "text"
+        }
+      ],
+      "kind": "symbol",
+      "title": "SFSafariServicesAvailable(_:)"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/creating-a-content-blocker": {
+      "url": "/documentation/safariservices/creating-a-content-blocker",
+      "abstract": [
+        {
+          "text": "Create a content blocker for Safari in Xcode.",
+          "type": "text"
+        }
+      ],
+      "type": "topic",
+      "title": "Creating a content blocker",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/creating-a-content-blocker",
+      "role": "article",
+      "kind": "article"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_10_1": {
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_10_1",
+      "url": "/documentation/safariservices/sf_available_mac_safari_10_1",
+      "abstract": [],
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_AVAILABLE_MAC_SAFARI_10_1"
+        }
+      ],
+      "role": "symbol",
+      "title": "SF_AVAILABLE_MAC_SAFARI_10_1",
+      "kind": "symbol",
+      "type": "topic"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_11_0": {
+      "title": "SF_CLASS_AVAILABLE_MAC_SAFARI_11_0",
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_CLASS_AVAILABLE_MAC_SAFARI_11_0"
+        }
+      ],
+      "type": "topic",
+      "url": "/documentation/safariservices/sf_class_available_mac_safari_11_0",
+      "abstract": [],
+      "role": "symbol",
+      "kind": "symbol",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_11_0"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_17_0": {
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_AVAILABLE_MAC_SAFARI_17_0"
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol",
+      "abstract": [],
+      "role": "symbol",
+      "title": "SF_AVAILABLE_MAC_SAFARI_17_0",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_17_0",
+      "url": "/documentation/safariservices/sf_available_mac_safari_17_0"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/deprecated-symbols": {
+      "type": "topic",
+      "kind": "article",
+      "abstract": [
+        {
+          "text": "Review unsupported symbols and their replacements.",
+          "type": "text"
+        }
+      ],
+      "role": "collectionGroup",
+      "title": "Deprecated symbols",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/deprecated-symbols",
+      "url": "/documentation/safariservices/deprecated-symbols"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SFErrorDomain": {
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The domain for content blocker or Safari app extension errors."
+        }
+      ],
+      "title": "SFErrorDomain",
+      "kind": "symbol",
+      "type": "topic",
+      "role": "symbol",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "let"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "SFErrorDomain"
+        },
+        {
+          "kind": "text",
+          "text": ": "
+        },
+        {
+          "kind": "typeIdentifier",
+          "text": "String",
+          "preciseIdentifier": "s:SS"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "SFErrorDomain"
+        }
+      ],
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SFErrorDomain",
+      "url": "/documentation/safariservices/sferrordomain"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SFAddToHomeScreenActivityItem": {
+      "navigatorTitle": [
+        {
+          "text": "SFAddToHomeScreenActivityItem",
+          "kind": "identifier"
+        }
+      ],
+      "kind": "symbol",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "SFAddToHomeScreenActivityItem",
+          "kind": "identifier"
+        }
+      ],
+      "title": "SFAddToHomeScreenActivityItem",
+      "url": "/documentation/safariservices/sfaddtohomescreenactivityitem",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SFAddToHomeScreenActivityItem",
+      "role": "symbol",
+      "type": "topic",
+      "abstract": [
+        {
+          "text": "A protocol that describes a bookmark someone can add to their Home Screen.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_12_1": {
+      "role": "symbol",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_12_1",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "text": "SF_ENUM_AVAILABLE_MAC_SAFARI_12_1",
+          "kind": "identifier"
+        }
+      ],
+      "url": "/documentation/safariservices/sf_enum_available_mac_safari_12_1",
+      "type": "topic",
+      "abstract": [],
+      "title": "SF_ENUM_AVAILABLE_MAC_SAFARI_12_1"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI": {
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_CLASS_AVAILABLE_MAC_SAFARI"
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol",
+      "abstract": [],
+      "role": "symbol",
+      "title": "SF_CLASS_AVAILABLE_MAC_SAFARI",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI",
+      "url": "/documentation/safariservices/sf_class_available_mac_safari"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_EXTERN": {
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_EXTERN",
+      "abstract": [],
+      "title": "SF_EXTERN",
+      "fragments": [
+        {
+          "text": "SF_EXTERN",
+          "kind": "identifier"
+        }
+      ],
+      "kind": "symbol",
+      "role": "symbol",
+      "type": "topic",
+      "url": "/documentation/safariservices/sf_extern"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_11_0": {
+      "url": "/documentation/safariservices/sf_available_mac_safari_11_0",
+      "abstract": [],
+      "title": "SF_AVAILABLE_MAC_SAFARI_11_0",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_11_0",
+      "kind": "symbol",
+      "role": "symbol",
+      "fragments": [
+        {
+          "text": "SF_AVAILABLE_MAC_SAFARI_11_0",
+          "kind": "identifier"
+        }
+      ],
+      "type": "topic"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_14_0": {
+      "type": "topic",
+      "title": "SF_AVAILABLE_MAC_SAFARI_14_0",
+      "role": "symbol",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_14_0",
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_AVAILABLE_MAC_SAFARI_14_0"
+        }
+      ],
+      "kind": "symbol",
+      "url": "/documentation/safariservices/sf_available_mac_safari_14_0",
+      "abstract": []
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_12_1": {
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_CLASS_AVAILABLE_MAC_SAFARI_12_1"
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol",
+      "abstract": [],
+      "role": "symbol",
+      "title": "SF_CLASS_AVAILABLE_MAC_SAFARI_12_1",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_12_1",
+      "url": "/documentation/safariservices/sf_class_available_mac_safari_12_1"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/safari-app-extensions": {
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/safari-app-extensions",
+      "title": "Safari app extensions",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Learn how Safari app extensions extend the web-browsing experience in Safari by leveraging web technologies and native code."
+        }
+      ],
+      "role": "collectionGroup",
+      "type": "topic",
+      "kind": "article",
+      "url": "/documentation/safariservices/safari-app-extensions"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_11_0": {
+      "role": "symbol",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_11_0",
+      "title": "SF_ENUM_AVAILABLE_MAC_SAFARI_11_0",
+      "url": "/documentation/safariservices/sf_enum_available_mac_safari_11_0",
+      "kind": "symbol",
+      "type": "topic",
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_ENUM_AVAILABLE_MAC_SAFARI_11_0"
+        }
+      ],
+      "abstract": []
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_13_0": {
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_ENUM_AVAILABLE_MAC_SAFARI_13_0"
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol",
+      "abstract": [],
+      "role": "symbol",
+      "title": "SF_ENUM_AVAILABLE_MAC_SAFARI_13_0",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_13_0",
+      "url": "/documentation/safariservices/sf_enum_available_mac_safari_13_0"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/safari-web-extensions": {
+      "url": "/documentation/safariservices/safari-web-extensions",
+      "abstract": [
+        {
+          "text": "Create web extensions that work in Safari and other browsers.",
+          "type": "text"
+        }
+      ],
+      "kind": "article",
+      "title": "Safari web extensions",
+      "type": "topic",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/safari-web-extensions",
+      "role": "collectionGroup"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SFContentBlockerManager": {
+      "url": "/documentation/safariservices/sfcontentblockermanager",
+      "kind": "symbol",
+      "role": "symbol",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SFContentBlockerManager",
+      "title": "SFContentBlockerManager",
+      "type": "topic",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "SFContentBlockerManager"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "A class that your app uses to interact with a content blocker extension.",
+          "type": "text"
+        }
+      ],
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "kind": "identifier",
+          "text": "SFContentBlockerManager"
+        }
+      ]
+    },
+    "doc://com.apple.documentation/documentation/BundleResources/Entitlements/com.apple.developer.associated-domains": {
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The associated domains for specific services, such as shared web credentials, universal links, and App Clips."
+        }
+      ],
+      "type": "topic",
+      "url": "/documentation/BundleResources/Entitlements/com.apple.developer.associated-domains",
+      "title": "Associated Domains Entitlement",
+      "identifier": "doc://com.apple.documentation/documentation/BundleResources/Entitlements/com.apple.developer.associated-domains",
+      "role": "symbol"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SFUniversalLink": {
+      "kind": "symbol",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "SFUniversalLink",
+          "kind": "identifier"
+        }
+      ],
+      "url": "/documentation/safariservices/sfuniversallink",
+      "type": "topic",
+      "abstract": [
+        {
+          "text": "An object that provides browsers with the ability to discover associations between an app and a website.",
+          "type": "text"
+        }
+      ],
+      "role": "symbol",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SFUniversalLink",
+      "title": "SFUniversalLink",
+      "navigatorTitle": [
+        {
+          "text": "SFUniversalLink",
+          "kind": "identifier"
+        }
+      ]
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_12_0": {
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_CLASS_AVAILABLE_MAC_SAFARI_12_0"
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol",
+      "abstract": [],
+      "role": "symbol",
+      "title": "SF_CLASS_AVAILABLE_MAC_SAFARI_12_0",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_12_0",
+      "url": "/documentation/safariservices/sf_class_available_mac_safari_12_0"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_12_1": {
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_AVAILABLE_MAC_SAFARI_12_1"
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol",
+      "abstract": [],
+      "role": "symbol",
+      "title": "SF_AVAILABLE_MAC_SAFARI_12_1",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_12_1",
+      "url": "/documentation/safariservices/sf_available_mac_safari_12_1"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_10_0": {
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_CLASS_AVAILABLE_MAC_SAFARI_10_0"
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol",
+      "abstract": [],
+      "role": "symbol",
+      "title": "SF_CLASS_AVAILABLE_MAC_SAFARI_10_0",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_10_0",
+      "url": "/documentation/safariservices/sf_class_available_mac_safari_10_0"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI": {
+      "role": "symbol",
+      "url": "/documentation/safariservices/sf_available_mac_safari",
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_AVAILABLE_MAC_SAFARI"
+        }
+      ],
+      "title": "SF_AVAILABLE_MAC_SAFARI",
+      "type": "topic",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI",
+      "abstract": [],
+      "kind": "symbol"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_13_0": {
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_AVAILABLE_MAC_SAFARI_13_0"
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol",
+      "abstract": [],
+      "role": "symbol",
+      "title": "SF_AVAILABLE_MAC_SAFARI_13_0",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_13_0",
+      "url": "/documentation/safariservices/sf_available_mac_safari_13_0"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SSReadingListError": {
+      "type": "topic",
+      "abstract": [
+        {
+          "text": "A Safari Reading List error.",
+          "type": "text"
+        }
+      ],
+      "role": "symbol",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "text": "struct",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "SSReadingListError",
+          "kind": "identifier"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "text": "SSReadingListError",
+          "kind": "identifier"
+        }
+      ],
+      "title": "SSReadingListError",
+      "url": "/documentation/safariservices/ssreadinglisterror",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SSReadingListError"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_17_0": {
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_ENUM_AVAILABLE_MAC_SAFARI_17_0"
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol",
+      "abstract": [],
+      "role": "symbol",
+      "title": "SF_ENUM_AVAILABLE_MAC_SAFARI_17_0",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_17_0",
+      "url": "/documentation/safariservices/sf_enum_available_mac_safari_17_0"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SFAuthenticationSession/CompletionHandler": {
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "typealias"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "CompletionHandler"
+        }
+      ],
+      "title": "SFAuthenticationSession.CompletionHandler",
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The completion handler for an authentication session when the user cancels or finishes the login."
+        }
+      ],
+      "kind": "symbol",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SFAuthenticationSession/CompletionHandler",
+      "type": "topic",
+      "url": "/documentation/safariservices/sfauthenticationsession/completionhandler",
+      "navigatorTitle": [
+        {
+          "text": "CompletionHandler",
+          "kind": "identifier"
+        }
+      ]
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SFSafariExtension": {
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SFSafariExtension",
+      "kind": "symbol",
+      "title": "SFSafariExtension",
+      "type": "topic",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A proxy for the Safari extension."
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "SFSafariExtension",
+          "kind": "identifier"
+        }
+      ],
+      "url": "/documentation/safariservices/sfsafariextension",
+      "navigatorTitle": [
+        {
+          "text": "SFSafariExtension",
+          "kind": "identifier"
+        }
+      ],
+      "role": "symbol"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SFSafariServicesVersion": {
+      "url": "/documentation/safariservices/sfsafariservicesversion",
+      "role": "symbol",
+      "title": "SFSafariServicesVersion",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SFSafariServicesVersion",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "The version of Safari services.",
+          "type": "text"
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "enum"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "SFSafariServicesVersion"
+        }
+      ],
+      "type": "topic",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "SFSafariServicesVersion"
+        }
+      ]
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_12_0": {
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_ENUM_AVAILABLE_MAC_SAFARI_12_0"
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol",
+      "abstract": [],
+      "role": "symbol",
+      "title": "SF_ENUM_AVAILABLE_MAC_SAFARI_12_0",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_12_0",
+      "url": "/documentation/safariservices/sf_enum_available_mac_safari_12_0"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SFSafariTab": {
+      "abstract": [
+        {
+          "text": "A proxy for a tab in a Safari window.",
+          "type": "text"
+        }
+      ],
+      "type": "topic",
+      "url": "/documentation/safariservices/sfsafaritab",
+      "kind": "symbol",
+      "navigatorTitle": [
+        {
+          "text": "SFSafariTab",
+          "kind": "identifier"
+        }
+      ],
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "SFSafariTab",
+          "kind": "identifier"
+        }
+      ],
+      "title": "SFSafariTab",
+      "role": "symbol",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SFSafariTab"
+    },
+    "doc://com.apple.documentation/documentation/Xcode/supporting-associated-domains": {
+      "url": "/documentation/Xcode/supporting-associated-domains",
+      "type": "topic",
+      "kind": "article",
+      "identifier": "doc://com.apple.documentation/documentation/Xcode/supporting-associated-domains",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Connect your app and a website to provide both a native app and a browser experience."
+        }
+      ],
+      "role": "article",
+      "title": "Supporting associated domains"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SFSafariSettings": {
+      "kind": "symbol",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SFSafariSettings",
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "text": "SFSafariSettings",
+          "kind": "identifier"
+        }
+      ],
+      "url": "/documentation/safariservices/sfsafarisettings",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "SFSafariSettings",
+          "kind": "identifier"
+        }
+      ],
+      "title": "SFSafariSettings",
+      "type": "topic",
+      "abstract": []
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_14_0": {
+      "kind": "symbol",
+      "type": "topic",
+      "title": "SF_CLASS_AVAILABLE_MAC_SAFARI_14_0",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_14_0",
+      "abstract": [],
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_CLASS_AVAILABLE_MAC_SAFARI_14_0"
+        }
+      ],
+      "role": "symbol",
+      "url": "/documentation/safariservices/sf_class_available_mac_safari_14_0"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_10_0": {
+      "kind": "symbol",
+      "type": "topic",
+      "title": "SF_AVAILABLE_MAC_SAFARI_10_0",
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_10_0",
+      "abstract": [],
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "SF_AVAILABLE_MAC_SAFARI_10_0"
+        }
+      ],
+      "role": "symbol",
+      "url": "/documentation/safariservices/sf_available_mac_safari_10_0"
+    },
+    "doc://com.apple.safariservices/documentation/SafariServices/SSReadingList": {
+      "title": "SSReadingList",
+      "role": "symbol",
+      "url": "/documentation/safariservices/ssreadinglist",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object for adding items to a user’s Safari Reading List."
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "SSReadingList"
+        }
+      ],
+      "identifier": "doc://com.apple.safariservices/documentation/SafariServices/SSReadingList",
+      "type": "topic",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "SSReadingList",
+          "kind": "identifier"
+        }
+      ]
+    }
+  },
+  "variantOverrides": [
+    {
+      "traits": [
+        {
+          "interfaceLanguage": "occ"
+        }
+      ],
+      "patch": [
+        {
+          "value": "occ",
+          "path": "/identifier/interfaceLanguage",
+          "op": "replace"
+        },
+        {
+          "value": {
+            "paths": [
+              [
+                "doc://com.apple.documentation/documentation/technologies"
+              ]
+            ]
+          },
+          "path": "/hierarchy",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "anchor": "Safari-web-extensions",
+              "title": "Safari web extensions",
+              "identifiers": [
+                "doc://com.apple.safariservices/documentation/SafariServices/safari-web-extensions"
+              ]
+            },
+            {
+              "anchor": "Content-blockers",
+              "title": "Content blockers",
+              "identifiers": [
+                "doc://com.apple.safariservices/documentation/SafariServices/creating-a-content-blocker",
+                "doc://com.apple.safariservices/documentation/SafariServices/SFContentBlockerManager",
+                "doc://com.apple.safariservices/documentation/SafariServices/SFContentBlockerState"
+              ]
+            },
+            {
+              "anchor": "Safari-app-extensions",
+              "title": "Safari app extensions",
+              "identifiers": [
+                "doc://com.apple.safariservices/documentation/SafariServices/safari-app-extensions",
+                "doc://com.apple.safariservices/documentation/SafariServices/SFSafariExtension",
+                "doc://com.apple.safariservices/documentation/SafariServices/SFSafariApplication",
+                "doc://com.apple.safariservices/documentation/SafariServices/SFSafariWindow",
+                "doc://com.apple.safariservices/documentation/SafariServices/SFSafariPage",
+                "doc://com.apple.safariservices/documentation/SafariServices/SFSafariTab"
+              ]
+            },
+            {
+              "anchor": "Safari-content-in-your-app",
+              "title": "Safari content in your app",
+              "identifiers": [
+                "doc://com.apple.safariservices/documentation/SafariServices/SFSafariViewController",
+                "doc://com.apple.safariservices/documentation/SafariServices/SFAuthenticationSession/CompletionHandler",
+                "doc://com.apple.safariservices/documentation/SafariServices/importing-data-exported-from-safari"
+              ]
+            },
+            {
+              "anchor": "Associated-domains",
+              "title": "Associated domains",
+              "identifiers": [
+                "doc://com.apple.documentation/documentation/Xcode/supporting-associated-domains",
+                "doc://com.apple.safariservices/documentation/SafariServices/SFUniversalLink",
+                "doc://com.apple.documentation/documentation/BundleResources/Entitlements/com.apple.developer.associated-domains"
+              ]
+            },
+            {
+              "anchor": "Availability",
+              "title": "Availability",
+              "identifiers": [
+                "doc://com.apple.safariservices/documentation/SafariServices/SFSafariServicesVersion"
+              ]
+            },
+            {
+              "anchor": "Safari-Reading-List",
+              "title": "Safari Reading List",
+              "identifiers": [
+                "doc://com.apple.safariservices/documentation/SafariServices/SSReadingList",
+                "doc://com.apple.safariservices/documentation/SafariServices/SSReadingListErrorDomain",
+                "doc://com.apple.safariservices/documentation/SafariServices/SSReadingListErrorCode"
+              ]
+            },
+            {
+              "anchor": "Home-Screen-bookmarks",
+              "title": "Home Screen bookmarks",
+              "identifiers": [
+                "doc://com.apple.safariservices/documentation/SafariServices/SFAddToHomeScreenActivityItem"
+              ]
+            },
+            {
+              "anchor": "Miscellaneous-errors",
+              "title": "Miscellaneous errors",
+              "identifiers": [
+                "doc://com.apple.safariservices/documentation/SafariServices/SFErrorCode",
+                "doc://com.apple.safariservices/documentation/SafariServices/SFErrorDomain"
+              ]
+            },
+            {
+              "anchor": "Deprecated",
+              "title": "Deprecated",
+              "identifiers": [
+                "doc://com.apple.safariservices/documentation/SafariServices/deprecated-symbols"
+              ]
+            },
+            {
+              "generated": true,
+              "anchor": "Classes",
+              "title": "Classes",
+              "identifiers": [
+                "doc://com.apple.safariservices/documentation/SafariServices/SFSafariSettings"
+              ]
+            },
+            {
+              "generated": true,
+              "anchor": "Macros",
+              "title": "Macros",
+              "identifiers": [
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_10_0",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_10_1",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_11_0",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_11_1",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_12_0",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_12_1",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_13_0",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_14_0",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_17_0",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_AVAILABLE_MAC_SAFARI_18_4",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_10_0",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_10_1",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_11_0",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_11_1",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_12_0",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_12_1",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_13_0",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_14_0",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_17_0",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_CLASS_AVAILABLE_MAC_SAFARI_18_4",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_DEPRECATED_MAC_SAFARI",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_DEPRECATED_MAC_SAFARI_10_0_11_0",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_10_0",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_10_1",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_11_0",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_11_1",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_12_0",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_12_1",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_13_0",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_14_0",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_17_0",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_ENUM_AVAILABLE_MAC_SAFARI_18_4",
+                "doc://com.apple.safariservices/documentation/SafariServices/SF_EXTERN"
+              ]
+            }
+          ],
+          "path": "/topicSections",
+          "op": "replace"
+        },
+        {
+          "value": null,
+          "path": "/relationshipsSections",
+          "op": "add"
+        },
+        {
+          "value": null,
+          "path": "/seeAlsoSections",
+          "op": "add"
+        },
+        {
+          "value": [
+            {
+              "text": "@interface",
+              "kind": "keyword"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "ASWebAuthenticationSession",
+              "kind": "identifier"
+            },
+            {
+              "text": " : ",
+              "kind": "text"
+            },
+            {
+              "preciseIdentifier": "c:objc(cs)NSObject",
+              "text": "NSObject",
+              "kind": "typeIdentifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AuthenticationServices~1ASWebAuthenticationSession/fragments",
+          "op": "replace"
+        },
+        {
+          "value": "SFErrorCode",
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFErrorCode/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "SFErrorCode"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFErrorCode/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "SFErrorCode"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFErrorCode/navigatorTitle",
+          "op": "replace"
+        },
+        {
+          "value": "SFSafariPage",
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFSafariPage/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "SFSafariPage",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFSafariPage/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "SFSafariPage",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFSafariPage/navigatorTitle",
+          "op": "replace"
+        },
+        {
+          "value": "SFSafariViewController",
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFSafariViewController/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "SFSafariViewController"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFSafariViewController/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "SFSafariViewController"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFSafariViewController/navigatorTitle",
+          "op": "replace"
+        },
+        {
+          "value": "SSReadingListErrorDomain",
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SSReadingListErrorDomain/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "SSReadingListErrorDomain"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SSReadingListErrorDomain/fragments",
+          "op": "replace"
+        },
+        {
+          "value": "SFContentBlockerState",
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFContentBlockerState/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "SFContentBlockerState"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFContentBlockerState/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "SFContentBlockerState",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFContentBlockerState/navigatorTitle",
+          "op": "replace"
+        },
+        {
+          "value": "SFSafariApplication",
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFSafariApplication/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "SFSafariApplication"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFSafariApplication/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "SFSafariApplication",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFSafariApplication/navigatorTitle",
+          "op": "replace"
+        },
+        {
+          "value": "SSReadingListErrorCode",
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SSReadingListErrorCode/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "SSReadingListErrorCode"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SSReadingListErrorCode/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "SSReadingListErrorCode"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SSReadingListErrorCode/navigatorTitle",
+          "op": "replace"
+        },
+        {
+          "value": "SFSafariWindow",
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFSafariWindow/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "SFSafariWindow",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFSafariWindow/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "SFSafariWindow"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFSafariWindow/navigatorTitle",
+          "op": "replace"
+        },
+        {
+          "value": "SFErrorDomain",
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFErrorDomain/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "SFErrorDomain",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFErrorDomain/fragments",
+          "op": "replace"
+        },
+        {
+          "value": "SFAddToHomeScreenActivityItem",
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFAddToHomeScreenActivityItem/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "SFAddToHomeScreenActivityItem",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFAddToHomeScreenActivityItem/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "SFAddToHomeScreenActivityItem",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFAddToHomeScreenActivityItem/navigatorTitle",
+          "op": "replace"
+        },
+        {
+          "value": "SFContentBlockerManager",
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFContentBlockerManager/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "SFContentBlockerManager",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFContentBlockerManager/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "SFContentBlockerManager"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFContentBlockerManager/navigatorTitle",
+          "op": "replace"
+        },
+        {
+          "value": "SFUniversalLink",
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFUniversalLink/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "SFUniversalLink"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFUniversalLink/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "SFUniversalLink"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFUniversalLink/navigatorTitle",
+          "op": "replace"
+        },
+        {
+          "value": "SFAuthenticationCompletionHandler",
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFAuthenticationSession~1CompletionHandler/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "SFAuthenticationCompletionHandler"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFAuthenticationSession~1CompletionHandler/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "SFAuthenticationCompletionHandler",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFAuthenticationSession~1CompletionHandler/navigatorTitle",
+          "op": "replace"
+        },
+        {
+          "value": "SFSafariExtension",
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFSafariExtension/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "SFSafariExtension",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFSafariExtension/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "SFSafariExtension"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFSafariExtension/navigatorTitle",
+          "op": "replace"
+        },
+        {
+          "value": "SFSafariServicesVersion",
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFSafariServicesVersion/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "SFSafariServicesVersion"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFSafariServicesVersion/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "SFSafariServicesVersion",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFSafariServicesVersion/navigatorTitle",
+          "op": "replace"
+        },
+        {
+          "value": "SFSafariTab",
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFSafariTab/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "SFSafariTab",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFSafariTab/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "SFSafariTab"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFSafariTab/navigatorTitle",
+          "op": "replace"
+        },
+        {
+          "value": "SFSafariSettings",
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFSafariSettings/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "SFSafariSettings",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFSafariSettings/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "SFSafariSettings"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SFSafariSettings/navigatorTitle",
+          "op": "replace"
+        },
+        {
+          "value": "SSReadingList",
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SSReadingList/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "SSReadingList",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SSReadingList/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "SSReadingList",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.safariservices~1documentation~1SafariServices~1SSReadingList/navigatorTitle",
+          "op": "replace"
+        }
+      ]
+    }
+  ],
+  "legalNotices": {
+    "copyright": "Copyright &copy; 2025 Apple Inc. All rights reserved.",
+    "termsOfUse": "https://www.apple.com/legal/internet-services/terms/site.html",
+    "privacyPolicy": "https://www.apple.com/privacy/privacy-policy"
+  }
+}

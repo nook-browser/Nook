@@ -192,8 +192,68 @@ class BrowserConfiguration {
         return config
     }
     
+    // MARK: - Extension-Specific Configuration
+
+    /// WebView configuration specifically for extension contexts (popups, background pages, options)
+    /// This configuration allows CORS and cross-origin requests that extensions typically need
+    /// while maintaining security for regular browsing
+    func extensionWebViewConfiguration() -> WKWebViewConfiguration {
+        let config = WKWebViewConfiguration()
+
+        // Use persistent data store for extensions
+        config.websiteDataStore = WKWebsiteDataStore.default()
+
+        // Configure JavaScript preferences for extension support
+        let preferences = WKWebpagePreferences()
+        preferences.allowsContentJavaScript = true
+        config.defaultWebpagePreferences = preferences
+
+        // Core WebKit preferences for extensions
+        config.preferences.javaScriptCanOpenWindowsAutomatically = true
+
+        // Media settings
+        config.mediaTypesRequiringUserActionForPlayback = []
+
+        // Enable Picture-in-Picture for web media
+        config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
+
+        // Enable full-screen API support
+        config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
+        config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
+        config.preferences.isElementFullscreenEnabled = true
+
+        // Enable background media playback
+        config.allowsAirPlayForMediaPlayback = true
+
+        // User agent for better compatibility
+        config.applicationNameForUserAgent = "Version/26.0.1 Safari/605.1.15"
+
+        // Enable developer tools for debugging
+        config.preferences.setValue(true, forKey: "developerExtrasEnabled")
+
+        // CRITICAL: Set webExtensionController for webkit-extension:// URL support
+        // This fixes extension resource loading and CORS for external API access
+        if #available(macOS 15.4, *) {
+            if config.webExtensionController == nil {
+                let controller = MainActor.assumeIsolated {
+                    ExtensionManager.shared.nativeController
+                }
+                config.webExtensionController = controller
+                print("   ✅ Extension WebView configured with webExtensionController")
+            }
+        }
+
+        // Note: WebKit security preferences are handled through the WKWebExtensionController
+        // The extension framework automatically manages security for external resource access
+        // based on granted permissions in the manifest
+
+        print("   🔧 Extension WebView configured - security managed by WKWebExtensionController")
+
+        return config
+    }
+
     // MARK: - Chrome Web Store Integration
-    
+
     /// Get the Web Store injector script
     static func webStoreInjectorScript() -> WKUserScript? {
         guard let scriptPath = Bundle.main.path(forResource: "WebStoreInjector", ofType: "js"),

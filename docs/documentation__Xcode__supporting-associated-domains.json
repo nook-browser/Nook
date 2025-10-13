@@ -1,0 +1,1061 @@
+{
+  "identifier": {
+    "url": "doc://com.apple.Xcode/documentation/Xcode/supporting-associated-domains",
+    "interfaceLanguage": "swift"
+  },
+  "schemaVersion": {
+    "major": 0,
+    "minor": 3,
+    "patch": 0
+  },
+  "primaryContentSections": [
+    {
+      "kind": "content",
+      "content": [
+        {
+          "text": "Overview",
+          "level": 2,
+          "anchor": "Overview",
+          "type": "heading"
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "Associated domains establish a secure association between domains and your app so",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "you can share credentials or provide features in your app from your website. For",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "example, an online retailer may offer an app to accompany their website and enhance",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "the user experience.",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "Shared web credentials, universal links, Handoff, and App Clips all use associated",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "domains. Associated domains provide the underpinning to universal links, a feature",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "that allows an app to present content in place of all or part of its website. Users",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "who don’t download the app get the same information in a web browser instead of the",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "native app.",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "To associate a website with your app, you need to have the associated domain file",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "on your website and the appropriate entitlement in your app. The apps in the ",
+              "type": "text"
+            },
+            {
+              "code": "apple-app-site-association",
+              "type": "codeVoice"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "file on your website must have a matching ",
+              "type": "text"
+            },
+            {
+              "identifier": "doc://com.apple.documentation/documentation/BundleResources/Entitlements/com.apple.developer.associated-domains",
+              "type": "reference",
+              "isActive": true
+            },
+            {
+              "text": ".",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "text": "Add the associated domain file to your website",
+          "type": "heading",
+          "anchor": "Add-the-associated-domain-file-to-your-website",
+          "level": 3
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "When a user installs your app, the system attempts to download the associated domain",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "file and verify the domains in your entitlement.",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "content": [
+            {
+              "type": "paragraph",
+              "inlineContent": [
+                {
+                  "type": "text",
+                  "text": "If your site uses multiple subdomains (such as "
+                },
+                {
+                  "code": "example.com",
+                  "type": "codeVoice"
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "code": "www.example.com",
+                  "type": "codeVoice"
+                },
+                {
+                  "type": "text",
+                  "text": ","
+                },
+                {
+                  "type": "text",
+                  "text": " "
+                },
+                {
+                  "type": "text",
+                  "text": "and "
+                },
+                {
+                  "code": "support.example.com",
+                  "type": "codeVoice"
+                },
+                {
+                  "type": "text",
+                  "text": "), each requires its own entry in the "
+                },
+                {
+                  "isActive": true,
+                  "type": "reference",
+                  "identifier": "doc://com.apple.documentation/documentation/BundleResources/Entitlements/com.apple.developer.associated-domains"
+                },
+                {
+                  "type": "text",
+                  "text": ","
+                },
+                {
+                  "type": "text",
+                  "text": " "
+                },
+                {
+                  "type": "text",
+                  "text": "and each must serve its own "
+                },
+                {
+                  "code": "apple-app-site-association",
+                  "type": "codeVoice"
+                },
+                {
+                  "type": "text",
+                  "text": " file."
+                }
+              ]
+            }
+          ],
+          "name": "Note",
+          "type": "aside",
+          "style": "note"
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "To add the associated domain file to your website, create a file named ",
+              "type": "text"
+            },
+            {
+              "code": "apple-app-site-association",
+              "type": "codeVoice"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "(without an extension). Update the JSON code in the file for the services you",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "support on the domain. For universal links, be sure to list the app identifiers for",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "your domain in the ",
+              "type": "text"
+            },
+            {
+              "code": "applinks",
+              "type": "codeVoice"
+            },
+            {
+              "text": " service. Similarly, if you create an App Clip, be sure",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "to list your App Clip’s app identifier using the ",
+              "type": "text"
+            },
+            {
+              "code": "appclips",
+              "type": "codeVoice"
+            },
+            {
+              "text": " service.",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "The following JSON code represents the contents of a simple association file:"
+            }
+          ]
+        },
+        {
+          "code": [
+            "{",
+            "  \"applinks\": {",
+            "      \"details\": [",
+            "           {",
+            "             \"appIDs\": [ \"ABCDE12345.com.example.app\", \"ABCDE12345.com.example.app2\" ],",
+            "             \"components\": [",
+            "               {",
+            "                  \"#\": \"no_universal_links\",",
+            "                  \"exclude\": true,",
+            "                  \"comment\": \"Matches any URL with a fragment that equals no_universal_links and instructs the system not to open it as a universal link.\"",
+            "               },",
+            "               {",
+            "                  \"/\": \"/buy/*\",",
+            "                  \"comment\": \"Matches any URL with a path that starts with /buy/.\"",
+            "               },",
+            "               {",
+            "                  \"/\": \"/help/website/*\",",
+            "                  \"exclude\": true,",
+            "                  \"comment\": \"Matches any URL with a path that starts with /help/website/ and instructs the system not to open it as a universal link.\"",
+            "               },",
+            "               {",
+            "                  \"/\": \"/help/*\",",
+            "                  \"?\": { \"articleNumber\": \"????\" },",
+            "                  \"comment\": \"Matches any URL with a path that starts with /help/ and that has a query item with name 'articleNumber' and a value of exactly four characters.\"",
+            "               }",
+            "             ]",
+            "           }",
+            "       ]",
+            "   },",
+            "   \"webcredentials\": {",
+            "      \"apps\": [ \"ABCDE12345.com.example.app\" ]",
+            "   },",
+            "",
+            "    \"appclips\": {",
+            "        \"apps\": [\"ABCDE12345.com.example.MyApp.Clip\"]",
+            "    }",
+            "}"
+          ],
+          "type": "codeListing",
+          "syntax": "other"
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "The ",
+              "type": "text"
+            },
+            {
+              "type": "codeVoice",
+              "code": "appIDs"
+            },
+            {
+              "text": " and ",
+              "type": "text"
+            },
+            {
+              "type": "codeVoice",
+              "code": "apps"
+            },
+            {
+              "text": " keys specify the application identifiers for the apps that",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "are available for use on this website along with their service types. Use the following",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "format for the values in these keys:",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "code": [
+            "<Application Identifier Prefix>.<Bundle Identifier>"
+          ],
+          "type": "codeListing",
+          "syntax": "javascript"
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "The ",
+              "type": "text"
+            },
+            {
+              "code": "details",
+              "type": "codeVoice"
+            },
+            {
+              "text": " dictionary only applies to the ",
+              "type": "text"
+            },
+            {
+              "identifier": "doc://com.apple.documentation/documentation/BundleResources/applinks",
+              "isActive": true,
+              "type": "reference"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "service type; other service types don’t use it. The ",
+              "type": "text"
+            },
+            {
+              "code": "components",
+              "type": "codeVoice"
+            },
+            {
+              "text": " key is an array",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "of dictionaries that provides pattern matching for components of the URL.",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "After you construct the association file, place it in your site’s ."
+            },
+            {
+              "code": "well-known",
+              "type": "codeVoice"
+            },
+            {
+              "type": "text",
+              "text": " directory."
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "The file’s URL should match the following format:"
+            }
+          ]
+        },
+        {
+          "code": [
+            "https://<fully qualified domain>/.well-known/apple-app-site-association"
+          ],
+          "type": "codeListing",
+          "syntax": "other"
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "You must host the file using "
+            },
+            {
+              "type": "codeVoice",
+              "code": "https://"
+            },
+            {
+              "type": "text",
+              "text": " with a valid certificate and with no redirects."
+            }
+          ]
+        },
+        {
+          "text": "Add the associated domains entitlement to your app",
+          "type": "heading",
+          "anchor": "Add-the-associated-domains-entitlement-to-your-app",
+          "level": 3
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "To set up the entitlement in your app, open the target’s Signing & Capabilities",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "tab in Xcode and add the Associated Domains capability. If they’re not already present,",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "this step adds the ",
+              "type": "text"
+            },
+            {
+              "identifier": "doc://com.apple.documentation/documentation/BundleResources/Entitlements/com.apple.developer.associated-domains",
+              "isActive": true,
+              "type": "reference"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "to your app and the associated domains feature to your app ID.",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "content": [
+            {
+              "inlineContent": [
+                {
+                  "text": "For a single-target watchOS apps, add the Associated Domains capability",
+                  "type": "text"
+                },
+                {
+                  "text": " ",
+                  "type": "text"
+                },
+                {
+                  "text": "to the watchOS app target. For watchOS apps with separate WatchKit extensions, you",
+                  "type": "text"
+                },
+                {
+                  "text": " ",
+                  "type": "text"
+                },
+                {
+                  "text": "must add the Associated Domains capability to the WatchKit Extension target.",
+                  "type": "text"
+                }
+              ],
+              "type": "paragraph"
+            }
+          ],
+          "name": "Important",
+          "type": "aside",
+          "style": "important"
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "To add your domain to the entitlement, click Add (+) at the bottom of the Domains",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "table to add a placeholder domain. Replace the placeholder with the appropriate prefix",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "for the service your app supports and your site’s domain. Make sure to only include",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "the desired subdomain and the top-level domain. Don’t include path and query components",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "or a trailing slash (",
+              "type": "text"
+            },
+            {
+              "code": "/)",
+              "type": "codeVoice"
+            },
+            {
+              "text": ".",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "identifier": "supporting-associated-domains-1.png",
+              "type": "image"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "Add the domains that share credentials with your app. For services other than",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "code": "appclips",
+              "type": "codeVoice"
+            },
+            {
+              "text": ", you can prefix a domain with ",
+              "type": "text"
+            },
+            {
+              "code": "*.",
+              "type": "codeVoice"
+            },
+            {
+              "text": " to match all of its subdomains.",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "Each domain you specify uses the following format:",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "code": [
+            "<service>:<fully qualified domain>"
+          ],
+          "type": "codeListing",
+          "syntax": "other"
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "Starting with macOS 11 and iOS 14, apps no longer send requests for "
+            },
+            {
+              "type": "codeVoice",
+              "code": "apple-app-site-association"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "files directly to your web server. Instead, they send these requests to an Apple-managed"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "content delivery network (CDN) dedicated to associated domains."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "While you’re developing your app, if your web server is unreachable from the public",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "internet, you can use the alternate mode feature to bypass the CDN and connect directly",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "to your private domain.",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "You enable an alternate mode by adding a query string to your associated domain’s"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "entitlement as follows:"
+            }
+          ]
+        },
+        {
+          "code": [
+            "<service>:<fully qualified domain>?mode=<alternate mode>"
+          ],
+          "type": "codeListing",
+          "syntax": "other"
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "For more information about alternate modes, see "
+            },
+            {
+              "type": "reference",
+              "isActive": true,
+              "identifier": "doc://com.apple.documentation/documentation/BundleResources/Entitlements/com.apple.developer.associated-domains"
+            },
+            {
+              "type": "text",
+              "text": "."
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "For information about universal links, see "
+            },
+            {
+              "type": "reference",
+              "isActive": true,
+              "identifier": "doc://com.apple.Xcode/documentation/Xcode/allowing-apps-and-websites-to-link-to-your-content"
+            },
+            {
+              "type": "text",
+              "text": "."
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "For information about Handoff, see "
+            },
+            {
+              "type": "reference",
+              "isActive": true,
+              "identifier": "doc://com.apple.documentation/documentation/Foundation/implementing-handoff-in-your-app"
+            },
+            {
+              "type": "text",
+              "text": "."
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "For information about App Clips, see "
+            },
+            {
+              "type": "reference",
+              "isActive": true,
+              "identifier": "doc://com.apple.documentation/documentation/AppClip/configuring-the-launch-experience-of-your-app-clip"
+            },
+            {
+              "type": "text",
+              "text": "."
+            }
+          ]
+        },
+        {
+          "content": [
+            {
+              "type": "paragraph",
+              "inlineContent": [
+                {
+                  "text": "Apple’s content delivery network requests the ",
+                  "type": "text"
+                },
+                {
+                  "type": "codeVoice",
+                  "code": "apple-app-site-association"
+                },
+                {
+                  "text": " file for your domain within 24 hours. Devices check for updates approximately once per week after app installation.",
+                  "type": "text"
+                }
+              ]
+            }
+          ],
+          "name": "Important",
+          "type": "aside",
+          "style": "important"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "role": "collectionGroup",
+    "title": "Supporting associated domains"
+  },
+  "abstract": [
+    {
+      "text": "Connect your app and a website to provide both a native app and a browser experience.",
+      "type": "text"
+    }
+  ],
+  "sections": [],
+  "hierarchy": {
+    "paths": [
+      [
+        "doc://com.apple.documentation/documentation/technologies",
+        "doc://com.apple.Xcode/documentation/Xcode",
+        "doc://com.apple.Xcode/documentation/Xcode/projects-and-workspaces",
+        "doc://com.apple.Xcode/documentation/Xcode/allowing-apps-and-websites-to-link-to-your-content"
+      ]
+    ]
+  },
+  "topicSections": [
+    {
+      "title": "Entitlements",
+      "identifiers": [
+        "doc://com.apple.documentation/documentation/BundleResources/Entitlements/com.apple.developer.associated-domains"
+      ],
+      "anchor": "Entitlements"
+    },
+    {
+      "title": "Services",
+      "identifiers": [
+        "doc://com.apple.documentation/documentation/BundleResources/applinks"
+      ],
+      "anchor": "Services"
+    }
+  ],
+  "kind": "article",
+  "references": {
+    "supporting-associated-domains-1.png": {
+      "identifier": "supporting-associated-domains-1.png",
+      "variants": [
+        {
+          "traits": [
+            "2x",
+            "light"
+          ],
+          "url": "https://docs-assets.developer.apple.com/published/3c16a5146cb1de5e57b632dce38b5553/supporting-associated-domains-1%402x.png"
+        },
+        {
+          "traits": [
+            "2x",
+            "dark"
+          ],
+          "url": "https://docs-assets.developer.apple.com/published/5a2a2e8fba33a95a14378a207c18dd0c/supporting-associated-domains-1~dark%402x.png"
+        }
+      ],
+      "type": "image",
+      "alt": "A screenshot of the Associated Domains table in Xcode with two domains listed."
+    },
+    "doc://com.apple.Xcode/documentation/Xcode/allowing-apps-and-websites-to-link-to-your-content": {
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Use universal links to link directly to content within your app and share data securely."
+        }
+      ],
+      "title": "Allowing apps and websites to link to your content",
+      "kind": "article",
+      "role": "collectionGroup",
+      "url": "/documentation/xcode/allowing-apps-and-websites-to-link-to-your-content",
+      "identifier": "doc://com.apple.Xcode/documentation/Xcode/allowing-apps-and-websites-to-link-to-your-content",
+      "type": "topic"
+    },
+    "doc://com.apple.documentation/documentation/AppClip/configuring-the-launch-experience-of-your-app-clip": {
+      "identifier": "doc://com.apple.documentation/documentation/AppClip/configuring-the-launch-experience-of-your-app-clip",
+      "title": "Configuring App Clip experiences",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Review how people launch your App Clip with invocation URLs, default and demo links, and advanced App Clip experiences."
+        }
+      ],
+      "kind": "article",
+      "type": "topic",
+      "role": "article",
+      "url": "/documentation/AppClip/configuring-the-launch-experience-of-your-app-clip"
+    },
+    "doc://com.apple.Xcode/documentation/Xcode": {
+      "identifier": "doc://com.apple.Xcode/documentation/Xcode",
+      "type": "topic",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Build, test, and submit your app with Apple’s integrated development environment."
+        }
+      ],
+      "url": "/documentation/xcode",
+      "kind": "article",
+      "title": "Xcode",
+      "role": "collection",
+      "images": [
+        {
+          "type": "card",
+          "identifier": "Xcode-PageImage-card.png"
+        }
+      ]
+    },
+    "doc://com.apple.documentation/documentation/BundleResources/Entitlements/com.apple.developer.associated-domains": {
+      "role": "symbol",
+      "kind": "symbol",
+      "type": "topic",
+      "identifier": "doc://com.apple.documentation/documentation/BundleResources/Entitlements/com.apple.developer.associated-domains",
+      "url": "/documentation/BundleResources/Entitlements/com.apple.developer.associated-domains",
+      "abstract": [
+        {
+          "text": "The associated domains for specific services, such as shared web credentials, universal links, and App Clips.",
+          "type": "text"
+        }
+      ],
+      "title": "Associated Domains Entitlement"
+    },
+    "doc://com.apple.Xcode/documentation/Xcode/projects-and-workspaces": {
+      "title": "Projects and workspaces",
+      "kind": "article",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Manage the code and resources you use to build apps, libraries, and other"
+        },
+        {
+          "text": " ",
+          "type": "text"
+        },
+        {
+          "text": "software for Apple platforms.",
+          "type": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.Xcode/documentation/Xcode/projects-and-workspaces",
+      "url": "/documentation/xcode/projects-and-workspaces",
+      "type": "topic",
+      "role": "collectionGroup"
+    },
+    "doc://com.apple.documentation/documentation/technologies": {
+      "abstract": [
+        {
+          "type": "text",
+          "text": ""
+        }
+      ],
+      "title": "Technologies",
+      "kind": "technologies",
+      "role": "overview",
+      "url": "/documentation/technologies",
+      "identifier": "doc://com.apple.documentation/documentation/technologies",
+      "type": "topic"
+    },
+    "doc://com.apple.documentation/documentation/Foundation/implementing-handoff-in-your-app": {
+      "identifier": "doc://com.apple.documentation/documentation/Foundation/implementing-handoff-in-your-app",
+      "title": "Implementing Handoff in Your App",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Create, send, and receive user activities directly."
+        }
+      ],
+      "kind": "article",
+      "type": "topic",
+      "role": "article",
+      "url": "/documentation/Foundation/implementing-handoff-in-your-app"
+    },
+    "Xcode-PageImage-card.png": {
+      "identifier": "Xcode-PageImage-card.png",
+      "variants": [
+        {
+          "traits": [
+            "2x",
+            "light"
+          ],
+          "url": "https://docs-assets.developer.apple.com/published/cc63eacd8f7f660388b46204d1d9bbcb/Xcode-PageImage-card%402x.png"
+        },
+        {
+          "traits": [
+            "2x",
+            "dark"
+          ],
+          "url": "https://docs-assets.developer.apple.com/published/62dba87d5f60ec96eb48882c9dff86d8/Xcode-PageImage-card~dark%402x.png"
+        }
+      ],
+      "type": "image",
+      "alt": "The Xcode logo on a blue gradient background."
+    },
+    "doc://com.apple.documentation/documentation/BundleResources/applinks": {
+      "identifier": "doc://com.apple.documentation/documentation/BundleResources/applinks",
+      "title": "applinks",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The root object for a universal links service definition."
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "text",
+          "text": "object "
+        },
+        {
+          "kind": "identifier",
+          "text": "applinks"
+        }
+      ],
+      "kind": "symbol",
+      "type": "topic",
+      "role": "symbol",
+      "url": "/documentation/BundleResources/applinks"
+    }
+  },
+  "legalNotices": {
+    "copyright": "Copyright &copy; 2025 Apple Inc. All rights reserved.",
+    "termsOfUse": "https://www.apple.com/legal/internet-services/terms/site.html",
+    "privacyPolicy": "https://www.apple.com/privacy/privacy-policy"
+  }
+}

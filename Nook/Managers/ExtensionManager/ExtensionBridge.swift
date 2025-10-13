@@ -38,17 +38,25 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
             print("[ExtensionWindowAdapter] activeTab() called")
             lastActiveTabCall = now
         }
-        
-        if let t = browserManager.currentTabForActiveWindow(),
-           let a = ExtensionManager.shared.stableAdapter(for: t) {
-            return a
+
+        if let t = browserManager.currentTabForActiveWindow() {
+            let a = MainActor.assumeIsolated {
+                ExtensionManager.shared.stableAdapter(for: t)
+            }
+            if let a = a {
+                return a
+            }
         }
-        
-        if let first = browserManager.tabManager.pinnedTabs.first ?? browserManager.tabManager.tabs.first,
-           let a = ExtensionManager.shared.stableAdapter(for: first) {
-            return a
+
+        if let first = browserManager.tabManager.pinnedTabs.first ?? browserManager.tabManager.tabs.first {
+            let a = MainActor.assumeIsolated {
+                ExtensionManager.shared.stableAdapter(for: first)
+            }
+            if let a = a {
+                return a
+            }
         }
-        
+
         return nil
     }
 
@@ -64,8 +72,12 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
         }
         
         let all = browserManager.tabManager.pinnedTabs + browserManager.tabManager.tabs
-        let adapters = all.compactMap { ExtensionManager.shared.stableAdapter(for: $0) }
-        
+        let adapters = all.compactMap { tab in
+            MainActor.assumeIsolated {
+                ExtensionManager.shared.stableAdapter(for: tab)
+            }
+        }
+
         return adapters
     }
 
@@ -224,6 +236,17 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
         self.tab = tab
         self.browserManager = browserManager
         super.init()
+    }
+
+    // MARK: - Object Identity
+
+    override func isEqual(_ object: Any?) -> Bool {
+        guard let other = object as? ExtensionTabAdapter else { return false }
+        return other.tab.id == self.tab.id
+    }
+
+    override var hash: Int {
+        return tab.id.hashValue
     }
 
     private var lastMethodCall: Date = Date.distantPast
@@ -414,7 +437,9 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
     // MARK: - Window Association
 
     func window(for extensionContext: WKWebExtensionContext) -> (any WKWebExtensionWindow)? {
-        let manager = ExtensionManager.shared
+        let manager = MainActor.assumeIsolated {
+            ExtensionManager.shared
+        }
         if manager.windowAdapter == nil {
             manager.windowAdapter = ExtensionWindowAdapter(browserManager: browserManager)
         }
