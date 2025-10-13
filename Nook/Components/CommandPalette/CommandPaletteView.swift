@@ -51,131 +51,108 @@ struct CommandPaletteView: View {
             browserManager.activeWindowState?.id == windowState.id
         let isVisible = isActiveWindow && windowState.isCommandPaletteVisible
 
-        ZStack {
-            Color.clear
-                .ignoresSafeArea()
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    browserManager.closeCommandPalette(for: windowState)
-                }
-                .gesture(WindowDragGesture())
+        UniversalGlassEffectContainer {
+            VStack(alignment: .center,spacing: 6) {
+                // Input field - fixed at top of box
+                HStack(spacing: 15) {
+                    Image(
+                        systemName: isLikelyURL(text)
+                            ? "globe" : "magnifyingglass"
+                    )
+                    .id(isLikelyURL(text) ? "globe" : "magnifyingglass")
+                    .transition(.blur(intensity: 2, scale: 0.6).animation(.smooth(duration: 0.3)))
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundStyle(isDark ? .white : .black)
+                    .frame(width: 15)
 
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    VStack {
-                        VStack(alignment: .center,spacing: 6) {
-                            // Input field - fixed at top of box
-                            HStack(spacing: 15) {
-                                Image(
-                                    systemName: isLikelyURL(text)
-                                        ? "globe" : "magnifyingglass"
-                                )
-                                .id(isLikelyURL(text) ? "globe" : "magnifyingglass")
-                                .transition(.blur(intensity: 2, scale: 0.6).animation(.smooth(duration: 0.3)))
-                                .font(.system(size: 14, weight: .regular))
-                                .foregroundStyle(isDark ? .white : .black)
-                                .frame(width: 15)
+                    TextField("Search or enter URL...", text: $text)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(
+                            text.isEmpty
+                                ? isDark
+                                    ? .white.opacity(0.25)
+                                    : .black.opacity(0.25)
+                                : isDark
+                                    ? .white.opacity(0.9)
+                                    : .black.opacity(0.9)
 
-                                TextField("Search or enter URL...", text: $text)
-                                    .textFieldStyle(.plain)
-                                    .font(.system(size: 18, weight: .medium))
-                                    .foregroundColor(
-                                        text.isEmpty
-                                            ? isDark
-                                                ? .white.opacity(0.25)
-                                                : .black.opacity(0.25)
-                                            : isDark
-                                                ? .white.opacity(0.9)
-                                                : .black.opacity(0.9)
-
-                                    )
-                                    .tint(gradientColorManager.primaryColor)
-                                    .focused($isSearchFocused)
-                                    .onKeyPress(.return) {
-                                        handleReturn()
-                                        return .handled
-                                    }
-                                    .onKeyPress(.upArrow) {
-                                        navigateSuggestions(direction: -1)
-                                        return .handled
-                                    }
-                                    .onKeyPress(.downArrow) {
-                                        navigateSuggestions(direction: 1)
-                                        return .handled
-                                    }
-                                    .onChange(of: text) { _, newValue in
-                                        selectedSuggestionIndex = -1
-                                        searchManager.searchSuggestions(
-                                            for: newValue
-                                        )
-                                        if windowState.commandPalettePrefilledText
-                                            != newValue
-                                        {
-                                            windowState
-                                                .commandPalettePrefilledText =
-                                                newValue
-                                        }
-                                    }
-                            }
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 8)
-
-                            // Separator
-                            if !searchManager.suggestions.isEmpty {
-                                RoundedRectangle(cornerRadius: 100)
-                                    .fill(
-                                        isDark
-                                            ? Color.white.opacity(0.4)
-                                            : Color.black.opacity(0.4)
-                                    )
-                                    .frame(height: 0.5)
-                                    .frame(maxWidth: .infinity)
-
-                            }
-
-                            // Suggestions - expand the box downward
-                            if !searchManager.suggestions.isEmpty {
-                                let suggestions = searchManager.suggestions
-                                CommandPaletteSuggestionsListView(
-                                    suggestions: suggestions,
-                                    selectedIndex: $selectedSuggestionIndex,
-                                    hoveredIndex: $hoveredSuggestionIndex,
-                                    onSelect: { suggestion in
-                                        selectSuggestion(suggestion)
-                                    }
-                                )
+                        )
+                        .tint(gradientColorManager.primaryColor)
+                        .focused($isSearchFocused)
+                        .onKeyPress(.return) {
+                            handleReturn()
+                            return .handled
+                        }
+                        .onKeyPress(.upArrow) {
+                            navigateSuggestions(direction: -1)
+                            return .handled
+                        }
+                        .onKeyPress(.downArrow) {
+                            navigateSuggestions(direction: 1)
+                            return .handled
+                        }
+                        .onChange(of: text) { _, newValue in
+                            selectedSuggestionIndex = -1
+                            searchManager.searchSuggestions(
+                                for: newValue
+                            )
+                            if windowState.commandPalettePrefilledText
+                                != newValue
+                            {
+                                windowState
+                                    .commandPalettePrefilledText =
+                                    newValue
                             }
                         }
-                        .padding(10)
-                        .frame(maxWidth: .infinity)
-                        .frame(width: effectiveCommandPaletteWidth)
-                        .universalGlassEffect(
-                            .regular.tint(
-                                gradientColorManager.primaryColor.adjustedLuminance(by: colorScheme == .light ? 0.4 : 0.2).opacity( colorScheme == .light ? 0.05 : 0.55)
-                            ),
-                            in: .rect(cornerRadius: 26))
-                        .animation(
-                            .easeInOut(duration: 0.15),
-                            value: searchManager.suggestions.count
-                        )
-                        Spacer()
-                            .border(.red)
-                    }
-                    .frame(
-                        width: effectiveCommandPaletteWidth,
-                        height: 328
-                    )
-
-                    Spacer()
                 }
-                Spacer()
-            }
+                .padding(.vertical, 8)
+                .padding(.horizontal, 8)
 
+                // Separator
+                if !searchManager.suggestions.isEmpty {
+                    RoundedRectangle(cornerRadius: 100)
+                        .fill(
+                            isDark
+                                ? Color.white.opacity(0.4)
+                                : Color.black.opacity(0.4)
+                        )
+                        .frame(height: 0.5)
+                        .frame(maxWidth: .infinity)
+
+                }
+
+                // Suggestions - expand the box downward
+                if !searchManager.suggestions.isEmpty {
+                    let suggestions = searchManager.suggestions
+                    CommandPaletteSuggestionsListView(
+                        suggestions: suggestions,
+                        selectedIndex: $selectedSuggestionIndex,
+                        hoveredIndex: $hoveredSuggestionIndex,
+                        onSelect: { suggestion in
+                            selectSuggestion(suggestion)
+                        }
+                    )
+                }
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity)
+            .frame(width: effectiveCommandPaletteWidth)
+            .universalGlassEffect(
+                .regular.tint(
+                    gradientColorManager.primaryColor.adjustedLuminance(by: colorScheme == .light ? 0.4 : 0.2).opacity( colorScheme == .light ? 0.05 : 0.55)
+                ),
+                in: .rect(cornerRadius: 26))
+            .universalGlassEffectTransition(.materialize)
+            .animation(
+                .easeInOut(duration: 0.15),
+                value: searchManager.suggestions.count
+            )
         }
-        .allowsHitTesting(isVisible)
-        .opacity(isVisible ? 1.0 : 0.0)
+        .frame(
+            width: effectiveCommandPaletteWidth,
+            height: 328
+        )
         .onChange(of: windowState.isCommandPaletteVisible) { _, newVisible in
             if newVisible && isActiveWindow {
                 searchManager.setTabManager(browserManager.tabManager)
@@ -458,4 +435,57 @@ struct CommandPaletteView: View {
             return false
         }
     }
+}
+
+#Preview("Command Palette - Light") {
+    @Previewable @State var isVisible = true
+
+    let browserManager = BrowserManager()
+    let windowState = BrowserWindowState()
+    let gradientColorManager = GradientColorManager()
+
+    windowState.isCommandPaletteVisible = isVisible
+    browserManager.activeWindowState = windowState
+
+    return ZStack {
+        if isVisible{
+            CommandPaletteView()
+                .environment(browserManager)
+                .environment(windowState)
+                .environment(gradientColorManager)
+        }
+
+        VStack {
+            HStack {
+                Button("Toggle Palette") {
+                    withAnimation(.smooth){
+                        isVisible.toggle()
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                Spacer()
+            }
+            .padding()
+            Spacer()
+        }
+    }
+    .frame(width: 800, height: 400)
+    .preferredColorScheme(.light)
+    .background(Image("tulips").resizable().scaledToFill())
+}
+
+#Preview("Command Palette - Dark") {
+    let browserManager = BrowserManager()
+    let windowState = BrowserWindowState()
+    let gradientColorManager = GradientColorManager()
+
+    windowState.isCommandPaletteVisible = true
+    browserManager.activeWindowState = windowState
+
+    return CommandPaletteView()
+        .environment(browserManager)
+        .environment(windowState)
+        .environment(gradientColorManager)
+        .frame(width: 1200, height: 800)
+        .preferredColorScheme(.dark)
 }
