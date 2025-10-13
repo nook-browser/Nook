@@ -7,13 +7,12 @@
 
 import SwiftUI
 import Foundation
-import Observation
 
 /// Represents the state of a single browser window, allowing multiple windows
 /// to have independent tab selections and UI states while sharing the same tab data.
 @MainActor
 @Observable
-class BrowserWindowState {
+class BrowserWindowState: ObservableObject {
     /// Unique identifier for this window instance
     let id: UUID
     

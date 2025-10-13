@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct DialogView: View {
-    @Environment(BrowserManager.self) private var browserManager
+    @EnvironmentObject var browserManager: BrowserManager
 
     var body: some View {
         ZStack {

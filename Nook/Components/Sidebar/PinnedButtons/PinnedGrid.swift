@@ -15,8 +15,8 @@ struct PinnedGrid: View {
     let rowSpacing: CGFloat = 6
     let maxColumns: Int = 3
 
-    @Environment(BrowserManager.self) private var browserManager
-    @Environment(BrowserWindowState.self) private var windowState
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     @State private var draggedItem: UUID? = nil
     
     init(width: CGFloat, profileId: UUID? = nil) {
@@ -75,7 +75,7 @@ struct PinnedGrid: View {
                                 onSplitRight: { browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState) },
                                 onSplitLeft: { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) }
                             )
-                            .environment(browserManager)
+                            .environmentObject(browserManager)
                             .onTabDrag(tab.id, draggedItem: $draggedItem)
                             .opacity(draggedItem == tab.id ? 0.0 : 1.0)
                             .onDrop(

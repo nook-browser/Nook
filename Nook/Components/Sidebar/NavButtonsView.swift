@@ -5,13 +5,11 @@
 //  Created by Maciek Bagiński on 30/07/2025.
 //
 import SwiftUI
-import Observation
 
 // Wrapper to properly observe Tab object and use active window's WebView
 @MainActor
-@Observable
-class ObservableTabWrapper {
-    var tab: Tab?
+class ObservableTabWrapper: ObservableObject {
+    @Published var tab: Tab?
     weak var browserManager: BrowserManager?
     weak var windowState: BrowserWindowState?
     
@@ -46,10 +44,10 @@ class ObservableTabWrapper {
 }
 
 struct NavButtonsView: View {
-    @Environment(BrowserManager.self) private var browserManager
-    @Environment(BrowserWindowState.self) private var windowState
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     var effectiveSidebarWidth: CGFloat?
-    @State private var tabWrapper = ObservableTabWrapper()
+    @StateObject private var tabWrapper = ObservableTabWrapper()
     @State private var isMenuHovered = false
     
     var body: some View {

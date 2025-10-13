@@ -34,8 +34,8 @@ public enum SidebarPosition: String, CaseIterable, Identifiable {
 
 struct SidebarMenu: View {
     @State private var selectedTab: Tabs = .history
-    @Environment(BrowserWindowState.self) private var windowState
-    @Environment(BrowserManager.self) private var browserManager
+    @EnvironmentObject var windowState: BrowserWindowState
+    @EnvironmentObject var browserManager: BrowserManager
     
     var body: some View {
         HStack(alignment: .center, spacing: 0) {

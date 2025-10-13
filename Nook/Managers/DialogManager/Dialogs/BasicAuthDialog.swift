@@ -24,7 +24,7 @@ final class BasicAuthDialogModel {
 }
 
 struct BasicAuthDialog: DialogPresentable {
-    var model: BasicAuthDialogModel
+    @Bindable var model: BasicAuthDialogModel
     let onSubmit: (String, String, Bool) -> Void
     let onCancel: () -> Void
 
@@ -48,7 +48,6 @@ struct BasicAuthDialog: DialogPresentable {
 
     @ViewBuilder
     func dialogContent() -> some View {
-        @Bindable var model = model
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("User name")

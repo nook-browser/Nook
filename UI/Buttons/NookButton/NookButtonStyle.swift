@@ -11,7 +11,7 @@ import Garnish
 struct NookButtonStyle: ButtonStyle {
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.isEnabled) var isEnabled
-    @Environment(GradientColorManager.self) var gradientColorManager
+    @EnvironmentObject var gradientColorManager: GradientColorManager
 
     let variant: Variant
     let shadowStyle: ShadowStyle
@@ -240,7 +240,7 @@ private struct ButtonPreviewSection: View {
         .padding()
         .background(.background.opacity(0.5))
         .cornerRadius(12)
-        .environment(makeColorManager())
+        .environmentObject(makeColorManager())
     }
 
     private var colorName: String {

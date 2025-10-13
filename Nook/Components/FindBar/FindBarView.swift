@@ -8,11 +8,10 @@
 import SwiftUI
 
 struct FindBarView: View {
-    var findManager: FindManager
+    @ObservedObject var findManager: FindManager
     @FocusState private var isTextFieldFocused: Bool
     
     var body: some View {
-        @Bindable var findManager = findManager
         HStack(spacing: 12) {
             // Search text field
             HStack(spacing: 8) {

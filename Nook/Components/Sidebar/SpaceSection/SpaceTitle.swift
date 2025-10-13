@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SpaceTitle: View {
-    @Environment(BrowserManager.self) private var browserManager
+    @EnvironmentObject var browserManager: BrowserManager
     @Environment(\.colorScheme) var colorScheme
 
     let space: Space
@@ -17,7 +17,7 @@ struct SpaceTitle: View {
     @State private var isDropHovering: Bool = false
     @State private var dropDraggedItem: UUID?
     
-    @State private var emojiManager = EmojiPickerManager()
+    @StateObject private var emojiManager = EmojiPickerManager()
 
     var body: some View {
         HStack(spacing: 6) {
@@ -93,7 +93,7 @@ struct SpaceTitle: View {
                     currentProfileId: space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID(),
                     onProfileSelected: { assignProfile($0) }
                 )
-                .environment(browserManager)
+                .environmentObject(browserManager)
                 Divider()
                 Button {
                     startRenaming()
@@ -210,7 +210,7 @@ struct SpaceTitle: View {
                 currentProfileId: space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID(),
                 onProfileSelected: { assignProfile($0) }
             )
-            .environment(browserManager)
+            .environmentObject(browserManager)
             Divider()
             Button {
                 createFolder()

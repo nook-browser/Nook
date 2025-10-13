@@ -10,13 +10,11 @@ import SwiftUI
 
 // MARK: - Settings Root (Native macOS Settings)
 struct SettingsView: View {
-    @Environment(BrowserManager.self) private var browserManager
-    @Environment(GradientColorManager.self) private var gradientColorManager
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var gradientColorManager: GradientColorManager
 
     var body: some View {
-        @Bindable var bindableBrowserManager = browserManager
-        
-        TabView(selection: $bindableBrowserManager.settingsManager.currentSettingsTab) {
+        TabView(selection: $browserManager.settingsManager.currentSettingsTab) {
             SettingsPane {
                 GeneralSettingsView()
             }
@@ -148,10 +146,9 @@ struct SettingsTabItem: View {
 // MARK: - General Settings
 
 struct GeneralSettingsView: View {
-    @Environment(BrowserManager.self) private var browserManager
+    @EnvironmentObject var browserManager: BrowserManager
 
     var body: some View {
-        @Bindable var bindableBrowserManager = browserManager
         HStack(alignment: .top, spacing: 16) {
             // Hero card
             SettingsHeroCard()
@@ -169,7 +166,7 @@ struct GeneralSettingsView: View {
                             Spacer()
                             Picker(
                                 "Background Material",
-                                selection: $bindableBrowserManager.settingsManager
+                                selection: $browserManager.settingsManager
                                     .currentMaterialRaw
                             ) {
                                 ForEach(materials, id: \.value.rawValue) {
@@ -187,7 +184,7 @@ struct GeneralSettingsView: View {
                         Divider().opacity(0.4)
 
                         Toggle(
-                            isOn: $bindableBrowserManager.settingsManager
+                            isOn: $browserManager.settingsManager
                                 .isLiquidGlassEnabled
                         ) {
                             VStack(alignment: .leading, spacing: 2) {
@@ -207,7 +204,7 @@ struct GeneralSettingsView: View {
                     ) {
                         VStack(alignment: .leading, spacing: 16) {
                             Toggle(
-                                isOn: $bindableBrowserManager.settingsManager
+                                isOn: $browserManager.settingsManager
                                     .askBeforeQuit
                             ) {
                                 VStack(alignment: .leading, spacing: 2) {
@@ -224,7 +221,7 @@ struct GeneralSettingsView: View {
                                 Spacer()
                                 Picker(
                                     "Sidebar Position",
-                                    selection: $bindableBrowserManager.settingsManager
+                                    selection: $browserManager.settingsManager
                                         .sidebarPosition
                                 ) {
                                     ForEach(SidebarPosition.allCases) { provider in
@@ -237,7 +234,7 @@ struct GeneralSettingsView: View {
                             }
                             
                             Toggle(
-                                isOn: $bindableBrowserManager.settingsManager
+                                isOn: $browserManager.settingsManager
                                     .topBarAddressView
                             ) {
                                 VStack(alignment: .leading, spacing: 2) {
@@ -261,7 +258,7 @@ struct GeneralSettingsView: View {
                             Spacer()
                             Picker(
                                 "Search Engine",
-                                selection: $bindableBrowserManager.settingsManager
+                                selection: $browserManager.settingsManager
                                     .searchEngine
                             ) {
                                 ForEach(SearchProvider.allCases) { provider in
@@ -282,7 +279,7 @@ struct GeneralSettingsView: View {
                             HStack(alignment: .firstTextBaseline) {
                                 Text("Enable AI Assistant")
                                 Spacer()
-                                Toggle("", isOn: $bindableBrowserManager.settingsManager.showAIAssistant)
+                                Toggle("", isOn: $browserManager.settingsManager.showAIAssistant)
                                     .labelsHidden()
                             }
                             
@@ -292,7 +289,7 @@ struct GeneralSettingsView: View {
                                 HStack(alignment: .firstTextBaseline) {
                                     Text("Gemini API Key")
                                     Spacer()
-                                    SecureField("Enter API Key", text: $bindableBrowserManager.settingsManager.geminiApiKey)
+                                    SecureField("Enter API Key", text: $browserManager.settingsManager.geminiApiKey)
                                         .textFieldStyle(.roundedBorder)
                                         .frame(width: 220)
                                 }
@@ -311,7 +308,7 @@ struct GeneralSettingsView: View {
                                     Spacer()
                                     Picker(
                                         "Model",
-                                        selection: $bindableBrowserManager.settingsManager.geminiModel
+                                        selection: $browserManager.settingsManager.geminiModel
                                     ) {
                                         ForEach(GeminiModel.allCases) { model in
                                             VStack(alignment: .leading) {
@@ -404,7 +401,7 @@ struct GeneralSettingsView: View {
 // MARK: - Placeholder Settings Views
 
 struct ProfilesSettingsView: View {
-    @Environment(BrowserManager.self) private var browserManager
+    @EnvironmentObject var browserManager: BrowserManager
     @State private var profileToRename: Profile? = nil
     @State private var profileToDelete: Profile? = nil
 
@@ -481,7 +478,7 @@ struct ProfilesSettingsView: View {
 
                 // Migration controls appear under the profile list
                 MigrationControls()
-                    .environment(browserManager)
+                    .environmentObject(browserManager)
 
                 Divider().opacity(0.4)
 
@@ -579,66 +576,65 @@ struct ProfilesSettingsView: View {
 
     // MARK: - Actions
     private func showCreateDialog() {
-//        @Bindable var bindableBrowserManager = browserManager
-//        browserManager.dialogManager.showDialog(
-//            ProfileCreationDialog(
-//                isNameAvailable: { proposed in
-//                    let trimmed = proposed.trimmingCharacters(
-//                        in: .whitespacesAndNewlines
-//                    )
-//                    guard !trimmed.isEmpty else { return false }
-//                    return !browserManager.profileManager.profiles.contains {
-//                        $0.name.caseInsensitiveCompare(trimmed) == .orderedSame
-//                    }
-//                },
-//                onCreate: { name, icon in
-//                    let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-//                    guard !trimmed.isEmpty else { return }
-//                    let safeIcon = icon.isEmpty ? "person.crop.circle" : icon
-//                    let created = browserManager.profileManager.createProfile(
-//                        name: trimmed,
-//                        icon: safeIcon
-//                    )
-//                    Task { await browserManager.switchToProfile(created) }
-//                    browserManager.dialogManager.closeDialog()
-//                },
-//                onCancel: {
-//                    browserManager.dialogManager.closeDialog()
-//                }
-//            )
-//        )
+        browserManager.dialogManager.showDialog(
+            ProfileCreationDialog(
+                isNameAvailable: { proposed in
+                    let trimmed = proposed.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                    guard !trimmed.isEmpty else { return false }
+                    return !browserManager.profileManager.profiles.contains {
+                        $0.name.caseInsensitiveCompare(trimmed) == .orderedSame
+                    }
+                },
+                onCreate: { name, icon in
+                    let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmed.isEmpty else { return }
+                    let safeIcon = icon.isEmpty ? "person.crop.circle" : icon
+                    let created = browserManager.profileManager.createProfile(
+                        name: trimmed,
+                        icon: safeIcon
+                    )
+                    Task { await browserManager.switchToProfile(created) }
+                    browserManager.dialogManager.closeDialog()
+                },
+                onCancel: {
+                    browserManager.dialogManager.closeDialog()
+                }
+            )
+        )
     }
 
     private func startRename(_ profile: Profile) {
-//        profileToRename = profile
-//        browserManager.dialogManager.showDialog(
-//            ProfileRenameDialog(
-//                originalProfile: profile,
-//                isNameAvailable: { proposed in
-//                    let trimmed = proposed.trimmingCharacters(
-//                        in: .whitespacesAndNewlines
-//                    )
-//                    return !browserManager.profileManager.profiles.contains {
-//                        $0.id != profile.id
-//                            && $0.name.caseInsensitiveCompare(trimmed)
-//                                == .orderedSame
-//                    }
-//                },
-//                onSave: { newName, newIcon in
-//                    guard let target = profileToRename else {
-//                        browserManager.dialogManager.closeDialog()
-//                        return
-//                    }
-//                    target.name = newName
-//                    target.icon = newIcon
-//                    browserManager.profileManager.persistProfiles()
-//                    browserManager.dialogManager.closeDialog()
-//                },
-//                onCancel: {
-//                    browserManager.dialogManager.closeDialog()
-//                }
-//            )
-//        )
+        profileToRename = profile
+        browserManager.dialogManager.showDialog(
+            ProfileRenameDialog(
+                originalProfile: profile,
+                isNameAvailable: { proposed in
+                    let trimmed = proposed.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                    return !browserManager.profileManager.profiles.contains {
+                        $0.id != profile.id
+                            && $0.name.caseInsensitiveCompare(trimmed)
+                                == .orderedSame
+                    }
+                },
+                onSave: { newName, newIcon in
+                    guard let target = profileToRename else {
+                        browserManager.dialogManager.closeDialog()
+                        return
+                    }
+                    target.name = newName
+                    target.icon = newIcon
+                    browserManager.profileManager.persistProfiles()
+                    browserManager.dialogManager.closeDialog()
+                },
+                onCancel: {
+                    browserManager.dialogManager.closeDialog()
+                }
+            )
+        )
     }
 
     private func startDelete(_ profile: Profile) {
@@ -775,7 +771,7 @@ struct ProfilesSettingsView: View {
     }
 
     private struct SpaceAssignmentRowView: View {
-        @Environment(BrowserManager.self) private var browserManager
+        @EnvironmentObject var browserManager: BrowserManager
         let space: Space
 
         var body: some View {
@@ -801,7 +797,7 @@ struct ProfilesSettingsView: View {
                         .font(.subheadline)
                     HStack(spacing: 6) {
                         SpaceProfileBadge(space: space, size: .compact)
-                            .environment(browserManager)
+                            .environmentObject(browserManager)
                         Text(currentProfileName)
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -842,7 +838,7 @@ struct ProfilesSettingsView: View {
                         onSelect: { _ in },
                         compact: true
                     )
-                    .environment(browserManager)
+                    .environmentObject(browserManager)
                 } label: {
                     Label("Change", systemImage: "person.crop.circle")
                         .labelStyle(.titleAndIcon)
@@ -883,7 +879,7 @@ struct ProfilesSettingsView: View {
 
 // MARK: - Migration Controls
 private struct MigrationControls: View {
-    @Environment(BrowserManager.self) private var browserManager
+    @EnvironmentObject var browserManager: BrowserManager
     @State private var legacySummary: BrowserManager.LegacyDataSummary? = nil
     @State private var lastDetectionDate: Date? = nil
     @State private var showingCancelConfirm: Bool = false
@@ -1013,7 +1009,7 @@ private struct MigrationControls: View {
 }
 
 struct ShortcutsSettingsView: View {
-    @Environment(BrowserManager.self) private var browserManager
+    @EnvironmentObject var browserManager: BrowserManager
     @State private var searchText = ""
     @State private var selectedCategory: ShortcutCategory? = nil
 
@@ -1123,7 +1119,7 @@ struct ShortcutsSettingsView: View {
 private struct CategorySection: View {
     let category: ShortcutCategory
     let shortcuts: [KeyboardShortcut]
-    var shortcutManager: KeyboardShortcutManager
+    @ObservedObject var shortcutManager: KeyboardShortcutManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1149,7 +1145,7 @@ private struct CategorySection: View {
 // MARK: - Shortcut Row
 private struct ShortcutRowView: View {
     let shortcut: KeyboardShortcut
-    var shortcutManager: KeyboardShortcutManager
+    @ObservedObject var shortcutManager: KeyboardShortcutManager
     @State private var localKeyCombination: KeyCombination
 
     init(shortcut: KeyboardShortcut, shortcutManager: KeyboardShortcutManager) {
@@ -1244,7 +1240,7 @@ private struct CategoryFilterChip: View {
 }
 
 struct ExtensionsSettingsView: View {
-    @Environment(BrowserManager.self) private var browserManager
+    @EnvironmentObject var browserManager: BrowserManager
     @State private var showingInstallDialog = false
 
     var body: some View {
@@ -1287,7 +1283,7 @@ struct ExtensionsSettingsView: View {
                                     id: \.id
                                 ) { ext in
                                     ExtensionRowView(extension: ext)
-                                        .environment(browserManager)
+                                        .environmentObject(browserManager)
                                 }
                             }
                             .padding(.vertical)
@@ -1328,7 +1324,7 @@ struct ExtensionsSettingsView: View {
 
 struct ExtensionRowView: View {
     let `extension`: InstalledExtension
-    @Environment(BrowserManager.self) private var browserManager
+    @EnvironmentObject var browserManager: BrowserManager
 
     var body: some View {
         HStack(spacing: 12) {
@@ -1404,10 +1400,9 @@ struct ExtensionRowView: View {
 }
 
 struct AdvancedSettingsView: View {
-    @Environment(BrowserManager.self) private var browserManager
+    @EnvironmentObject var browserManager: BrowserManager
 
     var body: some View {
-        @Bindable var bindableBrowserManager = browserManager
         VStack(alignment: .leading, spacing: 16) {
             if #available(macOS 15.5, *) {
                 SettingsSectionCard(
@@ -1415,7 +1410,7 @@ struct AdvancedSettingsView: View {
                     subtitle: "Features in development"
                 ) {
                     Toggle(
-                        isOn: $bindableBrowserManager.settingsManager.experimentalExtensions
+                        isOn: $browserManager.settingsManager.experimentalExtensions
                     ) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("EXPERIMENTAL: Enable Extension Support")
@@ -1435,7 +1430,7 @@ struct AdvancedSettingsView: View {
                 subtitle: "Development and debugging features"
             ) {
                 Toggle(
-                    isOn: $bindableBrowserManager.settingsManager.debugToggleUpdateNotification
+                    isOn: $browserManager.settingsManager.debugToggleUpdateNotification
                 ) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Show Update Notification")
@@ -1519,7 +1514,7 @@ struct SettingsSectionCard<Content: View>: View {
 }
 
 struct SettingsHeroCard: View {
-    @Environment(GradientColorManager.self) private var gradientColorManager
+    @EnvironmentObject var gradientColorManager: GradientColorManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
