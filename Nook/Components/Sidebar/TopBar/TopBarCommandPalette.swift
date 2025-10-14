@@ -11,6 +11,7 @@ struct TopBarCommandPalette: View {
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.nookSettings) private var settings
+    @Environment(\.nookCommandPalette) private var commandPalette
     
     @State private var searchManager = SearchManager()
     @State private var text: String = ""
@@ -28,7 +29,7 @@ struct TopBarCommandPalette: View {
                     .ignoresSafeArea()
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        browserManager.closeCommandPalette(for: windowState)
+                        commandPalette.closeCommandPalette(using: browserManager, windowState: windowState)
                     }
                 
                 // Command palette in center with proper animation
@@ -79,7 +80,7 @@ struct TopBarCommandPalette: View {
             }
         }
         .onKeyPress(.escape) {
-            browserManager.closeCommandPalette(for: windowState)
+            commandPalette.closeCommandPalette(using: browserManager, windowState: windowState)
             return .handled
         }
         .onChange(of: searchManager.suggestions.count) { _, newCount in
@@ -198,7 +199,7 @@ struct TopBarCommandPalette: View {
             currentTab.navigateToURL(text)
         }
         
-        browserManager.closeCommandPalette(for: windowState)
+        commandPalette.closeCommandPalette(using: browserManager, windowState: windowState)
     }
 }
 

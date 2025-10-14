@@ -12,6 +12,7 @@ struct WindowView: View {
     @Environment(BrowserWindowState.self) private var windowState
     @State private var hoverSidebarManager = HoverSidebarManager()
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.nookCommandPalette) private var commandPalette
     @Environment(\.nookSettings) private var settings
 
     // Calculate webview Y offset (where the web content starts)
@@ -149,8 +150,7 @@ struct WindowView: View {
             .coordinateSpace(name: "WindowSpace")
             // Keep BrowserManager aware of URL bar frame in window space
             .onPreferenceChange(URLBarFramePreferenceKey.self) { frame in
-                browserManager.urlBarFrame = frame
-                windowState.urlBarFrame = frame
+                commandPalette.updateURLBarFrame(frame, for: windowState, browserManager: browserManager)
             }
             // Attach hover sidebar manager lifecycle
             .onAppear {
@@ -278,6 +278,7 @@ private struct MiniCommandPaletteOverlay: View {
     @Environment(BrowserManager.self) private var browserManager
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.nookSettings) private var settings
+    @Environment(\.nookCommandPalette) private var commandPalette
 
     var body: some View {
         let isActiveWindow =
@@ -293,7 +294,7 @@ private struct MiniCommandPaletteOverlay: View {
                     .contentShape(Rectangle())
                     .ignoresSafeArea()
                     .onTapGesture {
-                        browserManager.hideMiniCommandPalette(for: windowState)
+                        commandPalette.hideMiniCommandPalette(using: browserManager, windowState: windowState)
                     }
 
                 // Use reported URL bar frame when reliable; otherwise compute manual fallback

@@ -184,7 +184,7 @@ class KeyboardShortcutManager {
 
             // Tab Management
             case .newTab:
-                browserManager.openCommandPalette()
+                CommandPaletteCoordinator.shared.openCommandPalette(using: browserManager)
             case .closeTab:
                 browserManager.closeCurrentTab()
             case .undoCloseTab:
@@ -222,7 +222,7 @@ class KeyboardShortcutManager {
 
             // Tools & Features
             case .openCommandPalette:
-                browserManager.openCommandPalette()
+                CommandPaletteCoordinator.shared.openCommandPalette(using: browserManager)
             case .openDevTools:
                 browserManager.openWebInspector()
             case .viewDownloads:

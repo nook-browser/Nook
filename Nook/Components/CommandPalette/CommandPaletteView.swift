@@ -12,6 +12,7 @@ struct CommandPaletteView: View {
     @Environment(BrowserManager.self) private var browserManager
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.nookTheme) private var gradientColorManager
+    @Environment(\.nookCommandPalette) private var commandPalette
     @State private var searchManager = SearchManager()
     @Environment(\.colorScheme) var colorScheme
 
@@ -54,7 +55,7 @@ struct CommandPaletteView: View {
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    browserManager.closeCommandPalette(for: windowState)
+                    commandPalette.closeCommandPalette(using: browserManager, windowState: windowState)
                 }
                 .gesture(WindowDragGesture())
 
@@ -214,9 +215,9 @@ struct CommandPaletteView: View {
                 searchManager.clearSuggestions()
             }
         }
-        .onKeyPress(.escape) {
+       .onKeyPress(.escape) {
             DispatchQueue.main.async {
-                browserManager.closeCommandPalette(for: windowState)
+                commandPalette.closeCommandPalette(using: browserManager, windowState: windowState)
             }
             return .handled
         }
@@ -383,7 +384,7 @@ struct CommandPaletteView: View {
 
         text = ""
         selectedSuggestionIndex = -1
-        browserManager.closeCommandPalette(for: windowState)
+        commandPalette.closeCommandPalette(using: browserManager, windowState: windowState)
     }
 
     private func navigateSuggestions(direction: Int) {

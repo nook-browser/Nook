@@ -42,14 +42,8 @@ class BrowserManager {
     var sidebarWidth: CGFloat = 250
     var sidebarContentWidth: CGFloat = 234
     var isSidebarVisible: Bool = true
-    var isCommandPaletteVisible: Bool = false
     // Mini palette shown when clicking the URL bar
-    var isMiniCommandPaletteVisible: Bool = false
     var didCopyURL: Bool = false
-    var commandPalettePrefilledText: String = ""
-    var shouldNavigateCurrentTab: Bool = false
-    // Frame of the URL bar within the window; used to anchor the mini palette precisely
-    var urlBarFrame: CGRect = .zero
     var currentProfile: Profile?
     // Indicates an in-progress animated profile transition for coordinating UI
     var isTransitioningProfile: Bool = false
@@ -527,139 +521,10 @@ class BrowserManager {
         return savedSidebarWidth
     }
 
-    // MARK: - Command Palette
-    private func showCommandPalette(in windowState: BrowserWindowState, prefill: String, navigateCurrentTab: Bool) {
-        for state in windowStateManager.windowStates.values where state.id != windowState.id {
-            state.isCommandPaletteVisible = false
-            state.isMiniCommandPaletteVisible = false
-        }
-
-        windowState.commandPalettePrefilledText = prefill
-        windowState.shouldNavigateCurrentTab = navigateCurrentTab
-        windowState.isMiniCommandPaletteVisible = false
-        DispatchQueue.main.async {
-            windowState.isCommandPaletteVisible = true
-        }
-
-        commandPalettePrefilledText = prefill
-        shouldNavigateCurrentTab = navigateCurrentTab
-        isMiniCommandPaletteVisible = false
-        isCommandPaletteVisible = true
-    }
-
-    func openCommandPalette() {
-        guard let target = windowStateManager.activeWindowState ?? windowStateManager.windowStates.values.first else {
-            commandPalettePrefilledText = ""
-            shouldNavigateCurrentTab = false
-            isMiniCommandPaletteVisible = false
-            DispatchQueue.main.async { self.isCommandPaletteVisible = true }
-            return
-        }
-        showCommandPalette(in: target, prefill: "", navigateCurrentTab: false)
-    }
-
-    /// Opens the full command palette prefilled with the current tab's URL,
-    /// with Return navigating the current tab (not creating a new one).
-    func openCommandPaletteWithCurrentURL() {
-        guard let target = windowStateManager.activeWindowState ?? windowStateManager.windowStates.values.first else {
-            openCommandPalette()
-            return
-        }
-        let prefill = currentTab(for: target)?.url.absoluteString ?? ""
-        showCommandPalette(in: target, prefill: prefill, navigateCurrentTab: true)
-    }
-
-    func closeCommandPalette(for windowState: BrowserWindowState? = nil) {
-        let targets: [BrowserWindowState]
-        if let windowState {
-            targets = [windowState]
-        } else {
-            targets = Array(windowStates.values)
-        }
-
-        for state in targets {
-            state.isCommandPaletteVisible = false
-            state.isMiniCommandPaletteVisible = false
-            state.shouldNavigateCurrentTab = false
-            state.commandPalettePrefilledText = ""
-        }
-
-        if windowState == nil || windowState?.id == windowStateManager.activeWindowState?.id {
-            isCommandPaletteVisible = false
-            isMiniCommandPaletteVisible = false
-            shouldNavigateCurrentTab = false
-            commandPalettePrefilledText = ""
-        }
-    }
-    
     func toggleTopBarAddressView() {
         withAnimation(.easeInOut(duration: 0.2)) {
             SettingsManager.shared.topBarAddressView.toggle()
         }
-    }
-    
-    func toggleCommandPalette() {
-        if let target = windowStateManager.activeWindowState {
-            if target.isCommandPaletteVisible {
-                closeCommandPalette(for: target)
-            } else {
-                openCommandPalette()
-            }
-        } else {
-            openCommandPalette()
-        }
-    }
-
-    private func showMiniCommandPalette(in windowState: BrowserWindowState, prefill: String) {
-        for state in windowStateManager.windowStates.values where state.id != windowState.id {
-            state.isMiniCommandPaletteVisible = false
-        }
-
-        windowState.commandPalettePrefilledText = prefill
-        windowState.shouldNavigateCurrentTab = true
-        windowState.isCommandPaletteVisible = false
-        DispatchQueue.main.async {
-            windowState.isMiniCommandPaletteVisible = true
-        }
-
-        commandPalettePrefilledText = prefill
-        shouldNavigateCurrentTab = true
-        isCommandPaletteVisible = false
-        isMiniCommandPaletteVisible = true
-    }
-
-    func hideMiniCommandPalette(for windowState: BrowserWindowState? = nil) {
-        let targets: [BrowserWindowState]
-        if let windowState {
-            targets = [windowState]
-        } else {
-            targets = Array(windowStates.values)
-        }
-
-        for state in targets {
-            state.isMiniCommandPaletteVisible = false
-            state.shouldNavigateCurrentTab = false
-            state.commandPalettePrefilledText = ""
-        }
-
-        if windowState == nil || windowState?.id == windowStateManager.activeWindowState?.id {
-            isMiniCommandPaletteVisible = false
-            shouldNavigateCurrentTab = false
-            commandPalettePrefilledText = ""
-        }
-    }
-
-    func showFindBar() {
-        if findManager.isFindBarVisible {
-            findManager.hideFindBar()
-        } else {
-            findManager.showFindBar(for: currentTabForActiveWindow())
-        }
-    }
-    
-    func updateFindManagerCurrentTab() {
-        // Update the current tab for find manager
-        findManager.updateCurrentTab(currentTabForActiveWindow())
     }
 
     // MARK: - Tab Management (delegates to TabManager)
@@ -726,7 +591,7 @@ class BrowserManager {
     func closeCurrentTab() {
         if let activeWindow = windowStateManager.activeWindowState,
            (activeWindow.isCommandPaletteVisible || activeWindow.isMiniCommandPaletteVisible) {
-            closeCommandPalette(for: activeWindow)
+            CommandPaletteCoordinator.shared.closeCommandPalette(using: self, windowState: activeWindow)
             return
         }
         // Close tab in the active window
@@ -737,14 +602,6 @@ class BrowserManager {
             // Fallback to global current tab for backward compatibility
             tabManager.closeActiveTab()
         }
-    }
-
-    func focusURLBar() {
-        // Open the mini palette anchored to the URL bar
-        // Pre-fill with current tab's URL and set to navigate current tab
-        guard let target = windowStateManager.activeWindowState ?? windowStateManager.windowStates.values.first else { return }
-        let prefill = currentTab(for: target)?.url.absoluteString ?? ""
-        showMiniCommandPalette(in: target, prefill: prefill)
     }
 
     // MARK: - Dialog Methods
@@ -1589,7 +1446,7 @@ class BrowserManager {
         }) ?? false }) {
             windowState.window = window
         }
-        windowState.urlBarFrame = urlBarFrame
+        windowState.urlBarFrame = CommandPaletteCoordinator.shared.urlBarFrame
         windowState.activeGradient = tabManager.currentSpace?.gradient ?? .default
         windowState.currentProfileId = currentProfile?.id
 
@@ -1614,7 +1471,7 @@ class BrowserManager {
 
         print("🧹 [BrowserManager] Starting comprehensive cleanup for window: \(windowId)")
 
-        closeCommandPalette(for: windowState)
+        CommandPaletteCoordinator.shared.closeCommandPalette(using: self, windowState: windowState)
 
         // MEMORY LEAK FIX: Enhanced cleanup for window-specific web views
         cleanupWebViewsForWindow(windowId)
@@ -1632,10 +1489,7 @@ class BrowserManager {
                 setActiveWindowState(newActive)
             } else {
                 splitManager.refreshPublishedState(for: windowId)
-                isCommandPaletteVisible = false
-                isMiniCommandPaletteVisible = false
-                commandPalettePrefilledText = ""
-                shouldNavigateCurrentTab = false
+                CommandPaletteCoordinator.shared.sync(from: nil)
             }
         }
 
@@ -1742,13 +1596,9 @@ class BrowserManager {
         savedSidebarWidth = windowState.savedSidebarWidth
         sidebarContentWidth = windowState.sidebarContentWidth
         isSidebarVisible = windowState.isSidebarVisible
-        urlBarFrame = windowState.urlBarFrame
+        CommandPaletteCoordinator.shared.sync(from: windowState)
         GradientColorManager.shared.setImmediate(windowState.activeGradient)
         splitManager.refreshPublishedState(for: windowState.id)
-        isCommandPaletteVisible = windowState.isCommandPaletteVisible
-        isMiniCommandPaletteVisible = windowState.isMiniCommandPaletteVisible
-        commandPalettePrefilledText = windowState.commandPalettePrefilledText
-        shouldNavigateCurrentTab = windowState.shouldNavigateCurrentTab
         if windowState.currentProfileId == nil {
             windowState.currentProfileId = currentProfile?.id
         }
@@ -2291,13 +2141,13 @@ class BrowserManager {
     /// Show downloads (placeholder implementation)
     func showDownloads() {
         // TODO: Implement downloads UI
-        openCommandPaletteWithCurrentURL()
+        commandPalette.openCommandPaletteWithCurrentURL()
     }
 
     /// Show history (placeholder implementation)
     func showHistory() {
         // TODO: Implement history UI
-        openCommandPaletteWithCurrentURL()
+        commandPalette.openCommandPaletteWithCurrentURL()
     }
 
     // MARK: - Tab Closure Undo Notification

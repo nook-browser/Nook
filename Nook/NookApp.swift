@@ -16,6 +16,7 @@ import Sparkle
 struct NookApp: App {
     @State private var browserManager = BrowserManager()
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    private let commandPalette = CommandPaletteCoordinator.shared
 
     var body: some Scene {
         WindowGroup {
@@ -23,6 +24,7 @@ struct NookApp: App {
                 .background(BackgroundWindowModifier())
                 .ignoresSafeArea(.all)
                 .environment(browserManager)
+                .nookCommandPalette(commandPalette)
                 .onAppear {
                     // Connect browser manager to app delegate for cleanup and Sparkle integration
                     appDelegate.browserManager = browserManager
@@ -41,6 +43,7 @@ struct NookApp: App {
         Settings {
             SettingsView()
                 .environment(browserManager)
+                .nookCommandPalette(commandPalette)
         }
     }
 }
@@ -278,7 +281,7 @@ struct NookCommands: Commands {
             Divider()
 
             Button("New Tab") {
-                browserManager.openCommandPalette()
+                commandPalette.openCommandPalette(using: browserManager)
             }
             .keyboardShortcut("t", modifiers: .command)
             Button("New Window") {
@@ -303,7 +306,7 @@ struct NookCommands: Commands {
 
             Button("Close Tab") {
                 if browserManager.activeWindow?.isCommandPaletteVisible == true {
-                    browserManager.closeCommandPalette(for: browserManager.activeWindow)
+                    commandPalette.closeCommandPalette(using: browserManager, windowState: browserManager.activeWindow)
                 } else {
                     browserManager.closeCurrentTab()
                 }
@@ -344,12 +347,12 @@ struct NookCommands: Commands {
         // View commands
         CommandGroup(after: .windowSize) {
             Button("New URL / Search") {
-                browserManager.openCommandPaletteWithCurrentURL()
+                commandPalette.openCommandPaletteWithCurrentURL(using: browserManager)
             }
             .keyboardShortcut("l", modifiers: .command)
             
             Button("Find in Page") {
-                browserManager.showFindBar()
+                commandPalette.showFindBar(using: browserManager)
             }
             .keyboardShortcut("f", modifiers: .command)
             .disabled(browserManager.currentTabForActiveWindow() == nil)

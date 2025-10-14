@@ -20,6 +20,7 @@ struct MiniCommandPaletteView: View {
     @Environment(BrowserManager.self) private var browserManager
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.nookTheme) private var gradientColorManager
+    @Environment(\.nookCommandPalette) private var commandPalette
     @State private var searchManager = SearchManager()
     @Environment(\.colorScheme) var colorScheme
 
@@ -80,8 +81,10 @@ struct MiniCommandPaletteView: View {
                 selectedSuggestionIndex = -1
             }
         }
-        .onKeyPress(.escape) {
-            DispatchQueue.main.async { browserManager.hideMiniCommandPalette(for: windowState) }
+       .onKeyPress(.escape) {
+            DispatchQueue.main.async {
+                commandPalette.hideMiniCommandPalette(using: browserManager, windowState: windowState)
+            }
             return .handled
         }
         .onChange(of: searchManager.suggestions.count) { _, newCount in
@@ -234,7 +237,7 @@ struct MiniCommandPaletteView: View {
 
         text = ""
         selectedSuggestionIndex = -1
-        browserManager.hideMiniCommandPalette(for: windowState)
+        commandPalette.hideMiniCommandPalette(using: browserManager, windowState: windowState)
     }
 
     private func navigateSuggestions(direction: Int) {
