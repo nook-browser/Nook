@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Test Tab Events",
+  "version": "1.0",
+  "description": "Tests chrome.tabs event listeners",
+  "permissions": ["tabs"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Test Tab Events"
+  }
+}
+

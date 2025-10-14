@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Test Storage API",
+  "version": "1.0",
+  "description": "Tests chrome.storage.local API",
+  "permissions": ["storage"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Test Storage"
+  }
+}
+
