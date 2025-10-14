@@ -49,6 +49,8 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     // Profile-aware extension storage
     private var profileExtensionStores: [UUID: WKWebsiteDataStore] = [:]
     var currentProfileId: UUID?
+    // Storage manager for chrome.storage.local API
+    private let storageManager = ExtensionStorageManager()
     
     private override init() {
         self.context = Persistence.shared.container.mainContext
@@ -186,6 +188,9 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         print("   Controller ID: \(config.identifier?.uuidString ?? "none")")
         let dataStoreDescription = controller.configuration.defaultWebsiteDataStore.map { String(describing: $0) } ?? "nil"
         print("   Data store: \(dataStoreDescription)")
+        
+        // Setup storage change observer
+        setupStorageChangeObserver()
     }
     
     
@@ -1840,9 +1845,18 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             // Add message handler to capture console output (check if already exists)
             let userContentController = webView.configuration.userContentController
 
+            
+            // Inject storage API bridge
+            let storageAPIScript = getStorageAPIBridge()
+            let storageUserScript = WKUserScript(source: storageAPIScript, injectionTime: .atDocumentStart, forMainFrameOnly: false)
+            userContentController.addUserScript(storageUserScript)
             // Remove existing handler if it exists to prevent crashes
             userContentController.removeScriptMessageHandler(forName: "PopupConsole")
             userContentController.add(self, name: "PopupConsole")
+            
+            // Add storage API message handler
+            userContentController.removeScriptMessageHandler(forName: "extensionStorage")
+            userContentController.add(self, name: "extensionStorage")
 
             // Enhanced Action API: Setup closePopup handler
             setupClosePopupHandler(for: webView, action: action, completionHandler: completionHandler)
@@ -2790,6 +2804,18 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                 }
 
                 print("\(emoji) [POPUP CONSOLE] \(timestamp) \(level.uppercased()): \(consoleMessage)")
+            }
+            return
+        }
+        
+        // Handle storage API messages
+        if message.name == "extensionStorage" {
+            guard let messageBody = message.body as? [String: Any] else {
+                return
+            }
+            
+            Task {
+                await handleStorageMessage(message, body: messageBody)
             }
             return
         }
