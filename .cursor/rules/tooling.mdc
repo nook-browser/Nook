@@ -1,0 +1,33 @@
+---
+alwaysApply: true
+---
+
+# Tooling and Development Guidelines
+
+## Build and Development Tools
+
+- **Primary Build Tool**: Use Xcode for all development and building. Open [Nook.xcodeproj](mdc:Nook.xcodeproj/project.pbxproj) in Xcode to compile and run Sociopath.
+- **Runtime Requirements**: Target macOS 15.5+ with Apple Silicon optimization. Ensure builds are compatible with Intel Macs if needed, but prioritize Apple Silicon performance.
+- **Scripting and Automation**: For any JavaScript or TypeScript tooling (e.g., build scripts or utilities), use `bun` as specified in user rules. Avoid Node.js-only commands; prefer `bun` for compatibility and speed.
+- **No Conflicting CI**: Do not add continuous integration or deployment scripts that conflict with macOS notarization requirements. Xcode handles signing and building for App Store or local distribution.
+- **Testing**: Use Xcode's built-in testing framework for unit and UI tests. No external test runners unless they integrate with Xcode.
+
+## Code Quality Tools
+
+- **Linting**: Use SwiftLint or Xcode's built-in analyzer. Run read_lints after edits to check for errors.
+- **Formatting**: Xcode handles Swift formatting; do not introduce external formatters that may conflict.
+- **Version Control**: Use Git for version control. Ensure commits follow conventional commit messages where possible.
+
+## Environment and Dependencies
+
+- **Third-Party Libraries**: Dependencies in [Sociopath/ThirdParty/](mdc:Sociopath/ThirdParty/) are managed separately. Do not modify them without checking licenses.
+- **macOS APIs**: Leverage modern macOS APIs for performance, assuming macOS 15.5+. Use WebKit for browser functionality exclusively.
+- **No AI Tools in Development**: Align with Sociopath's NON-AI stance; avoid AI-assisted coding tools that may introduce unwanted features.
+
+## Best Practices
+
+- **Local Development**: Build and test locally using Xcode. Set personal Development Team in Signing & Capabilities for code signing.
+- **Performance Optimization**: Profile with Xcode Instruments, focusing on WebKit rendering and memory usage.
+- **Distribution**: For releases, follow macOS notarization processes through Xcode or Developer Portal.
+
+These tooling guidelines ensure consistent, efficient development of Sociopath as a minimal, high-performance WebKit browser for macOS.

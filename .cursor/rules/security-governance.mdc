@@ -1,0 +1,35 @@
+---
+alwaysApply: false
+---
+
+# Security and Governance Guidelines
+
+## Security Posture
+
+- **Privacy by Design**: Sociopath is built with privacy as a core principle. No accounts are required, and data stays in the EU. Follow DSGVO (GDPR) compliance, including data minimization, purpose limitation, and user rights (access, rectification, erasure, portability).
+- **NON-AI Browser**: Explicitly no AI features or tracking. Built exclusively with WebKit for Apple Silicon, avoiding any AI-related risks or data collection.
+- **Enterprise-Grade Security**: Use secure coding practices: input validation, error handling, and sandboxing. Avoid unnecessary try/catch; prefer guard clauses for robust code.
+- **Responsible Disclosure**: Report security issues to [security@wemake.cx](mailto:security@wemake.cx). Follow verantwortungsvolle Offenlegung (responsible disclosure) with safe-harbor protection for good-faith research.
+- **EU Data Compliance**: Ensure all data processing adheres to DSGVO, NIS2, and emerging AI governance standards. No cross-border data transfers without proper mechanisms.
+
+## Code of Conduct
+
+- **WeMake Verhaltenskodex**: Adhere to the code of conduct in [docs/CODE_OF_CONDUCT.md](mdc:docs/CODE_OF_CONDUCT.md). Key principles: ethical AI development (though Sociopath is NON-AI), enterprise-quality, inclusive innovation, collaborative intelligence, sustainable technology, and security by design.
+- **What Works**: Professionalism, constructive collaboration, ethics advocacy, inclusive participation, enterprise integrity.
+- **What Doesn't Work**: Harassment, discrimination, unethical practices, data privacy violations, unprofessional behavior.
+- **Enforcement**: Community maintainers handle reports via [security@wemake.cx](mailto:security@wemake.cx). Measures include correction, warning, temporary/permanent bans. Appeals process available.
+- **Scope**: Applies to all project spaces: repository, issues, PRs, discussions, chat, events.
+
+## Licensing and Third-Party Code
+
+- **GPL-3.0 License**: All code except third-party libraries is under GPL-3.0. See [LICENSE](mdc:LICENSE) for details.
+- **Third-Party Libraries**: Code in [Sociopath/ThirdParty/](mdc:Sociopath/ThirdParty/) is licensed per-folder under various free, open-source licenses. Do not modify without checking licenses.
+- **WeMake-Labs Development**: Sociopath is a side project by [WeMake-Labs](https://wemake.cx) in Germany, maintaining open-source principles.
+
+## Reporting and Compliance
+
+- **Security Reports**: Use PGP-encrypted email to [security@wemake.cx](mailto:security@wemake.cx) for vulnerabilities. Include type, components, impact, reproduction steps, and remediation suggestions.
+- **Data Subject Requests (DSR)**: For DSGVO compliance, submit to [privacy@wemake.cx](mailto:privacy@wemake.cx) or [https://wemake.cx/privacy/requests](https://wemake.cx/privacy/requests).
+- **Updates**: Refer to [docs/SECURITY.md](mdc:docs/SECURITY.md) for the full security policy, last updated August 2025.
+
+These guidelines ensure Sociopath remains a secure, ethical, and compliant NON-AI browser project.

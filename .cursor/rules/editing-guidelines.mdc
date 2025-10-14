@@ -1,0 +1,25 @@
+---
+alwaysApply: true
+---
+
+# Editing Guidelines
+
+## Safe and Focused Edits
+
+- **Do Not Reformat Unrelated Code**: Only modify the specific sections or files requested. Preserve existing indentation, spacing, and formatting in unchanged areas to avoid merge conflicts and maintain consistency.
+- **Preserve Indentation**: When editing Swift code, maintain the existing tab or space-based indentation style. Do not convert tabs to spaces or vice versa unless the entire file is being reformatted.
+- **Avoid Adding TODO Comments**: Do not introduce new TODO comments unless explicitly requested. If a task is incomplete, note it in the code comment or use a more specific marker.
+- **Prefer Small, Focused Edits**: Break large changes into smaller, targeted edits. Use the search_replace tool for precise modifications, citing existing code with line ranges (e.g., `12:15:filepath`) for context.
+- **Cite Existing Code**: When referring to code in explanations or plans, use code references like [filename.swift:12-15](mdc:filename.swift) to link to specific sections. This helps with navigation and verification.
+- **Minimal Changes Principle**: Make the smallest possible change to achieve the goal. If adding code, ensure it's necessary and follows project conventions.
+- **Error Checking**: After edits, run read_lints on affected files to catch any introduced errors. Fix linter issues promptly.
+- **Context Preservation**: When editing, include sufficient surrounding context in the old_string to uniquely identify the location, typically 3-5 lines before and after.
+
+## Best Practices for Code Changes
+
+- **SwiftUI Views**: When modifying views, ensure state bindings and modifiers remain intact.
+- **Managers and Models**: Preserve existing protocols and data flow when updating business logic.
+- **Third-Party Code**: Do not modify files in [Sociopath/ThirdParty/](mdc:Sociopath/ThirdParty/) unless necessary, as they have separate licenses.
+- **Testing Edits**: If possible, suggest building the project in Xcode after changes to verify functionality.
+
+These guidelines ensure safe, reversible edits that respect the existing codebase structure and maintain Sociopath's focus on clean, maintainable Swift code.

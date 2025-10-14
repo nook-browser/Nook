@@ -1,0 +1,31 @@
+---
+globs: "*.swift"
+---
+
+# Swift and SwiftUI Coding Style
+
+## General Conventions
+
+- **Descriptive Names**: Use clear, descriptive names for variables, functions, classes, and enums. Avoid abbreviations unless standard (e.g., `URL` over `UniformResourceLocator`).
+- **Guard Clauses**: Prefer early returns with `guard` statements for preconditions and optional unwrapping to avoid deep nesting.
+- **Minimal Comments**: Code should be self-documenting. Use comments sparingly for complex logic or business rules.
+- **Consistent Formatting**: Match existing indentation, spacing, and brace style. Use 4-space indentation, trailing commas in arrays/dictionaries where appropriate.
+- **Error Handling**: Avoid unnecessary `try/catch` blocks; use optional binding or `guard` for error-prone operations. Only catch errors when recovery is possible.
+- **Platform Assumptions**: Code assumes Apple Silicon and macOS 15.5+. Use modern Swift features (e.g., async/await) where appropriate without compatibility shims.
+
+## SwiftUI Specific
+
+- **View Modifiers**: Chain modifiers clearly and group related ones. Avoid overly long modifier chains.
+- **State Management**: Use `@State`, `@Binding`, `@ObservedObject`, etc., appropriately. Prefer `@StateObject` for long-lived state.
+- **Performance**: Use `@ViewBuilder` for conditional views. Avoid recreating expensive computations in body.
+- **Accessibility**: Include accessibility labels and traits for UI elements, especially in custom components.
+- **Layout**: Use SwiftUI's declarative layout system; avoid manual frame calculations unless necessary.
+
+## Code Structure
+
+- **Imports**: Organize imports alphabetically, with system frameworks first, then third-party, then local modules.
+- **Extensions**: Group related extensions together, e.g., all `View` extensions in one section.
+- **Functions**: Keep functions short and focused. Use closures for simple operations.
+- **Enums and Structs**: Prefer structs for value types, classes for reference types with identity.
+
+Follow these guidelines to maintain readability and consistency in the Sociopath codebase, emphasizing clarity and modern Swift practices for a WebKit-based macOS browser.

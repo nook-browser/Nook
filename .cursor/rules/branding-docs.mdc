@@ -1,0 +1,30 @@
+---
+globs: "*.md"
+---
+
+# Branding and Documentation Conventions
+
+## App Name and Positioning
+
+- **Refer to the App as "Sociopath"**: Always use "Sociopath" in user-facing copy, external documentation, and marketing materials. For internal technical identifiers (project files, directories, source filenames, build artifacts, and Xcode project), preserve existing "Nook" names to avoid breaking changes. Only use "Nook" in attribution contexts or when referring to the original project.
+- **NON-AI Emphasis**: Highlight that Sociopath is a NON-AI browser, built exclusively with WebKit, with no AI features or tracking.
+- **Platform Focus**: Specify that it's designed for macOS (Apple Silicon recommended), requiring macOS 15.5+.
+- **Target Audience**: Position Sociopath for consultants, designers, coders, knowledge-workers, high-performers, managers, freelancers, and professionals who need focused, goal-oriented browsing.
+- **Privacy Stance**: Emphasize "No accounts required, data stays in the EU" in all descriptions.
+- **Performance Focus**: Stress uncompromising performance, minimalism, and focus on user goals without distractions.
+
+## Links and Attribution
+
+- **Repository Links**: Use `https://github.com/WeMake-Labs/sociopath` for all GitHub references, including badges, issues, PRs, and contributors.
+- **Download Links**: Point to `https://github.com/WeMake-Labs/sociopath/releases` for downloads.
+- **Attribution to Nook**: Include attribution as a fork of Nook. Example: "Sociopath is a focused fork of [Nook](https://browsewithnook.com/) by the Nook team, reoriented toward a minimal, NON-AI macOS browser. Original repository: [github.com/nook-browser/Nook](https://github.com/nook-browser/Nook)."
+- **WeMake-Labs Reference**: Mention that Sociopath is developed by [WeMake-Labs](https://wemake.cx) in Germany as a side project.
+
+## Documentation Style
+
+- **Clear and Concise**: Use clear, professional language. Avoid hype; focus on facts about minimalism, performance, and privacy.
+- **Feature Descriptions**: When listing features, lead with sidebar-first navigation, performance, minimal UI, NON-AI nature, and privacy focus.
+- **Build Instructions**: Always reference Xcode for building, with prerequisites of macOS 15.5+ and Apple Silicon recommendation.
+- **License Notes**: Note GPL-3.0 for main code and per-folder licenses for third-party code in [Nook/ThirdParty/](mdc:Nook/ThirdParty/).
+
+Ensure all documentation aligns with Sociopath's identity as a minimal, focused, NON-AI WebKit browser for professionals, maintaining accurate links and proper attribution.

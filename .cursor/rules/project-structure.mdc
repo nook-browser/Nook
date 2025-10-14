@@ -1,0 +1,29 @@
+---
+alwaysApply: true
+---
+
+# Project Structure Guide
+
+## Repository Layout
+
+- **Root Files**: [README.md](mdc:README.md) provides project overview and build instructions. [LICENSE](mdc:LICENSE) for GPL-3.0 terms. [Nook.xcodeproj/](mdc:Nook.xcodeproj/) contains Xcode project files for building the macOS app.
+- **Assets**: [assets/](mdc:assets/) holds the app icon and other static resources.
+- **Main App Directory**: [Nook/](mdc:Nook/) contains all Swift source code, organized into subdirectories:
+  - [NookApp.swift](mdc:Nook/NookApp.swift) – Main entry point for the SwiftUI application.
+  - [ContentView.swift](mdc:Nook/ContentView.swift) – Root view that orchestrates the app's UI.
+  - **Components/**: Reusable UI components like Browser, ColorPicker, CommandPalette, etc.
+  - **Managers/**: Business logic managers for Authentication, Browser, Cache, etc.
+  - **Models/**: Data models for BrowserConfig, Tab, History, etc.
+  - **Protocols/**: Protocol definitions like TabListDataSource.
+  - **Utils/**: Utility classes, extensions, and helper functions.
+  - **ThirdParty/**: External libraries and dependencies.
+- **Build and Config**: Use Xcode to open [Nook.xcodeproj](mdc:Nook.xcodeproj/project.pbxproj) for development and building. Requires macOS 15.5+ and Xcode for compilation.
+
+## Key Files for Navigation
+
+- Start with [NookApp.swift](mdc:Nook/NookApp.swift) to understand app initialization.
+- [ContentView.swift](mdc:Nook/ContentView.swift) for top-level UI structure.
+- Managers in [Nook/Managers/](mdc:Nook/Managers/) handle core functionality like TabManager and BrowserManager.
+- Components in [Nook/Components/](mdc:Nook/Components/) for specific UI features like Sidebar and Browser windows.
+
+This structure supports a modular, sidebar-first browser built with SwiftUI and WebKit for macOS.
