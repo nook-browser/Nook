@@ -2483,7 +2483,7 @@ class BrowserManager: ObservableObject {
             let result = await importManager.importArcSidebarData()
             
             for space in result.spaces {
-                self.tabManager.createSpace(name: space.title, icon: space.icon ?? "person")
+                self.tabManager.createSpace(name: space.title, icon: space.emoji ?? "0x1f30d")
                 
                 guard let createdSpace = self.tabManager.spaces.first(where: { $0.name == space.title }) else {
                     continue
