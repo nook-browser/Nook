@@ -492,7 +492,10 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         hasPiPActive = false
         loadingState = .idle
 
-        // 12. FORCE COMPOSITOR UPDATE
+        // 13. CLEANUP ZOOM DATA
+        browserManager?.cleanupZoomForTab(self.id)
+
+        // 14. FORCE COMPOSITOR UPDATE
         // Note: This is called during tab loading, so we use the global current tab
         // The compositor will handle window-specific visibility in its update methods
         browserManager?.compositorManager.updateTabVisibility(currentTabId: browserManager?.tabManager.currentTab?.id)
@@ -1997,6 +2000,9 @@ extension Tab: WKNavigationDelegate {
                 ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
             }
             browserManager?.syncTabAcrossWindows(self.id)
+
+            // Load saved zoom level for the new domain
+            browserManager?.loadZoomForTab(self.id)
             
             // CHROME WEB STORE INTEGRATION: Inject script after navigation
             injectWebStoreScriptIfNeeded(for: newURL, in: webView)
