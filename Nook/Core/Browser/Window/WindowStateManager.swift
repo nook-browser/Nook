@@ -8,6 +8,7 @@
 
 import SwiftUI
 import AppKit
+import WebKit
 import Observation
 
 @MainActor

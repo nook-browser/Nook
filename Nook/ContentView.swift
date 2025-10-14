@@ -19,11 +19,11 @@ struct ContentView: View {
             .frame(minWidth: 470, minHeight: 382)
             .onAppear {
                 // Register this window state with the browser manager
-                browserManager.registerWindowState(windowState)
+                browserManager.windowStateManager.registerWindow(windowState)
             }
             .onDisappear {
                 // Unregister this window state when the window closes
-                browserManager.unregisterWindowState(windowState.id)
+                browserManager.windowStateManager.unregisterWindow(windowState.id)
             }
     }
 }
@@ -78,13 +78,13 @@ private struct WindowFocusBridge: NSViewRepresentable {
             ) { [weak self] _ in
                 guard let self else { return }
                 Task { @MainActor in
-                    self.browserManager?.setActiveWindowState(self.windowState)
+                    self.browserManager?.windowStateManager.activate(self.windowState)
                 }
             }
 
             if window.isKeyWindow {
                 Task { @MainActor in
-                    browserManager?.setActiveWindowState(windowState)
+                    browserManager?.windowStateManager.activate(windowState)
                 }
             }
         }

@@ -246,6 +246,7 @@ class BrowserManager {
         self.windowStateManager = windowStateManager
         self.webViewCoordinator = webViewCoordinator
         self.currentProfile = initialProfile
+        self.windowStateManager.attach(browserManager: self)
 
         // Phase 2: wire dependencies and perform side effects (safe to use self)
         self.compositorManager.browserManager = self
