@@ -52,6 +52,12 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     // Storage manager for chrome.storage.local API
     private let storageManager = ExtensionStorageManager()
     
+    // DNR manager for declarativeNetRequest API
+    private let dnrManager = DeclarativeNetRequestManager()
+    
+    // Reference to BrowserManager for applying rules to webviews
+    private weak var browserManagerRef: BrowserManager?
+    
     private override init() {
         self.context = Persistence.shared.container.mainContext
         self.isExtensionSupportAvailable = ExtensionUtils.isExtensionSupportAvailable
@@ -1850,6 +1856,11 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             let storageAPIScript = getStorageAPIBridge()
             let storageUserScript = WKUserScript(source: storageAPIScript, injectionTime: .atDocumentStart, forMainFrameOnly: false)
             userContentController.addUserScript(storageUserScript)
+            
+            // Inject DNR API bridge
+            let dnrAPIScript = getDeclarativeNetRequestAPIBridge()
+            let dnrUserScript = WKUserScript(source: dnrAPIScript, injectionTime: .atDocumentStart, forMainFrameOnly: false)
+            userContentController.addUserScript(dnrUserScript)
             // Remove existing handler if it exists to prevent crashes
             userContentController.removeScriptMessageHandler(forName: "PopupConsole")
             userContentController.add(self, name: "PopupConsole")
@@ -1857,6 +1868,10 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             // Add storage API message handler
             userContentController.removeScriptMessageHandler(forName: "extensionStorage")
             userContentController.add(self, name: "extensionStorage")
+            
+            // Add DNR API message handler
+            userContentController.removeScriptMessageHandler(forName: "extensionDNR")
+            userContentController.add(self, name: "extensionDNR")
 
             // Enhanced Action API: Setup closePopup handler
             setupClosePopupHandler(for: webView, action: action, completionHandler: completionHandler)
@@ -2809,6 +2824,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         }
         
         // Handle storage API messages
+        // Handle storage API messages
         if message.name == "extensionStorage" {
             guard let messageBody = message.body as? [String: Any] else {
                 return
@@ -2816,6 +2832,18 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             
             Task {
                 await handleStorageMessage(message, body: messageBody)
+            }
+            return
+        }
+        
+        // Handle DNR API messages
+        if message.name == "extensionDNR" {
+            guard let messageBody = message.body as? [String: Any] else {
+                return
+            }
+            
+            Task {
+                await handleDNRMessage(message, body: messageBody)
             }
             return
         }
@@ -3773,6 +3801,32 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                 ]
             )
         }
+    }
+
+    // MARK: - DNR Integration Helpers
+    
+    /// Set BrowserManager reference for DNR rule application
+    func setBrowserManager(_ browserManager: BrowserManager) {
+        self.browserManagerRef = browserManager
+    }
+    
+    /// Get extension ID from a script message
+    private func getExtensionId(for message: WKScriptMessage) -> String? {
+        // Try to get from frameInfo URL
+        if let url = message.frameInfo.request.url,
+           let host = url.host {
+            return host
+        }
+        
+        // Fallback: try to extract from webView
+        if let webView = message.webView as? WKWebView,
+           let url = webView.url,
+           let host = url.host {
+            return host
+        }
+        
+        // Last resort: return first loaded extension
+        return installedExtensions.first?.id
     }
 }
 
