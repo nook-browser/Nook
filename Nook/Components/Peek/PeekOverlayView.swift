@@ -137,7 +137,6 @@ struct PeekOverlayView: View {
         Color.black.opacity(0.3)
             .contentShape(Rectangle()) // Ensure proper hit testing
             .allowsHitTesting(isActive) // Only allow hit testing when peek is active
-            .alwaysArrowCursor() // Force arrow cursor over background
             .onTapGesture {
                 // Simple dismiss on background tap
                 browserManager.peekManager.dismissPeek()
@@ -178,7 +177,6 @@ struct PeekOverlayView: View {
                 x: frame.minX + (frame.width / 2),
                 y: geometry.size.height / 2
             )
-            .alwaysArrowCursor() // Force arrow cursor over non-interactive peek content areas
         }
     }
 
