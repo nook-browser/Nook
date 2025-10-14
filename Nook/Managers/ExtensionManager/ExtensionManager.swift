@@ -55,6 +55,9 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     // DNR manager for declarativeNetRequest API
     private let dnrManager = DeclarativeNetRequestManager()
     
+    // Scripting manager for chrome.scripting API
+    private let scriptingManager = ScriptingManager()
+    
     // Reference to BrowserManager for applying rules to webviews
     private weak var browserManagerRef: BrowserManager?
     
@@ -1861,6 +1864,11 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             let dnrAPIScript = getDeclarativeNetRequestAPIBridge()
             let dnrUserScript = WKUserScript(source: dnrAPIScript, injectionTime: .atDocumentStart, forMainFrameOnly: false)
             userContentController.addUserScript(dnrUserScript)
+            
+            // Inject scripting API bridge
+            let scriptingAPIScript = getScriptingAPIBridge()
+            let scriptingUserScript = WKUserScript(source: scriptingAPIScript, injectionTime: .atDocumentStart, forMainFrameOnly: false)
+            userContentController.addUserScript(scriptingUserScript)
             // Remove existing handler if it exists to prevent crashes
             userContentController.removeScriptMessageHandler(forName: "PopupConsole")
             userContentController.add(self, name: "PopupConsole")
@@ -1872,6 +1880,10 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             // Add DNR API message handler
             userContentController.removeScriptMessageHandler(forName: "extensionDNR")
             userContentController.add(self, name: "extensionDNR")
+            
+            // Register scripting message handler
+            userContentController.removeScriptMessageHandler(forName: "extensionScripting")
+            userContentController.add(self, name: "extensionScripting")
 
             // Enhanced Action API: Setup closePopup handler
             setupClosePopupHandler(for: webView, action: action, completionHandler: completionHandler)
@@ -2844,6 +2856,18 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             
             Task {
                 await handleDNRMessage(message, body: messageBody)
+            }
+            return
+        }
+        
+        // Handle scripting API messages
+        if message.name == "extensionScripting" {
+            guard let messageBody = message.body as? [String: Any] else {
+                return
+            }
+            
+            Task {
+                await handleScriptingMessage(message, body: messageBody)
             }
             return
         }
