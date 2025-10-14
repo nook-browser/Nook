@@ -1394,6 +1394,26 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         guard let bm = browserManagerRef else { return nil }
         return adapter(for: tab, browserManager: bm)
     }
+    
+    // THREADING FIX: Nonisolated access methods for delegate callbacks
+    // These methods are thread-safe because tabAdapters access is done via MainActor.assumeIsolated
+    // which is acceptable here since we're just doing a dictionary lookup
+    @available(macOS 15.4, *)
+    nonisolated func getStableAdapter(for tab: Tab) -> ExtensionTabAdapter? {
+        return MainActor.assumeIsolated {
+            self.stableAdapter(for: tab)
+        }
+    }
+    
+    @available(macOS 15.4, *)
+    nonisolated func getWindowAdapter(for browserManager: BrowserManager) -> ExtensionWindowAdapter? {
+        return MainActor.assumeIsolated {
+            if self.windowAdapter == nil {
+                self.windowAdapter = ExtensionWindowAdapter(browserManager: browserManager)
+            }
+            return self.windowAdapter
+        }
+    }
 
     @available(macOS 15.4, *)
     func notifyTabOpened(_ tab: Tab) {

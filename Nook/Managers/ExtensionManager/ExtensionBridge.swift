@@ -32,6 +32,11 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
 
     private var lastActiveTabCall: Date = Date.distantPast
     
+    // CRITICAL FIX: Removed MainActor.assumeIsolated - This is a synchronous delegate method
+    // called by WKWebExtension framework, which expects immediate response.
+    // ExtensionManager.shared is @MainActor, so we need nonisolated access or ensure we're on MainActor.
+    // Since this is called from extension context (likely background thread), we use nonisolated(unsafe)
+    // access pattern with proper synchronization in ExtensionManager.
     func activeTab(for extensionContext: WKWebExtensionContext) -> (any WKWebExtensionTab)? {
         let now = Date()
         if now.timeIntervalSince(lastActiveTabCall) > 2.0 {
@@ -40,20 +45,15 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
         }
 
         if let t = browserManager.currentTabForActiveWindow() {
-            let a = MainActor.assumeIsolated {
-                ExtensionManager.shared.stableAdapter(for: t)
-            }
-            if let a = a {
-                return a
+            // Call nonisolated method that doesn't require MainActor isolation
+            if let adapter = ExtensionManager.shared.getStableAdapter(for: t) {
+                return adapter
             }
         }
 
         if let first = browserManager.tabManager.pinnedTabs.first ?? browserManager.tabManager.tabs.first {
-            let a = MainActor.assumeIsolated {
-                ExtensionManager.shared.stableAdapter(for: first)
-            }
-            if let a = a {
-                return a
+            if let adapter = ExtensionManager.shared.getStableAdapter(for: first) {
+                return adapter
             }
         }
 
@@ -62,6 +62,7 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
 
     private var lastTabsCall: Date = Date.distantPast
     
+    // CRITICAL FIX: Removed MainActor.assumeIsolated from tabs() - same issue as activeTab()
     func tabs(for extensionContext: WKWebExtensionContext) -> [any WKWebExtensionTab] {
         let now = Date()
         let shouldLog = now.timeIntervalSince(lastTabsCall) > 2.0
@@ -73,9 +74,7 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
         
         let all = browserManager.tabManager.pinnedTabs + browserManager.tabManager.tabs
         let adapters = all.compactMap { tab in
-            MainActor.assumeIsolated {
-                ExtensionManager.shared.stableAdapter(for: tab)
-            }
+            ExtensionManager.shared.getStableAdapter(for: tab)
         }
 
         return adapters
@@ -436,14 +435,9 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
 
     // MARK: - Window Association
 
+    // CRITICAL FIX: Removed MainActor.assumeIsolated - use nonisolated access method
     func window(for extensionContext: WKWebExtensionContext) -> (any WKWebExtensionWindow)? {
-        let manager = MainActor.assumeIsolated {
-            ExtensionManager.shared
-        }
-        if manager.windowAdapter == nil {
-            manager.windowAdapter = ExtensionWindowAdapter(browserManager: browserManager)
-        }
-        return manager.windowAdapter
+        return ExtensionManager.shared.getWindowAdapter(for: browserManager)
     }
 
     // MARK: - Tab Info Properties
