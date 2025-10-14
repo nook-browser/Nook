@@ -39,7 +39,6 @@ final class MediaControlsManager {
     /// Find the first tab with actively playing media (prioritize tabs with playing media)
     func findActiveMediaTab() -> Tab? {
         guard let browserManager = browserManager else {
-            print("🎵 [MediaControls] No browserManager")
             return nil
         }
         let allTabs = browserManager.tabManager.allTabs()
@@ -50,7 +49,6 @@ final class MediaControlsManager {
             let hasVideo = tab.hasPlayingVideo
 
             if isMediaHost && (hasAudio || hasVideo) {
-                print("✅ [MediaControls] Found active media tab: \(tab.url)")
                 return tab
             }
         }
