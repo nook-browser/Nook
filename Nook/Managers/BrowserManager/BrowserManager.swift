@@ -410,10 +410,10 @@ class BrowserManager {
                 performUpdates()
             }
 
-            if context.shouldProvideFeedback {
-                self.showProfileSwitchToast(from: previousProfile, to: profile, in: windowState ?? self.activeWindowState)
-                NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .drawCompleted)
-            }
+//            if context.shouldProvideFeedback {
+//                self.showProfileSwitchToast(from: previousProfile, to: profile, in: windowState ?? self.activeWindowState)
+//                NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .drawCompleted)
+//            }
 
             if animateTransition {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
@@ -1666,7 +1666,7 @@ class BrowserManager {
         }
         
         // Update find manager with new current tab
-        updateFindManagerCurrentTab()
+//        updateFindManagerCurrentTab()
         
         // Refresh compositor for this window
         windowState.refreshCompositor()
@@ -2141,13 +2141,11 @@ class BrowserManager {
     /// Show downloads (placeholder implementation)
     func showDownloads() {
         // TODO: Implement downloads UI
-        commandPalette.openCommandPaletteWithCurrentURL()
     }
 
     /// Show history (placeholder implementation)
     func showHistory() {
         // TODO: Implement history UI
-        commandPalette.openCommandPaletteWithCurrentURL()
     }
 
     // MARK: - Tab Closure Undo Notification

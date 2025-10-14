@@ -4,7 +4,6 @@ import SwiftUI
 @Observable
 final class CommandPaletteCoordinator {
     static let shared = CommandPaletteCoordinator()
-
     private init() {}
 
     var isCommandPaletteVisible: Bool = false
@@ -173,11 +172,5 @@ extension EnvironmentValues {
     @MainActor var nookCommandPalette: CommandPaletteCoordinator {
         get { self[NookCommandPaletteKey.self] }
         set { self[NookCommandPaletteKey.self] = newValue }
-    }
-}
-
-extension View {
-    @MainActor func nookCommandPalette(_ coordinator: CommandPaletteCoordinator) -> some View {
-        environment(\.nookCommandPalette, coordinator)
     }
 }

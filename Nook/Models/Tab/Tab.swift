@@ -589,16 +589,16 @@ public final class Tab: NSObject, Identifiable, WKDownloadDelegate {
     
     /// Navigate to a new URL with proper search engine normalization
     func navigateToURL(_ input: String) {
-        let engine = browserManager?.settingsManager.searchEngine ?? .google
-        let normalizedUrl = normalizeURL(input, provider: engine)
-        
-        guard let validURL = URL(string: normalizedUrl) else {
-            print("Invalid URL after normalization: \(input) -> \(normalizedUrl)")
-            return
-        }
-        
-        print("🌐 [Tab] Navigating current tab to: \(normalizedUrl)")
-        loadURL(validURL)
+//        let engine = browserManager?.settingsManager.searchEngine ?? .google
+//        let normalizedUrl = normalizeURL(input, provider: engine)
+//        
+//        guard let validURL = URL(string: normalizedUrl) else {
+//            print("Invalid URL after normalization: \(input) -> \(normalizedUrl)")
+//            return
+//        }
+//        
+//        print("🌐 [Tab] Navigating current tab to: \(normalizedUrl)")
+//        loadURL(validURL)
     }
     
 

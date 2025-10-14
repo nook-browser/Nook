@@ -1114,7 +1114,7 @@ class TabManager {
         url: String = "https://www.google.com",
         in space: Space? = nil
     ) -> Tab {
-        let engine = browserManager?.settingsManager.searchEngine ?? .google
+        let engine = SettingsManager.shared.searchEngine
         let normalizedUrl = normalizeURL(url, provider: engine)
         guard let validURL = URL(string: normalizedUrl)
         else {

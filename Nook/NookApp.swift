@@ -16,7 +16,7 @@ import Sparkle
 struct NookApp: App {
     @State private var browserManager = BrowserManager()
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    private let commandPalette = CommandPaletteCoordinator.shared
+//    private let commandPalette = CommandPaletteCoordinator.shared
 
     var body: some Scene {
         WindowGroup {
@@ -24,7 +24,6 @@ struct NookApp: App {
                 .background(BackgroundWindowModifier())
                 .ignoresSafeArea(.all)
                 .environment(browserManager)
-                .nookCommandPalette(commandPalette)
                 .onAppear {
                     // Connect browser manager to app delegate for cleanup and Sparkle integration
                     appDelegate.browserManager = browserManager
@@ -43,7 +42,6 @@ struct NookApp: App {
         Settings {
             SettingsView()
                 .environment(browserManager)
-                .nookCommandPalette(commandPalette)
         }
     }
 }
@@ -73,7 +71,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
                     
                     switch event.buttonNumber {
                     case 2:
-                        manager.openCommandPalette()
+                        CommandPaletteCoordinator.shared.openCommandPalette(using: manager)
                     case 3:
                         guard
                             let windowState = manager.activeWindow,
@@ -241,6 +239,7 @@ struct NookCommands: Commands {
     let browserManager: BrowserManager
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.nookCommandPalette) private var commandPalette
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     init(browserManager: BrowserManager) {

@@ -349,8 +349,7 @@ struct GeneralSettingsView: View {
                                     selection: Binding<TimeInterval>(
                                         get: {
                                             nearestTimeoutOption(
-                                                to: browserManager
-                                                    .settingsManager
+                                                to: settings
                                                     .tabUnloadTimeout
                                             )
                                         },
@@ -1407,9 +1406,11 @@ struct ExtensionRowView: View {
 
 struct AdvancedSettingsView: View {
     @Environment(BrowserManager.self) private var browserManager
+    @Environment(\.nookSettings) private var settings
 
     var body: some View {
         @Bindable var bindableBrowserManager = browserManager
+        @Bindable var bindableSettings = settings
         VStack(alignment: .leading, spacing: 16) {
             if #available(macOS 15.5, *) {
                 SettingsSectionCard(

@@ -12,6 +12,7 @@ struct TopBarView: View {
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.nookSettings) private var settings
     @Environment(\.nookTheme) private var theme
+    @Environment(\.nookCommandPalette) private var commandPalette
     @State private var tabWrapper = ObservableTabWrapper()
     @State private var isHovering: Bool = false
     
@@ -127,7 +128,7 @@ struct TopBarView: View {
                     }
                 }
                 .onTapGesture {
-                    browserManager.focusURLBar()
+                    commandPalette.focusURLBar(using: browserManager)
                 }
                 .frame(maxWidth: 400)
             }

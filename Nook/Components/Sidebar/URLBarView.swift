@@ -12,6 +12,7 @@ struct URLBarView: View {
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.nookSettings) private var settings
     @Environment(\.nookTheme) private var theme
+    @Environment(\.nookCommandPalette) private var commandPalette
     @State private var isHovering: Bool = false
 
     var body: some View {
@@ -82,7 +83,7 @@ struct URLBarView: View {
         // Focus URL bar when tapping anywhere in the bar
         .contentShape(Rectangle())
         .onTapGesture {
-            browserManager.focusURLBar()
+            commandPalette.focusURLBar(using: browserManager)
         }
         
     }

@@ -113,7 +113,7 @@ final class HoverSidebarManager {
         var inKeepOpenZone = false
 
         // Right Side Calculations (if flag is true)
-        if bm.settingsManager.sidebarPosition == .left {
+        if SettingsManager.shared.sidebarPosition == .left {
             inTriggerZone = (mouse.x >= frame.minX - overshootSlack) && (mouse.x <= frame.minX + triggerWidth)
             inKeepOpenZone = (mouse.x >= frame.minX) && (mouse.x <= frame.minX + overlayWidth + keepOpenHysteresis)
         } else {
