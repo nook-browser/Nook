@@ -784,12 +784,23 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         // CRITICAL: Load background content if the extension has a background script
         // This is essential for service workers and background extensions
         print("🔧 [ExtensionManager] Loading background content for new extension...")
+        print("   Extension has background content: \(webExtension.hasBackgroundContent)")
+        print("   Extension identifier: \(extensionContext.uniqueIdentifier)")
+        print("   Extension controller: \(String(describing: controller))")
+        
         Task { @MainActor in
             do {
                 try await extensionContext.loadBackgroundContent()
-                print("✅ [ExtensionManager] Background content loaded successfully (new)")
+                print("✅ [ExtensionManager] Background content loaded successfully!")
+                print("   Background script should now be running")
+                print("   Background can receive runtime.sendMessage calls")
+                
+                // Give background script time to initialize and register listeners
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                print("   Background script initialization window complete")
             } catch {
-                print("❌ [ExtensionManager] Failed to load background content (new): \(error.localizedDescription)")
+                print("❌ [ExtensionManager] Failed to load background content: \(error.localizedDescription)")
+                print("   This means runtime.sendMessage will NOT work!")
             }
         }
 
@@ -1726,23 +1737,44 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                 console.log('🔍 [Popup API Test] chrome available:', hasChrome);
                 console.log('🔍 [Popup API Test] browser available:', hasBrowser);
                 console.log('🔍 [Popup API Test] runtime available:', !!hasRuntime);
-
                 if (hasRuntime) {
                     const runtimeAPI = hasChrome ? chrome.runtime : browser.runtime;
                     console.log('🔍 [Popup API Test] runtime ID:', runtimeAPI.id);
                     console.log('🔍 [Popup API Test] getURL test:', runtimeAPI.getURL('test.js'));
+                    console.log('🔍 [Popup API Test] Testing onMessage listener presence...');
 
-                    // Test sending a message
+                    // Test sending a message with detailed error handling
+                    console.log('📤 [Popup API Test] Attempting runtime.sendMessage...');
+                    const testMessage = {
+                        type: 'popupTest',
+                        timestamp: Date.now(),
+                        source: 'popup-diagnostic'
+                    };
+                    
                     try {
-                        runtimeAPI.sendMessage({type: 'popupTest'}, (response) => {
-                            console.log('🔍 [Popup API Test] sendMessage response:', response);
+                        const sendStartTime = Date.now();
+                        runtimeAPI.sendMessage(testMessage, (response) => {
+                            const roundTripTime = Date.now() - sendStartTime;
+                            console.log('✅ [Popup API Test] sendMessage SUCCESS! Round trip:', roundTripTime, 'ms');
+                            console.log('   Response received:', response);
+                            
                             if (chrome.runtime.lastError) {
-                                console.error('🔍 [Popup API Test] sendMessage error:', chrome.runtime.lastError);
+                                console.error('⚠️  [Popup API Test] lastError despite response:', chrome.runtime.lastError);
                             }
                         });
+                        
+                        // Timeout check - if no response in 2 seconds, log warning
+                        setTimeout(() => {
+                            console.warn('⏱️  [Popup API Test] sendMessage timeout - no response after 2 seconds');
+                            console.warn('   This likely means background script has no onMessage listener registered');
+                            console.warn('   or background script failed to load');
+                        }, 2000);
+                        
                     } catch(e) {
-                        console.error('🔍 [Popup API Test] sendMessage exception:', e);
+                        console.error('❌ [Popup API Test] sendMessage exception:', e);
+                        console.error('   Stack:', e.stack);
                     }
+                }
                 }
 
                 // Override console methods to capture output
@@ -3036,7 +3068,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         }
     }
 
-    // CRITICAL FIX: Handle extension port connections for runtime.connect()
     @available(macOS 15.4, *)
     func webExtensionController(_ controller: WKWebExtensionController, openPortToExtensionContext extensionContext: WKWebExtensionContext, completionHandler: @escaping (Result<Any, Error>) -> Void) {
         print("🔌 [ExtensionManager] openPortToExtensionContext called")
