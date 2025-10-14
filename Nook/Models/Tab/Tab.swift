@@ -288,7 +288,7 @@ public final class Tab: NSObject, Identifiable, WKDownloadDelegate {
     private func injectWebStoreScriptIfNeeded(for url: URL, in webView: WKWebView) {
         // Only inject if experimental extensions are enabled
         guard let browserManager = browserManager,
-              browserManager.settingsManager.experimentalExtensions else {
+              SettingsManager.shared.experimentalExtensions else {
             return
         }
         
@@ -394,7 +394,7 @@ public final class Tab: NSObject, Identifiable, WKDownloadDelegate {
         
         // Add Web Store integration handler (only if experimental extensions are enabled)
         if let browserManager = browserManager,
-           browserManager.settingsManager.experimentalExtensions {
+           SettingsManager.shared.experimentalExtensions {
             webStoreHandler = WebStoreScriptHandler(browserManager: browserManager)
             _webView?.configuration.userContentController.add(webStoreHandler!, name: "nookWebStore")
             
@@ -607,7 +607,7 @@ public final class Tab: NSObject, Identifiable, WKDownloadDelegate {
         // In multi-window setup, we need to work with the WebView that's actually visible
         // in the current window, not just the first WebView created
         if let browserManager = browserManager,
-           let activeWindowId = browserManager.activeWindowState?.id,
+           let activeWindowId = browserManager.activeWindow?.id,
            let activeWebView = browserManager.getWebView(for: self.id, in: activeWindowId) {
             // Use the WebView that's actually visible in the current window
             PiPManager.shared.requestPiP(for: self, webView: activeWebView)
@@ -1174,7 +1174,7 @@ public final class Tab: NSObject, Identifiable, WKDownloadDelegate {
             print("🔇 [Tab] Mute state queued at \(muted); base webView not loaded yet")
         }
 
-        browserManager?.setMuteState(muted, for: id, originatingWindowId: browserManager?.activeWindowState?.id)
+        browserManager?.setMuteState(muted, for: id, originatingWindowId: browserManager?.activeWindow?.id)
 
         // Update our internal state
         DispatchQueue.main.async { [weak self] in
@@ -2712,7 +2712,7 @@ extension Tab {
         // Use the WebView that's actually visible in the current window
         let targetWebView: WKWebView?
         if let browserManager = browserManager,
-           let activeWindowId = browserManager.activeWindowState?.id {
+           let activeWindowId = browserManager.activeWindow?.id {
             targetWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
         } else {
             targetWebView = _webView
@@ -2842,7 +2842,7 @@ extension Tab {
         // Use the WebView that's actually visible in the current window
         let targetWebView: WKWebView?
         if let browserManager = browserManager,
-           let activeWindowId = browserManager.activeWindowState?.id {
+           let activeWindowId = browserManager.activeWindow?.id {
             targetWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
         } else {
             targetWebView = _webView
@@ -2913,7 +2913,7 @@ extension Tab {
         // Use the WebView that's actually visible in the current window
         let targetWebView: WKWebView?
         if let browserManager = browserManager,
-           let activeWindowId = browserManager.activeWindowState?.id {
+           let activeWindowId = browserManager.activeWindow?.id {
             targetWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
         } else {
             targetWebView = _webView
@@ -2984,7 +2984,7 @@ extension Tab {
         // Use the WebView that's actually visible in the current window
         let targetWebView: WKWebView?
         if let browserManager = browserManager,
-           let activeWindowId = browserManager.activeWindowState?.id {
+           let activeWindowId = browserManager.activeWindow?.id {
             targetWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
         } else {
             targetWebView = _webView

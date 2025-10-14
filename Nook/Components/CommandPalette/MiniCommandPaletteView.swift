@@ -19,7 +19,7 @@ import SwiftUI
 struct MiniCommandPaletteView: View {
     @Environment(BrowserManager.self) private var browserManager
     @Environment(BrowserWindowState.self) private var windowState
-    @Environment(GradientColorManager.self) private var gradientColorManager
+    @Environment(\.nookTheme) private var gradientColorManager
     @State private var searchManager = SearchManager()
     @Environment(\.colorScheme) var colorScheme
 
@@ -35,7 +35,7 @@ struct MiniCommandPaletteView: View {
     var body: some View {
         let isDark = colorScheme == .dark
         let symbolName = isLikelyURL(text) ? "globe" : "magnifyingglass"
-        let isActiveWindow = browserManager.activeWindowState?.id == windowState.id
+        let isActiveWindow = browserManager.isActive(windowState)
         let suggestions = searchManager.suggestions
 
         VStack(spacing: 6) {

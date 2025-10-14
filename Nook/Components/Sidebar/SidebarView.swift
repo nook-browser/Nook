@@ -7,6 +7,8 @@ struct SidebarView: View {
     @Environment(BrowserManager.self) private var browserManager
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.tabDragManager) private var dragManager
+    @Environment(\.nookSettings) private var settings
+    @Environment(\.nookDialog) private var dialogManager
     @State private var activeSpaceIndex: Int = 0
     @State private var currentScrollID: Int? = nil
     @State private var hasTriggeredHaptic = false
@@ -108,15 +110,15 @@ struct SidebarView: View {
                         ForEach(SidebarPosition.allCases) { position in
                             
                             Toggle(isOn: Binding(get: {
-                                return browserManager.settingsManager.sidebarPosition == position
+                                return settings.sidebarPosition == position
                             }, set: { Value in
-                                browserManager.settingsManager.sidebarPosition = position
+                                settings.sidebarPosition = position
                             })) {
                                 Label(position.displayName, systemImage: position.icon)
                             }
                         }
                     } label: {
-                        Label("Sidebar Position", systemImage: browserManager.settingsManager.sidebarPosition.icon)
+                        Label("Sidebar Position", systemImage: settings.sidebarPosition.icon)
                     }
                     
                     Divider()
@@ -159,12 +161,12 @@ struct SidebarView: View {
         } ?? 0
         
         let shouldAnimate =
-        (browserManager.activeWindowState?.id == windowState.id)
+        browserManager.isActive(windowState)
         && !browserManager.isTransitioningProfile
         
         let content = VStack(spacing: 8) {
             // Only show navigation buttons if top bar address view is disabled
-            if !browserManager.settingsManager.topBarAddressView {
+            if !settings.topBarAddressView {
                 HStack(spacing: 2) {
                     NavButtonsView(effectiveSidebarWidth: effectiveWidth)
                 }
@@ -173,7 +175,7 @@ struct SidebarView: View {
             }
             
             // Only show URL bar in sidebar if top bar address view is disabled
-            if !browserManager.settingsManager.topBarAddressView {
+            if !settings.topBarAddressView {
                 URLBarView()
                     .padding(.horizontal, 8)
             }
@@ -221,7 +223,7 @@ struct SidebarView: View {
             SidebarUpdateNotification(downloadsMenuVisible: showDownloadsMenu)
                 .environment(browserManager)
                 .environment(windowState)
-                .environment(browserManager.settingsManager)
+                .nookSettings(settings)
                 .padding(.horizontal, 8)
                 .padding(.bottom, 8)
             
@@ -290,7 +292,7 @@ struct SidebarView: View {
         let finalContent = ZStack {
             if windowState.isSidebarMenuVisible {
                 SidebarMenu()
-                    .transition(.move(edge: browserManager.settingsManager.sidebarPosition == .left ? .leading : .trailing).combined(with: .opacity))
+                    .transition(.move(edge: settings.sidebarPosition == .left ? .leading : .trailing).combined(with: .opacity))
             } else {
                 content
                     .transition(.blur)
@@ -438,7 +440,7 @@ struct SidebarView: View {
     }
     
     private func showSpaceCreationDialog() {
-        browserManager.dialogManager.showDialog(
+        dialogManager.showDialog(
             SpaceCreationDialog(
                 onCreate: { name, icon in
                     let finalName = name.isEmpty ? "New Space" : name
@@ -452,10 +454,10 @@ struct SidebarView: View {
                         activeSpaceIndex = targetIndex
                     }
                     
-                    browserManager.dialogManager.closeDialog()
+                    dialogManager.closeDialog()
                 },
                 onCancel: {
-                    browserManager.dialogManager.closeDialog()
+                    dialogManager.closeDialog()
                 }
             )
         )
@@ -486,7 +488,7 @@ struct SidebarView: View {
     private func showSpaceEditDialog(mode: SpaceEditDialog.Mode) {
         guard let targetSpace = resolveCurrentSpace() else { return }
         
-        browserManager.dialogManager.showDialog(
+        dialogManager.showDialog(
             SpaceEditDialog(
                 space: targetSpace,
                 mode: mode,
@@ -508,13 +510,13 @@ struct SidebarView: View {
                             )
                         }
                         
-                        browserManager.dialogManager.closeDialog()
+                        dialogManager.closeDialog()
                     } catch {
                         print("⚠️ Failed to update space \(spaceId.uuidString):", error)
                     }
                 },
                 onCancel: {
-                    browserManager.dialogManager.closeDialog()
+                    dialogManager.closeDialog()
                 }
             )
         )
@@ -531,8 +533,8 @@ struct SidebarView: View {
     }
     
     private func updateSidebarPosition(_ position: SidebarPosition) {
-        guard browserManager.settingsManager.sidebarPosition != position else { return }
-        browserManager.settingsManager.sidebarPosition = position
+        guard settings.sidebarPosition != position else { return }
+        settings.sidebarPosition = position
     }
 }
 

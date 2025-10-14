@@ -36,10 +36,11 @@ struct SidebarMenu: View {
     @State private var selectedTab: Tabs = .history
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(BrowserManager.self) private var browserManager
+    @Environment(\.nookSettings) private var settings
     
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
-            if browserManager.settingsManager.sidebarPosition == .left{
+            if settings.sidebarPosition == .left {
                 tabs
             }
             VStack {
@@ -51,7 +52,7 @@ struct SidebarMenu: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            if browserManager.settingsManager.sidebarPosition == .right{
+            if settings.sidebarPosition == .right {
                 tabs
             }
         }

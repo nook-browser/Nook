@@ -48,12 +48,13 @@ class ObservableTabWrapper {
 struct NavButtonsView: View {
     @Environment(BrowserManager.self) private var browserManager
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(\.nookSettings) private var settings
     var effectiveSidebarWidth: CGFloat?
     @State private var tabWrapper = ObservableTabWrapper()
     @State private var isMenuHovered = false
     
     var body: some View {
-        let sidebarOnLeft = browserManager.settingsManager.sidebarPosition == .left
+        let sidebarOnLeft = settings.sidebarPosition == .left
         let sidebarWidthForLayout = effectiveSidebarWidth ?? windowState.sidebarWidth
         let navigationCollapseThreshold: CGFloat = 250
         let refreshCollapseThreshold: CGFloat = 210
@@ -74,7 +75,7 @@ struct NavButtonsView: View {
             .buttonStyle(NavButtonStyle())
             .foregroundStyle(Color.primary)
             
-            if browserManager.settingsManager.showAIAssistant {
+            if settings.showAIAssistant {
                 Button("Toggle AI Assistant", systemImage: "sparkle") {
                     browserManager.toggleAISidebar(for: windowState)
                 }

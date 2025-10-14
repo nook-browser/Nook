@@ -11,7 +11,7 @@ import Observation
 
 struct MiniWindowToolbar: View {
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(GradientColorManager.self) private var gradientColorManager
+    @Environment(\.nookTheme) private var gradientColorManager
     private var fallbackBackgroundNSColor: NSColor {
         NSColor(hex: colorScheme == .dark ? "#242424" : "#EDEDED") ?? (colorScheme == .dark ? .black : .white)
     }

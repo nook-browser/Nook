@@ -8,12 +8,12 @@
 import SwiftUI
 
 struct DialogView: View {
-    @Environment(BrowserManager.self) private var browserManager
+    @Environment(\.nookDialog) private var dialogManager
 
     var body: some View {
         ZStack {
-            if browserManager.dialogManager.isVisible,
-               let dialog = browserManager.dialogManager.activeDialog {
+            if dialogManager.isVisible,
+               let dialog = dialogManager.activeDialog {
                 overlayBackground
                 dialogContent(dialog)
                     .transition(.asymmetric(
@@ -23,7 +23,7 @@ struct DialogView: View {
                     .zIndex(1)
             }
         }
-        .animation(.bouncy(duration: 0.2, extraBounce: -0.1), value: browserManager.dialogManager.isVisible)
+        .animation(.bouncy(duration: 0.2, extraBounce: -0.1), value: dialogManager.isVisible)
     }
 
     @ViewBuilder
@@ -31,7 +31,7 @@ struct DialogView: View {
         Color.black.opacity(0.4)
             .ignoresSafeArea()
             .onTapGesture {
-                browserManager.dialogManager.closeDialog()
+                dialogManager.closeDialog()
             }
             .transition(.opacity)
     }

@@ -67,14 +67,20 @@ class BrowserManager {
     var windowStateManager: WindowStateManager
     var webViewCoordinator: WebViewCoordinator
 
+    var activeWindow: BrowserWindowState? {
+        windowStateManager.activeWindowState
+    }
+
+    func isActive(_ windowState: BrowserWindowState) -> Bool {
+        windowStateManager.activeWindowState?.id == windowState.id
+    }
+
     /// Reference to the app delegate for Sparkle integration
     weak var appDelegate: AppDelegate?
 
     var modelContext: ModelContext
     var tabManager: TabManager
     var profileManager: ProfileManager
-    var settingsManager: SettingsManager
-    var dialogManager: DialogManager
     var downloadManager: DownloadManager
     var authenticationManager: AuthenticationManager
     var historyManager: HistoryManager
@@ -83,7 +89,6 @@ class BrowserManager {
     var extensionManager: ExtensionManager?
     var compositorManager: TabCompositorManager
     var splitManager: SplitViewManager
-    var gradientColorManager: GradientColorManager
     var trackingProtectionManager: TrackingProtectionManager
     var findManager: FindManager
     var importManager: ImportManager
@@ -145,10 +150,12 @@ class BrowserManager {
 
     private func updateGradient(for windowState: BrowserWindowState, to newGradient: SpaceGradient, animate: Bool) {
         let previousGradient = windowState.activeGradient
+        let themeManager = GradientColorManager.shared
+
         guard !previousGradient.visuallyEquals(newGradient) else {
             windowState.activeGradient = newGradient
             if windowStateManager.activeWindowState?.id == windowState.id {
-                gradientColorManager.setImmediate(newGradient)
+                themeManager.setImmediate(newGradient)
             }
             return
         }
@@ -158,9 +165,9 @@ class BrowserManager {
         guard windowStateManager.activeWindowState?.id == windowState.id else { return }
 
         if animate {
-            gradientColorManager.transition(from: previousGradient, to: newGradient)
+            themeManager.transition(from: previousGradient, to: newGradient)
         } else {
-            gradientColorManager.setImmediate(newGradient)
+            themeManager.setImmediate(newGradient)
         }
     }
 
@@ -213,8 +220,6 @@ class BrowserManager {
         profileManager.ensureDefaultProfile()
         let initialProfile = profileManager.profiles.first
         let tabManager = TabManager(browserManager: nil, context: context)
-        let settingsManager = SettingsManager()
-        let dialogManager = DialogManager()
         let downloadManager = DownloadManager.shared
         let authenticationManager = AuthenticationManager()
         let historyManager = HistoryManager(context: context, profileId: initialProfile?.id)
@@ -222,7 +227,6 @@ class BrowserManager {
         let cacheManager = CacheManager(dataStore: initialProfile?.dataStore)
         let compositorManager = TabCompositorManager()
         let splitManager = SplitViewManager()
-        let gradientColorManager = GradientColorManager()
         let trackingProtectionManager = TrackingProtectionManager()
         let findManager = FindManager()
         let importManager = ImportManager()
@@ -235,8 +239,6 @@ class BrowserManager {
         self.extensionManager = extensionManager
         self.profileManager = profileManager
         self.tabManager = tabManager
-        self.settingsManager = settingsManager
-        self.dialogManager = dialogManager
         self.downloadManager = downloadManager
         self.authenticationManager = authenticationManager
         self.historyManager = historyManager
@@ -244,7 +246,6 @@ class BrowserManager {
         self.cacheManager = cacheManager
         self.compositorManager = compositorManager
         self.splitManager = splitManager
-        self.gradientColorManager = gradientColorManager
         self.trackingProtectionManager = trackingProtectionManager
         self.findManager = findManager
         self.importManager = importManager
@@ -255,7 +256,7 @@ class BrowserManager {
         // Phase 2: wire dependencies and perform side effects (safe to use self)
         self.compositorManager.browserManager = self
         self.splitManager.browserManager = self
-        self.compositorManager.setUnloadTimeout(self.settingsManager.tabUnloadTimeout)
+        self.compositorManager.setUnloadTimeout(SettingsManager.shared.tabUnloadTimeout)
         self.tabManager.browserManager = self
         self.tabManager.reattachBrowserManager(self)
         if #available(macOS 15.5, *), let mgr = self.extensionManager {
@@ -266,12 +267,12 @@ class BrowserManager {
             }
         }
         if let g = self.tabManager.currentSpace?.gradient {
-            self.gradientColorManager.setImmediate(g)
+            GradientColorManager.shared.setImmediate(g)
         } else {
-        self.gradientColorManager.setImmediate(.default)
+            GradientColorManager.shared.setImmediate(.default)
         }
         self.trackingProtectionManager.attach(browserManager: self)
-        self.trackingProtectionManager.setEnabled(self.settingsManager.blockCrossSiteTracking)
+        self.trackingProtectionManager.setEnabled(SettingsManager.shared.blockCrossSiteTracking)
         
         self.externalMiniWindowManager.attach(browserManager: self)
         self.peekManager.attach(browserManager: self)
@@ -302,7 +303,7 @@ class BrowserManager {
     // MARK: - OAuth Assist Controls
     func maybeShowOAuthAssist(for url: URL, in tab: Tab) {
         // Only when protection is enabled and not already disabled for this tab
-        guard settingsManager.blockCrossSiteTracking, trackingProtectionManager.isEnabled else { return }
+        guard SettingsManager.shared.blockCrossSiteTracking, trackingProtectionManager.isEnabled else { return }
         guard !trackingProtectionManager.isTemporarilyDisabled(tabId: tab.id) else { return }
         let host = url.host?.lowercased() ?? ""
         guard !host.isEmpty else { return }
@@ -495,14 +496,14 @@ class BrowserManager {
     }
 
     func toggleAISidebar() {
-        guard settingsManager.showAIAssistant else { return }
+        guard SettingsManager.shared.showAIAssistant else { return }
         if let windowState = windowStateManager.activeWindowState {
             toggleAISidebar(for: windowState)
         }
     }
 
     func toggleAISidebar(for windowState: BrowserWindowState) {
-        guard settingsManager.showAIAssistant else { return }
+        guard SettingsManager.shared.showAIAssistant else { return }
 
         withAnimation(.easeInOut(duration: 0.2)) {
             if windowState.isSidebarAIChatVisible {
@@ -593,7 +594,7 @@ class BrowserManager {
     
     func toggleTopBarAddressView() {
         withAnimation(.easeInOut(duration: 0.2)) {
-            settingsManager.topBarAddressView.toggle()
+            SettingsManager.shared.topBarAddressView.toggle()
         }
     }
     
@@ -749,13 +750,13 @@ class BrowserManager {
     // MARK: - Dialog Methods
     
     func showQuitDialog() {
-        if(self.settingsManager.askBeforeQuit) {
-            dialogManager.showQuitDialog(
-                onAlwaysQuit: {
-                    self.quitApplication()
+        if SettingsManager.shared.askBeforeQuit {
+            DialogManager.shared.showQuitDialog(
+                onAlwaysQuit: { [weak self] in
+                    self?.quitApplication()
                 },
-                onQuit: {
-                    self.quitApplication()
+                onQuit: { [weak self] in
+                    self?.quitApplication()
                 }
             )
         } else {
@@ -765,11 +766,11 @@ class BrowserManager {
     }
     
     func showDialog<Content: View>(_ dialog: Content) {
-        dialogManager.showDialog(dialog)
+        DialogManager.shared.showDialog(dialog)
     }
 
     func showDialog<Content: View>(@ViewBuilder builder: () -> Content) {
-        dialogManager.showDialog(builder: builder)
+        DialogManager.shared.showDialog(builder: builder)
     }
     
     // MARK: - Appearance / Gradient Editing
@@ -781,7 +782,7 @@ class BrowserManager {
 
     func showGradientEditor() {
         guard let space = tabManager.currentSpace else {
-            dialogManager.showDialog {
+            DialogManager.shared.showDialog {
                 StandardDialog(
                     header: {
                         DialogHeader(
@@ -811,12 +812,12 @@ class BrowserManager {
             set: { draft.value = $0 }
         )
 
-        dialogManager.showDialog {
+        DialogManager.shared.showDialog {
             StandardDialog(
                 header: { EmptyView() },
                 content: {
                     GradientEditorView(gradient: binding)
-                        .environment(self.gradientColorManager)
+                        .environment(GradientColorManager.shared)
                 },
                 footer: {
                     DialogFooter(
@@ -824,8 +825,8 @@ class BrowserManager {
                             text: "Cancel",
                             variant: .secondary,
                             action: { [weak self] in
-                                self?.gradientColorManager.endInteractivePreview()
-                                self?.gradientColorManager.transition(to: space.gradient, duration: 0.25)
+                                GradientColorManager.shared.endInteractivePreview()
+                                GradientColorManager.shared.transition(to: space.gradient, duration: 0.25)
                                 self?.refreshGradientsForSpace(space, animate: true)
                                 self?.closeDialog()
                             }
@@ -837,8 +838,8 @@ class BrowserManager {
                                 variant: .primary,
                                 action: { [weak self] in
                                     space.gradient = draft.value
-                                    self?.gradientColorManager.endInteractivePreview()
-                                    self?.gradientColorManager.transition(to: draft.value, duration: 0.35)
+                                    GradientColorManager.shared.endInteractivePreview()
+                                    GradientColorManager.shared.transition(to: draft.value, duration: 0.35)
                                     self?.refreshGradientsForSpace(space, animate: true)
                                     self?.tabManager.persistSnapshot()
                                     self?.closeDialog()
@@ -852,7 +853,7 @@ class BrowserManager {
     }
 
     func closeDialog() {
-        dialogManager.closeDialog()
+        DialogManager.shared.closeDialog()
     }
     
     private func quitApplication() {
@@ -1416,7 +1417,7 @@ class BrowserManager {
                 try await migrateCacheToCurrentProfile()
                 if Task.isCancelled { self.resetMigrationState(); return }
                 await clearSharedDataAfterMigration()
-                self.dialogManager.showDialog {
+                DialogManager.shared.showDialog {
                     StandardDialog(
                         header: {
                             DialogHeader(
@@ -1432,7 +1433,7 @@ class BrowserManager {
                         footer: {
                             DialogFooter(rightButtons: [
                                 DialogButton(text: "OK", variant: .primary) { [weak self] in
-                                    self?.dialogManager.closeDialog()
+                                    DialogManager.shared.closeDialog()
                                 }
                             ])
                         }
@@ -1469,7 +1470,7 @@ class BrowserManager {
         // Fallback to default/first profile
         if let first = profileManager.profiles.first { Task { await switchToProfile(first, context: .recovery) } }
         // Show dialog
-        dialogManager.showDialog {
+        DialogManager.shared.showDialog {
             StandardDialog(
                 header: {
                     DialogHeader(
@@ -1485,7 +1486,7 @@ class BrowserManager {
                 footer: {
                     DialogFooter(rightButtons: [
                         DialogButton(text: "OK", variant: .primary) { [weak self] in
-                            self?.dialogManager.closeDialog()
+                            DialogManager.shared.closeDialog()
                         }
                     ])
                 }
@@ -1497,7 +1498,7 @@ class BrowserManager {
     func deleteProfile(_ profile: Profile) {
         // Avoid deleting the last profile
         guard profileManager.profiles.count > 1 else {
-            dialogManager.showDialog {
+            DialogManager.shared.showDialog {
                 StandardDialog(
                     header: {
                         DialogHeader(
@@ -1513,7 +1514,7 @@ class BrowserManager {
                     footer: {
                         DialogFooter(rightButtons: [
                             DialogButton(text: "OK", variant: .primary) { [weak self] in
-                                self?.dialogManager.closeDialog()
+                                DialogManager.shared.closeDialog()
                             }
                         ])
                     }
@@ -1536,7 +1537,7 @@ class BrowserManager {
             // Delete from manager
             let ok = self.profileManager.deleteProfile(profile)
             if !ok {
-                self.dialogManager.showDialog {
+                DialogManager.shared.showDialog {
                     StandardDialog(
                         header: {
                             DialogHeader(
@@ -1552,7 +1553,7 @@ class BrowserManager {
                         footer: {
                             DialogFooter(rightButtons: [
                                 DialogButton(text: "OK", variant: .primary) { [weak self] in
-                                    self?.dialogManager.closeDialog()
+                                    DialogManager.shared.closeDialog()
                                 }
                             ])
                         }
@@ -1742,7 +1743,7 @@ class BrowserManager {
         sidebarContentWidth = windowState.sidebarContentWidth
         isSidebarVisible = windowState.isSidebarVisible
         urlBarFrame = windowState.urlBarFrame
-        gradientColorManager.setImmediate(windowState.activeGradient)
+        GradientColorManager.shared.setImmediate(windowState.activeGradient)
         splitManager.refreshPublishedState(for: windowState.id)
         isCommandPaletteVisible = windowState.isCommandPaletteVisible
         isMiniCommandPaletteVisible = windowState.isMiniCommandPaletteVisible

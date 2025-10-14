@@ -6,11 +6,11 @@ import CoreGraphics
 // Renders the current space's gradient as a bottom background layer
 struct SpaceGradientBackgroundView: View {
     @Environment(BrowserManager.self) private var browserManager
-    @Environment(GradientColorManager.self) private var gradientColorManager
+    @Environment(\.nookTheme) private var gradientColorManager
     @Environment(BrowserWindowState.self) private var windowState
 
     private var isActiveWindow: Bool {
-        browserManager.activeWindowState?.id == windowState.id
+        browserManager.isActive(windowState)
     }
 
     private var gradient: SpaceGradient {

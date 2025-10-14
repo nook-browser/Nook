@@ -8,8 +8,11 @@
 import AppKit
 import SwiftUI
 
+@MainActor
 @Observable
-class SettingsManager {
+final class SettingsManager {
+    static let shared = SettingsManager()
+
     let keyboardShortcutManager = KeyboardShortcutManager()
     private let userDefaults = UserDefaults.standard
     private let materialKey = "settings.currentMaterialRaw"
@@ -336,3 +339,22 @@ extension Notification.Name {
     static let blockCrossSiteTrackingChanged = Notification.Name("blockCrossSiteTrackingChanged")
 }
 
+// MARK: - Environment Support
+
+@MainActor
+private struct NookSettingsKey: EnvironmentKey {
+    static let defaultValue: SettingsManager = .shared
+}
+
+extension EnvironmentValues {
+    @MainActor var nookSettings: SettingsManager {
+        get { self[NookSettingsKey.self] }
+        set { self[NookSettingsKey.self] = newValue }
+    }
+}
+
+extension View {
+    @MainActor func nookSettings(_ manager: SettingsManager) -> some View {
+        environment(\.nookSettings, manager)
+    }
+}

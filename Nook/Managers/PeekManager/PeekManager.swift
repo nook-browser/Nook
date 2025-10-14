@@ -32,7 +32,7 @@ final class PeekManager {
             return
         }
 
-        let windowId = browserManager.activeWindowState?.id ?? UUID()
+        let windowId = browserManager.activeWindow?.id ?? UUID()
         let session = PeekSession(
             targetURL: url,
             sourceTabId: tab?.id,

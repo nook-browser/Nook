@@ -10,6 +10,8 @@ import SwiftUI
 struct URLBarView: View {
     @Environment(BrowserManager.self) private var browserManager
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(\.nookSettings) private var settings
+    @Environment(\.nookTheme) private var theme
     @State private var isHovering: Bool = false
 
     var body: some View {
@@ -51,7 +53,7 @@ struct URLBarView: View {
                     // Extension action buttons
                     if #available(macOS 15.5, *),
                        let extensionManager = browserManager.extensionManager,
-                       browserManager.settingsManager.experimentalExtensions {
+                       settings.experimentalExtensions {
                         ExtensionActionView(extensions: extensionManager.installedExtensions)
                             .environment(browserManager)
                     }
@@ -87,13 +89,13 @@ struct URLBarView: View {
     
     private var backgroundColor: Color {
         if isHovering {
-            return browserManager.gradientColorManager.isDark ? AppColors.pinnedTabHoverDark : AppColors.pinnedTabHoverLight
+            return theme.isDark ? AppColors.pinnedTabHoverDark : AppColors.pinnedTabHoverLight
         } else {
-            return browserManager.gradientColorManager.isDark ? AppColors.pinnedTabIdleDark : AppColors.pinnedTabIdleLight
+            return theme.isDark ? AppColors.pinnedTabIdleDark : AppColors.pinnedTabIdleLight
         }
     }
     private var textColor: Color {
-        return browserManager.gradientColorManager.isDark ? AppColors.spaceTabTextDark : AppColors.spaceTabTextLight
+        return theme.isDark ? AppColors.spaceTabTextDark : AppColors.spaceTabTextLight
     }
     
     private var displayURL: String {

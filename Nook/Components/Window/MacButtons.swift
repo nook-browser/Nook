@@ -160,6 +160,7 @@ struct MacButtonsView: View {
 
 struct MacButtonView: View {
     @Environment(BrowserManager.self) private var browserManager
+    @Environment(\.nookTheme) private var theme
     var viewModel: MacButtonsViewModel
     var buttonType: MacButtonsViewModel.ButtonType
 
@@ -167,16 +168,16 @@ struct MacButtonView: View {
         Button(action: viewModel.getButtonAction(buttonType: buttonType)) {
             if viewModel.buttonState == .idle {
                 Circle()
-                    .fill(viewModel.getButtonColor(buttonType: buttonType, isDark: browserManager.gradientColorManager.isDark).0)
+                    .fill(viewModel.getButtonColor(buttonType: buttonType, isDark: theme.isDark).0)
                     .frame(width: 12.5, height: 12.5)
             } else {
                 ZStack {
                     Circle()
-                        .fill(viewModel.getButtonColor(buttonType: buttonType, isDark: browserManager.gradientColorManager.isDark).1)
+                        .fill(viewModel.getButtonColor(buttonType: buttonType, isDark: theme.isDark).1)
                         .overlay(
                             Circle()
                                 .inset(by: 0.5)
-                                .fill(viewModel.getButtonColor(buttonType: buttonType, isDark: browserManager.gradientColorManager.isDark).0)
+                                .fill(viewModel.getButtonColor(buttonType: buttonType, isDark: theme.isDark).0)
                         )
                     if viewModel.buttonState == .hover {}
                 }.frame(width: 12.5, height: 12.5)

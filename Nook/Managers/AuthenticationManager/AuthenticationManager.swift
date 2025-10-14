@@ -231,16 +231,16 @@ final class AuthenticationManager: NSObject {
                     }
                 }
 
-                manager.dialogManager.closeDialog()
+                DialogManager.shared.closeDialog()
                 finish(with: URLCredential(user: username, password: password, persistence: .forSession))
             },
             onCancel: {
                 NSApp.mainWindow?.makeFirstResponder(nil)
-                manager.dialogManager.closeDialog()
+                DialogManager.shared.closeDialog()
                 finish(with: nil)
             }
         )
 
-        manager.dialogManager.showDialog(dialog)
+        DialogManager.shared.showDialog(dialog)
     }
 }

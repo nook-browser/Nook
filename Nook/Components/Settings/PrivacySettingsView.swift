@@ -10,6 +10,7 @@ import WebKit
 
 struct PrivacySettingsView: View {
     @Environment(BrowserManager.self) private var browserManager
+    @Environment(\.nookSettings) private var settings
     @State private var cookieManager = CookieManager()
     @State private var cacheManager = CacheManager()
     @State private var showingCookieManager = false
@@ -17,7 +18,7 @@ struct PrivacySettingsView: View {
     @State private var isClearing = false
     
     var body: some View {
-        @Bindable var bindableBrowserManager = browserManager
+        @Bindable var bindableSettings = settings
         VStack(alignment: .leading, spacing: 20) {
             // Cookie Management Section
             VStack(alignment: .leading, spacing: 12) {
@@ -144,8 +145,8 @@ struct PrivacySettingsView: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     // Activated: Block cross‑site tracking via content rules + iframe cookie shim
-                    Toggle("Block Cross-Site Tracking", isOn: $bindableBrowserManager.settingsManager.blockCrossSiteTracking)
-                        .onChange(of: browserManager.settingsManager.blockCrossSiteTracking) { _, enabled in
+                    Toggle("Block Cross-Site Tracking", isOn: $bindableSettings.blockCrossSiteTracking)
+                        .onChange(of: settings.blockCrossSiteTracking) { _, enabled in
                             browserManager.trackingProtectionManager.setEnabled(enabled)
                         }
 

@@ -10,6 +10,7 @@ struct TopBarCommandPalette: View {
     @Environment(BrowserManager.self) private var browserManager
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.nookSettings) private var settings
     
     @State private var searchManager = SearchManager()
     @State private var text: String = ""
@@ -17,8 +18,8 @@ struct TopBarCommandPalette: View {
     @State private var selectedSuggestionIndex: Int = -1
     
     var body: some View {
-        let isActiveWindow = browserManager.activeWindowState?.id == windowState.id
-        let shouldShow = isActiveWindow && windowState.isMiniCommandPaletteVisible && browserManager.settingsManager.topBarAddressView
+        let isActiveWindow = browserManager.isActive(windowState)
+        let shouldShow = isActiveWindow && windowState.isMiniCommandPaletteVisible && settings.topBarAddressView
         
         ZStack {
             if shouldShow {
@@ -64,7 +65,7 @@ struct TopBarCommandPalette: View {
             }
         }
         .onChange(of: windowState.isMiniCommandPaletteVisible) { _, newVisible in
-            if newVisible && isActiveWindow && browserManager.settingsManager.topBarAddressView {
+            if newVisible && isActiveWindow && settings.topBarAddressView {
                 searchManager.setTabManager(browserManager.tabManager)
                 searchManager.setHistoryManager(browserManager.historyManager)
                 searchManager.updateProfileContext()

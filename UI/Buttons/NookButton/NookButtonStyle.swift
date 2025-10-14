@@ -11,7 +11,7 @@ import Garnish
 struct NookButtonStyle: ButtonStyle {
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.isEnabled) var isEnabled
-    @Environment(GradientColorManager.self) var gradientColorManager
+    @Environment(\.nookTheme) var gradientColorManager
 
     let variant: Variant
     let shadowStyle: ShadowStyle

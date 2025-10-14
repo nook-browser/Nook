@@ -8,6 +8,7 @@ import SwiftUI
 
 struct SpacesListItem: View {
     @Environment(BrowserManager.self) private var browserManager
+    @Environment(\.nookTheme) private var theme
     @Environment(BrowserWindowState.self) private var windowState
     var space: Space
     var isActive: Bool
@@ -116,14 +117,14 @@ struct SpacesListItem: View {
 
     private var backgroundColor: Color {
         if isHovering {
-            return browserManager.gradientColorManager.isDark
+            return theme.isDark
                 ? AppColors.spaceTabHoverDark : AppColors.spaceTabHoverLight
         } else {
             return Color.clear
         }
     }
     private var iconColor: Color {
-        return browserManager.gradientColorManager.isDark
+        return theme.isDark
             ? AppColors.spaceTabTextDark : AppColors.spaceTabTextLight
     }
 

@@ -119,7 +119,8 @@ struct OllamaModel: Identifiable, Equatable {
 struct SidebarAIChat: View {
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(BrowserManager.self) private var browserManager
-    @Environment(SettingsManager.self) var settingsManager
+    @Environment(\.nookSettings) private var settingsManager
+    @Environment(\.nookDialog) private var dialogManager
     
     @State private var messageText: String = ""
     @State private var messages: [ChatMessage] = []
@@ -548,7 +549,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
     }
     
     private func showApiKeyDialog() {
-        browserManager.dialogManager.showDialog {
+        dialogManager.showDialog {
             AISettingsDialog(
                 ollamaModels: ollamaModels,
                 isFetchingModels: isFetchingModels,
@@ -558,16 +559,16 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                     }
                 },
                 onClose: {
-                    browserManager.dialogManager.closeDialog()
+                    dialogManager.closeDialog()
                 }
             )
-            .environment(settingsManager)
+            .nookSettings(settingsManager)
         }
         
     }
     
     private func showClearMessagesDialog() {
-        browserManager.dialogManager.showDialog {
+        dialogManager.showDialog {
             StandardDialog(
                 header: {
                     DialogHeader(
@@ -586,7 +587,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                                 text: "Cancel",
                                 variant: .secondary,
                                 action: {
-                                    browserManager.dialogManager.closeDialog()
+                                    dialogManager.closeDialog()
                                 }
                             ),
                             DialogButton(
@@ -597,7 +598,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                                     withAnimation(.easeInOut(duration: 0.2)) {
                                         messages.removeAll()
                                     }
-                                    browserManager.dialogManager.closeDialog()
+                                    dialogManager.closeDialog()
                                 }
                             )
                         ]
@@ -1368,7 +1369,7 @@ struct CitationView: View {
 // MARK: - AI Settings Dialog
 
 struct AISettingsDialog: View {
-    @Environment(SettingsManager.self) var settingsManager
+    @Environment(\.nookSettings) var settingsManager
     let ollamaModels: [OllamaModel]
     let isFetchingModels: Bool
     let onFetchModels: () -> Void

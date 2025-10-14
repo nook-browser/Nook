@@ -171,7 +171,7 @@ final class TabCompositorManager {
     func updateTabVisibility(currentTabId: UUID?) {
         guard let browserManager = browserManager else { return }
         for (windowId, _) in browserManager.compositorContainers() {
-            guard let windowState = browserManager.windowStates[windowId] else { continue }
+            guard let windowState = browserManager.windowStateManager.windowStates[windowId] else { continue }
             browserManager.refreshCompositor(for: windowState)
         }
     }

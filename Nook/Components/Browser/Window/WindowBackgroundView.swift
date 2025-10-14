@@ -8,12 +8,12 @@
 import SwiftUI
 
 struct WindowBackgroundView: View {
-    @Environment(BrowserManager.self) private var browserManager
+    @Environment(\.nookSettings) private var settings
 
     var body: some View {
         Group {
             if #available(macOS 26.0, *) {
-                if browserManager.settingsManager.isLiquidGlassEnabled {
+                if settings.isLiquidGlassEnabled {
                     Rectangle()
                         .fill(Color.clear)
                         .blur(radius: 40)
@@ -21,7 +21,7 @@ struct WindowBackgroundView: View {
                         .clipped()
                 } else {
                     BlurEffectView(
-                        material: browserManager.settingsManager
+                        material: settings
                             .currentMaterial,
                         state: .active
                     )
@@ -31,7 +31,7 @@ struct WindowBackgroundView: View {
                     )
                 }
             } else {
-                if browserManager.settingsManager.isLiquidGlassEnabled {
+                if settings.isLiquidGlassEnabled {
                     Rectangle()
                         .fill(.clear)
                         .background(.thinMaterial)  // Use thinMaterial for liquid glass effect for better compatability
@@ -39,7 +39,7 @@ struct WindowBackgroundView: View {
                         .clipped()
                 } else {
                     BlurEffectView(
-                        material: browserManager.settingsManager
+                        material: settings
                             .currentMaterial,
                         state: .active
                     )
@@ -52,4 +52,3 @@ struct WindowBackgroundView: View {
         .backgroundDraggable()
     }
 }
-

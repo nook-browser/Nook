@@ -33,7 +33,7 @@ struct PinnedGrid: View {
         let colsCount: Int = columnCount(for: width, itemCount: items.count)
         let columns: [GridItem] = makeColumns(count: colsCount)
         
-        let shouldAnimate = (browserManager.activeWindowState?.id == windowState.id) && !browserManager.isTransitioningProfile
+        let shouldAnimate = (browserManager.isActive(windowState)) && !browserManager.isTransitioningProfile
 
         // For embedded use, return proper sized container even when empty to support transitions
         if items.isEmpty {

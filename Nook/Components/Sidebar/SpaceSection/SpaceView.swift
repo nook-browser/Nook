@@ -35,7 +35,7 @@ struct SpaceView: View {
     let isActive: Bool
     @Environment(BrowserManager.self) private var browserManager
     @Environment(BrowserWindowState.self) private var windowState
-    @Environment(GradientColorManager.self) private var gradientColorManager
+    @Environment(\.nookTheme) private var gradientColorManager
     @State private var draggedItem: UUID? = nil
     @State private var dropPreviewIndex: Int? = nil
     @State private var dropPreviewSection: SidebarTargetSection? = nil

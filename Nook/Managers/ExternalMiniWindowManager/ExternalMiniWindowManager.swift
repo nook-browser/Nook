@@ -140,7 +140,7 @@ final class ExternalMiniWindowManager {
                 session.cancelAuthDueToClose()
                 self?.sessions[session.id] = nil
             },
-            gradientColorManager: browserManager.gradientColorManager
+            gradientColorManager: GradientColorManager.shared
         )
 
         sessions[session.id] = SessionEntry(controller: controller)
@@ -192,7 +192,7 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
                 onClose(session)
             }
         )
-        .environment(gradientColorManager)
+        .nookTheme(gradientColorManager)
 
         let hostingController = NSHostingController(rootView: contentView)
         let window = NSWindow(

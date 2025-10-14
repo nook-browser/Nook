@@ -10,7 +10,9 @@ import Observation
 
 @MainActor
 @Observable
-class DialogManager {
+final class DialogManager {
+    static let shared = DialogManager()
+
     var isVisible: Bool = false
     var activeDialog: AnyView?
 
@@ -175,7 +177,7 @@ struct StandardDialog<Header: View, Content: View, Footer: View>: View {
 }
 
 struct DialogHeader: View {
-    @Environment(GradientColorManager.self) var gradientColorManager
+    @Environment(\.nookTheme) var gradientColorManager
     let icon: String
     let title: String
     let subtitle: String?
@@ -211,6 +213,26 @@ struct DialogHeader: View {
             .multilineTextAlignment(.leading)
         }
         .padding(.top, 8)
+    }
+}
+
+// MARK: - Environment Support
+
+@MainActor
+private struct NookDialogKey: EnvironmentKey {
+    static let defaultValue: DialogManager = .shared
+}
+
+extension EnvironmentValues {
+    @MainActor var nookDialog: DialogManager {
+        get { self[NookDialogKey.self] }
+        set { self[NookDialogKey.self] = newValue }
+    }
+}
+
+extension View {
+    @MainActor func nookDialog(_ manager: DialogManager) -> some View {
+        environment(\.nookDialog, manager)
     }
 }
 
@@ -366,4 +388,3 @@ private struct DialogManagerPreviewSurface: View {
         .environment(GradientColorManager())
 }
 #endif
-

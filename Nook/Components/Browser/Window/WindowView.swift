@@ -12,11 +12,12 @@ struct WindowView: View {
     @Environment(BrowserWindowState.self) private var windowState
     @State private var hoverSidebarManager = HoverSidebarManager()
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.nookSettings) private var settings
 
     // Calculate webview Y offset (where the web content starts)
     private var webViewYOffset: CGFloat {
         // Approximate Y offset for web content start (nav bar + URL bar + padding)
-        if browserManager.settingsManager.topBarAddressView {
+        if settings.topBarAddressView {
             return 44  // Top bar height
         } else {
             return 20  // Accounts for navigation area height
@@ -43,7 +44,7 @@ struct WindowView: View {
                     }
 
                 // Top bar when enabled
-                if browserManager.settingsManager.topBarAddressView {
+                if settings.topBarAddressView {
                     VStack(spacing: 0) {
                         TopBarView()
                             .environment(browserManager)
@@ -64,7 +65,7 @@ struct WindowView: View {
 
                 // Mini command palette anchored exactly to URL bar's top-left
                 // Only show when topbar is disabled
-                if !browserManager.settingsManager.topBarAddressView {
+                if !settings.topBarAddressView {
                     MiniCommandPaletteOverlay()
                         .environment(windowState)
                 }
@@ -160,7 +161,6 @@ struct WindowView: View {
                 hoverSidebarManager.stop()
             }
             .environment(browserManager)
-            .environment(browserManager.gradientColorManager)
             .environment(browserManager.splitManager)
             .environment(hoverSidebarManager)
         }
@@ -169,7 +169,7 @@ struct WindowView: View {
     @ViewBuilder
     private var mainLayout: some View {
         let aiVisible = windowState.isSidebarAIChatVisible
-        let aiAppearsOnTrailingEdge = browserManager.settingsManager.sidebarPosition == .left
+        let aiAppearsOnTrailingEdge = settings.sidebarPosition == .left
 
         HStack(spacing: 0) {
             if aiAppearsOnTrailingEdge {
@@ -186,14 +186,14 @@ struct WindowView: View {
                 sidebarColumn
             }
         }
-        .padding(.trailing, windowState.isFullScreen ? 0 : (windowState.isSidebarVisible && browserManager.settingsManager.sidebarPosition == .right ? 0 : aiVisible ? 0 : 8))
-        .padding(.leading, windowState.isFullScreen ? 0 : (windowState.isSidebarVisible && browserManager.settingsManager.sidebarPosition == .left ? 0 : aiVisible ? 0 : 8))
+        .padding(.trailing, windowState.isFullScreen ? 0 : (windowState.isSidebarVisible && settings.sidebarPosition == .right ? 0 : aiVisible ? 0 : 8))
+        .padding(.leading, windowState.isFullScreen ? 0 : (windowState.isSidebarVisible && settings.sidebarPosition == .left ? 0 : aiVisible ? 0 : 8))
     }
 
     private var sidebarColumn: some View {
         SidebarView()
         // Overlay the resize handle spanning the sidebar/webview boundary
-        .overlay(alignment: browserManager.settingsManager.sidebarPosition == .left ? .trailing : .leading) {
+        .overlay(alignment: settings.sidebarPosition == .left ? .trailing : .leading) {
             if windowState.isSidebarVisible {
                 // Position to span 14pts into sidebar and 2pts into web content (moved 6pts left)
                 SidebarResizeView()
@@ -220,7 +220,7 @@ struct WindowView: View {
 
     @ViewBuilder
     private var aiSidebar: some View {
-        let handleAlignment: Alignment = browserManager.settingsManager.sidebarPosition == .left ? .leading : .trailing
+        let handleAlignment: Alignment = settings.sidebarPosition == .left ? .leading : .trailing
 
         SidebarAIChat()
             .frame(width: windowState.aiSidebarWidth)
@@ -231,12 +231,12 @@ struct WindowView: View {
                     .environment(windowState)
             }
             .transition(
-                .move(edge: browserManager.settingsManager.sidebarPosition == .left ? .trailing : .leading)
+                .move(edge: settings.sidebarPosition == .left ? .trailing : .leading)
                     .combined(with: .opacity)
             )
             .environment(browserManager)
             .environment(windowState)
-            .environment(browserManager.settingsManager)
+            .nookSettings(settings)
     }
 
 }
@@ -277,15 +277,16 @@ private struct ProfileSwitchToastView: View {
 private struct MiniCommandPaletteOverlay: View {
     @Environment(BrowserManager.self) private var browserManager
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(\.nookSettings) private var settings
 
     var body: some View {
         let isActiveWindow =
-            browserManager.activeWindowState?.id == windowState.id
+            browserManager.isActive(windowState)
         let isVisible =
             isActiveWindow && windowState.isMiniCommandPaletteVisible
             && !windowState.isCommandPaletteVisible
 
-        ZStack(alignment: browserManager.settingsManager.sidebarPosition == .left ? .topLeading : .topTrailing) {
+        ZStack(alignment: settings.sidebarPosition == .left ? .topLeading : .topTrailing) {
             if isVisible {
                 // Click-away hit target
                 Color.clear
@@ -300,7 +301,7 @@ private struct MiniCommandPaletteOverlay: View {
                 let hasFrame = barFrame.width > 1 && barFrame.height > 1
                 // Match sidebar's internal 8pt padding when geometry is unavailable
                 let fallbackX: CGFloat = 8
-                let topBarHeight: CGFloat = browserManager.settingsManager.topBarAddressView ? 44 : 0
+                let topBarHeight: CGFloat = settings.topBarAddressView ? 44 : 0
                 let fallbackY: CGFloat =
                     8 /* sidebar top padding */ + 30 /* nav bar */
                     + 8 /* vstack spacing */ + topBarHeight
@@ -312,7 +313,7 @@ private struct MiniCommandPaletteOverlay: View {
                     forcedWidth: 400,
                     forcedCornerRadius: 12
                 )
-                .offset(x: browserManager.settingsManager.sidebarPosition == .left ? anchorX : -anchorX, y: anchorY)
+                .offset(x: settings.sidebarPosition == .left ? anchorX : -anchorX, y: anchorY)
                 .zIndex(1)
             }
         }

@@ -290,7 +290,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
 
             // Add pane containers with rounded corners and background
             let activeId = browserManager.currentTab(for: windowState)?.id
-            let accent = browserManager.gradientColorManager.displayGradient.primaryNSColor
+            let accent = GradientColorManager.shared.displayGradient.primaryNSColor
             // Resolve pane tabs across ALL tabs (not just current space)
             let allKnownTabs = browserManager.tabManager.allTabs()
 

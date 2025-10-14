@@ -12,6 +12,7 @@ struct SidebarHoverOverlayView: View {
     @Environment(BrowserManager.self) private var browserManager
     @Environment(HoverSidebarManager.self) private var hoverManager
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(\.nookSettings) private var settings
 
     private var overlayWidth: CGFloat {
         windowState.isSidebarVisible ? windowState.sidebarWidth : browserManager.getSavedSidebarWidth(for: windowState)
@@ -23,7 +24,7 @@ struct SidebarHoverOverlayView: View {
     var body: some View {
         // Only render overlay plumbing when the real sidebar is collapsed
         if !windowState.isSidebarVisible {
-            ZStack(alignment: browserManager.settingsManager.sidebarPosition == .left ? .leading : .trailing) {
+            ZStack(alignment: settings.sidebarPosition == .left ? .leading : .trailing) {
                 // Edge hover hotspot
                 Color.clear
                     .frame(width: hoverManager.triggerWidth)
@@ -41,6 +42,7 @@ struct SidebarHoverOverlayView: View {
                     SidebarView(forceVisible: true, forcedWidth: overlayWidth)
                         .environment(browserManager)
                         .environment(windowState)
+                        .nookSettings(settings)
                         .frame(width: overlayWidth)
                         .frame(maxHeight: .infinity)
                         .background(BlurEffectView(material: .contentBackground, state: .active))
@@ -52,15 +54,15 @@ struct SidebarHoverOverlayView: View {
                         // Force arrow cursor for the entire overlay region
                         .alwaysArrowCursor()
                         .shadow(color: Color.black.opacity(0.14), radius: 14, x: 0, y: 0)
-                        .padding(browserManager.settingsManager.sidebarPosition == .left ? .leading : .trailing, horizontalInset)
+                        .padding(settings.sidebarPosition == .left ? .leading : .trailing, horizontalInset)
                         .padding(.vertical, verticalInset)
                         .transition(
-                            .move(edge: browserManager.settingsManager.sidebarPosition == .left ? .leading : .trailing)
+                            .move(edge: settings.sidebarPosition == .left ? .leading : .trailing)
                                 .combined(with: .opacity)
                         )
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: browserManager.settingsManager.sidebarPosition == .left ? .topLeading : .topTrailing)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: settings.sidebarPosition == .left ? .topLeading : .topTrailing)
             // Container remains passive; only overlay/hotspot intercept
         }
     }

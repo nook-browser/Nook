@@ -94,7 +94,7 @@ fileprivate func cachedNSColor(hex: String) -> NSColor {
 struct DitheredGradientView: View {
     let gradient: SpaceGradient
     @State private var renderer = DitheredGradientRenderer()
-    @Environment(GradientColorManager.self) private var gradientColorManager
+    @Environment(\.nookTheme) private var gradientColorManager
     @Environment(\.backingScale) private var backingScale
 
     var body: some View {

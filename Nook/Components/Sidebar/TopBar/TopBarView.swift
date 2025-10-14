@@ -10,6 +10,8 @@ import SwiftUI
 struct TopBarView: View {
     @Environment(BrowserManager.self) private var browserManager
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(\.nookSettings) private var settings
+    @Environment(\.nookTheme) private var theme
     @State private var tabWrapper = ObservableTabWrapper()
     @State private var isHovering: Bool = false
     
@@ -20,14 +22,14 @@ struct TopBarView: View {
                 .frame(width: 70)
             
             // Left: Sidebar toggle button
-            Button("Toggle Sidebar", systemImage: browserManager.settingsManager.sidebarPosition == .left ? "sidebar.left" : "sidebar.right") {
+            Button("Toggle Sidebar", systemImage: settings.sidebarPosition == .left ? "sidebar.left" : "sidebar.right") {
                 browserManager.toggleSidebar(for: windowState)
             }
             .labelStyle(.iconOnly)
             .buttonStyle(NavButtonStyle())
             .foregroundStyle(Color.primary)
             
-            if browserManager.settingsManager.showAIAssistant {
+            if settings.showAIAssistant {
                 Button("Toggle AI Assistant", systemImage: "sparkle") {
                     browserManager.toggleAISidebar(for: windowState)
                 }
@@ -181,14 +183,14 @@ struct TopBarView: View {
     
     private var backgroundColor: Color {
         if isHovering {
-            return browserManager.gradientColorManager.isDark ? AppColors.pinnedTabHoverDark : AppColors.pinnedTabHoverLight
+            return theme.isDark ? AppColors.pinnedTabHoverDark : AppColors.pinnedTabHoverLight
         } else {
-            return browserManager.gradientColorManager.isDark ? AppColors.pinnedTabIdleDark : AppColors.pinnedTabIdleLight
+            return theme.isDark ? AppColors.pinnedTabIdleDark : AppColors.pinnedTabIdleLight
         }
     }
-    
+
     private var textColor: Color {
-        return browserManager.gradientColorManager.isDark ? AppColors.spaceTabTextDark : AppColors.spaceTabTextLight
+        return theme.isDark ? AppColors.spaceTabTextDark : AppColors.spaceTabTextLight
     }
     
     private var displayURL: String {

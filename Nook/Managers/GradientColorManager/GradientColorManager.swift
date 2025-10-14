@@ -5,6 +5,8 @@ import Observation
 @MainActor
 @Observable
 final class GradientColorManager {
+    static let shared = GradientColorManager()
+
     var displayGradient: SpaceGradient = .default
     private(set) var isEditing: Bool = false
     var isAnimating: Bool = false
@@ -77,5 +79,25 @@ extension GradientColorManager {
     // This is now a simple static color based on the current display gradient.
     var primaryColor: Color {
         return displayGradient.primaryColor
+    }
+}
+
+// MARK: - Environment Support
+
+@MainActor
+private struct NookThemeKey: EnvironmentKey {
+    static let defaultValue: GradientColorManager = .shared
+}
+
+extension EnvironmentValues {
+    @MainActor var nookTheme: GradientColorManager {
+        get { self[NookThemeKey.self] }
+        set { self[NookThemeKey.self] = newValue }
+    }
+}
+
+extension View {
+    @MainActor func nookTheme(_ manager: GradientColorManager) -> some View {
+        environment(\.nookTheme, manager)
     }
 }

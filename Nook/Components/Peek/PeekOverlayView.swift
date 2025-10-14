@@ -12,6 +12,7 @@ struct PeekOverlayView: View {
     @Environment(BrowserManager.self) private var browserManager
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.nookSettings) private var settings
         @State private var webView: PeekWebView?
     @State private var scale: CGFloat = 0.001
     @State private var opacity: Double = 0.0
@@ -301,7 +302,7 @@ struct PeekOverlayView: View {
     private func calculateLayout(geometry: GeometryProxy) -> (frame: CGRect, cornerRadius: CGFloat) {
         let windowSize = geometry.size
         let isSplit = browserManager.splitManager.isSplit(for: windowState.id)
-        let sidebarPosition = browserManager.settingsManager.sidebarPosition
+        let sidebarPosition = settings.sidebarPosition
 
         // Compute the visible web content area by excluding the sidebar width
         let sidebarWidth: CGFloat = windowState.isSidebarVisible ? windowState.sidebarWidth : 0

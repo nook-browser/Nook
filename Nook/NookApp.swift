@@ -29,7 +29,7 @@ struct NookApp: App {
                     browserManager.appDelegate = appDelegate
 
                     // Initialize keyboard shortcut manager
-                    browserManager.settingsManager.keyboardShortcutManager.setBrowserManager(browserManager)
+                    SettingsManager.shared.keyboardShortcutManager.setBrowserManager(browserManager)
                 }
         }
         .windowStyle(.hiddenTitleBar)
@@ -41,7 +41,6 @@ struct NookApp: App {
         Settings {
             SettingsView()
                 .environment(browserManager)
-                .environment(browserManager.gradientColorManager)
         }
     }
 }
@@ -74,7 +73,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
                         manager.openCommandPalette()
                     case 3:
                         guard
-                            let windowState = manager.activeWindowState,
+                            let windowState = manager.activeWindow,
                             let currentTab = manager.currentTabForActiveWindow(),
                             let webView = manager.getWebView(for: currentTab.id, in: windowState.id)
                         else {
@@ -84,7 +83,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
                         webView.goBack()
                     case 4:
                         guard
-                            let windowState = manager.activeWindowState,
+                            let windowState = manager.activeWindow,
                             let currentTab = manager.currentTabForActiveWindow(),
                             let webView = manager.getWebView(for: currentTab.id, in: windowState.id)
                         else {
@@ -303,8 +302,8 @@ struct NookCommands: Commands {
             .keyboardShortcut("n", modifiers: .command)
 
             Button("Close Tab") {
-                if browserManager.activeWindowState?.isCommandPaletteVisible == true {
-                    browserManager.closeCommandPalette(for: browserManager.activeWindowState)
+                if browserManager.activeWindow?.isCommandPaletteVisible == true {
+                    browserManager.closeCommandPalette(for: browserManager.activeWindow)
                 } else {
                     browserManager.closeCurrentTab()
                 }
@@ -331,7 +330,7 @@ struct NookCommands: Commands {
                 browserManager.toggleAISidebar()
             }
             .keyboardShortcut("a", modifiers: [.command, .shift])
-            .disabled(!browserManager.settingsManager.showAIAssistant)
+            .disabled(!SettingsManager.shared.showAIAssistant)
 
             Button("Toggle Picture in Picture") {
                 browserManager.requestPiPForCurrentTabInActiveWindow()
@@ -476,7 +475,7 @@ struct NookCommands: Commands {
         }
         
         // Extensions Commands
-        if browserManager.settingsManager.experimentalExtensions {
+        if SettingsManager.shared.experimentalExtensions {
             CommandMenu("Extensions") {
                 Button("Install Extension...") {
                     browserManager.showExtensionInstallDialog()
@@ -486,7 +485,7 @@ struct NookCommands: Commands {
                 Button("Manage Extensions...") {
                     // Open native Settings to Extensions pane
                     openSettings()
-                    browserManager.settingsManager.currentSettingsTab = .extensions
+                    SettingsManager.shared.currentSettingsTab = .extensions
                 }
 
                 if #available(macOS 15.5, *) {

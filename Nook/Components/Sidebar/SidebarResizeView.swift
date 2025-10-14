@@ -10,6 +10,7 @@ import SwiftUI
 struct SidebarResizeView: View {
     @Environment(BrowserManager.self) private var browserManager
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(\.nookSettings) private var settings
     @State private var isResizing = false
     @State private var isHovering = false
     @State private var startingWidth: CGFloat = 0
@@ -21,7 +22,7 @@ struct SidebarResizeView: View {
     private let maxWidth: CGFloat = 520
 
     private var sitsOnRight: Bool {
-        browserManager.settingsManager.sidebarPosition == .right
+        settings.sidebarPosition == .right
     }
 
     private var indicatorOffset: CGFloat {

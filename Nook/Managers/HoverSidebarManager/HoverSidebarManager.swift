@@ -75,7 +75,7 @@ final class HoverSidebarManager {
 
     @MainActor
     private func handleMouseMovementOnMain() {
-        guard let bm = browserManager, let activeState = bm.activeWindowState else { return }
+        guard let bm = browserManager, let activeState = bm.activeWindow else { return }
 
         // Never show overlay while the real sidebar is visible
         if activeState.isSidebarVisible {

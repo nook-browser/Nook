@@ -106,3 +106,4 @@ DerivedData/
 *.xcresult
 *.log
 *.profraw
+/local-remotes
