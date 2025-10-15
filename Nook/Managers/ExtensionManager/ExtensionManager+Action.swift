@@ -17,7 +17,7 @@ extension ExtensionManager {
     // MARK: - Action State Storage
     
     /// Storage for per-extension action state
-    private struct ActionState {
+    struct ActionState {
         var badgeText: String = ""
         var badgeBackgroundColor: [CGFloat] = [0.5, 0.5, 0.5, 1.0] // Default gray
         var badgeTextColor: [CGFloat] = [1.0, 1.0, 1.0, 1.0] // Default white
@@ -406,7 +406,7 @@ extension ExtensionManager {
         }
     }
     
-    private func generateActionAPIScript(extensionId: String) -> String {
+    func generateActionAPIScript(extensionId: String) -> String {
         return """
         (function() {
             'use strict';

@@ -538,7 +538,7 @@ extension ExtensionManager {
         }
     }
     
-    private func generateNotificationsAPIScript(extensionId: String) -> String {
+    func generateNotificationsAPIScript(extensionId: String) -> String {
         return """
         (function() {
             'use strict';

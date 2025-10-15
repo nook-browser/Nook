@@ -527,7 +527,7 @@ extension ExtensionManager {
         }
     }
     
-    private func generateContextMenusAPIScript(extensionId: String) -> String {
+    func generateContextMenusAPIScript(extensionId: String) -> String {
         return """
         (function() {
             'use strict';
@@ -667,7 +667,7 @@ extension ExtensionManager {
         return string
     }
     
-    private func getBackgroundWebView(for context: WKWebExtensionContext) -> WKWebView? {
+    func getBackgroundWebView(for context: WKWebExtensionContext) -> WKWebView? {
         // TODO: Implement proper background webview retrieval
         // For now, return nil - this will need to be connected to the actual background page
         return nil
