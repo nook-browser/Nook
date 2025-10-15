@@ -1,0 +1,2524 @@
+{
+  "identifier": {
+    "url": "doc://com.apple.metrickit/documentation/MetricKit",
+    "interfaceLanguage": "swift"
+  },
+  "kind": "symbol",
+  "abstract": [
+    {
+      "text": "Aggregate and analyze per-device reports on exception and crash diagnostics and on power and performance metrics.",
+      "type": "text"
+    }
+  ],
+  "topicSections": [
+    {
+      "anchor": "Essentials",
+      "identifiers": [
+        "doc://com.apple.metrickit/documentation/MetricKit/MXMetricManager",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXMetricPayload",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXDiagnosticPayload",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXMetricManagerSubscriber"
+      ],
+      "title": "Essentials"
+    },
+    {
+      "anchor": "Performance-improvements",
+      "identifiers": [
+        "doc://com.apple.documentation/documentation/Xcode/improving-your-app-s-performance"
+      ],
+      "title": "Performance improvements"
+    },
+    {
+      "anchor": "Battery-metrics",
+      "title": "Battery metrics",
+      "identifiers": [
+        "doc://com.apple.metrickit/documentation/MetricKit/MXCellularConditionMetric",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXCPUMetric",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXDisplayMetric",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXGPUMetric",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXLocationActivityMetric",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXNetworkTransferMetric",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXCPUExceptionDiagnostic"
+      ]
+    },
+    {
+      "anchor": "Performance-metrics",
+      "title": "Performance metrics",
+      "identifiers": [
+        "doc://com.apple.metrickit/documentation/MetricKit/MXAppLaunchDiagnostic",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXAppExitMetric",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXAppRunTimeMetric",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXMemoryMetric",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXCrashDiagnostic"
+      ]
+    },
+    {
+      "anchor": "Responsiveness-metrics",
+      "title": "Responsiveness metrics",
+      "identifiers": [
+        "doc://com.apple.metrickit/documentation/MetricKit/MXAnimationMetric",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXAppLaunchMetric",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXAppResponsivenessMetric",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXHangDiagnostic"
+      ]
+    },
+    {
+      "anchor": "Disk-usage-metrics",
+      "title": "Disk usage metrics",
+      "identifiers": [
+        "doc://com.apple.metrickit/documentation/MetricKit/MXDiskIOMetric",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXDiskSpaceUsageMetric",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXDiskWriteExceptionDiagnostic"
+      ]
+    },
+    {
+      "anchor": "Custom-metrics",
+      "title": "Custom metrics",
+      "identifiers": [
+        "doc://com.apple.metrickit/documentation/MetricKit/MXSignpostMetric"
+      ]
+    },
+    {
+      "anchor": "Data-types",
+      "title": "Data types",
+      "identifiers": [
+        "doc://com.apple.metrickit/documentation/MetricKit/MXCallStackTree",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXMetaData",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXAverage",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXHistogram",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXDiagnostic",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXMetric",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXError/Code",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXErrorDomain",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXError",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXCrashDiagnosticObjectiveCExceptionReason",
+        "doc://com.apple.metrickit/documentation/MetricKit/MXSignpostRecord"
+      ]
+    }
+  ],
+  "schemaVersion": {
+    "major": 0,
+    "minor": 3,
+    "patch": 0
+  },
+  "sections": [],
+  "variants": [
+    {
+      "traits": [
+        {
+          "interfaceLanguage": "swift"
+        }
+      ],
+      "paths": [
+        "/documentation/metrickit"
+      ]
+    },
+    {
+      "traits": [
+        {
+          "interfaceLanguage": "occ"
+        }
+      ],
+      "paths": [
+        "/documentation/metrickit"
+      ]
+    }
+  ],
+  "metadata": {
+    "platforms": [
+      {
+        "introducedAt": "13.0",
+        "beta": false,
+        "name": "iOS"
+      },
+      {
+        "introducedAt": "13.0",
+        "beta": false,
+        "name": "iPadOS"
+      },
+      {
+        "introducedAt": "13.0",
+        "beta": false,
+        "name": "Mac Catalyst"
+      },
+      {
+        "introducedAt": "12.0",
+        "beta": false,
+        "name": "macOS"
+      },
+      {
+        "introducedAt": "1.0",
+        "beta": false,
+        "name": "visionOS"
+      }
+    ],
+    "title": "MetricKit",
+    "externalID": "MetricKit",
+    "roleHeading": "Framework",
+    "role": "collection",
+    "symbolKind": "module",
+    "modules": [
+      {
+        "name": "MetricKit"
+      }
+    ]
+  },
+  "hierarchy": {
+    "paths": [
+      [
+        "doc://com.apple.documentation/documentation/technologies"
+      ]
+    ]
+  },
+  "primaryContentSections": [
+    {
+      "kind": "content",
+      "content": [
+        {
+          "text": "Overview",
+          "type": "heading",
+          "anchor": "overview",
+          "level": 2
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "With MetricKit, you can receive on-device app diagnostics and power and performance metrics the system captures. The system delivers metric reports about the previous 24 hours to a registered app at most once per day, and delivers diagnostic reports immediately in iOS 15 and later and macOS 12 and later. This framework supports diagnostics for crashes, hangs, energy, and disk writes for apps running in visionOS but doesn’t report metrics for apps running in visionOS. This includes apps built for visionOS or compatible iPhone and iPad apps running in visionOS."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "Use the data in the reports to help improve the performance of your iOS app, macOS app, or Mac app built with Mac Catalyst. The framework includes the following:",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "items": [
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "A manager class and a subscriber protocol"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "text": "Payload classes for reported data",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Classes for each category of metrics and diagnostics"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Classes for measurement units, such as bars of cellular connectivity"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "text": "Classes for representing accumulated data, such as histograms",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "text": "A class for capturing stack traces in diagnostics",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "type": "unorderedList"
+        }
+      ]
+    }
+  ],
+  "references": {
+    "doc://com.apple.metrickit/documentation/MetricKit/MXAppExitMetric": {
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "MXAppExitMetric"
+        }
+      ],
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXAppExitMetric",
+      "abstract": [
+        {
+          "text": "An object representing metrics about the types of foreground and background app exits.",
+          "type": "text"
+        }
+      ],
+      "title": "MXAppExitMetric",
+      "kind": "symbol",
+      "type": "topic",
+      "role": "symbol",
+      "url": "/documentation/metrickit/mxappexitmetric",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MXAppExitMetric"
+        }
+      ]
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXDiskWriteExceptionDiagnostic": {
+      "role": "symbol",
+      "title": "MXDiskWriteExceptionDiagnostic",
+      "type": "topic",
+      "url": "/documentation/metrickit/mxdiskwriteexceptiondiagnostic",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "MXDiskWriteExceptionDiagnostic",
+          "kind": "identifier"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "text": "MXDiskWriteExceptionDiagnostic",
+          "kind": "identifier"
+        }
+      ],
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXDiskWriteExceptionDiagnostic",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "An object representing a diagnostic report for a disk write exception.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXError/Code": {
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "enum"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "Code"
+        }
+      ],
+      "kind": "symbol",
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXError/Code",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "Code"
+        }
+      ],
+      "url": "/documentation/metrickit/mxerror/code",
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Error codes for error values from app metrics."
+        }
+      ],
+      "title": "MXError.Code",
+      "type": "topic"
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXSignpostMetric": {
+      "url": "/documentation/metrickit/mxsignpostmetric",
+      "title": "MXSignpostMetric",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "An object representing a custom metric.",
+          "type": "text"
+        }
+      ],
+      "role": "symbol",
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXSignpostMetric",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "MXSignpostMetric",
+          "kind": "identifier"
+        }
+      ],
+      "type": "topic",
+      "navigatorTitle": [
+        {
+          "text": "MXSignpostMetric",
+          "kind": "identifier"
+        }
+      ]
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXAppRunTimeMetric": {
+      "role": "symbol",
+      "title": "MXAppRunTimeMetric",
+      "type": "topic",
+      "url": "/documentation/metrickit/mxappruntimemetric",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "MXAppRunTimeMetric"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MXAppRunTimeMetric"
+        }
+      ],
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXAppRunTimeMetric",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object representing metrics about the amount of time the app is active."
+        }
+      ]
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXDisplayMetric": {
+      "abstract": [
+        {
+          "text": "An object representing metrics about the power used to display the app on the screen.",
+          "type": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXDisplayMetric",
+      "role": "symbol",
+      "url": "/documentation/metrickit/mxdisplaymetric",
+      "kind": "symbol",
+      "title": "MXDisplayMetric",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "kind": "identifier",
+          "text": "MXDisplayMetric"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MXDisplayMetric"
+        }
+      ],
+      "type": "topic"
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXCallStackTree": {
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "MXCallStackTree"
+        }
+      ],
+      "type": "topic",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MXCallStackTree"
+        }
+      ],
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXCallStackTree",
+      "url": "/documentation/metrickit/mxcallstacktree",
+      "role": "symbol",
+      "title": "MXCallStackTree",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object representing the call stack for an exception."
+        }
+      ],
+      "kind": "symbol"
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXSignpostAnimationIntervalBegin": {
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXSignpostAnimationIntervalBegin",
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "MXSignpostAnimationIntervalBegin"
+        }
+      ],
+      "type": "topic",
+      "title": "MXSignpostAnimationIntervalBegin",
+      "url": "/documentation/metrickit/mxsignpostanimationintervalbegin",
+      "kind": "symbol",
+      "role": "symbol",
+      "abstract": []
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit": {
+      "abstract": [
+        {
+          "text": "Aggregate and analyze per-device reports on exception and crash diagnostics and on power and performance metrics.",
+          "type": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit",
+      "role": "collection",
+      "url": "/documentation/metrickit",
+      "kind": "symbol",
+      "title": "MetricKit",
+      "type": "topic"
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXDiagnostic": {
+      "title": "MXDiagnostic",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "MXDiagnostic",
+          "kind": "identifier"
+        }
+      ],
+      "role": "symbol",
+      "kind": "symbol",
+      "navigatorTitle": [
+        {
+          "text": "MXDiagnostic",
+          "kind": "identifier"
+        }
+      ],
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXDiagnostic",
+      "type": "topic",
+      "url": "/documentation/metrickit/mxdiagnostic",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An abstract data class for a diagnostic."
+        }
+      ]
+    },
+    "doc://com.apple.documentation/documentation/technologies": {
+      "title": "Technologies",
+      "url": "/documentation/technologies",
+      "role": "overview",
+      "abstract": [
+        {
+          "text": "",
+          "type": "text"
+        }
+      ],
+      "type": "topic",
+      "kind": "technologies",
+      "identifier": "doc://com.apple.documentation/documentation/technologies"
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXMetaData": {
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "MXMetaData"
+        }
+      ],
+      "kind": "symbol",
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXMetaData",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MXMetaData"
+        }
+      ],
+      "url": "/documentation/metrickit/mxmetadata",
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object containing system-level information about the device."
+        }
+      ],
+      "title": "MXMetaData",
+      "type": "topic"
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXCellularConditionMetric": {
+      "abstract": [
+        {
+          "text": "An object representing metrics about the condition of the cellular network.",
+          "type": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXCellularConditionMetric",
+      "role": "symbol",
+      "url": "/documentation/metrickit/mxcellularconditionmetric",
+      "kind": "symbol",
+      "title": "MXCellularConditionMetric",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "kind": "identifier",
+          "text": "MXCellularConditionMetric"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MXCellularConditionMetric"
+        }
+      ],
+      "type": "topic"
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXCrashDiagnostic": {
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "MXCrashDiagnostic"
+        }
+      ],
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXCrashDiagnostic",
+      "abstract": [
+        {
+          "text": "An object representing a diagnostic report for an app crash.",
+          "type": "text"
+        }
+      ],
+      "title": "MXCrashDiagnostic",
+      "kind": "symbol",
+      "type": "topic",
+      "role": "symbol",
+      "url": "/documentation/metrickit/mxcrashdiagnostic",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MXCrashDiagnostic"
+        }
+      ]
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXMetricManagerSubscriber": {
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A protocol defining a method for receiving a daily metrics report."
+        }
+      ],
+      "role": "symbol",
+      "title": "MXMetricManagerSubscriber",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "MXMetricManagerSubscriber",
+          "kind": "identifier"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "text": "MXMetricManagerSubscriber",
+          "kind": "identifier"
+        }
+      ],
+      "type": "topic",
+      "url": "/documentation/metrickit/mxmetricmanagersubscriber",
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXMetricManagerSubscriber",
+      "kind": "symbol"
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXErrorDomain": {
+      "type": "topic",
+      "title": "MXErrorDomain",
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MXErrorDomain"
+        }
+      ],
+      "fragments": [
+        {
+          "text": "let",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "MXErrorDomain",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:SS",
+          "text": "String"
+        }
+      ],
+      "url": "/documentation/metrickit/mxerrordomain",
+      "kind": "symbol",
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXErrorDomain",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Error domain for error values from app metrics."
+        }
+      ]
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXCrashDiagnosticObjectiveCExceptionReason": {
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "MXCrashDiagnosticObjectiveCExceptionReason"
+        }
+      ],
+      "kind": "symbol",
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXCrashDiagnosticObjectiveCExceptionReason",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MXCrashDiagnosticObjectiveCExceptionReason"
+        }
+      ],
+      "url": "/documentation/metrickit/mxcrashdiagnosticobjectivecexceptionreason",
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object that represents the exception reason for an uncaught ObjC exception."
+        }
+      ],
+      "title": "MXCrashDiagnosticObjectiveCExceptionReason",
+      "type": "topic"
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXAppLaunchMetric": {
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXAppLaunchMetric",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MXAppLaunchMetric"
+        }
+      ],
+      "type": "topic",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object representing metrics about app launch time."
+        }
+      ],
+      "title": "MXAppLaunchMetric",
+      "url": "/documentation/metrickit/mxapplaunchmetric",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "MXAppLaunchMetric"
+        }
+      ],
+      "role": "symbol"
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXMetric": {
+      "abstract": [
+        {
+          "text": "An abstract data class for a metric.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/metrickit/mxmetric",
+      "kind": "symbol",
+      "type": "topic",
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXMetric",
+      "title": "MXMetric",
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MXMetric"
+        }
+      ],
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "MXMetric"
+        }
+      ]
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXCPUExceptionDiagnostic": {
+      "title": "MXCPUExceptionDiagnostic",
+      "url": "/documentation/metrickit/mxcpuexceptiondiagnostic",
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MXCPUExceptionDiagnostic"
+        }
+      ],
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "MXCPUExceptionDiagnostic"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "An object representing a diagnostic report for a fatal or nonfatal CPU exception.",
+          "type": "text"
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol",
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXCPUExceptionDiagnostic"
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXMetricManager": {
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The shared object that registers you to receive metrics, creates logs for custom metrics, and gives access to past reports."
+        }
+      ],
+      "role": "symbol",
+      "title": "MXMetricManager",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "MXMetricManager",
+          "kind": "identifier"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MXMetricManager"
+        }
+      ],
+      "type": "topic",
+      "url": "/documentation/metrickit/mxmetricmanager",
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXMetricManager",
+      "kind": "symbol"
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXAppLaunchDiagnostic": {
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "MXAppLaunchDiagnostic"
+        }
+      ],
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXAppLaunchDiagnostic",
+      "abstract": [
+        {
+          "text": "A diagnostic subclass that encapsulates app launch diagnostic reports.",
+          "type": "text"
+        }
+      ],
+      "title": "MXAppLaunchDiagnostic",
+      "kind": "symbol",
+      "type": "topic",
+      "role": "symbol",
+      "url": "/documentation/metrickit/mxapplaunchdiagnostic",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MXAppLaunchDiagnostic"
+        }
+      ]
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXCPUMetric": {
+      "abstract": [
+        {
+          "text": "An object representing metrics about the use of the CPU.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/metrickit/mxcpumetric",
+      "kind": "symbol",
+      "type": "topic",
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXCPUMetric",
+      "title": "MXCPUMetric",
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MXCPUMetric"
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "MXCPUMetric"
+        }
+      ]
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXMemoryMetric": {
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object representing metrics about the app’s memory use."
+        }
+      ],
+      "title": "MXMemoryMetric",
+      "url": "/documentation/metrickit/mxmemorymetric",
+      "role": "symbol",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "MXMemoryMetric",
+          "kind": "identifier"
+        }
+      ],
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXMemoryMetric",
+      "kind": "symbol",
+      "type": "topic",
+      "navigatorTitle": [
+        {
+          "text": "MXMemoryMetric",
+          "kind": "identifier"
+        }
+      ]
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXLocationActivityMetric": {
+      "abstract": [
+        {
+          "text": "An object representing metrics about the use of location-tracking features of a device.",
+          "type": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXLocationActivityMetric",
+      "role": "symbol",
+      "url": "/documentation/metrickit/mxlocationactivitymetric",
+      "kind": "symbol",
+      "title": "MXLocationActivityMetric",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "kind": "identifier",
+          "text": "MXLocationActivityMetric"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MXLocationActivityMetric"
+        }
+      ],
+      "type": "topic"
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXAnimationMetric": {
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXAnimationMetric",
+      "navigatorTitle": [
+        {
+          "text": "MXAnimationMetric",
+          "kind": "identifier"
+        }
+      ],
+      "type": "topic",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object representing metrics about the responsiveness of animation in the app."
+        }
+      ],
+      "title": "MXAnimationMetric",
+      "url": "/documentation/metrickit/mxanimationmetric",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "text": "MXAnimationMetric",
+          "kind": "identifier"
+        }
+      ],
+      "role": "symbol"
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXMetricPayload": {
+      "title": "MXMetricPayload",
+      "navigatorTitle": [
+        {
+          "text": "MXMetricPayload",
+          "kind": "identifier"
+        }
+      ],
+      "type": "topic",
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXMetricPayload",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "An object that encapsulates a daily metrics report.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/metrickit/mxmetricpayload",
+      "role": "symbol",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "MXMetricPayload",
+          "kind": "identifier"
+        }
+      ]
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXDiskIOMetric": {
+      "navigatorTitle": [
+        {
+          "text": "MXDiskIOMetric",
+          "kind": "identifier"
+        }
+      ],
+      "url": "/documentation/metrickit/mxdiskiometric",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "MXDiskIOMetric",
+          "kind": "identifier"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "An object representing metrics about disk usage.",
+          "type": "text"
+        }
+      ],
+      "role": "symbol",
+      "type": "topic",
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXDiskIOMetric",
+      "title": "MXDiskIOMetric"
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXDiagnosticPayload": {
+      "abstract": [
+        {
+          "text": "An object that encapsulates a diagnostic report.",
+          "type": "text"
+        }
+      ],
+      "role": "symbol",
+      "title": "MXDiagnosticPayload",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "MXDiagnosticPayload",
+          "kind": "identifier"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "text": "MXDiagnosticPayload",
+          "kind": "identifier"
+        }
+      ],
+      "type": "topic",
+      "url": "/documentation/metrickit/mxdiagnosticpayload",
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXDiagnosticPayload",
+      "kind": "symbol"
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXDiskSpaceUsageMetric": {
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXDiskSpaceUsageMetric",
+      "title": "MXDiskSpaceUsageMetric",
+      "abstract": [
+        {
+          "text": "An object representing metrics about your app’s disk space usage.",
+          "type": "text"
+        }
+      ],
+      "kind": "symbol",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "kind": "identifier",
+          "text": "MXDiskSpaceUsageMetric"
+        }
+      ],
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MXDiskSpaceUsageMetric"
+        }
+      ],
+      "type": "topic",
+      "url": "/documentation/metrickit/mxdiskspaceusagemetric"
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXAppResponsivenessMetric": {
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXAppResponsivenessMetric",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MXAppResponsivenessMetric"
+        }
+      ],
+      "type": "topic",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object representing metrics about the responsiveness of the app to user interaction."
+        }
+      ],
+      "title": "MXAppResponsivenessMetric",
+      "url": "/documentation/metrickit/mxappresponsivenessmetric",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "MXAppResponsivenessMetric"
+        }
+      ],
+      "role": "symbol"
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXHistogram": {
+      "role": "symbol",
+      "url": "/documentation/metrickit/mxhistogram",
+      "title": "MXHistogram",
+      "type": "topic",
+      "abstract": [
+        {
+          "text": "An object representing a histogram of data values of the same type of unit.",
+          "type": "text"
+        }
+      ],
+      "kind": "symbol",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MXHistogram"
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "MXHistogram"
+        }
+      ],
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXHistogram"
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXNetworkTransferMetric": {
+      "title": "MXNetworkTransferMetric",
+      "url": "/documentation/metrickit/mxnetworktransfermetric",
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MXNetworkTransferMetric"
+        }
+      ],
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "kind": "identifier",
+          "text": "MXNetworkTransferMetric"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "An object representing metrics about network transfers.",
+          "type": "text"
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol",
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXNetworkTransferMetric"
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXGPUMetric": {
+      "abstract": [
+        {
+          "text": "An object representing metrics about the use of the GPU.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/metrickit/mxgpumetric",
+      "kind": "symbol",
+      "type": "topic",
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXGPUMetric",
+      "title": "MXGPUMetric",
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MXGPUMetric"
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "MXGPUMetric"
+        }
+      ]
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXAverage": {
+      "type": "topic",
+      "title": "MXAverage",
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "text": "MXAverage",
+          "kind": "identifier"
+        }
+      ],
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "MXAverage",
+          "kind": "identifier"
+        }
+      ],
+      "url": "/documentation/metrickit/mxaverage",
+      "kind": "symbol",
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXAverage",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A unit of measure for an average."
+        }
+      ]
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXSignpostRecord": {
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "MXSignpostRecord",
+          "kind": "identifier"
+        }
+      ],
+      "kind": "symbol",
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXSignpostRecord",
+      "navigatorTitle": [
+        {
+          "text": "MXSignpostRecord",
+          "kind": "identifier"
+        }
+      ],
+      "url": "/documentation/metrickit/mxsignpostrecord",
+      "role": "symbol",
+      "abstract": [
+        {
+          "text": "An object representing the record for a signpost interval or event.",
+          "type": "text"
+        }
+      ],
+      "title": "MXSignpostRecord",
+      "type": "topic"
+    },
+    "doc://com.apple.documentation/documentation/Xcode/improving-your-app-s-performance": {
+      "role": "article",
+      "abstract": [
+        {
+          "text": "Model, measure, and boost the performance of your app by using a continuous-improvement cycle.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/Xcode/improving-your-app-s-performance",
+      "kind": "article",
+      "type": "topic",
+      "identifier": "doc://com.apple.documentation/documentation/Xcode/improving-your-app-s-performance",
+      "title": "Improving your app’s performance"
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXHangDiagnostic": {
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "MXHangDiagnostic"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MXHangDiagnostic"
+        }
+      ],
+      "title": "MXHangDiagnostic",
+      "kind": "symbol",
+      "url": "/documentation/metrickit/mxhangdiagnostic",
+      "type": "topic",
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXHangDiagnostic",
+      "abstract": [
+        {
+          "text": "An object representing a diagnostic report for an app that is too busy to handle user input responsively.",
+          "type": "text"
+        }
+      ],
+      "role": "symbol"
+    },
+    "doc://com.apple.metrickit/documentation/MetricKit/MXError": {
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MXError"
+        }
+      ],
+      "identifier": "doc://com.apple.metrickit/documentation/MetricKit/MXError",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "struct"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "MXError"
+        }
+      ],
+      "type": "topic",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Error domain for error handling of app metrics."
+        }
+      ],
+      "title": "MXError",
+      "role": "symbol",
+      "url": "/documentation/metrickit/mxerror"
+    }
+  },
+  "variantOverrides": [
+    {
+      "patch": [
+        {
+          "path": "/identifier/interfaceLanguage",
+          "value": "occ",
+          "op": "replace"
+        },
+        {
+          "path": "/hierarchy",
+          "value": {
+            "paths": [
+              [
+                "doc://com.apple.documentation/documentation/technologies"
+              ]
+            ]
+          },
+          "op": "replace"
+        },
+        {
+          "path": "/topicSections",
+          "value": [
+            {
+              "anchor": "Essentials",
+              "identifiers": [
+                "doc://com.apple.metrickit/documentation/MetricKit/MXMetricManager",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXMetricPayload",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXDiagnosticPayload",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXMetricManagerSubscriber"
+              ],
+              "title": "Essentials"
+            },
+            {
+              "anchor": "Performance-improvements",
+              "identifiers": [
+                "doc://com.apple.documentation/documentation/Xcode/improving-your-app-s-performance"
+              ],
+              "title": "Performance improvements"
+            },
+            {
+              "anchor": "Battery-metrics",
+              "identifiers": [
+                "doc://com.apple.metrickit/documentation/MetricKit/MXCellularConditionMetric",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXCPUMetric",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXDisplayMetric",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXGPUMetric",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXLocationActivityMetric",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXNetworkTransferMetric",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXCPUExceptionDiagnostic"
+              ],
+              "title": "Battery metrics"
+            },
+            {
+              "anchor": "Performance-metrics",
+              "identifiers": [
+                "doc://com.apple.metrickit/documentation/MetricKit/MXAppLaunchDiagnostic",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXAppExitMetric",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXAppRunTimeMetric",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXMemoryMetric",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXCrashDiagnostic"
+              ],
+              "title": "Performance metrics"
+            },
+            {
+              "anchor": "Responsiveness-metrics",
+              "identifiers": [
+                "doc://com.apple.metrickit/documentation/MetricKit/MXAnimationMetric",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXAppLaunchMetric",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXAppResponsivenessMetric",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXHangDiagnostic"
+              ],
+              "title": "Responsiveness metrics"
+            },
+            {
+              "anchor": "Disk-usage-metrics",
+              "identifiers": [
+                "doc://com.apple.metrickit/documentation/MetricKit/MXDiskIOMetric",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXDiskSpaceUsageMetric",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXDiskWriteExceptionDiagnostic"
+              ],
+              "title": "Disk usage metrics"
+            },
+            {
+              "anchor": "Custom-metrics",
+              "identifiers": [
+                "doc://com.apple.metrickit/documentation/MetricKit/MXSignpostMetric"
+              ],
+              "title": "Custom metrics"
+            },
+            {
+              "anchor": "Data-types",
+              "identifiers": [
+                "doc://com.apple.metrickit/documentation/MetricKit/MXCallStackTree",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXMetaData",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXAverage",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXHistogram",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXDiagnostic",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXMetric",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXError/Code",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXErrorDomain",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXCrashDiagnosticObjectiveCExceptionReason",
+                "doc://com.apple.metrickit/documentation/MetricKit/MXSignpostRecord"
+              ],
+              "title": "Data types"
+            },
+            {
+              "generated": true,
+              "anchor": "Macros",
+              "identifiers": [
+                "doc://com.apple.metrickit/documentation/MetricKit/MXSignpostAnimationIntervalBegin"
+              ],
+              "title": "Macros"
+            }
+          ],
+          "op": "replace"
+        },
+        {
+          "path": "/relationshipsSections",
+          "value": null,
+          "op": "add"
+        },
+        {
+          "path": "/seeAlsoSections",
+          "value": null,
+          "op": "add"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXAppExitMetric/title",
+          "value": "MXAppExitMetric",
+          "op": "replace"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXAppExitMetric/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXAppExitMetric"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXAppExitMetric/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXAppExitMetric"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXDiskWriteExceptionDiagnostic/title",
+          "op": "replace",
+          "value": "MXDiskWriteExceptionDiagnostic"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXDiskWriteExceptionDiagnostic/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXDiskWriteExceptionDiagnostic",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXDiskWriteExceptionDiagnostic/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXDiskWriteExceptionDiagnostic"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXError~1Code/title",
+          "op": "replace",
+          "value": "MXErrorCode"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXError~1Code/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXErrorCode",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXError~1Code/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXErrorCode",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXSignpostMetric/title",
+          "op": "replace",
+          "value": "MXSignpostMetric"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXSignpostMetric/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXSignpostMetric",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXSignpostMetric/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXSignpostMetric"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXAppRunTimeMetric/title",
+          "op": "replace",
+          "value": "MXAppRunTimeMetric"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXAppRunTimeMetric/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXAppRunTimeMetric"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXAppRunTimeMetric/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXAppRunTimeMetric"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXDisplayMetric/title",
+          "op": "replace",
+          "value": "MXDisplayMetric"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXDisplayMetric/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXDisplayMetric",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXDisplayMetric/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXDisplayMetric",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXCallStackTree/title",
+          "op": "replace",
+          "value": "MXCallStackTree"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXCallStackTree/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXCallStackTree",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXCallStackTree/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXCallStackTree",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXDiagnostic/title",
+          "op": "replace",
+          "value": "MXDiagnostic"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXDiagnostic/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXDiagnostic",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXDiagnostic/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXDiagnostic",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXMetaData/title",
+          "op": "replace",
+          "value": "MXMetaData"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXMetaData/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXMetaData",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXMetaData/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXMetaData",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXCellularConditionMetric/title",
+          "op": "replace",
+          "value": "MXCellularConditionMetric"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXCellularConditionMetric/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXCellularConditionMetric",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXCellularConditionMetric/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXCellularConditionMetric"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXCrashDiagnostic/title",
+          "op": "replace",
+          "value": "MXCrashDiagnostic"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXCrashDiagnostic/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXCrashDiagnostic",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXCrashDiagnostic/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXCrashDiagnostic"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXMetricManagerSubscriber/title",
+          "op": "replace",
+          "value": "MXMetricManagerSubscriber"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXMetricManagerSubscriber/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXMetricManagerSubscriber"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXMetricManagerSubscriber/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXMetricManagerSubscriber",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXErrorDomain/title",
+          "op": "replace",
+          "value": "MXErrorDomain"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXErrorDomain/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXErrorDomain"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXCrashDiagnosticObjectiveCExceptionReason/title",
+          "op": "replace",
+          "value": "MXCrashDiagnosticObjectiveCExceptionReason"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXCrashDiagnosticObjectiveCExceptionReason/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXCrashDiagnosticObjectiveCExceptionReason",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXCrashDiagnosticObjectiveCExceptionReason/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXCrashDiagnosticObjectiveCExceptionReason"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXAppLaunchMetric/title",
+          "op": "replace",
+          "value": "MXAppLaunchMetric"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXAppLaunchMetric/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXAppLaunchMetric"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXAppLaunchMetric/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXAppLaunchMetric"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXMetric/title",
+          "op": "replace",
+          "value": "MXMetric"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXMetric/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXMetric"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXMetric/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXMetric",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXCPUExceptionDiagnostic/title",
+          "op": "replace",
+          "value": "MXCPUExceptionDiagnostic"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXCPUExceptionDiagnostic/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXCPUExceptionDiagnostic",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXCPUExceptionDiagnostic/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXCPUExceptionDiagnostic",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXMetricManager/title",
+          "op": "replace",
+          "value": "MXMetricManager"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXMetricManager/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXMetricManager",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXMetricManager/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXMetricManager",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXAppLaunchDiagnostic/title",
+          "op": "replace",
+          "value": "MXAppLaunchDiagnostic"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXAppLaunchDiagnostic/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXAppLaunchDiagnostic",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXAppLaunchDiagnostic/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXAppLaunchDiagnostic"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXCPUMetric/title",
+          "op": "replace",
+          "value": "MXCPUMetric"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXCPUMetric/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXCPUMetric"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXCPUMetric/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXCPUMetric"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXMemoryMetric/title",
+          "op": "replace",
+          "value": "MXMemoryMetric"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXMemoryMetric/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXMemoryMetric"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXMemoryMetric/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXMemoryMetric",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXLocationActivityMetric/title",
+          "op": "replace",
+          "value": "MXLocationActivityMetric"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXLocationActivityMetric/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXLocationActivityMetric",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXLocationActivityMetric/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXLocationActivityMetric",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXAnimationMetric/title",
+          "op": "replace",
+          "value": "MXAnimationMetric"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXAnimationMetric/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXAnimationMetric",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXAnimationMetric/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXAnimationMetric",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXMetricPayload/title",
+          "op": "replace",
+          "value": "MXMetricPayload"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXMetricPayload/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXMetricPayload"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXMetricPayload/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXMetricPayload",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXDiskIOMetric/title",
+          "op": "replace",
+          "value": "MXDiskIOMetric"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXDiskIOMetric/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXDiskIOMetric",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXDiskIOMetric/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXDiskIOMetric"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXDiagnosticPayload/title",
+          "op": "replace",
+          "value": "MXDiagnosticPayload"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXDiagnosticPayload/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXDiagnosticPayload"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXDiagnosticPayload/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXDiagnosticPayload",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXDiskSpaceUsageMetric/title",
+          "op": "replace",
+          "value": "MXDiskSpaceUsageMetric"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXDiskSpaceUsageMetric/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXDiskSpaceUsageMetric"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXDiskSpaceUsageMetric/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXDiskSpaceUsageMetric",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXAppResponsivenessMetric/title",
+          "op": "replace",
+          "value": "MXAppResponsivenessMetric"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXAppResponsivenessMetric/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXAppResponsivenessMetric",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXAppResponsivenessMetric/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXAppResponsivenessMetric",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXHistogram/title",
+          "op": "replace",
+          "value": "MXHistogram"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXHistogram/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXHistogram",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXHistogram/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXHistogram",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXNetworkTransferMetric/title",
+          "op": "replace",
+          "value": "MXNetworkTransferMetric"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXNetworkTransferMetric/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXNetworkTransferMetric",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXNetworkTransferMetric/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXNetworkTransferMetric"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXGPUMetric/title",
+          "op": "replace",
+          "value": "MXGPUMetric"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXGPUMetric/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXGPUMetric"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXGPUMetric/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXGPUMetric"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXAverage/title",
+          "op": "replace",
+          "value": "MXAverage"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXAverage/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXAverage"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXAverage/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXAverage",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXSignpostRecord/title",
+          "op": "replace",
+          "value": "MXSignpostRecord"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXSignpostRecord/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXSignpostRecord"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXSignpostRecord/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXSignpostRecord",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXHangDiagnostic/title",
+          "op": "replace",
+          "value": "MXHangDiagnostic"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXHangDiagnostic/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "MXHangDiagnostic"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.metrickit~1documentation~1MetricKit~1MXHangDiagnostic/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "MXHangDiagnostic",
+              "kind": "identifier"
+            }
+          ]
+        }
+      ],
+      "traits": [
+        {
+          "interfaceLanguage": "occ"
+        }
+      ]
+    }
+  ],
+  "legalNotices": {
+    "copyright": "Copyright &copy; 2025 Apple Inc. All rights reserved.",
+    "termsOfUse": "https://www.apple.com/legal/internet-services/terms/site.html",
+    "privacyPolicy": "https://www.apple.com/privacy/privacy-policy"
+  }
+}

@@ -84,7 +84,17 @@ struct ExtensionActionButton: View {
         print("🎯 Performing action for extension: \(ext.name)")
 
         guard let extensionContext = ExtensionManager.shared.getExtensionContext(for: ext.id) else {
-            print("❌ No extension context found")
+            print("⚠️ [ExtensionActionView] No extension context found - extension may not be properly loaded")
+
+            // CRITICAL FIX: Show user feedback when extension is not available
+            DispatchQueue.main.async {
+                let alert = NSAlert()
+                alert.messageText = "Extension Not Available"
+                alert.informativeText = "The extension '\(self.ext.name)' is not currently loaded or has been disabled."
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "OK")
+                alert.runModal()
+            }
             return
         }
 
@@ -105,8 +115,17 @@ struct ExtensionActionButton: View {
     }
 
     private func updateActionState() {
-        guard ExtensionManager.shared.getExtensionContext(for: ext.id) != nil else {
-            print("❌ No extension context found for action state update")
+        guard let extensionContext = ExtensionManager.shared.getExtensionContext(for: ext.id) else {
+            print("⚠️ [ExtensionActionView] No extension context found for action state update - extension may be disabled")
+
+            // CRITICAL FIX: Set default values when extension context is not available
+            // This prevents the UI from being in an undefined state
+            DispatchQueue.main.async {
+                self.badgeText = ""
+                self.badgeBackgroundColor = NSColor.systemGray
+                self.badgeTextColor = NSColor.white
+                self.isActionEnabled = false
+            }
             return
         }
 

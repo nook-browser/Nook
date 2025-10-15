@@ -1,0 +1,2270 @@
+{
+  "hierarchy": {
+    "paths": [
+      [
+        "doc://com.apple.documentation/documentation/technologies",
+        "doc://com.apple.Apple-Silicon/documentation/apple-silicon"
+      ]
+    ]
+  },
+  "primaryContentSections": [
+    {
+      "kind": "content",
+      "content": [
+        {
+          "text": "Overview",
+          "type": "heading",
+          "anchor": "overview",
+          "level": 2
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "Port your existing macOS app to Apple silicon by creating a universal binary and",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "modifying your code to handle architectural differences. A universal binary looks",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "no different than a regular app, but its executable file contains two versions of",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "your compiled code. One version runs natively on Apple silicon, and the other runs",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "natively on Intel-based Mac computers. At runtime, the system automatically chooses",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "which version to run on the current platform.",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "image",
+              "identifier": "porting-your-macos-apps-to-apple-silicon-1.png"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "To build a universal binary, you need Xcode 12 or a later version, which adds ",
+              "type": "text"
+            },
+            {
+              "type": "codeVoice",
+              "code": "arm64"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "to the standard list of build architectures for macOS binaries. When you open your",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "project and do a clean build, Xcode creates a universal binary automatically if your",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "project uses the standard architectures. If you use custom makefiles or build scripts,",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "add the ",
+              "type": "text"
+            },
+            {
+              "type": "codeVoice",
+              "code": "arm64"
+            },
+            {
+              "text": " architecture to your build system.",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "After you create a universal binary, test it on both architectures and determine"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "whether you need to make additional changes. macOS frameworks shield apps from most"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "architectural differences between platforms, but some differences may still require"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "you to change your code. In addition, architectural differences may affect your app’s"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "performance and require further changes."
+            }
+          ]
+        },
+        {
+          "type": "aside",
+          "style": "note",
+          "name": "Note",
+          "content": [
+            {
+              "inlineContent": [
+                {
+                  "type": "text",
+                  "text": "On Apple silicon, apps built for the "
+                },
+                {
+                  "type": "codeVoice",
+                  "code": "x86_64"
+                },
+                {
+                  "type": "text",
+                  "text": " architecture run under the"
+                },
+                {
+                  "type": "text",
+                  "text": " "
+                },
+                {
+                  "type": "text",
+                  "text": "Rosetta translation environment. For more information, see "
+                },
+                {
+                  "isActive": true,
+                  "identifier": "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/about-the-rosetta-translation-environment",
+                  "type": "reference"
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ],
+              "type": "paragraph"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "To learn how to build a universal binary, see",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "isActive": true,
+              "type": "reference",
+              "identifier": "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/building-a-universal-macos-binary"
+            },
+            {
+              "text": ".",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "text": "Create a Porting Plan",
+          "type": "heading",
+          "anchor": "Create-a-Porting-Plan",
+          "level": 3
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "Early in the porting process, identify the workflow you’ll use to build and test",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "your code. Xcode runs on all Mac computers, so build your code on either an Apple",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "silicon or Intel-based Mac computer and do your initial testing there. However, always",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "test, tune, and validate your code on both computer types to uncover issues specific",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "to that architecture.",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "image",
+              "identifier": "porting-your-macos-apps-to-apple-silicon-2.png"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "In addition to a workflow plan, identify potential areas to investigate during the"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "porting process. The porting effort for "
+            },
+            {
+              "code": "arm64",
+              "type": "codeVoice"
+            },
+            {
+              "type": "text",
+              "text": " depends on how much you rely on hardware-specific"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "features. If you rely mostly on Apple frameworks and technologies, your porting effort"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "may be small. If you tuned your code specifically for the "
+            },
+            {
+              "code": "x86_64",
+              "type": "codeVoice"
+            },
+            {
+              "type": "text",
+              "text": " architecture and"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "hardware capabilities, porting to "
+            },
+            {
+              "code": "arm64",
+              "type": "codeVoice"
+            },
+            {
+              "type": "text",
+              "text": " may require additional effort."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "To start your investigation, make a note of any code that does the following:"
+            }
+          ]
+        },
+        {
+          "type": "unorderedList",
+          "items": [
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Interacts with third-party libraries you don’t own."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Interacts with the kernel or hardware."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "text": "Relies on specific GPU behaviors.",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Contains assembly instructions."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Manages threads or optimizes your app’s multithreaded behavior."
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "text": "Contains hardware-specific assumptions or performance optimizations.",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "The list above is not exhaustive, but it offers a starting point for your investigation.",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "Hardware and architectural differences may introduce bugs or performance issues to",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "your code on Apple silicon. Identifying potential problem areas early will save you",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "time later.",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "Always have a well-defined test plan, ideally with a set of automated test suites"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "you can run at build time. In addition to testing your code’s correctness, gather"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "metrics on your app’s performance. Examine your app’s memory usage, and measure how"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "long it takes to execute specific tasks on both Apple silicon and Intel-based Mac"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "computers. Use that information to identify additional areas to investigate."
+            }
+          ]
+        },
+        {
+          "text": "Obtain Universal Versions of Linked Libraries",
+          "type": "heading",
+          "anchor": "Obtain-Universal-Versions-of-Linked-Libraries",
+          "level": 3
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "If your project depends on any third-party libraries, contact the original vendors",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "and ask them to provide you with universal versions of those libraries. All code",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "running in the same process must support the same architecture. You cannot produce",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "a universal version of your binary without universal versions of all linked libraries.",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "If one or more libraries is not universal, the linker reports errors.",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "identifier": "porting-your-macos-apps-to-apple-silicon-3.png",
+              "type": "image"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "To learn how to create your own universal binaries, see"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "reference",
+              "isActive": true,
+              "identifier": "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/building-a-universal-macos-binary"
+            },
+            {
+              "type": "text",
+              "text": "."
+            }
+          ]
+        },
+        {
+          "text": "Update Plug-Ins to Universal Binaries",
+          "type": "heading",
+          "anchor": "Update-Plug-Ins-to-Universal-Binaries",
+          "level": 3
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "A universal plug-in runs natively on any Mac computer. If your app supports a plug-in"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "model, create universal versions of the plug-ins that you manage. If your company"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "allows external developers to contribute plug-ins, encourage those developers to"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "create universal versions of their plug-ins."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "Universal plug-ins are essential if your app loads those plug-ins directly into its"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "process space. Code running in the same process must support the same architecture."
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "If your app attempts to load a plug-in with an incompatible architecture, the system"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "reports an error at load time."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "identifier": "porting-your-macos-apps-to-apple-silicon-4.png",
+              "type": "image"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "Plug-ins that run out-of-process using an XPC service may run using a different architecture",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "than the app itself. To give your developers time to update their plug-ins, provide",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "two non-universal XPC services—one to run ",
+              "type": "text"
+            },
+            {
+              "code": "arm64",
+              "type": "codeVoice"
+            },
+            {
+              "text": " plug-ins and one to run ",
+              "type": "text"
+            },
+            {
+              "code": "x86_64",
+              "type": "codeVoice"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "plug-ins. A single XPC service can manage either native or translated plug-ins, but",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "not both at the same time. When creating the services, give each one a unique bundle",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "identifier so they may run simultaneously.",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "For information about how to communicate with out-of-process plug-ins using XPC,"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "see "
+            },
+            {
+              "type": "reference",
+              "isActive": true,
+              "identifier": "doc://com.apple.documentation/documentation/Foundation/xpc"
+            },
+            {
+              "type": "text",
+              "text": "."
+            }
+          ]
+        },
+        {
+          "text": "Address Architectural Differences",
+          "type": "heading",
+          "anchor": "Address-Architectural-Differences",
+          "level": 3
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "Apart from large-scale changes to the processor and graphics hardware, subtle architectural"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "differences exist between Apple silicon and Intel-based Mac computers. During the"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "porting process, audit your code to identify fixes for any potential architectural"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "issues. For example, look for places where your code relies on specific hardware"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "features or configurations."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "The following list identifies several known architectural differences between Apple"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "silicon and Intel-based Mac computers. Update code that relies on any of the following:"
+            }
+          ]
+        },
+        {
+          "type": "unorderedList",
+          "items": [
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "text": "Virtual memory-page sizes",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Cache line sizes"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Variadic functions"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Memory that is simultaneously writable and executable"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Just-in-time compilers"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Realtime threads"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "text": "Explicit thread priorities",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "text": "Hardware-specific details",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "text": "Assembly-language instructions or builtin intrinsics",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Vector unit instructions"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "C++ ABI details"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "aside",
+          "style": "note",
+          "name": "Note",
+          "content": [
+            {
+              "type": "paragraph",
+              "inlineContent": [
+                {
+                  "text": "Both Apple silicon and Intel-based Mac computers use the little-endian format",
+                  "type": "text"
+                },
+                {
+                  "text": " ",
+                  "type": "text"
+                },
+                {
+                  "text": "for data, so you don’t need to make endian conversions in your code. However, continue",
+                  "type": "text"
+                },
+                {
+                  "text": " ",
+                  "type": "text"
+                },
+                {
+                  "text": "to minimize the need for endian conversions in custom data formats that you create.",
+                  "type": "text"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "For additional information about architectural differences, see ",
+              "type": "text"
+            },
+            {
+              "isActive": true,
+              "type": "reference",
+              "identifier": "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/addressing-architectural-differences-in-your-macos-code"
+            },
+            {
+              "text": ".",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "text": "Update GPU-Specific Code",
+          "type": "heading",
+          "anchor": "Update-GPU-Specific-Code",
+          "level": 3
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "Metal on Apple silicon supports the features of both Intel-based Mac computers and"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "iOS devices. If your app adopts Metal features that are found only on Intel-based"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "Mac computers, consider also adopting the iOS-specific features in your "
+            },
+            {
+              "type": "codeVoice",
+              "code": "arm64"
+            },
+            {
+              "type": "text",
+              "text": " code."
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "Adopting these features can lead to performance improvements for many apps."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "If your app uses Metal, OpenGL, or OpenCL, be aware of the following differences:",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "type": "unorderedList",
+          "items": [
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "text": "The GPU and CPU on Apple silicon share memory.",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "text": "OpenGL is deprecated, but is available on Apple silicon.",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "OpenCL is deprecated, but is available on Apple silicon when targeting the GPU."
+                    },
+                    {
+                      "type": "text",
+                      "text": " "
+                    },
+                    {
+                      "type": "text",
+                      "text": "The OpenCL CPU device is not available to arm64 apps."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "For information about how to update your graphics code, see"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "reference",
+              "identifier": "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/porting-your-metal-code-to-apple-silicon",
+              "isActive": true
+            },
+            {
+              "type": "text",
+              "text": "."
+            }
+          ]
+        },
+        {
+          "text": "Update Drivers, System Extensions, and Kernel Extensions",
+          "type": "heading",
+          "anchor": "Update-Drivers-System-Extensions-and-Kernel-Extensions",
+          "level": 3
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "When porting code to macOS 11, be aware of the following requirements for code that"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "interacts with the kernel:"
+            }
+          ]
+        },
+        {
+          "type": "unorderedList",
+          "items": [
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "text": "Implement hardware drivers using DriverKit. macOS 11 requires you to use a DriverKit",
+                      "type": "text"
+                    },
+                    {
+                      "text": " ",
+                      "type": "text"
+                    },
+                    {
+                      "text": "extension when support for one is available. Most driver types now support DriverKit,",
+                      "type": "text"
+                    },
+                    {
+                      "text": " ",
+                      "type": "text"
+                    },
+                    {
+                      "text": "and only a few still require the creation of a kernel extension.",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "text": "Kernel extensions must support the native architecture. Kernel extensions run in",
+                      "type": "text"
+                    },
+                    {
+                      "text": " ",
+                      "type": "text"
+                    },
+                    {
+                      "text": "the kernel, and the kernel always runs as a native process. You cannot run kernel",
+                      "type": "text"
+                    },
+                    {
+                      "text": " ",
+                      "type": "text"
+                    },
+                    {
+                      "text": "extensions using Rosetta translation.",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "text": "The installation and uninstallation of kernel extensions requires a reboot. When",
+                      "type": "text"
+                    },
+                    {
+                      "text": " ",
+                      "type": "text"
+                    },
+                    {
+                      "text": "you install a kernel extension, the system doesn’t load your extension until after",
+                      "type": "text"
+                    },
+                    {
+                      "text": " ",
+                      "type": "text"
+                    },
+                    {
+                      "text": "a reboot.",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "For more information about kernel extension and driver changes, see",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "isActive": true,
+              "type": "reference",
+              "identifier": "doc://com.apple.documentation/documentation/SystemExtensions/implementing-drivers-system-extensions-and-kexts"
+            },
+            {
+              "text": ".",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "text": "Migrate Away from Specific Technologies",
+          "type": "heading",
+          "anchor": "Migrate-Away-from-Specific-Technologies",
+          "level": 3
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "macOS includes a few technologies that are currently deprecated or discouraged for"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "active development. If your app uses one of the following technologies, migrate to"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "an appropriate replacement as soon as possible:"
+            }
+          ]
+        },
+        {
+          "type": "unorderedList",
+          "items": [
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "OpenGL—Use "
+                    },
+                    {
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/Metal",
+                      "isActive": true
+                    },
+                    {
+                      "type": "text",
+                      "text": " instead."
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "OpenCL—Use "
+                    },
+                    {
+                      "isActive": true,
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/Metal"
+                    },
+                    {
+                      "type": "text",
+                      "text": " instead."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "AddressBook—Use the "
+                    },
+                    {
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/Contacts",
+                      "isActive": true
+                    },
+                    {
+                      "type": "text",
+                      "text": " framework"
+                    },
+                    {
+                      "type": "text",
+                      "text": " "
+                    },
+                    {
+                      "type": "text",
+                      "text": "instead."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "text": "Carbon APIs—Migrate to ",
+                      "type": "text"
+                    },
+                    {
+                      "identifier": "doc://com.apple.documentation/documentation/AppKit",
+                      "isActive": true,
+                      "type": "reference"
+                    },
+                    {
+                      "text": ",",
+                      "type": "text"
+                    },
+                    {
+                      "text": " ",
+                      "type": "text"
+                    },
+                    {
+                      "identifier": "doc://com.apple.documentation/documentation/Foundation",
+                      "isActive": true,
+                      "type": "reference"
+                    },
+                    {
+                      "text": ", and other modern APIs.",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "IOKit kernel extensions—Migrate to DriverKit where appropriate; see "
+                    },
+                    {
+                      "isActive": true,
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/DriverKit"
+                    },
+                    {
+                      "type": "text",
+                      "text": " "
+                    },
+                    {
+                      "type": "text",
+                      "text": "framework."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "Apple silicon still provides support for the preceding technologies, and you may",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "continue to use them in macOS 11. However, this support may be removed in a future",
+              "type": "text"
+            },
+            {
+              "text": " ",
+              "type": "text"
+            },
+            {
+              "text": "version of macOS, so migration to newer technologies is recommended.",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "text": "Debug and Test Your Code",
+          "type": "heading",
+          "anchor": "Debug-and-Test-Your-Code",
+          "level": 3
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "Apple silicon supports all debugging and testing tools found on Intel-based Mac computers."
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "Use the Xcode IDE to set and monitor breakpoints and monitor other aspects of your"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "app’s behavior. Use "
+            },
+            {
+              "type": "codeVoice",
+              "code": "lldb"
+            },
+            {
+              "type": "text",
+              "text": " from the command line to perform similar tasks outside"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "of the Xcode interface."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "For more information about how to debug and test your code, see"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "isActive": true,
+              "identifier": "doc://com.apple.documentation/documentation/Xcode",
+              "type": "reference"
+            },
+            {
+              "type": "text",
+              "text": "."
+            }
+          ]
+        },
+        {
+          "text": "Tune Your App’s Performance",
+          "type": "heading",
+          "anchor": "Tune-Your-Apps-Performance",
+          "level": 3
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "Apple silicon runs all performance tools found on Intel-based Mac computers. Use"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "Instruments and other performance tools to gather different types of metrics for"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "your app, including information about its memory usage, speed, energy usage, and"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "more. You can also use command-line tools such as "
+            },
+            {
+              "code": "leaks",
+              "type": "codeVoice"
+            },
+            {
+              "type": "text",
+              "text": ", "
+            },
+            {
+              "code": "heap",
+              "type": "codeVoice"
+            },
+            {
+              "type": "text",
+              "text": ", "
+            },
+            {
+              "code": "top",
+              "type": "codeVoice"
+            },
+            {
+              "type": "text",
+              "text": ", "
+            },
+            {
+              "code": "fs_usage",
+              "type": "codeVoice"
+            },
+            {
+              "type": "text",
+              "text": ","
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "code": "sc_usage",
+              "type": "codeVoice"
+            },
+            {
+              "type": "text",
+              "text": ", "
+            },
+            {
+              "code": "vm_stat",
+              "type": "codeVoice"
+            },
+            {
+              "type": "text",
+              "text": ", "
+            },
+            {
+              "code": "otool",
+              "type": "codeVoice"
+            },
+            {
+              "type": "text",
+              "text": ", "
+            },
+            {
+              "code": "sample",
+              "type": "codeVoice"
+            },
+            {
+              "type": "text",
+              "text": ", "
+            },
+            {
+              "code": "malloc_history",
+              "type": "codeVoice"
+            },
+            {
+              "type": "text",
+              "text": ", and "
+            },
+            {
+              "code": "vmmap",
+              "type": "codeVoice"
+            },
+            {
+              "type": "text",
+              "text": " to identify"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "potential performance issues."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "Architectural differences between "
+            },
+            {
+              "type": "codeVoice",
+              "code": "arm64"
+            },
+            {
+              "type": "text",
+              "text": " and "
+            },
+            {
+              "type": "codeVoice",
+              "code": "x86_64"
+            },
+            {
+              "type": "text",
+              "text": " mean that techniques that"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "work well on one system might not work well on the other. For example:"
+            }
+          ]
+        },
+        {
+          "type": "unorderedList",
+          "items": [
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "text": "Don’t assume a discrete GPU means better performance. The integrated GPU in Apple",
+                      "type": "text"
+                    },
+                    {
+                      "text": " ",
+                      "type": "text"
+                    },
+                    {
+                      "text": "processors is optimized for high performance graphics tasks. See",
+                      "type": "text"
+                    },
+                    {
+                      "text": " ",
+                      "type": "text"
+                    },
+                    {
+                      "identifier": "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/porting-your-metal-code-to-apple-silicon",
+                      "isActive": true,
+                      "type": "reference"
+                    },
+                    {
+                      "text": ".",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Don’t assume that all processor cores are equal. The processors on Apple silicon"
+                    },
+                    {
+                      "type": "text",
+                      "text": " "
+                    },
+                    {
+                      "type": "text",
+                      "text": "contain a mixture of performance cores (P-cores) and efficiency cores (E-cores),"
+                    },
+                    {
+                      "type": "text",
+                      "text": " "
+                    },
+                    {
+                      "type": "text",
+                      "text": "which execute tasks with different performance characteristics. Use Quality-of-Service"
+                    },
+                    {
+                      "type": "text",
+                      "text": " "
+                    },
+                    {
+                      "type": "text",
+                      "text": "(QoS) classes to help the system schedule your tasks on the right type of core."
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "During the porting process, measure your app’s performance on both Apple silicon"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "and Intel-based Mac computers and investigate any discrepancies. Tasks that take"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "longer to run on one platform may require additional tuning."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "For specific tips on tuning universal binaries, see"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "reference",
+              "isActive": true,
+              "identifier": "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/tuning-your-code-s-performance-for-apple-silicon"
+            },
+            {
+              "type": "text",
+              "text": "."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "schemaVersion": {
+    "major": 0,
+    "minor": 3,
+    "patch": 0
+  },
+  "sections": [],
+  "topicSections": [
+    {
+      "identifiers": [
+        "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/addressing-architectural-differences-in-your-macos-code",
+        "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/porting-your-audio-code-to-apple-silicon",
+        "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/porting-just-in-time-compilers-to-apple-silicon"
+      ],
+      "anchor": "Additional-Porting-Tips",
+      "title": "Additional Porting Tips"
+    }
+  ],
+  "abstract": [
+    {
+      "type": "text",
+      "text": "Create a version of your macOS app that runs on both Apple silicon and Intel-based"
+    },
+    {
+      "type": "text",
+      "text": " "
+    },
+    {
+      "type": "text",
+      "text": "Mac computers."
+    }
+  ],
+  "kind": "article",
+  "identifier": {
+    "url": "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/porting-your-macos-apps-to-apple-silicon",
+    "interfaceLanguage": "swift"
+  },
+  "seeAlsoSections": [
+    {
+      "identifiers": [
+        "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/building-a-universal-macos-binary"
+      ],
+      "anchor": "Essentials",
+      "title": "Essentials",
+      "generated": true
+    }
+  ],
+  "metadata": {
+    "title": "Porting your macOS apps to Apple silicon",
+    "role": "collectionGroup"
+  },
+  "references": {
+    "doc://com.apple.Apple-Silicon/documentation/apple-silicon": {
+      "identifier": "doc://com.apple.Apple-Silicon/documentation/apple-silicon",
+      "kind": "article",
+      "url": "/documentation/apple-silicon",
+      "role": "collection",
+      "title": "Apple silicon",
+      "abstract": [
+        {
+          "text": "Get the resources you need to create software for Macs with Apple silicon.",
+          "type": "text"
+        }
+      ],
+      "type": "topic"
+    },
+    "doc://com.apple.documentation/documentation/Xcode": {
+      "type": "topic",
+      "role": "collection",
+      "title": "Xcode",
+      "images": [
+        {
+          "type": "card",
+          "identifier": "Xcode-PageImage-card.png"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "Build, test, and submit your app with Apple’s integrated development environment.",
+          "type": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.documentation/documentation/Xcode",
+      "kind": "article",
+      "url": "/documentation/Xcode"
+    },
+    "doc://com.apple.documentation/documentation/DriverKit": {
+      "type": "topic",
+      "role": "collection",
+      "title": "DriverKit",
+      "abstract": [
+        {
+          "text": "Develop device drivers that run in user space.",
+          "type": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.documentation/documentation/DriverKit",
+      "kind": "symbol",
+      "url": "/documentation/DriverKit"
+    },
+    "porting-your-macos-apps-to-apple-silicon-4.png": {
+      "type": "image",
+      "alt": "An illustration of an XPC service managing a plug-in for an app.",
+      "variants": [
+        {
+          "traits": [
+            "2x",
+            "light"
+          ],
+          "url": "https://docs-assets.developer.apple.com/published/f3c16c0dcc7416b1f72398a74b7edb69/porting-your-macos-apps-to-apple-silicon-4%402x.png"
+        }
+      ],
+      "identifier": "porting-your-macos-apps-to-apple-silicon-4.png"
+    },
+    "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/porting-your-metal-code-to-apple-silicon": {
+      "type": "topic",
+      "role": "article",
+      "title": "Porting your Metal code to Apple silicon",
+      "abstract": [
+        {
+          "text": "Create a version of your Metal app that runs on both Apple silicon and Intel-based",
+          "type": "text"
+        },
+        {
+          "text": " ",
+          "type": "text"
+        },
+        {
+          "text": "Mac computers.",
+          "type": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/porting-your-metal-code-to-apple-silicon",
+      "kind": "article",
+      "url": "/documentation/apple-silicon/porting-your-metal-code-to-apple-silicon"
+    },
+    "doc://com.apple.documentation/documentation/AppKit": {
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Construct and manage a graphical, event-driven user interface for your macOS app."
+        }
+      ],
+      "role": "collection",
+      "url": "/documentation/AppKit",
+      "type": "topic",
+      "title": "AppKit",
+      "identifier": "doc://com.apple.documentation/documentation/AppKit"
+    },
+    "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/addressing-architectural-differences-in-your-macos-code": {
+      "title": "Addressing architectural differences in your macOS code",
+      "identifier": "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/addressing-architectural-differences-in-your-macos-code",
+      "type": "topic",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Fix problems that stem from architectural differences between Apple silicon and Intel-based"
+        },
+        {
+          "type": "text",
+          "text": " "
+        },
+        {
+          "type": "text",
+          "text": "Mac computers."
+        }
+      ],
+      "url": "/documentation/apple-silicon/addressing-architectural-differences-in-your-macos-code",
+      "kind": "article",
+      "role": "article"
+    },
+    "doc://com.apple.documentation/documentation/Metal": {
+      "title": "Metal",
+      "identifier": "doc://com.apple.documentation/documentation/Metal",
+      "type": "topic",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Render advanced 3D graphics and compute data in parallel with graphics processors."
+        }
+      ],
+      "url": "/documentation/Metal",
+      "kind": "symbol",
+      "role": "collection"
+    },
+    "doc://com.apple.documentation/documentation/SystemExtensions/implementing-drivers-system-extensions-and-kexts": {
+      "title": "Implementing drivers, system extensions, and kexts",
+      "identifier": "doc://com.apple.documentation/documentation/SystemExtensions/implementing-drivers-system-extensions-and-kexts",
+      "type": "topic",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Create drivers and system extensions to communicate with hardware and provide low-level services, and only use kernel extensions for a few tasks."
+        }
+      ],
+      "url": "/documentation/SystemExtensions/implementing-drivers-system-extensions-and-kexts",
+      "kind": "article",
+      "role": "article"
+    },
+    "porting-your-macos-apps-to-apple-silicon-3.png": {
+      "alt": "TAn illustration that shows the linker creating a universal app from the app’s code and a universal library.",
+      "variants": [
+        {
+          "url": "https://docs-assets.developer.apple.com/published/89e8c4c8fe530c1e7e34c783fac72822/porting-your-macos-apps-to-apple-silicon-3%402x.png",
+          "traits": [
+            "2x",
+            "light"
+          ]
+        }
+      ],
+      "identifier": "porting-your-macos-apps-to-apple-silicon-3.png",
+      "type": "image"
+    },
+    "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/about-the-rosetta-translation-environment": {
+      "title": "About the Rosetta translation environment",
+      "identifier": "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/about-the-rosetta-translation-environment",
+      "type": "topic",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Learn how Rosetta translates executables, and understand what Rosetta can’t translate."
+        }
+      ],
+      "url": "/documentation/apple-silicon/about-the-rosetta-translation-environment",
+      "kind": "article",
+      "role": "article"
+    },
+    "porting-your-macos-apps-to-apple-silicon-2.png": {
+      "alt": "An illustration of the process for building, debugging, and tuning your code on Apple silicon-based Mac computers and Intel-based Mac computers.",
+      "variants": [
+        {
+          "url": "https://docs-assets.developer.apple.com/published/c3701ee00fbe41f996a5f0aae509daf6/porting-your-macos-apps-to-apple-silicon-2%402x.png",
+          "traits": [
+            "2x",
+            "light"
+          ]
+        }
+      ],
+      "identifier": "porting-your-macos-apps-to-apple-silicon-2.png",
+      "type": "image"
+    },
+    "porting-your-macos-apps-to-apple-silicon-1.png": {
+      "alt": "ThAn illustration of an app, where the main executable file supports the arm64 and x86_64 architectures.",
+      "variants": [
+        {
+          "url": "https://docs-assets.developer.apple.com/published/8576d4db4481980842af6b4189e0c79e/porting-your-macos-apps-to-apple-silicon-1%402x.png",
+          "traits": [
+            "2x",
+            "light"
+          ]
+        }
+      ],
+      "identifier": "porting-your-macos-apps-to-apple-silicon-1.png",
+      "type": "image"
+    },
+    "Xcode-PageImage-card.png": {
+      "alt": null,
+      "variants": [
+        {
+          "url": "https://docs-assets.developer.apple.com/published/62dba87d5f60ec96eb48882c9dff86d8/Xcode-PageImage-card~dark%402x.png",
+          "traits": [
+            "2x",
+            "dark"
+          ]
+        },
+        {
+          "url": "https://docs-assets.developer.apple.com/published/cc63eacd8f7f660388b46204d1d9bbcb/Xcode-PageImage-card%402x.png",
+          "traits": [
+            "2x",
+            "light"
+          ]
+        }
+      ],
+      "identifier": "Xcode-PageImage-card.png",
+      "type": "image"
+    },
+    "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/porting-just-in-time-compilers-to-apple-silicon": {
+      "title": "Porting just-in-time compilers to Apple silicon",
+      "identifier": "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/porting-just-in-time-compilers-to-apple-silicon",
+      "type": "topic",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Update your just-in-time (JIT) compiler to work with the Hardened Runtime capability,"
+        },
+        {
+          "type": "text",
+          "text": " "
+        },
+        {
+          "type": "text",
+          "text": "and with Apple silicon."
+        }
+      ],
+      "url": "/documentation/apple-silicon/porting-just-in-time-compilers-to-apple-silicon",
+      "kind": "article",
+      "role": "article"
+    },
+    "doc://com.apple.documentation/documentation/technologies": {
+      "kind": "technologies",
+      "title": "Technologies",
+      "identifier": "doc://com.apple.documentation/documentation/technologies",
+      "abstract": [
+        {
+          "text": "",
+          "type": "text"
+        }
+      ],
+      "type": "topic",
+      "role": "overview",
+      "url": "/documentation/technologies"
+    },
+    "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/building-a-universal-macos-binary": {
+      "title": "Building a universal macOS binary",
+      "identifier": "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/building-a-universal-macos-binary",
+      "type": "topic",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Create macOS apps and other executables that run natively on both Apple silicon and"
+        },
+        {
+          "type": "text",
+          "text": " "
+        },
+        {
+          "type": "text",
+          "text": "Intel-based Mac computers."
+        }
+      ],
+      "url": "/documentation/apple-silicon/building-a-universal-macos-binary",
+      "kind": "article",
+      "role": "article"
+    },
+    "doc://com.apple.documentation/documentation/Foundation/xpc": {
+      "title": "XPC",
+      "identifier": "doc://com.apple.documentation/documentation/Foundation/xpc",
+      "type": "topic",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Manage secure interprocess communication."
+        }
+      ],
+      "url": "/documentation/Foundation/xpc",
+      "kind": "article",
+      "role": "article"
+    },
+    "doc://com.apple.documentation/documentation/Foundation": {
+      "title": "Foundation",
+      "identifier": "doc://com.apple.documentation/documentation/Foundation",
+      "type": "topic",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Access essential data types, collections, and operating-system services to define the base layer of functionality for your app."
+        }
+      ],
+      "url": "/documentation/Foundation",
+      "kind": "symbol",
+      "role": "collection"
+    },
+    "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/tuning-your-code-s-performance-for-apple-silicon": {
+      "title": "Tuning your code’s performance for Apple silicon",
+      "identifier": "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/tuning-your-code-s-performance-for-apple-silicon",
+      "type": "topic",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Improve your code to get the best performance from both Apple silicon and Intel-based"
+        },
+        {
+          "type": "text",
+          "text": " "
+        },
+        {
+          "type": "text",
+          "text": "Mac computers."
+        }
+      ],
+      "url": "/documentation/apple-silicon/tuning-your-code-s-performance-for-apple-silicon",
+      "kind": "article",
+      "role": "article"
+    },
+    "doc://com.apple.documentation/documentation/Contacts": {
+      "type": "topic",
+      "identifier": "doc://com.apple.documentation/documentation/Contacts",
+      "url": "/documentation/Contacts",
+      "role": "collection",
+      "title": "Contacts",
+      "abstract": [
+        {
+          "text": "Access the user’s contacts, and format and localize contact information.",
+          "type": "text"
+        }
+      ],
+      "kind": "symbol"
+    },
+    "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/porting-your-audio-code-to-apple-silicon": {
+      "type": "topic",
+      "identifier": "doc://com.apple.Apple-Silicon/documentation/Apple-Silicon/porting-your-audio-code-to-apple-silicon",
+      "url": "/documentation/apple-silicon/porting-your-audio-code-to-apple-silicon",
+      "role": "article",
+      "title": "Porting your audio code to Apple silicon",
+      "abstract": [
+        {
+          "text": "Eliminate issues in your audio-specific code when running on Apple silicon Mac computers.",
+          "type": "text"
+        }
+      ],
+      "kind": "article"
+    }
+  },
+  "legalNotices": {
+    "copyright": "Copyright &copy; 2025 Apple Inc. All rights reserved.",
+    "termsOfUse": "https://www.apple.com/legal/internet-services/terms/site.html",
+    "privacyPolicy": "https://www.apple.com/privacy/privacy-policy"
+  }
+}

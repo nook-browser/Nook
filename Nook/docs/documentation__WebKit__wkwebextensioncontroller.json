@@ -1,0 +1,3485 @@
+{
+  "abstract": [
+    {
+      "text": "An object that manages a set of loaded extension contexts.",
+      "type": "text"
+    }
+  ],
+  "schemaVersion": {
+    "major": 0,
+    "minor": 3,
+    "patch": 0
+  },
+  "hierarchy": {
+    "paths": [
+      [
+        "doc://com.apple.documentation/documentation/technologies",
+        "doc://com.apple.webkit/documentation/WebKit"
+      ]
+    ]
+  },
+  "variants": [
+    {
+      "traits": [
+        {
+          "interfaceLanguage": "swift"
+        }
+      ],
+      "paths": [
+        "/documentation/webkit/wkwebextensioncontroller"
+      ]
+    },
+    {
+      "traits": [
+        {
+          "interfaceLanguage": "occ"
+        }
+      ],
+      "paths": [
+        "/documentation/webkit/wkwebextensioncontroller"
+      ]
+    }
+  ],
+  "sections": [],
+  "relationshipsSections": [
+    {
+      "kind": "relationships",
+      "title": "Inherits From",
+      "identifiers": [
+        "doc://com.externally.resolved.symbol/c:objc(cs)NSObject"
+      ],
+      "type": "inheritsFrom"
+    },
+    {
+      "kind": "relationships",
+      "title": "Conforms To",
+      "identifiers": [
+        "doc://com.externally.resolved.symbol/s:s7CVarArgP",
+        "doc://com.externally.resolved.symbol/s:s28CustomDebugStringConvertibleP",
+        "doc://com.externally.resolved.symbol/s:s23CustomStringConvertibleP",
+        "doc://com.externally.resolved.symbol/s:SQ",
+        "doc://com.externally.resolved.symbol/s:SH",
+        "doc://com.externally.resolved.symbol/c:objc(pl)NSObject",
+        "doc://com.externally.resolved.symbol/s:s8SendableP"
+      ],
+      "type": "conformsTo"
+    }
+  ],
+  "kind": "symbol",
+  "metadata": {
+    "roleHeading": "Class",
+    "role": "symbol",
+    "externalID": "c:objc(cs)WKWebExtensionController",
+    "platforms": [
+      {
+        "introducedAt": "18.4",
+        "name": "iOS",
+        "deprecated": false,
+        "beta": false,
+        "unavailable": false
+      },
+      {
+        "introducedAt": "18.4",
+        "name": "iPadOS",
+        "deprecated": false,
+        "beta": false,
+        "unavailable": false
+      },
+      {
+        "introducedAt": "18.4",
+        "name": "Mac Catalyst",
+        "deprecated": false,
+        "beta": false,
+        "unavailable": false
+      },
+      {
+        "introducedAt": "15.4",
+        "name": "macOS",
+        "deprecated": false,
+        "beta": false,
+        "unavailable": false
+      },
+      {
+        "introducedAt": "2.4",
+        "beta": false,
+        "name": "visionOS",
+        "unavailable": false,
+        "deprecated": false
+      }
+    ],
+    "fragments": [
+      {
+        "text": "class",
+        "kind": "keyword"
+      },
+      {
+        "text": " ",
+        "kind": "text"
+      },
+      {
+        "text": "WKWebExtensionController",
+        "kind": "identifier"
+      }
+    ],
+    "modules": [
+      {
+        "name": "WebKit"
+      }
+    ],
+    "title": "WKWebExtensionController",
+    "symbolKind": "class",
+    "navigatorTitle": [
+      {
+        "text": "WKWebExtensionController",
+        "kind": "identifier"
+      }
+    ]
+  },
+  "topicSections": [
+    {
+      "generated": true,
+      "title": "Initializers",
+      "anchor": "Initializers",
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/init()",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/init(configuration:)"
+      ]
+    },
+    {
+      "generated": true,
+      "title": "Instance Properties",
+      "anchor": "Instance-Properties",
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/configuration-swift.property",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/delegate",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/extensionContexts",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/extensions"
+      ]
+    },
+    {
+      "generated": true,
+      "title": "Instance Methods",
+      "anchor": "Instance-Methods",
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didActivateTab(_:previousActiveTab:)",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didChangeTabProperties(_:for:)",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didCloseTab(_:windowIsClosing:)",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didCloseWindow(_:)",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didDeselectTabs(_:)",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didFocusWindow(_:)",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didMoveTab(_:from:in:)",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didOpenTab(_:)",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didOpenWindow(_:)",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didReplaceTab(_:with:)",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didSelectTabs(_:)",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/extensionContext(for:)-2kr4",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/extensionContext(for:)-6ecpm",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/fetchDataRecord(ofTypes:for:completionHandler:)",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/fetchDataRecords(ofTypes:completionHandler:)",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/load(_:)",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/removeData(ofTypes:from:completionHandler:)",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/unload(_:)"
+      ]
+    },
+    {
+      "generated": true,
+      "title": "Type Properties",
+      "anchor": "Type-Properties",
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/allExtensionDataTypes"
+      ]
+    }
+  ],
+  "identifier": {
+    "interfaceLanguage": "swift",
+    "url": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController"
+  },
+  "primaryContentSections": [
+    {
+      "declarations": [
+        {
+          "tokens": [
+            {
+              "text": "@",
+              "kind": "attribute"
+            },
+            {
+              "preciseIdentifier": "s:ScM",
+              "text": "MainActor",
+              "kind": "attribute",
+              "identifier": "doc://com.externally.resolved.symbol/s:ScM"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "class",
+              "kind": "keyword"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "WKWebExtensionController",
+              "kind": "identifier"
+            }
+          ],
+          "platforms": [
+            "iOS",
+            "iPadOS",
+            "Mac Catalyst",
+            "macOS",
+            "visionOS"
+          ],
+          "languages": [
+            "swift"
+          ]
+        }
+      ],
+      "kind": "declarations"
+    },
+    {
+      "content": [
+        {
+          "anchor": "overview",
+          "level": 2,
+          "type": "heading",
+          "text": "Overview"
+        },
+        {
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "You can have one or more extension controller instances, allowing different parts of the app to use different sets of extensions."
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "inlineContent": [
+            {
+              "text": "You can associate a controller with ",
+              "type": "text"
+            },
+            {
+              "isActive": true,
+              "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebView",
+              "type": "reference"
+            },
+            {
+              "text": " using the ",
+              "type": "text"
+            },
+            {
+              "isActive": true,
+              "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/webExtensionController",
+              "type": "reference"
+            },
+            {
+              "type": "text",
+              "text": " property on "
+            },
+            {
+              "isActive": true,
+              "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration",
+              "type": "reference"
+            },
+            {
+              "type": "text",
+              "text": "."
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "kind": "content"
+    }
+  ],
+  "seeAlsoSections": [
+    {
+      "anchor": "Web-extensions",
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtension",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionTab",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionWindow",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionContext",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionControllerDelegate"
+      ],
+      "title": "Web extensions",
+      "generated": true
+    }
+  ],
+  "references": {
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/extensions": {
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/extensions",
+      "type": "topic",
+      "url": "/documentation/webkit/wkwebextensioncontroller/extensions",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A set of all the currently loaded extensions."
+        }
+      ],
+      "kind": "symbol",
+      "title": "extensions",
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "text": "extensions",
+          "kind": "identifier"
+        }
+      ],
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "extensions",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "preciseIdentifier": "s:Sh",
+          "text": "Set",
+          "kind": "typeIdentifier"
+        },
+        {
+          "text": "<",
+          "kind": "text"
+        },
+        {
+          "preciseIdentifier": "c:objc(cs)WKWebExtension",
+          "text": "WKWebExtension",
+          "kind": "typeIdentifier"
+        },
+        {
+          "text": ">",
+          "kind": "text"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didOpenWindow(_:)": {
+      "navigatorTitle": [
+        {
+          "text": "didOpenWindow:",
+          "kind": "identifier"
+        }
+      ],
+      "url": "/documentation/webkit/wkwebextensioncontroller/didopenwindow(_:)",
+      "kind": "symbol",
+      "title": "didOpenWindow(_:)",
+      "fragments": [
+        {
+          "text": "func",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "didOpenWindow",
+          "kind": "identifier"
+        },
+        {
+          "text": "(any ",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtensionWindow",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(pl)WKWebExtensionWindow"
+        },
+        {
+          "text": ")",
+          "kind": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didOpenWindow(_:)",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Should be called by the app when a new window is opened to fire appropriate events with all loaded web extensions."
+        }
+      ],
+      "type": "topic",
+      "role": "symbol"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didMoveTab:fromIndex:inWindow:": {
+      "navigatorTitle": [
+        {
+          "text": "didMoveTab:fromIndex:inWindow:",
+          "kind": "identifier"
+        }
+      ],
+      "url": "/documentation/webkit/wkwebextensioncontroller/didmovetab:fromindex:inwindow:",
+      "kind": "symbol",
+      "title": "didMoveTab:fromIndex:inWindow:",
+      "fragments": [
+        {
+          "text": "- ",
+          "kind": "text"
+        },
+        {
+          "text": "didMoveTab:fromIndex:inWindow:",
+          "kind": "identifier"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didMoveTab:fromIndex:inWindow:",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Should be called by the app when a tab is moved to fire appropriate events with all loaded web extensions."
+        }
+      ],
+      "type": "topic",
+      "role": "symbol"
+    },
+    "doc://com.externally.resolved.symbol/s:s28CustomDebugStringConvertibleP": {
+      "title": "CustomDebugStringConvertible",
+      "identifier": "doc://com.externally.resolved.symbol/s:s28CustomDebugStringConvertibleP",
+      "type": "topic",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "CustomDebugStringConvertible"
+        }
+      ],
+      "role": "symbol",
+      "url": "/documentation/Swift/CustomDebugStringConvertible",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A type with a customized textual representation suitable for debugging purposes.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didOpenTab(_:)": {
+      "navigatorTitle": [
+        {
+          "text": "didOpenTab:",
+          "kind": "identifier"
+        }
+      ],
+      "url": "/documentation/webkit/wkwebextensioncontroller/didopentab(_:)",
+      "kind": "symbol",
+      "title": "didOpenTab(_:)",
+      "fragments": [
+        {
+          "text": "func",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "didOpenTab",
+          "kind": "identifier"
+        },
+        {
+          "text": "(any ",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtensionTab",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(pl)WKWebExtensionTab"
+        },
+        {
+          "text": ")",
+          "kind": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didOpenTab(_:)",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Should be called by the app when a new tab is opened to fire appropriate events with all loaded web extensions."
+        }
+      ],
+      "type": "topic",
+      "role": "symbol"
+    },
+    "doc://com.externally.resolved.symbol/s:s8SendableP": {
+      "identifier": "doc://com.externally.resolved.symbol/s:s8SendableP",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A thread-safe type whose values can be shared across arbitrary concurrent contexts without introducing a risk of data races.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/Swift/Sendable",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "Sendable"
+        },
+        {
+          "kind": "text",
+          "text": " : "
+        },
+        {
+          "kind": "typeIdentifier",
+          "text": "SendableMetatype",
+          "preciseIdentifier": "s:s16SendableMetatypeP"
+        }
+      ],
+      "role": "symbol",
+      "title": "Sendable",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionWindow": {
+      "type": "topic",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtensionWindow",
+          "kind": "identifier"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionWindow",
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "text": "WKWebExtensionWindow",
+          "kind": "identifier"
+        }
+      ],
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A protocol with methods that represent a window to web extensions."
+        }
+      ],
+      "title": "WKWebExtensionWindow",
+      "url": "/documentation/webkit/wkwebextensionwindow"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/delegate": {
+      "navigatorTitle": [
+        {
+          "text": "delegate",
+          "kind": "identifier"
+        }
+      ],
+      "url": "/documentation/webkit/wkwebextensioncontroller/delegate",
+      "kind": "symbol",
+      "title": "delegate",
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "delegate",
+          "kind": "identifier"
+        },
+        {
+          "text": ": (any ",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtensionControllerDelegate",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(pl)WKWebExtensionControllerDelegate"
+        },
+        {
+          "text": ")?",
+          "kind": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/delegate",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The extension controller delegate."
+        }
+      ],
+      "type": "topic",
+      "role": "symbol"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/extensionContext(for:)-6ecpm": {
+      "navigatorTitle": [
+        {
+          "text": "extensionContextForExtension:",
+          "kind": "identifier"
+        }
+      ],
+      "url": "/documentation/webkit/wkwebextensioncontroller/extensioncontext(for:)-6ecpm",
+      "kind": "symbol",
+      "title": "extensionContext(for:)",
+      "fragments": [
+        {
+          "text": "func",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "extensionContext",
+          "kind": "identifier"
+        },
+        {
+          "text": "(",
+          "kind": "text"
+        },
+        {
+          "text": "for",
+          "kind": "externalParam"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtension",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(cs)WKWebExtension"
+        },
+        {
+          "text": ") -> ",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtensionContext",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(cs)WKWebExtensionContext"
+        },
+        {
+          "text": "?",
+          "kind": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/extensionContext(for:)-6ecpm",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Returns a loaded extension context for the specified extension."
+        }
+      ],
+      "type": "topic",
+      "role": "symbol"
+    },
+    "doc://com.externally.resolved.symbol/s:SH": {
+      "identifier": "doc://com.externally.resolved.symbol/s:SH",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A type that can be hashed into a `Hasher` to produce an integer hash value.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/Swift/Hashable",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "kind": "identifier",
+          "text": "Hashable"
+        },
+        {
+          "kind": "text",
+          "text": " : "
+        },
+        {
+          "kind": "typeIdentifier",
+          "text": "Equatable",
+          "preciseIdentifier": "s:SQ"
+        }
+      ],
+      "role": "symbol",
+      "title": "Hashable",
+      "type": "topic"
+    },
+    "doc://com.externally.resolved.symbol/s:ScM": {
+      "identifier": "doc://com.externally.resolved.symbol/s:ScM",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A singleton actor whose executor is equivalent to the main dispatch queue."
+        }
+      ],
+      "url": "/documentation/Swift/MainActor",
+      "fragments": [
+        {
+          "kind": "attribute",
+          "text": "@globalActor"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "keyword",
+          "text": "final"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "keyword",
+          "text": "actor"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "MainActor"
+        }
+      ],
+      "role": "symbol",
+      "title": "MainActor",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didDeselectTabs(_:)": {
+      "navigatorTitle": [
+        {
+          "text": "didDeselectTabs:",
+          "kind": "identifier"
+        }
+      ],
+      "url": "/documentation/webkit/wkwebextensioncontroller/diddeselecttabs(_:)",
+      "kind": "symbol",
+      "title": "didDeselectTabs(_:)",
+      "fragments": [
+        {
+          "text": "func",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "didDeselectTabs",
+          "kind": "identifier"
+        },
+        {
+          "text": "([any ",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtensionTab",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(pl)WKWebExtensionTab"
+        },
+        {
+          "text": "])",
+          "kind": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didDeselectTabs(_:)",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Should be called by the app when tabs are deselected to fire appropriate events with all loaded web extensions."
+        }
+      ],
+      "type": "topic",
+      "role": "symbol"
+    },
+    "doc://com.apple.webkit/documentation/WebKit": {
+      "identifier": "doc://com.apple.webkit/documentation/WebKit",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "Integrate web content seamlessly into your app, and customize content interactions to meet your app’s needs.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/webkit",
+      "role": "collection",
+      "title": "WebKit",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/unload(_:)": {
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "func"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "unload"
+        },
+        {
+          "kind": "text",
+          "text": "("
+        },
+        {
+          "kind": "typeIdentifier",
+          "text": "WKWebExtensionContext",
+          "preciseIdentifier": "c:objc(cs)WKWebExtensionContext"
+        },
+        {
+          "kind": "text",
+          "text": ") "
+        },
+        {
+          "kind": "keyword",
+          "text": "throws"
+        }
+      ],
+      "kind": "symbol",
+      "type": "topic",
+      "url": "/documentation/webkit/wkwebextensioncontroller/unload(_:)",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Unloads the specified extension context."
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "unloadExtensionContext:error:"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/unload(_:)",
+      "title": "unload(_:)",
+      "role": "symbol"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/removeData(ofTypes:from:completionHandler:)": {
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/removeData(ofTypes:from:completionHandler:)",
+      "type": "topic",
+      "url": "/documentation/webkit/wkwebextensioncontroller/removedata(oftypes:from:completionhandler:)",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Removes extension data of the given types for the given data records."
+        }
+      ],
+      "kind": "symbol",
+      "title": "removeData(ofTypes:from:completionHandler:)",
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "text": "removeDataOfTypes:fromDataRecords:completionHandler:",
+          "kind": "identifier"
+        }
+      ],
+      "fragments": [
+        {
+          "text": "func",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "removeData",
+          "kind": "identifier"
+        },
+        {
+          "text": "(",
+          "kind": "text"
+        },
+        {
+          "text": "ofTypes",
+          "kind": "externalParam"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "text": "Set",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:Sh"
+        },
+        {
+          "text": "<",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtension",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(cs)WKWebExtension"
+        },
+        {
+          "text": ".",
+          "kind": "text"
+        },
+        {
+          "text": "DataType",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:@T@WKWebExtensionDataType"
+        },
+        {
+          "text": ">, ",
+          "kind": "text"
+        },
+        {
+          "text": "from",
+          "kind": "externalParam"
+        },
+        {
+          "text": ": [",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtension",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(cs)WKWebExtension"
+        },
+        {
+          "text": ".",
+          "kind": "text"
+        },
+        {
+          "text": "DataRecord",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(cs)WKWebExtensionDataRecord"
+        },
+        {
+          "text": "], ",
+          "kind": "text"
+        },
+        {
+          "text": "completionHandler",
+          "kind": "externalParam"
+        },
+        {
+          "text": ": () -> ",
+          "kind": "text"
+        },
+        {
+          "text": "Void",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:s4Voida"
+        },
+        {
+          "text": ")",
+          "kind": "text"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/extensionContext(for:)-2kr4": {
+      "fragments": [
+        {
+          "text": "func",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "extensionContext",
+          "kind": "identifier"
+        },
+        {
+          "text": "(",
+          "kind": "text"
+        },
+        {
+          "text": "for",
+          "kind": "externalParam"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "text": "URL",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:10Foundation3URLV"
+        },
+        {
+          "text": ") -> ",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtensionContext",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(cs)WKWebExtensionContext"
+        },
+        {
+          "text": "?",
+          "kind": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/extensionContext(for:)-2kr4",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Returns a loaded extension context matching the specified URL."
+        }
+      ],
+      "url": "/documentation/webkit/wkwebextensioncontroller/extensioncontext(for:)-2kr4",
+      "navigatorTitle": [
+        {
+          "text": "extensionContextForURL:",
+          "kind": "identifier"
+        }
+      ],
+      "role": "symbol",
+      "title": "extensionContext(for:)",
+      "type": "topic",
+      "kind": "symbol"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/allExtensionDataTypes": {
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "allExtensionDataTypes",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "text": "Set",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:Sh"
+        },
+        {
+          "text": "<",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtension",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(cs)WKWebExtension"
+        },
+        {
+          "text": ".",
+          "kind": "text"
+        },
+        {
+          "text": "DataType",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:@T@WKWebExtensionDataType"
+        },
+        {
+          "text": ">",
+          "kind": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/allExtensionDataTypes",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Returns a set of all available extension data types."
+        }
+      ],
+      "url": "/documentation/webkit/wkwebextensioncontroller/allextensiondatatypes",
+      "navigatorTitle": [
+        {
+          "text": "allExtensionDataTypes",
+          "kind": "identifier"
+        }
+      ],
+      "role": "symbol",
+      "title": "allExtensionDataTypes",
+      "type": "topic",
+      "kind": "symbol"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionTab": {
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "WKWebExtensionTab"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionTab",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A protocol with methods that represent a tab to web extensions."
+        }
+      ],
+      "url": "/documentation/webkit/wkwebextensiontab",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "protocol"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "WKWebExtensionTab"
+        }
+      ],
+      "role": "symbol",
+      "title": "WKWebExtensionTab",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionContext": {
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "WKWebExtensionContext"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionContext",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object that represents the runtime environment for a web extension."
+        }
+      ],
+      "url": "/documentation/webkit/wkwebextensioncontext",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "WKWebExtensionContext"
+        }
+      ],
+      "role": "symbol",
+      "title": "WKWebExtensionContext",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/init(configuration:)": {
+      "fragments": [
+        {
+          "text": "init",
+          "kind": "identifier"
+        },
+        {
+          "text": "(",
+          "kind": "text"
+        },
+        {
+          "text": "configuration",
+          "kind": "externalParam"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtensionController",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(cs)WKWebExtensionController"
+        },
+        {
+          "text": ".",
+          "kind": "text"
+        },
+        {
+          "text": "Configuration",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(cs)WKWebExtensionControllerConfiguration"
+        },
+        {
+          "text": ")",
+          "kind": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/init(configuration:)",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Returns a web extension controller initialized with the specified configuration."
+        }
+      ],
+      "url": "/documentation/webkit/wkwebextensioncontroller/init(configuration:)",
+      "navigatorTitle": [
+        {
+          "text": "initWithConfiguration:",
+          "kind": "identifier"
+        }
+      ],
+      "role": "symbol",
+      "title": "init(configuration:)",
+      "type": "topic",
+      "kind": "symbol"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didMoveTab(_:from:in:)": {
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didMoveTab(_:from:in:)",
+      "type": "topic",
+      "url": "/documentation/webkit/wkwebextensioncontroller/didmovetab(_:from:in:)",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Should be called by the app when a tab is moved to fire appropriate events with all loaded web extensions."
+        }
+      ],
+      "kind": "symbol",
+      "title": "didMoveTab(_:from:in:)",
+      "role": "symbol",
+      "fragments": [
+        {
+          "text": "func",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "didMoveTab",
+          "kind": "identifier"
+        },
+        {
+          "text": "(any ",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtensionTab",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(pl)WKWebExtensionTab"
+        },
+        {
+          "text": ", ",
+          "kind": "text"
+        },
+        {
+          "text": "from",
+          "kind": "externalParam"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "text": "Int",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:Si"
+        },
+        {
+          "text": ", ",
+          "kind": "text"
+        },
+        {
+          "text": "in",
+          "kind": "externalParam"
+        },
+        {
+          "text": ": (any ",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtensionWindow",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(pl)WKWebExtensionWindow"
+        },
+        {
+          "text": ")?)",
+          "kind": "text"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/fetchDataRecord(ofTypes:for:completionHandler:)": {
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/fetchDataRecord(ofTypes:for:completionHandler:)",
+      "type": "topic",
+      "url": "/documentation/webkit/wkwebextensioncontroller/fetchdatarecord(oftypes:for:completionhandler:)",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Fetches a data record containing the given extension data types for a specific known web extension context."
+        }
+      ],
+      "kind": "symbol",
+      "title": "fetchDataRecord(ofTypes:for:completionHandler:)",
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "fetchDataRecordOfTypes:forExtensionContext:completionHandler:"
+        }
+      ],
+      "fragments": [
+        {
+          "text": "func",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "fetchDataRecord",
+          "kind": "identifier"
+        },
+        {
+          "text": "(",
+          "kind": "text"
+        },
+        {
+          "text": "ofTypes",
+          "kind": "externalParam"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "text": "Set",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:Sh"
+        },
+        {
+          "text": "<",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtension",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(cs)WKWebExtension"
+        },
+        {
+          "text": ".",
+          "kind": "text"
+        },
+        {
+          "text": "DataType",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:@T@WKWebExtensionDataType"
+        },
+        {
+          "text": ">, ",
+          "kind": "text"
+        },
+        {
+          "text": "for",
+          "kind": "externalParam"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtensionContext",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(cs)WKWebExtensionContext"
+        },
+        {
+          "text": ", ",
+          "kind": "text"
+        },
+        {
+          "text": "completionHandler",
+          "kind": "externalParam"
+        },
+        {
+          "text": ": (",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtension",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(cs)WKWebExtension"
+        },
+        {
+          "text": ".",
+          "kind": "text"
+        },
+        {
+          "text": "DataRecord",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(cs)WKWebExtensionDataRecord"
+        },
+        {
+          "kind": "text",
+          "text": "?) -> "
+        },
+        {
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:s4Voida",
+          "text": "Void"
+        },
+        {
+          "kind": "text",
+          "text": ")"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/init()": {
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/init()",
+      "type": "topic",
+      "url": "/documentation/webkit/wkwebextensioncontroller/init()",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Returns a web extension controller initialized with the default configuration."
+        }
+      ],
+      "kind": "symbol",
+      "title": "init()",
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "text": "init",
+          "kind": "identifier"
+        }
+      ],
+      "fragments": [
+        {
+          "text": "init",
+          "kind": "identifier"
+        },
+        {
+          "text": "()",
+          "kind": "text"
+        }
+      ]
+    },
+    "doc://com.externally.resolved.symbol/s:s23CustomStringConvertibleP": {
+      "url": "/documentation/Swift/CustomStringConvertible",
+      "kind": "symbol",
+      "identifier": "doc://com.externally.resolved.symbol/s:s23CustomStringConvertibleP",
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A type with a customized textual representation."
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "protocol"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "CustomStringConvertible"
+        }
+      ],
+      "type": "topic",
+      "title": "CustomStringConvertible"
+    },
+    "doc://com.externally.resolved.symbol/c:objc(pl)NSObject": {
+      "identifier": "doc://com.externally.resolved.symbol/c:objc(pl)NSObject",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "The group of methods that are fundamental to all Objective-C objects.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/ObjectiveC/NSObjectProtocol",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "NSObjectProtocol",
+          "kind": "identifier"
+        }
+      ],
+      "role": "symbol",
+      "title": "NSObjectProtocol",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didActivateTab(_:previousActiveTab:)": {
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didActivateTab(_:previousActiveTab:)",
+      "type": "topic",
+      "url": "/documentation/webkit/wkwebextensioncontroller/didactivatetab(_:previousactivetab:)",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Should be called by the app when a tab is activated to notify all loaded web extensions."
+        }
+      ],
+      "kind": "symbol",
+      "title": "didActivateTab(_:previousActiveTab:)",
+      "role": "symbol",
+      "fragments": [
+        {
+          "text": "func",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "didActivateTab",
+          "kind": "identifier"
+        },
+        {
+          "text": "(any ",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtensionTab",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(pl)WKWebExtensionTab"
+        },
+        {
+          "text": ", ",
+          "kind": "text"
+        },
+        {
+          "text": "previousActiveTab",
+          "kind": "externalParam"
+        },
+        {
+          "text": ": (any ",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtensionTab",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(pl)WKWebExtensionTab"
+        },
+        {
+          "text": ")?)",
+          "kind": "text"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionControllerDelegate": {
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionControllerDelegate",
+      "type": "topic",
+      "url": "/documentation/webkit/wkwebextensioncontrollerdelegate",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A group of methods you use to customize web extension interactions."
+        }
+      ],
+      "kind": "symbol",
+      "title": "WKWebExtensionControllerDelegate",
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "text": "WKWebExtensionControllerDelegate",
+          "kind": "identifier"
+        }
+      ],
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtensionControllerDelegate",
+          "kind": "identifier"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didReplaceTab(_:with:)": {
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didReplaceTab(_:with:)",
+      "type": "topic",
+      "url": "/documentation/webkit/wkwebextensioncontroller/didreplacetab(_:with:)",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Should be called by the app when a tab is replaced by another tab to fire appropriate events with all loaded web extensions."
+        }
+      ],
+      "kind": "symbol",
+      "title": "didReplaceTab(_:with:)",
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "didReplaceTab:withTab:"
+        }
+      ],
+      "fragments": [
+        {
+          "text": "func",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "didReplaceTab",
+          "kind": "identifier"
+        },
+        {
+          "text": "(any ",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtensionTab",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(pl)WKWebExtensionTab"
+        },
+        {
+          "text": ", ",
+          "kind": "text"
+        },
+        {
+          "text": "with",
+          "kind": "externalParam"
+        },
+        {
+          "text": ": any ",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtensionTab",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(pl)WKWebExtensionTab"
+        },
+        {
+          "text": ")",
+          "kind": "text"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/webExtensionController": {
+      "role": "symbol",
+      "abstract": [],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "var"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "webExtensionController",
+          "kind": "identifier"
+        },
+        {
+          "kind": "text",
+          "text": ": "
+        },
+        {
+          "text": "WKWebExtensionController",
+          "preciseIdentifier": "c:objc(cs)WKWebExtensionController",
+          "kind": "typeIdentifier"
+        },
+        {
+          "text": "?",
+          "kind": "text"
+        }
+      ],
+      "url": "/documentation/webkit/wkwebviewconfiguration/webextensioncontroller",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "webExtensionController"
+        }
+      ],
+      "title": "webExtensionController",
+      "type": "topic",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration/webExtensionController",
+      "kind": "symbol"
+    },
+    "doc://com.apple.documentation/documentation/technologies": {
+      "identifier": "doc://com.apple.documentation/documentation/technologies",
+      "kind": "technologies",
+      "abstract": [
+        {
+          "text": "",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/technologies",
+      "role": "overview",
+      "title": "Technologies",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController": {
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "WKWebExtensionController"
+        }
+      ],
+      "role": "symbol",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController",
+      "url": "/documentation/webkit/wkwebextensioncontroller",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "WKWebExtensionController"
+        }
+      ],
+      "title": "WKWebExtensionController",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object that manages a set of loaded extension contexts."
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didCloseTab:windowIsClosing:": {
+      "title": "didCloseTab:windowIsClosing:",
+      "navigatorTitle": [
+        {
+          "text": "didCloseTab:windowIsClosing:",
+          "kind": "identifier"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didCloseTab:windowIsClosing:",
+      "kind": "symbol",
+      "url": "/documentation/webkit/wkwebextensioncontroller/didclosetab:windowisclosing:",
+      "fragments": [
+        {
+          "text": "- ",
+          "kind": "text"
+        },
+        {
+          "text": "didCloseTab:windowIsClosing:",
+          "kind": "identifier"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "Should be called by the app when a tab is closed to fire appropriate events with all loaded web extensions.",
+          "type": "text"
+        }
+      ],
+      "type": "topic",
+      "role": "symbol"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebView": {
+      "title": "WKWebView",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebView",
+      "type": "topic",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "WKWebView"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "WKWebView"
+        }
+      ],
+      "role": "symbol",
+      "url": "/documentation/webkit/wkwebview",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object that displays interactive web content, such as for an in-app browser."
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didCloseTab(_:windowIsClosing:)": {
+      "title": "didCloseTab(_:windowIsClosing:)",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didCloseTab(_:windowIsClosing:)",
+      "kind": "symbol",
+      "url": "/documentation/webkit/wkwebextensioncontroller/didclosetab(_:windowisclosing:)",
+      "fragments": [
+        {
+          "text": "func",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "didCloseTab",
+          "kind": "identifier"
+        },
+        {
+          "text": "(any ",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtensionTab",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(pl)WKWebExtensionTab"
+        },
+        {
+          "text": ", ",
+          "kind": "text"
+        },
+        {
+          "text": "windowIsClosing",
+          "kind": "externalParam"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "text": "Bool",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:Sb"
+        },
+        {
+          "kind": "text",
+          "text": ")"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "Should be called by the app when a tab is closed to fire appropriate events with all loaded web extensions.",
+          "type": "text"
+        }
+      ],
+      "type": "topic",
+      "role": "symbol"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didActivateTab:previousActiveTab:": {
+      "title": "didActivateTab:previousActiveTab:",
+      "navigatorTitle": [
+        {
+          "text": "didActivateTab:previousActiveTab:",
+          "kind": "identifier"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didActivateTab:previousActiveTab:",
+      "kind": "symbol",
+      "url": "/documentation/webkit/wkwebextensioncontroller/didactivatetab:previousactivetab:",
+      "fragments": [
+        {
+          "text": "- ",
+          "kind": "text"
+        },
+        {
+          "text": "didActivateTab:previousActiveTab:",
+          "kind": "identifier"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "Should be called by the app when a tab is activated to notify all loaded web extensions.",
+          "type": "text"
+        }
+      ],
+      "type": "topic",
+      "role": "symbol"
+    },
+    "doc://com.externally.resolved.symbol/c:objc(cs)NSObject": {
+      "url": "/documentation/ObjectiveC/NSObject-swift.class",
+      "kind": "symbol",
+      "identifier": "doc://com.externally.resolved.symbol/c:objc(cs)NSObject",
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The root class of most Objective-C class hierarchies, from which subclasses inherit a basic interface to the runtime system and the ability to behave as Objective-C objects."
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "NSObject"
+        }
+      ],
+      "type": "topic",
+      "title": "NSObject"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/load(_:)": {
+      "title": "load(_:)",
+      "navigatorTitle": [
+        {
+          "text": "loadExtensionContext:error:",
+          "kind": "identifier"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/load(_:)",
+      "kind": "symbol",
+      "url": "/documentation/webkit/wkwebextensioncontroller/load(_:)",
+      "fragments": [
+        {
+          "text": "func",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "load",
+          "kind": "identifier"
+        },
+        {
+          "text": "(",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtensionContext",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(cs)WKWebExtensionContext"
+        },
+        {
+          "text": ") ",
+          "kind": "text"
+        },
+        {
+          "text": "throws",
+          "kind": "keyword"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "Loads the specified extension context.",
+          "type": "text"
+        }
+      ],
+      "type": "topic",
+      "role": "symbol"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/configuration-swift.property": {
+      "title": "configuration",
+      "navigatorTitle": [
+        {
+          "text": "configuration",
+          "kind": "identifier"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/configuration-swift.property",
+      "kind": "symbol",
+      "url": "/documentation/webkit/wkwebextensioncontroller/configuration-swift.property",
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "configuration",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtensionController",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(cs)WKWebExtensionController"
+        },
+        {
+          "text": ".",
+          "kind": "text"
+        },
+        {
+          "preciseIdentifier": "c:objc(cs)WKWebExtensionControllerConfiguration",
+          "text": "Configuration",
+          "kind": "typeIdentifier"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "A copy of the configuration with which the web extension controller was initialized.",
+          "type": "text"
+        }
+      ],
+      "type": "topic",
+      "role": "symbol"
+    },
+    "doc://com.externally.resolved.symbol/s:SQ": {
+      "identifier": "doc://com.externally.resolved.symbol/s:SQ",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A type that can be compared for value equality.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/Swift/Equatable",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "Equatable",
+          "kind": "identifier"
+        }
+      ],
+      "role": "symbol",
+      "title": "Equatable",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didChangeTabProperties(_:for:)": {
+      "title": "didChangeTabProperties(_:for:)",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "didChangeTabProperties:forTab:"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didChangeTabProperties(_:for:)",
+      "kind": "symbol",
+      "url": "/documentation/webkit/wkwebextensioncontroller/didchangetabproperties(_:for:)",
+      "fragments": [
+        {
+          "text": "func",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "didChangeTabProperties",
+          "kind": "identifier"
+        },
+        {
+          "text": "(",
+          "kind": "text"
+        },
+        {
+          "preciseIdentifier": "c:objc(cs)WKWebExtension",
+          "text": "WKWebExtension",
+          "kind": "typeIdentifier"
+        },
+        {
+          "text": ".",
+          "kind": "text"
+        },
+        {
+          "text": "TabChangedProperties",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:@E@WKWebExtensionTabChangedProperties"
+        },
+        {
+          "text": ", ",
+          "kind": "text"
+        },
+        {
+          "text": "for",
+          "kind": "externalParam"
+        },
+        {
+          "kind": "text",
+          "text": ": any "
+        },
+        {
+          "kind": "typeIdentifier",
+          "text": "WKWebExtensionTab",
+          "preciseIdentifier": "c:objc(pl)WKWebExtensionTab"
+        },
+        {
+          "kind": "text",
+          "text": ")"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "Should be called by the app when the properties of a tab are changed to fire appropriate events with all loaded web extensions.",
+          "type": "text"
+        }
+      ],
+      "type": "topic",
+      "role": "symbol"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didSelectTabs(_:)": {
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didSelectTabs(_:)",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "text": "func",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "kind": "identifier",
+          "text": "didSelectTabs"
+        },
+        {
+          "text": "([any ",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtensionTab",
+          "preciseIdentifier": "c:objc(pl)WKWebExtensionTab",
+          "kind": "typeIdentifier"
+        },
+        {
+          "kind": "text",
+          "text": "])"
+        }
+      ],
+      "url": "/documentation/webkit/wkwebextensioncontroller/didselecttabs(_:)",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Should be called by the app when tabs are selected to fire appropriate events with all loaded web extensions."
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "text": "didSelectTabs:",
+          "kind": "identifier"
+        }
+      ],
+      "type": "topic",
+      "title": "didSelectTabs(_:)",
+      "role": "symbol"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didCloseWindow(_:)": {
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "text": "didCloseWindow:",
+          "kind": "identifier"
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "func"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "didCloseWindow",
+          "kind": "identifier"
+        },
+        {
+          "text": "(any ",
+          "kind": "text"
+        },
+        {
+          "preciseIdentifier": "c:objc(pl)WKWebExtensionWindow",
+          "text": "WKWebExtensionWindow",
+          "kind": "typeIdentifier"
+        },
+        {
+          "text": ")",
+          "kind": "text"
+        }
+      ],
+      "title": "didCloseWindow(_:)",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didCloseWindow(_:)",
+      "url": "/documentation/webkit/wkwebextensioncontroller/didclosewindow(_:)",
+      "type": "topic",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "Should be called by the app when a window is closed to fire appropriate events with all loaded web extensions.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/extensionContexts": {
+      "title": "extensionContexts",
+      "abstract": [
+        {
+          "text": "A set of all the currently loaded extension contexts.",
+          "type": "text"
+        }
+      ],
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "extensionContexts",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "text": "Set",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:Sh"
+        },
+        {
+          "text": "<",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtensionContext",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(cs)WKWebExtensionContext"
+        },
+        {
+          "kind": "text",
+          "text": ">"
+        }
+      ],
+      "role": "symbol",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/extensionContexts",
+      "type": "topic",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "extensionContexts"
+        }
+      ],
+      "kind": "symbol",
+      "url": "/documentation/webkit/wkwebextensioncontroller/extensioncontexts"
+    },
+    "doc://com.externally.resolved.symbol/s:s7CVarArgP": {
+      "title": "CVarArg",
+      "identifier": "doc://com.externally.resolved.symbol/s:s7CVarArgP",
+      "type": "topic",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "CVarArg"
+        }
+      ],
+      "role": "symbol",
+      "url": "/documentation/Swift/CVarArg",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A type whose instances can be encoded, and appropriately passed, as elements of a C `va_list`.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension": {
+      "url": "/documentation/webkit/wkwebextension",
+      "kind": "symbol",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension",
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "WKWebExtension"
+        }
+      ],
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object that encapsulates a web extension’s resources that the manifest file defines."
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "WKWebExtension"
+        }
+      ],
+      "type": "topic",
+      "title": "WKWebExtension"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/fetchDataRecords(ofTypes:completionHandler:)": {
+      "type": "topic",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/fetchDataRecords(ofTypes:completionHandler:)",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Fetches data records containing the given extension data types for all known extensions."
+        }
+      ],
+      "title": "fetchDataRecords(ofTypes:completionHandler:)",
+      "navigatorTitle": [
+        {
+          "text": "fetchDataRecordsOfTypes:completionHandler:",
+          "kind": "identifier"
+        }
+      ],
+      "kind": "symbol",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "func"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "text": "fetchDataRecords",
+          "kind": "identifier"
+        },
+        {
+          "text": "(",
+          "kind": "text"
+        },
+        {
+          "text": "ofTypes",
+          "kind": "externalParam"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "kind": "typeIdentifier",
+          "text": "Set",
+          "preciseIdentifier": "s:Sh"
+        },
+        {
+          "kind": "text",
+          "text": "<"
+        },
+        {
+          "kind": "typeIdentifier",
+          "text": "WKWebExtension",
+          "preciseIdentifier": "c:objc(cs)WKWebExtension"
+        },
+        {
+          "kind": "text",
+          "text": "."
+        },
+        {
+          "kind": "typeIdentifier",
+          "text": "DataType",
+          "preciseIdentifier": "c:@T@WKWebExtensionDataType"
+        },
+        {
+          "kind": "text",
+          "text": ">, "
+        },
+        {
+          "kind": "externalParam",
+          "text": "completionHandler"
+        },
+        {
+          "kind": "text",
+          "text": ": (["
+        },
+        {
+          "kind": "typeIdentifier",
+          "text": "WKWebExtension",
+          "preciseIdentifier": "c:objc(cs)WKWebExtension"
+        },
+        {
+          "text": ".",
+          "kind": "text"
+        },
+        {
+          "text": "DataRecord",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(cs)WKWebExtensionDataRecord"
+        },
+        {
+          "text": "]) -> ",
+          "kind": "text"
+        },
+        {
+          "text": "Void",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:s4Voida"
+        },
+        {
+          "text": ")",
+          "kind": "text"
+        }
+      ],
+      "url": "/documentation/webkit/wkwebextensioncontroller/fetchdatarecords(oftypes:completionhandler:)",
+      "role": "symbol"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didFocusWindow(_:)": {
+      "url": "/documentation/webkit/wkwebextensioncontroller/didfocuswindow(_:)",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "func"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "text": "didFocusWindow",
+          "kind": "identifier"
+        },
+        {
+          "text": "((any ",
+          "kind": "text"
+        },
+        {
+          "text": "WKWebExtensionWindow",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(pl)WKWebExtensionWindow"
+        },
+        {
+          "text": ")?)",
+          "kind": "text"
+        }
+      ],
+      "kind": "symbol",
+      "title": "didFocusWindow(_:)",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didFocusWindow(_:)",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Should be called by the app when a window gains focus to fire appropriate events with all loaded web extensions."
+        }
+      ],
+      "type": "topic",
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "text": "didFocusWindow:",
+          "kind": "identifier"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration": {
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "WKWebViewConfiguration"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebViewConfiguration",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A collection of properties that you use to initialize a web view.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/webkit/wkwebviewconfiguration",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "WKWebViewConfiguration"
+        }
+      ],
+      "role": "symbol",
+      "title": "WKWebViewConfiguration",
+      "type": "topic"
+    }
+  },
+  "variantOverrides": [
+    {
+      "patch": [
+        {
+          "value": "occ",
+          "path": "/identifier/interfaceLanguage",
+          "op": "replace"
+        },
+        {
+          "path": "/metadata/platforms",
+          "value": [
+            {
+              "unavailable": false,
+              "deprecated": false,
+              "introducedAt": "18.4",
+              "beta": false,
+              "name": "iOS"
+            },
+            {
+              "unavailable": false,
+              "deprecated": false,
+              "introducedAt": "18.4",
+              "beta": false,
+              "name": "iPadOS"
+            },
+            {
+              "unavailable": false,
+              "deprecated": false,
+              "introducedAt": "18.4",
+              "beta": false,
+              "name": "Mac Catalyst"
+            },
+            {
+              "unavailable": false,
+              "deprecated": false,
+              "introducedAt": "15.4",
+              "beta": false,
+              "name": "macOS"
+            },
+            {
+              "unavailable": false,
+              "deprecated": false,
+              "introducedAt": "2.4",
+              "beta": false,
+              "name": "visionOS"
+            }
+          ],
+          "op": "replace"
+        },
+        {
+          "path": "/metadata/roleHeading",
+          "value": "Class",
+          "op": "replace"
+        },
+        {
+          "op": "replace",
+          "path": "/metadata/title",
+          "value": "WKWebExtensionController"
+        },
+        {
+          "op": "replace",
+          "path": "/metadata/symbolKind",
+          "value": "class"
+        },
+        {
+          "op": "replace",
+          "path": "/metadata/fragments",
+          "value": [
+            {
+              "text": "WKWebExtensionController",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "op": "replace",
+          "path": "/metadata/navigatorTitle",
+          "value": [
+            {
+              "text": "WKWebExtensionController",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "op": "replace",
+          "path": "/hierarchy",
+          "value": {
+            "paths": [
+              [
+                "doc://com.apple.documentation/documentation/technologies",
+                "doc://com.apple.webkit/documentation/WebKit"
+              ]
+            ]
+          }
+        },
+        {
+          "op": "replace",
+          "path": "/topicSections",
+          "value": [
+            {
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/configuration-swift.property",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/delegate",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/extensionContexts",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/extensions"
+              ],
+              "anchor": "Instance-Properties",
+              "title": "Instance Properties",
+              "generated": true
+            },
+            {
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didActivateTab:previousActiveTab:",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didChangeTabProperties(_:for:)",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didCloseTab:windowIsClosing:",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didCloseWindow(_:)",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didDeselectTabs(_:)",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didFocusWindow(_:)",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didMoveTab:fromIndex:inWindow:",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didOpenTab(_:)",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didOpenWindow(_:)",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didReplaceTab(_:with:)",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/didSelectTabs(_:)",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/extensionContext(for:)-2kr4",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/extensionContext(for:)-6ecpm",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/fetchDataRecord(ofTypes:for:completionHandler:)",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/fetchDataRecords(ofTypes:completionHandler:)",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/init()",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/init(configuration:)",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/load(_:)",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/removeData(ofTypes:from:completionHandler:)",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/unload(_:)"
+              ],
+              "anchor": "Instance-Methods",
+              "title": "Instance Methods",
+              "generated": true
+            },
+            {
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/allExtensionDataTypes"
+              ],
+              "anchor": "Type-Properties",
+              "title": "Type Properties",
+              "generated": true
+            }
+          ]
+        },
+        {
+          "op": "replace",
+          "path": "/relationshipsSections",
+          "value": [
+            {
+              "title": "Inherits From",
+              "identifiers": [
+                "doc://com.externally.resolved.symbol/c:objc(cs)NSObject"
+              ],
+              "type": "inheritsFrom",
+              "kind": "relationships"
+            }
+          ]
+        },
+        {
+          "op": "replace",
+          "path": "/seeAlsoSections",
+          "value": [
+            {
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtension",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionTab",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionWindow",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionContext",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionControllerDelegate"
+              ],
+              "title": "Web extensions",
+              "generated": true,
+              "anchor": "Web-extensions"
+            }
+          ]
+        },
+        {
+          "op": "replace",
+          "path": "/primaryContentSections/0",
+          "value": {
+            "kind": "declarations",
+            "declarations": [
+              {
+                "tokens": [
+                  {
+                    "text": "@interface",
+                    "kind": "keyword"
+                  },
+                  {
+                    "text": " ",
+                    "kind": "text"
+                  },
+                  {
+                    "text": "WKWebExtensionController",
+                    "kind": "identifier"
+                  },
+                  {
+                    "text": " : ",
+                    "kind": "text"
+                  },
+                  {
+                    "text": "NSObject",
+                    "preciseIdentifier": "c:objc(cs)NSObject",
+                    "kind": "typeIdentifier",
+                    "identifier": "doc://com.externally.resolved.symbol/c:objc(cs)NSObject"
+                  }
+                ],
+                "platforms": [
+                  "iOS",
+                  "iPadOS",
+                  "Mac Catalyst",
+                  "macOS",
+                  "visionOS"
+                ],
+                "languages": [
+                  "occ"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "value": "extensions",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1extensions/title"
+        },
+        {
+          "value": [
+            {
+              "text": "extensions",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1extensions/fragments"
+        },
+        {
+          "value": "didOpenWindow:",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1didOpenWindow(_:)/title"
+        },
+        {
+          "value": [
+            {
+              "text": "- ",
+              "kind": "text"
+            },
+            {
+              "text": "didOpenWindow:",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1didOpenWindow(_:)/fragments"
+        },
+        {
+          "value": "didOpenTab:",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1didOpenTab(_:)/title"
+        },
+        {
+          "value": [
+            {
+              "kind": "text",
+              "text": "- "
+            },
+            {
+              "kind": "identifier",
+              "text": "didOpenTab:"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1didOpenTab(_:)/fragments"
+        },
+        {
+          "value": "WKWebExtensionWindow",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionWindow/title"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebExtensionWindow",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionWindow/fragments"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebExtensionWindow",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionWindow/navigatorTitle"
+        },
+        {
+          "value": "delegate",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1delegate/title"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "delegate"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1delegate/fragments"
+        },
+        {
+          "value": "extensionContextForExtension:",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1extensionContext(for:)-6ecpm/title"
+        },
+        {
+          "value": [
+            {
+              "kind": "text",
+              "text": "- "
+            },
+            {
+              "kind": "identifier",
+              "text": "extensionContextForExtension:"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1extensionContext(for:)-6ecpm/fragments"
+        },
+        {
+          "value": "didDeselectTabs:",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1didDeselectTabs(_:)/title"
+        },
+        {
+          "value": [
+            {
+              "kind": "text",
+              "text": "- "
+            },
+            {
+              "kind": "identifier",
+              "text": "didDeselectTabs:"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1didDeselectTabs(_:)/fragments"
+        },
+        {
+          "value": "unloadExtensionContext:error:",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1unload(_:)/title"
+        },
+        {
+          "value": [
+            {
+              "text": "- ",
+              "kind": "text"
+            },
+            {
+              "text": "unloadExtensionContext:error:",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1unload(_:)/fragments"
+        },
+        {
+          "value": "removeDataOfTypes:fromDataRecords:completionHandler:",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1removeData(ofTypes:from:completionHandler:)/title"
+        },
+        {
+          "value": [
+            {
+              "kind": "text",
+              "text": "- "
+            },
+            {
+              "kind": "identifier",
+              "text": "removeDataOfTypes:fromDataRecords:completionHandler:"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1removeData(ofTypes:from:completionHandler:)/fragments"
+        },
+        {
+          "value": "extensionContextForURL:",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1extensionContext(for:)-2kr4/title"
+        },
+        {
+          "value": [
+            {
+              "text": "- ",
+              "kind": "text"
+            },
+            {
+              "text": "extensionContextForURL:",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1extensionContext(for:)-2kr4/fragments"
+        },
+        {
+          "value": "allExtensionDataTypes",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1allExtensionDataTypes/title"
+        },
+        {
+          "value": [
+            {
+              "text": "allExtensionDataTypes",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1allExtensionDataTypes/fragments"
+        },
+        {
+          "value": "WKWebExtensionTab",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionTab/title"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebExtensionTab",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionTab/fragments"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebExtensionTab",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionTab/navigatorTitle"
+        },
+        {
+          "value": "WKWebExtensionContext",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionContext/title"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebExtensionContext"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionContext/fragments"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebExtensionContext",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionContext/navigatorTitle"
+        },
+        {
+          "value": "initWithConfiguration:",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1init(configuration:)/title"
+        },
+        {
+          "value": [
+            {
+              "kind": "text",
+              "text": "- "
+            },
+            {
+              "kind": "identifier",
+              "text": "initWithConfiguration:"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1init(configuration:)/fragments"
+        },
+        {
+          "value": "fetchDataRecordOfTypes:forExtensionContext:completionHandler:",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1fetchDataRecord(ofTypes:for:completionHandler:)/title"
+        },
+        {
+          "value": [
+            {
+              "text": "- ",
+              "kind": "text"
+            },
+            {
+              "text": "fetchDataRecordOfTypes:forExtensionContext:completionHandler:",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1fetchDataRecord(ofTypes:for:completionHandler:)/fragments"
+        },
+        {
+          "value": "init",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1init()/title"
+        },
+        {
+          "value": [
+            {
+              "text": "- ",
+              "kind": "text"
+            },
+            {
+              "text": "init",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1init()/fragments"
+        },
+        {
+          "value": "NSObject",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.externally.resolved.symbol~1c:objc(pl)NSObject/title"
+        },
+        {
+          "value": [
+            {
+              "kind": "keyword",
+              "text": "@protocol"
+            },
+            {
+              "kind": "text",
+              "text": " "
+            },
+            {
+              "kind": "identifier",
+              "text": "NSObject"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.externally.resolved.symbol~1c:objc(pl)NSObject/fragments"
+        },
+        {
+          "value": "WKWebExtensionControllerDelegate",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionControllerDelegate/title"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebExtensionControllerDelegate",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionControllerDelegate/fragments"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebExtensionControllerDelegate"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionControllerDelegate/navigatorTitle"
+        },
+        {
+          "value": "didReplaceTab:withTab:",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1didReplaceTab(_:with:)/title"
+        },
+        {
+          "value": [
+            {
+              "kind": "text",
+              "text": "- "
+            },
+            {
+              "kind": "identifier",
+              "text": "didReplaceTab:withTab:"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1didReplaceTab(_:with:)/fragments"
+        },
+        {
+          "value": "webExtensionController",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1webExtensionController/title"
+        },
+        {
+          "value": [
+            {
+              "text": "webExtensionController",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration~1webExtensionController/fragments"
+        },
+        {
+          "value": "WKWebExtensionController",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController/title"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebExtensionController",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController/fragments"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebExtensionController",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController/navigatorTitle"
+        },
+        {
+          "value": "WKWebView",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebView/title"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebView",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebView/fragments"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebView"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebView/navigatorTitle"
+        },
+        {
+          "value": [
+            {
+              "text": "@interface",
+              "kind": "keyword"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "NSObject",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.externally.resolved.symbol~1c:objc(cs)NSObject/fragments"
+        },
+        {
+          "value": "loadExtensionContext:error:",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1load(_:)/title"
+        },
+        {
+          "value": [
+            {
+              "kind": "text",
+              "text": "- "
+            },
+            {
+              "kind": "identifier",
+              "text": "loadExtensionContext:error:"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1load(_:)/fragments"
+        },
+        {
+          "value": "configuration",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1configuration-swift.property/title"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "configuration"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1configuration-swift.property/fragments"
+        },
+        {
+          "value": "didChangeTabProperties:forTab:",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1didChangeTabProperties(_:for:)/title"
+        },
+        {
+          "value": [
+            {
+              "kind": "text",
+              "text": "- "
+            },
+            {
+              "kind": "identifier",
+              "text": "didChangeTabProperties:forTab:"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1didChangeTabProperties(_:for:)/fragments"
+        },
+        {
+          "value": "didSelectTabs:",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1didSelectTabs(_:)/title"
+        },
+        {
+          "value": [
+            {
+              "kind": "text",
+              "text": "- "
+            },
+            {
+              "kind": "identifier",
+              "text": "didSelectTabs:"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1didSelectTabs(_:)/fragments"
+        },
+        {
+          "value": "didCloseWindow:",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1didCloseWindow(_:)/title"
+        },
+        {
+          "value": [
+            {
+              "kind": "text",
+              "text": "- "
+            },
+            {
+              "kind": "identifier",
+              "text": "didCloseWindow:"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1didCloseWindow(_:)/fragments"
+        },
+        {
+          "value": "extensionContexts",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1extensionContexts/title"
+        },
+        {
+          "value": [
+            {
+              "text": "extensionContexts",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1extensionContexts/fragments"
+        },
+        {
+          "value": "WKWebExtension",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension/title"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebExtension"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension/fragments"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebExtension"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension/navigatorTitle"
+        },
+        {
+          "value": "fetchDataRecordsOfTypes:completionHandler:",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1fetchDataRecords(ofTypes:completionHandler:)/title"
+        },
+        {
+          "value": [
+            {
+              "text": "- ",
+              "kind": "text"
+            },
+            {
+              "text": "fetchDataRecordsOfTypes:completionHandler:",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1fetchDataRecords(ofTypes:completionHandler:)/fragments"
+        },
+        {
+          "value": "didFocusWindow:",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1didFocusWindow(_:)/title"
+        },
+        {
+          "value": [
+            {
+              "kind": "text",
+              "text": "- "
+            },
+            {
+              "kind": "identifier",
+              "text": "didFocusWindow:"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1didFocusWindow(_:)/fragments"
+        },
+        {
+          "value": "WKWebViewConfiguration",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration/title"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebViewConfiguration",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration/fragments"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebViewConfiguration"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebViewConfiguration/navigatorTitle"
+        }
+      ],
+      "traits": [
+        {
+          "interfaceLanguage": "occ"
+        }
+      ]
+    }
+  ],
+  "legalNotices": {
+    "copyright": "Copyright &copy; 2025 Apple Inc. All rights reserved.",
+    "termsOfUse": "https://www.apple.com/legal/internet-services/terms/site.html",
+    "privacyPolicy": "https://www.apple.com/privacy/privacy-policy"
+  }
+}
