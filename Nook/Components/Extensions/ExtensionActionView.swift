@@ -78,6 +78,14 @@ struct ExtensionActionButton: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             updateActionState()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .extensionActionUpdated)) { notification in
+            // Update if this is for our extension
+            if let userInfo = notification.userInfo,
+               let updatedExtensionId = userInfo["extensionId"] as? String,
+               updatedExtensionId == ext.id {
+                updateActionState()
+            }
+        }
     }
     
     private func showExtensionPopup() {
@@ -115,7 +123,7 @@ struct ExtensionActionButton: View {
     }
 
     private func updateActionState() {
-        guard let extensionContext = ExtensionManager.shared.getExtensionContext(for: ext.id) else {
+        guard let _ = ExtensionManager.shared.getExtensionContext(for: ext.id) else {
             print("⚠️ [ExtensionActionView] No extension context found for action state update - extension may be disabled")
 
             // CRITICAL FIX: Set default values when extension context is not available
@@ -129,18 +137,33 @@ struct ExtensionActionButton: View {
             return
         }
 
-        // Get the action from the extension context
-        // Note: WKWebExtension.Action properties are limited in current SDK
-        // We'll use placeholder implementations for missing properties
+        // Get the action state from ExtensionManager
+        if #available(macOS 15.4, *) {
+            let state = ExtensionManager.shared.getActionState(for: ext.id)
+            
+            Task { @MainActor in
+                // Update badge properties from actual state
+                self.badgeText = state.badgeText
+                
+                // Convert color arrays to NSColor
+                self.badgeBackgroundColor = NSColor(
+                    red: state.badgeBackgroundColor[0],
+                    green: state.badgeBackgroundColor[1],
+                    blue: state.badgeBackgroundColor[2],
+                    alpha: state.badgeBackgroundColor[3]
+                )
+                
+                self.badgeTextColor = NSColor(
+                    red: state.badgeTextColor[0],
+                    green: state.badgeTextColor[1],
+                    blue: state.badgeTextColor[2],
+                    alpha: state.badgeTextColor[3]
+                )
+                
+                self.isActionEnabled = state.isEnabled
 
-        Task { @MainActor in
-            // Update badge properties (using placeholder values for now)
-            self.badgeText = "" // placeholder - action.badgeText not available
-            self.badgeBackgroundColor = NSColor.systemBlue // placeholder - action.badgeBackgroundColor not available
-            self.badgeTextColor = NSColor.white // placeholder - action.badgeTextColor not available
-            self.isActionEnabled = true // placeholder - action.isEnabled not available
-
-            print("🔧 Updated action state for \(ext.name): badge='\(self.badgeText)', enabled=\(self.isActionEnabled)")
+                print("🔧 Updated action state for \(ext.name): badge='\(self.badgeText)', enabled=\(self.isActionEnabled)")
+            }
         }
     }
 }

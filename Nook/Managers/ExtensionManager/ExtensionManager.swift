@@ -612,6 +612,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         let storageScript = generateStorageAPIScript(extensionId: extensionId)
         let tabsScript = generateTabsAPIScript(extensionId: extensionId)
         let scriptingScript = generateScriptingAPIScript(extensionId: extensionId)
+        let actionScript = generateActionAPIScript(extensionId: extensionId)
 
         // Combine all API scripts
         let completeChromeAPIScript = """
@@ -625,6 +626,8 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         \(tabsScript)
 
         \(scriptingScript)
+
+        \(actionScript)
 
         console.log('[Chrome API Bridge] All Chrome APIs injected into existing tab');
         """
@@ -2892,6 +2895,11 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                 let scriptingUserScript = WKUserScript(source: scriptingAPIScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
                 webView.configuration.userContentController.addUserScript(scriptingUserScript)
 
+                // Inject Chrome Action API
+                let actionAPIScript = generateActionAPIScript(extensionId: extensionId)
+                let actionUserScript = WKUserScript(source: actionAPIScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
+                webView.configuration.userContentController.addUserScript(actionUserScript)
+
                 print("   ✅ Chrome API bridge scripts injected for extension: \(extensionId)")
             }
 
@@ -3700,9 +3708,12 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
 
         controller.removeScriptMessageHandler(forName: "chromeTabsResponse")
         controller.add(self, name: "chromeTabsResponse")
+        
+        controller.removeScriptMessageHandler(forName: "chromeAction")
+        controller.add(self, name: "chromeAction")
 
         print("   ✅ Enhanced Action API: closePopup handler installed")
-        print("   ✅ Chrome API bridge handlers installed: runtime, tabs, storage, scripting")
+        print("   ✅ Chrome API bridge handlers installed: runtime, tabs, storage, scripting, action")
     }
 
     // MARK: - WKScriptMessageHandler (popup bridge)
@@ -3738,6 +3749,8 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             handleStorageScriptMessage(message)
         case "chromeScripting":
             handleScriptingScriptMessage(message)
+        case "chromeAction":
+            handleActionScriptMessage(message)
         case "chromeTabsResponse":
             // Handle tab message responses
             if let messageBody = message.body as? [String: Any],
