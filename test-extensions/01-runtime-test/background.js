@@ -94,6 +94,31 @@ function testOnMessageListener() {
   }
 }
 
+// Test 5b: chrome.runtime.onConnect listener for port connections
+function testOnConnectListener() {
+  console.log('✅ Test 5b: chrome.runtime.onConnect listener');
+  try {
+    chrome.runtime.onConnect.addListener((port) => {
+      console.log('   Port connected:', port.name);
+      
+      port.onMessage.addListener((msg) => {
+        console.log('   Received port message:', msg);
+        if (msg.type === 'PORT_PING') {
+          console.log('   ✅ PASS: Port connection and messaging works');
+          port.postMessage({ type: 'PORT_PONG', from: 'background', timestamp: Date.now() });
+        }
+      });
+      
+      port.onDisconnect.addListener(() => {
+        console.log('   Port disconnected');
+      });
+    });
+    console.log('   ✅ onConnect listener registered');
+  } catch (error) {
+    console.error('   ❌ FAIL: onConnect.addListener() threw error:', error);
+  }
+}
+
 // Test 6: chrome.runtime.onInstalled
 function testOnInstalled() {
   console.log('✅ Test 6: chrome.runtime.onInstalled listener');
@@ -194,6 +219,7 @@ function runAllTests() {
   testGetManifest();
   testGetURL();
   testOnMessageListener();
+  testOnConnectListener();
   testOnInstalled();
   testOnStartup();
   
@@ -212,4 +238,3 @@ function runAllTests() {
 runAllTests();
 
 console.log('🚀 [Runtime Test] Background script ready');
-

@@ -138,16 +138,19 @@ document.getElementById('testConnect').addEventListener('click', () => {
     
     port.onMessage.addListener((message) => {
       console.log('   📥 Message on port:', message);
-      resultDiv.className = 'result success';
-      resultDiv.textContent = `✅ SUCCESS\nPort connected!\nReceived: ${JSON.stringify(message, null, 2)}`;
+      if (message.type === 'PORT_PONG') {
+        resultDiv.className = 'result success';
+        resultDiv.textContent = `✅ SUCCESS\nPort connected and messaging works!\nReceived: ${JSON.stringify(message, null, 2)}`;
+        console.log('   ✅ PASS: Port connection and messaging works');
+      }
     });
     
     port.onDisconnect.addListener(() => {
       console.log('   🔌 Port disconnected');
     });
     
-    // Send a message through the port
-    port.postMessage({ type: 'PORT_TEST', from: 'popup' });
+    // Send a PING message through the port
+    port.postMessage({ type: 'PORT_PING', from: 'popup', timestamp: Date.now() });
     
     setTimeout(() => {
       if (resultDiv.textContent.includes('⏳')) {
@@ -171,4 +174,3 @@ document.getElementById('viewConsole').addEventListener('click', () => {
 });
 
 console.log('🎨 [Runtime Test] Popup script ready');
-
