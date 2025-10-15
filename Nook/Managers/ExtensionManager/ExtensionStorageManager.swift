@@ -206,6 +206,9 @@ class ExtensionStorageManager: ObservableObject {
                 let data = try JSONEncoder().encode(anyCodable)
                 localUserDefaults.set(data, forKey: fullKey)
             }
+            // CRITICAL: Force immediate persistence to disk
+            // Without this, subsequent reads may return empty results
+            localUserDefaults.synchronize()
         }
     }
 
@@ -230,6 +233,8 @@ class ExtensionStorageManager: ObservableObject {
                 let fullKey = localStorageKeyPrefix + key
                 localUserDefaults.removeObject(forKey: fullKey)
             }
+            // Force immediate persistence
+            localUserDefaults.synchronize()
         }
     }
 
@@ -256,6 +261,8 @@ class ExtensionStorageManager: ObservableObject {
             for key in keys {
                 localUserDefaults.removeObject(forKey: key)
             }
+            // Force immediate persistence
+            localUserDefaults.synchronize()
         }
     }
 
