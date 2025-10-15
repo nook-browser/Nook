@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "Tier 1 APIs Test",
+  "version": "1.0.0",
+  "description": "Tests chrome.action, chrome.contextMenus, chrome.notifications, and chrome.commands APIs",
+  "permissions": [
+    "contextMenus",
+    "notifications"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    },
+    "default_title": "Tier 1 APIs Test"
+  },
+  "commands": {
+    "test-command": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y"
+      },
+      "description": "Test command shortcut"
+    },
+    "show-notification": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+N"
+      },
+      "description": "Show a test notification"
+    },
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+U"
+      }
+    }
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}
+
