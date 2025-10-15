@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Tabs API Test</title>
+  <style>
+    body {
+      width: 450px;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    h1 {
+      font-size: 18px;
+      margin: 0 0 15px 0;
+      color: #333;
+    }
+    .test-section {
+      margin-bottom: 15px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      background: #f9f9f9;
+    }
+    .test-section h2 {
+      font-size: 14px;
+      margin: 0 0 10px 0;
+      color: #666;
+    }
+    button {
+      padding: 8px 16px;
+      margin: 5px 5px 5px 0;
+      border: 1px solid #0066cc;
+      background: #0066cc;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    button:hover {
+      background: #0052a3;
+    }
+    button.danger {
+      background: #dc3545;
+      border-color: #dc3545;
+    }
+    button.danger:hover {
+      background: #c82333;
+    }
+    .result {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .success {
+      background: #d4edda;
+      border: 1px solid #c3e6cb;
+      color: #155724;
+    }
+    .error {
+      background: #f8d7da;
+      border: 1px solid #f5c6cb;
+      color: #721c24;
+    }
+    .info {
+      background: #d1ecf1;
+      border: 1px solid #bee5eb;
+      color: #0c5460;
+    }
+    .warning {
+      background: #fff3cd;
+      border: 1px solid #ffeeba;
+      color: #856404;
+      font-size: 12px;
+      padding: 8px;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>📑 Tabs API Test</h1>
+  
+  <div class="warning">
+    ⚠️ Some tests will create/close tabs. Make sure you're okay with that before running!
+  </div>
+  
+  <div class="test-section" style="background: #e8f4f8; border-color: #0066cc;">
+    <button id="runAllTests" style="font-size: 16px; font-weight: bold; width: 100%; padding: 12px;">
+      ▶️ Run All Tests
+    </button>
+    <div id="allTestsResults" class="result info" style="display: none; margin-top: 10px;"></div>
+  </div>
+  
+  <div class="test-section">
+    <h2>Individual Tests (Optional)</h2>
+    <button id="queryActive">Query Active Tab</button>
+    <button id="queryAll">Query All Tabs</button>
+    <button id="getCurrent">Get Current Tab</button>
+    <button id="createTab">Create New Tab</button>
+    <button id="updateTab">Update Tab URL</button>
+    <button id="reloadTab">Reload Tab</button>
+    <button id="removeTab" class="danger">Close Tab</button>
+    <button id="testEvents">Test Events</button>
+    <div id="individualResults" class="result info" style="display: none;"></div>
+  </div>
+  
+  <div class="test-section">
+    <h2>Console Output</h2>
+    <button id="viewConsole">Open Console</button>
+    <p style="font-size: 12px; color: #666; margin-top: 10px;">
+      Check the browser console for detailed event logs from the background service worker.
+    </p>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
+

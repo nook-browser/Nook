@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Tabs API Test",
+  "version": "1.0.0",
+  "description": "Test extension for validating chrome.tabs.* API implementation",
+  
+  "permissions": [
+    "tabs"
+  ],
+  
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Tabs API Test"
+  },
+  
+  "icons": {
+    "16": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text x='2' y='14' font-size='14'>📑</text></svg>",
+    "48": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><text x='6' y='38' font-size='38'>📑</text></svg>",
+    "128": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'><text x='16' y='100' font-size='100'>📑</text></svg>"
+  }
+}
+
