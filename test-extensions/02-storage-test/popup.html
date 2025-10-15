@@ -101,26 +101,23 @@
 <body>
   <h1>💾 Storage API Test</h1>
   
+  <div class="test-section" style="background: #e8f4f8; border-color: #0066cc;">
+    <button id="runAllTests" style="font-size: 16px; font-weight: bold; width: 100%; padding: 12px;">
+      ▶️ Run All Tests
+    </button>
+    <div id="allTestsResults" class="result info" style="display: none; margin-top: 10px;"></div>
+  </div>
+  
   <div class="test-section">
-    <h2>Local Storage Tests</h2>
+    <h2>Individual Tests (Optional)</h2>
     <button id="writeLocal">Write Data</button>
     <button id="readLocal">Read Data</button>
     <button id="clearLocal">Clear All</button>
-    <div id="localResults" class="result info" style="display: none;"></div>
-  </div>
-  
-  <div class="test-section">
-    <h2>Session Storage Tests</h2>
-    <button id="writeSession">Write Session Data</button>
-    <button id="readSession">Read Session Data</button>
-    <div id="sessionResults" class="result info" style="display: none;"></div>
-  </div>
-  
-  <div class="test-section">
-    <h2>Advanced Tests</h2>
+    <button id="writeSession">Write Session</button>
+    <button id="readSession">Read Session</button>
     <button id="testLarge">Test Large Data</button>
     <button id="testSpeed">Speed Test</button>
-    <div id="advancedResults" class="result info" style="display: none;"></div>
+    <div id="individualResults" class="result info" style="display: none;"></div>
   </div>
   
   <div class="stats">
@@ -149,4 +146,3 @@
   <script src="popup.js"></script>
 </body>
 </html>
-

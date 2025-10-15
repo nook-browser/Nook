@@ -68,19 +68,21 @@
 <body>
   <h1>🧪 Runtime API Test</h1>
   
-  <div class="test-section">
-    <h2>Basic Runtime APIs</h2>
-    <button id="testId">Test runtime.id</button>
-    <button id="testManifest">Test getManifest()</button>
-    <button id="testURL">Test getURL()</button>
-    <div id="basicResults" class="result info" style="display: none;"></div>
+  <div class="test-section" style="background: #e8f4f8; border-color: #0066cc;">
+    <button id="runAllTests" style="font-size: 16px; font-weight: bold; width: 100%; padding: 12px;">
+      ▶️ Run All Tests
+    </button>
+    <div id="allTestsResults" class="result info" style="display: none; margin-top: 10px;"></div>
   </div>
   
   <div class="test-section">
-    <h2>Messaging APIs</h2>
-    <button id="testSendMessage">Send Message to Background</button>
+    <h2>Individual Tests (Optional)</h2>
+    <button id="testId">Test runtime.id</button>
+    <button id="testManifest">Test getManifest()</button>
+    <button id="testURL">Test getURL()</button>
+    <button id="testSendMessage">Test sendMessage()</button>
     <button id="testConnect">Test connect()</button>
-    <div id="messageResults" class="result info" style="display: none;"></div>
+    <div id="individualResults" class="result info" style="display: none;"></div>
   </div>
   
   <div class="test-section">
@@ -94,4 +96,3 @@
   <script src="popup.js"></script>
 </body>
 </html>
-

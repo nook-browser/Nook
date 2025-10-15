@@ -4,6 +4,233 @@
 
 console.log('💾 [Storage Test] Popup loaded');
 
+// ============================================================================
+// RUN ALL TESTS BUTTON
+// ============================================================================
+
+document.getElementById('runAllTests').addEventListener('click', async () => {
+  const resultDiv = document.getElementById('allTestsResults');
+  resultDiv.style.display = 'block';
+  resultDiv.className = 'result info';
+  resultDiv.textContent = '⏳ Running all storage tests...\n\n';
+  
+  const results = [];
+  let passCount = 0;
+  let failCount = 0;
+  
+  // Test 1: Write to local storage
+  try {
+    const testData = { test1: 'write', timestamp: Date.now() };
+    await new Promise((resolve, reject) => {
+      chrome.storage.local.set(testData, () => {
+        if (chrome.runtime.lastError) {
+          results.push(`❌ local.set(): FAIL (${chrome.runtime.lastError.message})`);
+          failCount++;
+          reject();
+        } else {
+          results.push('✅ local.set(): PASS');
+          passCount++;
+          resolve();
+        }
+      });
+    });
+  } catch (e) {
+    results.push(`❌ local.set(): FAIL (${e.message})`);
+    failCount++;
+  }
+  
+  // Test 2: Read from local storage
+  try {
+    await new Promise((resolve, reject) => {
+      chrome.storage.local.get(['test1'], (items) => {
+        if (chrome.runtime.lastError) {
+          results.push(`❌ local.get(): FAIL (${chrome.runtime.lastError.message})`);
+          failCount++;
+          reject();
+        } else if (items.test1 === 'write') {
+          results.push('✅ local.get(): PASS');
+          passCount++;
+          resolve();
+        } else {
+          results.push(`❌ local.get(): FAIL (expected 'write', got ${items.test1})`);
+          failCount++;
+          reject();
+        }
+      });
+    });
+  } catch (e) {
+    results.push(`❌ local.get(): FAIL (${e.message})`);
+    failCount++;
+  }
+  
+  // Test 3: Remove from local storage
+  try {
+    await new Promise((resolve, reject) => {
+      chrome.storage.local.remove(['test1'], () => {
+        if (chrome.runtime.lastError) {
+          results.push(`❌ local.remove(): FAIL (${chrome.runtime.lastError.message})`);
+          failCount++;
+          reject();
+        } else {
+          results.push('✅ local.remove(): PASS');
+          passCount++;
+          resolve();
+        }
+      });
+    });
+  } catch (e) {
+    results.push(`❌ local.remove(): FAIL (${e.message})`);
+    failCount++;
+  }
+  
+  // Test 4: Clear local storage
+  try {
+    await new Promise((resolve, reject) => {
+      chrome.storage.local.clear(() => {
+        if (chrome.runtime.lastError) {
+          results.push(`❌ local.clear(): FAIL (${chrome.runtime.lastError.message})`);
+          failCount++;
+          reject();
+        } else {
+          results.push('✅ local.clear(): PASS');
+          passCount++;
+          resolve();
+        }
+      });
+    });
+  } catch (e) {
+    results.push(`❌ local.clear(): FAIL (${e.message})`);
+    failCount++;
+  }
+  
+  // Test 5: getBytesInUse
+  try {
+    const testData = { largeKey: 'x'.repeat(1000) };
+    await new Promise((resolve, reject) => {
+      chrome.storage.local.set(testData, () => {
+        chrome.storage.local.getBytesInUse(null, (bytes) => {
+          if (chrome.runtime.lastError) {
+            results.push(`❌ local.getBytesInUse(): FAIL (${chrome.runtime.lastError.message})`);
+            failCount++;
+            reject();
+          } else if (bytes > 0) {
+            results.push(`✅ local.getBytesInUse(): PASS (${bytes} bytes)`);
+            passCount++;
+            resolve();
+          } else {
+            results.push('❌ local.getBytesInUse(): FAIL (returned 0 bytes)');
+            failCount++;
+            reject();
+          }
+        });
+      });
+    });
+  } catch (e) {
+    results.push(`❌ local.getBytesInUse(): FAIL (${e.message})`);
+    failCount++;
+  }
+  
+  // Test 6: Session storage write
+  try {
+    const sessionData = { sessionTest: 'session value', timestamp: Date.now() };
+    await new Promise((resolve, reject) => {
+      chrome.storage.session.set(sessionData, () => {
+        if (chrome.runtime.lastError) {
+          results.push(`❌ session.set(): FAIL (${chrome.runtime.lastError.message})`);
+          failCount++;
+          reject();
+        } else {
+          results.push('✅ session.set(): PASS');
+          passCount++;
+          resolve();
+        }
+      });
+    });
+  } catch (e) {
+    results.push(`❌ session.set(): FAIL (${e.message})`);
+    failCount++;
+  }
+  
+  // Test 7: Session storage read
+  try {
+    await new Promise((resolve, reject) => {
+      chrome.storage.session.get(['sessionTest'], (items) => {
+        if (chrome.runtime.lastError) {
+          results.push(`❌ session.get(): FAIL (${chrome.runtime.lastError.message})`);
+          failCount++;
+          reject();
+        } else if (items.sessionTest === 'session value') {
+          results.push('✅ session.get(): PASS');
+          passCount++;
+          resolve();
+        } else {
+          results.push(`❌ session.get(): FAIL (no data returned)`);
+          failCount++;
+          reject();
+        }
+      });
+    });
+  } catch (e) {
+    results.push(`❌ session.get(): FAIL (${e.message})`);
+    failCount++;
+  }
+  
+  // Test 8: Complex nested objects
+  try {
+    const complexData = {
+      nested: { level1: { level2: { value: 'deep', array: [1, 2, 3] } } }
+    };
+    await new Promise((resolve, reject) => {
+      chrome.storage.local.set(complexData, () => {
+        chrome.storage.local.get(['nested'], (items) => {
+          if (items.nested?.level1?.level2?.value === 'deep') {
+            results.push('✅ Complex objects: PASS');
+            passCount++;
+            resolve();
+          } else {
+            results.push('❌ Complex objects: FAIL');
+            failCount++;
+            reject();
+          }
+        });
+      });
+    });
+  } catch (e) {
+    results.push(`❌ Complex objects: FAIL (${e.message})`);
+    failCount++;
+  }
+  
+  // Display results
+  const totalTests = passCount + failCount;
+  const successRate = ((passCount / totalTests) * 100).toFixed(1);
+  
+  let summary = `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  summary += `RESULTS: ${passCount}/${totalTests} tests passed (${successRate}%)\n`;
+  summary += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+  
+  const finalResults = summary + results.join('\n');
+  
+  if (failCount === 0) {
+    resultDiv.className = 'result success';
+    resultDiv.textContent = '🎉 ALL TESTS PASSED!\n' + finalResults;
+  } else if (passCount > 0) {
+    resultDiv.className = 'result info';
+    resultDiv.textContent = '⚠️ SOME TESTS FAILED\n' + finalResults;
+  } else {
+    resultDiv.className = 'result error';
+    resultDiv.textContent = '❌ ALL TESTS FAILED\n' + finalResults;
+  }
+  
+  console.log('[Storage Test] All tests completed:', { passCount, failCount, totalTests });
+  
+  // Update stats after tests
+  updateStats();
+});
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
 // Update statistics
 function updateStats() {
   // Local storage stats
@@ -29,9 +256,13 @@ function updateStats() {
   });
 }
 
+// ============================================================================
+// INDIVIDUAL TEST BUTTONS (kept for detailed testing)
+// ============================================================================
+
 // Write to local storage
 document.getElementById('writeLocal').addEventListener('click', () => {
-  const resultDiv = document.getElementById('localResults');
+  const resultDiv = document.getElementById('individualResults');
   resultDiv.style.display = 'block';
   resultDiv.className = 'result info';
   resultDiv.textContent = '⏳ Writing data...';
@@ -57,7 +288,7 @@ document.getElementById('writeLocal').addEventListener('click', () => {
 
 // Read from local storage
 document.getElementById('readLocal').addEventListener('click', () => {
-  const resultDiv = document.getElementById('localResults');
+  const resultDiv = document.getElementById('individualResults');
   resultDiv.style.display = 'block';
   resultDiv.className = 'result info';
   resultDiv.textContent = '⏳ Reading data...';
@@ -78,7 +309,7 @@ document.getElementById('readLocal').addEventListener('click', () => {
 document.getElementById('clearLocal').addEventListener('click', () => {
   if (!confirm('Clear all local storage?')) return;
   
-  const resultDiv = document.getElementById('localResults');
+  const resultDiv = document.getElementById('individualResults');
   resultDiv.style.display = 'block';
   resultDiv.className = 'result info';
   resultDiv.textContent = '⏳ Clearing storage...';
@@ -97,7 +328,7 @@ document.getElementById('clearLocal').addEventListener('click', () => {
 
 // Write to session storage
 document.getElementById('writeSession').addEventListener('click', () => {
-  const resultDiv = document.getElementById('sessionResults');
+  const resultDiv = document.getElementById('individualResults');
   resultDiv.style.display = 'block';
   resultDiv.className = 'result info';
   resultDiv.textContent = '⏳ Writing session data...';
@@ -122,7 +353,7 @@ document.getElementById('writeSession').addEventListener('click', () => {
 
 // Read from session storage
 document.getElementById('readSession').addEventListener('click', () => {
-  const resultDiv = document.getElementById('sessionResults');
+  const resultDiv = document.getElementById('individualResults');
   resultDiv.style.display = 'block';
   resultDiv.className = 'result info';
   resultDiv.textContent = '⏳ Reading session data...';
@@ -141,7 +372,7 @@ document.getElementById('readSession').addEventListener('click', () => {
 
 // Test large data
 document.getElementById('testLarge').addEventListener('click', () => {
-  const resultDiv = document.getElementById('advancedResults');
+  const resultDiv = document.getElementById('individualResults');
   resultDiv.style.display = 'block';
   resultDiv.className = 'result info';
   resultDiv.textContent = '⏳ Testing large data storage...';
@@ -180,7 +411,7 @@ document.getElementById('testLarge').addEventListener('click', () => {
 
 // Speed test
 document.getElementById('testSpeed').addEventListener('click', () => {
-  const resultDiv = document.getElementById('advancedResults');
+  const resultDiv = document.getElementById('individualResults');
   resultDiv.style.display = 'block';
   resultDiv.className = 'result info';
   resultDiv.textContent = '⏳ Running speed test (100 operations)...';
@@ -225,4 +456,3 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 });
 
 console.log('💾 [Storage Test] Popup ready');
-

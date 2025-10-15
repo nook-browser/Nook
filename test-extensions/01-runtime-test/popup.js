@@ -21,9 +21,167 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
+// ============================================================================
+// RUN ALL TESTS BUTTON
+// ============================================================================
+
+document.getElementById('runAllTests').addEventListener('click', async () => {
+  const resultDiv = document.getElementById('allTestsResults');
+  resultDiv.style.display = 'block';
+  resultDiv.className = 'result info';
+  resultDiv.textContent = '⏳ Running all tests...\n\n';
+  
+  const results = [];
+  let passCount = 0;
+  let failCount = 0;
+  
+  // Test 1: runtime.id
+  try {
+    if (chrome.runtime.id) {
+      results.push('✅ runtime.id: PASS');
+      passCount++;
+    } else {
+      results.push('❌ runtime.id: FAIL (undefined)');
+      failCount++;
+    }
+  } catch (e) {
+    results.push(`❌ runtime.id: FAIL (${e.message})`);
+    failCount++;
+  }
+  
+  // Test 2: getManifest()
+  try {
+    const manifest = chrome.runtime.getManifest();
+    if (manifest && manifest.name === 'Runtime API Test') {
+      results.push('✅ getManifest(): PASS');
+      passCount++;
+    } else {
+      results.push('❌ getManifest(): FAIL (invalid data)');
+      failCount++;
+    }
+  } catch (e) {
+    results.push(`❌ getManifest(): FAIL (${e.message})`);
+    failCount++;
+  }
+  
+  // Test 3: getURL()
+  try {
+    const url = chrome.runtime.getURL('popup.html');
+    if (url && url.includes('popup.html')) {
+      results.push('✅ getURL(): PASS');
+      passCount++;
+    } else {
+      results.push('❌ getURL(): FAIL (invalid URL)');
+      failCount++;
+    }
+  } catch (e) {
+    results.push(`❌ getURL(): FAIL (${e.message})`);
+    failCount++;
+  }
+  
+  // Test 4: sendMessage()
+  try {
+    await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        { type: 'PING', from: 'popup-all-tests', timestamp: Date.now() },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            results.push(`❌ sendMessage(): FAIL (${chrome.runtime.lastError.message})`);
+            failCount++;
+            reject();
+          } else if (response && response.type === 'PONG') {
+            results.push('✅ sendMessage(): PASS');
+            passCount++;
+            resolve();
+          } else {
+            results.push('❌ sendMessage(): FAIL (no response)');
+            failCount++;
+            reject();
+          }
+        }
+      );
+      
+      // Timeout after 2 seconds
+      setTimeout(() => {
+        reject(new Error('timeout'));
+      }, 2000);
+    }).catch((e) => {
+      if (e && e.message === 'timeout') {
+        results.push('❌ sendMessage(): FAIL (timeout)');
+        failCount++;
+      }
+    });
+  } catch (e) {
+    results.push(`❌ sendMessage(): FAIL (${e.message})`);
+    failCount++;
+  }
+  
+  // Test 5: connect()
+  try {
+    await new Promise((resolve, reject) => {
+      const port = chrome.runtime.connect({ name: 'popup-all-tests' });
+      let received = false;
+      
+      port.onMessage.addListener((message) => {
+        if (message.type === 'PORT_PONG') {
+          results.push('✅ connect(): PASS');
+          passCount++;
+          received = true;
+          port.disconnect();
+          resolve();
+        }
+      });
+      
+      port.postMessage({ type: 'PORT_PING', from: 'popup-all-tests', timestamp: Date.now() });
+      
+      // Timeout after 2 seconds
+      setTimeout(() => {
+        if (!received) {
+          results.push('❌ connect(): FAIL (timeout)');
+          failCount++;
+          port.disconnect();
+          reject();
+        }
+      }, 2000);
+    }).catch(() => {
+      // Already handled
+    });
+  } catch (e) {
+    results.push(`❌ connect(): FAIL (${e.message})`);
+    failCount++;
+  }
+  
+  // Display results
+  const totalTests = passCount + failCount;
+  const successRate = ((passCount / totalTests) * 100).toFixed(1);
+  
+  let summary = `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  summary += `RESULTS: ${passCount}/${totalTests} tests passed (${successRate}%)\n`;
+  summary += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+  
+  const finalResults = summary + results.join('\n');
+  
+  if (failCount === 0) {
+    resultDiv.className = 'result success';
+    resultDiv.textContent = '🎉 ALL TESTS PASSED!\n' + finalResults;
+  } else if (passCount > 0) {
+    resultDiv.className = 'result info';
+    resultDiv.textContent = '⚠️ SOME TESTS FAILED\n' + finalResults;
+  } else {
+    resultDiv.className = 'result error';
+    resultDiv.textContent = '❌ ALL TESTS FAILED\n' + finalResults;
+  }
+  
+  console.log('[Runtime Test] All tests completed:', { passCount, failCount, totalTests });
+});
+
+// ============================================================================
+// INDIVIDUAL TEST BUTTONS (kept for detailed testing)
+// ============================================================================
+
 // Test runtime.id
 document.getElementById('testId').addEventListener('click', () => {
-  const resultDiv = document.getElementById('basicResults');
+  const resultDiv = document.getElementById('individualResults');
   resultDiv.style.display = 'block';
   
   console.log('✅ [Popup] Testing runtime.id');
@@ -41,7 +199,7 @@ document.getElementById('testId').addEventListener('click', () => {
 
 // Test getManifest()
 document.getElementById('testManifest').addEventListener('click', () => {
-  const resultDiv = document.getElementById('basicResults');
+  const resultDiv = document.getElementById('individualResults');
   resultDiv.style.display = 'block';
   
   console.log('✅ [Popup] Testing getManifest()');
@@ -67,7 +225,7 @@ document.getElementById('testManifest').addEventListener('click', () => {
 
 // Test getURL()
 document.getElementById('testURL').addEventListener('click', () => {
-  const resultDiv = document.getElementById('basicResults');
+  const resultDiv = document.getElementById('individualResults');
   resultDiv.style.display = 'block';
   
   console.log('✅ [Popup] Testing getURL()');
@@ -96,7 +254,7 @@ document.getElementById('testURL').addEventListener('click', () => {
 
 // Test sendMessage()
 document.getElementById('testSendMessage').addEventListener('click', () => {
-  const resultDiv = document.getElementById('messageResults');
+  const resultDiv = document.getElementById('individualResults');
   resultDiv.style.display = 'block';
   resultDiv.className = 'result info';
   resultDiv.textContent = '⏳ Sending message to background...';
@@ -126,7 +284,7 @@ document.getElementById('testSendMessage').addEventListener('click', () => {
 
 // Test connect()
 document.getElementById('testConnect').addEventListener('click', () => {
-  const resultDiv = document.getElementById('messageResults');
+  const resultDiv = document.getElementById('individualResults');
   resultDiv.style.display = 'block';
   resultDiv.className = 'result info';
   resultDiv.textContent = '⏳ Testing connect()...';
