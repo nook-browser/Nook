@@ -49,6 +49,7 @@ struct NookApp: App {
 class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "AppTermination")
     weak var browserManager: BrowserManager?
+    weak var windowStateManager: WindowStateManager?
     private let urlEventClass = AEEventClass(kInternetEventClass)
     private let urlEventID = AEEventID(kAEGetURL)
     private var mouseEventMonitor: Any?
@@ -74,7 +75,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
                         CommandPaletteCoordinator.shared.openCommandPalette(using: manager)
                     case 3:
                         guard
-                            let windowState = manager.activeWindow,
+                            let windowState = windowStateManager?.activeWindow,
                             let currentTab = manager.currentTabForActiveWindow(),
                             let webView = manager.getWebView(for: currentTab.id, in: windowState.id)
                         else {
