@@ -2486,18 +2486,36 @@ class BrowserManager: ObservableObject {
             let result = await importManager.importArcSidebarData()
             
             for space in result.spaces {
-                self.tabManager.createSpace(name: space.title, icon: space.emoji ?? "0x1f30d")
+                print("========== \(space.title)")
+                self.tabManager.createSpace(name: space.title, icon: space.emoji ?? "person.fill")
                 
                 guard let createdSpace = self.tabManager.spaces.first(where: { $0.name == space.title }) else {
-                    continue
-                }
+                                continue
+                                    }
                 
-                for tab in space.tabs {
+                
+                for tab in space.unpinnedTabs {
+                    print("Unpinned tab - \(tab.title)")
                     self.tabManager.createNewTab(url: tab.url, in: createdSpace)
                 }
+                
+                for tab in space.pinnedTabs {
+                    print("Pinned tab - \(tab.title)")
+                    let newtab = self.tabManager.createNewTab(url: tab.url, in: createdSpace)
+                    self.tabManager.pinTabToSpace(newtab, spaceId: createdSpace.id)
+                }
+                for folder in space.folders {
+                    print("Folder - \(folder.title)")
+                    let newFolder = self.tabManager.createFolder(for: createdSpace.id, name: folder.title)
+                    
+                    for tab in folder.tabs {
+                        let newtab = self.tabManager.createNewTab(url: tab.url, in: createdSpace)
+                        self.tabManager.moveTabToFolder(tab: newtab, folderId: newFolder.id)
+                    }
+                }
             }
-            
             for topTab in result.topTabs {
+                print("TopTab - \(topTab.title)")
                 let tab = self.tabManager.createNewTab(url: topTab.url, in: self.tabManager.spaces.first!)
                 self.tabManager.addToEssentials(tab)
             }
