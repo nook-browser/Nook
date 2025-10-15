@@ -614,6 +614,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         let scriptingScript = generateScriptingAPIScript(extensionId: extensionId)
         let actionScript = generateActionAPIScript(extensionId: extensionId)
         let contextMenusScript = generateContextMenusAPIScript(extensionId: extensionId)
+        let notificationsScript = generateNotificationsAPIScript(extensionId: extensionId)
 
         // Combine all API scripts
         let completeChromeAPIScript = """
@@ -632,6 +633,8 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
 
         \(contextMenusScript)
 
+
+        \(notificationsScript)
         console.log('[Chrome API Bridge] All Chrome APIs injected into existing tab');
         """
 
@@ -2907,6 +2910,9 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                 let contextMenusAPIScript = generateContextMenusAPIScript(extensionId: extensionId)
                 let contextMenusUserScript = WKUserScript(source: contextMenusAPIScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
                 webView.configuration.userContentController.addUserScript(contextMenusUserScript)
+                let notificationsAPIScript = generateNotificationsAPIScript(extensionId: extensionId)
+                let notificationsUserScript = WKUserScript(source: notificationsAPIScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
+                webView.configuration.userContentController.addUserScript(notificationsUserScript)
 
                 print("   ✅ Chrome API bridge scripts injected for extension: \(extensionId)")
             }
@@ -3722,9 +3728,11 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
 
         controller.removeScriptMessageHandler(forName: "chromeContextMenus")
         controller.add(self, name: "chromeContextMenus")
+        controller.removeScriptMessageHandler(forName: "chromeNotifications")
+        controller.add(self, name: "chromeNotifications")
 
         print("   ✅ Enhanced Action API: closePopup handler installed")
-        print("   ✅ Chrome API bridge handlers installed: runtime, tabs, storage, scripting, action, contextMenus")
+        print("   ✅ Chrome API bridge handlers installed: runtime, tabs, storage, scripting, action, contextMenus, notifications")
     }
 
     // MARK: - WKScriptMessageHandler (popup bridge)
@@ -3764,6 +3772,8 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             handleActionScriptMessage(message)
         case "chromeContextMenus":
             handleContextMenusScriptMessage(message)
+        case "chromeNotifications":
+            handleNotificationsScriptMessage(message)
         case "chromeTabsResponse":
             // Handle tab message responses
             if let messageBody = message.body as? [String: Any],
