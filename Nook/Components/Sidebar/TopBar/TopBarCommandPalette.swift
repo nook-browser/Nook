@@ -19,7 +19,7 @@ struct TopBarCommandPalette: View {
     @State private var selectedSuggestionIndex: Int = -1
     
     var body: some View {
-        let isActiveWindow = browserManager.isActive(windowState)
+        let isActiveWindow = windowState.isActive(windowState)
         let shouldShow = isActiveWindow && windowState.isMiniCommandPaletteVisible && settings.topBarAddressView
         
         ZStack {

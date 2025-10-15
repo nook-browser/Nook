@@ -23,7 +23,7 @@ final class PeekManager {
         self.browserManager = browserManager
     }
 
-    func presentExternalURL(_ url: URL, from tab: Tab?) {
+    func presentExternalURL(_ url: URL, from tab: Tab?, in activeWindow: BrowserWindowState) {
         guard let browserManager else { return }
 
         // Don't show Peek if already showing this URL
@@ -32,7 +32,7 @@ final class PeekManager {
             return
         }
 
-        let windowId = browserManager.activeWindow?.id ?? UUID()
+        let windowId = activeWindow.id ?? UUID()
         let session = PeekSession(
             targetURL: url,
             sourceTabId: tab?.id,

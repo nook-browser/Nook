@@ -6,10 +6,10 @@
 //  Manages window state registry and lifecycle
 //
 
-import SwiftUI
+import Foundation
 import AppKit
-import WebKit
 import Observation
+import SwiftUI
 
 @MainActor
 @Observable
@@ -21,7 +21,10 @@ final class WindowStateManager {
     private(set) var activeWindowState: BrowserWindowState?
 
     /// Weak wrapper for NSView references stored per window
-    private struct WeakNSView { weak var view: NSView? }
+    private final class WeakNSView {
+        weak var view: NSView?
+        init(view: NSView?) { self.view = view }
+    }
 
     /// Container views per window so the compositor can manage multiple windows safely
     private var compositorContainerViews: [UUID: WeakNSView] = [:]
@@ -121,5 +124,27 @@ final class WindowStateManager {
         windowStates.removeAll()
         compositorContainerViews.removeAll()
         activeWindowState = nil
+    }
+    
+    // MARK: - Active State Helpers
+    var activeWindow: BrowserWindowState? {
+        activeWindowState
+    }
+
+    func isActive(_ windowState: BrowserWindowState) -> Bool {
+        activeWindowState?.id == windowState.id
+    }
+
+}
+
+@MainActor
+private struct WindowStateManagerKey: EnvironmentKey {
+    static let defaultValue: WindowStateManager = WindowStateManager()
+}
+
+extension EnvironmentValues {
+    @MainActor var windowStateManager: WindowStateManager {
+        get { self[WindowStateManagerKey.self] }
+        set { self[WindowStateManagerKey.self] = newValue }
     }
 }

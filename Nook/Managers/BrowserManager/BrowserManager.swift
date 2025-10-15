@@ -58,16 +58,7 @@ class BrowserManager {
 
 
     // MARK: - Window State Management
-    var windowStateManager: WindowStateManager
     var webViewCoordinator: WebViewCoordinator
-
-    var activeWindow: BrowserWindowState? {
-        windowStateManager.activeWindowState
-    }
-
-    func isActive(_ windowState: BrowserWindowState) -> Bool {
-        windowStateManager.activeWindowState?.id == windowState.id
-    }
 
     /// Reference to the app delegate for Sparkle integration
     weak var appDelegate: AppDelegate?
@@ -89,7 +80,7 @@ class BrowserManager {
 
     var externalMiniWindowManager = ExternalMiniWindowManager()
     var peekManager = PeekManager()
-    
+
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
     var isSwitchingProfile: Bool = false
@@ -246,7 +237,6 @@ class BrowserManager {
         self.windowStateManager = windowStateManager
         self.webViewCoordinator = webViewCoordinator
         self.currentProfile = initialProfile
-        self.windowStateManager.attach(browserManager: self)
 
         // Phase 2: wire dependencies and perform side effects (safe to use self)
         self.compositorManager.browserManager = self
@@ -1424,77 +1414,6 @@ class BrowserManager {
     /// Presents an external URL in a mini window popup (for URL events)
     func presentExternalURL(_ url: URL) {
         externalMiniWindowManager.present(url: url)
-    }
-    
-    // MARK: - Window State Management
-    
-    /// Register a new window state
-    func registerWindowState(_ windowState: BrowserWindowState) {
-        // Initialize window state with current global state for backward compatibility
-        windowState.sidebarWidth = sidebarWidth
-        windowState.sidebarContentWidth = max(sidebarWidth - 16, 0)
-        windowState.isSidebarVisible = isSidebarVisible
-        windowState.savedSidebarWidth = savedSidebarWidth
-        windowState.isCommandPaletteVisible = false
-        windowState.isMiniCommandPaletteVisible = false
-        windowState.didCopyURL = false
-        windowState.commandPalettePrefilledText = ""
-        windowState.shouldNavigateCurrentTab = false
-
-        // Set the NSWindow reference for keyboard shortcuts
-        if let window = NSApplication.shared.windows.first(where: { $0.contentView?.subviews.contains(where: {
-            ($0 as? NSHostingView<ContentView>) != nil
-        }) ?? false }) {
-            windowState.window = window
-        }
-        windowState.urlBarFrame = CommandPaletteCoordinator.shared.urlBarFrame
-        windowState.activeGradient = tabManager.currentSpace?.gradient ?? .default
-        windowState.currentProfileId = currentProfile?.id
-
-        // Set initial tab and space
-        windowState.currentTabId = tabManager.currentTab?.id
-        windowState.currentSpaceId = tabManager.currentSpace?.id
-        if let spaceId = windowState.currentSpaceId,
-           let space = tabManager.spaces.first(where: { $0.id == spaceId }) {
-            windowState.currentProfileId = space.profileId ?? currentProfile?.id
-            windowState.activeGradient = space.gradient
-        }
-
-        windowStateManager.register(windowState)
-        setActiveWindowState(windowState)
-
-        print("🪟 [BrowserManager] Registered window state: \(windowState.id)")
-    }
-    
-    /// MEMORY LEAK FIX: Comprehensive cleanup for a specific window
-    func unregisterWindowState(_ windowId: UUID) {
-        guard let windowState = windowStateManager.windowStates[windowId] else { return }
-
-        print("🧹 [BrowserManager] Starting comprehensive cleanup for window: \(windowId)")
-
-        CommandPaletteCoordinator.shared.closeCommandPalette(using: self, windowState: windowState)
-
-        // MEMORY LEAK FIX: Enhanced cleanup for window-specific web views
-        cleanupWebViewsForWindow(windowId)
-        
-        // Clean up split state for this window
-        splitManager.cleanupWindow(windowId)
-        removeCompositorContainerView(for: windowId)
-
-        // Unregister from window state manager
-        windowStateManager.unregister(windowId)
-
-        // If this was the active window, switch to another window
-        if windowStateManager.activeWindowState == nil {
-            if let newActive = windowStateManager.windowStates.values.first {
-                setActiveWindowState(newActive)
-            } else {
-                splitManager.refreshPublishedState(for: windowId)
-                CommandPaletteCoordinator.shared.sync(from: nil)
-            }
-        }
-
-        print("✅ [BrowserManager] Completed comprehensive cleanup for window: \(windowId)")
     }
     
     /// MEMORY LEAK FIX: Comprehensive cleanup for all WebViews in a specific window

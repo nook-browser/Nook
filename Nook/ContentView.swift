@@ -10,6 +10,7 @@ import AppKit
 
 struct ContentView: View {
     @Environment(BrowserManager.self) private var browserManager
+    @Environment(\.windowStateManager) private var windowStateManager
     @State private var windowState = BrowserWindowState()
     
     var body: some View {
@@ -19,11 +20,11 @@ struct ContentView: View {
             .frame(minWidth: 470, minHeight: 382)
             .onAppear {
                 // Register this window state with the browser manager
-                browserManager.windowStateManager.registerWindow(windowState)
+                windowStateManager.register(windowState)
             }
             .onDisappear {
                 // Unregister this window state when the window closes
-                browserManager.windowStateManager.unregisterWindow(windowState.id)
+                windowStateManager.unregister(windowState.id)
             }
     }
 }
@@ -78,13 +79,13 @@ private struct WindowFocusBridge: NSViewRepresentable {
             ) { [weak self] _ in
                 guard let self else { return }
                 Task { @MainActor in
-                    self.browserManager?.windowStateManager.activate(self.windowState)
+                    self.browserManager?.windowStateManager.setActive(self.windowState)
                 }
             }
 
             if window.isKeyWindow {
                 Task { @MainActor in
-                    browserManager?.windowStateManager.activate(windowState)
+                    browserManager?.windowStateManager.setActive(windowState)
                 }
             }
         }
