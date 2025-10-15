@@ -1,5 +1,5 @@
 //
-//  WindowStateManager.swift
+//  NookWindowState.swift
 //  Nook
 //
 //  Extracted from BrowserManager.swift
@@ -13,7 +13,7 @@ import SwiftUI
 
 @MainActor
 @Observable
-final class WindowStateManager {
+final class NookWindowState {
     /// Registry of all active window states
     private(set) var windowStates: [UUID: BrowserWindowState] = [:]
 
@@ -34,14 +34,14 @@ final class WindowStateManager {
     /// Register a new window state
     func register(_ windowState: BrowserWindowState) {
         windowStates[windowState.id] = windowState
-        print("🪟 [WindowStateManager] Registered window state: \(windowState.id)")
+        print("🪟 [NookWindowState] Registered window state: \(windowState.id)")
     }
 
     /// Unregister a window state
     func unregister(_ windowId: UUID) {
         guard let windowState = windowStates[windowId] else { return }
 
-        print("🧹 [WindowStateManager] Unregistering window: \(windowId)")
+        print("🧹 [NookWindowState] Unregistering window: \(windowId)")
 
         // Remove compositor container
         compositorContainerViews.removeValue(forKey: windowId)
@@ -54,7 +54,7 @@ final class WindowStateManager {
             activeWindowState = nil
         }
 
-        print("✅ [WindowStateManager] Unregistered window: \(windowId)")
+        print("✅ [NookWindowState] Unregistered window: \(windowId)")
     }
 
     /// Set the active window state
@@ -138,13 +138,13 @@ final class WindowStateManager {
 }
 
 @MainActor
-private struct WindowStateManagerKey: EnvironmentKey {
-    static let defaultValue: WindowStateManager = WindowStateManager()
+private struct NookWindowStateKey: EnvironmentKey {
+    static let defaultValue: NookWindowState = NookWindowState()
 }
 
 extension EnvironmentValues {
-    @MainActor var windowStateManager: WindowStateManager {
-        get { self[WindowStateManagerKey.self] }
-        set { self[WindowStateManagerKey.self] = newValue }
+    @MainActor var nookWindowState: NookWindowState {
+        get { self[NookWindowStateKey.self] }
+        set { self[NookWindowStateKey.self] = newValue }
     }
 }

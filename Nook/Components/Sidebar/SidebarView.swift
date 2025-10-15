@@ -6,6 +6,7 @@ import Sparkle
 struct SidebarView: View {
     @Environment(BrowserManager.self) private var browserManager
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(\.nookWindowState) private var nookWindowState
     @Environment(\.tabDragManager) private var dragManager
     @Environment(\.nookSettings) private var settings
     @Environment(\.nookDialog) private var dialogManager
@@ -161,7 +162,7 @@ struct SidebarView: View {
         } ?? 0
         
         let shouldAnimate =
-        browserManager.isActive(windowState)
+        nookWindowState.isActive(windowState)
         && !browserManager.isTransitioningProfile
         
         let content = VStack(spacing: 8) {

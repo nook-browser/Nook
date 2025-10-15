@@ -10,21 +10,21 @@ import AppKit
 
 struct ContentView: View {
     @Environment(BrowserManager.self) private var browserManager
-    @Environment(\.windowStateManager) private var windowStateManager
+    @Environment(\.nookWindowState) private var nookWindowState
     @State private var windowState = BrowserWindowState()
     
     var body: some View {
         WindowView()
             .environment(windowState)
-            .background(WindowFocusBridge(windowState: windowState, browserManager: browserManager))
+            .background(WindowFocusBridge(windowState: windowState, browserManager: browserManager, nookWindowState: nookWindowState))
             .frame(minWidth: 470, minHeight: 382)
             .onAppear {
                 // Register this window state with the browser manager
-                windowStateManager.register(windowState)
+                nookWindowState.register(windowState)
             }
             .onDisappear {
                 // Unregister this window state when the window closes
-                windowStateManager.unregister(windowState.id)
+                nookWindowState.unregister(windowState.id)
             }
     }
 }
@@ -32,9 +32,10 @@ struct ContentView: View {
 private struct WindowFocusBridge: NSViewRepresentable {
     let windowState: BrowserWindowState
     unowned let browserManager: BrowserManager
+    unowned let nookWindowState: NookWindowState
     
     func makeCoordinator() -> Coordinator {
-        Coordinator(windowState: windowState, browserManager: browserManager)
+        Coordinator(windowState: windowState, browserManager: browserManager, nookWindowState: nookWindowState)
     }
     
     func makeNSView(context: Context) -> NSView {
@@ -57,13 +58,15 @@ private struct WindowFocusBridge: NSViewRepresentable {
 
     final class Coordinator: NSObject {
         let windowState: BrowserWindowState
+        unowned let nookWindowState: NookWindowState
         weak var browserManager: BrowserManager?
         private weak var window: NSWindow?
         private var keyObserver: Any?
 
-        init(windowState: BrowserWindowState, browserManager: BrowserManager) {
+        init(windowState: BrowserWindowState, browserManager: BrowserManager, nookWindowState: NookWindowState) {
             self.windowState = windowState
             self.browserManager = browserManager
+            self.nookWindowState = nookWindowState
         }
 
         func attach(to window: NSWindow?) {
@@ -79,13 +82,13 @@ private struct WindowFocusBridge: NSViewRepresentable {
             ) { [weak self] _ in
                 guard let self else { return }
                 Task { @MainActor in
-                    self.browserManager?.windowStateManager.setActive(self.windowState)
+                    self.nookWindowState.setActive(self.windowState)
                 }
             }
 
             if window.isKeyWindow {
                 Task { @MainActor in
-                    browserManager?.windowStateManager.setActive(windowState)
+                    self.nookWindowState.setActive(windowState)
                 }
             }
         }

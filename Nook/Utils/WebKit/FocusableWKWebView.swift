@@ -211,7 +211,8 @@ final class FocusableWKWebView: WKWebView {
         guard let url = sender.representedObject as? URL else { return }
         Task { @MainActor [weak self] in
             guard let tab = self?.owningTab else { return }
-            tab.browserManager?.peekManager.presentExternalURL(url, from: tab)
+            // RE-IMPLEMENT LATER
+//            tab.browserManager?.peekManager.presentExternalURL(url, from: tab)
         }
     }
 

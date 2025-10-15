@@ -2,6 +2,7 @@ import AppKit
 
 final class SplitDropCaptureView: NSView {
     weak var browserManager: BrowserManager?
+    weak var nookWindowState: NookWindowState?
     weak var splitManager: SplitViewManager?
     var windowId: UUID?
     private var isDragActive: Bool = false
@@ -68,7 +69,7 @@ final class SplitDropCaptureView: NSView {
                 return true
             }
         }
-        if let windowState = bm.windowStateManager.windowStates[windowId] {
+        if let windowState = nookWindowState?.windowStates[windowId] {
             sm.enterSplit(with: tab, placeOn: side, in: windowState)
         }
         // Cancel any in-progress sidebar/tab drag to prevent unintended reorder/removal

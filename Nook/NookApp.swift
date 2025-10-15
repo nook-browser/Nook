@@ -49,7 +49,7 @@ struct NookApp: App {
 class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "AppTermination")
     weak var browserManager: BrowserManager?
-    weak var windowStateManager: WindowStateManager?
+    weak var nookWindowState: NookWindowState?
     private let urlEventClass = AEEventClass(kInternetEventClass)
     private let urlEventID = AEEventID(kAEGetURL)
     private var mouseEventMonitor: Any?
@@ -75,7 +75,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
                         CommandPaletteCoordinator.shared.openCommandPalette(using: manager)
                     case 3:
                         guard
-                            let windowState = windowStateManager?.activeWindow,
+                            let windowState = nookWindowState?.activeWindow,
                             let currentTab = manager.currentTabForActiveWindow(),
                             let webView = manager.getWebView(for: currentTab.id, in: windowState.id)
                         else {
@@ -85,7 +85,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
                         webView.goBack()
                     case 4:
                         guard
-                            let windowState = manager.activeWindow,
+                            let windowState = nookWindowState?.activeWindow,
                             let currentTab = manager.currentTabForActiveWindow(),
                             let webView = manager.getWebView(for: currentTab.id, in: windowState.id)
                         else {
@@ -241,6 +241,7 @@ struct NookCommands: Commands {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
     @Environment(\.nookCommandPalette) private var commandPalette
+    @Environment(\.nookWindowState) private var nookWindowState
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     init(browserManager: BrowserManager) {
@@ -305,8 +306,8 @@ struct NookCommands: Commands {
             .keyboardShortcut("n", modifiers: .command)
 
             Button("Close Tab") {
-                if browserManager.activeWindow?.isCommandPaletteVisible == true {
-                    commandPalette.closeCommandPalette(using: browserManager, windowState: browserManager.activeWindow)
+                if nookWindowState.activeWindow?.isCommandPaletteVisible == true {
+                    commandPalette.closeCommandPalette(using: browserManager, windowState: nookWindowState.activeWindow)
                 } else {
                     browserManager.closeCurrentTab()
                 }

@@ -87,19 +87,19 @@ class BrowserManager {
     
     // Compositor container view
     func setCompositorContainerView(_ view: NSView?, for windowId: UUID) {
-        windowStateManager.setCompositorContainer(view, for: windowId)
+        nookWindowState.setCompositorContainer(view, for: windowId)
     }
 
     func compositorContainerView(for windowId: UUID) -> NSView? {
-        return windowStateManager.getCompositorContainer(for: windowId)
+        return nookWindowState.getCompositorContainer(for: windowId)
     }
 
     func removeCompositorContainerView(for windowId: UUID) {
-        windowStateManager.removeCompositorContainer(for: windowId)
+        nookWindowState.removeCompositorContainer(for: windowId)
     }
     
     func removeWebViewFromContainers(_ webView: WKWebView) {
-        let containers = windowStateManager.getAllCompositorContainers()
+        let containers = nookWindowState.getAllCompositorContainers()
         for (_, container) in containers {
             for subview in container.subviews where subview === webView {
                 subview.removeFromSuperview()
@@ -120,7 +120,7 @@ class BrowserManager {
         let activeMute = desiredMuteState ?? tab.isAudioMuted
         for webView in clones {
             // Find which window this webView belongs to
-            let windowId = windowStateManager.getAllCompositorContainers().first(where: { _, container in
+            let windowId = nookWindowState.getAllCompositorContainers().first(where: { _, container in
                 container.subviews.contains(webView)
             })?.0
 
@@ -139,7 +139,7 @@ class BrowserManager {
 
         guard !previousGradient.visuallyEquals(newGradient) else {
             windowState.activeGradient = newGradient
-            if windowStateManager.activeWindowState?.id == windowState.id {
+            if nookWindowState.activeWindowState?.id == windowState.id {
                 themeManager.setImmediate(newGradient)
             }
             return
@@ -147,7 +147,7 @@ class BrowserManager {
 
         windowState.activeGradient = newGradient
 
-        guard windowStateManager.activeWindowState?.id == windowState.id else { return }
+        guard nookWindowState.activeWindowState?.id == windowState.id else { return }
 
         if animate {
             themeManager.transition(from: previousGradient, to: newGradient)
@@ -157,8 +157,8 @@ class BrowserManager {
     }
 
     func refreshGradientsForSpace(_ space: Space, animate: Bool) {
-        for (_, state) in windowStateManager.windowStates where state.currentSpaceId == space.id {
-            updateGradient(for: state, to: space.gradient, animate: animate && windowStateManager.activeWindowState?.id == state.id)
+        for (_, state) in nookWindowState.windowStates where state.currentSpaceId == space.id {
+            updateGradient(for: state, to: space.gradient, animate: animate && nookWindowState.activeWindowState?.id == state.id)
         }
     }
 
@@ -170,15 +170,15 @@ class BrowserManager {
         Task { [weak self] in
             await self?.switchToProfile(targetProfile, context: context, in: windowState)
             await MainActor.run {
-                if let activeId = self?.windowStateManager.activeWindowState?.id, activeId == windowState.id {
-                    self?.windowStateManager.activeWindowState?.currentProfileId = targetProfileId
+                if let activeId = self?.nookWindowState.activeWindowState?.id, activeId == windowState.id {
+                    self?.nookWindowState.activeWindowState?.currentProfileId = targetProfileId
                 }
             }
         }
     }
 
     func compositorContainers() -> [(UUID, NSView)] {
-        return windowStateManager.getAllCompositorContainers()
+        return nookWindowState.getAllCompositorContainers()
     }
 
     // MARK: - OAuth Assist Banner
@@ -217,7 +217,7 @@ class BrowserManager {
         let importManager = ImportManager()
 
         // Initialize window and webview managers
-        let windowStateManager = WindowStateManager()
+        let nookWindowState = NookWindowState()
         let webViewCoordinator = WebViewCoordinator()
 
         self.modelContext = context
@@ -234,7 +234,6 @@ class BrowserManager {
         self.trackingProtectionManager = trackingProtectionManager
         self.findManager = findManager
         self.importManager = importManager
-        self.windowStateManager = windowStateManager
         self.webViewCoordinator = webViewCoordinator
         self.currentProfile = initialProfile
 
@@ -379,7 +378,7 @@ class BrowserManager {
                     self.isTransitioningProfile = false
                 }
                 self.currentProfile = profile
-                self.windowStateManager.activeWindowState?.currentProfileId = profile.id
+                self.nookWindowState.activeWindowState?.currentProfileId = profile.id
                 // Switch data stores for cookie/cache
                 self.cookieManager.switchDataStore(profile.dataStore, profileId: profile.id)
                 self.cacheManager.switchDataStore(profile.dataStore, profileId: profile.id)
@@ -415,7 +414,7 @@ class BrowserManager {
     }
     
     func updateSidebarWidth(_ width: CGFloat) {
-        if let activeWindow = windowStateManager.activeWindowState {
+        if let activeWindow = nookWindowState.activeWindowState {
             updateSidebarWidth(width, for: activeWindow)
             return
         }
@@ -428,7 +427,7 @@ class BrowserManager {
         windowState.sidebarWidth = width
         windowState.savedSidebarWidth = width
         windowState.sidebarContentWidth = max(width - 16, 0)
-        if windowStateManager.activeWindowState?.id == windowState.id {
+        if nookWindowState.activeWindowState?.id == windowState.id {
             sidebarWidth = width
             savedSidebarWidth = width
             sidebarContentWidth = max(width - 16, 0)
@@ -440,7 +439,7 @@ class BrowserManager {
     }
 
     func toggleSidebar() {
-        if let windowState = windowStateManager.activeWindowState {
+        if let windowState = nookWindowState.activeWindowState {
             toggleSidebar(for: windowState)
         } else {
             withAnimation(.easeInOut(duration: 0.1)) {
@@ -471,7 +470,7 @@ class BrowserManager {
                 windowState.sidebarContentWidth = 0
             }
         }
-        if windowStateManager.activeWindowState?.id == windowState.id {
+        if nookWindowState.activeWindowState?.id == windowState.id {
             isSidebarVisible = windowState.isSidebarVisible
             sidebarWidth = windowState.sidebarWidth
             savedSidebarWidth = windowState.savedSidebarWidth
@@ -482,7 +481,7 @@ class BrowserManager {
 
     func toggleAISidebar() {
         guard SettingsManager.shared.showAIAssistant else { return }
-        if let windowState = windowStateManager.activeWindowState {
+        if let windowState = nookWindowState.activeWindowState {
             toggleAISidebar(for: windowState)
         }
     }
@@ -506,7 +505,7 @@ class BrowserManager {
         if let state = windowState {
             return state.savedSidebarWidth
         }
-        if let active = windowStateManager.activeWindowState {
+        if let active = nookWindowState.activeWindowState {
             return active.savedSidebarWidth
         }
         return savedSidebarWidth
@@ -543,7 +542,7 @@ class BrowserManager {
         print("🔧 [BrowserManager] Current tab: \(currentTab.name) - \(currentTab.url)")
         
         // Get the current space for the active window
-        let targetSpace = windowStateManager.activeWindowState?.currentSpaceId.flatMap { id in
+        let targetSpace = nookWindowState.activeWindowState?.currentSpaceId.flatMap { id in
             tabManager.spaces.first(where: { $0.id == id })
         } ?? tabManager.currentSpace
         
@@ -570,7 +569,7 @@ class BrowserManager {
         }
         
         // Set as active tab in the current window
-        if let windowState = windowStateManager.activeWindowState {
+        if let windowState = nookWindowState.activeWindowState {
             selectTab(newTab, in: windowState)
         } else {
             selectTab(newTab)
@@ -580,13 +579,13 @@ class BrowserManager {
     }
 
     func closeCurrentTab() {
-        if let activeWindow = windowStateManager.activeWindowState,
+        if let activeWindow = nookWindowState.activeWindowState,
            (activeWindow.isCommandPaletteVisible || activeWindow.isMiniCommandPaletteVisible) {
             CommandPaletteCoordinator.shared.closeCommandPalette(using: self, windowState: activeWindow)
             return
         }
         // Close tab in the active window
-        if let activeWindow = windowStateManager.activeWindowState,
+        if let activeWindow = nookWindowState.activeWindowState,
            let currentTab = currentTab(for: activeWindow) {
             tabManager.removeTab(currentTab.id)
         } else {
@@ -795,7 +794,7 @@ class BrowserManager {
     func hardReloadCurrentPage() {
         guard let currentTab = currentTabForActiveWindow(),
               let host = currentTab.url.host,
-              let activeWindowId = windowStateManager.activeWindowState?.id else { return }
+              let activeWindowId = nookWindowState.activeWindowState?.id else { return }
         Task { @MainActor in
             await cacheManager.clearCacheForDomainExcludingCookies(host)
             // Use the WebView that's actually visible in the current window
@@ -964,7 +963,7 @@ class BrowserManager {
     
     /// Get the current tab for the active window (used by keyboard shortcuts)
     func currentTabForActiveWindow() -> Tab? {
-        if let activeWindow = windowStateManager.activeWindowState {
+        if let activeWindow = nookWindowState.activeWindowState {
             return currentTab(for: activeWindow)
         }
         // Fallback to global current tab for backward compatibility
@@ -1036,7 +1035,7 @@ class BrowserManager {
     // MARK: - Web Inspector
     func openWebInspector() {
         guard let currentTab = currentTabForActiveWindow(),
-              let activeWindowId = windowStateManager.activeWindowState?.id else {
+              let activeWindowId = nookWindowState.activeWindowState?.id else {
             print("No current tab to inspect")
             return
         }
@@ -1090,7 +1089,7 @@ class BrowserManager {
 
     // MARK: - Profile Switch Toast
     func showProfileSwitchToast(from: Profile?, to: Profile, in windowState: BrowserWindowState?) {
-        guard let targetWindow = windowState ?? windowStateManager.activeWindowState else { return }
+        guard let targetWindow = windowState ?? nookWindowState.activeWindowState else { return }
         let toast = ProfileSwitchToast(fromProfile: from, toProfile: to, timestamp: Date())
         let windowId = targetWindow.id
         targetWindow.profileSwitchToast = toast
@@ -1103,12 +1102,12 @@ class BrowserManager {
     }
 
     func hideProfileSwitchToast(for windowState: BrowserWindowState? = nil) {
-        guard let window = windowState ?? windowStateManager.activeWindowState else { return }
+        guard let window = windowState ?? nookWindowState.activeWindowState else { return }
         hideProfileSwitchToast(forWindowId: window.id)
     }
 
     private func hideProfileSwitchToast(forWindowId windowId: UUID) {
-        guard let window = windowStateManager.windowStates[windowId] ?? (windowStateManager.activeWindowState?.id == windowId ? windowStateManager.activeWindowState : nil) else { return }
+        guard let window = nookWindowState.windowStates[windowId] ?? (nookWindowState.activeWindowState?.id == windowId ? nookWindowState.activeWindowState : nil) else { return }
         withAnimation(.spring(response: 0.45, dampingFraction: 0.9)) {
             window.isShowingProfileSwitchToast = false
         }
@@ -1503,7 +1502,7 @@ class BrowserManager {
 
         // Clear all tracking
         webViewCoordinator.clearAll()
-        // Note: compositorContainerViews is now managed by windowStateManager
+        // Note: compositorContainerViews is now managed by nookWindowState
         // and cleared via window unregistration
 
         print("✅ [BrowserManager] Completed comprehensive cleanup for ALL WebViews")
@@ -1511,7 +1510,7 @@ class BrowserManager {
 
     /// Set the active window state (called when a window gains focus)
     func setActiveWindowState(_ windowState: BrowserWindowState) {
-        windowStateManager.setActive(windowState)
+        nookWindowState.setActive(windowState)
         sidebarWidth = windowState.sidebarWidth
         savedSidebarWidth = windowState.savedSidebarWidth
         sidebarContentWidth = windowState.sidebarContentWidth
@@ -1539,7 +1538,7 @@ class BrowserManager {
     
     /// Select a tab in the active window (convenience method for sidebar clicks)
     func selectTab(_ tab: Tab) {
-        guard let activeWindow = windowStateManager.activeWindowState else {
+        guard let activeWindow = nookWindowState.activeWindowState else {
             print("⚠️ [BrowserManager] No active window for tab selection")
             return
         }
@@ -1596,7 +1595,7 @@ class BrowserManager {
         print("🪟 [BrowserManager] Selected tab \(tab.name) in window \(windowState.id)")
 
         // Update global tab state for the active window
-        if windowStateManager.activeWindowState?.id == windowState.id {
+        if nookWindowState.activeWindowState?.id == windowState.id {
             // Only update the global state, don't trigger UI operations again
             tabManager.updateActiveTabState(tab)
         }
@@ -1734,7 +1733,7 @@ class BrowserManager {
         // Store the web view
         webViewCoordinator.storeWebView(newWebView, for: tabId, in: windowId)
 
-        if let activeId = windowStateManager.activeWindowState?.id {
+        if let activeId = nookWindowState.activeWindowState?.id {
             enforceExclusiveAudio(for: tab, activeWindowId: activeId)
         } else {
             enforceExclusiveAudio(for: tab, activeWindowId: windowId)
@@ -1822,7 +1821,7 @@ class BrowserManager {
     
     /// Set active space for a specific window
     func setActiveSpace(_ space: Space, in windowState: BrowserWindowState) {
-        let isActiveWindow = windowStateManager.activeWindowState?.id == windowState.id
+        let isActiveWindow = nookWindowState.activeWindowState?.id == windowState.id
         if isActiveWindow {
             tabManager.setActiveSpace(space)
         }
@@ -1870,7 +1869,7 @@ class BrowserManager {
     
     /// Validate and fix window states after tab/space mutations
     func validateWindowStates() {
-        for (_, windowState) in windowStateManager.windowStates {
+        for (_, windowState) in nookWindowState.windowStates {
             var needsUpdate = false
             
             // Check if current tab still exists
@@ -1957,7 +1956,7 @@ class BrowserManager {
 
     /// Select the next tab in the active window
     func selectNextTabInActiveWindow() {
-        guard let activeWindow = windowStateManager.activeWindowState else { return }
+        guard let activeWindow = nookWindowState.activeWindowState else { return }
         let currentTabs = tabsForDisplay(in: activeWindow)
         guard let currentTab = currentTab(for: activeWindow),
               let currentIndex = currentTabs.firstIndex(where: { $0.id == currentTab.id }) else { return }
@@ -1970,7 +1969,7 @@ class BrowserManager {
 
     /// Select the previous tab in the active window
     func selectPreviousTabInActiveWindow() {
-        guard let activeWindow = windowStateManager.activeWindowState else { return }
+        guard let activeWindow = nookWindowState.activeWindowState else { return }
         let currentTabs = tabsForDisplay(in: activeWindow)
         guard let currentTab = currentTab(for: activeWindow),
               let currentIndex = currentTabs.firstIndex(where: { $0.id == currentTab.id }) else { return }
@@ -1983,7 +1982,7 @@ class BrowserManager {
 
     /// Select tab by index in the active window
     func selectTabByIndexInActiveWindow(_ index: Int) {
-        guard let activeWindow = windowStateManager.activeWindowState else { return }
+        guard let activeWindow = nookWindowState.activeWindowState else { return }
         let currentTabs = tabsForDisplay(in: activeWindow)
         guard currentTabs.indices.contains(index) else { return }
 
@@ -1993,7 +1992,7 @@ class BrowserManager {
 
     /// Select the last tab in the active window
     func selectLastTabInActiveWindow() {
-        guard let activeWindow = windowStateManager.activeWindowState else { return }
+        guard let activeWindow = nookWindowState.activeWindowState else { return }
         let currentTabs = tabsForDisplay(in: activeWindow)
         guard let lastTab = currentTabs.last else { return }
 
@@ -2002,7 +2001,7 @@ class BrowserManager {
 
     /// Select the next space in the active window
     func selectNextSpaceInActiveWindow() {
-        guard let activeWindow = windowStateManager.activeWindowState,
+        guard let activeWindow = nookWindowState.activeWindowState,
               let currentSpaceId = activeWindow.currentSpaceId,
               let currentSpaceIndex = tabManager.spaces.firstIndex(where: { $0.id == currentSpaceId }) else { return }
 
@@ -2014,7 +2013,7 @@ class BrowserManager {
 
     /// Select the previous space in the active window
     func selectPreviousSpaceInActiveWindow() {
-        guard let activeWindow = windowStateManager.activeWindowState,
+        guard let activeWindow = nookWindowState.activeWindowState,
               let currentSpaceId = activeWindow.currentSpaceId,
               let currentSpaceIndex = tabManager.spaces.firstIndex(where: { $0.id == currentSpaceId }) else { return }
 
@@ -2048,13 +2047,13 @@ class BrowserManager {
 
     /// Close the active window
     func closeActiveWindow() {
-        guard let activeWindow = windowStateManager.activeWindowState?.window else { return }
+        guard let activeWindow = nookWindowState.activeWindowState?.window else { return }
         activeWindow.close()
     }
 
     /// Toggle full screen for the active window
     func toggleFullScreenForActiveWindow() {
-        guard let activeWindow = windowStateManager.activeWindowState?.window else { return }
+        guard let activeWindow = nookWindowState.activeWindowState?.window else { return }
         activeWindow.toggleFullScreen(nil)
     }
 

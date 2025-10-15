@@ -1480,7 +1480,7 @@ class TabManager {
         // Keep the opposite side focused so the remaining pane stays visible.
         if let sm = browserManager?.splitManager, let bm = browserManager {
             // Check all windows for split state
-            for (windowId, _) in bm.windowStateManager.windowStates {
+            for (windowId, _) in bm.nookWindowState.windowStates {
                 if sm.isSplit(for: windowId) {
                     if sm.leftTabId(for: windowId) == tab.id {
                         sm.exitSplit(keep: .right, for: windowId)

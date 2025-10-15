@@ -15,7 +15,7 @@ final class CommandPaletteCoordinator {
     // MARK: - Public API
 
     func openCommandPalette(using browserManager: BrowserManager) {
-        guard let target = browserManager.activeWindow ?? browserManager.windowStateManager.windowStates.values.first else {
+        guard let target = browserManager.activeWindow ?? browserManager.nookWindowState.windowStates.values.first else {
             commandPalettePrefilledText = ""
             shouldNavigateCurrentTab = false
             isMiniCommandPaletteVisible = false
@@ -26,7 +26,7 @@ final class CommandPaletteCoordinator {
     }
 
     func openCommandPaletteWithCurrentURL(using browserManager: BrowserManager) {
-        guard let target = browserManager.activeWindow ?? browserManager.windowStateManager.windowStates.values.first else {
+        guard let target = browserManager.activeWindow ?? browserManager.nookWindowState.windowStates.values.first else {
             openCommandPalette(using: browserManager)
             return
         }
@@ -39,7 +39,7 @@ final class CommandPaletteCoordinator {
         if let windowState {
             targets = [windowState]
         } else {
-            targets = Array(browserManager.windowStateManager.windowStates.values)
+            targets = Array(browserManager.nookWindowState.windowStates.values)
         }
 
         for state in targets {
@@ -70,7 +70,7 @@ final class CommandPaletteCoordinator {
     }
 
     func showMiniCommandPalette(using browserManager: BrowserManager, in windowState: BrowserWindowState, prefill: String) {
-        for state in browserManager.windowStateManager.windowStates.values where state.id != windowState.id {
+        for state in browserManager.nookWindowState.windowStates.values where state.id != windowState.id {
             state.isMiniCommandPaletteVisible = false
         }
 
@@ -92,7 +92,7 @@ final class CommandPaletteCoordinator {
         if let windowState {
             targets = [windowState]
         } else {
-            targets = Array(browserManager.windowStateManager.windowStates.values)
+            targets = Array(browserManager.nookWindowState.windowStates.values)
         }
 
         for state in targets {
@@ -121,7 +121,7 @@ final class CommandPaletteCoordinator {
     }
 
     func focusURLBar(using browserManager: BrowserManager) {
-        guard let target = browserManager.activeWindow ?? browserManager.windowStateManager.windowStates.values.first else { return }
+        guard let target = browserManager.activeWindow ?? browserManager.nookWindowState.windowStates.values.first else { return }
         let prefill = browserManager.currentTab(for: target)?.url.absoluteString ?? ""
         showMiniCommandPalette(using: browserManager, in: target, prefill: prefill)
     }
@@ -142,7 +142,7 @@ final class CommandPaletteCoordinator {
     // MARK: - Private helpers
 
     private func showCommandPalette(in windowState: BrowserWindowState, prefill: String, navigateCurrentTab: Bool, using browserManager: BrowserManager) {
-        for state in browserManager.windowStateManager.windowStates.values where state.id != windowState.id {
+        for state in browserManager.nookWindowState.windowStates.values where state.id != windowState.id {
             state.isCommandPaletteVisible = false
             state.isMiniCommandPaletteVisible = false
         }

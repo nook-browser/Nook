@@ -5,6 +5,7 @@ import Observation
 
 struct TabCompositorView: NSViewRepresentable {
     let browserManager: BrowserManager
+    @Environment(\.nookWindowState) private var nookWindowState
     @Environment(BrowserWindowState.self) private var windowState
     
     func makeNSView(context: Context) -> NSView {
@@ -53,6 +54,8 @@ struct TabCompositorView: NSViewRepresentable {
 @MainActor
 @Observable
 final class TabCompositorManager {
+    weak var browserManager: BrowserManager?
+    weak var nookWindowState: NookWindowState?
     private var unloadTimers: [UUID: Timer] = [:]
     private var lastAccessTimes: [UUID: Date] = [:]
     
@@ -171,7 +174,7 @@ final class TabCompositorManager {
     func updateTabVisibility(currentTabId: UUID?) {
         guard let browserManager = browserManager else { return }
         for (windowId, _) in browserManager.compositorContainers() {
-            guard let windowState = browserManager.windowStateManager.windowStates[windowId] else { continue }
+            guard let windowState = nookWindowState?.windowStates[windowId] else { continue }
             browserManager.refreshCompositor(for: windowState)
         }
     }
@@ -180,7 +183,4 @@ final class TabCompositorManager {
     func updateTabVisibility(for windowState: BrowserWindowState) {
         browserManager?.refreshCompositor(for: windowState)
     }
-    
-    // MARK: - Dependencies
-    weak var browserManager: BrowserManager?
 }
