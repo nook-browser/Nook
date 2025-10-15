@@ -273,8 +273,14 @@ struct NookCommands: Commands {
             }
             .keyboardShortcut("u", modifiers: [.command, .shift])
             
-            Button("Import from Arc") {
-                browserManager.importArcData()
+            Button("Import from another Browser") {
+                browserManager.dialogManager.showDialog(
+                    BrowserImportDialog(
+                        onCancel: {
+                            browserManager.dialogManager.closeDialog()
+                        }
+                    )
+                )
             }
             Divider()
 
@@ -326,6 +332,13 @@ struct NookCommands: Commands {
                 browserManager.toggleSidebar()
             }
             .keyboardShortcut("s", modifiers: .command)
+
+            Button("Toggle AI Assistant") {
+                browserManager.toggleAISidebar()
+            }
+            .keyboardShortcut("a", modifiers: [.command, .shift])
+            .disabled(!browserManager.settingsManager.showAIAssistant)
+
             Button("Toggle Picture in Picture") {
                 browserManager.requestPiPForCurrentTabInActiveWindow()
             }
@@ -353,6 +366,29 @@ struct NookCommands: Commands {
             }
             .keyboardShortcut("r", modifiers: .command)
             .disabled(browserManager.currentTabForActiveWindow() == nil)
+
+            Divider()
+
+            // Zoom controls
+            Button("Zoom In") {
+                browserManager.zoomInCurrentTab()
+            }
+            .keyboardShortcut("+", modifiers: .command)
+            .disabled(browserManager.currentTabForActiveWindow() == nil)
+
+            Button("Zoom Out") {
+                browserManager.zoomOutCurrentTab()
+            }
+            .keyboardShortcut("-", modifiers: .command)
+            .disabled(browserManager.currentTabForActiveWindow() == nil)
+
+            Button("Actual Size") {
+                browserManager.resetZoomCurrentTab()
+            }
+            .keyboardShortcut("0", modifiers: .command)
+            .disabled(browserManager.currentTabForActiveWindow() == nil)
+
+            Divider()
 
             Button("Hard Reload (Ignore Cache)") {
                 browserManager.hardReloadCurrentPage()
@@ -535,4 +571,3 @@ struct BackgroundWindowModifier: NSViewRepresentable {
 
     }
 }
-

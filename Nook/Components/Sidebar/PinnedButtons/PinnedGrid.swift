@@ -17,6 +17,7 @@ struct PinnedGrid: View {
 
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(\.colorScheme) var colorScheme
     @State private var draggedItem: UUID? = nil
     
     init(width: CGFloat, profileId: UUID? = nil) {
@@ -37,16 +38,27 @@ struct PinnedGrid: View {
 
         // For embedded use, return proper sized container even when empty to support transitions
         if items.isEmpty {
+            let isDragging = draggedItem != nil
+            let backgroundColor = isDragging
+                ? (colorScheme == .dark ? AppColors.pinnedTabHoverLight : AppColors.pinnedTabHoverDark)
+                : Color.clear
+
             return AnyView(
-                Color.clear
-                    .frame(height: 44)
+                backgroundColor
+                    .frame(height: isDragging ? 44 : 10)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .animation(.easeInOut(duration: 0.15), value: isDragging)
                     .onDrop(
                         of: [.text],
                         delegate: SidebarSectionDropDelegateSimple(
                             itemsCount: { 0 },
                             draggedItem: $draggedItem,
                             targetSection: .essentials,
-                            tabManager: browserManager.tabManager
+                            tabManager: browserManager.tabManager,
+                            targetIndex: nil,
+                            onDropEntered: {
+                                NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                            }
                         )
                     )
             )
@@ -93,7 +105,11 @@ struct PinnedGrid: View {
                             itemsCount: { items.count },
                             draggedItem: $draggedItem,
                             targetSection: .essentials,
-                            tabManager: browserManager.tabManager
+                            tabManager: browserManager.tabManager,
+                            targetIndex: nil,
+                            onDropEntered: {
+                                NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                            }
                         )
                     )
                 }

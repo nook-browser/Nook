@@ -161,33 +161,8 @@ struct SidebarSectionDropDelegateSimple: DropDelegate {
             else { return }
 
             DispatchQueue.main.async {
-                let all = tabManager.allTabs()
-                guard let from = all.first(where: { $0.id == uuid }) else { return }
-
-                if case .folder = self.targetSection {
-                    self.draggedItem = uuid
-                    self.onDropEntered?()
-                    return
-                }
-
-                let (fromContainer, fromIndex, _) = containerFor(tab: from, tabManager: tabManager)
-                let (toContainer, toSpace) = targetContainer(from: self.targetSection)
-                let toIndex = max(0, self.targetIndex?() ?? self.itemsCount())
-
-                let op = DragOperation(
-                    tab: from,
-                    fromContainer: fromContainer,
-                    fromIndex: max(fromIndex, 0),
-                    toContainer: toContainer,
-                    toIndex: toIndex,
-                    toSpaceId: toSpace
-                )
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    tabManager.handleDragOperation(op)
-                }
                 self.draggedItem = uuid
-                haptic(.alignment)
-                self.onDropCompleted?()
+                self.onDropEntered?()
             }
         }
     }
@@ -206,9 +181,53 @@ struct SidebarSectionDropDelegateSimple: DropDelegate {
         if case .folder = targetSection {
             handleFolderDrop(info: info)
         } else {
-            finishDrop()
+            handleRegularDrop(info: info)
         }
         return true
+    }
+
+    private func handleRegularDrop(info: DropInfo) {
+        guard let provider = info.itemProviders(for: [.text]).first else {
+            finishDrop()
+            return
+        }
+        provider.loadObject(ofClass: NSString.self) { object, _ in
+            guard
+                let string = object as? String,
+                let uuid = UUID(uuidString: string)
+            else {
+                DispatchQueue.main.async {
+                    self.finishDrop()
+                }
+                return
+            }
+
+            DispatchQueue.main.async {
+                let all = tabManager.allTabs()
+                guard let from = all.first(where: { $0.id == uuid }) else {
+                    self.finishDrop()
+                    return
+                }
+
+                let (fromContainer, fromIndex, _) = containerFor(tab: from, tabManager: tabManager)
+                let (toContainer, toSpace) = targetContainer(from: self.targetSection)
+                let toIndex = max(0, self.targetIndex?() ?? self.itemsCount())
+
+                let op = DragOperation(
+                    tab: from,
+                    fromContainer: fromContainer,
+                    fromIndex: max(fromIndex, 0),
+                    toContainer: toContainer,
+                    toIndex: toIndex,
+                    toSpaceId: toSpace
+                )
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    tabManager.handleDragOperation(op)
+                }
+                self.onDropCompleted?()
+                self.finishDrop()
+            }
+        }
     }
 
     private func handleFolderDrop(info: DropInfo) {

@@ -38,8 +38,8 @@ struct SpaceTab: View {
                     tab.favicon
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 20, height: 20)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .frame(width: 14, height: 14)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         .opacity(tab.isUnloaded ? 0.5 : 1.0)
                     
                     if tab.isUnloaded {
@@ -51,7 +51,7 @@ struct SpaceTab: View {
                             .offset(x: 6, y: -6)
                     }
                 }
-                if tab.hasAudioContent || tab.isAudioMuted {
+                if tab.hasAudioContent || tab.hasPlayingAudio || tab.isAudioMuted {
                     Button(action: {
                         onMute()
                     }) {
@@ -75,7 +75,7 @@ struct SpaceTab: View {
                 
                 if tab.isRenaming {
                     TextField("", text: $tab.editingName)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(tab.isUnloaded ? AppColors.textSecondary : textTab)
                         .textFieldStyle(.plain)
                         .onSubmit {
@@ -94,7 +94,7 @@ struct SpaceTab: View {
                         .focused($isTextFieldFocused)
                 } else {
                     Text(tab.name)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(textTab)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -109,8 +109,8 @@ struct SpaceTab: View {
                         Image(systemName: "xmark")
                             .font(.system(size: 12, weight: .heavy))
                             .foregroundColor(textTab)
-                            .padding(4)
-                            .background(isCloseHovering ? (isCurrentTab ? AppColors.controlBackgroundHoverLight : AppColors.controlBackgroundActive) : Color.clear)                                                   
+                            .frame(width: 24,height: 24)
+                            .background(isCloseHovering ? (isCurrentTab ? AppColors.controlBackgroundHoverLight : AppColors.controlBackgroundActive) : Color.clear)
                             .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -120,15 +120,14 @@ struct SpaceTab: View {
                 }
             }
             .padding(.horizontal, 10)
-            .frame(height: 40)
+            .frame(height: 36)
             .frame(minWidth: 0, maxWidth: .infinity)
             .background(
                 backgroundColor
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(PlainButtonStyle())
-        .contentShape(RoundedRectangle(cornerRadius: 12))
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.05)) {
                 isHovering = hovering
@@ -163,7 +162,7 @@ struct SpaceTab: View {
                 }
                 Divider()
             }
-            if tab.hasAudioContent || tab.isAudioMuted {
+            if tab.hasAudioContent || tab.hasPlayingAudio || tab.isAudioMuted {
                 Button(action: onMute) {
                     Label(tab.isAudioMuted ? "Unmute Audio" : "Mute Audio",
                           systemImage: tab.isAudioMuted ? "speaker.wave.2" : "speaker.slash")

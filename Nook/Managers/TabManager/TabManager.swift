@@ -404,6 +404,16 @@ import OSLog
 
 @MainActor
 class TabManager: ObservableObject {
+    enum TabManagerError: LocalizedError {
+        case spaceNotFound(UUID)
+
+        var errorDescription: String? {
+            switch self {
+            case .spaceNotFound(let id):
+                return "Space with id \(id.uuidString) was not found."
+            }
+        }
+    }
     weak var browserManager: BrowserManager?
     private let context: ModelContext
     private let persistence: PersistenceActor
@@ -785,16 +795,27 @@ class TabManager: ObservableObject {
         }
     }
 
-    func renameSpace(spaceId: UUID, newName: String) {
-        guard let idx = spaces.firstIndex(where: { $0.id == spaceId }) else {
-            return
+    func renameSpace(spaceId: UUID, newName: String) throws {
+        guard let idx = spaces.firstIndex(where: { $0.id == spaceId }), idx < spaces.count else {
+            throw TabManagerError.spaceNotFound(spaceId)
         }
-
-        guard idx < spaces.count else { return }
         spaces[idx].name = newName
 
         if currentSpace?.id == spaceId {
             currentSpace?.name = newName
+        }
+
+        persistSnapshot()
+    }
+
+    func updateSpaceIcon(spaceId: UUID, icon: String) throws {
+        guard let idx = spaces.firstIndex(where: { $0.id == spaceId }), idx < spaces.count else {
+            throw TabManagerError.spaceNotFound(spaceId)
+        }
+        spaces[idx].icon = icon
+
+        if currentSpace?.id == spaceId {
+            currentSpace?.icon = icon
         }
 
         persistSnapshot()
@@ -812,10 +833,8 @@ class TabManager: ObservableObject {
         print("   Created folder: \(folder.name) (id: \(folder.id.uuidString.prefix(8))...)")
 
         var folders = foldersBySpace[spaceId] ?? []
-        let oldCount = folders.count
         folders.append(folder)
         setFolders(folders, for: spaceId)
-        print("   Added to foldersBySpace[\(spaceId.uuidString.prefix(8))...]: \(oldCount) → \(folders.count) folders")
 
         // Send notification for SpaceView folderChangeCount
         NotificationCenter.default.post(name: .init("TabFoldersDidChange"), object: nil)
@@ -857,7 +876,6 @@ class TabManager: ObservableObject {
                 var mutableFolders = folders
                 mutableFolders.remove(at: index)
                 setFolders(mutableFolders, for: spaceId)
-                print("   Removed folder from foldersBySpace[\(spaceId.uuidString.prefix(8))...]: \(folders.count) → \(mutableFolders.count) folders")
 
                 // Send notification for SpaceView folderChangeCount
                 NotificationCenter.default.post(name: .init("TabFoldersDidChange"), object: nil)
@@ -1700,10 +1718,6 @@ class TabManager: ObservableObject {
     func spacePinnedTabs(for spaceId: UUID) -> [Tab] {
         // Create a copy of the array before sorting to prevent race conditions
         let tabs = Array(spacePinnedTabs[spaceId] ?? []).sorted { $0.index < $1.index }
-        print("📌 spacePinnedTabs(for: \(spaceId.uuidString.prefix(8))...) returning \(tabs.count) tabs:")
-        for tab in tabs {
-            print("   - \(tab.name) (id: \(tab.id.uuidString.prefix(8))..., folderId: \(tab.folderId?.uuidString.prefix(8) ?? "nil"))")
-        }
         return tabs
     }
     
