@@ -13,7 +13,7 @@ import AppKit
 struct LinkStatusBar: View {
     let hoveredLink: String?
     let isCommandPressed: Bool
-    
+
     var body: some View {
         if let link = hoveredLink, !link.isEmpty {
             Text(isCommandPressed ? "Open \(link) in a new tab and focus it" : link)
@@ -71,6 +71,9 @@ struct WebsiteView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .clipShape(RoundedRectangle(cornerRadius: {
                             if windowState.isFullScreen {
+                                return 0
+                            }
+                            if browserManager.settingsManager.borderless {
                                 return 0
                             }
                             if #available(macOS 26.0, *) {
