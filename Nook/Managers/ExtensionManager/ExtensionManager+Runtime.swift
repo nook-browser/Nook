@@ -599,13 +599,11 @@ extension ExtensionManager {
                 } else {
                     markAPIReady('scripting');
 
-                // chrome.alarms API - NEW
-                if (!chrome.alarms) {
-                    \(generateAlarmsAPIScript(extensionId: extensionId))
-                    markAPIReady('alarms');
                 }
 
-                }
+                // chrome.alarms API - Force override native implementation
+                \(generateAlarmsAPIScript(extensionId: extensionId))
+                markAPIReady('alarms');
 
                 // Context-specific initialization
                 \(contextSpecificCode)
