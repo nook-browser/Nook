@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Clipboard API Deep Validation Test Suite</title>
+  <style>
+    body {
+      width: 450px;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      margin: 0;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    
+    h1 {
+      font-size: 18px;
+      margin: 0 0 8px 0;
+      color: #333;
+    }
+    
+    .subtitle {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 20px;
+    }
+    
+    .section {
+      margin-bottom: 16px;
+      padding: 14px;
+      background: #f5f5f5;
+      border-radius: 8px;
+    }
+    
+    .section h2 {
+      font-size: 14px;
+      margin: 0 0 10px 0;
+      color: #666;
+      font-weight: 600;
+    }
+    
+    textarea {
+      width: 100%;
+      min-height: 60px;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 11px;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+    
+    button {
+      width: 100%;
+      padding: 8px 14px;
+      margin-top: 8px;
+      background: #007AFF;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    
+    button:hover {
+      background: #0051D5;
+    }
+    
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    
+    button.secondary {
+      background: #5856D6;
+    }
+    
+    button.secondary:hover {
+      background: #4544B8;
+    }
+    
+    button.danger {
+      background: #FF3B30;
+    }
+    
+    button.danger:hover {
+      background: #DD2C1F;
+    }
+    
+    .result {
+      margin-top: 10px;
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      display: none;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    
+    .result.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    
+    .result.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    
+    .result.info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+    
+    .test-all {
+      background: #34C759;
+      margin-top: 16px;
+      font-size: 14px;
+      padding: 10px;
+    }
+    
+    .test-all:hover {
+      background: #28A745;
+    }
+    
+    .status-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+    
+    .status-indicator.pass {
+      background: #34C759;
+    }
+    
+    .status-indicator.fail {
+      background: #FF3B30;
+    }
+    
+    .status-indicator.pending {
+      background: #FFD60A;
+    }
+    
+    .test-category {
+      background: #e8f5e9;
+      padding: 8px 12px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+      font-weight: 600;
+      font-size: 13px;
+      color: #2e7d32;
+    }
+    
+    .validation-badge {
+      display: inline-block;
+      background: #007AFF;
+      color: white;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 600;
+      margin-left: 6px;
+    }
+  </style>
+</head>
+<body>
+  <h1>📋 Clipboard API Deep Validation Test Suite</h1>
+  <div class="subtitle">Comprehensive testing based on deep validation analysis</div>
+  
+  <!-- API Detection Section -->
+  <div class="section">
+    <h2>🔍 API Detection</h2>
+    <div style="font-size: 12px; color: #333;">
+      <div style="margin-bottom: 6px;">
+        <span class="status-indicator pending"></span>
+        <strong>navigator.clipboard:</strong> <span id="clipboardExists">Checking...</span>
+      </div>
+      <div style="margin-bottom: 6px;">
+        <span class="status-indicator pending"></span>
+        <strong>clipboard.writeText:</strong> <span id="writeTextExists">Checking...</span>
+      </div>
+      <div>
+        <span class="status-indicator pending"></span>
+        <strong>clipboard.readText:</strong> <span id="readTextExists">Checking...</span>
+      </div>
+    </div>
+  </div>
+  
+  <div class="test-category">✅ Phase 1: Basic Functionality</div>
+  
+  <!-- Basic Write Test -->
+  <div class="section">
+    <h2>✍️ Basic Write Test</h2>
+    <textarea id="writeInput" placeholder="Enter text to copy...">Hello from Nook! 🚀</textarea>
+    <button id="writeBtn">Copy to Clipboard</button>
+    <div id="writeResult" class="result"></div>
+  </div>
+  
+  <!-- Basic Read Test -->
+  <div class="section">
+    <h2>📖 Basic Read Test</h2>
+    <button id="readBtn" class="secondary">Read from Clipboard</button>
+    <textarea id="readOutput" placeholder="Clipboard content will appear here..." readonly></textarea>
+    <div id="readResult" class="result"></div>
+  </div>
+  
+  <!-- Round Trip Test -->
+  <div class="section">
+    <h2>🔄 Round Trip Test</h2>
+    <button id="roundTripBtn">Test Write → Read Cycle</button>
+    <div id="roundTripResult" class="result"></div>
+  </div>
+  
+  <div class="test-category">🔐 Phase 2: Security & Edge Cases</div>
+  
+  <!-- Special Characters Test -->
+  <div class="section">
+    <h2>🎯 Special Characters Test <span class="validation-badge">SECURITY</span></h2>
+    <button id="specialCharsBtn">Test Unicode & Escaping</button>
+    <div id="specialCharsResult" class="result"></div>
+  </div>
+  
+  <!-- Empty Clipboard Test -->
+  <div class="section">
+    <h2>⭕ Empty Clipboard Test</h2>
+    <button id="emptyBtn" class="secondary">Test Empty Clipboard</button>
+    <div id="emptyResult" class="result"></div>
+  </div>
+  
+  <!-- Error Handling Test -->
+  <div class="section">
+    <h2>⚠️ Error Message Escaping <span class="validation-badge">SECURITY FIX</span></h2>
+    <button id="errorEscapingBtn">Test Error Injection Safety</button>
+    <div id="errorEscapingResult" class="result"></div>
+  </div>
+  
+  <div class="test-category">⚡ Phase 3: Performance & Reliability</div>
+  
+  <!-- Timeout Test -->
+  <div class="section">
+    <h2>⏱️ Timeout Protection Test <span class="validation-badge">5s TIMEOUT</span></h2>
+    <p style="font-size: 11px; color: #666; margin: 0 0 8px 0;">
+      Note: This test would require simulating a hang (not possible in normal operation)
+    </p>
+    <button id="timeoutBtn" class="secondary">Verify Timeout Config</button>
+    <div id="timeoutResult" class="result"></div>
+  </div>
+  
+  <!-- Concurrent Operations Test -->
+  <div class="section">
+    <h2>🔀 Concurrent Operations Test</h2>
+    <button id="concurrentBtn">Run 5 Simultaneous Operations</button>
+    <div id="concurrentResult" class="result"></div>
+  </div>
+  
+  <!-- Large Content Test -->
+  <div class="section">
+    <h2>📦 Large Content Test</h2>
+    <button id="largeContentBtn">Test 1MB Content</button>
+    <div id="largeContentResult" class="result"></div>
+  </div>
+  
+  <!-- Rapid Operations Test -->
+  <div class="section">
+    <h2>⚡ Rapid Operations Test <span class="validation-badge">MEMORY</span></h2>
+    <button id="rapidBtn">Run 20 Rapid Operations</button>
+    <div id="rapidResult" class="result"></div>
+  </div>
+  
+  <div class="test-category">🧪 Phase 4: Comprehensive Validation</div>
+  
+  <!-- Run All Tests Button -->
+  <button id="runAllBtn" class="test-all">🧪 Run Complete Validation Suite</button>
+  
+  <div id="summaryResult" class="result" style="margin-top: 16px; font-weight: 600;"></div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
+

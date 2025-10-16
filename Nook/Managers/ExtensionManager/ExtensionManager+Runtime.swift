@@ -3,8 +3,7 @@
 //  Nook
 //
 //  Chrome Runtime API Bridge for WKWebExtension support
-//  Implements chrome.runtime.* APIs for Bitwarden compatibility
-//
+//  Implements chrome.runtime.* APIs
 
 import Foundation
 import WebKit
@@ -175,44 +174,13 @@ extension ExtensionManager {
     func getExtensionManifest(for context: WKWebExtensionContext) -> [String: Any]? {
         guard let extensionId = getExtensionId(for: context) else { return nil }
 
-        // This would typically read the actual manifest.json file
-        // For now, return a basic manifest structure that Bitwarden expects
-        return [
-            "manifest_version": 3,
-            "name": "Bitwarden",
-            "version": "2024.6.2",
-            "description": "Bitwarden password manager",
-            "permissions": [
-                "activeTab",
-                "alarms",
-                "storage",
-                "tabs",
-                "scripting",
-                "unlimitedStorage",
-                "webNavigation",
-                "webRequest",
-                "notifications"
-            ],
-            "host_permissions": [
-                "https://*/*",
-                "http://*/*"
-            ],
-            "background": [
-                "service_worker": "background.js"
-            ],
-            "action": [
-                "default_popup": "popup/index.html",
-                "default_title": "Bitwarden"
-            ],
-            "content_scripts": [
-                [
-                    "matches": ["<all_urls>"],
-                    "js": ["content/content-message-handler.js"],
-                    "run_at": "document_start",
-                    "all_frames": false
-                ]
-            ]
-        ]
+        // Read the actual manifest from the web extension
+        guard let manifest = context.webExtension.manifest as? [String: Any] else {
+            print("❌ [ExtensionManager+Runtime] Failed to read manifest from extension \(extensionId)")
+            return nil
+        }
+        
+        return manifest
     }
 
     // MARK: - Message Reply System
@@ -242,7 +210,7 @@ extension ExtensionManager {
         webView.evaluateJavaScript(completeAPIScript) { result, error in
             if let error = error {
                 print("❌ [ExtensionManager+Runtime] CHROME API INJECTION FAILED: \(error)")
-                print("❌ [ExtensionManager+Runtime] This will prevent Bitwarden from loading properly")
+                print("❌ [ExtensionManager+Runtime] This will prevent extensions from loading properly")
             } else {
                 print("✅ [ExtensionManager+Runtime] CHROME API INJECTION SUCCESSFUL")
                 // Verify API availability after injection
@@ -273,13 +241,13 @@ extension ExtensionManager {
         switch contextType {
         case .popup:
             contextSpecificCode = """
-            // POPUP CONTEXT: Bitwarden Angular app initialization
+            // POPUP CONTEXT: Extension popup initialization
             console.log('[Chrome Bridge] POPUP CONTEXT - Preparing for Angular bootstrap');
             window.CHROME_BRIDGE_CONTEXT = 'popup';
             window.CHROME_BRIDGE_READY = false;
             """
             additionalAPICode = """
-            // Popup-specific APIs that Bitwarden needs
+            // Popup-specific APIs that extensions need
             if (!chrome.runtime.id) {
                 console.error('[Chrome Bridge] CRITICAL: chrome.runtime.id is missing - Angular will fail');
             }
@@ -329,7 +297,7 @@ extension ExtensionManager {
                 getSelf: function(callback) {
                     const selfInfo = {
                         id: '\(extensionId)',
-                        name: 'Bitwarden',
+                        name: 'Web Extension',
                         version: '2024.6.2'
                     };
                     if (callback) callback(selfInfo);
@@ -661,7 +629,7 @@ extension ExtensionManager {
 
             if (missingAPIs.length > 0) {
                 console.error('❌ [Chrome Bridge] MISSING APIS:', missingAPIs);
-                console.error('❌ [Chrome Bridge] Bitwarden will fail to load without these APIs');
+                console.error('❌ [Chrome Bridge] Extensions will fail to load without these APIs');
                 return { success: false, missingAPIs: missingAPIs, availableAPIs: availableAPIs };
             }
 
@@ -700,7 +668,7 @@ extension ExtensionManager {
                     let success = resultDict["success"] as? Bool ?? false
                     if success {
                         print("✅ [ExtensionManager+Runtime] ALL CHROME APIS VERIFIED SUCCESSFULLY")
-                        print("✅ [ExtensionManager+Runtime] Bitwarden should be able to load properly")
+                        print("✅ [ExtensionManager+Runtime] Extension should be able to load properly")
                     } else {
                         print("❌ [ExtensionManager+Runtime] CHROME API VERIFICATION FAILED")
                         if let missingAPIs = resultDict["missingAPIs"] as? [String] {
@@ -803,7 +771,7 @@ extension ExtensionManager {
                 console.log('🚀 [Chrome Injection] Created chrome object');
             }
 
-            // Phase 1: Essential Runtime API (needed immediately by Bitwarden)
+            // Phase 1: Essential Runtime API (needed immediately by extensions)
             if (!chrome.runtime) {
                 chrome.runtime = {
                     id: '\(extensionId)',
@@ -885,7 +853,7 @@ extension ExtensionManager {
                 console.log('✅ [Chrome Injection] Runtime API initialized');
             }
 
-            // Phase 2: Storage API (essential for Bitwarden settings)
+            // Phase 2: Storage API (essential for extension settings)
             if (!chrome.storage) {
                 chrome.storage = {
                     local: {
@@ -1148,7 +1116,7 @@ extension ExtensionManager {
             print("   Expected package path: \(packageURLPath)")
         }
 
-        // Test loading multiple known resource files that Bitwarden needs
+        // Test loading multiple known resource files that extensions need
         let testResources = [
             "manifest.json",
             "popup/index.html",
@@ -1467,7 +1435,7 @@ extension ExtensionManager {
                 print("❌ [ExtensionManager] CRITICAL TESTS FAILED")
                 print("❌ [ExtensionManager] webkit-extension:// URLs will NOT work")
                 print("❌ [ExtensionManager] Extension popups will fail to load resources")
-                print("❌ [ExtensionManager] This explains Bitwarden popup loading failures")
+                print("❌ [ExtensionManager] This explains extension popup loading failures")
             }
         }
     }

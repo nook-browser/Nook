@@ -1802,13 +1802,19 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             "chromeRuntime",
             "chromeTabs",
             "chromeStorage",
-            "chromeScripting"
+            "chromeScripting",
+            "chromeClipboard"
         ]
 
         for handlerName in messageHandlers {
             contentController.add(self, name: handlerName)
             print("  ✅ [ExtensionManager] Added message handler: \(handlerName)")
         }
+
+        // CRITICAL FIX: Inject clipboard API polyfill into regular browser tabs
+        // This enables content scripts to use navigator.clipboard API
+        injectClipboardAPI(into: contentController)
+        print("  ✅ [ExtensionManager] Clipboard API polyfill injected for content scripts")
 
         // Mark this WebView as configured
         configuredWebViews.insert(webViewId)
@@ -2229,7 +2235,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                 }
 
                 // CRITICAL FIX: Inject Chrome APIs early for popup Angular bootstrap
-                // This ensures chrome.* APIs are available before Bitwarden's Angular app starts
+                // This ensures chrome.* APIs are available
                 let hasChromeAPIInjection = existingScripts.contains { $0.source.contains("CHROME API INJECTION") }
                 if !hasChromeAPIInjection {
                     // Get the extension ID for Chrome API injection
@@ -3741,9 +3747,15 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         controller.add(self, name: "chromeNotifications")
         controller.removeScriptMessageHandler(forName: "chromeCommands")
         controller.add(self, name: "chromeCommands")
+        
+        controller.removeScriptMessageHandler(forName: "chromeClipboard")
+        controller.add(self, name: "chromeClipboard")
+        
+        // Inject clipboard API polyfill
+        injectClipboardAPI(into: controller)
 
         print("   ✅ Enhanced Action API: closePopup handler installed")
-        print("   ✅ Chrome API bridge handlers installed: runtime, tabs, storage, scripting, action, contextMenus, notifications, commands")
+        print("   ✅ Chrome API bridge handlers installed: runtime, tabs, storage, scripting, action, contextMenus, notifications, commands, clipboard")
     }
 
     // MARK: - WKScriptMessageHandler (popup bridge)
@@ -3783,6 +3795,8 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             handleActionScriptMessage(message)
         case "chromeContextMenus":
             handleContextMenusScriptMessage(message)
+        case "chromeClipboard":
+            handleClipboardScriptMessage(message)
         case "chromeNotifications":
             handleNotificationsScriptMessage(message)
         case "chromeCommands":
@@ -4814,7 +4828,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     private func handleNativeRuntimeMessage(_ message: [String: Any], from extensionContext: WKWebExtensionContext, on port: WKWebExtension.MessagePort? = nil) {
         print("🚀 [ExtensionManager] Native runtime message: \(message)")
 
-        // For Bitwarden, the main runtime communication is about getting extension info
+        // Runtime communication for getting extension info
         let response: [String: Any] = [
             "id": extensionContext.uniqueIdentifier,
             "manifest": extensionContext.webExtension.manifest
@@ -5032,11 +5046,13 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                         }
                     },
                     getManifest: function() {
-                        return {
+                        // This is a synchronous polyfill - actual manifest should be injected
+                        // Extension-specific manifest will be provided via chrome.runtime API
+                        console.warn('[Chrome API Bridge] Using fallback getManifest() - manifest should be injected by extension manager');
+                        return window.__EXTENSION_MANIFEST__ || {
                             manifest_version: 3,
-                            name: "Bitwarden",
-                            version: "2024.6.2",
-                            description: "Bitwarden password manager"
+                            name: "Unknown Extension",
+                            version: "1.0.0"
                         };
                     }
                 };

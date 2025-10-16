@@ -3,7 +3,7 @@
 //  Nook
 //
 //  Chrome Scripting API Bridge for WKWebExtension support
-//  Implements chrome.scripting.* APIs for Bitwarden compatibility
+//  Implements chrome.scripting.* APIs for web extension compatibility
 //
 
 import Foundation
