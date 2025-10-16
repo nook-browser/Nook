@@ -2,7 +2,7 @@
 //  SpaceEditDialog.swift
 //  Nook
 //
-//  Created by OpenAI Codex on 22/01/2025.
+//  Created by Jonathan Caudill on 22/09/2025.
 //
 
 import AppKit

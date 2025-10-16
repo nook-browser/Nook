@@ -2,7 +2,7 @@
 //  TweakPanelWindowController.swift
 //  Nook
 //
-//  Created by Claude Code on 16/10/2025.
+//  Created by Jonathan Caudill on 16/10/2025.
 //
 
 import AppKit
