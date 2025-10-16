@@ -823,10 +823,10 @@ class TabManager: ObservableObject {
 
     // MARK: - Folder Management
 
-    func createFolder(for spaceId: UUID) {
+    func createFolder(for spaceId: UUID, name: String = "New Folder") -> TabFolder {
         print("📁 Creating folder for spaceId: \(spaceId.uuidString)")
         let folder = TabFolder(
-            name: "New Folder",
+            name: name,
             spaceId: spaceId,
             color: spaces.first(where: { $0.id == spaceId })?.color ?? .controlAccentColor
         )
@@ -840,6 +840,7 @@ class TabManager: ObservableObject {
         NotificationCenter.default.post(name: .init("TabFoldersDidChange"), object: nil)
 
         persistSnapshot()
+        return folder
     }
 
     func renameFolder(_ folderId: UUID, newName: String) {
@@ -899,6 +900,17 @@ class TabManager: ObservableObject {
                 break
             }
         }
+    }
+    func moveTabToFolder(tab: Tab, folderId: UUID) {
+        let newTab = tab
+        removeFromCurrentContainer(newTab)
+        newTab.folderId = folderId
+        newTab.isSpacePinned = true
+        var sp = spacePinnedTabs[tab.spaceId!] ?? []
+        sp.append(tab)
+        // Reindex
+        for (i, t) in sp.enumerated() { t.index = i }
+        setSpacePinnedTabs(sp, for: tab.spaceId!)
     }
 
     // MARK: - Tab Management (Normal within current space)
