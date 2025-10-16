@@ -598,6 +598,13 @@ extension ExtensionManager {
                     markAPIReady('scripting');
                 } else {
                     markAPIReady('scripting');
+
+                // chrome.alarms API - NEW
+                if (!chrome.alarms) {
+                    \(generateAlarmsAPIScript(extensionId: extensionId))
+                    markAPIReady('alarms');
+                }
+
                 }
 
                 // Context-specific initialization

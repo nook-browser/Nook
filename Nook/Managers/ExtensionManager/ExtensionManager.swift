@@ -3787,6 +3787,8 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             handleNotificationsScriptMessage(message)
         case "chromeCommands":
             handleCommandsScriptMessage(message)
+        case "chromeAlarms":
+            handleAlarmsScriptMessage(message)
         case "chromeTabsResponse":
             // Handle tab message responses
             if let messageBody = message.body as? [String: Any],
@@ -5151,4 +5153,36 @@ final class WeakAnchor {
 // MARK: - Extension Notifications
 extension Notification.Name {
     static let extensionActionUpdated = Notification.Name("extensionActionUpdated")
+}
+
+// MARK: - Alarms Script Message Handler
+@available(macOS 15.4, *)
+extension ExtensionManager {
+    func handleAlarmsScriptMessage(_ message: WKScriptMessage) {
+        guard let messageBody = message.body as? [String: Any],
+              let api = messageBody["api"] as? String,
+              api == "alarms" else {
+            print("❌ [ExtensionManager] Invalid alarms message format")
+            return
+        }
+        
+        print("🔔 [ExtensionManager] Handling alarms script message")
+        
+        // Find the extension context for this message
+        // This is a simplified approach - you may need to track which webview belongs to which context
+        guard let context = extensionContexts.values.first else {
+            print("❌ [ExtensionManager] No extension context found for alarms message")
+            return
+        }
+        
+        handleAlarmsMessage(message: messageBody, from: context) { response in
+            // Send response back to the script
+            if let responseDict = response as? [String: Any],
+               let jsonData = try? JSONSerialization.data(withJSONObject: responseDict),
+               let jsonString = String(data: jsonData, encoding: .utf8) {
+                let script = "window.postMessage({ type: 'alarmsResponse', data: \(jsonString) }, '*');"
+                message.webView?.evaluateJavaScript(script, completionHandler: nil)
+            }
+        }
+    }
 }
