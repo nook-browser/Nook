@@ -1802,7 +1802,8 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             "chromeRuntime",
             "chromeTabs",
             "chromeStorage",
-            "chromeScripting"
+            "chromeScripting",
+            "chromeClipboard"
         ]
 
         for handlerName in messageHandlers {
@@ -3741,9 +3742,15 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         controller.add(self, name: "chromeNotifications")
         controller.removeScriptMessageHandler(forName: "chromeCommands")
         controller.add(self, name: "chromeCommands")
+        
+        controller.removeScriptMessageHandler(forName: "chromeClipboard")
+        controller.add(self, name: "chromeClipboard")
+        
+        // Inject clipboard API polyfill
+        injectClipboardAPI(into: controller)
 
         print("   ✅ Enhanced Action API: closePopup handler installed")
-        print("   ✅ Chrome API bridge handlers installed: runtime, tabs, storage, scripting, action, contextMenus, notifications, commands")
+        print("   ✅ Chrome API bridge handlers installed: runtime, tabs, storage, scripting, action, contextMenus, notifications, commands, clipboard")
     }
 
     // MARK: - WKScriptMessageHandler (popup bridge)
@@ -3783,6 +3790,8 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             handleActionScriptMessage(message)
         case "chromeContextMenus":
             handleContextMenusScriptMessage(message)
+        case "chromeClipboard":
+            handleClipboardScriptMessage(message)
         case "chromeNotifications":
             handleNotificationsScriptMessage(message)
         case "chromeCommands":
