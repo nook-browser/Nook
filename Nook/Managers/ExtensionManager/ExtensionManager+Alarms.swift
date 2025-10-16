@@ -87,9 +87,17 @@ extension ExtensionManager {
     
     private func handleAlarmsCreate(message: [String: Any], extensionId: String, context: WKWebExtensionContext, replyHandler: @escaping (Any?) -> Void) {
         let name = message["name"] as? String ?? ""
-        guard let alarmInfoDict = message["alarmInfo"] as? [String: Any] else {
+        
+        // Handle missing or invalid alarmInfo
+        guard let alarmInfo = message["alarmInfo"] else {
             print("❌ [ExtensionManager+Alarms] No alarm info provided")
-            replyHandler(["error": "No alarm info provided"])
+            replyHandler(["error": "Invalid call to alarms.create(). The 'info' value is invalid, because an object is expected."])
+            return
+        }
+        
+        guard let alarmInfoDict = alarmInfo as? [String: Any] else {
+            print("❌ [ExtensionManager+Alarms] Alarm info is not a dictionary: \(type(of: alarmInfo))")
+            replyHandler(["error": "Invalid call to alarms.create(). The 'info' value is invalid, because an object is expected."])
             return
         }
         
@@ -310,20 +318,6 @@ extension ExtensionManager {
         }
     }
     
-    // MARK: - Helper Methods
-    
-    private func getBackgroundWebView(for context: WKWebExtensionContext) -> WKWebView? {
-        // Try to get the background webview for this extension
-        // This is a simplified implementation - may need adjustment based on your architecture
-        guard let extensionId = getExtensionId(for: context) else {
-            return nil
-        }
-        
-        // Look for background webview in configured webviews
-        // You may need to adjust this based on how background scripts are managed
-        return nil  // TODO: Implement background webview retrieval
-    }
-    
     // MARK: - JavaScript API Injection
     
     /// Generates the chrome.alarms JavaScript API
@@ -349,11 +343,21 @@ extension ExtensionManager {
                         name = '';
                     }
                     
+                    // Ensure alarmInfo is a valid object
+                    if (typeof alarmInfo !== 'object' || alarmInfo === null) {
+                        console.error('❌ [Alarms] alarmInfo must be an object, got:', typeof alarmInfo);
+                        const error = new Error("Invalid call to alarms.create(). The 'info' value is invalid, because an object is expected.");
+                        chrome.runtime.lastError = { message: error.message };
+                        if (callback) callback();
+                        delete chrome.runtime.lastError;
+                        return;
+                    }
+                    
                     const message = {
                         api: 'alarms',
                         action: 'create',
                         name: name || '',
-                        alarmInfo: alarmInfo || {}
+                        alarmInfo: alarmInfo
                     };
                     
                     window.webkit.messageHandlers.extensionAPI.postMessage(message).then(function(response) {
