@@ -1811,6 +1811,11 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             print("  ✅ [ExtensionManager] Added message handler: \(handlerName)")
         }
 
+        // CRITICAL FIX: Inject clipboard API polyfill into regular browser tabs
+        // This enables content scripts to use navigator.clipboard API
+        injectClipboardAPI(into: contentController)
+        print("  ✅ [ExtensionManager] Clipboard API polyfill injected for content scripts")
+
         // Mark this WebView as configured
         configuredWebViews.insert(webViewId)
         print("  ✅ [ExtensionManager] WebView configuration completed and tracked")

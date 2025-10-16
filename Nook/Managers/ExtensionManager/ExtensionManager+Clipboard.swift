@@ -176,6 +176,28 @@ extension ExtensionManager {
     }
     
     // MARK: - Response Helpers
+
+    /// Safely escape a string for JavaScript by using JSON serialization
+    private func escapeForJavaScript(_ string: String) -> String {
+        // Use JSONSerialization for safe string escaping
+        // This handles all special characters including unicode, backslashes, quotes, etc.
+        if let jsonData = try? JSONSerialization.data(withJSONObject: string),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            // JSONSerialization wraps strings in quotes, so remove them
+            var escaped = jsonString
+            if escaped.hasPrefix("\"") && escaped.hasSuffix("\"") {
+                escaped = String(escaped.dropFirst().dropLast())
+            }
+            return escaped
+        }
+        
+        // Fallback to manual escaping if JSON serialization fails
+        return string.replacingOccurrences(of: "\\", with: "\\\\")
+                     .replacingOccurrences(of: "'", with: "\\'")
+                     .replacingOccurrences(of: "\n", with: "\\n")
+                     .replacingOccurrences(of: "\r", with: "\\r")
+                     .replacingOccurrences(of: "\t", with: "\\t")
+    }
     
     private func sendClipboardSuccessResponse(to message: WKScriptMessage, timestamp: String, data: String?) {
         guard let webView = message.webView else {
@@ -186,10 +208,8 @@ extension ExtensionManager {
         let responseScript: String
         if let data = data {
             // For readText - return the text
-            let escapedData = data.replacingOccurrences(of: "\\", with: "\\\\\\\\")
-                                  .replacingOccurrences(of: "'", with: "\\\\'")
-                                  .replacingOccurrences(of: "\\n", with: "\\\\n")
-                                  .replacingOccurrences(of: "\\r", with: "\\\\r")
+            // Use JSON-safe escaping
+            let escapedData = escapeForJavaScript(data)
             
             responseScript = """
             if (window.chromeClipboardCallbacks && window.chromeClipboardCallbacks['\\(timestamp)']) {
