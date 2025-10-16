@@ -3,7 +3,6 @@
 //  Nook
 //
 //  Chrome Alarms API Bridge for WKWebExtension support
-//  Implements chrome.alarms.* APIs for Bitwarden compatibility
 //
 
 import Foundation
@@ -499,4 +498,3 @@ extension ExtensionManager {
         """
     }
 }
-
