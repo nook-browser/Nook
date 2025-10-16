@@ -142,7 +142,7 @@ class ExtensionStorageManager: ObservableObject {
                         result[key] = anyCodable.value
                     } catch {
                         print("⚠️ [ExtensionStorageManager] Failed to decode key \(key): \(error)")
-                        // Provide default values for known Bitwarden keys to prevent hanging
+                        // Provide default values for known extension keys to prevent hanging
                         if key.contains("migrations") || key.contains("migration") {
                             result[key] = ["completed": Date().timeIntervalSince1970] // Simulate completed migration
                         }

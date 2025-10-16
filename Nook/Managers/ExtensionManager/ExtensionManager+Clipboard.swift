@@ -3,7 +3,7 @@
 //  Nook
 //
 //  Implements navigator.clipboard API for browser extensions.
-//  Provides clipboard read/write functionality for password managers like Bitwarden.
+//  Provides W3C Clipboard API (navigator.clipboard) support for web extensions.
 //
 //  - Uses navigator.clipboard.writeText(text) for copying passwords/TOTP
 //  - Uses navigator.clipboard.readText() for reading clipboard content

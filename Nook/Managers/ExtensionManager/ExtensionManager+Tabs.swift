@@ -3,7 +3,7 @@
 //  Nook
 //
 //  Chrome Tabs API Bridge for WKWebExtension support
-//  Implements chrome.tabs.* APIs for Bitwarden compatibility
+//  Implements chrome.tabs.* APIs for web extension compatibility
 //
 
 import Foundation

@@ -4828,7 +4828,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     private func handleNativeRuntimeMessage(_ message: [String: Any], from extensionContext: WKWebExtensionContext, on port: WKWebExtension.MessagePort? = nil) {
         print("🚀 [ExtensionManager] Native runtime message: \(message)")
 
-        // For Bitwarden, the main runtime communication is about getting extension info
+        // Runtime communication for getting extension info
         let response: [String: Any] = [
             "id": extensionContext.uniqueIdentifier,
             "manifest": extensionContext.webExtension.manifest
@@ -5046,11 +5046,13 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                         }
                     },
                     getManifest: function() {
-                        return {
+                        // This is a synchronous polyfill - actual manifest should be injected
+                        // Extension-specific manifest will be provided via chrome.runtime API
+                        console.warn('[Chrome API Bridge] Using fallback getManifest() - manifest should be injected by extension manager');
+                        return window.__EXTENSION_MANIFEST__ || {
                             manifest_version: 3,
-                            name: "Bitwarden",
-                            version: "2024.6.2",
-                            description: "Bitwarden password manager"
+                            name: "Unknown Extension",
+                            version: "1.0.0"
                         };
                     }
                 };
