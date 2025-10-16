@@ -262,7 +262,8 @@ extension ExtensionManager {
             return
         }
         
-        let escapedError = error.replacingOccurrences(of: "'", with: "\\\\'")
+        // Use robust JSON escaping for error messages (security fix)
+        let escapedError = escapeForJavaScript(error)
         
         let responseScript = """
         if (window.chromeClipboardCallbacks && window.chromeClipboardCallbacks['\\(timestamp)']) {
