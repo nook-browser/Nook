@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Storage API Test</title>
+  <style>
+    body {
+      width: 450px;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    h1 {
+      font-size: 18px;
+      margin: 0 0 15px 0;
+      color: #333;
+    }
+    .test-section {
+      margin-bottom: 15px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      background: #f9f9f9;
+    }
+    .test-section h2 {
+      font-size: 14px;
+      margin: 0 0 10px 0;
+      color: #666;
+    }
+    button {
+      padding: 8px 16px;
+      margin: 5px 5px 5px 0;
+      border: 1px solid #0066cc;
+      background: #0066cc;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    button:hover {
+      background: #0052a3;
+    }
+    .result {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .success {
+      background: #d4edda;
+      border: 1px solid #c3e6cb;
+      color: #155724;
+    }
+    .error {
+      background: #f8d7da;
+      border: 1px solid #f5c6cb;
+      color: #721c24;
+    }
+    .info {
+      background: #d1ecf1;
+      border: 1px solid #bee5eb;
+      color: #0c5460;
+    }
+    .stats {
+      margin-top: 15px;
+      padding: 15px;
+      background: #fff3cd;
+      border: 1px solid #ffeeba;
+      border-radius: 5px;
+    }
+    .stats h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      color: #856404;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      font-size: 12px;
+    }
+    .stat-item {
+      padding: 8px;
+      background: white;
+      border-radius: 4px;
+    }
+    .stat-label {
+      font-weight: bold;
+      color: #666;
+    }
+    .stat-value {
+      color: #333;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>💾 Storage API Test</h1>
+  
+  <div class="test-section" style="background: #e8f4f8; border-color: #0066cc;">
+    <button id="runAllTests" style="font-size: 16px; font-weight: bold; width: 100%; padding: 12px;">
+      ▶️ Run All Tests
+    </button>
+    <div id="allTestsResults" class="result info" style="display: none; margin-top: 10px;"></div>
+  </div>
+  
+  <div class="test-section">
+    <h2>Individual Tests (Optional)</h2>
+    <button id="writeLocal">Write Data</button>
+    <button id="readLocal">Read Data</button>
+    <button id="clearLocal">Clear All</button>
+    <button id="writeSession">Write Session</button>
+    <button id="readSession">Read Session</button>
+    <button id="testLarge">Test Large Data</button>
+    <button id="testSpeed">Speed Test</button>
+    <div id="individualResults" class="result info" style="display: none;"></div>
+  </div>
+  
+  <div class="stats">
+    <h3>📊 Storage Statistics</h3>
+    <div class="stats-grid">
+      <div class="stat-item">
+        <div class="stat-label">Local Items</div>
+        <div class="stat-value" id="localCount">-</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Session Items</div>
+        <div class="stat-value" id="sessionCount">-</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Local Size</div>
+        <div class="stat-value" id="localSize">-</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Session Size</div>
+        <div class="stat-value" id="sessionSize">-</div>
+      </div>
+    </div>
+    <button id="refreshStats" style="margin-top: 10px; width: 100%;">Refresh Stats</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

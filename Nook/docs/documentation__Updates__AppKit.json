@@ -1,0 +1,3366 @@
+{
+  "schemaVersion": {
+    "major": 0,
+    "minor": 3,
+    "patch": 0
+  },
+  "variants": [
+    {
+      "traits": [
+        {
+          "interfaceLanguage": "swift"
+        }
+      ],
+      "paths": [
+        "/documentation/updates/appkit"
+      ]
+    }
+  ],
+  "abstract": [
+    {
+      "type": "text",
+      "text": "Learn about important changes to AppKit."
+    }
+  ],
+  "identifier": {
+    "interfaceLanguage": "swift",
+    "url": "doc://com.apple.Updates/documentation/Updates/AppKit"
+  },
+  "seeAlsoSections": [
+    {
+      "identifiers": [
+        "doc://com.apple.Updates/documentation/Updates/Accelerate",
+        "doc://com.apple.Updates/documentation/Updates/Accessibility",
+        "doc://com.apple.Updates/documentation/Updates/ActivityKit",
+        "doc://com.apple.Updates/documentation/Updates/AdAttributionKit",
+        "doc://com.apple.Updates/documentation/Updates/AppClips",
+        "doc://com.apple.Updates/documentation/Updates/AppIntents",
+        "doc://com.apple.Updates/documentation/Updates/Apple-Intelligence",
+        "doc://com.apple.Updates/documentation/Updates/AppleMapsServerAPI",
+        "doc://com.apple.Updates/documentation/Updates/ApplePencil",
+        "doc://com.apple.Updates/documentation/Updates/ARKit",
+        "doc://com.apple.Updates/documentation/Updates/AudioToolbox",
+        "doc://com.apple.Updates/documentation/Updates/AuthenticationServices",
+        "doc://com.apple.Updates/documentation/Updates/AVFAudio",
+        "doc://com.apple.Updates/documentation/Updates/AVFoundation",
+        "doc://com.apple.Updates/documentation/Updates/BackgroundTasks"
+      ],
+      "generated": true,
+      "title": "Technology updates",
+      "anchor": "Technology-updates"
+    }
+  ],
+  "hierarchy": {
+    "paths": [
+      [
+        "doc://com.apple.documentation/documentation/technologies",
+        "doc://com.apple.Updates/documentation/Updates"
+      ]
+    ]
+  },
+  "metadata": {
+    "title": "AppKit updates",
+    "role": "article",
+    "modules": [
+      {
+        "name": "Updates"
+      }
+    ],
+    "roleHeading": "Article"
+  },
+  "kind": "article",
+  "primaryContentSections": [
+    {
+      "kind": "content",
+      "content": [
+        {
+          "level": 2,
+          "type": "heading",
+          "anchor": "Overview",
+          "text": "Overview"
+        },
+        {
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "Browse notable changes in "
+            },
+            {
+              "identifier": "https://developer.apple.com/documentation/appkit",
+              "type": "reference",
+              "isActive": true
+            },
+            {
+              "type": "text",
+              "text": "."
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "level": 2,
+          "type": "heading",
+          "anchor": "June-2025",
+          "text": "June 2025"
+        },
+        {
+          "level": 3,
+          "type": "heading",
+          "anchor": "General",
+          "text": "General"
+        },
+        {
+          "items": [
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "To use control metrics consistent with macOS 15 and earlier, use "
+                    },
+                    {
+                      "type": "reference",
+                      "isActive": true,
+                      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSView/prefersCompactControlSizeMetrics"
+                    },
+                    {
+                      "type": "text",
+                      "text": "."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "isActive": true,
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSControl/ControlSize-swift.enum"
+                    },
+                    {
+                      "text": " includes a new extra large size, ",
+                      "type": "text"
+                    },
+                    {
+                      "isActive": true,
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSControl/ControlSize-swift.enum/extraLarge"
+                    },
+                    {
+                      "text": ".",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Provide seamless immersive visuals by using "
+                    },
+                    {
+                      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSBackgroundExtensionView",
+                      "type": "reference",
+                      "isActive": true
+                    },
+                    {
+                      "type": "text",
+                      "text": " to extend a view’s content under sidebars and inspectors."
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Apply Liquid Glass effects to your custom views using "
+                    },
+                    {
+                      "isActive": true,
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSGlassEffectView"
+                    },
+                    {
+                      "type": "text",
+                      "text": ". Use "
+                    },
+                    {
+                      "isActive": true,
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSGlassEffectContainerView"
+                    },
+                    {
+                      "type": "text",
+                      "text": " to efficiently merge these views when they’re in proximity to one other."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "text": "Configure buttons for Liquid Glass by setting ",
+                      "type": "text"
+                    },
+                    {
+                      "code": "NSButton.BezelStyle",
+                      "type": "codeVoice"
+                    },
+                    {
+                      "text": " to ",
+                      "type": "text"
+                    },
+                    {
+                      "isActive": true,
+                      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSButton/BezelStyle-swift.enum/glass",
+                      "type": "reference"
+                    },
+                    {
+                      "text": ".",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "type": "unorderedList"
+        },
+        {
+          "level": 3,
+          "type": "heading",
+          "anchor": "Split-views",
+          "text": "Split views"
+        },
+        {
+          "items": [
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Add top and bottom accessory views in split views by adding one or more "
+                    },
+                    {
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSSplitViewItemAccessoryViewController",
+                      "isActive": true
+                    },
+                    {
+                      "type": "text",
+                      "text": " objects to the "
+                    },
+                    {
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSSplitViewItem/topAlignedAccessoryViewControllers",
+                      "isActive": true
+                    },
+                    {
+                      "type": "text",
+                      "text": " and "
+                    },
+                    {
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSSplitViewItem/bottomAlignedAccessoryViewControllers",
+                      "isActive": true
+                    },
+                    {
+                      "type": "text",
+                      "text": " properties."
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            }
+          ],
+          "type": "unorderedList"
+        },
+        {
+          "level": 3,
+          "type": "heading",
+          "anchor": "Toolbars",
+          "text": "Toolbars"
+        },
+        {
+          "items": [
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "text": "Tint toolbar items to make them stand out and stand apart from other toolbar items by setting ",
+                      "type": "text"
+                    },
+                    {
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSToolbarItem/Style-swift.enum",
+                      "isActive": true
+                    },
+                    {
+                      "text": " to ",
+                      "type": "text"
+                    },
+                    {
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSToolbarItem/Style-swift.enum/prominent",
+                      "isActive": true
+                    },
+                    {
+                      "text": ", and setting ",
+                      "type": "text"
+                    },
+                    {
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSToolbarItem/backgroundTintColor",
+                      "isActive": true
+                    },
+                    {
+                      "text": ".",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            }
+          ],
+          "type": "unorderedList"
+        },
+        {
+          "level": 2,
+          "type": "heading",
+          "anchor": "April-2025",
+          "text": "April 2025"
+        },
+        {
+          "level": 3,
+          "type": "heading",
+          "anchor": "macOS-pasteboard-privacy",
+          "text": "macOS pasteboard privacy"
+        },
+        {
+          "items": [
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "text": "Prepare your app for an upcoming feature in macOS that alerts a person using a device when your app programmatically reads the general pasteboard. The system shows the alert only if the pasteboard access wasn’t a result of someone’s input on a UI element that the system considers paste-related. This behavior is similar to how ",
+                      "type": "text"
+                    },
+                    {
+                      "isActive": true,
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/UIKit/UIPasteboard"
+                    },
+                    {
+                      "text": " behaves in iOS. New ",
+                      "type": "text"
+                    },
+                    {
+                      "code": "detect",
+                      "type": "codeVoice"
+                    },
+                    {
+                      "text": " methods in ",
+                      "type": "text"
+                    },
+                    {
+                      "isActive": true,
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSPasteboard"
+                    },
+                    {
+                      "text": " and ",
+                      "type": "text"
+                    },
+                    {
+                      "isActive": true,
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSPasteboardItem"
+                    },
+                    {
+                      "text": " make it possible for an app to examine the kinds of data on the pasteboard without actually reading them and showing the alert. ",
+                      "type": "text"
+                    },
+                    {
+                      "isActive": true,
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSPasteboard"
+                    },
+                    {
+                      "text": " also adds an ",
+                      "type": "text"
+                    },
+                    {
+                      "isActive": true,
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSPasteboard/accessBehavior-86972"
+                    },
+                    {
+                      "text": " property to determine if programmatic pasteboard access is always allowed, never allowed, or if it prompts an alert requesting permission. You can adopt these APIs ahead of the change, and set a user default to test the new behavior on your Mac. To do so, launch Terminal and enter the command ",
+                      "type": "text"
+                    },
+                    {
+                      "code": "defaults write <your_app_bundle_id> EnablePasteboardPrivacyDeveloperPreview -bool yes",
+                      "type": "codeVoice"
+                    },
+                    {
+                      "text": " to enable the behavior for your app.",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            }
+          ],
+          "type": "unorderedList"
+        },
+        {
+          "level": 2,
+          "type": "heading",
+          "anchor": "June-2024",
+          "text": "June 2024"
+        },
+        {
+          "level": 3,
+          "type": "heading",
+          "anchor": "General",
+          "text": "General"
+        },
+        {
+          "items": [
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Organize your windows’ display and layout with window tiling."
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "type": "unorderedList"
+        },
+        {
+          "level": 3,
+          "type": "heading",
+          "anchor": "Swift-and-SwiftUI",
+          "text": "Swift and SwiftUI"
+        },
+        {
+          "items": [
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Use SwiftUI menus in AppKit with the "
+                    },
+                    {
+                      "isActive": true,
+                      "identifier": "doc://com.apple.documentation/documentation/SwiftUI/NSHostingMenu",
+                      "type": "reference"
+                    },
+                    {
+                      "type": "text",
+                      "text": "."
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Animate AppKit views using SwiftUI animations using "
+                    },
+                    {
+                      "type": "reference",
+                      "isActive": true,
+                      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSAnimationContext/animate(_:changes:completion:)"
+                    },
+                    {
+                      "type": "text",
+                      "text": "."
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            }
+          ],
+          "type": "unorderedList"
+        },
+        {
+          "level": 3,
+          "type": "heading",
+          "anchor": "API-refinements",
+          "text": "API refinements"
+        },
+        {
+          "items": [
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Use the keyboard to open context menus for UI elements on which you are focused currently."
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "text": "Add repeat, wiggle, bounce, and rotate effects to ",
+                      "type": "text"
+                    },
+                    {
+                      "identifier": "https://developer.apple.com/sf-symbols/",
+                      "type": "reference",
+                      "isActive": true
+                    },
+                    {
+                      "text": ".",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Leverage predefined content types when saving files using the new format picker on "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "NSPanel"
+                    },
+                    {
+                      "type": "text",
+                      "text": "."
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "text": "Resize frames and zoom in and out with new ",
+                      "type": "text"
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "NSCursor"
+                    },
+                    {
+                      "text": " APIs such as ",
+                      "type": "text"
+                    },
+                    {
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSCursor/FrameResizeDirection",
+                      "isActive": true
+                    },
+                    {
+                      "text": " and ",
+                      "type": "text"
+                    },
+                    {
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSCursor/FrameResizePosition",
+                      "isActive": true
+                    },
+                    {
+                      "text": ".",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "text": "Control whether your toolbars display text as well as icons using the ",
+                      "type": "text"
+                    },
+                    {
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSToolbar/allowsDisplayModeCustomization",
+                      "isActive": true
+                    },
+                    {
+                      "text": " property.",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Offer customized type-ahead suggestions in NSTextField using the "
+                    },
+                    {
+                      "isActive": true,
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSTextField/suggestionsDelegate"
+                    },
+                    {
+                      "type": "text",
+                      "text": "."
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "type": "unorderedList"
+        },
+        {
+          "level": 2,
+          "type": "heading",
+          "anchor": "June-2023",
+          "text": "June 2023"
+        },
+        {
+          "level": 3,
+          "type": "heading",
+          "anchor": "Views-and-controls",
+          "text": "Views and controls"
+        },
+        {
+          "items": [
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Use the new "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "userCanChangeVisibilityOf"
+                    },
+                    {
+                      "type": "text",
+                      "text": " delegate method on "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "NSTableView"
+                    },
+                    {
+                      "type": "text",
+                      "text": " to toggle the visibility of table columns."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Use a new "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "NSProgressIndicator"
+                    },
+                    {
+                      "type": "text",
+                      "text": " property to observe progress of an ongoing task."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "text": "Simplify how you display and style buttons with the new ",
+                      "type": "text"
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": ".automatic"
+                    },
+                    {
+                      "text": " bezel style. This bezel style adapts to the most appropriate style based on the contents of the button, as well as its location in the view hierarchy.",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Display additional contextual information about currently selected documents with "
+                    },
+                    {
+                      "code": "NSSplitView",
+                      "type": "codeVoice"
+                    },
+                    {
+                      "type": "text",
+                      "text": " inspectors."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "New improvements to "
+                    },
+                    {
+                      "code": "NSPopover",
+                      "type": "codeVoice"
+                    },
+                    {
+                      "type": "text",
+                      "text": " enable you to anchor popovers from toolbar items, as well as support full-size popovers."
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "text": "Explore new UI elements in ",
+                      "type": "text"
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "NSMenu"
+                    },
+                    {
+                      "text": ". Group information more easily in section headers, lay out menu items in horizontal palettes, as well as display badge counts on menu items.",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "type": "unorderedList"
+        },
+        {
+          "level": 3,
+          "type": "heading",
+          "anchor": "Cooperative-app-activation",
+          "text": "Cooperative app activation"
+        },
+        {
+          "items": [
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "App activation is now driven by the user, preventing unexpected switches between apps."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "text": "Take advantage of Cooperative Activation, where your apps can yield and accept activation from other apps on the system without interrupting the user’s workflows. For more information, see the ",
+                      "type": "text"
+                    },
+                    {
+                      "code": "activate()",
+                      "type": "codeVoice"
+                    },
+                    {
+                      "text": " function on ",
+                      "type": "text"
+                    },
+                    {
+                      "code": "NSApp",
+                      "type": "codeVoice"
+                    },
+                    {
+                      "text": " and ",
+                      "type": "text"
+                    },
+                    {
+                      "code": "NSRunningApplication",
+                      "type": "codeVoice"
+                    },
+                    {
+                      "text": ".",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            }
+          ],
+          "type": "unorderedList"
+        },
+        {
+          "level": 3,
+          "type": "heading",
+          "anchor": "Graphics",
+          "text": "Graphics"
+        },
+        {
+          "items": [
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "codeVoice",
+                      "code": "CGPath"
+                    },
+                    {
+                      "type": "text",
+                      "text": " and "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "NSBezierPath"
+                    },
+                    {
+                      "type": "text",
+                      "text": " are now interoperable. You can create a "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "CGPath"
+                    },
+                    {
+                      "type": "text",
+                      "text": " from a "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "NSBezierPath"
+                    },
+                    {
+                      "type": "text",
+                      "text": " and vice versa."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Leverage "
+                    },
+                    {
+                      "code": "CADisplayLink",
+                      "type": "codeVoice"
+                    },
+                    {
+                      "type": "text",
+                      "text": " to synchronize your app’s ability to draw to the refresh of the display."
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Create consistent, great visuals for your controls by taking advantage of standard system fill "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "NSColor"
+                    },
+                    {
+                      "type": "text",
+                      "text": " ("
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": ".systemFill"
+                    },
+                    {
+                      "type": "text",
+                      "text": ", "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": ".secondarySystemFill"
+                    },
+                    {
+                      "type": "text",
+                      "text": ", "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": ".tertiarySystemFill"
+                    },
+                    {
+                      "type": "text",
+                      "text": ", "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": ".quaternarySystemFill"
+                    },
+                    {
+                      "type": "text",
+                      "text": ", and "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": ".quinarySystemFill"
+                    },
+                    {
+                      "type": "text",
+                      "text": ")."
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Views no longer clip their contents by default. This includes any drawing done by the view and its subviews. For more information, see the "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "clipsToBounds"
+                    },
+                    {
+                      "type": "text",
+                      "text": " property on "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "NSView"
+                    },
+                    {
+                      "type": "text",
+                      "text": "."
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Animate symbol images with the new "
+                    },
+                    {
+                      "code": "addSymbolEffect",
+                      "type": "codeVoice"
+                    },
+                    {
+                      "type": "text",
+                      "text": " function on "
+                    },
+                    {
+                      "code": " NSImageView",
+                      "type": "codeVoice"
+                    },
+                    {
+                      "type": "text",
+                      "text": ". Symbol effects include: bounce, pulse, variable color, scale, appear, disappear, and replace."
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "text": "Display and manipulate high dynamic range (HDR) images.",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "type": "unorderedList"
+        },
+        {
+          "level": 3,
+          "type": "heading",
+          "anchor": "Swift-and-SwiftUI",
+          "text": "Swift and SwiftUI"
+        },
+        {
+          "items": [
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "AppKit more fully integrates with Swift and SwiftUI with Sendable ("
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "NSColor"
+                    },
+                    {
+                      "type": "text",
+                      "text": ", "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "NSColorSpace"
+                    },
+                    {
+                      "type": "text",
+                      "text": ", "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "NSGradient"
+                    },
+                    {
+                      "type": "text",
+                      "text": ", "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "NSShadow"
+                    },
+                    {
+                      "type": "text",
+                      "text": ", "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "NSTouch"
+                    },
+                    {
+                      "type": "text",
+                      "text": ") and Transferable ("
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "NSImage"
+                    },
+                    {
+                      "type": "text",
+                      "text": ", "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "NSColor"
+                    },
+                    {
+                      "type": "text",
+                      "text": ", "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "NSSound"
+                    },
+                    {
+                      "type": "text",
+                      "text": ") types."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "text": "Preview your views and view controllers alongside your code using the new ",
+                      "type": "text"
+                    },
+                    {
+                      "code": "#Preview",
+                      "type": "codeVoice"
+                    },
+                    {
+                      "text": " Swift macro. Incrementally adopt SwiftUI into your AppKit life cycle by leveraging modifiers like toolbar and navigation title on ",
+                      "type": "text"
+                    },
+                    {
+                      "code": "NSWindows",
+                      "type": "codeVoice"
+                    },
+                    {
+                      "text": ".",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Simplify your code with new attributes, "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "@ViewLoading"
+                    },
+                    {
+                      "type": "text",
+                      "text": " and "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "@WindowLoading"
+                    },
+                    {
+                      "type": "text",
+                      "text": ", to help with view and window loading."
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "type": "unorderedList"
+        },
+        {
+          "level": 3,
+          "type": "heading",
+          "anchor": "Text-improvements",
+          "text": "Text improvements"
+        },
+        {
+          "items": [
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Help people enter text more effectively with the "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "NSTextInsertionIndicator"
+                    },
+                    {
+                      "type": "text",
+                      "text": " that adapts to the current accent color of the app. Cursor accessories also help users visualize where and how to enter text."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "text": "Simplify ",
+                      "type": "text"
+                    },
+                    {
+                      "code": "NSTextField",
+                      "type": "codeVoice"
+                    },
+                    {
+                      "text": " entry by leveraging the new ",
+                      "type": "text"
+                    },
+                    {
+                      "code": ".contentType",
+                      "type": "codeVoice"
+                    },
+                    {
+                      "text": " AutoFill feature, making it more convenient to enter types such as contact information, birthdays, names, credit cards, and street addresses.",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Adopt text styles like "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": ".body"
+                    },
+                    {
+                      "type": "text",
+                      "text": ", "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "largeTitle"
+                    },
+                    {
+                      "type": "text",
+                      "text": ", and "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "headline"
+                    },
+                    {
+                      "type": "text",
+                      "text": " on "
+                    },
+                    {
+                      "type": "codeVoice",
+                      "code": "NSFont.preferredFont"
+                    },
+                    {
+                      "type": "text",
+                      "text": "  to take advantage of enhancements to the font system, like improved hyphenation for non-English languages and dynamic line-height adjustments for languages that require more vertical space. Access localized variants of symbol images by specifying a locale."
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "type": "unorderedList"
+        },
+        {
+          "content": [
+            {
+              "type": "paragraph",
+              "inlineContent": [
+                {
+                  "text": "Session 10054: ",
+                  "type": "text"
+                },
+                {
+                  "isActive": true,
+                  "type": "reference",
+                  "identifier": "https://developer.apple.com/videos/play/wwdc2023/10054/"
+                }
+              ]
+            }
+          ],
+          "style": "note",
+          "type": "aside",
+          "name": "Related sessions from WWDC23"
+        }
+      ]
+    }
+  ],
+  "sections": [],
+  "references": {
+    "doc://com.apple.documentation/documentation/SwiftUI/NSHostingMenu": {
+      "role": "symbol",
+      "type": "topic",
+      "abstract": [
+        {
+          "text": "An AppKit menu with menu items that are defined by a SwiftUI View.",
+          "type": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.documentation/documentation/SwiftUI/NSHostingMenu",
+      "title": "NSHostingMenu",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "NSHostingMenu"
+        },
+        {
+          "kind": "text",
+          "text": "<"
+        },
+        {
+          "kind": "genericParameter",
+          "text": "Content"
+        },
+        {
+          "kind": "text",
+          "text": "> "
+        },
+        {
+          "kind": "keyword",
+          "text": "where"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "typeIdentifier",
+          "text": "Content"
+        },
+        {
+          "text": " : ",
+          "kind": "text"
+        },
+        {
+          "text": "View",
+          "preciseIdentifier": "s:7SwiftUI4ViewP",
+          "kind": "typeIdentifier"
+        }
+      ],
+      "url": "/documentation/SwiftUI/NSHostingMenu"
+    },
+    "doc://com.apple.documentation/documentation/AppKit/NSCursor/FrameResizePosition": {
+      "role": "symbol",
+      "type": "topic",
+      "abstract": [
+        {
+          "text": "The position along the perimeter of a rectangular frame (its edges and corners) from which it’s resized.",
+          "type": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSCursor/FrameResizePosition",
+      "title": "NSCursor.FrameResizePosition",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "kind": "attribute",
+          "text": "@frozen"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "keyword",
+          "text": "enum"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "FrameResizePosition"
+        }
+      ],
+      "url": "/documentation/AppKit/NSCursor/FrameResizePosition"
+    },
+    "doc://com.apple.documentation/documentation/AppKit/NSCursor/FrameResizeDirection": {
+      "type": "topic",
+      "title": "NSCursor.FrameResizeDirection",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The direction in which a rectangular frame can be resized."
+        }
+      ],
+      "url": "/documentation/AppKit/NSCursor/FrameResizeDirection",
+      "role": "symbol",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "enum"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "FrameResizeDirection"
+        }
+      ],
+      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSCursor/FrameResizeDirection",
+      "kind": "symbol"
+    },
+    "doc://com.apple.documentation/documentation/AppKit/NSSplitViewItem/topAlignedAccessoryViewControllers": {
+      "type": "topic",
+      "title": "topAlignedAccessoryViewControllers",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The following methods allow you to add accessory views to the top/bottom of this splitViewItem. See `NSSplitViewItemAccessoryViewController` for more details."
+        }
+      ],
+      "url": "/documentation/AppKit/NSSplitViewItem/topAlignedAccessoryViewControllers",
+      "role": "symbol",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "var"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "topAlignedAccessoryViewControllers"
+        },
+        {
+          "kind": "text",
+          "text": ": ["
+        },
+        {
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(cs)NSSplitViewItemAccessoryViewController",
+          "text": "NSSplitViewItemAccessoryViewController"
+        },
+        {
+          "kind": "text",
+          "text": "] { "
+        },
+        {
+          "kind": "keyword",
+          "text": "get"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "text": "set",
+          "kind": "keyword"
+        },
+        {
+          "text": " }",
+          "kind": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSSplitViewItem/topAlignedAccessoryViewControllers",
+      "kind": "symbol"
+    },
+    "doc://com.apple.documentation/documentation/AppKit/NSTextField/suggestionsDelegate": {
+      "type": "topic",
+      "title": "suggestionsDelegate",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The delegate that provides text suggestions for the receiving text field and responds to the user highlighting and selecting items."
+        }
+      ],
+      "url": "/documentation/AppKit/NSTextField/suggestionsDelegate",
+      "role": "symbol",
+      "fragments": [
+        {
+          "kind": "attribute",
+          "text": "@"
+        },
+        {
+          "kind": "attribute",
+          "preciseIdentifier": "s:ScM",
+          "text": "MainActor"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "attribute",
+          "text": "@preconcurrency"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "keyword",
+          "text": "weak"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "keyword",
+          "text": "var"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "suggestionsDelegate",
+          "kind": "identifier"
+        },
+        {
+          "text": ": (any ",
+          "kind": "text"
+        },
+        {
+          "text": "NSTextSuggestionsDelegate",
+          "preciseIdentifier": "s:6AppKit25NSTextSuggestionsDelegateP",
+          "kind": "typeIdentifier"
+        },
+        {
+          "text": ")? { ",
+          "kind": "text"
+        },
+        {
+          "text": "get",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "set",
+          "kind": "keyword"
+        },
+        {
+          "text": " }",
+          "kind": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSTextField/suggestionsDelegate",
+      "kind": "symbol"
+    },
+    "doc://com.apple.documentation/documentation/AppKit/NSToolbarItem/backgroundTintColor": {
+      "role": "symbol",
+      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSToolbarItem/backgroundTintColor",
+      "url": "/documentation/AppKit/NSToolbarItem/backgroundTintColor",
+      "type": "topic",
+      "fragments": [
+        {
+          "kind": "attribute",
+          "text": "@NSCopying"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "attribute",
+          "text": "@"
+        },
+        {
+          "kind": "attribute",
+          "text": "MainActor",
+          "preciseIdentifier": "s:ScM"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "keyword",
+          "text": "var"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "text": "backgroundTintColor",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "text": "NSColor",
+          "preciseIdentifier": "c:objc(cs)NSColor",
+          "kind": "typeIdentifier"
+        },
+        {
+          "text": "? { ",
+          "kind": "text"
+        },
+        {
+          "text": "get",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "set",
+          "kind": "keyword"
+        },
+        {
+          "text": " }",
+          "kind": "text"
+        }
+      ],
+      "kind": "symbol",
+      "title": "backgroundTintColor",
+      "abstract": [
+        {
+          "type": "text",
+          "text": ""
+        }
+      ]
+    },
+    "doc://com.apple.documentation/documentation/AppKit/NSToolbarItem/Style-swift.enum": {
+      "role": "symbol",
+      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSToolbarItem/Style-swift.enum",
+      "url": "/documentation/AppKit/NSToolbarItem/Style-swift.enum",
+      "type": "topic",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "enum"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "Style"
+        }
+      ],
+      "kind": "symbol",
+      "title": "NSToolbarItem.Style",
+      "abstract": [
+        {
+          "type": "text",
+          "text": ""
+        }
+      ]
+    },
+    "doc://com.apple.documentation/documentation/AppKit/NSBackgroundExtensionView": {
+      "role": "symbol",
+      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSBackgroundExtensionView",
+      "url": "/documentation/AppKit/NSBackgroundExtensionView",
+      "type": "topic",
+      "fragments": [
+        {
+          "kind": "attribute",
+          "text": "@"
+        },
+        {
+          "kind": "attribute",
+          "text": "MainActor",
+          "preciseIdentifier": "s:ScM"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "NSBackgroundExtensionView"
+        }
+      ],
+      "kind": "symbol",
+      "title": "NSBackgroundExtensionView",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A view that extends content to fill its own bounds."
+        }
+      ]
+    },
+    "https://developer.apple.com/videos/play/wwdc2023/10054/": {
+      "type": "link",
+      "identifier": "https://developer.apple.com/videos/play/wwdc2023/10054/",
+      "titleInlineContent": [
+        {
+          "type": "text",
+          "text": "What’s new in AppKit"
+        }
+      ],
+      "url": "https://developer.apple.com/videos/play/wwdc2023/10054/",
+      "title": "What’s new in AppKit"
+    },
+    "featured.svg": {
+      "type": "image",
+      "identifier": "featured.svg",
+      "variants": [
+        {
+          "traits": [
+            "1x",
+            "light"
+          ],
+          "url": "https://docs-assets.developer.apple.com/published/70c10a18eb39cac81bd40849ad68cbff/featured.svg"
+        }
+      ],
+      "alt": "An icon, with a star and a speech bubble around it, representing updates."
+    },
+    "doc://com.apple.documentation/documentation/AppKit/NSToolbar/allowsDisplayModeCustomization": {
+      "type": "topic",
+      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSToolbar/allowsDisplayModeCustomization",
+      "kind": "symbol",
+      "url": "/documentation/AppKit/NSToolbar/allowsDisplayModeCustomization",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Whether or not the user is allowed to change display modes at run time. This functionality is independent of customizing the order of the items themselves. Only disable when the functionality or legibility of your toolbar could not be improved by another display mode. The user’s selection will be persisted using the toolbar’s `identifier` when `autosavesConfiguration` is enabled. The default is YES for apps linked on macOS 15.0 and above."
+        }
+      ],
+      "role": "symbol",
+      "fragments": [
+        {
+          "text": "@",
+          "kind": "attribute"
+        },
+        {
+          "text": "MainActor",
+          "preciseIdentifier": "s:ScM",
+          "kind": "attribute"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "allowsDisplayModeCustomization",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "text": "Bool",
+          "preciseIdentifier": "s:Sb",
+          "kind": "typeIdentifier"
+        },
+        {
+          "text": " { ",
+          "kind": "text"
+        },
+        {
+          "text": "get",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "set",
+          "kind": "keyword"
+        },
+        {
+          "text": " }",
+          "kind": "text"
+        }
+      ],
+      "title": "allowsDisplayModeCustomization"
+    },
+    "doc://com.apple.documentation/documentation/AppKit/NSAnimationContext/animate(_:changes:completion:)": {
+      "kind": "symbol",
+      "url": "/documentation/AppKit/NSAnimationContext/animate(_:changes:completion:)",
+      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSAnimationContext/animate(_:changes:completion:)",
+      "type": "topic",
+      "role": "symbol",
+      "title": "animate(_:changes:completion:)",
+      "abstract": [
+        {
+          "text": "Animate changes to one or more views using the specified SwiftUI animation.",
+          "type": "text"
+        }
+      ],
+      "fragments": [
+        {
+          "text": "static",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "func",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "animate",
+          "kind": "identifier"
+        },
+        {
+          "text": "(",
+          "kind": "text"
+        },
+        {
+          "text": "_",
+          "kind": "externalParam"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "animation",
+          "kind": "internalParam"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "text": "Animation",
+          "preciseIdentifier": "s:7SwiftUI9AnimationV",
+          "kind": "typeIdentifier"
+        },
+        {
+          "text": ", ",
+          "kind": "text"
+        },
+        {
+          "text": "changes",
+          "kind": "externalParam"
+        },
+        {
+          "text": ": () -> ",
+          "kind": "text"
+        },
+        {
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:s4Voida",
+          "text": "Void"
+        },
+        {
+          "kind": "text",
+          "text": ", "
+        },
+        {
+          "kind": "externalParam",
+          "text": "completion"
+        },
+        {
+          "kind": "text",
+          "text": ": (() -> "
+        },
+        {
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:s4Voida",
+          "text": "Void"
+        },
+        {
+          "kind": "text",
+          "text": ")? = nil)"
+        }
+      ]
+    },
+    "doc://com.apple.documentation/documentation/AppKit/NSControl/ControlSize-swift.enum/extraLarge": {
+      "kind": "symbol",
+      "role": "symbol",
+      "url": "/documentation/AppKit/NSControl/ControlSize-swift.enum/extraLarge",
+      "type": "topic",
+      "title": "NSControl.ControlSize.extraLarge",
+      "fragments": [
+        {
+          "text": "case",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "extraLarge",
+          "kind": "identifier"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "",
+          "type": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSControl/ControlSize-swift.enum/extraLarge"
+    },
+    "doc://com.apple.Updates/documentation/Updates/ActivityKit": {
+      "kind": "article",
+      "title": "ActivityKit updates",
+      "url": "/documentation/updates/activitykit",
+      "role": "article",
+      "identifier": "doc://com.apple.Updates/documentation/Updates/ActivityKit",
+      "type": "topic",
+      "abstract": [
+        {
+          "text": "Learn about important changes in ActivityKit.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.apple.Updates/documentation/Updates/BackgroundTasks": {
+      "role": "article",
+      "title": "Background Tasks updates",
+      "type": "topic",
+      "url": "/documentation/updates/backgroundtasks",
+      "kind": "article",
+      "abstract": [
+        {
+          "text": "Learn about important changes in Background Tasks.",
+          "type": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.Updates/documentation/Updates/BackgroundTasks"
+    },
+    "doc://com.apple.Updates/documentation/Updates/AVFoundation": {
+      "kind": "article",
+      "title": "AVFoundation updates",
+      "url": "/documentation/updates/avfoundation",
+      "role": "article",
+      "identifier": "doc://com.apple.Updates/documentation/Updates/AVFoundation",
+      "type": "topic",
+      "abstract": [
+        {
+          "text": "Learn about important changes to AVFoundation.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.apple.Updates/documentation/Updates/ARKit": {
+      "kind": "article",
+      "url": "/documentation/updates/arkit",
+      "title": "ARKit updates",
+      "identifier": "doc://com.apple.Updates/documentation/Updates/ARKit",
+      "role": "article",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Learn about important changes to ARKit."
+        }
+      ],
+      "type": "topic"
+    },
+    "doc://com.apple.Updates/documentation/Updates/Accessibility": {
+      "kind": "article",
+      "title": "Accessibility updates",
+      "url": "/documentation/updates/accessibility",
+      "role": "article",
+      "identifier": "doc://com.apple.Updates/documentation/Updates/Accessibility",
+      "type": "topic",
+      "abstract": [
+        {
+          "text": "Learn about important changes to Accessibility.",
+          "type": "text"
+        }
+      ]
+    },
+    "https://developer.apple.com/sf-symbols/": {
+      "url": "https://developer.apple.com/sf-symbols/",
+      "type": "link",
+      "title": "SF Symbols",
+      "titleInlineContent": [
+        {
+          "text": "SF Symbols",
+          "type": "text"
+        }
+      ],
+      "identifier": "https://developer.apple.com/sf-symbols/"
+    },
+    "doc://com.apple.documentation/documentation/AppKit/NSPasteboardItem": {
+      "kind": "symbol",
+      "role": "symbol",
+      "url": "/documentation/AppKit/NSPasteboardItem",
+      "type": "topic",
+      "title": "NSPasteboardItem",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "NSPasteboardItem",
+          "kind": "identifier"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "An item on a pasteboard.",
+          "type": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSPasteboardItem"
+    },
+    "doc://com.apple.documentation/documentation/AppKit/NSPasteboard": {
+      "kind": "symbol",
+      "role": "symbol",
+      "url": "/documentation/AppKit/NSPasteboard",
+      "type": "topic",
+      "title": "NSPasteboard",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "NSPasteboard",
+          "kind": "identifier"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "An object that transfers data to and from the pasteboard server.",
+          "type": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSPasteboard"
+    },
+    "doc://com.apple.documentation/documentation/AppKit/NSSplitViewItem/bottomAlignedAccessoryViewControllers": {
+      "kind": "symbol",
+      "role": "symbol",
+      "url": "/documentation/AppKit/NSSplitViewItem/bottomAlignedAccessoryViewControllers",
+      "type": "topic",
+      "title": "bottomAlignedAccessoryViewControllers",
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "bottomAlignedAccessoryViewControllers",
+          "kind": "identifier"
+        },
+        {
+          "text": ": [",
+          "kind": "text"
+        },
+        {
+          "text": "NSSplitViewItemAccessoryViewController",
+          "preciseIdentifier": "c:objc(cs)NSSplitViewItemAccessoryViewController",
+          "kind": "typeIdentifier"
+        },
+        {
+          "text": "] { ",
+          "kind": "text"
+        },
+        {
+          "text": "get",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "set",
+          "kind": "keyword"
+        },
+        {
+          "text": " }",
+          "kind": "text"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "",
+          "type": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSSplitViewItem/bottomAlignedAccessoryViewControllers"
+    },
+    "doc://com.apple.documentation/documentation/AppKit/NSGlassEffectView": {
+      "type": "topic",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "text": "@",
+          "kind": "attribute"
+        },
+        {
+          "text": "MainActor",
+          "kind": "attribute",
+          "preciseIdentifier": "s:ScM"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "NSGlassEffectView",
+          "kind": "identifier"
+        }
+      ],
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A view that embeds its content view in a dynamic glass effect."
+        }
+      ],
+      "title": "NSGlassEffectView",
+      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSGlassEffectView",
+      "url": "/documentation/AppKit/NSGlassEffectView"
+    },
+    "doc://com.apple.documentation/documentation/AppKit/NSControl/ControlSize-swift.enum": {
+      "type": "topic",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "text": "enum",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "ControlSize",
+          "kind": "identifier"
+        }
+      ],
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A constant for specifying a cell’s size."
+        }
+      ],
+      "title": "NSControl.ControlSize",
+      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSControl/ControlSize-swift.enum",
+      "url": "/documentation/AppKit/NSControl/ControlSize-swift.enum"
+    },
+    "doc://com.apple.documentation/documentation/UIKit/UIPasteboard": {
+      "type": "topic",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "UIPasteboard",
+          "kind": "identifier"
+        }
+      ],
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object that helps a user share data from one place to another within your app, and from your app to other apps."
+        }
+      ],
+      "title": "UIPasteboard",
+      "identifier": "doc://com.apple.documentation/documentation/UIKit/UIPasteboard",
+      "url": "/documentation/UIKit/UIPasteboard"
+    },
+    "doc://com.apple.Updates/documentation/Updates/AudioToolbox": {
+      "kind": "article",
+      "title": "Audio Toolbox updates",
+      "url": "/documentation/updates/audiotoolbox",
+      "role": "article",
+      "identifier": "doc://com.apple.Updates/documentation/Updates/AudioToolbox",
+      "type": "topic",
+      "abstract": [
+        {
+          "text": "Learn about important changes to Audio Toolbox.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.apple.Updates/documentation/Updates/Apple-Intelligence": {
+      "kind": "article",
+      "title": "Apple Intelligence updates",
+      "url": "/documentation/updates/apple-intelligence",
+      "role": "article",
+      "identifier": "doc://com.apple.Updates/documentation/Updates/Apple-Intelligence",
+      "images": [
+        {
+          "identifier": "Apple-Intelligence-updates-page-PageImage-card.png",
+          "type": "card"
+        }
+      ],
+      "type": "topic",
+      "abstract": [
+        {
+          "text": "Learn about important changes to Apple Intelligence.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.apple.Updates/documentation/Updates/AppClips": {
+      "kind": "article",
+      "title": "App Clips updates",
+      "url": "/documentation/updates/appclips",
+      "role": "article",
+      "identifier": "doc://com.apple.Updates/documentation/Updates/AppClips",
+      "type": "topic",
+      "abstract": [
+        {
+          "text": "Learn about important changes in App Clips.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.apple.documentation/documentation/technologies": {
+      "kind": "technologies",
+      "title": "Technologies",
+      "url": "/documentation/technologies",
+      "role": "overview",
+      "identifier": "doc://com.apple.documentation/documentation/technologies",
+      "type": "topic",
+      "abstract": [
+        {
+          "text": "",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.apple.Updates/documentation/Updates/AuthenticationServices": {
+      "kind": "article",
+      "title": "AuthenticationServices updates",
+      "url": "/documentation/updates/authenticationservices",
+      "role": "article",
+      "identifier": "doc://com.apple.Updates/documentation/Updates/AuthenticationServices",
+      "type": "topic",
+      "abstract": [
+        {
+          "text": "Learn about important changes to AuthenticationServices.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.apple.Updates/documentation/Updates/AdAttributionKit": {
+      "kind": "article",
+      "url": "/documentation/updates/adattributionkit",
+      "title": "AdAttributionKit Updates",
+      "identifier": "doc://com.apple.Updates/documentation/Updates/AdAttributionKit",
+      "role": "article",
+      "abstract": [
+        {
+          "text": "Learn about important changes to AdAttributionKit.",
+          "type": "text"
+        }
+      ],
+      "type": "topic"
+    },
+    "doc://com.apple.Updates/documentation/Updates/Accelerate": {
+      "kind": "article",
+      "title": "Accelerate updates",
+      "url": "/documentation/updates/accelerate",
+      "role": "article",
+      "identifier": "doc://com.apple.Updates/documentation/Updates/Accelerate",
+      "type": "topic",
+      "abstract": [
+        {
+          "text": "Learn about important changes to Accelerate.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.apple.Updates/documentation/Updates/AppleMapsServerAPI": {
+      "kind": "article",
+      "identifier": "doc://com.apple.Updates/documentation/Updates/AppleMapsServerAPI",
+      "title": "AppleMapsServerAPI Updates",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Learn about important changes to AppleMapsServerAPI."
+        }
+      ],
+      "role": "article",
+      "url": "/documentation/updates/applemapsserverapi",
+      "type": "topic"
+    },
+    "doc://com.apple.documentation/documentation/AppKit/NSSplitViewItemAccessoryViewController": {
+      "type": "topic",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "text": "@",
+          "kind": "attribute"
+        },
+        {
+          "text": "MainActor",
+          "kind": "attribute",
+          "preciseIdentifier": "s:ScM"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "NSSplitViewItemAccessoryViewController",
+          "kind": "identifier"
+        }
+      ],
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": ""
+        }
+      ],
+      "title": "NSSplitViewItemAccessoryViewController",
+      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSSplitViewItemAccessoryViewController",
+      "url": "/documentation/AppKit/NSSplitViewItemAccessoryViewController"
+    },
+    "doc://com.apple.documentation/documentation/AppKit/NSPasteboard/accessBehavior-86972": {
+      "type": "topic",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The current pasteboard access behavior. The user can customize this behavior per-app in System Settings for any app that has triggered a pasteboard access alert in the past."
+        }
+      ],
+      "url": "/documentation/AppKit/NSPasteboard/accessBehavior-86972",
+      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSPasteboard/accessBehavior-86972",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "accessBehavior",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "text": "NSPasteboard",
+          "preciseIdentifier": "c:objc(cs)NSPasteboard",
+          "kind": "typeIdentifier"
+        },
+        {
+          "text": ".",
+          "kind": "text"
+        },
+        {
+          "text": "AccessBehavior",
+          "preciseIdentifier": "c:@E@NSPasteboardAccessBehavior",
+          "kind": "typeIdentifier"
+        },
+        {
+          "text": " { ",
+          "kind": "text"
+        },
+        {
+          "text": "get",
+          "kind": "keyword"
+        },
+        {
+          "text": " }",
+          "kind": "text"
+        }
+      ],
+      "title": "accessBehavior",
+      "role": "symbol"
+    },
+    "doc://com.apple.Updates/documentation/Updates/AppIntents": {
+      "kind": "article",
+      "url": "/documentation/updates/appintents",
+      "title": "App Intents updates",
+      "identifier": "doc://com.apple.Updates/documentation/Updates/AppIntents",
+      "role": "article",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Learn about important changes in App Intents."
+        }
+      ],
+      "type": "topic"
+    },
+    "Apple-Intelligence-updates-page-PageImage-card.png": {
+      "variants": [
+        {
+          "url": "https://docs-assets.developer.apple.com/published/582fe08f6f69a366c2f1b35cd91e3c52/Apple-Intelligence-updates-page-PageImage-card%402x.png",
+          "traits": [
+            "2x",
+            "light"
+          ]
+        },
+        {
+          "url": "https://docs-assets.developer.apple.com/published/d4b11a932a5a2c7880eccd8043a1c524/Apple-Intelligence-updates-page-PageImage-card~dark%402x.png",
+          "traits": [
+            "2x",
+            "dark"
+          ]
+        }
+      ],
+      "type": "image",
+      "identifier": "Apple-Intelligence-updates-page-PageImage-card.png",
+      "alt": "A stylistic image of the Apple Intelligence logo."
+    },
+    "doc://com.apple.Updates/documentation/Updates": {
+      "kind": "symbol",
+      "title": "Updates",
+      "url": "/documentation/updates",
+      "role": "collection",
+      "identifier": "doc://com.apple.Updates/documentation/Updates",
+      "images": [
+        {
+          "identifier": "featured.svg",
+          "type": "icon"
+        }
+      ],
+      "type": "topic",
+      "abstract": [
+        {
+          "text": "View major documentation updates and highlights from WWDC, browse ongoing updates from a set of framework releases over time, and jump to the latest release notes.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.apple.Updates/documentation/Updates/AVFAudio": {
+      "kind": "article",
+      "identifier": "doc://com.apple.Updates/documentation/Updates/AVFAudio",
+      "title": "AVFAudio updates",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Learn about important changes to AVFAudio."
+        }
+      ],
+      "role": "article",
+      "url": "/documentation/updates/avfaudio",
+      "type": "topic"
+    },
+    "doc://com.apple.documentation/documentation/AppKit/NSToolbarItem/Style-swift.enum/prominent": {
+      "abstract": [
+        {
+          "type": "text",
+          "text": ""
+        }
+      ],
+      "kind": "symbol",
+      "role": "symbol",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "case"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "prominent"
+        }
+      ],
+      "url": "/documentation/AppKit/NSToolbarItem/Style-swift.enum/prominent",
+      "type": "topic",
+      "title": "NSToolbarItem.Style.prominent",
+      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSToolbarItem/Style-swift.enum/prominent"
+    },
+    "doc://com.apple.documentation/documentation/AppKit/NSButton/BezelStyle-swift.enum/glass": {
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A bezel style with a glass effect"
+        }
+      ],
+      "kind": "symbol",
+      "role": "symbol",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "case"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "glass"
+        }
+      ],
+      "url": "/documentation/AppKit/NSButton/BezelStyle-swift.enum/glass",
+      "type": "topic",
+      "title": "NSButton.BezelStyle.glass",
+      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSButton/BezelStyle-swift.enum/glass"
+    },
+    "doc://com.apple.Updates/documentation/Updates/ApplePencil": {
+      "kind": "article",
+      "identifier": "doc://com.apple.Updates/documentation/Updates/ApplePencil",
+      "title": "Apple Pencil updates",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Learn about important changes to Apple Pencil."
+        }
+      ],
+      "role": "article",
+      "url": "/documentation/updates/applepencil",
+      "type": "topic"
+    },
+    "doc://com.apple.documentation/documentation/AppKit/NSView/prefersCompactControlSizeMetrics": {
+      "title": "prefersCompactControlSizeMetrics",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "When this property is true, any NSControls in the view or its descendants will be sized with compact metrics compatible with macOS 15 and earlier. Defaults to false"
+        }
+      ],
+      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSView/prefersCompactControlSizeMetrics",
+      "url": "/documentation/AppKit/NSView/prefersCompactControlSizeMetrics",
+      "type": "topic",
+      "kind": "symbol",
+      "role": "symbol",
+      "fragments": [
+        {
+          "text": "@",
+          "kind": "attribute"
+        },
+        {
+          "text": "MainActor",
+          "kind": "attribute",
+          "preciseIdentifier": "s:ScM"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "prefersCompactControlSizeMetrics",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "text": "Bool",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:Sb"
+        },
+        {
+          "text": " { ",
+          "kind": "text"
+        },
+        {
+          "kind": "keyword",
+          "text": "get"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "keyword",
+          "text": "set"
+        },
+        {
+          "kind": "text",
+          "text": " }"
+        }
+      ]
+    },
+    "https://developer.apple.com/documentation/appkit": {
+      "title": "AppKit",
+      "identifier": "https://developer.apple.com/documentation/appkit",
+      "url": "https://developer.apple.com/documentation/appkit",
+      "type": "link",
+      "titleInlineContent": [
+        {
+          "type": "text",
+          "text": "AppKit"
+        }
+      ]
+    },
+    "doc://com.apple.documentation/documentation/AppKit/NSGlassEffectContainerView": {
+      "title": "NSGlassEffectContainerView",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A view that efficiently merges descendant glass effect views together when they are within a specified proximity to each other."
+        }
+      ],
+      "identifier": "doc://com.apple.documentation/documentation/AppKit/NSGlassEffectContainerView",
+      "url": "/documentation/AppKit/NSGlassEffectContainerView",
+      "type": "topic",
+      "kind": "symbol",
+      "role": "symbol",
+      "fragments": [
+        {
+          "text": "@",
+          "kind": "attribute"
+        },
+        {
+          "text": "MainActor",
+          "kind": "attribute",
+          "preciseIdentifier": "s:ScM"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "NSGlassEffectContainerView",
+          "kind": "identifier"
+        }
+      ]
+    }
+  },
+  "variantOverrides": [
+    {
+      "traits": [
+        {
+          "interfaceLanguage": "occ"
+        }
+      ],
+      "patch": [
+        {
+          "value": "NSCursorFrameResizePosition",
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AppKit~1NSCursor~1FrameResizePosition/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "enum",
+              "kind": "keyword"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "NSCursorFrameResizePosition",
+              "kind": "identifier"
+            },
+            {
+              "text": " : ",
+              "kind": "text"
+            },
+            {
+              "preciseIdentifier": "c:@T@NSUInteger",
+              "text": "NSUInteger",
+              "kind": "typeIdentifier"
+            },
+            {
+              "text": ";",
+              "kind": "text"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AppKit~1NSCursor~1FrameResizePosition/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "@property",
+              "kind": "keyword"
+            },
+            {
+              "text": " (",
+              "kind": "text"
+            },
+            {
+              "text": "copy",
+              "kind": "keyword"
+            },
+            {
+              "text": ") ",
+              "kind": "text"
+            },
+            {
+              "text": "NSArray<NSSplitViewItemAccessoryViewController *>",
+              "kind": "typeIdentifier",
+              "preciseIdentifier": "c:Q$objc(cs)NSArray"
+            },
+            {
+              "text": " * ",
+              "kind": "text"
+            },
+            {
+              "text": "topAlignedAccessoryViewControllers",
+              "kind": "identifier"
+            },
+            {
+              "text": ";",
+              "kind": "text"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AppKit~1NSSplitViewItem~1topAlignedAccessoryViewControllers/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "keyword",
+              "text": "@property"
+            },
+            {
+              "kind": "text",
+              "text": " ("
+            },
+            {
+              "kind": "keyword",
+              "text": "copy"
+            },
+            {
+              "kind": "text",
+              "text": ") "
+            },
+            {
+              "kind": "typeIdentifier",
+              "preciseIdentifier": "c:objc(cs)UIColor",
+              "text": "UIColor"
+            },
+            {
+              "kind": "text",
+              "text": " * "
+            },
+            {
+              "kind": "identifier",
+              "text": "backgroundTintColor"
+            },
+            {
+              "kind": "text",
+              "text": ";"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AppKit~1NSToolbarItem~1backgroundTintColor/fragments",
+          "op": "replace"
+        },
+        {
+          "value": "NSToolbarItemStyle",
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AppKit~1NSToolbarItem~1Style-swift.enum/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "enum",
+              "kind": "keyword"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "NSToolbarItemStyle",
+              "kind": "identifier"
+            },
+            {
+              "text": " : ",
+              "kind": "text"
+            },
+            {
+              "text": "NSInteger",
+              "preciseIdentifier": "c:@T@NSInteger",
+              "kind": "typeIdentifier"
+            },
+            {
+              "text": ";",
+              "kind": "text"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AppKit~1NSToolbarItem~1Style-swift.enum/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "@interface",
+              "kind": "keyword"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "NSBackgroundExtensionView",
+              "kind": "identifier"
+            },
+            {
+              "text": " : ",
+              "kind": "text"
+            },
+            {
+              "text": "NSView",
+              "kind": "typeIdentifier",
+              "preciseIdentifier": "c:objc(cs)NSView"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AppKit~1NSBackgroundExtensionView/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "@property",
+              "kind": "keyword"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "BOOL",
+              "kind": "typeIdentifier",
+              "preciseIdentifier": "c:@T@BOOL"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "allowsDisplayModeCustomization",
+              "kind": "identifier"
+            },
+            {
+              "text": ";",
+              "kind": "text"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AppKit~1NSToolbar~1allowsDisplayModeCustomization/fragments",
+          "op": "replace"
+        },
+        {
+          "value": "NSControlSizeExtraLarge",
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AppKit~1NSControl~1ControlSize-swift.enum~1extraLarge/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "NSControlSizeExtraLarge"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AppKit~1NSControl~1ControlSize-swift.enum~1extraLarge/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "keyword",
+              "text": "@interface"
+            },
+            {
+              "kind": "text",
+              "text": " "
+            },
+            {
+              "kind": "identifier",
+              "text": "NSPasteboardItem"
+            },
+            {
+              "kind": "text",
+              "text": " : "
+            },
+            {
+              "kind": "typeIdentifier",
+              "text": "NSObject",
+              "preciseIdentifier": "c:objc(cs)NSObject"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AppKit~1NSPasteboardItem/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "@interface",
+              "kind": "keyword"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "NSPasteboard",
+              "kind": "identifier"
+            },
+            {
+              "text": " : ",
+              "kind": "text"
+            },
+            {
+              "text": "NSObject",
+              "preciseIdentifier": "c:objc(cs)NSObject",
+              "kind": "typeIdentifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AppKit~1NSPasteboard/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "@property",
+              "kind": "keyword"
+            },
+            {
+              "text": " (",
+              "kind": "text"
+            },
+            {
+              "text": "copy",
+              "kind": "keyword"
+            },
+            {
+              "text": ") ",
+              "kind": "text"
+            },
+            {
+              "text": "NSArray<NSSplitViewItemAccessoryViewController *>",
+              "preciseIdentifier": "c:Q$objc(cs)NSArray",
+              "kind": "typeIdentifier"
+            },
+            {
+              "text": " * ",
+              "kind": "text"
+            },
+            {
+              "text": "bottomAlignedAccessoryViewControllers",
+              "kind": "identifier"
+            },
+            {
+              "text": ";",
+              "kind": "text"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AppKit~1NSSplitViewItem~1bottomAlignedAccessoryViewControllers/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "keyword",
+              "text": "@interface"
+            },
+            {
+              "kind": "text",
+              "text": " "
+            },
+            {
+              "kind": "identifier",
+              "text": "NSGlassEffectView"
+            },
+            {
+              "kind": "text",
+              "text": " : "
+            },
+            {
+              "kind": "typeIdentifier",
+              "preciseIdentifier": "c:objc(cs)NSView",
+              "text": "NSView"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AppKit~1NSGlassEffectView/fragments",
+          "op": "replace"
+        },
+        {
+          "value": "NSControlSize",
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AppKit~1NSControl~1ControlSize-swift.enum/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "keyword",
+              "text": "enum"
+            },
+            {
+              "kind": "text",
+              "text": " "
+            },
+            {
+              "kind": "identifier",
+              "text": "NSControlSize"
+            },
+            {
+              "kind": "text",
+              "text": " : "
+            },
+            {
+              "kind": "typeIdentifier",
+              "text": "NSUInteger",
+              "preciseIdentifier": "c:@T@NSUInteger"
+            },
+            {
+              "kind": "text",
+              "text": ";"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AppKit~1NSControl~1ControlSize-swift.enum/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "keyword",
+              "text": "@interface"
+            },
+            {
+              "kind": "text",
+              "text": " "
+            },
+            {
+              "kind": "identifier",
+              "text": "UIPasteboard"
+            },
+            {
+              "kind": "text",
+              "text": " : "
+            },
+            {
+              "preciseIdentifier": "c:objc(cs)NSObject",
+              "kind": "typeIdentifier",
+              "text": "NSObject"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1UIKit~1UIPasteboard/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "@interface",
+              "kind": "keyword"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "NSSplitViewItemAccessoryViewController",
+              "kind": "identifier"
+            },
+            {
+              "text": " : ",
+              "kind": "text"
+            },
+            {
+              "text": "NSViewController",
+              "kind": "typeIdentifier",
+              "preciseIdentifier": "c:objc(cs)NSViewController"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AppKit~1NSSplitViewItemAccessoryViewController/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "@property",
+              "kind": "keyword"
+            },
+            {
+              "text": " (",
+              "kind": "text"
+            },
+            {
+              "text": "assign",
+              "kind": "keyword"
+            },
+            {
+              "text": ", ",
+              "kind": "text"
+            },
+            {
+              "text": "readonly",
+              "kind": "keyword"
+            },
+            {
+              "text": ") ",
+              "kind": "text"
+            },
+            {
+              "text": "NSPasteboardAccessBehavior",
+              "kind": "typeIdentifier",
+              "preciseIdentifier": "c:@E@NSPasteboardAccessBehavior"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "accessBehavior",
+              "kind": "identifier"
+            },
+            {
+              "text": ";",
+              "kind": "text"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AppKit~1NSPasteboard~1accessBehavior-86972/fragments",
+          "op": "replace"
+        },
+        {
+          "value": "NSToolbarItemStyleProminent",
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AppKit~1NSToolbarItem~1Style-swift.enum~1prominent/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "NSToolbarItemStyleProminent",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AppKit~1NSToolbarItem~1Style-swift.enum~1prominent/fragments",
+          "op": "replace"
+        },
+        {
+          "value": "NSBezelStyleGlass",
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AppKit~1NSButton~1BezelStyle-swift.enum~1glass/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "NSBezelStyleGlass"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AppKit~1NSButton~1BezelStyle-swift.enum~1glass/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "@property",
+              "kind": "keyword"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "BOOL",
+              "preciseIdentifier": "c:@T@BOOL",
+              "kind": "typeIdentifier"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "prefersCompactControlSizeMetrics",
+              "kind": "identifier"
+            },
+            {
+              "text": ";",
+              "kind": "text"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AppKit~1NSView~1prefersCompactControlSizeMetrics/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "keyword",
+              "text": "@interface"
+            },
+            {
+              "kind": "text",
+              "text": " "
+            },
+            {
+              "kind": "identifier",
+              "text": "NSGlassEffectContainerView"
+            },
+            {
+              "kind": "text",
+              "text": " : "
+            },
+            {
+              "kind": "typeIdentifier",
+              "preciseIdentifier": "c:objc(cs)NSView",
+              "text": "NSView"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AppKit~1NSGlassEffectContainerView/fragments",
+          "op": "replace"
+        }
+      ]
+    }
+  ],
+  "legalNotices": {
+    "copyright": "Copyright &copy; 2025 Apple Inc. All rights reserved.",
+    "termsOfUse": "https://www.apple.com/legal/internet-services/terms/site.html",
+    "privacyPolicy": "https://www.apple.com/privacy/privacy-policy"
+  }
+}

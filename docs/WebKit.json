@@ -1,0 +1,598 @@
+{
+  "abstract": [
+    {
+      "text": "Integrate web content seamlessly into your app, and customize content interactions to meet your app’s needs.",
+      "type": "text"
+    }
+  ],
+  "schemaVersion": {
+    "major": 0,
+    "minor": 3,
+    "patch": 0
+  },
+  "variants": [
+    {
+      "traits": [
+        {
+          "interfaceLanguage": "swift"
+        }
+      ],
+      "paths": [
+        "/documentation/webkit"
+      ]
+    },
+    {
+      "traits": [
+        {
+          "interfaceLanguage": "occ"
+        }
+      ],
+      "paths": [
+        "/documentation/webkit"
+      ]
+    }
+  ],
+  "primaryContentSections": [
+    {
+      "kind": "content",
+      "content": [
+        {
+          "text": "Overview",
+          "type": "heading",
+          "anchor": "overview",
+          "level": 2
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "Use the WebKit framework to integrate richly styled web content into your app’s native content. WebKit offers a full browsing experience for your content, offering a platform-native view and supporting classes to:",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "type": "unorderedList",
+          "items": [
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "text": "Display rich web content using HTML, CSS, and JavaScript",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "text": "Handle the incremental loading of page content",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Display multiple MIME types and compound frame elements"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "text": "Navigate between pages of content",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Manage a forward-back list of recently visited pages"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "text": "For more information about WebKit, go to ",
+              "type": "text"
+            },
+            {
+              "isActive": true,
+              "type": "reference",
+              "identifier": "https://webkit.org"
+            },
+            {
+              "text": ".",
+              "type": "text"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "identifier": {
+    "url": "doc://com.apple.webkit/documentation/WebKit",
+    "interfaceLanguage": "swift"
+  },
+  "topicSections": [
+    {
+      "title": "WebKit APIs",
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/webkit-for-appkit-and-uikit",
+        "doc://com.apple.webkit/documentation/WebKit/webkit-for-swiftui"
+      ],
+      "anchor": "WebKit-APIs"
+    },
+    {
+      "title": "Safari Support",
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/optimizing-your-website-for-safari",
+        "doc://com.apple.webkit/documentation/WebKit/delivering-video-content-for-safari",
+        "doc://com.apple.webkit/documentation/WebKit/promoting-apps-with-smart-app-banners"
+      ],
+      "anchor": "Safari-Support"
+    },
+    {
+      "title": "WebDriver",
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/macos-webdriver-commands-for-safari-11-1-and-earlier",
+        "doc://com.apple.webkit/documentation/WebKit/macos-webdriver-commands-for-safari-12-and-later",
+        "doc://com.apple.webkit/documentation/WebKit/about-webdriver-for-safari",
+        "doc://com.apple.webkit/documentation/WebKit/testing-with-webdriver-in-safari"
+      ],
+      "anchor": "WebDriver",
+      "abstract": [
+        {
+          "text": "Create automated tests of your web content using WebDriver commands.",
+          "type": "text"
+        }
+      ]
+    }
+  ],
+  "hierarchy": {
+    "paths": [
+      [
+        "doc://com.apple.documentation/documentation/technologies"
+      ]
+    ]
+  },
+  "metadata": {
+    "externalID": "WebKit",
+    "platforms": [
+      {
+        "name": "iOS",
+        "introducedAt": "16.0",
+        "beta": false
+      },
+      {
+        "name": "iPadOS",
+        "introducedAt": "16.0",
+        "beta": false
+      },
+      {
+        "name": "Mac Catalyst",
+        "introducedAt": "13.1",
+        "beta": false
+      },
+      {
+        "name": "macOS",
+        "introducedAt": "10.2",
+        "beta": false
+      },
+      {
+        "beta": false,
+        "name": "visionOS",
+        "introducedAt": "1.0"
+      }
+    ],
+    "modules": [
+      {
+        "name": "WebKit"
+      }
+    ],
+    "role": "collection",
+    "title": "WebKit",
+    "roleHeading": "Framework",
+    "symbolKind": "module"
+  },
+  "kind": "symbol",
+  "sections": [],
+  "references": {
+    "doc://com.apple.webkit/documentation/WebKit/WKDownload/PlaceholderPolicy": {
+      "navigatorTitle": [
+        {
+          "text": "PlaceholderPolicy",
+          "kind": "identifier"
+        }
+      ],
+      "fragments": [
+        {
+          "text": "enum",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "PlaceholderPolicy",
+          "kind": "identifier"
+        }
+      ],
+      "role": "symbol",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKDownload/PlaceholderPolicy",
+      "kind": "symbol",
+      "type": "topic",
+      "abstract": [],
+      "title": "WKDownload.PlaceholderPolicy",
+      "url": "/documentation/webkit/wkdownload/placeholderpolicy"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/about-webdriver-for-safari": {
+      "abstract": [
+        {
+          "text": "Enhance testing of your web content using Safari’s enhancements to WebDriver.",
+          "type": "text"
+        }
+      ],
+      "role": "article",
+      "url": "/documentation/webkit/about-webdriver-for-safari",
+      "type": "topic",
+      "title": "About WebDriver for Safari",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/about-webdriver-for-safari",
+      "kind": "article"
+    },
+    "doc://com.apple.documentation/documentation/technologies": {
+      "identifier": "doc://com.apple.documentation/documentation/technologies",
+      "kind": "technologies",
+      "abstract": [
+        {
+          "text": "",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/technologies",
+      "role": "overview",
+      "title": "Technologies",
+      "type": "topic"
+    },
+    "https://webkit.org": {
+      "titleInlineContent": [
+        {
+          "text": "https://webkit.org",
+          "type": "text"
+        }
+      ],
+      "url": "https://webkit.org",
+      "identifier": "https://webkit.org",
+      "title": "https://webkit.org",
+      "type": "link"
+    },
+    "doc://com.apple.webkit/documentation/WebKit": {
+      "identifier": "doc://com.apple.webkit/documentation/WebKit",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "Integrate web content seamlessly into your app, and customize content interactions to meet your app’s needs.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/webkit",
+      "role": "collection",
+      "title": "WebKit",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/optimizing-your-website-for-safari": {
+      "kind": "article",
+      "role": "article",
+      "url": "/documentation/webkit/optimizing-your-website-for-safari",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/optimizing-your-website-for-safari",
+      "title": "Optimizing Your Website for Safari",
+      "type": "topic",
+      "abstract": [
+        {
+          "text": "Improve your website by optimizing it for Safari.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/macos-webdriver-commands-for-safari-11-1-and-earlier": {
+      "type": "topic",
+      "url": "/documentation/webkit/macos-webdriver-commands-for-safari-11-1-and-earlier",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/macos-webdriver-commands-for-safari-11-1-and-earlier",
+      "role": "article",
+      "title": "macOS WebDriver Commands for Safari 11.1 and earlier",
+      "abstract": [
+        {
+          "text": "Test your web content using the WebDriver commands supported by Safari 11.1 and earlier.",
+          "type": "text"
+        }
+      ],
+      "kind": "article"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/promoting-apps-with-smart-app-banners": {
+      "type": "topic",
+      "abstract": [
+        {
+          "text": "Create a banner to promote your app on the App Store from a website.",
+          "type": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/promoting-apps-with-smart-app-banners",
+      "url": "/documentation/webkit/promoting-apps-with-smart-app-banners",
+      "kind": "article",
+      "role": "article",
+      "title": "Promoting Apps with Smart App Banners"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/delivering-video-content-for-safari": {
+      "kind": "article",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Improve the performance and appearance of video in your website in Safari."
+        }
+      ],
+      "role": "article",
+      "type": "topic",
+      "url": "/documentation/webkit/delivering-video-content-for-safari",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/delivering-video-content-for-safari",
+      "title": "Delivering Video Content for Safari"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/macos-webdriver-commands-for-safari-12-and-later": {
+      "abstract": [
+        {
+          "text": "Test your web content using the WebDriver commands supported by Safari 12 and later.",
+          "type": "text"
+        }
+      ],
+      "role": "article",
+      "url": "/documentation/webkit/macos-webdriver-commands-for-safari-12-and-later",
+      "type": "topic",
+      "title": "macOS WebDriver Commands for Safari 12 and later",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/macos-webdriver-commands-for-safari-12-and-later",
+      "kind": "article"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebpagePreferences/UpgradeToHTTPSPolicy": {
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "enum"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "UpgradeToHTTPSPolicy"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "UpgradeToHTTPSPolicy"
+        }
+      ],
+      "kind": "symbol",
+      "role": "symbol",
+      "abstract": [],
+      "url": "/documentation/webkit/wkwebpagepreferences/upgradetohttpspolicy",
+      "title": "WKWebpagePreferences.UpgradeToHTTPSPolicy",
+      "type": "topic",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebpagePreferences/UpgradeToHTTPSPolicy"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/webkit-for-swiftui": {
+      "url": "/documentation/webkit/webkit-for-swiftui",
+      "kind": "article",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Integrate web content into your SwiftUI apps with new standard views you connect to webpages."
+        }
+      ],
+      "type": "topic",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/webkit-for-swiftui",
+      "role": "collectionGroup",
+      "title": "WebKit for SwiftUI"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/testing-with-webdriver-in-safari": {
+      "type": "topic",
+      "url": "/documentation/webkit/testing-with-webdriver-in-safari",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/testing-with-webdriver-in-safari",
+      "role": "article",
+      "title": "Testing with WebDriver in Safari",
+      "abstract": [
+        {
+          "text": "Enable WebDriver and run a test.",
+          "type": "text"
+        }
+      ],
+      "kind": "article"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/webkit-for-appkit-and-uikit": {
+      "kind": "article",
+      "title": "WebKit for AppKit and UIKit",
+      "type": "topic",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Display web content in AppKit or UIKit apps, or apps built with Objective-C."
+        }
+      ],
+      "role": "collectionGroup",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/webkit-for-appkit-and-uikit",
+      "url": "/documentation/webkit/webkit-for-appkit-and-uikit"
+    }
+  },
+  "variantOverrides": [
+    {
+      "traits": [
+        {
+          "interfaceLanguage": "occ"
+        }
+      ],
+      "patch": [
+        {
+          "op": "replace",
+          "value": "occ",
+          "path": "/identifier/interfaceLanguage"
+        },
+        {
+          "op": "replace",
+          "value": {
+            "paths": [
+              [
+                "doc://com.apple.documentation/documentation/technologies"
+              ]
+            ]
+          },
+          "path": "/hierarchy"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/webkit-for-appkit-and-uikit",
+                "doc://com.apple.webkit/documentation/WebKit/webkit-for-swiftui"
+              ],
+              "title": "WebKit APIs",
+              "anchor": "WebKit-APIs"
+            },
+            {
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/optimizing-your-website-for-safari",
+                "doc://com.apple.webkit/documentation/WebKit/delivering-video-content-for-safari",
+                "doc://com.apple.webkit/documentation/WebKit/promoting-apps-with-smart-app-banners"
+              ],
+              "title": "Safari Support",
+              "anchor": "Safari-Support"
+            },
+            {
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/macos-webdriver-commands-for-safari-11-1-and-earlier",
+                "doc://com.apple.webkit/documentation/WebKit/macos-webdriver-commands-for-safari-12-and-later",
+                "doc://com.apple.webkit/documentation/WebKit/about-webdriver-for-safari",
+                "doc://com.apple.webkit/documentation/WebKit/testing-with-webdriver-in-safari"
+              ],
+              "title": "WebDriver",
+              "anchor": "WebDriver",
+              "abstract": [
+                {
+                  "text": "Create automated tests of your web content using WebDriver commands.",
+                  "type": "text"
+                }
+              ]
+            },
+            {
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/WKDownload/PlaceholderPolicy",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebpagePreferences/UpgradeToHTTPSPolicy"
+              ],
+              "title": "Enumerations",
+              "anchor": "Enumerations",
+              "generated": true
+            }
+          ],
+          "path": "/topicSections"
+        },
+        {
+          "value": null,
+          "path": "/relationshipsSections",
+          "op": "add"
+        },
+        {
+          "value": null,
+          "path": "/seeAlsoSections",
+          "op": "add"
+        },
+        {
+          "value": "WKDownloadPlaceholderPolicy",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKDownload~1PlaceholderPolicy/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "WKDownloadPlaceholderPolicy",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKDownload~1PlaceholderPolicy/fragments",
+          "op": "replace"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKDownload~1PlaceholderPolicy/navigatorTitle",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKDownloadPlaceholderPolicy"
+            }
+          ],
+          "op": "replace"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebpagePreferences~1UpgradeToHTTPSPolicy/title",
+          "value": "WKWebpagePreferencesUpgradeToHTTPSPolicy",
+          "op": "replace"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebpagePreferences~1UpgradeToHTTPSPolicy/fragments",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebpagePreferencesUpgradeToHTTPSPolicy"
+            }
+          ],
+          "op": "replace"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebpagePreferences~1UpgradeToHTTPSPolicy/navigatorTitle",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebpagePreferencesUpgradeToHTTPSPolicy"
+            }
+          ],
+          "op": "replace"
+        }
+      ]
+    }
+  ],
+  "legalNotices": {
+    "copyright": "Copyright &copy; 2025 Apple Inc. All rights reserved.",
+    "termsOfUse": "https://www.apple.com/legal/internet-services/terms/site.html",
+    "privacyPolicy": "https://www.apple.com/privacy/privacy-policy"
+  }
+}

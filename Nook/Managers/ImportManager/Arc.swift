@@ -92,6 +92,21 @@ struct SidebarContainer: Codable {
     }
 }
 
+struct AnyCodingKey: CodingKey {
+    var stringValue: String
+    var intValue: Int?
+
+    init?(stringValue: String) {
+        self.stringValue = stringValue
+        self.intValue = nil
+    }
+
+    init?(intValue: Int) {
+        self.stringValue = "\(intValue)"
+        self.intValue = intValue
+    }
+}
+
 struct AnyCodable: Codable {
     let value: Any
     
@@ -106,11 +121,15 @@ struct AnyCodable: Codable {
             value = int
         } else if let double = try? container.decode(Double.self) {
             value = double
-        } else if let dict = try? container.decode([String: AnyCodable].self) {
-            value = dict.mapValues { $0.value }
-        } else if let array = try? container.decode([AnyCodable].self) {
-            value = array.map { $0.value }
+          } else if let jsonData = try? container.decode(Data.self) {
+            // Try to decode as JSON for complex types
+            if let jsonObject = try? JSONSerialization.jsonObject(with: jsonData) {
+                value = jsonObject
+            } else {
+                value = NSNull()
+            }
         } else {
+            // Default fallback
             throw DecodingError.typeMismatch(AnyCodable.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Cannot decode AnyCodable"))
         }
     }

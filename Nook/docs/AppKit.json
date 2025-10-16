@@ -1,0 +1,1166 @@
+{
+  "topicSections": [
+    {
+      "identifiers": [
+        "doc://com.apple.documentation/documentation/TechnologyOverviews/adopting-liquid-glass",
+        "doc://com.apple.documentation/documentation/Updates/AppKit",
+        "doc://com.apple.documentation/documentation/UIKit/protecting-the-user-s-privacy",
+        "doc://com.apple.documentation/documentation/Apple-Silicon/porting-your-macos-apps-to-apple-silicon"
+      ],
+      "anchor": "Essentials",
+      "title": "Essentials"
+    },
+    {
+      "identifiers": [
+        "doc://com.apple.appkit/documentation/AppKit/app-and-environment",
+        "doc://com.apple.appkit/documentation/AppKit/documents-data-and-pasteboard",
+        "doc://com.apple.appkit/documentation/AppKit/cocoa-bindings",
+        "doc://com.apple.appkit/documentation/AppKit/resource-management",
+        "doc://com.apple.appkit/documentation/AppKit/app-extensions"
+      ],
+      "anchor": "App-Structure",
+      "title": "App Structure"
+    },
+    {
+      "anchor": "User-Interface",
+      "identifiers": [
+        "doc://com.apple.appkit/documentation/AppKit/views-and-controls",
+        "doc://com.apple.appkit/documentation/AppKit/view-management",
+        "doc://com.apple.appkit/documentation/AppKit/view-layout",
+        "doc://com.apple.appkit/documentation/AppKit/appearance-customization",
+        "doc://com.apple.appkit/documentation/AppKit/animation",
+        "doc://com.apple.appkit/documentation/AppKit/windows-panels-and-screens",
+        "doc://com.apple.appkit/documentation/AppKit/sound-speech-and-haptics",
+        "doc://com.apple.appkit/documentation/AppKit/supporting-continuity-camera-in-your-mac-app"
+      ],
+      "abstract": [
+        {
+          "text": "Your app’s user interface provides visual, audible, and tactile feedback to the user about what your app is doing.",
+          "type": "text"
+        }
+      ],
+      "title": "User Interface"
+    },
+    {
+      "anchor": "User-Interactions",
+      "identifiers": [
+        "doc://com.apple.appkit/documentation/AppKit/mouse-keyboard-and-trackpad",
+        "doc://com.apple.appkit/documentation/AppKit/menus-cursors-and-the-dock",
+        "doc://com.apple.appkit/documentation/AppKit/gestures",
+        "doc://com.apple.appkit/documentation/AppKit/touch-bar",
+        "doc://com.apple.appkit/documentation/AppKit/drag-and-drop",
+        "doc://com.apple.appkit/documentation/AppKit/accessibility-for-appkit"
+      ],
+      "title": "User Interactions"
+    },
+    {
+      "anchor": "Graphics-Drawing-Color-and-Printing",
+      "identifiers": [
+        "doc://com.apple.appkit/documentation/AppKit/images-and-pdf",
+        "doc://com.apple.appkit/documentation/AppKit/drawing",
+        "doc://com.apple.appkit/documentation/AppKit/color",
+        "doc://com.apple.appkit/documentation/AppKit/printing"
+      ],
+      "title": "Graphics, Drawing, Color, and Printing"
+    },
+    {
+      "anchor": "Text",
+      "identifiers": [
+        "doc://com.apple.appkit/documentation/AppKit/text-display",
+        "doc://com.apple.appkit/documentation/AppKit/textkit",
+        "doc://com.apple.appkit/documentation/AppKit/fonts",
+        "doc://com.apple.appkit/documentation/AppKit/writing-tools"
+      ],
+      "title": "Text"
+    },
+    {
+      "anchor": "Deprecated",
+      "title": "Deprecated",
+      "identifiers": [
+        "doc://com.apple.appkit/documentation/AppKit/deprecated-symbols"
+      ],
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Avoid using deprecated classes and protocols in your apps."
+        }
+      ]
+    },
+    {
+      "anchor": "Reference",
+      "title": "Reference",
+      "identifiers": [
+        "doc://com.apple.appkit/documentation/AppKit/enumerations",
+        "doc://com.apple.appkit/documentation/AppKit/constants",
+        "doc://com.apple.appkit/documentation/AppKit/data-types",
+        "doc://com.apple.appkit/documentation/AppKit/macros"
+      ]
+    }
+  ],
+  "primaryContentSections": [
+    {
+      "kind": "content",
+      "content": [
+        {
+          "anchor": "overview",
+          "level": 2,
+          "text": "Overview",
+          "type": "heading"
+        },
+        {
+          "inlineContent": [
+            {
+              "text": "AppKit contains the objects you need to build the user interface for a macOS app. In addition to drawing windows, buttons, panels, and text fields, it handles all the event management and interaction between your app, people, and macOS.",
+              "type": "text"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "inlineContent": [
+            {
+              "identifier": "landmarks-app-article-hero",
+              "type": "image"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "inlineContent": [
+            {
+              "text": "Aside from drawing and managing interactions, AppKit handles printing, animating, as well as creating documents with large amounts of data efficiently. The framework also contains built-in support for localization and accessibility to ensure that your app reaches as many people as possible.",
+              "type": "text"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "AppKit also works with "
+            },
+            {
+              "type": "reference",
+              "isActive": true,
+              "identifier": "doc://com.apple.documentation/documentation/SwiftUI"
+            },
+            {
+              "type": "text",
+              "text": ", so you can implement parts of your AppKit app in SwiftUI or mix interface elements between the two frameworks. For example, you can place AppKit views and view controllers inside SwiftUI views, and vice versa."
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "name": "Note",
+          "content": [
+            {
+              "type": "paragraph",
+              "inlineContent": [
+                {
+                  "text": "",
+                  "type": "text"
+                },
+                {
+                  "text": " ",
+                  "type": "text"
+                },
+                {
+                  "text": "For information about bringing your iPad app to Mac, see ",
+                  "type": "text"
+                },
+                {
+                  "isActive": true,
+                  "identifier": "doc://com.apple.documentation/documentation/UIKit/mac-catalyst",
+                  "type": "reference"
+                },
+                {
+                  "text": ". To build an iOS app, you can use SwiftUI to create an app that works across all of Apple’s platforms, or use ",
+                  "type": "text"
+                },
+                {
+                  "isActive": true,
+                  "identifier": "doc://com.apple.documentation/documentation/UIKit",
+                  "type": "reference"
+                },
+                {
+                  "type": "text",
+                  "text": " to create an app for iOS only."
+                }
+              ]
+            }
+          ],
+          "type": "aside",
+          "style": "note"
+        }
+      ]
+    }
+  ],
+  "sections": [],
+  "hierarchy": {
+    "paths": [
+      [
+        "doc://com.apple.documentation/documentation/technologies"
+      ]
+    ]
+  },
+  "abstract": [
+    {
+      "text": "Construct and manage a graphical, event-driven user interface for your macOS app.",
+      "type": "text"
+    }
+  ],
+  "variants": [
+    {
+      "paths": [
+        "/documentation/appkit"
+      ],
+      "traits": [
+        {
+          "interfaceLanguage": "swift"
+        }
+      ]
+    },
+    {
+      "paths": [
+        "/documentation/appkit"
+      ],
+      "traits": [
+        {
+          "interfaceLanguage": "occ"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "externalID": "AppKit",
+    "roleHeading": "Framework",
+    "symbolKind": "module",
+    "platforms": [
+      {
+        "beta": false,
+        "introducedAt": "13.0",
+        "name": "Mac Catalyst"
+      },
+      {
+        "beta": false,
+        "name": "macOS",
+        "introducedAt": "10.0"
+      }
+    ],
+    "modules": [
+      {
+        "name": "AppKit"
+      }
+    ],
+    "role": "collection",
+    "title": "AppKit"
+  },
+  "identifier": {
+    "url": "doc://com.apple.appkit/documentation/AppKit",
+    "interfaceLanguage": "swift"
+  },
+  "schemaVersion": {
+    "major": 0,
+    "minor": 3,
+    "patch": 0
+  },
+  "kind": "symbol",
+  "references": {
+    "doc://com.apple.appkit/documentation/AppKit/supporting-continuity-camera-in-your-mac-app": {
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/supporting-continuity-camera-in-your-mac-app",
+      "role": "article",
+      "title": "Supporting Continuity Camera in Your Mac App",
+      "type": "topic",
+      "url": "/documentation/appkit/supporting-continuity-camera-in-your-mac-app",
+      "abstract": [
+        {
+          "text": "Incorporate scanned documents and pictures from a user’s iPhone, iPad, or iPod touch into your Mac app using Continuity Camera.",
+          "type": "text"
+        }
+      ],
+      "kind": "article"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/NSViewLayoutRegionAdaptivityAxis": {
+      "title": "NSViewLayoutRegionAdaptivityAxis",
+      "abstract": [],
+      "type": "topic",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/NSViewLayoutRegionAdaptivityAxis",
+      "role": "symbol",
+      "fragments": [
+        {
+          "text": "NSViewLayoutRegionAdaptivityAxis",
+          "kind": "identifier"
+        }
+      ],
+      "kind": "symbol",
+      "url": "/documentation/appkit/nsviewlayoutregionadaptivityaxis"
+    },
+    "doc://com.apple.documentation/documentation/SwiftUI": {
+      "type": "topic",
+      "images": [
+        {
+          "identifier": "SwiftUI-PageImage-card.png",
+          "type": "card"
+        }
+      ],
+      "title": "SwiftUI",
+      "identifier": "doc://com.apple.documentation/documentation/SwiftUI",
+      "abstract": [
+        {
+          "text": "Declare the user interface and behavior for your app on every platform.",
+          "type": "text"
+        }
+      ],
+      "kind": "symbol",
+      "role": "collection",
+      "url": "/documentation/SwiftUI"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/printing": {
+      "title": "Printing",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Display the system print panels and manage the printing process."
+        }
+      ],
+      "type": "topic",
+      "url": "/documentation/appkit/printing",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/printing",
+      "kind": "article",
+      "role": "collectionGroup"
+    },
+    "doc://com.apple.appkit/documentation/AppKit": {
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Construct and manage a graphical, event-driven user interface for your macOS app."
+        }
+      ],
+      "role": "collection",
+      "type": "topic",
+      "title": "AppKit",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit",
+      "url": "/documentation/appkit"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/deprecated-symbols": {
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Review symbols that are no longer supported, and find the replacements to use instead."
+        }
+      ],
+      "title": "Deprecated Symbols",
+      "url": "/documentation/appkit/deprecated-symbols",
+      "kind": "article",
+      "role": "collectionGroup",
+      "type": "topic",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/deprecated-symbols"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/windows-panels-and-screens": {
+      "kind": "article",
+      "title": "Windows, Panels, and Screens",
+      "abstract": [
+        {
+          "text": "Organize your view hierarchies and facilitate their display onscreen.",
+          "type": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/windows-panels-and-screens",
+      "url": "/documentation/appkit/windows-panels-and-screens",
+      "type": "topic",
+      "role": "collectionGroup"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/views-and-controls": {
+      "abstract": [
+        {
+          "text": "Present your content onscreen and handle user input and events.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/appkit/views-and-controls",
+      "kind": "article",
+      "type": "topic",
+      "title": "Views and Controls",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/views-and-controls",
+      "role": "collectionGroup"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/appearance-customization": {
+      "type": "topic",
+      "title": "Appearance Customization",
+      "role": "collectionGroup",
+      "url": "/documentation/appkit/appearance-customization",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/appearance-customization",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Add Dark Mode support to your app, and use appearance proxies to modify your UI."
+        }
+      ],
+      "kind": "article"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/view-layout": {
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/view-layout",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Position and size views using a stack view or Auto Layout constraints."
+        }
+      ],
+      "kind": "article",
+      "url": "/documentation/appkit/view-layout",
+      "role": "collectionGroup",
+      "type": "topic",
+      "title": "View Layout"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/drawing": {
+      "type": "topic",
+      "title": "Drawing",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/drawing",
+      "role": "collectionGroup",
+      "url": "/documentation/appkit/drawing",
+      "kind": "article",
+      "abstract": [
+        {
+          "text": "Draw shapes, images, and other content on the screen.",
+          "type": "text"
+        }
+      ]
+    },
+    "liquid-glass.png": {
+      "type": "image",
+      "alt": "An abstract representation of an interface with a translucent layer that appears above the content layer.",
+      "variants": [
+        {
+          "traits": [
+            "1x",
+            "dark"
+          ],
+          "url": "https://docs-assets.developer.apple.com/published/9e6f0f4c73f588db44f7b17b1043ac3d/liquid-glass~dark.png"
+        },
+        {
+          "traits": [
+            "1x",
+            "light"
+          ],
+          "url": "https://docs-assets.developer.apple.com/published/cea5eb617d7e05fb04c260722bfb7242/liquid-glass.png"
+        }
+      ],
+      "identifier": "liquid-glass.png"
+    },
+    "doc://com.apple.documentation/documentation/technologies": {
+      "kind": "technologies",
+      "abstract": [
+        {
+          "type": "text",
+          "text": ""
+        }
+      ],
+      "role": "overview",
+      "type": "topic",
+      "title": "Technologies",
+      "identifier": "doc://com.apple.documentation/documentation/technologies",
+      "url": "/documentation/technologies"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/touch-bar": {
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/touch-bar",
+      "type": "topic",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Display interactive content and controls in the Touch Bar."
+        }
+      ],
+      "title": "Touch Bar",
+      "kind": "article",
+      "role": "collectionGroup",
+      "url": "/documentation/appkit/touch-bar"
+    },
+    "SwiftUI-PageImage-card.png": {
+      "type": "image",
+      "identifier": "SwiftUI-PageImage-card.png",
+      "variants": [
+        {
+          "url": "https://docs-assets.developer.apple.com/published/a0ca0e84aabe29cd5bf4d29b4ab5046e/SwiftUI-PageImage-card%402x.png",
+          "traits": [
+            "2x",
+            "light"
+          ]
+        },
+        {
+          "url": "https://docs-assets.developer.apple.com/published/a6ddc19a84fa8156d8ec8353a9622d0e/SwiftUI-PageImage-card~dark%402x.png",
+          "traits": [
+            "2x",
+            "dark"
+          ]
+        }
+      ],
+      "alt": "A stylized Swift logo using dashes on a white or blue background."
+    },
+    "doc://com.apple.documentation/documentation/UIKit/mac-catalyst": {
+      "type": "topic",
+      "identifier": "doc://com.apple.documentation/documentation/UIKit/mac-catalyst",
+      "url": "/documentation/UIKit/mac-catalyst",
+      "abstract": [
+        {
+          "text": "Create a version of your iPad app that users can run on a Mac device.",
+          "type": "text"
+        }
+      ],
+      "kind": "article",
+      "title": "Mac Catalyst",
+      "role": "article"
+    },
+    "doc://com.apple.documentation/documentation/UIKit": {
+      "type": "topic",
+      "identifier": "doc://com.apple.documentation/documentation/UIKit",
+      "url": "/documentation/UIKit",
+      "abstract": [
+        {
+          "text": "Construct and manage a graphical, event-driven user interface for your iOS, iPadOS, or tvOS app.",
+          "type": "text"
+        }
+      ],
+      "kind": "symbol",
+      "title": "UIKit",
+      "role": "collection"
+    },
+    "doc://com.apple.documentation/documentation/TechnologyOverviews/adopting-liquid-glass": {
+      "images": [
+        {
+          "type": "card",
+          "identifier": "liquid-glass.png"
+        }
+      ],
+      "identifier": "doc://com.apple.documentation/documentation/TechnologyOverviews/adopting-liquid-glass",
+      "kind": "article",
+      "title": "Adopting Liquid Glass",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Find out how to bring the new material to your app."
+        }
+      ],
+      "url": "/documentation/TechnologyOverviews/adopting-liquid-glass",
+      "role": "article",
+      "type": "topic"
+    },
+    "landmarks-app-article-hero": {
+      "variants": [
+        {
+          "traits": [
+            "2x",
+            "light"
+          ],
+          "url": "https://docs-assets.developer.apple.com/published/2ba3100f3acde10ba4fbbbdb32b4cbda/landmarks-app-article-hero%402x.png"
+        },
+        {
+          "traits": [
+            "2x",
+            "dark"
+          ],
+          "url": "https://docs-assets.developer.apple.com/published/a834fd0b08a439941aedce9dcb0981dd/landmarks-app-article-hero~dark%402x.png"
+        }
+      ],
+      "alt": "An image of the Landmarks sample app on Mac showing the Mount Fuji landmark.",
+      "type": "image",
+      "identifier": "landmarks-app-article-hero"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/drag-and-drop": {
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/drag-and-drop",
+      "type": "topic",
+      "abstract": [
+        {
+          "text": "Support the direct manipulation of your app’s content using drag and drop.",
+          "type": "text"
+        }
+      ],
+      "title": "Drag and Drop",
+      "kind": "article",
+      "role": "collectionGroup",
+      "url": "/documentation/appkit/drag-and-drop"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/NSGlassEffectView/Style-swift.enum": {
+      "abstract": [],
+      "url": "/documentation/appkit/nsglasseffectview/style-swift.enum",
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "Style"
+        }
+      ],
+      "type": "topic",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/NSGlassEffectView/Style-swift.enum",
+      "title": "NSGlassEffectView.Style",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "enum"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "Style"
+        }
+      ]
+    },
+    "doc://com.apple.appkit/documentation/AppKit/text-display": {
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Display text and check spelling."
+        }
+      ],
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/text-display",
+      "type": "topic",
+      "kind": "article",
+      "url": "/documentation/appkit/text-display",
+      "role": "collectionGroup",
+      "title": "Text Display"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/documents-data-and-pasteboard": {
+      "role": "collectionGroup",
+      "title": "Documents, Data, and Pasteboard",
+      "kind": "article",
+      "url": "/documentation/appkit/documents-data-and-pasteboard",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Organize your app’s data and preferences, and share that data on the pasteboard or in iCloud."
+        }
+      ],
+      "type": "topic",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/documents-data-and-pasteboard"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/resource-management": {
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Manage the storyboards and nib files containing your app’s user interface, and learn how to load data that is stored in resource files."
+        }
+      ],
+      "url": "/documentation/appkit/resource-management",
+      "title": "Resource Management",
+      "kind": "article",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/resource-management",
+      "type": "topic",
+      "role": "collectionGroup"
+    },
+    "doc://com.apple.documentation/documentation/Apple-Silicon/porting-your-macos-apps-to-apple-silicon": {
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Create a version of your macOS app that runs on both Apple silicon and Intel-based Mac computers."
+        }
+      ],
+      "url": "/documentation/Apple-Silicon/porting-your-macos-apps-to-apple-silicon",
+      "role": "article",
+      "type": "topic",
+      "identifier": "doc://com.apple.documentation/documentation/Apple-Silicon/porting-your-macos-apps-to-apple-silicon",
+      "title": "Porting your macOS apps to Apple silicon",
+      "kind": "article"
+    },
+    "doc://com.apple.documentation/documentation/UIKit/protecting-the-user-s-privacy": {
+      "kind": "article",
+      "abstract": [
+        {
+          "text": "Secure personal data, and respect user preferences for how data is used.",
+          "type": "text"
+        }
+      ],
+      "type": "topic",
+      "url": "/documentation/UIKit/protecting-the-user-s-privacy",
+      "role": "article",
+      "identifier": "doc://com.apple.documentation/documentation/UIKit/protecting-the-user-s-privacy",
+      "title": "Protecting the User’s Privacy"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/sound-speech-and-haptics": {
+      "title": "Sound, Speech, and Haptics",
+      "role": "collectionGroup",
+      "url": "/documentation/appkit/sound-speech-and-haptics",
+      "type": "topic",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/sound-speech-and-haptics",
+      "abstract": [
+        {
+          "text": "Play sounds and haptic feedback, and incorporate speech recognition and synthesis into your interface.",
+          "type": "text"
+        }
+      ],
+      "kind": "article"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/enumerations": {
+      "kind": "article",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Enumerations for use with multiple classes."
+        }
+      ],
+      "type": "topic",
+      "url": "/documentation/appkit/enumerations",
+      "role": "collectionGroup",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/enumerations",
+      "title": "Enumerations"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/fonts": {
+      "url": "/documentation/appkit/fonts",
+      "role": "collectionGroup",
+      "kind": "article",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/fonts",
+      "type": "topic",
+      "title": "Fonts",
+      "abstract": [
+        {
+          "text": "Manage the fonts used to display text.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.apple.appkit/documentation/AppKit/constants": {
+      "kind": "article",
+      "abstract": [
+        {
+          "text": "Constants for use with multiple classes.",
+          "type": "text"
+        }
+      ],
+      "type": "topic",
+      "url": "/documentation/appkit/constants",
+      "role": "collectionGroup",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/constants",
+      "title": "Constants"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/cocoa-bindings": {
+      "kind": "article",
+      "role": "collectionGroup",
+      "url": "/documentation/appkit/cocoa-bindings",
+      "type": "topic",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/cocoa-bindings",
+      "title": "Cocoa Bindings",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Automatically synchronize your data model with your app’s interface using Cocoa Bindings."
+        }
+      ]
+    },
+    "doc://com.apple.appkit/documentation/AppKit/app-and-environment": {
+      "abstract": [
+        {
+          "text": "Learn about the objects that you use to interact with the system.",
+          "type": "text"
+        }
+      ],
+      "kind": "article",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/app-and-environment",
+      "title": "App and Environment",
+      "url": "/documentation/appkit/app-and-environment",
+      "type": "topic",
+      "role": "collectionGroup"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/textkit": {
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/textkit",
+      "url": "/documentation/appkit/textkit",
+      "abstract": [
+        {
+          "text": "Manage text storage and perform custom layout of text-based content in your app’s views.",
+          "type": "text"
+        }
+      ],
+      "title": "TextKit",
+      "type": "topic",
+      "role": "collectionGroup",
+      "kind": "article"
+    },
+    "doc://com.apple.documentation/documentation/Updates/AppKit": {
+      "kind": "article",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Learn about important changes to AppKit."
+        }
+      ],
+      "type": "topic",
+      "url": "/documentation/Updates/AppKit",
+      "role": "article",
+      "identifier": "doc://com.apple.documentation/documentation/Updates/AppKit",
+      "title": "AppKit updates"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/color": {
+      "title": "Color",
+      "abstract": [
+        {
+          "text": "Represent colors using built-in or custom formats, and give users options for selecting and applying colors.",
+          "type": "text"
+        }
+      ],
+      "type": "topic",
+      "url": "/documentation/appkit/color",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/color",
+      "kind": "article",
+      "role": "collectionGroup"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/mouse-keyboard-and-trackpad": {
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Handle events related to mouse, keyboard, and trackpad input."
+        }
+      ],
+      "type": "topic",
+      "kind": "article",
+      "role": "collectionGroup",
+      "url": "/documentation/appkit/mouse-keyboard-and-trackpad",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/mouse-keyboard-and-trackpad",
+      "title": "Mouse, Keyboard, and Trackpad"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/images-and-pdf": {
+      "role": "collectionGroup",
+      "type": "topic",
+      "url": "/documentation/appkit/images-and-pdf",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/images-and-pdf",
+      "title": "Images and PDF",
+      "abstract": [
+        {
+          "text": "Create and manage images, in bitmap, PDF, and other formats.",
+          "type": "text"
+        }
+      ],
+      "kind": "article"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/gestures": {
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/gestures",
+      "type": "topic",
+      "abstract": [
+        {
+          "text": "Encapsulate your app’s event-handling logic in gesture recognizers so that you can reuse that code throughout your app.",
+          "type": "text"
+        }
+      ],
+      "title": "Gestures",
+      "kind": "article",
+      "role": "collectionGroup",
+      "url": "/documentation/appkit/gestures"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/animation": {
+      "kind": "article",
+      "role": "collectionGroup",
+      "url": "/documentation/appkit/animation",
+      "title": "Animation",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Animate your views and other content to create a more engaging experience for users."
+        }
+      ],
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/animation",
+      "type": "topic"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/menus-cursors-and-the-dock": {
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/menus-cursors-and-the-dock",
+      "type": "topic",
+      "abstract": [
+        {
+          "text": "Implement menus and cursors to facilitate interactions with your app, and use your app’s Dock tile to convey updated information.",
+          "type": "text"
+        }
+      ],
+      "title": "Menus, Cursors, and the Dock",
+      "kind": "article",
+      "role": "collectionGroup",
+      "url": "/documentation/appkit/menus-cursors-and-the-dock"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/macros": {
+      "kind": "article",
+      "abstract": [
+        {
+          "text": "Macros for use with multiple classes.",
+          "type": "text"
+        }
+      ],
+      "type": "topic",
+      "url": "/documentation/appkit/macros",
+      "role": "collectionGroup",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/macros",
+      "title": "Macros"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/app-extensions": {
+      "kind": "article",
+      "abstract": [
+        {
+          "text": "Extend your app’s basic functionality to other parts of the system.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/appkit/app-extensions",
+      "title": "App Extensions",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/app-extensions",
+      "type": "topic",
+      "role": "collectionGroup"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/data-types": {
+      "kind": "article",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Data types for use with multiple classes."
+        }
+      ],
+      "type": "topic",
+      "url": "/documentation/appkit/data-types",
+      "role": "collectionGroup",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/data-types",
+      "title": "Data Types"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/NSViewLayoutRegion": {
+      "fragments": [
+        {
+          "kind": "identifier",
+          "text": "NSViewLayoutRegion"
+        }
+      ],
+      "kind": "symbol",
+      "abstract": [],
+      "type": "topic",
+      "url": "/documentation/appkit/nsviewlayoutregion",
+      "role": "symbol",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/NSViewLayoutRegion",
+      "title": "NSViewLayoutRegion"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/writing-tools": {
+      "kind": "article",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Add support for Writing Tools to your app’s text views."
+        }
+      ],
+      "type": "topic",
+      "url": "/documentation/appkit/writing-tools",
+      "role": "collectionGroup",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/writing-tools",
+      "title": "Writing Tools"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/accessibility-for-appkit": {
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/accessibility-for-appkit",
+      "type": "topic",
+      "abstract": [
+        {
+          "text": "Make your AppKit apps accessible to everyone who uses macOS.",
+          "type": "text"
+        }
+      ],
+      "title": "Accessibility for AppKit",
+      "kind": "article",
+      "role": "collectionGroup",
+      "url": "/documentation/appkit/accessibility-for-appkit"
+    },
+    "doc://com.apple.appkit/documentation/AppKit/view-management": {
+      "type": "topic",
+      "url": "/documentation/appkit/view-management",
+      "kind": "article",
+      "role": "collectionGroup",
+      "title": "View Management",
+      "identifier": "doc://com.apple.appkit/documentation/AppKit/view-management",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Manage your user interface, including the size and position of views in a window."
+        }
+      ]
+    }
+  },
+  "variantOverrides": [
+    {
+      "traits": [
+        {
+          "interfaceLanguage": "occ"
+        }
+      ],
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/identifier/interfaceLanguage",
+          "value": "occ"
+        },
+        {
+          "op": "replace",
+          "path": "/hierarchy",
+          "value": {
+            "paths": [
+              [
+                "doc://com.apple.documentation/documentation/technologies"
+              ]
+            ]
+          }
+        },
+        {
+          "op": "replace",
+          "path": "/topicSections",
+          "value": [
+            {
+              "title": "Essentials",
+              "identifiers": [
+                "doc://com.apple.documentation/documentation/TechnologyOverviews/adopting-liquid-glass",
+                "doc://com.apple.documentation/documentation/Updates/AppKit",
+                "doc://com.apple.documentation/documentation/UIKit/protecting-the-user-s-privacy",
+                "doc://com.apple.documentation/documentation/Apple-Silicon/porting-your-macos-apps-to-apple-silicon"
+              ],
+              "anchor": "Essentials"
+            },
+            {
+              "title": "App Structure",
+              "identifiers": [
+                "doc://com.apple.appkit/documentation/AppKit/app-and-environment",
+                "doc://com.apple.appkit/documentation/AppKit/documents-data-and-pasteboard",
+                "doc://com.apple.appkit/documentation/AppKit/cocoa-bindings",
+                "doc://com.apple.appkit/documentation/AppKit/resource-management",
+                "doc://com.apple.appkit/documentation/AppKit/app-extensions"
+              ],
+              "anchor": "App-Structure"
+            },
+            {
+              "title": "User Interface",
+              "identifiers": [
+                "doc://com.apple.appkit/documentation/AppKit/views-and-controls",
+                "doc://com.apple.appkit/documentation/AppKit/view-management",
+                "doc://com.apple.appkit/documentation/AppKit/view-layout",
+                "doc://com.apple.appkit/documentation/AppKit/appearance-customization",
+                "doc://com.apple.appkit/documentation/AppKit/animation",
+                "doc://com.apple.appkit/documentation/AppKit/windows-panels-and-screens",
+                "doc://com.apple.appkit/documentation/AppKit/sound-speech-and-haptics",
+                "doc://com.apple.appkit/documentation/AppKit/supporting-continuity-camera-in-your-mac-app"
+              ],
+              "abstract": [
+                {
+                  "text": "Your app’s user interface provides visual, audible, and tactile feedback to the user about what your app is doing.",
+                  "type": "text"
+                }
+              ],
+              "anchor": "User-Interface"
+            },
+            {
+              "title": "User Interactions",
+              "identifiers": [
+                "doc://com.apple.appkit/documentation/AppKit/mouse-keyboard-and-trackpad",
+                "doc://com.apple.appkit/documentation/AppKit/menus-cursors-and-the-dock",
+                "doc://com.apple.appkit/documentation/AppKit/gestures",
+                "doc://com.apple.appkit/documentation/AppKit/touch-bar",
+                "doc://com.apple.appkit/documentation/AppKit/drag-and-drop",
+                "doc://com.apple.appkit/documentation/AppKit/accessibility-for-appkit"
+              ],
+              "anchor": "User-Interactions"
+            },
+            {
+              "title": "Graphics, Drawing, Color, and Printing",
+              "identifiers": [
+                "doc://com.apple.appkit/documentation/AppKit/images-and-pdf",
+                "doc://com.apple.appkit/documentation/AppKit/drawing",
+                "doc://com.apple.appkit/documentation/AppKit/color",
+                "doc://com.apple.appkit/documentation/AppKit/printing"
+              ],
+              "anchor": "Graphics-Drawing-Color-and-Printing"
+            },
+            {
+              "title": "Text",
+              "identifiers": [
+                "doc://com.apple.appkit/documentation/AppKit/text-display",
+                "doc://com.apple.appkit/documentation/AppKit/textkit",
+                "doc://com.apple.appkit/documentation/AppKit/fonts",
+                "doc://com.apple.appkit/documentation/AppKit/writing-tools"
+              ],
+              "anchor": "Text"
+            },
+            {
+              "title": "Deprecated",
+              "identifiers": [
+                "doc://com.apple.appkit/documentation/AppKit/deprecated-symbols"
+              ],
+              "abstract": [
+                {
+                  "text": "Avoid using deprecated classes and protocols in your apps.",
+                  "type": "text"
+                }
+              ],
+              "anchor": "Deprecated"
+            },
+            {
+              "title": "Reference",
+              "identifiers": [
+                "doc://com.apple.appkit/documentation/AppKit/enumerations",
+                "doc://com.apple.appkit/documentation/AppKit/constants",
+                "doc://com.apple.appkit/documentation/AppKit/data-types",
+                "doc://com.apple.appkit/documentation/AppKit/macros"
+              ],
+              "anchor": "Reference"
+            },
+            {
+              "generated": true,
+              "title": "Classes",
+              "identifiers": [
+                "doc://com.apple.appkit/documentation/AppKit/NSViewLayoutRegion"
+              ],
+              "anchor": "Classes"
+            },
+            {
+              "generated": true,
+              "title": "Enumerations",
+              "identifiers": [
+                "doc://com.apple.appkit/documentation/AppKit/NSGlassEffectView/Style-swift.enum",
+                "doc://com.apple.appkit/documentation/AppKit/NSViewLayoutRegionAdaptivityAxis"
+              ],
+              "anchor": "Enumerations"
+            }
+          ]
+        },
+        {
+          "op": "add",
+          "path": "/relationshipsSections",
+          "value": null
+        },
+        {
+          "op": "add",
+          "path": "/seeAlsoSections",
+          "value": null
+        },
+        {
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.appkit~1documentation~1AppKit~1NSGlassEffectView~1Style-swift.enum/title",
+          "value": "NSGlassEffectViewStyle"
+        },
+        {
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.appkit~1documentation~1AppKit~1NSGlassEffectView~1Style-swift.enum/fragments",
+          "value": [
+            {
+              "text": "NSGlassEffectViewStyle",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.appkit~1documentation~1AppKit~1NSGlassEffectView~1Style-swift.enum/navigatorTitle",
+          "value": [
+            {
+              "text": "NSGlassEffectViewStyle",
+              "kind": "identifier"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "legalNotices": {
+    "copyright": "Copyright &copy; 2025 Apple Inc. All rights reserved.",
+    "termsOfUse": "https://www.apple.com/legal/internet-services/terms/site.html",
+    "privacyPolicy": "https://www.apple.com/privacy/privacy-policy"
+  }
+}

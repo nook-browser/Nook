@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Runtime API Test</title>
+  <style>
+    body {
+      width: 400px;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    h1 {
+      font-size: 18px;
+      margin: 0 0 15px 0;
+      color: #333;
+    }
+    .test-section {
+      margin-bottom: 15px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      background: #f9f9f9;
+    }
+    .test-section h2 {
+      font-size: 14px;
+      margin: 0 0 10px 0;
+      color: #666;
+    }
+    button {
+      padding: 8px 16px;
+      margin: 5px 5px 5px 0;
+      border: 1px solid #0066cc;
+      background: #0066cc;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    button:hover {
+      background: #0052a3;
+    }
+    .result {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .success {
+      background: #d4edda;
+      border: 1px solid #c3e6cb;
+      color: #155724;
+    }
+    .error {
+      background: #f8d7da;
+      border: 1px solid #f5c6cb;
+      color: #721c24;
+    }
+    .info {
+      background: #d1ecf1;
+      border: 1px solid #bee5eb;
+      color: #0c5460;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧪 Runtime API Test</h1>
+  
+  <div class="test-section" style="background: #e8f4f8; border-color: #0066cc;">
+    <button id="runAllTests" style="font-size: 16px; font-weight: bold; width: 100%; padding: 12px;">
+      ▶️ Run All Tests
+    </button>
+    <div id="allTestsResults" class="result info" style="display: none; margin-top: 10px;"></div>
+  </div>
+  
+  <div class="test-section">
+    <h2>Individual Tests (Optional)</h2>
+    <button id="testId">Test runtime.id</button>
+    <button id="testManifest">Test getManifest()</button>
+    <button id="testURL">Test getURL()</button>
+    <button id="testSendMessage">Test sendMessage()</button>
+    <button id="testConnect">Test connect()</button>
+    <div id="individualResults" class="result info" style="display: none;"></div>
+  </div>
+  
+  <div class="test-section">
+    <h2>Console Output</h2>
+    <button id="viewConsole">Open Console</button>
+    <p style="font-size: 12px; color: #666; margin-top: 10px;">
+      Check the browser console for detailed test output from background and content scripts.
+    </p>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

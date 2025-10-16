@@ -1,0 +1,1158 @@
+{
+  "topicSections": [
+    {
+      "anchor": "Supporting-Privacy",
+      "identifiers": [
+        "doc://com.apple.uikit/documentation/UIKit/requesting-access-to-protected-resources",
+        "doc://com.apple.uikit/documentation/UIKit/encrypting-your-app-s-files"
+      ],
+      "title": "Supporting Privacy"
+    }
+  ],
+  "variants": [
+    {
+      "paths": [
+        "/documentation/uikit/protecting-the-user-s-privacy"
+      ],
+      "traits": [
+        {
+          "interfaceLanguage": "swift"
+        }
+      ]
+    },
+    {
+      "paths": [
+        "/documentation/uikit/protecting-the-user-s-privacy"
+      ],
+      "traits": [
+        {
+          "interfaceLanguage": "occ"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": {
+    "major": 0,
+    "minor": 3,
+    "patch": 0
+  },
+  "seeAlsoSections": [
+    {
+      "anchor": "Essentials",
+      "identifiers": [
+        "doc://com.apple.documentation/documentation/TechnologyOverviews/adopting-liquid-glass",
+        "doc://com.apple.documentation/documentation/Updates/UIKit",
+        "doc://com.apple.uikit/documentation/UIKit/about-app-development-with-uikit"
+      ],
+      "generated": true,
+      "title": "Essentials"
+    }
+  ],
+  "primaryContentSections": [
+    {
+      "content": [
+        {
+          "anchor": "overview",
+          "type": "heading",
+          "text": "Overview",
+          "level": 2
+        },
+        {
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "Designing for user privacy is important. Most Apple devices contain personal data that the user doesn’t want to expose to apps or to external entities. If your app accesses or uses data inappropriately, the user might stop using your app and even delete it from their device."
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "inlineContent": [
+            {
+              "text": "Access user or device data only with the user’s informed consent obtained in accordance with applicable law. In addition, take appropriate steps to protect user and device data, and be transparent about how you use it.",
+              "type": "text"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "anchor": "Review-Guidelines-from-Government-and-Industry-Sources",
+          "type": "heading",
+          "text": "Review Guidelines from Government and Industry Sources",
+          "level": 3
+        },
+        {
+          "inlineContent": [
+            {
+              "text": "Consult these documents:",
+              "type": "text"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "items": [
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "identifier": "https://www.ftc.gov/sites/default/files/documents/reports/mobile-privacy-disclosures-building-trust-through-transparency-federal-trade-commission-staff-report/130201mobileprivacyreport.pdf",
+                      "isActive": true,
+                      "type": "reference"
+                    },
+                    {
+                      "text": ". The Federal Trade Commission’s report on mobile privacy.",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "isActive": true,
+                      "identifier": "https://ec.europa.eu/justice/article-29/documentation/opinion-recommendation/files/2013/wp202_en.pdf",
+                      "type": "reference"
+                    },
+                    {
+                      "text": ". The EU Data Protection Commissioners’ opinion on data protection for mobile apps.",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "isActive": true,
+                      "identifier": "https://oag.ca.gov/sites/all/files/agweb/pdfs/privacy/privacy_on_the_go.pdf",
+                      "type": "reference"
+                    },
+                    {
+                      "text": ". The California State Attorney General’s recommendations for mobile privacy.",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "text": "Smartphone Privacy Initiative (2012) in ",
+                      "type": "text"
+                    },
+                    {
+                      "isActive": true,
+                      "identifier": "http://www.soumu.go.jp/main_sosiki/joho_tsusin/eng/presentation/pdf/Initiative.pdf",
+                      "type": "reference"
+                    },
+                    {
+                      "text": " or ",
+                      "type": "text"
+                    },
+                    {
+                      "isActive": true,
+                      "identifier": "http://www.soumu.go.jp/main_content/000171225.pdf",
+                      "type": "reference"
+                    },
+                    {
+                      "text": " and Smartphone Privacy Initiative II (2013) in ",
+                      "type": "text"
+                    },
+                    {
+                      "isActive": true,
+                      "identifier": "http://www.soumu.go.jp/main_sosiki/joho_tsusin/eng/presentation/pdf/Summary_II.pdf",
+                      "type": "reference"
+                    },
+                    {
+                      "text": " or ",
+                      "type": "text"
+                    },
+                    {
+                      "isActive": true,
+                      "identifier": "http://www.soumu.go.jp/main_content/000247654.pdf",
+                      "type": "reference"
+                    },
+                    {
+                      "text": ". The Japanese Ministry of Internal Affairs and Communications’ Smartphone Privacy Initiatives.",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            }
+          ],
+          "type": "unorderedList"
+        },
+        {
+          "anchor": "Request-Access-Only-When-Your-App-Needs-the-Data",
+          "type": "heading",
+          "text": "Request Access Only When Your App Needs the Data",
+          "level": 3
+        },
+        {
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "Request access to sensitive user or device data—like location, contacts, and photos—at the time your app needs the data. Supply a purpose string (sometimes called a usage description string) in your app’s "
+            },
+            {
+              "isActive": true,
+              "type": "reference",
+              "identifier": "doc://com.apple.documentation/documentation/BundleResources/Information-Property-List"
+            },
+            {
+              "type": "text",
+              "text": " that the system can present to a user explaining why your app needs access. Provide reasonable fallback behavior in situations where the user doesn’t grant access to the requested data. For more details, see "
+            },
+            {
+              "isActive": true,
+              "type": "reference",
+              "identifier": "doc://com.apple.uikit/documentation/UIKit/requesting-access-to-protected-resources"
+            },
+            {
+              "type": "text",
+              "text": "."
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "anchor": "Be-Transparent-About-How-Data-Will-Be-Used",
+          "type": "heading",
+          "text": "Be Transparent About How Data Will Be Used",
+          "level": 3
+        },
+        {
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "For example, when you submit your app to the App Store, specify a URL for your privacy policy or statement as part of your App Store Connect metadata. You can also summarize that policy or statement in your app description."
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "anchor": "Give-the-User-Control-Over-Data-and-Protect-Data-You-Collect",
+          "type": "heading",
+          "text": "Give the User Control Over Data and Protect Data You Collect",
+          "level": 3
+        },
+        {
+          "inlineContent": [
+            {
+              "text": "Respect the user’s preferences, and take reasonable steps to protect the data that you collect in your apps:",
+              "type": "text"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "items": [
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "Provide settings that allow the user to disable access to sensitive information. The operating system does this automatically for protected system resources—like location, contacts, and health data—through the Privacy menu of the Settings app. Extend this behavior to any data you cache from these sources or collect directly. For example, if your users build a social media profile containing personal information, offer them a way to delete the data (including any server copies you have)."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "inlineContent": [
+                    {
+                      "text": "When storing files in iOS, use the strongest data protection level that works for your app, as described in ",
+                      "type": "text"
+                    },
+                    {
+                      "identifier": "doc://com.apple.uikit/documentation/UIKit/encrypting-your-app-s-files",
+                      "isActive": true,
+                      "type": "reference"
+                    },
+                    {
+                      "text": ". Use App Transport Security when sending user or device data over the network, as described in ",
+                      "type": "text"
+                    },
+                    {
+                      "identifier": "https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CocoaKeys.html#//apple_ref/doc/plist/info/NSAppTransportSecurity",
+                      "isActive": true,
+                      "type": "reference"
+                    },
+                    {
+                      "text": ".",
+                      "type": "text"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "type": "text",
+                      "text": "If your app uses the "
+                    },
+                    {
+                      "isActive": true,
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/AdSupport/ASIdentifierManager"
+                    },
+                    {
+                      "type": "text",
+                      "text": " class, respect the value of its "
+                    },
+                    {
+                      "isActive": true,
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/AdSupport/ASIdentifierManager/isAdvertisingTrackingEnabled"
+                    },
+                    {
+                      "type": "text",
+                      "text": " property. If the user sets that property to false, then use the "
+                    },
+                    {
+                      "isActive": true,
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/AdSupport/ASIdentifierManager"
+                    },
+                    {
+                      "type": "text",
+                      "text": " class only for limited advertising purposes, like frequency capping, attribution, conversion events, estimating the number of unique users, advertising fraud detection, and debugging. See the "
+                    },
+                    {
+                      "isActive": true,
+                      "type": "reference",
+                      "identifier": "doc://com.apple.documentation/documentation/AdSupport"
+                    },
+                    {
+                      "type": "text",
+                      "text": " framework for additional information."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "paragraph",
+                  "inlineContent": [
+                    {
+                      "text": "If you must identify users persistently, use the ",
+                      "type": "text"
+                    },
+                    {
+                      "identifier": "doc://com.apple.uikit/documentation/UIKit/UIDevice/identifierForVendor",
+                      "isActive": true,
+                      "type": "reference"
+                    },
+                    {
+                      "text": " property of the ",
+                      "type": "text"
+                    },
+                    {
+                      "identifier": "doc://com.apple.uikit/documentation/UIKit/UIDevice",
+                      "isActive": true,
+                      "type": "reference"
+                    },
+                    {
+                      "text": " class or the ",
+                      "type": "text"
+                    },
+                    {
+                      "identifier": "doc://com.apple.documentation/documentation/AdSupport/ASIdentifierManager/advertisingIdentifier",
+                      "isActive": true,
+                      "type": "reference"
+                    },
+                    {
+                      "text": " property of the ",
+                      "type": "text"
+                    },
+                    {
+                      "identifier": "doc://com.apple.documentation/documentation/AdSupport/ASIdentifierManager",
+                      "isActive": true,
+                      "type": "reference"
+                    },
+                    {
+                      "text": " class.",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "type": "unorderedList"
+        },
+        {
+          "anchor": "Use-the-Minimum-Amount-of-Data-Required",
+          "type": "heading",
+          "text": "Use the Minimum Amount of Data Required",
+          "level": 3
+        },
+        {
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "Request and use the minimum amount of user or device data needed to accomplish a given task. Don’t seek access to or collect data for unnecessary or non-obvious reasons, or because you think it might be useful later."
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "If your app supports audio input, configure your audio session for recording only at the point where you actually plan to begin recording. Don’t configure your audio session for recording at launch time if you don’t plan to record right away. The system alerts users when apps configure their audio session for recording and gives the user the option to disable recording for your app."
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "kind": "content"
+    }
+  ],
+  "abstract": [
+    {
+      "text": "Secure personal data, and respect user preferences for how data is used.",
+      "type": "text"
+    }
+  ],
+  "metadata": {
+    "modules": [
+      {
+        "name": "UIKit"
+      }
+    ],
+    "role": "collectionGroup",
+    "title": "Protecting the User’s Privacy"
+  },
+  "hierarchy": {
+    "paths": [
+      [
+        "doc://com.apple.documentation/documentation/technologies",
+        "doc://com.apple.uikit/documentation/UIKit"
+      ]
+    ]
+  },
+  "sections": [],
+  "kind": "article",
+  "identifier": {
+    "url": "doc://com.apple.uikit/documentation/UIKit/protecting-the-user-s-privacy",
+    "interfaceLanguage": "swift"
+  },
+  "references": {
+    "doc://com.apple.documentation/documentation/BundleResources/Information-Property-List": {
+      "kind": "symbol",
+      "identifier": "doc://com.apple.documentation/documentation/BundleResources/Information-Property-List",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A resource containing key-value pairs that identify and configure a bundle."
+        }
+      ],
+      "url": "/documentation/BundleResources/Information-Property-List",
+      "title": "Information Property List",
+      "role": "symbol",
+      "type": "topic"
+    },
+    "doc://com.apple.documentation/documentation/AdSupport/ASIdentifierManager/advertisingIdentifier": {
+      "kind": "symbol",
+      "identifier": "doc://com.apple.documentation/documentation/AdSupport/ASIdentifierManager/advertisingIdentifier",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The UUID that is specific to a device."
+        }
+      ],
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "advertisingIdentifier",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "text": "UUID",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:10Foundation4UUIDV"
+        },
+        {
+          "text": " { ",
+          "kind": "text"
+        },
+        {
+          "text": "get",
+          "kind": "keyword"
+        },
+        {
+          "text": " }",
+          "kind": "text"
+        }
+      ],
+      "url": "/documentation/AdSupport/ASIdentifierManager/advertisingIdentifier",
+      "title": "advertisingIdentifier",
+      "role": "symbol",
+      "type": "topic"
+    },
+    "doc://com.apple.uikit/documentation/UIKit/encrypting-your-app-s-files": {
+      "kind": "article",
+      "identifier": "doc://com.apple.uikit/documentation/UIKit/encrypting-your-app-s-files",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Protect the user’s data in iOS by encrypting it on disk."
+        }
+      ],
+      "url": "/documentation/uikit/encrypting-your-app-s-files",
+      "title": "Encrypting Your App’s Files",
+      "role": "article",
+      "type": "topic"
+    },
+    "doc://com.apple.documentation/documentation/TechnologyOverviews/adopting-liquid-glass": {
+      "identifier": "doc://com.apple.documentation/documentation/TechnologyOverviews/adopting-liquid-glass",
+      "images": [
+        {
+          "type": "card",
+          "identifier": "liquid-glass.png"
+        }
+      ],
+      "role": "article",
+      "type": "topic",
+      "title": "Adopting Liquid Glass",
+      "url": "/documentation/TechnologyOverviews/adopting-liquid-glass",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Find out how to bring the new material to your app."
+        }
+      ],
+      "kind": "article"
+    },
+    "doc://com.apple.documentation/documentation/AdSupport": {
+      "kind": "symbol",
+      "identifier": "doc://com.apple.documentation/documentation/AdSupport",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Provide apps with access to an advertising identifier."
+        }
+      ],
+      "url": "/documentation/AdSupport",
+      "title": "AdSupport",
+      "role": "collection",
+      "type": "topic"
+    },
+    "http://www.soumu.go.jp/main_sosiki/joho_tsusin/eng/presentation/pdf/Initiative.pdf": {
+      "identifier": "http://www.soumu.go.jp/main_sosiki/joho_tsusin/eng/presentation/pdf/Initiative.pdf",
+      "titleInlineContent": [
+        {
+          "type": "text",
+          "text": "English"
+        }
+      ],
+      "url": "http://www.soumu.go.jp/main_sosiki/joho_tsusin/eng/presentation/pdf/Initiative.pdf",
+      "title": "English",
+      "type": "link"
+    },
+    "http://www.soumu.go.jp/main_content/000171225.pdf": {
+      "identifier": "http://www.soumu.go.jp/main_content/000171225.pdf",
+      "titleInlineContent": [
+        {
+          "type": "text",
+          "text": "Japanese"
+        }
+      ],
+      "url": "http://www.soumu.go.jp/main_content/000171225.pdf",
+      "title": "Japanese",
+      "type": "link"
+    },
+    "http://www.soumu.go.jp/main_content/000247654.pdf": {
+      "identifier": "http://www.soumu.go.jp/main_content/000247654.pdf",
+      "titleInlineContent": [
+        {
+          "type": "text",
+          "text": "Japanese"
+        }
+      ],
+      "url": "http://www.soumu.go.jp/main_content/000247654.pdf",
+      "title": "Japanese",
+      "type": "link"
+    },
+    "doc://com.apple.uikit/documentation/UIKit/about-app-development-with-uikit": {
+      "type": "topic",
+      "role": "article",
+      "identifier": "doc://com.apple.uikit/documentation/UIKit/about-app-development-with-uikit",
+      "kind": "article",
+      "abstract": [
+        {
+          "text": "Learn about the basic support that UIKit and Xcode provide for your iOS and tvOS apps.",
+          "type": "text"
+        }
+      ],
+      "title": "About App Development with UIKit",
+      "url": "/documentation/uikit/about-app-development-with-uikit"
+    },
+    "doc://com.apple.uikit/documentation/UIKit/requesting-access-to-protected-resources": {
+      "kind": "article",
+      "identifier": "doc://com.apple.uikit/documentation/UIKit/requesting-access-to-protected-resources",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Provide a purpose string that explains to a person why you need access to protected resources on their device."
+        }
+      ],
+      "url": "/documentation/uikit/requesting-access-to-protected-resources",
+      "title": "Requesting access to protected resources",
+      "role": "article",
+      "type": "topic"
+    },
+    "doc://com.apple.documentation/documentation/Updates/UIKit": {
+      "kind": "article",
+      "type": "topic",
+      "identifier": "doc://com.apple.documentation/documentation/Updates/UIKit",
+      "url": "/documentation/Updates/UIKit",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Learn about important changes to UIKit."
+        }
+      ],
+      "role": "article",
+      "title": "UIKit updates"
+    },
+    "liquid-glass.png": {
+      "variants": [
+        {
+          "traits": [
+            "1x",
+            "dark"
+          ],
+          "url": "https://docs-assets.developer.apple.com/published/9e6f0f4c73f588db44f7b17b1043ac3d/liquid-glass~dark.png"
+        },
+        {
+          "traits": [
+            "1x",
+            "light"
+          ],
+          "url": "https://docs-assets.developer.apple.com/published/cea5eb617d7e05fb04c260722bfb7242/liquid-glass.png"
+        }
+      ],
+      "type": "image",
+      "alt": "An abstract representation of an interface with a translucent layer that appears above the content layer.",
+      "identifier": "liquid-glass.png"
+    },
+    "https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CocoaKeys.html#//apple_ref/doc/plist/info/NSAppTransportSecurity": {
+      "url": "https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CocoaKeys.html#//apple_ref/doc/plist/info/NSAppTransportSecurity",
+      "titleInlineContent": [
+        {
+          "type": "text",
+          "text": "NSAppTransportSecurity"
+        }
+      ],
+      "type": "link",
+      "title": "NSAppTransportSecurity",
+      "identifier": "https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CocoaKeys.html#//apple_ref/doc/plist/info/NSAppTransportSecurity"
+    },
+    "doc://com.apple.documentation/documentation/AdSupport/ASIdentifierManager": {
+      "url": "/documentation/AdSupport/ASIdentifierManager",
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The object that contains the advertising identifier."
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "ASIdentifierManager"
+        }
+      ],
+      "title": "ASIdentifierManager",
+      "identifier": "doc://com.apple.documentation/documentation/AdSupport/ASIdentifierManager"
+    },
+    "https://oag.ca.gov/sites/all/files/agweb/pdfs/privacy/privacy_on_the_go.pdf": {
+      "url": "https://oag.ca.gov/sites/all/files/agweb/pdfs/privacy/privacy_on_the_go.pdf",
+      "titleInlineContent": [
+        {
+          "type": "text",
+          "text": "Privacy on the Go: Recommendations for the Mobile Ecosystem"
+        }
+      ],
+      "type": "link",
+      "title": "Privacy on the Go: Recommendations for the Mobile Ecosystem",
+      "identifier": "https://oag.ca.gov/sites/all/files/agweb/pdfs/privacy/privacy_on_the_go.pdf"
+    },
+    "doc://com.apple.uikit/documentation/UIKit": {
+      "title": "UIKit",
+      "kind": "symbol",
+      "role": "collection",
+      "url": "/documentation/uikit",
+      "abstract": [
+        {
+          "text": "Construct and manage a graphical, event-driven user interface for your iOS, iPadOS, or tvOS app.",
+          "type": "text"
+        }
+      ],
+      "type": "topic",
+      "identifier": "doc://com.apple.uikit/documentation/UIKit"
+    },
+    "doc://com.apple.documentation/documentation/technologies": {
+      "title": "Technologies",
+      "kind": "technologies",
+      "role": "overview",
+      "url": "/documentation/technologies",
+      "abstract": [
+        {
+          "text": "",
+          "type": "text"
+        }
+      ],
+      "type": "topic",
+      "identifier": "doc://com.apple.documentation/documentation/technologies"
+    },
+    "http://www.soumu.go.jp/main_sosiki/joho_tsusin/eng/presentation/pdf/Summary_II.pdf": {
+      "url": "http://www.soumu.go.jp/main_sosiki/joho_tsusin/eng/presentation/pdf/Summary_II.pdf",
+      "titleInlineContent": [
+        {
+          "type": "text",
+          "text": "English"
+        }
+      ],
+      "type": "link",
+      "title": "English",
+      "identifier": "http://www.soumu.go.jp/main_sosiki/joho_tsusin/eng/presentation/pdf/Summary_II.pdf"
+    },
+    "https://ec.europa.eu/justice/article-29/documentation/opinion-recommendation/files/2013/wp202_en.pdf": {
+      "url": "https://ec.europa.eu/justice/article-29/documentation/opinion-recommendation/files/2013/wp202_en.pdf",
+      "titleInlineContent": [
+        {
+          "type": "text",
+          "text": "Opinion 02/2013 on Apps on Smart Devices"
+        }
+      ],
+      "type": "link",
+      "title": "Opinion 02/2013 on Apps on Smart Devices",
+      "identifier": "https://ec.europa.eu/justice/article-29/documentation/opinion-recommendation/files/2013/wp202_en.pdf"
+    },
+    "https://www.ftc.gov/sites/default/files/documents/reports/mobile-privacy-disclosures-building-trust-through-transparency-federal-trade-commission-staff-report/130201mobileprivacyreport.pdf": {
+      "url": "https://www.ftc.gov/sites/default/files/documents/reports/mobile-privacy-disclosures-building-trust-through-transparency-federal-trade-commission-staff-report/130201mobileprivacyreport.pdf",
+      "titleInlineContent": [
+        {
+          "type": "text",
+          "text": "Mobile Privacy Disclosures: Building Trust Through Transparency"
+        }
+      ],
+      "type": "link",
+      "title": "Mobile Privacy Disclosures: Building Trust Through Transparency",
+      "identifier": "https://www.ftc.gov/sites/default/files/documents/reports/mobile-privacy-disclosures-building-trust-through-transparency-federal-trade-commission-staff-report/130201mobileprivacyreport.pdf"
+    },
+    "doc://com.apple.documentation/documentation/AdSupport/ASIdentifierManager/isAdvertisingTrackingEnabled": {
+      "url": "/documentation/AdSupport/ASIdentifierManager/isAdvertisingTrackingEnabled",
+      "deprecated": true,
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A Boolean value that indicates whether the user has limited ad tracking enabled."
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "var"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "isAdvertisingTrackingEnabled"
+        },
+        {
+          "kind": "text",
+          "text": ": "
+        },
+        {
+          "preciseIdentifier": "s:Sb",
+          "kind": "typeIdentifier",
+          "text": "Bool"
+        },
+        {
+          "kind": "text",
+          "text": " { "
+        },
+        {
+          "kind": "keyword",
+          "text": "get"
+        },
+        {
+          "kind": "text",
+          "text": " }"
+        }
+      ],
+      "title": "isAdvertisingTrackingEnabled",
+      "identifier": "doc://com.apple.documentation/documentation/AdSupport/ASIdentifierManager/isAdvertisingTrackingEnabled"
+    },
+    "doc://com.apple.uikit/documentation/UIKit/UIDevice": {
+      "navigatorTitle": [
+        {
+          "text": "UIDevice",
+          "kind": "identifier"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "A representation of the current device.",
+          "type": "text"
+        }
+      ],
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "UIDevice",
+          "kind": "identifier"
+        }
+      ],
+      "title": "UIDevice",
+      "identifier": "doc://com.apple.uikit/documentation/UIKit/UIDevice",
+      "kind": "symbol",
+      "url": "/documentation/uikit/uidevice",
+      "role": "symbol",
+      "type": "topic"
+    },
+    "doc://com.apple.uikit/documentation/UIKit/UIDevice/identifierForVendor": {
+      "kind": "symbol",
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "identifierForVendor",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "preciseIdentifier": "s:10Foundation4UUIDV",
+          "text": "UUID",
+          "kind": "typeIdentifier"
+        },
+        {
+          "text": "?",
+          "kind": "text"
+        }
+      ],
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An alphanumeric string that uniquely identifies a device to the app’s vendor."
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "text": "identifierForVendor",
+          "kind": "identifier"
+        }
+      ],
+      "identifier": "doc://com.apple.uikit/documentation/UIKit/UIDevice/identifierForVendor",
+      "role": "symbol",
+      "type": "topic",
+      "url": "/documentation/uikit/uidevice/identifierforvendor",
+      "title": "identifierForVendor"
+    }
+  },
+  "variantOverrides": [
+    {
+      "patch": [
+        {
+          "path": "/identifier/interfaceLanguage",
+          "value": "occ",
+          "op": "replace"
+        },
+        {
+          "path": "/topicSections",
+          "value": [
+            {
+              "identifiers": [
+                "doc://com.apple.uikit/documentation/UIKit/requesting-access-to-protected-resources",
+                "doc://com.apple.uikit/documentation/UIKit/encrypting-your-app-s-files"
+              ],
+              "title": "Supporting Privacy",
+              "anchor": "Supporting-Privacy"
+            }
+          ],
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "generated": true,
+              "anchor": "Essentials",
+              "identifiers": [
+                "doc://com.apple.uikit/documentation/UIKit/about-app-development-with-uikit"
+              ],
+              "title": "Essentials"
+            }
+          ],
+          "path": "/seeAlsoSections",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "@property",
+              "kind": "keyword"
+            },
+            {
+              "text": " (",
+              "kind": "text"
+            },
+            {
+              "text": "nonatomic",
+              "kind": "keyword"
+            },
+            {
+              "text": ", ",
+              "kind": "text"
+            },
+            {
+              "text": "readonly",
+              "kind": "keyword"
+            },
+            {
+              "text": ") ",
+              "kind": "text"
+            },
+            {
+              "text": "NSUUID",
+              "kind": "typeIdentifier",
+              "preciseIdentifier": "c:objc(cs)NSUUID"
+            },
+            {
+              "text": " * ",
+              "kind": "text"
+            },
+            {
+              "text": "advertisingIdentifier",
+              "kind": "identifier"
+            },
+            {
+              "text": ";",
+              "kind": "text"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AdSupport~1ASIdentifierManager~1advertisingIdentifier/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "@interface",
+              "kind": "keyword"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "ASIdentifierManager",
+              "kind": "identifier"
+            },
+            {
+              "kind": "text",
+              "text": " : "
+            },
+            {
+              "kind": "typeIdentifier",
+              "preciseIdentifier": "c:objc(cs)NSObject",
+              "text": "NSObject"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AdSupport~1ASIdentifierManager/fragments",
+          "op": "replace"
+        },
+        {
+          "value": "advertisingTrackingEnabled",
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AdSupport~1ASIdentifierManager~1isAdvertisingTrackingEnabled/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "@property",
+              "kind": "keyword"
+            },
+            {
+              "text": " (",
+              "kind": "text"
+            },
+            {
+              "text": "nonatomic",
+              "kind": "keyword"
+            },
+            {
+              "text": ", ",
+              "kind": "text"
+            },
+            {
+              "text": "readonly",
+              "kind": "keyword"
+            },
+            {
+              "text": ", ",
+              "kind": "text"
+            },
+            {
+              "text": "getter",
+              "kind": "keyword"
+            },
+            {
+              "text": "=",
+              "kind": "text"
+            },
+            {
+              "text": "isAdvertisingTrackingEnabled",
+              "kind": "identifier"
+            },
+            {
+              "text": ") ",
+              "kind": "text"
+            },
+            {
+              "preciseIdentifier": "c:@T@BOOL",
+              "text": "BOOL",
+              "kind": "typeIdentifier"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "advertisingTrackingEnabled",
+              "kind": "identifier"
+            },
+            {
+              "text": ";",
+              "kind": "text"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.documentation~1documentation~1AdSupport~1ASIdentifierManager~1isAdvertisingTrackingEnabled/fragments",
+          "op": "replace"
+        },
+        {
+          "value": "UIDevice",
+          "path": "/references/doc:~1~1com.apple.uikit~1documentation~1UIKit~1UIDevice/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "UIDevice"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.uikit~1documentation~1UIKit~1UIDevice/fragments",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "UIDevice"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.uikit~1documentation~1UIKit~1UIDevice/navigatorTitle",
+          "op": "replace"
+        },
+        {
+          "value": "identifierForVendor",
+          "path": "/references/doc:~1~1com.apple.uikit~1documentation~1UIKit~1UIDevice~1identifierForVendor/title",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "text": "identifierForVendor",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/references/doc:~1~1com.apple.uikit~1documentation~1UIKit~1UIDevice~1identifierForVendor/fragments",
+          "op": "replace"
+        }
+      ],
+      "traits": [
+        {
+          "interfaceLanguage": "occ"
+        }
+      ]
+    }
+  ],
+  "legalNotices": {
+    "copyright": "Copyright &copy; 2025 Apple Inc. All rights reserved.",
+    "termsOfUse": "https://www.apple.com/legal/internet-services/terms/site.html",
+    "privacyPolicy": "https://www.apple.com/privacy/privacy-policy"
+  }
+}

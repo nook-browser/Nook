@@ -1,0 +1,2023 @@
+{
+  "relationshipsSections": [
+    {
+      "title": "Inherits From",
+      "kind": "relationships",
+      "type": "inheritsFrom",
+      "identifiers": [
+        "doc://com.externally.resolved.symbol/c:objc(cs)NSObject"
+      ]
+    },
+    {
+      "title": "Conforms To",
+      "kind": "relationships",
+      "type": "conformsTo",
+      "identifiers": [
+        "doc://com.externally.resolved.symbol/s:s7CVarArgP",
+        "doc://com.externally.resolved.symbol/s:s28CustomDebugStringConvertibleP",
+        "doc://com.externally.resolved.symbol/s:s23CustomStringConvertibleP",
+        "doc://com.externally.resolved.symbol/s:SQ",
+        "doc://com.externally.resolved.symbol/s:SH",
+        "doc://com.externally.resolved.symbol/c:objc(pl)NSCoding",
+        "doc://com.externally.resolved.symbol/c:objc(pl)NSCopying",
+        "doc://com.externally.resolved.symbol/c:objc(pl)NSObject",
+        "doc://com.externally.resolved.symbol/c:objc(pl)NSSecureCoding",
+        "doc://com.externally.resolved.symbol/s:s8SendableP"
+      ]
+    }
+  ],
+  "metadata": {
+    "navigatorTitle": [
+      {
+        "text": "Configuration",
+        "kind": "identifier"
+      }
+    ],
+    "extendedModule": "WebKit",
+    "symbolKind": "class",
+    "modules": [
+      {
+        "name": "WebKit"
+      }
+    ],
+    "title": "WKWebExtensionController.Configuration",
+    "platforms": [
+      {
+        "deprecated": false,
+        "introducedAt": "18.4",
+        "name": "iOS",
+        "unavailable": false,
+        "beta": false
+      },
+      {
+        "deprecated": false,
+        "introducedAt": "18.4",
+        "name": "iPadOS",
+        "unavailable": false,
+        "beta": false
+      },
+      {
+        "deprecated": false,
+        "introducedAt": "18.4",
+        "name": "Mac Catalyst",
+        "unavailable": false,
+        "beta": false
+      },
+      {
+        "deprecated": false,
+        "introducedAt": "15.4",
+        "name": "macOS",
+        "unavailable": false,
+        "beta": false
+      },
+      {
+        "deprecated": false,
+        "introducedAt": "2.4",
+        "name": "visionOS",
+        "unavailable": false,
+        "beta": false
+      }
+    ],
+    "role": "symbol",
+    "roleHeading": "Class",
+    "fragments": [
+      {
+        "text": "class",
+        "kind": "keyword"
+      },
+      {
+        "text": " ",
+        "kind": "text"
+      },
+      {
+        "text": "Configuration",
+        "kind": "identifier"
+      }
+    ],
+    "externalID": "c:objc(cs)WKWebExtensionControllerConfiguration"
+  },
+  "kind": "symbol",
+  "identifier": {
+    "url": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class",
+    "interfaceLanguage": "swift"
+  },
+  "sections": [],
+  "seeAlsoSections": [
+    {
+      "title": "Classes",
+      "generated": true,
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/Action",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/Command",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/DataRecord",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MatchPattern",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/TabConfiguration",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/WindowConfiguration"
+      ],
+      "anchor": "Classes"
+    }
+  ],
+  "schemaVersion": {
+    "major": 0,
+    "minor": 3,
+    "patch": 0
+  },
+  "hierarchy": {
+    "paths": [
+      [
+        "doc://com.apple.documentation/documentation/technologies",
+        "doc://com.apple.webkit/documentation/WebKit",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController"
+      ]
+    ]
+  },
+  "primaryContentSections": [
+    {
+      "declarations": [
+        {
+          "languages": [
+            "swift"
+          ],
+          "tokens": [
+            {
+              "text": "@",
+              "kind": "attribute"
+            },
+            {
+              "text": "MainActor",
+              "identifier": "doc://com.externally.resolved.symbol/s:ScM",
+              "kind": "attribute",
+              "preciseIdentifier": "s:ScM"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "class",
+              "kind": "keyword"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "Configuration",
+              "kind": "identifier"
+            }
+          ],
+          "platforms": [
+            "iOS",
+            "iPadOS",
+            "Mac Catalyst",
+            "macOS",
+            "visionOS"
+          ]
+        }
+      ],
+      "kind": "declarations"
+    },
+    {
+      "kind": "content",
+      "content": [
+        {
+          "text": "Overview",
+          "level": 2,
+          "type": "heading",
+          "anchor": "overview"
+        },
+        {
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "Contains properties used to configure a "
+            },
+            {
+              "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController",
+              "type": "reference",
+              "isActive": true
+            },
+            {
+              "type": "text",
+              "text": "."
+            }
+          ],
+          "type": "paragraph"
+        }
+      ]
+    }
+  ],
+  "variants": [
+    {
+      "traits": [
+        {
+          "interfaceLanguage": "swift"
+        }
+      ],
+      "paths": [
+        "/documentation/webkit/wkwebextensioncontroller/configuration-swift.class"
+      ]
+    },
+    {
+      "traits": [
+        {
+          "interfaceLanguage": "occ"
+        }
+      ],
+      "paths": [
+        "/documentation/webkit/wkwebextensioncontroller/configuration-swift.class"
+      ]
+    }
+  ],
+  "topicSections": [
+    {
+      "title": "Initializers",
+      "generated": true,
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/init(identifier:)"
+      ],
+      "anchor": "Initializers"
+    },
+    {
+      "title": "Instance Properties",
+      "generated": true,
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/defaultWebsiteDataStore",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/identifier",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/isPersistent",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/webViewConfiguration"
+      ],
+      "anchor": "Instance-Properties"
+    },
+    {
+      "title": "Type Methods",
+      "generated": true,
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/default()",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/nonPersistent()"
+      ],
+      "anchor": "Type-Methods"
+    }
+  ],
+  "abstract": [
+    {
+      "text": "A ",
+      "type": "text"
+    },
+    {
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class",
+      "type": "reference",
+      "isActive": true
+    },
+    {
+      "text": " object with which to initialize a web extension controller.",
+      "type": "text"
+    }
+  ],
+  "references": {
+    "doc://com.externally.resolved.symbol/s:s7CVarArgP": {
+      "title": "CVarArg",
+      "identifier": "doc://com.externally.resolved.symbol/s:s7CVarArgP",
+      "type": "topic",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "CVarArg"
+        }
+      ],
+      "role": "symbol",
+      "url": "/documentation/Swift/CVarArg",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A type whose instances can be encoded, and appropriately passed, as elements of a C `va_list`.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.apple.documentation/documentation/technologies": {
+      "identifier": "doc://com.apple.documentation/documentation/technologies",
+      "kind": "technologies",
+      "abstract": [
+        {
+          "text": "",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/technologies",
+      "role": "overview",
+      "title": "Technologies",
+      "type": "topic"
+    },
+    "doc://com.externally.resolved.symbol/s:s23CustomStringConvertibleP": {
+      "url": "/documentation/Swift/CustomStringConvertible",
+      "kind": "symbol",
+      "identifier": "doc://com.externally.resolved.symbol/s:s23CustomStringConvertibleP",
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A type with a customized textual representation."
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "protocol"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "CustomStringConvertible"
+        }
+      ],
+      "type": "topic",
+      "title": "CustomStringConvertible"
+    },
+    "doc://com.externally.resolved.symbol/c:objc(cs)NSObject": {
+      "url": "/documentation/ObjectiveC/NSObject-swift.class",
+      "kind": "symbol",
+      "identifier": "doc://com.externally.resolved.symbol/c:objc(cs)NSObject",
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The root class of most Objective-C class hierarchies, from which subclasses inherit a basic interface to the runtime system and the ability to behave as Objective-C objects."
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "NSObject"
+        }
+      ],
+      "type": "topic",
+      "title": "NSObject"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort": {
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MessagePort"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "MessagePort"
+        }
+      ],
+      "role": "symbol",
+      "type": "topic",
+      "url": "/documentation/webkit/wkwebextension/messageport",
+      "title": "WKWebExtension.MessagePort",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object that manages message-based communication with a web extension."
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/init(identifier:)": {
+      "title": "init(identifier:)",
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "configurationWithIdentifier:"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "Returns a new configuration that is persistent and unique for the specified identifier.",
+          "type": "text"
+        }
+      ],
+      "type": "topic",
+      "url": "/documentation/webkit/wkwebextensioncontroller/configuration-swift.class/init(identifier:)",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "text": "convenience",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "init",
+          "kind": "identifier"
+        },
+        {
+          "text": "(",
+          "kind": "text"
+        },
+        {
+          "text": "identifier",
+          "kind": "externalParam"
+        },
+        {
+          "kind": "text",
+          "text": ": "
+        },
+        {
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:10Foundation4UUIDV",
+          "text": "UUID"
+        },
+        {
+          "kind": "text",
+          "text": ")"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/init(identifier:)"
+    },
+    "doc://com.externally.resolved.symbol/s:SH": {
+      "identifier": "doc://com.externally.resolved.symbol/s:SH",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A type that can be hashed into a `Hasher` to produce an integer hash value.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/Swift/Hashable",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "kind": "identifier",
+          "text": "Hashable"
+        },
+        {
+          "kind": "text",
+          "text": " : "
+        },
+        {
+          "kind": "typeIdentifier",
+          "text": "Equatable",
+          "preciseIdentifier": "s:SQ"
+        }
+      ],
+      "role": "symbol",
+      "title": "Hashable",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/defaultWebsiteDataStore": {
+      "url": "/documentation/webkit/wkwebextensioncontroller/configuration-swift.class/defaultwebsitedatastore",
+      "kind": "symbol",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/defaultWebsiteDataStore",
+      "role": "symbol",
+      "title": "defaultWebsiteDataStore",
+      "type": "topic",
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "kind": "identifier",
+          "text": "defaultWebsiteDataStore"
+        },
+        {
+          "kind": "text",
+          "text": ": "
+        },
+        {
+          "preciseIdentifier": "c:objc(cs)WKWebsiteDataStore",
+          "kind": "typeIdentifier",
+          "text": "WKWebsiteDataStore"
+        },
+        {
+          "kind": "text",
+          "text": "!"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "defaultWebsiteDataStore"
+        }
+      ],
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The default data store for website data and cookie access in extension contexts."
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit": {
+      "identifier": "doc://com.apple.webkit/documentation/WebKit",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "Integrate web content seamlessly into your app, and customize content interactions to meet your app’s needs.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/webkit",
+      "role": "collection",
+      "title": "WebKit",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/default()": {
+      "title": "default()",
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "text": "defaultConfiguration",
+          "kind": "identifier"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "Returns a new default configuration that is persistent and not unique.",
+          "type": "text"
+        }
+      ],
+      "type": "topic",
+      "url": "/documentation/webkit/wkwebextensioncontroller/configuration-swift.class/default()",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "func",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "`default`",
+          "kind": "identifier"
+        },
+        {
+          "text": "() -> ",
+          "kind": "text"
+        },
+        {
+          "text": "Self",
+          "kind": "typeIdentifier"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/default()"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/WindowConfiguration": {
+      "url": "/documentation/webkit/wkwebextension/windowconfiguration",
+      "type": "topic",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/WindowConfiguration",
+      "role": "symbol",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object that encapsulates configuration options for a window in an extension."
+        }
+      ],
+      "title": "WKWebExtension.WindowConfiguration",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "WindowConfiguration"
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "WindowConfiguration"
+        }
+      ]
+    },
+    "doc://com.externally.resolved.symbol/s:SQ": {
+      "identifier": "doc://com.externally.resolved.symbol/s:SQ",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A type that can be compared for value equality.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/Swift/Equatable",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "Equatable",
+          "kind": "identifier"
+        }
+      ],
+      "role": "symbol",
+      "title": "Equatable",
+      "type": "topic"
+    },
+    "doc://com.externally.resolved.symbol/c:objc(pl)NSCopying": {
+      "title": "NSCopying",
+      "identifier": "doc://com.externally.resolved.symbol/c:objc(pl)NSCopying",
+      "type": "topic",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "kind": "identifier",
+          "text": "NSCopying"
+        }
+      ],
+      "role": "symbol",
+      "url": "/documentation/Foundation/NSCopying",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A protocol that objects adopt to provide functional copies of themselves.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.externally.resolved.symbol/s:s28CustomDebugStringConvertibleP": {
+      "title": "CustomDebugStringConvertible",
+      "identifier": "doc://com.externally.resolved.symbol/s:s28CustomDebugStringConvertibleP",
+      "type": "topic",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "CustomDebugStringConvertible"
+        }
+      ],
+      "role": "symbol",
+      "url": "/documentation/Swift/CustomDebugStringConvertible",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A type with a customized textual representation suitable for debugging purposes.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/Command": {
+      "type": "topic",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/Command",
+      "url": "/documentation/webkit/wkwebextension/command",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "Command"
+        }
+      ],
+      "kind": "symbol",
+      "title": "WKWebExtension.Command",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "Command"
+        }
+      ],
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object that encapsulates the properties for an individual web extension command."
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/nonPersistent()": {
+      "url": "/documentation/webkit/wkwebextensioncontroller/configuration-swift.class/nonpersistent()",
+      "kind": "symbol",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/nonPersistent()",
+      "role": "symbol",
+      "title": "nonPersistent()",
+      "type": "topic",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "kind": "keyword",
+          "text": "func"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "nonPersistent"
+        },
+        {
+          "kind": "text",
+          "text": "() -> "
+        },
+        {
+          "kind": "typeIdentifier",
+          "text": "Self"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "nonPersistentConfiguration"
+        }
+      ],
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Returns a new non-persistent configuration."
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/DataRecord": {
+      "type": "topic",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object that represents a record of stored data for a specific web extension context."
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "DataRecord"
+        }
+      ],
+      "url": "/documentation/webkit/wkwebextension/datarecord",
+      "title": "WKWebExtension.DataRecord",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "DataRecord"
+        }
+      ],
+      "role": "symbol",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/DataRecord",
+      "kind": "symbol"
+    },
+    "doc://com.externally.resolved.symbol/c:objc(pl)NSCoding": {
+      "url": "/documentation/Foundation/NSCoding",
+      "kind": "symbol",
+      "identifier": "doc://com.externally.resolved.symbol/c:objc(pl)NSCoding",
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A protocol that enables an object to be encoded and decoded for archiving and distribution."
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "protocol"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "NSCoding"
+        }
+      ],
+      "type": "topic",
+      "title": "NSCoding"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController": {
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "WKWebExtensionController"
+        }
+      ],
+      "role": "symbol",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController",
+      "url": "/documentation/webkit/wkwebextensioncontroller",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "WKWebExtensionController"
+        }
+      ],
+      "title": "WKWebExtensionController",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object that manages a set of loaded extension contexts."
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/webViewConfiguration": {
+      "url": "/documentation/webkit/wkwebextensioncontroller/configuration-swift.class/webviewconfiguration",
+      "kind": "symbol",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/webViewConfiguration",
+      "role": "symbol",
+      "title": "webViewConfiguration",
+      "type": "topic",
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "kind": "identifier",
+          "text": "webViewConfiguration"
+        },
+        {
+          "kind": "text",
+          "text": ": "
+        },
+        {
+          "preciseIdentifier": "c:objc(cs)WKWebViewConfiguration",
+          "kind": "typeIdentifier",
+          "text": "WKWebViewConfiguration"
+        },
+        {
+          "kind": "text",
+          "text": "!"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "webViewConfiguration"
+        }
+      ],
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The web view configuration to be used as a basis for configuring web views in extension contexts."
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/identifier": {
+      "title": "identifier",
+      "type": "topic",
+      "url": "/documentation/webkit/wkwebextensioncontroller/configuration-swift.class/identifier",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/identifier",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "var"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "identifier"
+        },
+        {
+          "kind": "text",
+          "text": ": "
+        },
+        {
+          "kind": "typeIdentifier",
+          "text": "UUID",
+          "preciseIdentifier": "s:10Foundation4UUIDV"
+        },
+        {
+          "kind": "text",
+          "text": "?"
+        }
+      ],
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The unique identifier used for persistent configuration storage, or "
+        },
+        {
+          "type": "codeVoice",
+          "code": "nil"
+        },
+        {
+          "type": "text",
+          "text": " when it is the default or not persistent."
+        }
+      ],
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "identifier"
+        }
+      ],
+      "kind": "symbol"
+    },
+    "doc://com.externally.resolved.symbol/c:objc(pl)NSObject": {
+      "identifier": "doc://com.externally.resolved.symbol/c:objc(pl)NSObject",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "The group of methods that are fundamental to all Objective-C objects.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/ObjectiveC/NSObjectProtocol",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "NSObjectProtocol",
+          "kind": "identifier"
+        }
+      ],
+      "role": "symbol",
+      "title": "NSObjectProtocol",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class": {
+      "type": "topic",
+      "navigatorTitle": [
+        {
+          "text": "Configuration",
+          "kind": "identifier"
+        }
+      ],
+      "kind": "symbol",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class",
+      "role": "symbol",
+      "title": "WKWebExtensionController.Configuration",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "Configuration",
+          "kind": "identifier"
+        }
+      ],
+      "url": "/documentation/webkit/wkwebextensioncontroller/configuration-swift.class",
+      "abstract": [
+        {
+          "text": "A ",
+          "type": "text"
+        },
+        {
+          "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class",
+          "isActive": true,
+          "type": "reference"
+        },
+        {
+          "text": " object with which to initialize a web extension controller.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MatchPattern": {
+      "title": "WKWebExtension.MatchPattern",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MatchPattern",
+      "type": "topic",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "MatchPattern"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MatchPattern"
+        }
+      ],
+      "role": "symbol",
+      "url": "/documentation/webkit/wkwebextension/matchpattern",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object that represents a way to specify groups of URLs."
+        }
+      ]
+    },
+    "doc://com.externally.resolved.symbol/c:objc(pl)NSSecureCoding": {
+      "title": "NSSecureCoding",
+      "identifier": "doc://com.externally.resolved.symbol/c:objc(pl)NSSecureCoding",
+      "type": "topic",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "NSSecureCoding"
+        },
+        {
+          "kind": "text",
+          "text": " : "
+        },
+        {
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "c:objc(pl)NSCoding",
+          "text": "NSCoding"
+        }
+      ],
+      "role": "symbol",
+      "url": "/documentation/Foundation/NSSecureCoding",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A protocol that enables encoding and decoding in a manner that is robust against object substitution attacks.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.externally.resolved.symbol/s:ScM": {
+      "identifier": "doc://com.externally.resolved.symbol/s:ScM",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A singleton actor whose executor is equivalent to the main dispatch queue."
+        }
+      ],
+      "url": "/documentation/Swift/MainActor",
+      "fragments": [
+        {
+          "kind": "attribute",
+          "text": "@globalActor"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "keyword",
+          "text": "final"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "keyword",
+          "text": "actor"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "MainActor"
+        }
+      ],
+      "role": "symbol",
+      "title": "MainActor",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/Action": {
+      "url": "/documentation/webkit/wkwebextension/action",
+      "type": "topic",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/Action",
+      "role": "symbol",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object that encapsulates the properties for an individual web extension action."
+        }
+      ],
+      "title": "WKWebExtension.Action",
+      "navigatorTitle": [
+        {
+          "text": "Action",
+          "kind": "identifier"
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "Action",
+          "kind": "identifier"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/TabConfiguration": {
+      "url": "/documentation/webkit/wkwebextension/tabconfiguration",
+      "role": "symbol",
+      "abstract": [
+        {
+          "text": "An object that encapsulates configuration options for a tab in an extension.",
+          "type": "text"
+        }
+      ],
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "TabConfiguration",
+          "kind": "identifier"
+        }
+      ],
+      "type": "topic",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "TabConfiguration"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/TabConfiguration",
+      "title": "WKWebExtension.TabConfiguration",
+      "kind": "symbol"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/isPersistent": {
+      "url": "/documentation/webkit/wkwebextensioncontroller/configuration-swift.class/ispersistent",
+      "kind": "symbol",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/isPersistent",
+      "role": "symbol",
+      "title": "isPersistent",
+      "type": "topic",
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "isPersistent",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "text": "Bool",
+          "preciseIdentifier": "s:Sb",
+          "kind": "typeIdentifier"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "persistent"
+        }
+      ],
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A Boolean value indicating if this context will write data to the the file system."
+        }
+      ]
+    },
+    "doc://com.externally.resolved.symbol/s:s8SendableP": {
+      "identifier": "doc://com.externally.resolved.symbol/s:s8SendableP",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A thread-safe type whose values can be shared across arbitrary concurrent contexts without introducing a risk of data races.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/Swift/Sendable",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "Sendable"
+        },
+        {
+          "kind": "text",
+          "text": " : "
+        },
+        {
+          "kind": "typeIdentifier",
+          "text": "SendableMetatype",
+          "preciseIdentifier": "s:s16SendableMetatypeP"
+        }
+      ],
+      "role": "symbol",
+      "title": "Sendable",
+      "type": "topic"
+    }
+  },
+  "variantOverrides": [
+    {
+      "traits": [
+        {
+          "interfaceLanguage": "occ"
+        }
+      ],
+      "patch": [
+        {
+          "op": "replace",
+          "value": "occ",
+          "path": "/identifier/interfaceLanguage"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "deprecated": false,
+              "introducedAt": "18.4",
+              "name": "iOS",
+              "unavailable": false,
+              "beta": false
+            },
+            {
+              "deprecated": false,
+              "introducedAt": "18.4",
+              "name": "iPadOS",
+              "unavailable": false,
+              "beta": false
+            },
+            {
+              "deprecated": false,
+              "introducedAt": "18.4",
+              "name": "Mac Catalyst",
+              "unavailable": false,
+              "beta": false
+            },
+            {
+              "deprecated": false,
+              "introducedAt": "15.4",
+              "name": "macOS",
+              "unavailable": false,
+              "beta": false
+            },
+            {
+              "deprecated": false,
+              "introducedAt": "2.4",
+              "name": "visionOS",
+              "unavailable": false,
+              "beta": false
+            }
+          ],
+          "path": "/metadata/platforms"
+        },
+        {
+          "op": "replace",
+          "value": "Class",
+          "path": "/metadata/roleHeading"
+        },
+        {
+          "op": "replace",
+          "value": "WKWebExtensionControllerConfiguration",
+          "path": "/metadata/title"
+        },
+        {
+          "op": "replace",
+          "value": "class",
+          "path": "/metadata/symbolKind"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "text": "WKWebExtensionControllerConfiguration",
+              "kind": "identifier"
+            }
+          ],
+          "path": "/metadata/fragments"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebExtensionControllerConfiguration"
+            }
+          ],
+          "path": "/metadata/navigatorTitle"
+        },
+        {
+          "op": "replace",
+          "value": {
+            "paths": [
+              [
+                "doc://com.apple.documentation/documentation/technologies",
+                "doc://com.apple.webkit/documentation/WebKit"
+              ]
+            ]
+          },
+          "path": "/hierarchy"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "generated": true,
+              "title": "Instance Properties",
+              "anchor": "Instance-Properties",
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/defaultWebsiteDataStore",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/identifier",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/isPersistent",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/webViewConfiguration"
+              ]
+            },
+            {
+              "generated": true,
+              "title": "Type Methods",
+              "anchor": "Type-Methods",
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/default()",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/init(identifier:)",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class/nonPersistent()"
+              ]
+            }
+          ],
+          "path": "/topicSections"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "title": "Inherits From",
+              "type": "inheritsFrom",
+              "identifiers": [
+                "doc://com.externally.resolved.symbol/c:objc(cs)NSObject"
+              ],
+              "kind": "relationships"
+            },
+            {
+              "title": "Conforms To",
+              "type": "conformsTo",
+              "identifiers": [
+                "doc://com.externally.resolved.symbol/c:objc(pl)NSCopying",
+                "doc://com.externally.resolved.symbol/c:objc(pl)NSSecureCoding"
+              ],
+              "kind": "relationships"
+            }
+          ],
+          "path": "/relationshipsSections"
+        },
+        {
+          "op": "replace",
+          "value": [
+            {
+              "generated": true,
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/Action",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/Command",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/DataRecord",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MatchPattern",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/TabConfiguration",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/WindowConfiguration"
+              ],
+              "anchor": "Classes",
+              "title": "Classes"
+            }
+          ],
+          "path": "/seeAlsoSections"
+        },
+        {
+          "op": "replace",
+          "value": {
+            "declarations": [
+              {
+                "languages": [
+                  "occ"
+                ],
+                "tokens": [
+                  {
+                    "text": "@interface",
+                    "kind": "keyword"
+                  },
+                  {
+                    "text": " ",
+                    "kind": "text"
+                  },
+                  {
+                    "text": "WKWebExtensionControllerConfiguration",
+                    "kind": "identifier"
+                  },
+                  {
+                    "text": " : ",
+                    "kind": "text"
+                  },
+                  {
+                    "preciseIdentifier": "c:objc(cs)NSObject",
+                    "text": "NSObject",
+                    "kind": "typeIdentifier",
+                    "identifier": "doc://com.externally.resolved.symbol/c:objc(cs)NSObject"
+                  }
+                ],
+                "platforms": [
+                  "iOS",
+                  "iPadOS",
+                  "Mac Catalyst",
+                  "macOS",
+                  "visionOS"
+                ]
+              }
+            ],
+            "kind": "declarations"
+          },
+          "path": "/primaryContentSections/0"
+        },
+        {
+          "path": "/references/doc:~1~1com.externally.resolved.symbol~1c:objc(cs)NSObject/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "@interface",
+              "kind": "keyword"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "NSObject",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort/title",
+          "op": "replace",
+          "value": "WKWebExtensionMessagePort"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebExtensionMessagePort"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "WKWebExtensionMessagePort",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1Configuration-swift.class~1init(identifier:)/title",
+          "op": "replace",
+          "value": "configurationWithIdentifier:"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1Configuration-swift.class~1init(identifier:)/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "text",
+              "text": "+ "
+            },
+            {
+              "kind": "identifier",
+              "text": "configurationWithIdentifier:"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1Configuration-swift.class~1defaultWebsiteDataStore/title",
+          "op": "replace",
+          "value": "defaultWebsiteDataStore"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1Configuration-swift.class~1defaultWebsiteDataStore/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "defaultWebsiteDataStore",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1Configuration-swift.class~1default()/title",
+          "op": "replace",
+          "value": "defaultConfiguration"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1Configuration-swift.class~1default()/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "+ ",
+              "kind": "text"
+            },
+            {
+              "text": "defaultConfiguration",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1WindowConfiguration/title",
+          "op": "replace",
+          "value": "WKWebExtensionWindowConfiguration"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1WindowConfiguration/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "WKWebExtensionWindowConfiguration",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1WindowConfiguration/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "WKWebExtensionWindowConfiguration",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.externally.resolved.symbol~1c:objc(pl)NSCopying/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "@protocol",
+              "kind": "keyword"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "NSCopying",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1Command/title",
+          "op": "replace",
+          "value": "WKWebExtensionCommand"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1Command/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "WKWebExtensionCommand",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1Command/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebExtensionCommand"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1Configuration-swift.class~1nonPersistent()/title",
+          "op": "replace",
+          "value": "nonPersistentConfiguration"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1Configuration-swift.class~1nonPersistent()/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "+ ",
+              "kind": "text"
+            },
+            {
+              "text": "nonPersistentConfiguration",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1DataRecord/title",
+          "op": "replace",
+          "value": "WKWebExtensionDataRecord"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1DataRecord/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebExtensionDataRecord"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1DataRecord/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "WKWebExtensionDataRecord",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.externally.resolved.symbol~1c:objc(pl)NSCoding/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "keyword",
+              "text": "@protocol"
+            },
+            {
+              "kind": "text",
+              "text": " "
+            },
+            {
+              "kind": "identifier",
+              "text": "NSCoding"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController/title",
+          "op": "replace",
+          "value": "WKWebExtensionController"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "WKWebExtensionController",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "WKWebExtensionController",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1Configuration-swift.class~1webViewConfiguration/title",
+          "op": "replace",
+          "value": "webViewConfiguration"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1Configuration-swift.class~1webViewConfiguration/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "webViewConfiguration",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1Configuration-swift.class~1identifier/title",
+          "op": "replace",
+          "value": "identifier"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1Configuration-swift.class~1identifier/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.externally.resolved.symbol~1c:objc(pl)NSObject/title",
+          "op": "replace",
+          "value": "NSObject"
+        },
+        {
+          "path": "/references/doc:~1~1com.externally.resolved.symbol~1c:objc(pl)NSObject/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "keyword",
+              "text": "@protocol"
+            },
+            {
+              "kind": "text",
+              "text": " "
+            },
+            {
+              "kind": "identifier",
+              "text": "NSObject"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1Configuration-swift.class/title",
+          "op": "replace",
+          "value": "WKWebExtensionControllerConfiguration"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1Configuration-swift.class/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "WKWebExtensionControllerConfiguration",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1Configuration-swift.class/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "WKWebExtensionControllerConfiguration",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MatchPattern/title",
+          "op": "replace",
+          "value": "WKWebExtensionMatchPattern"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MatchPattern/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebExtensionMatchPattern"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MatchPattern/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebExtensionMatchPattern"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.externally.resolved.symbol~1c:objc(pl)NSSecureCoding/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "text": "@protocol",
+              "kind": "keyword"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "NSSecureCoding",
+              "kind": "identifier"
+            },
+            {
+              "text": " <",
+              "kind": "text"
+            },
+            {
+              "text": "NSCoding",
+              "kind": "typeIdentifier",
+              "preciseIdentifier": "c:objc(pl)NSCoding"
+            },
+            {
+              "text": ">",
+              "kind": "text"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1Action/title",
+          "op": "replace",
+          "value": "WKWebExtensionAction"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1Action/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebExtensionAction"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1Action/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "WKWebExtensionAction",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1TabConfiguration/title",
+          "op": "replace",
+          "value": "WKWebExtensionTabConfiguration"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1TabConfiguration/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebExtensionTabConfiguration"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1TabConfiguration/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebExtensionTabConfiguration"
+            }
+          ]
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1Configuration-swift.class~1isPersistent/title",
+          "op": "replace",
+          "value": "persistent"
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1Configuration-swift.class~1isPersistent/fragments",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "persistent"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "legalNotices": {
+    "copyright": "Copyright &copy; 2025 Apple Inc. All rights reserved.",
+    "termsOfUse": "https://www.apple.com/legal/internet-services/terms/site.html",
+    "privacyPolicy": "https://www.apple.com/privacy/privacy-policy"
+  }
+}

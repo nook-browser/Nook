@@ -1,0 +1,2047 @@
+{
+  "primaryContentSections": [
+    {
+      "declarations": [
+        {
+          "platforms": [
+            "iOS",
+            "iPadOS",
+            "Mac Catalyst",
+            "macOS",
+            "visionOS"
+          ],
+          "tokens": [
+            {
+              "kind": "attribute",
+              "text": "@"
+            },
+            {
+              "kind": "attribute",
+              "preciseIdentifier": "s:ScM",
+              "identifier": "doc://com.externally.resolved.symbol/s:ScM",
+              "text": "MainActor"
+            },
+            {
+              "kind": "text",
+              "text": " "
+            },
+            {
+              "kind": "keyword",
+              "text": "class"
+            },
+            {
+              "kind": "text",
+              "text": " "
+            },
+            {
+              "kind": "identifier",
+              "text": "MessagePort"
+            }
+          ],
+          "languages": [
+            "swift"
+          ]
+        }
+      ],
+      "kind": "declarations"
+    },
+    {
+      "content": [
+        {
+          "anchor": "overview",
+          "type": "heading",
+          "level": 2,
+          "text": "Overview"
+        },
+        {
+          "type": "paragraph",
+          "inlineContent": [
+            {
+              "type": "text",
+              "text": "Contains properties and methods to handle message exchanges with a web extension."
+            }
+          ]
+        }
+      ],
+      "kind": "content"
+    }
+  ],
+  "topicSections": [
+    {
+      "anchor": "Structures",
+      "title": "Structures",
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/Error"
+      ],
+      "generated": true
+    },
+    {
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/applicationIdentifier",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/disconnectHandler",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/isDisconnected",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/messageHandler"
+      ],
+      "generated": true,
+      "title": "Instance Properties",
+      "anchor": "Instance-Properties"
+    },
+    {
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/disconnect()",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/disconnect(throwing:)",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/sendMessage(_:completionHandler:)"
+      ],
+      "generated": true,
+      "title": "Instance Methods",
+      "anchor": "Instance-Methods"
+    }
+  ],
+  "variants": [
+    {
+      "traits": [
+        {
+          "interfaceLanguage": "swift"
+        }
+      ],
+      "paths": [
+        "/documentation/webkit/wkwebextension/messageport"
+      ]
+    },
+    {
+      "traits": [
+        {
+          "interfaceLanguage": "occ"
+        }
+      ],
+      "paths": [
+        "/documentation/webkit/wkwebextension/messageport"
+      ]
+    }
+  ],
+  "identifier": {
+    "url": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort",
+    "interfaceLanguage": "swift"
+  },
+  "sections": [],
+  "relationshipsSections": [
+    {
+      "identifiers": [
+        "doc://com.externally.resolved.symbol/c:objc(cs)NSObject"
+      ],
+      "title": "Inherits From",
+      "kind": "relationships",
+      "type": "inheritsFrom"
+    },
+    {
+      "identifiers": [
+        "doc://com.externally.resolved.symbol/s:s7CVarArgP",
+        "doc://com.externally.resolved.symbol/s:s28CustomDebugStringConvertibleP",
+        "doc://com.externally.resolved.symbol/s:s23CustomStringConvertibleP",
+        "doc://com.externally.resolved.symbol/s:SQ",
+        "doc://com.externally.resolved.symbol/s:SH",
+        "doc://com.externally.resolved.symbol/c:objc(pl)NSObject",
+        "doc://com.externally.resolved.symbol/s:s8SendableP"
+      ],
+      "title": "Conforms To",
+      "kind": "relationships",
+      "type": "conformsTo"
+    }
+  ],
+  "metadata": {
+    "fragments": [
+      {
+        "text": "class",
+        "kind": "keyword"
+      },
+      {
+        "text": " ",
+        "kind": "text"
+      },
+      {
+        "text": "MessagePort",
+        "kind": "identifier"
+      }
+    ],
+    "roleHeading": "Class",
+    "role": "symbol",
+    "externalID": "c:objc(cs)WKWebExtensionMessagePort",
+    "navigatorTitle": [
+      {
+        "text": "MessagePort",
+        "kind": "identifier"
+      }
+    ],
+    "extendedModule": "WebKit",
+    "platforms": [
+      {
+        "deprecated": false,
+        "introducedAt": "18.4",
+        "name": "iOS",
+        "unavailable": false,
+        "beta": false
+      },
+      {
+        "deprecated": false,
+        "introducedAt": "18.4",
+        "name": "iPadOS",
+        "unavailable": false,
+        "beta": false
+      },
+      {
+        "deprecated": false,
+        "introducedAt": "18.4",
+        "name": "Mac Catalyst",
+        "unavailable": false,
+        "beta": false
+      },
+      {
+        "deprecated": false,
+        "introducedAt": "15.4",
+        "name": "macOS",
+        "unavailable": false,
+        "beta": false
+      },
+      {
+        "deprecated": false,
+        "introducedAt": "2.4",
+        "name": "visionOS",
+        "unavailable": false,
+        "beta": false
+      }
+    ],
+    "symbolKind": "class",
+    "modules": [
+      {
+        "name": "WebKit"
+      }
+    ],
+    "title": "WKWebExtension.MessagePort"
+  },
+  "abstract": [
+    {
+      "text": "An object that manages message-based communication with a web extension.",
+      "type": "text"
+    }
+  ],
+  "schemaVersion": {
+    "major": 0,
+    "minor": 3,
+    "patch": 0
+  },
+  "kind": "symbol",
+  "hierarchy": {
+    "paths": [
+      [
+        "doc://com.apple.documentation/documentation/technologies",
+        "doc://com.apple.webkit/documentation/WebKit",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtension"
+      ]
+    ]
+  },
+  "seeAlsoSections": [
+    {
+      "identifiers": [
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/Action",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/Command",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/DataRecord",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MatchPattern",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/TabConfiguration",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/WindowConfiguration",
+        "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class"
+      ],
+      "generated": true,
+      "title": "Classes",
+      "anchor": "Classes"
+    }
+  ],
+  "references": {
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MatchPattern": {
+      "title": "WKWebExtension.MatchPattern",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MatchPattern",
+      "type": "topic",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "MatchPattern"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MatchPattern"
+        }
+      ],
+      "role": "symbol",
+      "url": "/documentation/webkit/wkwebextension/matchpattern",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object that represents a way to specify groups of URLs."
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/WindowConfiguration": {
+      "url": "/documentation/webkit/wkwebextension/windowconfiguration",
+      "type": "topic",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/WindowConfiguration",
+      "role": "symbol",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object that encapsulates configuration options for a window in an extension."
+        }
+      ],
+      "title": "WKWebExtension.WindowConfiguration",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "WindowConfiguration"
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "WindowConfiguration"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/disconnect(throwing:)": {
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Disconnects the port, terminating all further messages with an optional error."
+        }
+      ],
+      "fragments": [
+        {
+          "text": "func",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "disconnect",
+          "kind": "identifier"
+        },
+        {
+          "text": "(",
+          "kind": "text"
+        },
+        {
+          "text": "throwing",
+          "kind": "externalParam"
+        },
+        {
+          "text": ": (any ",
+          "kind": "text"
+        },
+        {
+          "preciseIdentifier": "s:s5ErrorP",
+          "text": "Error",
+          "kind": "typeIdentifier"
+        },
+        {
+          "text": ")?)",
+          "kind": "text"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/disconnect(throwing:)",
+      "navigatorTitle": [
+        {
+          "text": "disconnectWithError:",
+          "kind": "identifier"
+        }
+      ],
+      "url": "/documentation/webkit/wkwebextension/messageport/disconnect(throwing:)",
+      "kind": "symbol",
+      "type": "topic",
+      "role": "symbol",
+      "title": "disconnect(throwing:)"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class": {
+      "type": "topic",
+      "navigatorTitle": [
+        {
+          "text": "Configuration",
+          "kind": "identifier"
+        }
+      ],
+      "kind": "symbol",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class",
+      "role": "symbol",
+      "title": "WKWebExtensionController.Configuration",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "Configuration",
+          "kind": "identifier"
+        }
+      ],
+      "url": "/documentation/webkit/wkwebextensioncontroller/configuration-swift.class",
+      "abstract": [
+        {
+          "text": "A ",
+          "type": "text"
+        },
+        {
+          "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class",
+          "isActive": true,
+          "type": "reference"
+        },
+        {
+          "text": " object with which to initialize a web extension controller.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/sendMessage(_:completionHandler:)": {
+      "abstract": [
+        {
+          "text": "Sends a message to the connected web extension.",
+          "type": "text"
+        }
+      ],
+      "title": "sendMessage(_:completionHandler:)",
+      "type": "topic",
+      "url": "/documentation/webkit/wkwebextension/messageport/sendmessage(_:completionhandler:)",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/sendMessage(_:completionHandler:)",
+      "role": "symbol",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "func"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "sendMessage"
+        },
+        {
+          "kind": "text",
+          "text": "("
+        },
+        {
+          "text": "Any",
+          "kind": "keyword"
+        },
+        {
+          "text": "?, ",
+          "kind": "text"
+        },
+        {
+          "text": "completionHandler",
+          "kind": "externalParam"
+        },
+        {
+          "text": ": (((any ",
+          "kind": "text"
+        },
+        {
+          "preciseIdentifier": "s:s5ErrorP",
+          "text": "Error",
+          "kind": "typeIdentifier"
+        },
+        {
+          "text": ")?) -> ",
+          "kind": "text"
+        },
+        {
+          "preciseIdentifier": "s:s4Voida",
+          "kind": "typeIdentifier",
+          "text": "Void"
+        },
+        {
+          "kind": "text",
+          "text": ")?)"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "sendMessage:completionHandler:"
+        }
+      ],
+      "kind": "symbol"
+    },
+    "doc://com.apple.documentation/documentation/technologies": {
+      "identifier": "doc://com.apple.documentation/documentation/technologies",
+      "kind": "technologies",
+      "abstract": [
+        {
+          "text": "",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/technologies",
+      "role": "overview",
+      "title": "Technologies",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/applicationIdentifier": {
+      "role": "symbol",
+      "url": "/documentation/webkit/wkwebextension/messageport/applicationidentifier",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/applicationIdentifier",
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "applicationIdentifier",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "text": "String",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:SS"
+        },
+        {
+          "text": "?",
+          "kind": "text"
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "text": "applicationIdentifier",
+          "kind": "identifier"
+        }
+      ],
+      "type": "topic",
+      "title": "applicationIdentifier",
+      "abstract": [
+        {
+          "text": "The unique identifier for the app to which this port should be connected.",
+          "type": "text"
+        }
+      ],
+      "kind": "symbol"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/disconnect()": {
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Disconnects the port, terminating all further messages."
+        }
+      ],
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "disconnect"
+        }
+      ],
+      "kind": "symbol",
+      "title": "disconnect()",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/disconnect()",
+      "url": "/documentation/webkit/wkwebextension/messageport/disconnect()",
+      "fragments": [
+        {
+          "text": "func",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "disconnect"
+        },
+        {
+          "kind": "text",
+          "text": "()"
+        }
+      ],
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/messageHandler": {
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "var"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "messageHandler"
+        },
+        {
+          "kind": "text",
+          "text": ": (("
+        },
+        {
+          "kind": "keyword",
+          "text": "Any"
+        },
+        {
+          "kind": "text",
+          "text": "?, (any "
+        },
+        {
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:s5ErrorP",
+          "text": "Error"
+        },
+        {
+          "kind": "text",
+          "text": ")?) -> "
+        },
+        {
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:s4Voida",
+          "text": "Void"
+        },
+        {
+          "kind": "text",
+          "text": ")?"
+        }
+      ],
+      "role": "symbol",
+      "kind": "symbol",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "messageHandler"
+        }
+      ],
+      "url": "/documentation/webkit/wkwebextension/messageport/messagehandler",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The block to be executed when a message is received from the web extension."
+        }
+      ],
+      "title": "messageHandler",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/messageHandler",
+      "type": "topic"
+    },
+    "doc://com.externally.resolved.symbol/s:ScM": {
+      "identifier": "doc://com.externally.resolved.symbol/s:ScM",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A singleton actor whose executor is equivalent to the main dispatch queue."
+        }
+      ],
+      "url": "/documentation/Swift/MainActor",
+      "fragments": [
+        {
+          "kind": "attribute",
+          "text": "@globalActor"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "keyword",
+          "text": "final"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "keyword",
+          "text": "actor"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "MainActor"
+        }
+      ],
+      "role": "symbol",
+      "title": "MainActor",
+      "type": "topic"
+    },
+    "doc://com.externally.resolved.symbol/s:s28CustomDebugStringConvertibleP": {
+      "title": "CustomDebugStringConvertible",
+      "identifier": "doc://com.externally.resolved.symbol/s:s28CustomDebugStringConvertibleP",
+      "type": "topic",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "CustomDebugStringConvertible"
+        }
+      ],
+      "role": "symbol",
+      "url": "/documentation/Swift/CustomDebugStringConvertible",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A type with a customized textual representation suitable for debugging purposes.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit": {
+      "identifier": "doc://com.apple.webkit/documentation/WebKit",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "Integrate web content seamlessly into your app, and customize content interactions to meet your app’s needs.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/webkit",
+      "role": "collection",
+      "title": "WebKit",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/DataRecord": {
+      "type": "topic",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object that represents a record of stored data for a specific web extension context."
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "DataRecord"
+        }
+      ],
+      "url": "/documentation/webkit/wkwebextension/datarecord",
+      "title": "WKWebExtension.DataRecord",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "DataRecord"
+        }
+      ],
+      "role": "symbol",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/DataRecord",
+      "kind": "symbol"
+    },
+    "doc://com.externally.resolved.symbol/c:objc(cs)NSObject": {
+      "url": "/documentation/ObjectiveC/NSObject-swift.class",
+      "kind": "symbol",
+      "identifier": "doc://com.externally.resolved.symbol/c:objc(cs)NSObject",
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "The root class of most Objective-C class hierarchies, from which subclasses inherit a basic interface to the runtime system and the ability to behave as Objective-C objects."
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "NSObject"
+        }
+      ],
+      "type": "topic",
+      "title": "NSObject"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/disconnectHandler": {
+      "abstract": [
+        {
+          "text": "The block to be executed when the port disconnects.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/webkit/wkwebextension/messageport/disconnecthandler",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/disconnectHandler",
+      "title": "disconnectHandler",
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "disconnectHandler",
+          "kind": "identifier"
+        },
+        {
+          "text": ": (((any ",
+          "kind": "text"
+        },
+        {
+          "text": "Error",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:s5ErrorP"
+        },
+        {
+          "text": ")?) -> ",
+          "kind": "text"
+        },
+        {
+          "text": "Void",
+          "kind": "typeIdentifier",
+          "preciseIdentifier": "s:s4Voida"
+        },
+        {
+          "text": ")?",
+          "kind": "text"
+        }
+      ],
+      "type": "topic",
+      "kind": "symbol",
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "text": "disconnectHandler",
+          "kind": "identifier"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/Error": {
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Constants that indicate errors in the "
+        },
+        {
+          "isActive": true,
+          "type": "reference",
+          "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort"
+        },
+        {
+          "text": " domain.",
+          "type": "text"
+        }
+      ],
+      "type": "topic",
+      "url": "/documentation/webkit/wkwebextension/messageport/error",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/Error",
+      "kind": "symbol",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "Error"
+        }
+      ],
+      "title": "WKWebExtension.MessagePort.Error",
+      "role": "symbol",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "struct"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "Error"
+        }
+      ]
+    },
+    "doc://com.externally.resolved.symbol/c:objc(pl)NSObject": {
+      "identifier": "doc://com.externally.resolved.symbol/c:objc(pl)NSObject",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "The group of methods that are fundamental to all Objective-C objects.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/ObjectiveC/NSObjectProtocol",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "NSObjectProtocol",
+          "kind": "identifier"
+        }
+      ],
+      "role": "symbol",
+      "title": "NSObjectProtocol",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension": {
+      "url": "/documentation/webkit/wkwebextension",
+      "kind": "symbol",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension",
+      "role": "symbol",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "WKWebExtension"
+        }
+      ],
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object that encapsulates a web extension’s resources that the manifest file defines."
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "WKWebExtension"
+        }
+      ],
+      "type": "topic",
+      "title": "WKWebExtension"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/Command": {
+      "type": "topic",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/Command",
+      "url": "/documentation/webkit/wkwebextension/command",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "Command"
+        }
+      ],
+      "kind": "symbol",
+      "title": "WKWebExtension.Command",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "Command"
+        }
+      ],
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object that encapsulates the properties for an individual web extension command."
+        }
+      ]
+    },
+    "doc://com.externally.resolved.symbol/s:s7CVarArgP": {
+      "title": "CVarArg",
+      "identifier": "doc://com.externally.resolved.symbol/s:s7CVarArgP",
+      "type": "topic",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "CVarArg"
+        }
+      ],
+      "role": "symbol",
+      "url": "/documentation/Swift/CVarArg",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A type whose instances can be encoded, and appropriately passed, as elements of a C `va_list`.",
+          "type": "text"
+        }
+      ]
+    },
+    "doc://com.externally.resolved.symbol/s:SQ": {
+      "identifier": "doc://com.externally.resolved.symbol/s:SQ",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A type that can be compared for value equality.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/Swift/Equatable",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "Equatable",
+          "kind": "identifier"
+        }
+      ],
+      "role": "symbol",
+      "title": "Equatable",
+      "type": "topic"
+    },
+    "doc://com.externally.resolved.symbol/s:s8SendableP": {
+      "identifier": "doc://com.externally.resolved.symbol/s:s8SendableP",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A thread-safe type whose values can be shared across arbitrary concurrent contexts without introducing a risk of data races.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/Swift/Sendable",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "Sendable"
+        },
+        {
+          "kind": "text",
+          "text": " : "
+        },
+        {
+          "kind": "typeIdentifier",
+          "text": "SendableMetatype",
+          "preciseIdentifier": "s:s16SendableMetatypeP"
+        }
+      ],
+      "role": "symbol",
+      "title": "Sendable",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/TabConfiguration": {
+      "url": "/documentation/webkit/wkwebextension/tabconfiguration",
+      "role": "symbol",
+      "abstract": [
+        {
+          "text": "An object that encapsulates configuration options for a tab in an extension.",
+          "type": "text"
+        }
+      ],
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "TabConfiguration",
+          "kind": "identifier"
+        }
+      ],
+      "type": "topic",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "TabConfiguration"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/TabConfiguration",
+      "title": "WKWebExtension.TabConfiguration",
+      "kind": "symbol"
+    },
+    "doc://com.externally.resolved.symbol/s:s23CustomStringConvertibleP": {
+      "url": "/documentation/Swift/CustomStringConvertible",
+      "kind": "symbol",
+      "identifier": "doc://com.externally.resolved.symbol/s:s23CustomStringConvertibleP",
+      "role": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "A type with a customized textual representation."
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "protocol"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "CustomStringConvertible"
+        }
+      ],
+      "type": "topic",
+      "title": "CustomStringConvertible"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/Action": {
+      "url": "/documentation/webkit/wkwebextension/action",
+      "type": "topic",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/Action",
+      "role": "symbol",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object that encapsulates the properties for an individual web extension action."
+        }
+      ],
+      "title": "WKWebExtension.Action",
+      "navigatorTitle": [
+        {
+          "text": "Action",
+          "kind": "identifier"
+        }
+      ],
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "class"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "Action",
+          "kind": "identifier"
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort": {
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "MessagePort"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "MessagePort"
+        }
+      ],
+      "role": "symbol",
+      "type": "topic",
+      "url": "/documentation/webkit/wkwebextension/messageport",
+      "title": "WKWebExtension.MessagePort",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "An object that manages message-based communication with a web extension."
+        }
+      ]
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/Error/Code": {
+      "url": "/documentation/webkit/wkwebextension/messageport/error/code",
+      "kind": "symbol",
+      "fragments": [
+        {
+          "kind": "keyword",
+          "text": "enum"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "identifier",
+          "text": "Code"
+        }
+      ],
+      "abstract": [
+        {
+          "text": "Constants that indicate errors in the ",
+          "type": "text"
+        },
+        {
+          "type": "reference",
+          "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort",
+          "isActive": true
+        },
+        {
+          "type": "text",
+          "text": " domain."
+        }
+      ],
+      "type": "topic",
+      "title": "WKWebExtension.MessagePort.Error.Code",
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/Error/Code",
+      "navigatorTitle": [
+        {
+          "kind": "identifier",
+          "text": "Code"
+        }
+      ],
+      "role": "symbol"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/errorDomain": {
+      "abstract": [
+        {
+          "text": "A string that identifies the error domain.",
+          "type": "text"
+        }
+      ],
+      "fragments": [
+        {
+          "text": "class",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "let",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "errorDomain",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "preciseIdentifier": "s:SS",
+          "text": "String",
+          "kind": "typeIdentifier"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/errorDomain",
+      "kind": "symbol",
+      "navigatorTitle": [
+        {
+          "text": "WKWebExtensionMessagePortErrorDomain",
+          "kind": "identifier"
+        }
+      ],
+      "url": "/documentation/webkit/wkwebextension/messageport/errordomain",
+      "type": "topic",
+      "role": "symbol",
+      "title": "errorDomain"
+    },
+    "doc://com.externally.resolved.symbol/s:SH": {
+      "identifier": "doc://com.externally.resolved.symbol/s:SH",
+      "kind": "symbol",
+      "abstract": [
+        {
+          "text": "A type that can be hashed into a `Hasher` to produce an integer hash value.",
+          "type": "text"
+        }
+      ],
+      "url": "/documentation/Swift/Hashable",
+      "fragments": [
+        {
+          "text": "protocol",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "kind": "identifier",
+          "text": "Hashable"
+        },
+        {
+          "kind": "text",
+          "text": " : "
+        },
+        {
+          "kind": "typeIdentifier",
+          "text": "Equatable",
+          "preciseIdentifier": "s:SQ"
+        }
+      ],
+      "role": "symbol",
+      "title": "Hashable",
+      "type": "topic"
+    },
+    "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/isDisconnected": {
+      "navigatorTitle": [
+        {
+          "text": "disconnected",
+          "kind": "identifier"
+        }
+      ],
+      "identifier": "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/isDisconnected",
+      "role": "symbol",
+      "kind": "symbol",
+      "type": "topic",
+      "fragments": [
+        {
+          "text": "var",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "text"
+        },
+        {
+          "text": "isDisconnected",
+          "kind": "identifier"
+        },
+        {
+          "text": ": ",
+          "kind": "text"
+        },
+        {
+          "preciseIdentifier": "s:Sb",
+          "text": "Bool",
+          "kind": "typeIdentifier"
+        }
+      ],
+      "title": "isDisconnected",
+      "url": "/documentation/webkit/wkwebextension/messageport/isdisconnected",
+      "abstract": [
+        {
+          "type": "text",
+          "text": "Indicates whether the message port is disconnected."
+        }
+      ]
+    }
+  },
+  "variantOverrides": [
+    {
+      "traits": [
+        {
+          "interfaceLanguage": "occ"
+        }
+      ],
+      "patch": [
+        {
+          "value": "occ",
+          "path": "/identifier/interfaceLanguage",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "unavailable": false,
+              "beta": false,
+              "name": "iOS",
+              "deprecated": false,
+              "introducedAt": "18.4"
+            },
+            {
+              "unavailable": false,
+              "beta": false,
+              "name": "iPadOS",
+              "deprecated": false,
+              "introducedAt": "18.4"
+            },
+            {
+              "unavailable": false,
+              "beta": false,
+              "name": "Mac Catalyst",
+              "deprecated": false,
+              "introducedAt": "18.4"
+            },
+            {
+              "unavailable": false,
+              "deprecated": false,
+              "beta": false,
+              "name": "macOS",
+              "introducedAt": "15.4"
+            },
+            {
+              "unavailable": false,
+              "deprecated": false,
+              "beta": false,
+              "name": "visionOS",
+              "introducedAt": "2.4"
+            }
+          ],
+          "path": "/metadata/platforms",
+          "op": "replace"
+        },
+        {
+          "value": "Class",
+          "path": "/metadata/roleHeading",
+          "op": "replace"
+        },
+        {
+          "value": "WKWebExtensionMessagePort",
+          "path": "/metadata/title",
+          "op": "replace"
+        },
+        {
+          "value": "class",
+          "path": "/metadata/symbolKind",
+          "op": "replace"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebExtensionMessagePort"
+            }
+          ],
+          "path": "/metadata/fragments",
+          "op": "replace"
+        },
+        {
+          "path": "/metadata/navigatorTitle",
+          "op": "replace",
+          "value": [
+            {
+              "text": "WKWebExtensionMessagePort",
+              "kind": "identifier"
+            }
+          ]
+        },
+        {
+          "path": "/hierarchy",
+          "op": "replace",
+          "value": {
+            "paths": [
+              [
+                "doc://com.apple.documentation/documentation/technologies",
+                "doc://com.apple.webkit/documentation/WebKit"
+              ]
+            ]
+          }
+        },
+        {
+          "path": "/topicSections",
+          "op": "replace",
+          "value": [
+            {
+              "title": "Errors",
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/Error/Code",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/errorDomain"
+              ],
+              "anchor": "Errors"
+            },
+            {
+              "title": "Instance Properties",
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/applicationIdentifier",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/disconnectHandler",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/isDisconnected",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/messageHandler"
+              ],
+              "generated": true,
+              "anchor": "Instance-Properties"
+            },
+            {
+              "generated": true,
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/disconnect()",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/disconnect(throwing:)",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MessagePort/sendMessage(_:completionHandler:)"
+              ],
+              "title": "Instance Methods",
+              "anchor": "Instance-Methods"
+            }
+          ]
+        },
+        {
+          "path": "/relationshipsSections",
+          "op": "replace",
+          "value": [
+            {
+              "kind": "relationships",
+              "title": "Inherits From",
+              "type": "inheritsFrom",
+              "identifiers": [
+                "doc://com.externally.resolved.symbol/c:objc(cs)NSObject"
+              ]
+            }
+          ]
+        },
+        {
+          "path": "/seeAlsoSections",
+          "op": "replace",
+          "value": [
+            {
+              "anchor": "Classes",
+              "title": "Classes",
+              "generated": true,
+              "identifiers": [
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/Action",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/Command",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/DataRecord",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/MatchPattern",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/TabConfiguration",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtension/WindowConfiguration",
+                "doc://com.apple.webkit/documentation/WebKit/WKWebExtensionController/Configuration-swift.class"
+              ]
+            }
+          ]
+        },
+        {
+          "path": "/primaryContentSections/0",
+          "op": "replace",
+          "value": {
+            "declarations": [
+              {
+                "platforms": [
+                  "iOS",
+                  "iPadOS",
+                  "Mac Catalyst",
+                  "macOS",
+                  "visionOS"
+                ],
+                "languages": [
+                  "occ"
+                ],
+                "tokens": [
+                  {
+                    "text": "@interface",
+                    "kind": "keyword"
+                  },
+                  {
+                    "text": " ",
+                    "kind": "text"
+                  },
+                  {
+                    "text": "WKWebExtensionMessagePort",
+                    "kind": "identifier"
+                  },
+                  {
+                    "text": " : ",
+                    "kind": "text"
+                  },
+                  {
+                    "identifier": "doc://com.externally.resolved.symbol/c:objc(cs)NSObject",
+                    "text": "NSObject",
+                    "preciseIdentifier": "c:objc(cs)NSObject",
+                    "kind": "typeIdentifier"
+                  }
+                ]
+              }
+            ],
+            "kind": "declarations"
+          }
+        },
+        {
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MatchPattern/title",
+          "op": "replace",
+          "value": "WKWebExtensionMatchPattern"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebExtensionMatchPattern"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MatchPattern/fragments"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebExtensionMatchPattern"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MatchPattern/navigatorTitle"
+        },
+        {
+          "value": "WKWebExtensionWindowConfiguration",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1WindowConfiguration/title"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebExtensionWindowConfiguration",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1WindowConfiguration/fragments"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebExtensionWindowConfiguration",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1WindowConfiguration/navigatorTitle"
+        },
+        {
+          "value": "disconnectWithError:",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort~1disconnect(throwing:)/title"
+        },
+        {
+          "value": [
+            {
+              "text": "- ",
+              "kind": "text"
+            },
+            {
+              "text": "disconnectWithError:",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort~1disconnect(throwing:)/fragments"
+        },
+        {
+          "value": "WKWebExtensionControllerConfiguration",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1Configuration-swift.class/title"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebExtensionControllerConfiguration",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1Configuration-swift.class/fragments"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebExtensionControllerConfiguration",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtensionController~1Configuration-swift.class/navigatorTitle"
+        },
+        {
+          "value": "sendMessage:completionHandler:",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort~1sendMessage(_:completionHandler:)/title"
+        },
+        {
+          "value": [
+            {
+              "text": "- ",
+              "kind": "text"
+            },
+            {
+              "text": "sendMessage:completionHandler:",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort~1sendMessage(_:completionHandler:)/fragments"
+        },
+        {
+          "value": "applicationIdentifier",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort~1applicationIdentifier/title"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "applicationIdentifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort~1applicationIdentifier/fragments"
+        },
+        {
+          "value": "disconnect",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort~1disconnect()/title"
+        },
+        {
+          "value": [
+            {
+              "text": "- ",
+              "kind": "text"
+            },
+            {
+              "text": "disconnect",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort~1disconnect()/fragments"
+        },
+        {
+          "value": "messageHandler",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort~1messageHandler/title"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "messageHandler"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort~1messageHandler/fragments"
+        },
+        {
+          "value": "WKWebExtensionDataRecord",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1DataRecord/title"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebExtensionDataRecord"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1DataRecord/fragments"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebExtensionDataRecord",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1DataRecord/navigatorTitle"
+        },
+        {
+          "value": [
+            {
+              "text": "@interface",
+              "kind": "keyword"
+            },
+            {
+              "text": " ",
+              "kind": "text"
+            },
+            {
+              "text": "NSObject",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.externally.resolved.symbol~1c:objc(cs)NSObject/fragments"
+        },
+        {
+          "value": "disconnectHandler",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort~1disconnectHandler/title"
+        },
+        {
+          "value": [
+            {
+              "text": "disconnectHandler",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort~1disconnectHandler/fragments"
+        },
+        {
+          "value": "NSObject",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.externally.resolved.symbol~1c:objc(pl)NSObject/title"
+        },
+        {
+          "value": [
+            {
+              "kind": "keyword",
+              "text": "@protocol"
+            },
+            {
+              "kind": "text",
+              "text": " "
+            },
+            {
+              "text": "NSObject",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.externally.resolved.symbol~1c:objc(pl)NSObject/fragments"
+        },
+        {
+          "value": "WKWebExtension",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension/title"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebExtension",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension/fragments"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebExtension",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension/navigatorTitle"
+        },
+        {
+          "value": "WKWebExtensionCommand",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1Command/title"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebExtensionCommand"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1Command/fragments"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebExtensionCommand",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1Command/navigatorTitle"
+        },
+        {
+          "value": "WKWebExtensionTabConfiguration",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1TabConfiguration/title"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebExtensionTabConfiguration"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1TabConfiguration/fragments"
+        },
+        {
+          "value": [
+            {
+              "kind": "identifier",
+              "text": "WKWebExtensionTabConfiguration"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1TabConfiguration/navigatorTitle"
+        },
+        {
+          "value": "WKWebExtensionAction",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1Action/title"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebExtensionAction",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1Action/fragments"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebExtensionAction",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1Action/navigatorTitle"
+        },
+        {
+          "value": "WKWebExtensionMessagePort",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort/title"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebExtensionMessagePort",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort/fragments"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebExtensionMessagePort",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort/navigatorTitle"
+        },
+        {
+          "value": "WKWebExtensionMessagePortError",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort~1Error~1Code/title"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebExtensionMessagePortError",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort~1Error~1Code/fragments"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebExtensionMessagePortError",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort~1Error~1Code/navigatorTitle"
+        },
+        {
+          "value": "WKWebExtensionMessagePortErrorDomain",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort~1errorDomain/title"
+        },
+        {
+          "value": [
+            {
+              "text": "WKWebExtensionMessagePortErrorDomain",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort~1errorDomain/fragments"
+        },
+        {
+          "value": "disconnected",
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort~1isDisconnected/title"
+        },
+        {
+          "value": [
+            {
+              "text": "disconnected",
+              "kind": "identifier"
+            }
+          ],
+          "op": "replace",
+          "path": "/references/doc:~1~1com.apple.webkit~1documentation~1WebKit~1WKWebExtension~1MessagePort~1isDisconnected/fragments"
+        }
+      ]
+    }
+  ],
+  "legalNotices": {
+    "copyright": "Copyright &copy; 2025 Apple Inc. All rights reserved.",
+    "termsOfUse": "https://www.apple.com/legal/internet-services/terms/site.html",
+    "privacyPolicy": "https://www.apple.com/privacy/privacy-policy"
+  }
+}
