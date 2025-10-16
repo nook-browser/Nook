@@ -1954,6 +1954,12 @@ extension Tab: WKNavigationDelegate {
                 hasPlayingAudio = false
                 // Note: isAudioMuted is preserved to maintain user's mute preference
                 print("🔄 [Tab] Swift reset audio tracking for navigation to: \(newURL.absoluteString)")
+
+                // TWEAKS INTEGRATION: Clear tweaks from previous page
+                Task {
+                    await TweakManager.shared.clearTweaksFromWebView(webView)
+                }
+
                 // Update URL but don't persist yet - wait for navigation to complete
                 self.url = newURL
             } else {
@@ -2006,6 +2012,13 @@ extension Tab: WKNavigationDelegate {
             
             // CHROME WEB STORE INTEGRATION: Inject script after navigation
             injectWebStoreScriptIfNeeded(for: newURL, in: webView)
+
+            // TWEAKS INTEGRATION: Apply tweaks for the loaded page
+            if let profileId = self.resolveProfile()?.id {
+                Task {
+                    await TweakManager.shared.applyTweaksForURL(newURL, in: webView, profileId: profileId)
+                }
+            }
         }
 
         // CRITICAL: Update navigation state after back/forward navigation

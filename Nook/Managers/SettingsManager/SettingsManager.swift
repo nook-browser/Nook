@@ -34,6 +34,8 @@ class SettingsManager {
     private let webSearchEngineKey = "settings.webSearchEngine"
     private let webSearchMaxResultsKey = "settings.webSearchMaxResults"
     private let webSearchContextSizeKey = "settings.webSearchContextSize"
+    private let enableTweaksKey = "settings.enableTweaks"
+    private let tweakSyncEnabledKey = "settings.tweakSyncEnabled"
     var currentSettingsTab: SettingsTabs = .general
 
     // Stored properties
@@ -180,6 +182,19 @@ class SettingsManager {
         }
     }
 
+    var enableTweaks: Bool {
+        didSet {
+            userDefaults.set(enableTweaks, forKey: enableTweaksKey)
+            NotificationCenter.default.post(name: .enableTweaksChanged, object: nil, userInfo: ["enabled": enableTweaks])
+        }
+    }
+
+    var tweakSyncEnabled: Bool {
+        didSet {
+            userDefaults.set(tweakSyncEnabled, forKey: tweakSyncEnabledKey)
+        }
+    }
+
     init() {
         // Register default values
         userDefaults.register(defaults: [
@@ -205,7 +220,9 @@ class SettingsManager {
             webSearchEnabledKey: false,
             webSearchEngineKey: "auto",
             webSearchMaxResultsKey: 5,
-            webSearchContextSizeKey: "medium"
+            webSearchContextSizeKey: "medium",
+            enableTweaksKey: true,
+            tweakSyncEnabledKey: false
         ])
 
         // Initialize properties from UserDefaults
@@ -242,6 +259,8 @@ class SettingsManager {
         self.webSearchEngine = userDefaults.string(forKey: webSearchEngineKey) ?? "auto"
         self.webSearchMaxResults = userDefaults.integer(forKey: webSearchMaxResultsKey)
         self.webSearchContextSize = userDefaults.string(forKey: webSearchContextSizeKey) ?? "medium"
+        self.enableTweaks = userDefaults.bool(forKey: enableTweaksKey)
+        self.tweakSyncEnabled = userDefaults.bool(forKey: tweakSyncEnabledKey)
     }
 }
 
@@ -334,5 +353,6 @@ public enum OpenRouterModel: String, CaseIterable, Identifiable {
 extension Notification.Name {
     static let tabUnloadTimeoutChanged = Notification.Name("tabUnloadTimeoutChanged")
     static let blockCrossSiteTrackingChanged = Notification.Name("blockCrossSiteTrackingChanged")
+    static let enableTweaksChanged = Notification.Name("enableTweaksChanged")
 }
 

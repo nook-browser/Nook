@@ -201,4 +201,210 @@ class BrowserConfiguration {
         
         return false
     }
+
+    // MARK: - Tweaks Integration
+
+    /// Create a configuration with tweak support integrated
+    func webViewConfigurationWithTweaks(for profile: Profile) -> WKWebViewConfiguration {
+        let config = webViewConfiguration(for: profile)
+
+        // Add tweak injection support
+        addTweakSupport(to: config)
+
+        return config
+    }
+
+    /// Add tweak support to an existing configuration
+    private func addTweakSupport(to config: WKWebViewConfiguration) {
+        // Add message handler for tweak communication
+        // Note: scriptMessageHandlerNames API not available in this WebKit version
+        // The handler will be added each time this method is called
+        config.userContentController.add(TweakMessageHandler(), name: "nookTweaks")
+
+        // Add base tweak injection script
+        let baseScript = createBaseTweakScript()
+        let baseUserScript = WKUserScript(
+            source: baseScript,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        )
+        config.userContentController.addUserScript(baseUserScript)
+    }
+
+    /// Create the base script that provides tweak functionality
+    private func createBaseTweakScript() -> String {
+        let securityPolicy = TweakSecurityValidator.shared.generateSecurityPolicy()
+
+        return """
+        // Nook Tweaks Base Script
+        (function() {
+            if (typeof window.nookTweakBase === 'undefined') {
+                window.nookTweakBase = {
+                    version: '1.0.0',
+                    debug: false,
+
+                    // Log debug messages
+                    log: function(message, data) {
+                        if (this.debug) {
+                            console.log('[Nook Tweaks]', message, data || '');
+                        }
+                    },
+
+                    // Safely execute JavaScript with error handling
+                    safeExecute: function(code, context) {
+                        try {
+                            if (typeof code === 'function') {
+                                return code.call(context || window);
+                            } else if (typeof code === 'string') {
+                                return eval(code);
+                            }
+                        } catch (error) {
+                            this.log('JavaScript execution error:', error);
+                            return null;
+                        }
+                    },
+
+                    // Safely manipulate DOM elements
+                    safeManipulate: function(selector, operation, value) {
+                        try {
+                            const elements = document.querySelectorAll(selector);
+                            elements.forEach(element => {
+                                switch (operation) {
+                                    case 'hide':
+                                        element.style.display = 'none';
+                                        break;
+                                    case 'show':
+                                        element.style.display = '';
+                                        break;
+                                    case 'addClass':
+                                        element.classList.add(value);
+                                        break;
+                                    case 'removeClass':
+                                        element.classList.remove(value);
+                                        break;
+                                    case 'setAttribute':
+                                        element.setAttribute(value.name, value.value);
+                                        break;
+                                    case 'removeAttribute':
+                                        element.removeAttribute(value);
+                                        break;
+                                }
+                            });
+                            return elements.length;
+                        } catch (error) {
+                            this.log('DOM manipulation error:', error);
+                            return 0;
+                        }
+                    },
+
+                    // Create a sandboxed execution context
+                    createSandbox: function() {
+                        const sandbox = {
+                            console: {
+                                log: (...args) => this.log('[User Script]', args),
+                                error: (...args) => this.log('[User Script Error]', args),
+                                warn: (...args) => this.log('[User Script Warning]', args)
+                            },
+
+                            // Safe DOM manipulation
+                            hide: (selector) => this.safeManipulate(selector, 'hide'),
+                            show: (selector) => this.safeManipulate(selector, 'show'),
+
+                            // Limited CSS manipulation
+                            addCSS: (css) => {
+                                try {
+                                    const style = document.createElement('style');
+                                    style.textContent = css;
+                                    style.setAttribute('data-nook-tweak', 'user-css');
+                                    document.head.appendChild(style);
+                                    return true;
+                                } catch (error) {
+                                    this.log('CSS injection error:', error);
+                                    return false;
+                                }
+                            },
+
+                            // Safe event handling
+                            addEventListener: (selector, event, handler) => {
+                                try {
+                                    const elements = document.querySelectorAll(selector);
+                                    elements.forEach(element => {
+                                        element.addEventListener(event, (e) => {
+                                            try {
+                                                handler.call(sandbox, e);
+                                            } catch (error) {
+                                                this.log('Event handler error:', error);
+                                            }
+                                        });
+                                    });
+                                    return elements.length;
+                                } catch (error) {
+                                    this.log('Event listener error:', error);
+                                    return 0;
+                                }
+                            }
+                        };
+
+                        return sandbox;
+                    },
+
+                    // Clean up all tweak modifications
+                    cleanup: function() {
+                        // Remove tweak styles
+                        const tweakStyles = document.querySelectorAll('style[data-nook-tweak]');
+                        tweakStyles.forEach(style => style.remove());
+
+                        // Remove tweak attributes
+                        const tweakElements = document.querySelectorAll('[data-nook-tweak-modified]');
+                        tweakElements.forEach(element => {
+                            element.removeAttribute('data-nook-tweak-modified');
+                        });
+
+                        this.log('Cleanup completed');
+                    }
+                };
+
+                // Load security policy first
+                \(securityPolicy)
+
+                // Make available globally for user scripts
+                window.nookTweaksSandbox = window.nookTweakBase.createSandbox();
+
+                // Log initialization
+                window.nookTweakBase.log('Nook Tweaks base script initialized with security policy');
+            }
+        })();
+        """
+    }
+}
+
+// MARK: - Tweak Message Handler
+class TweakMessageHandler: NSObject, WKScriptMessageHandler {
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard let body = message.body as? [String: Any] else { return }
+
+        let action = body["action"] as? String ?? ""
+        let data = body["data"]
+
+        switch action {
+        case "log":
+            if let message = data as? String {
+                print("🎨 [Tweak WebView] \(message)")
+            }
+
+        case "error":
+            if let error = data as? String {
+                print("🎨 [Tweak WebView Error] \(error)")
+            }
+
+        case "debug":
+            // Enable/disable debug mode
+            if let enabled = data as? Bool {
+                UserDefaults.standard.set(enabled, forKey: "nook.tweaks.debug")
+            }
+
+        default:
+            print("🎨 [Tweak WebView] Unknown action: \(action)")
+        }
+    }
 }
