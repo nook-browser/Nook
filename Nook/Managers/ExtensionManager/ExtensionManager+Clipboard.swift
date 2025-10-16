@@ -29,10 +29,11 @@ extension ExtensionManager {
             
             // Only inject if clipboard API doesn't already exist or is incomplete
             if (!navigator.clipboard || !navigator.clipboard.writeText || !navigator.clipboard.readText) {
-                console.log('[Clipboard API] Installing polyfill');
-                
                 // Callback storage for async operations
                 window.chromeClipboardCallbacks = window.chromeClipboardCallbacks || {};
+                
+                // Timeout configuration (5 seconds)
+                const CLIPBOARD_TIMEOUT_MS = 5000;
                 
                 // Create clipboard API object
                 const clipboardAPI = {
@@ -40,10 +41,25 @@ extension ExtensionManager {
                         return new Promise(function(resolve, reject) {
                             const timestamp = Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9);
                             
-                            // Store callbacks
+                            // Setup timeout handler
+                            const timeoutId = setTimeout(function() {
+                                if (window.chromeClipboardCallbacks[timestamp]) {
+                                    delete window.chromeClipboardCallbacks[timestamp];
+                                    reject(new DOMException('Clipboard operation timed out', 'TimeoutError'));
+                                }
+                            }, CLIPBOARD_TIMEOUT_MS);
+                            
+                            // Store callbacks and timeout ID
                             window.chromeClipboardCallbacks[timestamp] = {
-                                resolve: resolve,
-                                reject: reject
+                                resolve: function(result) {
+                                    clearTimeout(timeoutId);
+                                    resolve(result);
+                                },
+                                reject: function(error) {
+                                    clearTimeout(timeoutId);
+                                    reject(error);
+                                },
+                                timeoutId: timeoutId
                             };
                             
                             // Send message to native handler
@@ -59,10 +75,25 @@ extension ExtensionManager {
                         return new Promise(function(resolve, reject) {
                             const timestamp = Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9);
                             
-                            // Store callbacks
+                            // Setup timeout handler
+                            const timeoutId = setTimeout(function() {
+                                if (window.chromeClipboardCallbacks[timestamp]) {
+                                    delete window.chromeClipboardCallbacks[timestamp];
+                                    reject(new DOMException('Clipboard operation timed out', 'TimeoutError'));
+                                }
+                            }, CLIPBOARD_TIMEOUT_MS);
+                            
+                            // Store callbacks and timeout ID
                             window.chromeClipboardCallbacks[timestamp] = {
-                                resolve: resolve,
-                                reject: reject
+                                resolve: function(result) {
+                                    clearTimeout(timeoutId);
+                                    resolve(result);
+                                },
+                                reject: function(error) {
+                                    clearTimeout(timeoutId);
+                                    reject(error);
+                                },
+                                timeoutId: timeoutId
                             };
                             
                             // Send message to native handler
@@ -86,8 +117,6 @@ extension ExtensionManager {
                     navigator.clipboard.writeText = clipboardAPI.writeText;
                     navigator.clipboard.readText = clipboardAPI.readText;
                 }
-                
-                console.log('[Clipboard API] Polyfill installed successfully');
             }
         })();
         """
@@ -99,8 +128,6 @@ extension ExtensionManager {
             forMainFrameOnly: false // Apply to all frames including iframes
         )
         controller.addUserScript(userScript)
-        
-        print("✅ [Clipboard] navigator.clipboard polyfill configured")
     }
     
     // MARK: - Message Handler
@@ -114,8 +141,6 @@ extension ExtensionManager {
             print("❌ [Clipboard] Invalid message format")
             return
         }
-        
-        print("📋 [Clipboard] Received request: \\(messageType) [\\(timestamp)]")
         
         switch messageType {
         case "writeText":
@@ -147,7 +172,6 @@ extension ExtensionManager {
             let success = pasteboard.setString(text, forType: .string)
             
             if success {
-                print("✅ [Clipboard] Successfully wrote \\(text.count) characters to clipboard")
                 self?.sendClipboardSuccessResponse(to: message, timestamp: timestamp, data: nil)
             } else {
                 print("❌ [Clipboard] Failed to write to clipboard")
@@ -164,13 +188,11 @@ extension ExtensionManager {
             let pasteboard = NSPasteboard.general
             
             guard let text = pasteboard.string(forType: .string) else {
-                print("⚠️ [Clipboard] No text content in clipboard")
                 // Return empty string (not an error - clipboard might just be empty)
                 self?.sendClipboardSuccessResponse(to: message, timestamp: timestamp, data: "")
                 return
             }
             
-            print("✅ [Clipboard] Successfully read \\(text.count) characters from clipboard")
             self?.sendClipboardSuccessResponse(to: message, timestamp: timestamp, data: text)
         }
     }
@@ -230,8 +252,6 @@ extension ExtensionManager {
         webView.evaluateJavaScript(responseScript) { _, error in
             if let error = error {
                 print("❌ [Clipboard] Error injecting response script: \\(error)")
-            } else {
-                print("✅ [Clipboard] Response sent successfully [\\(timestamp)]")
             }
         }
     }
@@ -254,10 +274,7 @@ extension ExtensionManager {
         webView.evaluateJavaScript(responseScript) { _, error in
             if let error = error {
                 print("❌ [Clipboard] Error injecting error response script: \\(error)")
-            } else {
-                print("✅ [Clipboard] Error response sent successfully [\\(timestamp)]")
             }
         }
     }
 }
-
