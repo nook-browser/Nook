@@ -11,49 +11,96 @@ import AppKit
 @MainActor
 struct WebStoreDownloader {
     
-    /// Download extension from Chrome Web Store
+    static let fallbackChromeVersion = "141.0.7390.78" // (almost) the latest version as of rn; 15 oct 2025
+    
     static func downloadExtension(extensionId: String, completionHandler: @escaping (Result<URL, Error>) -> Void) {
-        // Simulate Chrome version for API compatibility
-        let chromeVersion = "120.0.6099.129"
-        let naclArch = getNaclArch()
-        
-        // Build Chrome Web Store API URL
-        let urlString = "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=\(chromeVersion)&x=id%3D\(extensionId)%26installsource%3Dondemand%26uc&nacl_arch=\(naclArch)&acceptformat=crx2,crx3"
+        // fetch the latest chrome (mac, stable) version!!
+        fetchLatestChromeVersion { result in
+            Task { @MainActor in
+                let chromeVersion: String
+                switch result {
+                case .success(let version):
+                    chromeVersion = version
+                case .failure:
+                    chromeVersion = Self.fallbackChromeVersion
+                }
+                
+                let naclArch = getNaclArch()
+                
+                let urlString = "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=\(chromeVersion)&x=id%3D\(extensionId)%26installsource%3Dondemand%26uc&nacl_arch=\(naclArch)&acceptformat=crx2,crx3"
+                
+                guard let url = URL(string: urlString) else {
+                    completionHandler(.failure(WebStoreError.invalidURL))
+                    return
+                }
+                
+                // download CRX file
+                let task = URLSession.shared.dataTask(with: url) { data, response, error in
+                    Task { @MainActor in
+                        if let error = error {
+                            completionHandler(.failure(error))
+                            return
+                        }
+                        
+                        guard let data = data else {
+                            completionHandler(.failure(WebStoreError.noData))
+                            return
+                        }
+                        
+                        // convert CRX to ZIP
+                        guard let zipData = convertCRXtoZIP(data) else {
+                            completionHandler(.failure(WebStoreError.conversionFailed))
+                            return
+                        }
+                        
+                        // temporary save
+                        let tempDir = FileManager.default.temporaryDirectory
+                        let tempFile = tempDir.appendingPathComponent("\(extensionId).zip")
+                        
+                        do {
+                            try zipData.write(to: tempFile)
+                            completionHandler(.success(tempFile))
+                        } catch {
+                            completionHandler(.failure(error))
+                        }
+                    }
+                }
+                
+                task.resume()
+            }
+        }
+    }
+    
+    private static func fetchLatestChromeVersion(completionHandler: @escaping (Result<String, Error>) -> Void) {
+        let urlString = "https://versionhistory.googleapis.com/v1/chrome/platforms/mac/channels/stable/versions"
         
         guard let url = URL(string: urlString) else {
             completionHandler(.failure(WebStoreError.invalidURL))
             return
         }
         
-        // Download CRX file
         let task = URLSession.shared.dataTask(with: url) { data, response, error in
-            Task { @MainActor in
-                if let error = error {
-                    completionHandler(.failure(error))
-                    return
-                }
+            if let error = error {
+                completionHandler(.failure(error))
+                return
+            }
+            
+            guard let data = data else {
+                completionHandler(.failure(WebStoreError.noData))
+                return
+            }
+            
+            do {
+                let decoder = JSONDecoder()
+                let response = try decoder.decode(ChromeVersionResponse.self, from: data)
                 
-                guard let data = data else {
+                if let latestVersion = response.versions.first?.version {
+                    completionHandler(.success(latestVersion))
+                } else {
                     completionHandler(.failure(WebStoreError.noData))
-                    return
                 }
-                
-                // Convert CRX to ZIP by stripping header
-                guard let zipData = convertCRXtoZIP(data) else {
-                    completionHandler(.failure(WebStoreError.conversionFailed))
-                    return
-                }
-                
-                // Save to temporary file
-                let tempDir = FileManager.default.temporaryDirectory
-                let tempFile = tempDir.appendingPathComponent("\(extensionId).zip")
-                
-                do {
-                    try zipData.write(to: tempFile)
-                    completionHandler(.success(tempFile))
-                } catch {
-                    completionHandler(.failure(error))
-                }
+            } catch {
+                completionHandler(.failure(error))
             }
         }
         
@@ -125,5 +172,16 @@ enum WebStoreError: LocalizedError {
             return "Invalid CRX file format"
         }
     }
+}
+
+// MARK: - Chrome Version API Response Models
+
+struct ChromeVersionResponse: Codable {
+    let versions: [ChromeVersion]
+}
+
+struct ChromeVersion: Codable {
+    let name: String
+    let version: String
 }
 
