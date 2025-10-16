@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head><title>Generate Icon</title></head>
+<body>
+<canvas id="c" width="128" height="128"></canvas>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+// Background
+ctx.fillStyle = '#007AFF';
+ctx.roundRect(0, 0, 128, 128, 24);
+ctx.fill();
+
+// Emoji
+ctx.font = '72px Arial';
+ctx.textAlign = 'center';
+ctx.textBaseline = 'middle';
+ctx.fillText('📋', 64, 64);
+
+// Convert to PNG and download
+canvas.toBlob(blob => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'icon.png';
+  a.click();
+});
+</script>
+</body>
+</html>

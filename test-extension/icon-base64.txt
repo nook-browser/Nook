@@ -1,0 +1,8 @@
+This extension needs an icon.png file.
+
+For now, you can:
+1. Use any 128x128 PNG image and name it icon.png
+2. Or open create-icon.html in a browser to generate one
+3. Or use ImageMagick: convert -size 128x128 xc:#007AFF -pointsize 72 -fill white -gravity center -annotate +0+0 "📋" icon.png
+
+The extension will work without an icon, it just won't have a visual icon in the toolbar.
