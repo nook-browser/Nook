@@ -3,8 +3,7 @@
 //  Nook
 //
 //  Chrome Runtime API Bridge for WKWebExtension support
-//  Implements chrome.runtime.* APIs for Bitwarden compatibility
-//
+//  Implements chrome.runtime.* APIs
 
 import Foundation
 import WebKit

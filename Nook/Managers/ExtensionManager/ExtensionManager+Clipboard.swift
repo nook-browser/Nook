@@ -5,7 +5,6 @@
 //  Implements navigator.clipboard API for browser extensions.
 //  Provides clipboard read/write functionality for password managers like Bitwarden.
 //
-//  Bitwarden Usage Pattern (from browser-clipboard.service.ts):
 //  - Uses navigator.clipboard.writeText(text) for copying passwords/TOTP
 //  - Uses navigator.clipboard.readText() for reading clipboard content
 //  - Has fallback to document.execCommand('copy'/'paste') if modern API unavailable

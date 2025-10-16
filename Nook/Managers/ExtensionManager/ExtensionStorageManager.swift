@@ -126,8 +126,6 @@ class ExtensionStorageManager: ObservableObject {
 
                 print("🔧 [ExtensionStorageManager] Found \(allData.count) extension storage items")
 
-                // CRITICAL FIX: Always return at least an empty object for Bitwarden
-                // Bitwarden expects some storage data even if empty
                 if allData.isEmpty {
                     print("⚠️ [ExtensionStorageManager] No extension storage found, returning empty object")
                     return [:]
@@ -151,7 +149,6 @@ class ExtensionStorageManager: ObservableObject {
                     }
                 } else {
                     print("⚠️ [ExtensionStorageManager] Key not found: \(key)")
-                    // For Bitwarden migration keys, provide a default to prevent hanging
                     if key.contains("migrations") || key.contains("migration") {
                         result[key] = ["completed": Date().timeIntervalSince1970]
                     }

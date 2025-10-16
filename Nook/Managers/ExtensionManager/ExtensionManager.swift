@@ -2235,7 +2235,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                 }
 
                 // CRITICAL FIX: Inject Chrome APIs early for popup Angular bootstrap
-                // This ensures chrome.* APIs are available before Bitwarden's Angular app starts
+                // This ensures chrome.* APIs are available
                 let hasChromeAPIInjection = existingScripts.contains { $0.source.contains("CHROME API INJECTION") }
                 if !hasChromeAPIInjection {
                     // Get the extension ID for Chrome API injection
