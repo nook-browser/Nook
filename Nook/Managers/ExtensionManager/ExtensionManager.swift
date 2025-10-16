@@ -612,6 +612,10 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         let storageScript = generateStorageAPIScript(extensionId: extensionId)
         let tabsScript = generateTabsAPIScript(extensionId: extensionId)
         let scriptingScript = generateScriptingAPIScript(extensionId: extensionId)
+        let actionScript = generateActionAPIScript(extensionId: extensionId)
+        let contextMenusScript = generateContextMenusAPIScript(extensionId: extensionId)
+        let notificationsScript = generateNotificationsAPIScript(extensionId: extensionId)
+        let commandsScript = generateCommandsAPIScript(extensionId: extensionId)
 
         // Combine all API scripts
         let completeChromeAPIScript = """
@@ -626,7 +630,15 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
 
         \(scriptingScript)
 
+        \(actionScript)
+
+        \(contextMenusScript)
+
+
+        \(notificationsScript)
         console.log('[Chrome API Bridge] All Chrome APIs injected into existing tab');
+
+        \(commandsScript)
         """
 
         // Create and inject the user script
@@ -2892,7 +2904,26 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                 let scriptingUserScript = WKUserScript(source: scriptingAPIScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
                 webView.configuration.userContentController.addUserScript(scriptingUserScript)
 
+                // Inject Chrome Action API
+                let actionAPIScript = generateActionAPIScript(extensionId: extensionId)
+                let actionUserScript = WKUserScript(source: actionAPIScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
+                webView.configuration.userContentController.addUserScript(actionUserScript)
+
+                // Inject Chrome ContextMenus API
+                let contextMenusAPIScript = generateContextMenusAPIScript(extensionId: extensionId)
+                let contextMenusUserScript = WKUserScript(source: contextMenusAPIScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
+                webView.configuration.userContentController.addUserScript(contextMenusUserScript)
+                let notificationsAPIScript = generateNotificationsAPIScript(extensionId: extensionId)
+                let notificationsUserScript = WKUserScript(source: notificationsAPIScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
+                webView.configuration.userContentController.addUserScript(notificationsUserScript)
+                let commandsAPIScript = generateCommandsAPIScript(extensionId: extensionId)
+                let commandsUserScript = WKUserScript(source: commandsAPIScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
+                webView.configuration.userContentController.addUserScript(commandsUserScript)
+
                 print("   ✅ Chrome API bridge scripts injected for extension: \(extensionId)")
+
+                // Register keyboard shortcuts for commands
+                registerCommandsForExtension(extensionId)
             }
 
 
@@ -3700,9 +3731,19 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
 
         controller.removeScriptMessageHandler(forName: "chromeTabsResponse")
         controller.add(self, name: "chromeTabsResponse")
+        
+        controller.removeScriptMessageHandler(forName: "chromeAction")
+        controller.add(self, name: "chromeAction")
+
+        controller.removeScriptMessageHandler(forName: "chromeContextMenus")
+        controller.add(self, name: "chromeContextMenus")
+        controller.removeScriptMessageHandler(forName: "chromeNotifications")
+        controller.add(self, name: "chromeNotifications")
+        controller.removeScriptMessageHandler(forName: "chromeCommands")
+        controller.add(self, name: "chromeCommands")
 
         print("   ✅ Enhanced Action API: closePopup handler installed")
-        print("   ✅ Chrome API bridge handlers installed: runtime, tabs, storage, scripting")
+        print("   ✅ Chrome API bridge handlers installed: runtime, tabs, storage, scripting, action, contextMenus, notifications, commands")
     }
 
     // MARK: - WKScriptMessageHandler (popup bridge)
@@ -3738,6 +3779,16 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             handleStorageScriptMessage(message)
         case "chromeScripting":
             handleScriptingScriptMessage(message)
+        case "chromeAction":
+            handleActionScriptMessage(message)
+        case "chromeContextMenus":
+            handleContextMenusScriptMessage(message)
+        case "chromeNotifications":
+            handleNotificationsScriptMessage(message)
+        case "chromeCommands":
+            handleCommandsScriptMessage(message)
+        case "chromeAlarms":
+            handleAlarmsScriptMessage(message)
         case "chromeTabsResponse":
             // Handle tab message responses
             if let messageBody = message.body as? [String: Any],
@@ -5102,4 +5153,36 @@ final class WeakAnchor {
 // MARK: - Extension Notifications
 extension Notification.Name {
     static let extensionActionUpdated = Notification.Name("extensionActionUpdated")
+}
+
+// MARK: - Alarms Script Message Handler
+@available(macOS 15.4, *)
+extension ExtensionManager {
+    func handleAlarmsScriptMessage(_ message: WKScriptMessage) {
+        guard let messageBody = message.body as? [String: Any],
+              let api = messageBody["api"] as? String,
+              api == "alarms" else {
+            print("❌ [ExtensionManager] Invalid alarms message format")
+            return
+        }
+        
+        print("🔔 [ExtensionManager] Handling alarms script message")
+        
+        // Find the extension context for this message
+        // This is a simplified approach - you may need to track which webview belongs to which context
+        guard let context = extensionContexts.values.first else {
+            print("❌ [ExtensionManager] No extension context found for alarms message")
+            return
+        }
+        
+        handleAlarmsMessage(message: messageBody, from: context) { response in
+            // Send response back to the script
+            if let responseDict = response as? [String: Any],
+               let jsonData = try? JSONSerialization.data(withJSONObject: responseDict),
+               let jsonString = String(data: jsonData, encoding: .utf8) {
+                let script = "window.postMessage({ type: 'alarmsResponse', data: \(jsonString) }, '*');"
+                message.webView?.evaluateJavaScript(script, completionHandler: nil)
+            }
+        }
+    }
 }

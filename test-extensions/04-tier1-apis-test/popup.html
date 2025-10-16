@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Tier 1 APIs Test</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 400px;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    h1 {
+      font-size: 20px;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    .subtitle {
+      text-align: center;
+      opacity: 0.9;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+
+    .section {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 15px;
+      backdrop-filter: blur(10px);
+    }
+
+    .section h2 {
+      font-size: 16px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section p {
+      font-size: 13px;
+      opacity: 0.9;
+      margin-bottom: 10px;
+      line-height: 1.4;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      margin: 5px 0;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: white;
+      color: #667eea;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    .status {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.2);
+      font-size: 12px;
+      text-align: center;
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .kbd {
+      display: inline-block;
+      padding: 2px 6px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 11px;
+      margin: 0 2px;
+    }
+
+    .commands-list {
+      font-size: 12px;
+      margin-top: 10px;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 6px;
+    }
+
+    .commands-list div {
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .commands-list div:last-child {
+      border-bottom: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>🚀 Tier 1 APIs Test</h1>
+  <div class="subtitle">Action • Context Menus • Notifications • Commands</div>
+
+  <!-- chrome.action tests -->
+  <div class="section">
+    <h2>🎯 chrome.action</h2>
+    <p>Test toolbar icon and badge features</p>
+    <button id="updateBadge">Update Badge</button>
+    <button id="changeTitle">Change Title</button>
+    <button id="changeIcon">Change Icon Color</button>
+  </div>
+
+  <!-- chrome.contextMenus tests -->
+  <div class="section">
+    <h2>📋 chrome.contextMenus</h2>
+    <p>Right-click anywhere on any page to see the test context menus</p>
+    <button id="updateMenu">Update Menu Items</button>
+  </div>
+
+  <!-- chrome.notifications tests -->
+  <div class="section">
+    <h2>🔔 chrome.notifications</h2>
+    <p>Test native system notifications</p>
+    <button id="basicNotif">Show Basic</button>
+    <button id="buttonNotif">Show with Buttons</button>
+    <button id="clearNotif">Clear All</button>
+  </div>
+
+  <!-- chrome.commands tests -->
+  <div class="section">
+    <h2>⌨️ chrome.commands</h2>
+    <p>Test keyboard shortcuts</p>
+    <button id="listCommands">List All Shortcuts</button>
+    <div class="commands-list" id="commandsList" style="display: none;"></div>
+    <p style="margin-top: 10px; font-size: 11px; opacity: 0.8;">
+      Try: <span class="kbd">Ctrl+Shift+Y</span> or <span class="kbd">Ctrl+Shift+N</span>
+    </p>
+  </div>
+
+  <div class="status" id="status">Ready! Click any button to test.</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
+

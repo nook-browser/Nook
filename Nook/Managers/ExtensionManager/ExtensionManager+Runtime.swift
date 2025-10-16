@@ -598,7 +598,12 @@ extension ExtensionManager {
                     markAPIReady('scripting');
                 } else {
                     markAPIReady('scripting');
+
                 }
+
+                // chrome.alarms API - Force override native implementation
+                \(generateAlarmsAPIScript(extensionId: extensionId))
+                markAPIReady('alarms');
 
                 // Context-specific initialization
                 \(contextSpecificCode)

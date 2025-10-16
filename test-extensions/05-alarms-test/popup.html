@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Alarms API Test</title>
+  <style>
+    body {
+      width: 400px;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    h1 {
+      font-size: 18px;
+      margin: 0 0 15px 0;
+    }
+    .section {
+      margin-bottom: 20px;
+      padding: 15px;
+      background: #f5f5f5;
+      border-radius: 8px;
+    }
+    button {
+      padding: 8px 16px;
+      margin: 5px 5px 5px 0;
+      border: none;
+      border-radius: 4px;
+      background: #007AFF;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #0051D5;
+    }
+    button.danger {
+      background: #FF3B30;
+    }
+    button.danger:hover {
+      background: #D70015;
+    }
+    #alarmsList {
+      margin-top: 10px;
+      padding: 10px;
+      background: white;
+      border-radius: 4px;
+      min-height: 100px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .alarm-item {
+      padding: 8px;
+      margin: 5px 0;
+      background: #e8f4f8;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    .alarm-name {
+      font-weight: bold;
+      color: #007AFF;
+    }
+    .alarm-time {
+      color: #666;
+      font-size: 11px;
+    }
+    .status {
+      margin-top: 10px;
+      padding: 10px;
+      background: #e8f5e9;
+      border-radius: 4px;
+      font-size: 13px;
+      color: #2e7d32;
+    }
+    .error {
+      background: #ffebee;
+      color: #c62828;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔔 Alarms API Test</h1>
+  
+  <div class="section">
+    <h3>Create Alarms</h3>
+    <button id="create5s">Create 5s Alarm</button>
+    <button id="create30s">Create 30s Alarm</button>
+    <button id="createRepeating">Create Repeating (1min)</button>
+  </div>
+  
+  <div class="section">
+    <h3>Manage Alarms</h3>
+    <button id="listAlarms">List All Alarms</button>
+    <button id="clearAll" class="danger">Clear All Alarms</button>
+  </div>
+  
+  <div class="section">
+    <h3>Active Alarms</h3>
+    <div id="alarmsList">Click "List All Alarms" to view active alarms</div>
+  </div>
+  
+  <div id="status"></div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
+

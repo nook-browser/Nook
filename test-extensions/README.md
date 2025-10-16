@@ -57,30 +57,28 @@ Will test `chrome.tabs.*` APIs.
 
 ---
 
-### 4. Scripting API Test (`04-scripting-test/`) - Coming Soon
-Will test `chrome.scripting.*` APIs.
+### 4. Tier 1 APIs Test (`04-tier1-apis-test/`)
+Comprehensive test for all Tier 1 Chrome Extension APIs.
 
-**Will cover:**
-- executeScript() with different targets
-- insertCSS() / removeCSS()
-- Script injection worlds (MAIN, ISOLATED)
-- Frame targeting
-- Dynamic content scripts
+**Covers:**
+- **chrome.action**: Toolbar icon, badge, popup, click events
+- **chrome.contextMenus**: Parent/submenu items, separators, click handlers
+- **chrome.notifications**: Basic/button notifications, events (click, close)
+- **chrome.commands**: Keyboard shortcuts, getAll(), onCommand events
 
-**Status:** 📋 Planned
+**Keyboard Shortcuts:**
+- `Ctrl+Shift+Y` - Test command (shows notification)
+- `Ctrl+Shift+N` - Advanced notification with buttons
+- `Ctrl+Shift+U` - Execute action (open popup)
 
----
+**Features:**
+- Interactive popup with test controls
+- Background service worker with all APIs
+- Right-click context menus
+- Native system notifications
+- Full event handling for all APIs
 
-### 5. Commands API Test (`05-commands-test/`) - Coming Soon
-Will test keyboard shortcuts via `chrome.commands.*`.
-
-**Will cover:**
-- Keyboard shortcut registration
-- Command execution
-- Platform-specific shortcuts
-- Global vs page shortcuts
-
-**Status:** 📋 Planned
+**Status:** ✅ Complete
 
 ---
 
@@ -254,4 +252,3 @@ To add new test extensions:
 | Notifications| TBD | 📋 Future | 0% |
 
 **Last Updated:** October 15, 2025
-
