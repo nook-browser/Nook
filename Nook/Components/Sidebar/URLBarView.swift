@@ -11,7 +11,7 @@ struct URLBarView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var windowState: BrowserWindowState
     @State private var isHovering: Bool = false
-
+  
     var body: some View {
         ZStack {
             HStack(spacing: 8) {
@@ -46,6 +46,21 @@ struct URLBarView: View {
                         }
                         .buttonStyle(.plain)
                         .help(currentTab.hasPiPActive ? "Exit Picture in Picture" : "Enter Picture in Picture")
+                    }
+
+                    // Tweak Panel button
+                    if browserManager.currentTab(for: windowState) != nil {
+                        Button(action: {
+                            browserManager.toggleTweakPanel()
+                        }) {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(textColor)
+                                .frame(width: 20, height: 20)
+                                .contentShape(RoundedRectangle(cornerRadius: 4))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Tweak Panel")
                     }
                     
                     // Extension action buttons
@@ -82,8 +97,8 @@ struct URLBarView: View {
         .onTapGesture {
             browserManager.focusURLBar()
         }
-        
-    }
+
+      }
     
     private var backgroundColor: Color {
         if isHovering {

@@ -176,6 +176,8 @@ struct WindowView: View {
                     }
                     Spacer()
                 }
+
+    
             }
             // Named coordinate space for geometry preferences
             .coordinateSpace(name: "WindowSpace")

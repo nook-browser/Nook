@@ -13,7 +13,7 @@ struct TopBarView: View {
     @StateObject private var tabWrapper = ObservableTabWrapper()
     @State private var isHovering: Bool = false
     @State private var showZoomPopup: Bool = false
-    
+        
     var body: some View {
         HStack(spacing: 8) {
             // Far left: Mac traffic light buttons
@@ -138,6 +138,26 @@ struct TopBarView: View {
                             }
                         }
                     }
+
+                    // Tweak Panel button
+                    if browserManager.currentTab(for: windowState) != nil {
+                        Button(action: {
+                            browserManager.toggleTweakPanel()
+                        }) {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(textColor)
+                                .frame(width: 20, height: 20)
+                                .contentShape(RoundedRectangle(cornerRadius: 4))
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .help("Tweak Panel")
+                        .onHover { hovering in
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                isHovering = hovering
+                            }
+                        }
+                    }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -176,8 +196,8 @@ struct TopBarView: View {
             updateCurrentTab()
         }
         .overlay(
-            // Zoom popup overlay for button click (shows when showZoomPopup is true)
-            Group {
+            VStack {
+                // Zoom popup overlay for button click (shows when showZoomPopup is true)
                 if showZoomPopup {
                     ZoomPopupView(
                         zoomManager: browserManager.zoomManager,
@@ -203,7 +223,8 @@ struct TopBarView: View {
                     .transition(.opacity.combined(with: .scale))
                     .zIndex(1000)
                 }
-            }
+
+              }
             .animation(.easeInOut(duration: 0.2), value: showZoomPopup)
         )
     }

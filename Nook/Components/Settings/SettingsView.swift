@@ -74,18 +74,6 @@ struct SettingsView: View {
             }
 
             SettingsPane {
-                TweaksSettingsView()
-                    .environmentObject(browserManager)
-            }
-            .tabItem {
-                Label(
-                    SettingsTabs.tweaks.name,
-                    systemImage: SettingsTabs.tweaks.icon
-                )
-            }
-            .tag(SettingsTabs.tweaks)
-
-            SettingsPane {
                 AdvancedSettingsView()
             }
             .tabItem {
@@ -1436,40 +1424,7 @@ struct AdvancedSettingsView: View {
                 }
             }
 
-            SettingsSectionCard(
-                title: "Tweaks",
-                subtitle: "Website customization settings"
-            ) {
-                Toggle(
-                    isOn: $browserManager.settingsManager.enableTweaks
-                ) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Enable Tweaks")
-                        Text(
-                            "Allow website customization through color adjustments, font changes, and CSS injections"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-                }
-
-                Divider().opacity(0.4)
-
-                Toggle(
-                    isOn: $browserManager.settingsManager.tweakSyncEnabled
-                ) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Sync Tweaks Across Devices")
-                        Text(
-                            "Sync your website customizations when sync is available"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-                }
-                .disabled(!browserManager.settingsManager.enableTweaks)
-            }
-
+  
             #if DEBUG
             SettingsSectionCard(
                 title: "Debug Options",

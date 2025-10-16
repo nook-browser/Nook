@@ -324,6 +324,8 @@ class BrowserManager: ObservableObject {
     @Published var urlBarFrame: CGRect = .zero
     @Published var shouldShowZoomPopup: Bool = false
     private var zoomPopupHideTimer: Timer?
+    // Tweak Panel management
+    private var tweakPanelController: TweakPanelWindowController?
     @Published var currentProfile: Profile?
     // Indicates an in-progress animated profile transition for coordinating UI
     @Published var isTransitioningProfile: Bool = false
@@ -583,6 +585,9 @@ class BrowserManager: ObservableObject {
                 self?.trackingProtectionManager.setEnabled(enabled)
             }
         }
+
+        // Initialize Tweak Panel controller
+        self.tweakPanelController = TweakPanelWindowController(browserManager: self)
     }
 
     private func bindTabManagerUpdates() {
@@ -1150,6 +1155,24 @@ class BrowserManager: ObservableObject {
                 }
             )
         }
+    }
+
+    // MARK: - Tweak Panel Management
+
+    func showTweakPanel() {
+        tweakPanelController?.showTweakPanel()
+    }
+
+    func hideTweakPanel() {
+        tweakPanelController?.hideTweakPanel()
+    }
+
+    func toggleTweakPanel() {
+        tweakPanelController?.toggleTweakPanel()
+    }
+
+    func isTweakPanelVisible() -> Bool {
+        return tweakPanelController?.isPanelVisible() ?? false
     }
 
     func closeDialog() {
