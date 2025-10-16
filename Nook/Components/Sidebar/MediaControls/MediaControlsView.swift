@@ -16,11 +16,8 @@ struct MediaControlsView: View {
     @State private var isHovering: Bool = false
     @State private var overrideIsPlaying: Bool? = nil
     @State private var overrideIsMuted: Bool? = nil
-
-    // Create manager directly from environment
-    private var mediaControlsManager: MediaControlsManager {
-        MediaControlsManager(browserManager: browserManager, windowState: windowState)
-    }
+    @State private var mediaControlsManager: MediaControlsManager?
+    @State private var updateTask: Task<Void, Never>?
 
     // Check if media is currently playing (derived from Tab state)
     private var isPlaying: Bool {
@@ -38,8 +35,6 @@ struct MediaControlsView: View {
     }
 
     var body: some View {
-        let _ = print("[MediaControlsView] body rendered - hasActiveMedia: \(hasActiveMedia)")
-
         Group {
             if hasActiveMedia, let tab = activeMediaTab {
                 VStack(spacing: 8) {
@@ -66,7 +61,8 @@ struct MediaControlsView: View {
                         // Previous button
                         Button("Previous", systemImage: "backward.fill") {
                             Task {
-                                await mediaControlsManager.previous(tab: tab)
+                                guard let manager = mediaControlsManager else { return }
+                                await manager.previous(tab: tab)
                                 await MainActor.run {
                                     updateMediaState()
                                 }
@@ -82,7 +78,8 @@ struct MediaControlsView: View {
                         // Play/Pause button
                         Button(isPlaying ? "Pause" : "Play", systemImage: isPlaying ? "pause.fill" : "play.fill") {
                             Task {
-                                let newState = await mediaControlsManager.playPause(tab: tab)
+                                guard let manager = mediaControlsManager else { return }
+                                let newState = await manager.playPause(tab: tab)
                                 await MainActor.run {
                                     if let newState {
                                         overrideIsPlaying = newState
@@ -101,7 +98,8 @@ struct MediaControlsView: View {
                         // Next button
                         Button("Next", systemImage: "forward.fill") {
                             Task {
-                                await mediaControlsManager.next(tab: tab)
+                                guard let manager = mediaControlsManager else { return }
+                                await manager.next(tab: tab)
                                 await MainActor.run {
                                     updateMediaState()
                                 }
@@ -117,7 +115,8 @@ struct MediaControlsView: View {
                         // Mute toggle
                         Button(isMuted ? "Unmute" : "Mute", systemImage: isMuted ? "speaker.slash.fill": "speaker.wave.2.fill") {
                             Task {
-                                let newMutedState = await mediaControlsManager.toggleMute(tab: tab)
+                                guard let manager = mediaControlsManager else { return }
+                                let newMutedState = await manager.toggleMute(tab: tab)
                                 await MainActor.run {
                                     if let newMutedState {
                                         overrideIsMuted = newMutedState
@@ -154,6 +153,9 @@ struct MediaControlsView: View {
         }
         .animation(.easeInOut(duration: 0.25), value: hasActiveMedia)
         .onAppear {
+            if mediaControlsManager == nil {
+                mediaControlsManager = MediaControlsManager(browserManager: browserManager, windowState: windowState)
+            }
             updateMediaState()
         }
         // Trigger when spaces change (tabs added/removed)
@@ -178,56 +180,66 @@ struct MediaControlsView: View {
     }
 
     private func updateMediaState() {
-        print("🎬 [MediaControlsView] updateMediaState() called")
+        // Cancel any previous update task to debounce rapid calls
+        updateTask?.cancel()
 
-        let manager = mediaControlsManager
-        let foundTab = manager.findActiveMediaTab()
+        updateTask = Task { @MainActor in
+            // Small delay to debounce rapid successive calls
+            try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
 
-        var resolvedTab: Tab? = foundTab
+            // Check if cancelled during sleep
+            if Task.isCancelled { return }
 
-        if resolvedTab == nil, let current = activeMediaTab,
-           let refreshed = browserManager.tabManager.allTabs().first(where: { $0.id == current.id }) {
-            let isCurrentWindowTab = windowState.currentTabId == refreshed.id
-            if !isCurrentWindowTab {
-                resolvedTab = refreshed
+            // Lazy initialization - create manager if it doesn't exist
+            if mediaControlsManager == nil {
+                mediaControlsManager = MediaControlsManager(browserManager: browserManager, windowState: windowState)
             }
-        }
 
-        if let candidate = resolvedTab,
-           windowState.currentTabId == candidate.id {
-            print("🎬 [MediaControlsView] Active tab is visible in this window, clearing media controls")
-            resolvedTab = nil
-        }
+            guard let manager = mediaControlsManager else {
+                return
+            }
+            let foundTab = manager.findActiveMediaTab()
 
-        let hasMedia = resolvedTab != nil
+            var resolvedTab: Tab? = foundTab
 
-        print("🎬 [MediaControlsView] hasMedia: \(hasMedia), current hasActiveMedia: \(hasActiveMedia)")
+            if resolvedTab == nil, let current = activeMediaTab,
+               let refreshed = browserManager.tabManager.allTabs().first(where: { $0.id == current.id }) {
+                let isCurrentWindowTab = windowState.currentTabId == refreshed.id
+                if !isCurrentWindowTab {
+                    resolvedTab = refreshed
+                }
+            }
 
-        if hasActiveMedia != hasMedia {
-            print("🎬 [MediaControlsView] Updating hasActiveMedia: \(hasActiveMedia) -> \(hasMedia)")
-            hasActiveMedia = hasMedia
-        }
+            // IMPORTANT: Media controls only show for BACKGROUND tabs with playing media
+            // This is by design - if the user can see the video/player, they don't need sidebar controls
+            if let candidate = resolvedTab,
+               windowState.currentTabId == candidate.id {
+                resolvedTab = nil
+            }
 
-        if activeMediaTab?.id != resolvedTab?.id {
-            print("🎬 [MediaControlsView] Updating activeMediaTab: \(activeMediaTab?.url.absoluteString ?? "nil") -> \(resolvedTab?.url.absoluteString ?? "nil")")
-            activeMediaTab = resolvedTab
-        } else if let resolvedTab {
-            // Refresh reference to keep metadata in sync
-            activeMediaTab = resolvedTab
-        }
+            let hasMedia = resolvedTab != nil
 
-        if let resolvedTab {
-            let liveState = resolvedTab.hasPlayingAudio || resolvedTab.hasPlayingVideo
-            if let override = overrideIsPlaying, override == liveState {
+            if hasActiveMedia != hasMedia {
+                hasActiveMedia = hasMedia
+            }
+
+            if activeMediaTab?.id != resolvedTab?.id {
+                activeMediaTab = resolvedTab
+            }
+
+            if let resolvedTab {
+                let liveState = resolvedTab.hasPlayingAudio || resolvedTab.hasPlayingVideo
+                if let override = overrideIsPlaying, override == liveState {
+                    overrideIsPlaying = nil
+                }
+                let liveMute = resolvedTab.isAudioMuted
+                if let overrideMute = overrideIsMuted, overrideMute == liveMute {
+                    overrideIsMuted = nil
+                }
+            } else {
                 overrideIsPlaying = nil
-            }
-            let liveMute = resolvedTab.isAudioMuted
-            if let overrideMute = overrideIsMuted, overrideMute == liveMute {
                 overrideIsMuted = nil
             }
-        } else {
-            overrideIsPlaying = nil
-            overrideIsMuted = nil
         }
     }
 }

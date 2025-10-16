@@ -51,7 +51,7 @@ struct SpaceTab: View {
                             .offset(x: 6, y: -6)
                     }
                 }
-                if tab.hasAudioContent || tab.isAudioMuted {
+                if tab.hasAudioContent || tab.hasPlayingAudio || tab.isAudioMuted {
                     Button(action: {
                         onMute()
                     }) {
@@ -162,7 +162,7 @@ struct SpaceTab: View {
                 }
                 Divider()
             }
-            if tab.hasAudioContent || tab.isAudioMuted {
+            if tab.hasAudioContent || tab.hasPlayingAudio || tab.isAudioMuted {
                 Button(action: onMute) {
                     Label(tab.isAudioMuted ? "Unmute Audio" : "Mute Audio",
                           systemImage: tab.isAudioMuted ? "speaker.wave.2" : "speaker.slash")

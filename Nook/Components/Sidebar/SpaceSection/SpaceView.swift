@@ -88,8 +88,7 @@ struct SpaceView: View {
     }
 
     private var folders: [TabFolder] {
-        let folders = browserManager.tabManager.folders(for: space.id)
-        return folders
+        browserManager.tabManager.folders(for: space.id)
     }
 
     private var hasSpacePinnedContent: Bool {
@@ -97,16 +96,23 @@ struct SpaceView: View {
     }
     
     private var spacePinnedItems: [AnyHashable] {
-        // Force dependency tracking for both folder changes and tab changes
+        // Force dependency tracking for folder changes
         _ = folderChangeCount
+
         let currentFolders = folders
+        let currentSpacePinnedTabs = spacePinnedTabs
+
+        // Early return if no content
+        guard !currentSpacePinnedTabs.isEmpty || !currentFolders.isEmpty else {
+            return []
+        }
 
         var items: [AnyHashable] = []
 
-        // CRITICAL FIX: Filter out folder tabs from spacePinnedTabs before processing
+        // Filter out folder tabs from spacePinnedTabs before processing
         // Only tabs with folderId == nil should appear outside folders
-        let nonFolderSpacePinnedTabs = spacePinnedTabs.filter { $0.folderId == nil }
-        let folderSpacePinnedTabs = spacePinnedTabs.filter { $0.folderId != nil }
+        let nonFolderSpacePinnedTabs = currentSpacePinnedTabs.filter { $0.folderId == nil }
+        let folderSpacePinnedTabs = currentSpacePinnedTabs.filter { $0.folderId != nil }
 
         // Group folder tabs by their folderId
         let tabsByFolderId = Dictionary(grouping: folderSpacePinnedTabs) { tab in
@@ -123,7 +129,6 @@ struct SpaceView: View {
         let sortedNonFolderTabs = nonFolderSpacePinnedTabs.sorted { $0.index < $1.index }
         items.append(contentsOf: sortedNonFolderTabs)
 
-        // Removed verbose logging
         return items
     }
     
