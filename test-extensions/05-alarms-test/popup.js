@@ -43,78 +43,73 @@ function displayAlarms(alarms) {
 }
 
 // Create 5 second alarm
-document.getElementById('create5s').addEventListener('click', () => {
+document.getElementById('create5s').addEventListener('click', async () => {
   console.log('🔔 Creating 5s alarm');
-  chrome.alarms.create('test-5s', {
-    delayInMinutes: 5 / 60  // 5 seconds
-  }, () => {
-    if (chrome.runtime.lastError) {
-      showStatus(`Error: ${chrome.runtime.lastError.message}`, true);
-    } else {
-      showStatus('✅ Created 5-second alarm');
-      setTimeout(() => listAlarms(), 100);
-    }
-  });
+  try {
+    await chrome.alarms.create('test-5s', {
+      delayInMinutes: 5 / 60  // 5 seconds
+    });
+    showStatus('✅ Created 5-second alarm');
+    setTimeout(() => listAlarms(), 100);
+  } catch (error) {
+    showStatus(`Error: ${error.message}`, true);
+  }
 });
 
 // Create 30 second alarm
-document.getElementById('create30s').addEventListener('click', () => {
+document.getElementById('create30s').addEventListener('click', async () => {
   console.log('🔔 Creating 30s alarm');
-  chrome.alarms.create('test-30s', {
-    delayInMinutes: 0.5  // 30 seconds
-  }, () => {
-    if (chrome.runtime.lastError) {
-      showStatus(`Error: ${chrome.runtime.lastError.message}`, true);
-    } else {
-      showStatus('✅ Created 30-second alarm');
-      setTimeout(() => listAlarms(), 100);
-    }
-  });
+  try {
+    await chrome.alarms.create('test-30s', {
+      delayInMinutes: 0.5  // 30 seconds
+    });
+    showStatus('✅ Created 30-second alarm');
+    setTimeout(() => listAlarms(), 100);
+  } catch (error) {
+    showStatus(`Error: ${error.message}`, true);
+  }
 });
 
 // Create repeating alarm
-document.getElementById('createRepeating').addEventListener('click', () => {
+document.getElementById('createRepeating').addEventListener('click', async () => {
   console.log('🔔 Creating repeating alarm');
-  chrome.alarms.create('test-repeating', {
-    delayInMinutes: 1,
-    periodInMinutes: 1
-  }, () => {
-    if (chrome.runtime.lastError) {
-      showStatus(`Error: ${chrome.runtime.lastError.message}`, true);
-    } else {
-      showStatus('✅ Created repeating alarm (1 min)');
-      setTimeout(() => listAlarms(), 100);
-    }
-  });
+  try {
+    await chrome.alarms.create('test-repeating', {
+      delayInMinutes: 1,
+      periodInMinutes: 1
+    });
+    showStatus('✅ Created repeating alarm (1 min)');
+    setTimeout(() => listAlarms(), 100);
+  } catch (error) {
+    showStatus(`Error: ${error.message}`, true);
+  }
 });
 
 // List all alarms
-function listAlarms() {
+async function listAlarms() {
   console.log('🔔 Listing all alarms');
-  chrome.alarms.getAll((alarms) => {
-    if (chrome.runtime.lastError) {
-      showStatus(`Error: ${chrome.runtime.lastError.message}`, true);
-      return;
-    }
+  try {
+    const alarms = await chrome.alarms.getAll();
     console.log('🔔 Got alarms:', alarms);
     displayAlarms(alarms);
     showStatus(`Found ${alarms.length} active alarm(s)`);
-  });
+  } catch (error) {
+    showStatus(`Error: ${error.message}`, true);
+  }
 }
 
 document.getElementById('listAlarms').addEventListener('click', listAlarms);
 
 // Clear all alarms
-document.getElementById('clearAll').addEventListener('click', () => {
+document.getElementById('clearAll').addEventListener('click', async () => {
   console.log('🔔 Clearing all alarms');
-  chrome.alarms.clearAll((wasCleared) => {
-    if (chrome.runtime.lastError) {
-      showStatus(`Error: ${chrome.runtime.lastError.message}`, true);
-    } else {
-      showStatus(wasCleared ? '✅ All alarms cleared' : 'No alarms to clear');
-      setTimeout(() => listAlarms(), 100);
-    }
-  });
+  try {
+    const wasCleared = await chrome.alarms.clearAll();
+    showStatus(wasCleared ? '✅ All alarms cleared' : 'No alarms to clear');
+    setTimeout(() => listAlarms(), 100);
+  } catch (error) {
+    showStatus(`Error: ${error.message}`, true);
+  }
 });
 
 // Listen for alarm events
@@ -131,4 +126,3 @@ setInterval(listAlarms, 5000);
 listAlarms();
 
 console.log('✅ [Alarms Test Popup] Popup initialized');
-
