@@ -285,35 +285,19 @@ extension ExtensionManager {
     }
     
     private func dispatchAlarmEvent(alarm: ExtensionAlarm, context: WKWebExtensionContext) {
-        // Get background webview for this extension
-        guard let backgroundWebView = getBackgroundWebView(for: context) else {
-            print("❌ [ExtensionManager+Alarms] No background webview found for alarm dispatch")
-            return
-        }
+        print("🔔 [ExtensionManager+Alarms] Dispatching alarm event via MessagePort")
         
+        // Prepare alarm data
         let alarmDict = alarm.dictionary
-        let alarmJSON = try? JSONSerialization.data(withJSONObject: alarmDict, options: [])
-        let alarmJSONString = alarmJSON.flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
         
-        let script = """
-        (function() {
-            if (typeof chrome !== 'undefined' && chrome.alarms && chrome.alarms.onAlarm) {
-                const alarm = \(alarmJSONString);
-                console.log('🔔 [Alarms] Dispatching onAlarm event:', alarm);
-                chrome.alarms.onAlarm.dispatch(alarm);
+        // Use MessagePort to send alarm event to background service worker
+        sendEventToBackground(eventType: "alarms.onAlarm",
+                            eventData: ["alarm": alarmDict],
+                            for: context) { response, error in
+            if let error = error {
+                print("❌ [ExtensionManager+Alarms] Error dispatching alarm via MessagePort: \(error.localizedDescription)")
             } else {
-                console.error('❌ [Alarms] chrome.alarms.onAlarm not available');
-            }
-        })();
-        """
-        
-        Task { @MainActor in
-            backgroundWebView.evaluateJavaScript(script) { result, error in
-                if let error = error {
-                    print("❌ [ExtensionManager+Alarms] Error dispatching alarm event: \(error)")
-                } else {
-                    print("✅ [ExtensionManager+Alarms] Alarm event dispatched successfully")
-                }
+                print("✅ [ExtensionManager+Alarms] Alarm event sent to background via MessagePort")
             }
         }
     }

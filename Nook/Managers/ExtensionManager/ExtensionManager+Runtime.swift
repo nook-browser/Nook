@@ -42,6 +42,12 @@ extension ExtensionManager {
                 handleSendMessage(messageData: messageData, from: extensionId, to: targetExtensionId, messageId: messageId, replyHandler: replyHandler)
             case "connect":
                 handleConnect(messageData: messageData, from: extensionId, replyHandler: replyHandler)
+            case "portConnect":
+                handlePortConnect(message: message, from: extensionId, replyHandler: replyHandler)
+            case "portMessage":
+                handlePortMessage(message: message, from: extensionId, replyHandler: replyHandler)
+            case "portDisconnect":
+                handlePortDisconnect(message: message, from: extensionId, replyHandler: replyHandler)
             default:
                 replyHandler(["error": "Unknown message type: \(messageType)"])
             }
@@ -54,12 +60,16 @@ extension ExtensionManager {
     // MARK: - Message Passing Implementation
 
     private func handleSendMessage(messageData: Any, from extensionId: String, to targetExtensionId: String?, messageId: String, replyHandler: @escaping (Any?) -> Void) {
-        print("[ExtensionManager+Runtime] Sending message from \(extensionId) to \(targetExtensionId ?? "broadcast")")
-
-        // Store the reply handler for async response
-        pendingRuntimeMessageRepliesAccess[messageId] = replyHandler
-
-        // Create Chrome runtime message format
+        print("📤 [ExtensionManager+Runtime] chrome.runtime.sendMessage from \(extensionId) to \(targetExtensionId ?? "background")")
+        
+        // Get the extension context for the sender
+        guard let senderContext = extensionContextsAccess[extensionId] else {
+            print("❌ [ExtensionManager+Runtime] Sender context not found for extension: \(extensionId)")
+            replyHandler(["error": "Sender extension not found"])
+            return
+        }
+        
+        // Create Chrome runtime message format with sender info
         let runtimeMessage: [String: Any] = [
             "id": messageId,
             "sender": [
@@ -69,59 +79,244 @@ extension ExtensionManager {
             ],
             "data": messageData
         ]
-
-        // Broadcast to all contexts or target specific extension
-        if let targetId = targetExtensionId {
-            // Send to specific extension
-            if let targetContext = extensionContextsAccess[targetId] {
-                deliverMessageToContext(runtimeMessage, to: targetContext)
+        
+        // Determine target: specific extension or sender's own background
+        let targetId = targetExtensionId ?? extensionId
+        
+        guard let targetContext = extensionContextsAccess[targetId] else {
+            print("❌ [ExtensionManager+Runtime] Target extension not found: \(targetId)")
+            replyHandler(["error": "Target extension not found: \(targetId)"])
+            return
+        }
+        
+        // Use MessagePort to deliver message to background service worker
+        print("📡 [ExtensionManager+Runtime] Routing message through MessagePort to background worker")
+        
+        sendMessageToBackground(runtimeMessage, for: targetContext) { response, error in
+            if let error = error {
+                print("❌ [ExtensionManager+Runtime] Message delivery failed: \(error.localizedDescription)")
+                replyHandler(["error": error.localizedDescription])
             } else {
-                replyHandler(["error": "Target extension not found: \(targetId)"])
-                pendingRuntimeMessageRepliesAccess.removeValue(forKey: messageId)
-            }
-        } else {
-            // Broadcast to all extension contexts (including background scripts)
-            broadcastMessageToAllContexts(runtimeMessage, from: extensionId)
-
-            // CRITICAL FIX: Provide timeout for broadcasts that don't get responses
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [self] in
-                if let callback = self.pendingRuntimeMessageRepliesAccess[messageId] {
-                    print("[ExtensionManager+Runtime] Timeout for message \(messageId) - providing default response")
-                    callback(["success": true, "message": "Message delivered"])
-                    self.pendingRuntimeMessageRepliesAccess.removeValue(forKey: messageId)
-                }
+                print("✅ [ExtensionManager+Runtime] Message delivered, response received from background")
+                // Return the actual response from the background worker
+                replyHandler(response)
             }
         }
     }
 
     private func handleConnect(messageData: Any, from extensionId: String, replyHandler: @escaping (Any?) -> Void) {
-        print("[ExtensionManager+Runtime] Handling connection request from \(extensionId)")
+        print("🔌 [ExtensionManager+Runtime] chrome.runtime.connect request from \(extensionId)")
+        
+        // Extract port name from message data if provided
+        var portName: String? = nil
+        if let messageDict = messageData as? [String: Any],
+           let requestedPortName = messageDict["name"] as? String {
+            portName = requestedPortName
+        }
+        
+        // Get the extension context
+        guard let context = extensionContextsAccess[extensionId] else {
+            print("❌ [ExtensionManager+Runtime] Extension context not found: \(extensionId)")
+            replyHandler(["error": "Extension context not found"])
+            return
+        }
+        
+        // Check if we already have a background port for this extension
+        if let existingPort = getBackgroundPort(for: context) {
+            print("✅ [ExtensionManager+Runtime] Reusing existing background port")
+            
+            // Return port information
+            replyHandler([
+                "name": portName ?? "background",
+                "sender": [
+                    "id": extensionId,
+                    "url": "webkit-extension://\(extensionId)/"
+                ],
+                "connected": true
+            ])
+        } else {
+            print("⏳ [ExtensionManager+Runtime] Background port not yet established")
+            
+            // The port will be established through the webExtensionController delegate method
+            // For now, return port info indicating connection is pending
+            replyHandler([
+                "name": portName ?? "background",
+                "sender": [
+                    "id": extensionId,
+                    "url": "webkit-extension://\(extensionId)/"
+                ],
+                "connected": false,
+                "pending": true
+            ])
+        }
+    }
 
-        // Create a message port for ongoing communication
-        let portName = UUID().uuidString
-        // Create message port using controller (simplified approach)
-
-        // Store the port
-        // extensionMessagePorts[portName] = messagePort (simplified approach)
-
-        // Return port information to the caller
+    // MARK: - Port Message Handlers
+    
+    private func handlePortConnect(message: [String: Any], from extensionId: String, replyHandler: @escaping (Any?) -> Void) {
+        print("🔌 [ExtensionManager+Runtime] Port connect request from \(extensionId)")
+        print("🔌 [ExtensionManager+Runtime] Message: \(message)")
+        
+        guard let portId = message["portId"] as? String else {
+            print("❌ [ExtensionManager+Runtime] Missing portId in port connect")
+            replyHandler(["error": "Missing portId"])
+            return
+        }
+        
+        let portName = message["portName"] as? String
+        let targetExtensionId = message["extensionId"] as? String
+        
+        print("🔌 [ExtensionManager+Runtime] Creating port: \(portId), name: \(portName ?? "none")")
+        
+        // For now, acknowledge the connection
+        // The actual MessagePort connection will be established through the delegate
         replyHandler([
-            "name": portName,
-            "sender": [
-                "id": extensionId,
-                "url": "webkit-extension://\(extensionId)/"
-            ]
+            "success": true,
+            "portId": portId,
+            "portName": portName ?? "",
+            "connected": true
         ])
     }
+    
+    private func handlePortMessage(message: [String: Any], from extensionId: String, replyHandler: @escaping (Any?) -> Void) {
+        print("📤 [ExtensionManager+Runtime] Port message from \(extensionId)")
+        
+        guard let portId = message["portId"] as? String else {
+            print("❌ [ExtensionManager+Runtime] Missing portId in port message")
+            replyHandler(["error": "Missing portId"])
+            return
+        }
+        
+        guard let portMessage = message["message"] else {
+            print("❌ [ExtensionManager+Runtime] Missing message in port message")
+            replyHandler(["error": "Missing message"])
+            return
+        }
+        
+        let portName = message["portName"] as? String
+        
+        print("📤 [ExtensionManager+Runtime] Sending message on port: \(portId), name: \(portName ?? "none")")
+        
+        // Get the extension context
+        guard let context = extensionContextsAccess[extensionId] else {
+            print("❌ [ExtensionManager+Runtime] Extension context not found")
+            replyHandler(["error": "Extension context not found"])
+            return
+        }
+        
+        // Send message through MessagePort system
+        if let portName = portName {
+            sendMessageToNamedPort(portName, message: portMessage, for: context) { success in
+                replyHandler(["success": success])
+            }
+        } else {
+            // Send to background port
+            sendMessageToBackgroundPort(message: portMessage, for: context) { success in
+                replyHandler(["success": success])
+            }
+        }
+    }
+    
+    private func handlePortDisconnect(message: [String: Any], from extensionId: String, replyHandler: @escaping (Any?) -> Void) {
+        print("🔌 [ExtensionManager+Runtime] Port disconnect from \(extensionId)")
+        
+        guard let portId = message["portId"] as? String else {
+            print("❌ [ExtensionManager+Runtime] Missing portId in port disconnect")
+            replyHandler(["error": "Missing portId"])
+            return
+        }
+        
+        let portName = message["portName"] as? String
+        
+        print("🔌 [ExtensionManager+Runtime] Disconnecting port: \(portId), name: \(portName ?? "none")")
+        
+        // Disconnect the port through MessagePort system
+        if let portName = portName {
+            disconnectPort(portName: portName, for: extensionId)
+        }
+        
+        replyHandler(["success": true])
+    }
+    
+    // MARK: - Port Messaging Helpers
+    
+    private func sendMessageToNamedPort(_ portName: String, message: Any, for context: WKWebExtensionContext, completion: @escaping (Bool) -> Void) {
+        guard let extensionId = getExtensionId(for: context) else {
+            print("❌ [ExtensionManager+Runtime] Cannot send port message - extension ID not found")
+            completion(false)
+            return
+        }
+        
+        // Get the named port
+        guard let port = getNamedPort(portName: portName, for: context) else {
+            print("❌ [ExtensionManager+Runtime] Named port '\(portName)' not found")
+            completion(false)
+            return
+        }
+        
+        // Send message through the port
+        let messageDict: [String: Any] = [
+            "type": "portMessage",
+            "portName": portName,
+            "message": message
+        ]
+        
+        port.sendMessage(messageDict) { error in
+            if let error = error {
+                print("❌ [ExtensionManager+Runtime] Failed to send message to port '\(portName)': \(error.localizedDescription)")
+                completion(false)
+            } else {
+                print("✅ [ExtensionManager+Runtime] Message sent to port '\(portName)'")
+                completion(true)
+            }
+        }
+    }
+    
+    private func sendMessageToBackgroundPort(message: Any, for context: WKWebExtensionContext, completion: @escaping (Bool) -> Void) {
+        guard let extensionId = getExtensionId(for: context) else {
+            print("❌ [ExtensionManager+Runtime] Cannot send port message - extension ID not found")
+            completion(false)
+            return
+        }
+        
+        // Get the background port
+        guard let port = getBackgroundPort(for: context) else {
+            print("❌ [ExtensionManager+Runtime] Background port not found")
+            completion(false)
+            return
+        }
+        
+        // Send message through the port
+        let messageDict: [String: Any] = [
+            "type": "portMessage",
+            "message": message
+        ]
+        
+        port.sendMessage(messageDict) { error in
+            if let error = error {
+                print("❌ [ExtensionManager+Runtime] Failed to send message to background port: \(error.localizedDescription)")
+                completion(false)
+            } else {
+                print("✅ [ExtensionManager+Runtime] Message sent to background port")
+                completion(true)
+            }
+        }
+    }
+
+
+    // MARK: - Port Access Helpers
+    // Note: These are wrapper methods that delegate to ExtensionManager+MessagePorts.swift
+    
+    private func disconnectNamedPortForRuntime(_ portName: String, for extensionId: String) {
+        // Delegate to the actual implementation in ExtensionManager+MessagePorts.swift
+        disconnectPort(portName:portName, for: extensionId)
+    }
+
 
     // MARK: - Message Delivery
 
     private func deliverMessageToContext(_ message: [String: Any], to context: WKWebExtensionContext) {
         print("[ExtensionManager+Runtime] Delivering message to extension context: \(context.uniqueIdentifier)")
-
-        // CRITICAL FIX: Simplified message delivery using WebKit's built-in system
-        // The delegate method we added (webExtensionController:sendMessage:...) will be called by WebKit
-        // We don't need to manually call delegate methods - WebKit handles the routing
 
         // Check if we have a pending reply handler for this message
         if let messageId = message["id"] as? String,
@@ -234,6 +429,18 @@ extension ExtensionManager {
     }
 
     /// Generate the complete Chrome API bridge system for a specific context
+
+    /// Load the Chrome Runtime Port Bridge script
+    private func loadPortBridgeScript() -> String {
+        // Load from chrome-runtime-port-bridge.js file
+        guard let scriptURL = Bundle.main.url(forResource: "chrome-runtime-port-bridge", withExtension: "js", subdirectory: "Managers/ExtensionManager"),
+              let scriptContent = try? String(contentsOf: scriptURL, encoding: .utf8) else {
+            print("⚠️ [ExtensionManager+Runtime] Failed to load Port bridge script")
+            return "// Port bridge script not found"
+        }
+        return scriptContent
+    }
+
     private func generateCompleteChromeAPIScript(extensionId: String, contextType: ChromeAPIContextType) -> String {
         let contextSpecificCode: String
         let additionalAPICode: String
@@ -312,6 +519,9 @@ extension ExtensionManager {
         // Generated for extension: \(extensionId)
         // Context: \(contextType)
         // ========================================================
+
+        // Load Chrome Runtime Port Bridge
+        \(loadPortBridgeScript())
 
         (function() {
             'use strict';
@@ -397,19 +607,18 @@ extension ExtensionManager {
                         getManifest: function() {
                             return \(getManifestJSON() ?? "{}");
                         },
-                        connect: function(extensionId, connectInfo) {
+                        connect: function(extensionIdOrConnectInfo, connectInfo) {
                             try {
-                                const messageData = {
-                                    type: 'connect',
-                                    extensionId: extensionId,
-                                    connectInfo: connectInfo
-                                };
-
-                                if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.chromeRuntime) {
-                                    return window.webkit.messageHandlers.chromeRuntime.postMessage(messageData);
+                                // Use the Port factory from chrome-runtime-port-bridge.js
+                                if (typeof window.createChromeRuntimePort === 'function') {
+                                    return window.createChromeRuntimePort('\(extensionId)', extensionIdOrConnectInfo, connectInfo);
+                                } else {
+                                    logError('Port factory not loaded - chrome-runtime-port-bridge.js missing');
+                                    return null;
                                 }
                             } catch (error) {
                                 logError('chrome.runtime.connect error: ' + error.message);
+                                return null;
                             }
                         }
                     };
@@ -985,7 +1194,6 @@ extension ExtensionManager {
 
         print("[ExtensionManager+Runtime] Received script message: \(messageBody.keys)")
 
-        // CRITICAL FIX: Ensure we have extension context
         guard let extensionContext = extensionContextsAccess.values.first else {
             print("[ExtensionManager+Runtime] No extension context available for runtime message")
             return
@@ -997,7 +1205,6 @@ extension ExtensionManager {
 
             print("[ExtensionManager+Runtime] Sending response: \(response ?? NSNull())")
 
-            // CRITICAL FIX: Send response back to the same webView that sent the message
             let responseScript: String
             if let responseJSON = try? JSONSerialization.data(withJSONObject: response ?? NSNull()),
                let responseString = String(data: responseJSON, encoding: .utf8) {
@@ -1055,8 +1262,6 @@ extension ExtensionManager {
             print("❌ [ExtensionManager] Extension context loading FAILED for \(extensionId): \(error.localizedDescription)")
             print("❌ [ExtensionManager] webkit-extension:// URLs will NOT work without proper loading")
 
-            // CRITICAL FIX: Even on load error, try to provide basic functionality
-            // But first, attempt to diagnose the failure
             diagnoseExtensionLoadingFailure(extensionId: extensionId, error: error, context: webExtensionContext)
             return
         }
@@ -1183,7 +1388,6 @@ extension ExtensionManager {
             let isActive = extensionContext.webExtensionController != nil
             print("📊 [ExtensionManager] Extension context active: \(isActive)")
 
-            // CRITICAL FIX: Check for WebAssembly MIME type issues
             self.checkWebAssemblyMIMETypes(packagePath: packagePath)
         }
     }

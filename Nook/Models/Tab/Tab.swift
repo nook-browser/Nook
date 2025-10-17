@@ -435,12 +435,9 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
         print("Created WebView for tab: \(name)")
 
-        // CRITICAL FIX: Double-check extension controller association before notifying extensions
-        // This ensures content scripts can find their tab when injected
         if #available(macOS 15.5, *) {
             if let controller = ExtensionManager.shared.nativeController {
                 if _webView?.configuration.webExtensionController !== controller {
-                    print("  🔧 [Tab] CRITICAL FIX: Adding missing extension controller to WebView")
                     _webView?.configuration.webExtensionController = controller
                 }
             }
@@ -2104,7 +2101,6 @@ extension Tab: WKNavigationDelegate {
         print("   Error: \(error.localizedDescription)")
         loadingState = .didFailProvisionalNavigation(error)
 
-        // CRITICAL FIX: Handle CORS failures for extension API access
         let nsError = error as NSError
         if nsError.domain == NSURLErrorDomain && (nsError.code == NSURLErrorNotConnectedToInternet || nsError.code == NSURLErrorNetworkConnectionLost || nsError.code == NSURLErrorResourceUnavailable) {
             if let failedURL = nsError.userInfo[NSURLErrorFailingURLStringErrorKey] as? String,

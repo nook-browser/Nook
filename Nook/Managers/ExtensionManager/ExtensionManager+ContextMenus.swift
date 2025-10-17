@@ -411,37 +411,40 @@ extension ExtensionManager {
             clickInfo["checked"] = checked
         }
         
-        // Inject click event into extension background script
-        let clickEventScript = """
-        (function() {
-            if (chrome.contextMenus && chrome.contextMenus.onClicked) {
-                const info = \(jsonString(from: clickInfo));
-                const tab = null; // TODO: Pass actual tab info
-                
-                // Trigger onClicked listeners
-                if (chrome.contextMenus.onClicked._listeners) {
-                    chrome.contextMenus.onClicked._listeners.forEach(function(listener) {
-                        try {
-                            listener(info, tab);
-                        } catch (error) {
-                            console.error('[ContextMenus] Error in onClicked listener:', error);
-                        }
-                    });
-                }
-            }
-        })();
-        """
+        // Get current tab info
+        let tabInfo = getCurrentTabInfoForContextMenus()
         
-        // Find background page webview and inject
-        if let backgroundWebView = getBackgroundWebView(for: extensionContext) {
-            backgroundWebView.evaluateJavaScript(clickEventScript) { _, error in
-                if let error = error {
-                    print("❌ [ExtensionManager+ContextMenus] Error notifying extension: \(error)")
-                } else {
-                    print("✅ [ExtensionManager+ContextMenus] Extension notified of click")
-                }
+        // Use MessagePort to send context menu click event to background service worker
+        var eventData: [String: Any] = clickInfo
+        if let tab = tabInfo {
+            eventData["tab"] = tab
+        }
+        
+        sendEventToBackground(eventType: "contextMenus.onClicked",
+                            eventData: eventData,
+                            for: extensionContext) { response, error in
+            if let error = error {
+                print("❌ [ExtensionManager+ContextMenus] Error sending menu click via MessagePort: \(error.localizedDescription)")
+            } else {
+                print("✅ [ExtensionManager+ContextMenus] Context menu click event sent to background via MessagePort")
             }
         }
+    }
+    
+    // Helper function for getting current tab info
+    private func getCurrentTabInfoForContextMenus() -> [String: Any]? {
+        guard let browserManager = browserManagerAccess,
+              let currentTab = browserManager.currentTabForActiveWindow() else {
+            return nil
+        }
+        
+        return [
+            "id": currentTab.id.uuidString,
+            "url": currentTab.url.absoluteString,
+            "title": currentTab.name,
+            "active": true,
+            "windowId": 1 // Simplified window ID
+        ]
     }
     
     // MARK: - Script Message Handler
@@ -673,4 +676,3 @@ extension ExtensionManager {
         return nil
     }
 }
-

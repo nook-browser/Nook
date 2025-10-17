@@ -33,6 +33,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     private var extensionCommands: [String: [String: WKWebExtension.Command]] = [:] // extensionId -> commandId -> Command
     // Extension message port management
     private var extensionMessagePorts: [String: WKWebExtension.MessagePort] = [:] // portName -> MessagePort
+    internal var backgroundServiceWorkerPorts: [String: WKWebExtension.MessagePort] = [:] // extensionId -> background port
     private var messagePortHandlers: [String: (Any, WKWebExtensionContext) -> Void] = [:] // portName -> handler
     // Extension storage data management
     private var extensionDataRecords: [String: WKWebExtension.DataRecord] = [:] // extensionId -> DataRecord
@@ -50,6 +51,10 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
 
     // Chrome API pending tab message replies
     var pendingTabMessageResponses: [String: (Any?, Error?) -> Void] = [:]
+    
+    // Message response tracking for runtime.sendMessage() round-trips
+    private var pendingMessageResponses: [String: (Any?, Error?) -> Void] = [:]
+    private let pendingResponsesQueue = DispatchQueue(label: "com.nook.pendingMessageResponses", attributes: .concurrent)
 
     let context: ModelContext
 
@@ -69,6 +74,26 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     internal var pendingRuntimeMessageRepliesAccess: [String: (Any?) -> Void] {
         get { return pendingRuntimeMessageReplies }
         set { pendingRuntimeMessageReplies = newValue }
+    }
+
+    /// Thread-safe access to pending message responses
+    internal func storePendingResponse(messageId: String, handler: @escaping (Any?, Error?) -> Void) {
+        pendingResponsesQueue.async(flags: .barrier) {
+            self.pendingMessageResponses[messageId] = handler
+        }
+    }
+    
+    internal func retrieveAndRemovePendingResponse(messageId: String) -> ((Any?, Error?) -> Void)? {
+        var handler: ((Any?, Error?) -> Void)?
+        pendingResponsesQueue.sync {
+            handler = self.pendingMessageResponses[messageId]
+        }
+        if handler != nil {
+            pendingResponsesQueue.async(flags: .barrier) {
+                self.pendingMessageResponses.removeValue(forKey: messageId)
+            }
+        }
+        return handler
     }
 
     /// Internal access to extension message ports for Chrome API extensions
@@ -153,8 +178,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         // Store controller reference first
         self.extensionController = controller
 
-        // CRITICAL FIX: Register all existing tabs IMMEDIATELY after controller creation
-        // This prevents "Tab not found" errors when extensions try to communicate
         print("🔧 [ExtensionManager] Performing immediate tab registration after controller creation...")
         registerAllExistingTabs()
         
@@ -272,12 +295,9 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         
         extensionController = controller
 
-        // CRITICAL FIX: Register all existing tabs IMMEDIATELY after controller setup
-        // This prevents "Tab not found" errors when extensions try to communicate
         print("🔧 [ExtensionManager] Performing immediate tab registration after controller setup...")
         registerAllExistingTabs()
 
-        // CRITICAL FIX: Ensure cross-context tab sharing
         // This makes all tabs visible to all loaded extensions
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             self.registerAllTabsAcrossAllContexts()
@@ -399,7 +419,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         print("✅ [ExtensionManager] Tab registration complete")
     }
 
-    /// CRITICAL FIX: Register all existing tabs with a SPECIFIC extension context
     /// This ensures newly loaded extensions know about all existing tabs
     private func registerAllExistingTabsForContext(_ extensionContext: WKWebExtensionContext) {
         guard let bm = browserManagerRef, let controller = extensionController else {
@@ -417,7 +436,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
 
         print("📊 [ExtensionManager] Found \(allTabs.count) total tabs to register")
 
-        // CRITICAL FIX: Register each tab with enhanced debugging
         for (index, tab) in allTabs.enumerated() {
             let adapter = self.adapter(for: tab, browserManager: bm)
 
@@ -426,13 +444,9 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             print("      - WebView available: \(tab.webView != nil)")
             print("      - Extension ID: \(extensionId)")
 
-            // CRITICAL FIX: Ensure the adapter has proper extension context association
-            // This is the key to fixing "Tab not found" errors
-
             // Force the adapter to be registered with the controller immediately
             controller.didOpenTab(adapter)
 
-            // CRITICAL FIX: Also set active tab if this is the active one
             if let activeTab = bm.currentTabForActiveWindow(), activeTab.id == tab.id {
                 controller.didActivateTab(adapter, previousActiveTab: nil)
                 controller.didSelectTabs([adapter])
@@ -443,7 +457,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             registeredCount += 1
         }
 
-        // CRITICAL FIX: Ensure at least one tab is set as active if none were automatically detected
         if !activeTabRegistered && !allTabs.isEmpty {
             let firstTab = allTabs.first!
             let firstAdapter = self.adapter(for: firstTab, browserManager: bm)
@@ -456,7 +469,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         print("✅ [ExtensionManager] Registered \(registeredCount) existing tabs with extension: \(extensionId)")
         print("🔍 [ExtensionManager] Extension should now be able to communicate with all existing tabs")
 
-        // CRITICAL FIX: Add debugging to verify tab registration worked
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [self] in
             print("🔍 [ExtensionManager] Verifying tab registration after delay...")
             self.verifyTabRegistration(extensionContext: extensionContext, expectedCount: registeredCount)
@@ -523,7 +535,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         }
     }
 
-    /// CRITICAL FIX: Register all existing tabs with ALL loaded extension contexts
     /// This ensures cross-context tab sharing and prevents "Tab not found" errors
     private func registerAllTabsAcrossAllContexts() {
         guard extensionController != nil else {
@@ -572,7 +583,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         for tab in allTabs {
             guard let webView = tab.webView else { continue }
 
-            // CRITICAL FIX: Ensure WebView has extension controller assigned
             if webView.configuration.webExtensionController !== controller {
                 print("  📝 Updating WebView for tab: \(tab.name)")
                 webView.configuration.webExtensionController = controller
@@ -933,7 +943,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             print("   Directory permissions: \(String(permissions ?? 0, radix: 8))")
         }
 
-        // CRITICAL FIX: Ensure the destinationDir URL is in the correct format for WebKit
         // WebKit expects file:// URLs for resource base URLs
         var correctedBaseURL = destinationDir
         if correctedBaseURL.scheme == nil {
@@ -984,7 +993,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             print("⚠️ [ExtensionManager] Extension context webViewConfiguration is nil, setting up...")
             print("   🔧 [ExtensionManager] Using pre-configured sharedWebConfig for proper resource loading")
 
-            // CRITICAL FIX: Use the sharedWebConfig instead of creating a new one
             // The sharedWebConfig has the correct webExtensionController set for webkit-extension:// URL resolution
             guard let config = self.sharedWebConfig else {
                 print("❌ [ExtensionManager] sharedWebConfig is nil, cannot configure extension context")
@@ -1107,13 +1115,11 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         // Load with native controller
         try extensionController?.load(extensionContext)
 
-        // CRITICAL FIX: Wait for extension to be fully loaded before loading background content
         // WebKit needs time to properly initialize the extension context
         Task { @MainActor in
             // Wait a brief moment for the extension context to fully initialize
             try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
 
-            // CRITICAL FIX: Register all existing tabs with THIS SPECIFIC extension context
             // This ensures the newly loaded extension knows about all existing tabs
             self.registerAllExistingTabsForContext(extensionContext)
 
@@ -1531,7 +1537,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                                     print("⚠️ [ExtensionManager] Extension context webViewConfiguration is nil (reload), setting up...")
                                     print("   🔧 [ExtensionManager] Using pre-configured sharedWebConfig for proper resource loading")
 
-                                    // CRITICAL FIX: Use the sharedWebConfig instead of creating a new one
                                     // The sharedWebConfig has the correct webExtensionController set for webkit-extension:// URL resolution
                                     guard let config = self.sharedWebConfig else {
                                         print("❌ [ExtensionManager] sharedWebConfig is nil, cannot configure extension context (reload)")
@@ -1603,11 +1608,9 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                                 // PROACTIVE CORS: Grant common API permissions to prevent repeated CORS failures
                                 grantCommonAPIPermissions(to: extensionContext)
 
-                                // CRITICAL: Load background content if the extension has a background script
                                 // This is essential for service workers and background extensions
                                 print("🔧 [ExtensionManager] Loading background content for extension...")
 
-                                // CRITICAL FIX: Wait for extension to be fully loaded before loading background content
                                 Task { @MainActor in
                                     // Wait a brief moment for the extension context to fully initialize
                                     try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
@@ -1694,7 +1697,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     func getExtensionContext(for extensionId: String) -> WKWebExtensionContext? {
         let context = extensionContexts[extensionId]
 
-        // CRITICAL FIX: Add debugging for extension context lookup failures
         if context == nil {
             print("🔍 [ExtensionManager] Extension context not found for: \(extensionId)")
             print("   Available extension contexts: \(extensionContexts.keys)")
@@ -1789,7 +1791,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     private func configureWebViewForExtensionSupport(_ webView: WKWebView, controller: WKWebExtensionController) {
         let webViewId = ObjectIdentifier(webView)
 
-        // CRITICAL FIX: Check if this WebView has already been configured
         if configuredWebViews.contains(webViewId) {
             print("  ℹ️ [ExtensionManager] WebView already configured, skipping duplicate setup")
             return
@@ -1811,7 +1812,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             print("  ✅ [ExtensionManager] Added message handler: \(handlerName)")
         }
 
-        // CRITICAL FIX: Inject clipboard API polyfill into regular browser tabs
         // This enables content scripts to use navigator.clipboard API
         injectClipboardAPI(into: contentController)
         print("  ✅ [ExtensionManager] Clipboard API polyfill injected for content scripts")
@@ -1845,7 +1845,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         let a = adapter(for: tab, browserManager: bm)
         print("🔔 [ExtensionManager] Notifying controller of tab opened: \(tab.name)")
 
-        // CRITICAL FIX: Ensure the tab's WebView has the extension controller set
         // This fixes "Tab not found" errors when content scripts try to communicate
         if let webView = tab.webView {
             if webView.configuration.webExtensionController !== controller {
@@ -1856,7 +1855,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                 webView.configuration.defaultWebpagePreferences.allowsContentJavaScript = true
             }
 
-            // CRITICAL FIX: Always ensure user content controller is properly configured
             print("  🔧 [ExtensionManager] Configuring script message handlers for: \(tab.name)")
             configureWebViewForExtensionSupport(webView, controller: controller)
         }
@@ -1864,7 +1862,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         // Register the tab with all extension contexts
         controller.didOpenTab(a)
 
-        // CRITICAL FIX: After registration, verify the tab is accessible to extensions
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             self?.verifyTabAccessibility(tab: tab, controller: controller)
         }
@@ -1920,6 +1917,32 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     }
     
     // MARK: - WKWebExtensionControllerDelegate
+    
+    /// Get the actual popup path from the extension's manifest
+    /// This supports both MV2 (browser_action) and MV3 (action) manifest formats
+    private func getPopupPath(for extensionContext: WKWebExtensionContext) -> String? {
+        guard let manifest = extensionContext.webExtension.manifest as? [String: Any] else { return nil }
+        
+        // MV3: Check action.default_popup
+        if let action = manifest["action"] as? [String: Any],
+           let popup = action["default_popup"] as? String {
+            return popup
+        }
+        
+        // MV2: Check browser_action.default_popup
+        if let browserAction = manifest["browser_action"] as? [String: Any],
+           let popup = browserAction["default_popup"] as? String {
+            return popup
+        }
+        
+        // MV2: Check page_action.default_popup (less common)
+        if let pageAction = manifest["page_action"] as? [String: Any],
+           let popup = pageAction["default_popup"] as? String {
+            return popup
+        }
+        
+        return nil
+    }
     
     func webExtensionController(_ controller: WKWebExtensionController, presentActionPopup action: WKWebExtension.Action, for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
         // Present the extension's action popover with enhanced Action API support
@@ -2035,17 +2058,22 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             print("      Popup uses correct data store: \(dataStoreMatches)")
 
             if !dataStoreMatches {
-                print("   ❌ CRITICAL: Popup data store mismatch - this causes network failures!")
-                print("   ❌ This explains 'to extension base network error' messages")
-
-                // Since websiteDataStore is read-only after creation, we need to document this limitation
-                print("   🔧 [ExtensionManager] NOTE: websiteDataStore cannot be changed after WebView creation")
-                print("   🔧 [ExtensionManager] The fix must happen at WebView creation time")
+                print("   ⚠️ WARNING: Popup data store mismatch detected")
+                print("   ⚠️ This may cause network failures and resource loading issues")
+                print("   📝 NOTE: websiteDataStore is read-only after WebView creation")
+                print("   📝 Solution: WKWebExtension should use extensionContext.webViewConfiguration")
+                print("   📝 Workaround: Extensions may still work if webExtensionController is correct")
+            } else {
+                print("   ✅ Popup data store matches expected configuration")
             }
 
-            // CRITICAL: Test webkit-extension:// URL resolution in popup context
+            // IMPROVED: Test webkit-extension:// URL resolution using actual popup path from manifest
             print("   🔧 [ExtensionManager] Testing popup webkit-extension:// URL resolution...")
-            let testPopupURL = "webkit-extension://\(extensionContext.uniqueIdentifier)/popup/index.html"
+            
+            // Get the actual popup path from the manifest
+            let actualPopupPath = getPopupPath(for: extensionContext) ?? "popup.html"
+            let testPopupURL = "webkit-extension://\(extensionContext.uniqueIdentifier)/\(actualPopupPath)"
+            print("   🔧 [ExtensionManager] Actual popup path from manifest: \(actualPopupPath)")
             print("   🔧 [ExtensionManager] Test popup URL: \(testPopupURL)")
 
             // Check if popup can resolve extension URLs
@@ -2062,7 +2090,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                 }
             }
 
-            // CRITICAL FIX: Ensure popup WebView inherits all critical settings from extension's configuration
             // This is essential for proper webkit-extension:// URL resolution and resource loading
             if let extensionConfig = expectedConfig {
                 print("   🔧 [ExtensionManager] Applying extension configuration to popup WebView:")
@@ -2082,7 +2109,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
 
             // CRITICAL NETWORK FIX: Ensure popup WebView uses the same data store as the browser for network connectivity
             if webView.configuration.websiteDataStore !== controller.configuration.defaultWebsiteDataStore {
-                print("   🔧 [ExtensionManager] CRITICAL FIX: Popup WebView data store differs - this causes network errors!")
                 print("      [ExtensionManager] Popup data store: \(webView.configuration.websiteDataStore)")
                 print("      [ExtensionManager] Browser data store: \(controller.configuration.defaultWebsiteDataStore)")
 
@@ -2171,7 +2197,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                 print("   ✅ [ExtensionManager] Popup WebView uses correct data store - network connectivity should work")
             }
 
-            // CRITICAL FIX: The popup needs to use the extension's own configuration for proper resource loading
             // The webkit-extension:// URLs need the webExtensionController to be set correctly
             print("   🔧 [ExtensionManager] Popup configuration check:")
             print("      [ExtensionManager] webExtensionController: \(webView.configuration.webExtensionController != nil ? "✅" : "❌")")
@@ -2181,7 +2206,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             if let url = webView.url, url.scheme?.lowercased() == "webkit-extension" {
                 print("   🎯 [ExtensionManager] Popup loading webkit-extension:// URL - ensuring proper resource access")
 
-                // CRITICAL FIX: Add comprehensive error handling for WKWebExtensionErrorDomain Code=2
                 let errorHandlerScript = """
                 // WKWebExtensionErrorDomain Code=2 Error Handler
                 window.addEventListener('error', function(event) {
@@ -2234,7 +2258,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                     print("   ✅ [ExtensionManager] Added WKWebExtensionErrorDomain error handler")
                 }
 
-                // CRITICAL FIX: Inject Chrome APIs early for popup Angular bootstrap
                 // This ensures chrome.* APIs are available
                 let hasChromeAPIInjection = existingScripts.contains { $0.source.contains("CHROME API INJECTION") }
                 if !hasChromeAPIInjection {
@@ -2262,7 +2285,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                     console.log('🚀 [Simple Test] Browser APIs:', typeof browser !== 'undefined' ? 'browser available' : 'browser not available');
                     console.log('🚀 [Simple Test] Runtime ID:', (chrome.runtime || browser.runtime).id);
 
-                    // CRITICAL FIX: Prevent infinite state migration timeout loops
                     console.log('🔧 [State Migration Fix] Installing state migration timeout breaker...');
 
                     // Track migration attempts to detect infinite loops
@@ -2352,178 +2374,55 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                     console.log('✅ [State Migration Fix] Migration timeout breaker installed');
                     """
 
-                    // Add a comprehensive script to fix extension resource loading
+                    // IMPROVED: Targeted popup resource loading fixes without hardcoded paths
                     let resourceFixScript = """
                     (function(){
-                        console.log('🔧 [Popup Resource Fix] Initializing extension resource loading fixes');
-                        console.log('🔍 [Popup Resource Test] URL:', window.location.href);
-                        console.log('🔍 [Popup Resource Test] Extension ID:', chrome.runtime.id || browser.runtime.id);
+                        console.log('🔧 [Popup Resource Fix] Initializing improved extension resource loading fixes');
+                        console.log('🔍 [Popup Info] URL:', window.location.href);
+                        console.log('🔍 [Popup Info] Extension ID:', chrome.runtime?.id || browser.runtime?.id || 'unknown');
 
-                        // CRITICAL FIX: Implement robust resource loading with fallbacks
-                        const testResources = [
-                            'popup.js',
-                            'popup/index.js',
-                            'popup/popup.js',
-                            'content/popup.js',
-                            'index.js',
-                            'popup.html'
-                        ];
-
-                        let successCount = 0;
-                        let testCount = 0;
-                        let failedResources = [];
-
-                        // Enhanced fetch with timeout and retry logic
-                        function fetchResourceWithFallback(resourceUrl, resourceName, retryCount = 0) {
-                            const maxRetries = 2;
-                            const timeout = 5000; // 5 second timeout
-
-                            return Promise.race([
-                                fetch(resourceUrl, {
-                                    method: 'GET',
-                                    headers: {
-                                        'Cache-Control': 'no-cache',
-                                        'Pragma': 'no-cache'
-                                    }
-                                }),
-                                new Promise((_, reject) =>
-                                    setTimeout(() => reject(new Error('Timeout')), timeout)
-                                )
-                            ])
-                            .then(response => {
-                                if (response.ok) {
-                                    console.log('✅ [Popup Resource Test] Successfully loaded:', resourceName);
-                                    successCount++;
-                                    return response.text();
-                                } else {
-                                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                                }
-                            })
-                            .catch(err => {
-                                console.error('❌ [Popup Resource Test] Fetch error for', resourceName, ':', err.message);
-                                failedResources.push(resourceName);
-
-                                // Retry logic for network errors
-                                if (retryCount < maxRetries && (err.message.includes('Failed to fetch') || err.message.includes('Timeout'))) {
-                                    console.log(`🔄 [Popup Resource Test] Retrying ${resourceName} (attempt ${retryCount + 1}/${maxRetries})`);
-                                    return new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
-                                        .then(() => fetchResourceWithFallback(resourceUrl, resourceName, retryCount + 1));
-                                }
-
-                                // If it's the popup.html file, try to reload the page
-                                if (resourceName === 'popup.html' && retryCount === 0) {
-                                    console.log('🔄 [Popup Resource Test] Attempting to reload popup due to missing popup.html');
-                                    setTimeout(() => {
-                                        window.location.reload();
-                                    }, 1000);
-                                }
-
-                                throw err;
-                            });
+                        // Check if Chrome/Browser APIs are available
+                        if (typeof chrome === 'undefined' || !chrome.runtime) {
+                            console.error('❌ [Popup Resource Fix] Chrome APIs not available');
+                            return;
                         }
 
-                        // Test all resources with enhanced error handling
-                        testResources.forEach(resource => {
-                            const resourceUrl = (chrome.runtime || browser.runtime).getURL(resource);
-                            console.log('🔍 [Popup Resource Test] Testing resource:', resourceUrl);
-                            testCount++;
+                        console.log('✅ [Popup Resource Fix] Chrome APIs available');
+                        console.log('   Extension base URL:', chrome.runtime.getURL('/'));
 
-                            fetchResourceWithFallback(resourceUrl, resource)
-                                .catch(() => {
-                                    // Resource failed, but continue testing others
+                        // Monitor network errors for debugging
+                        window.addEventListener('error', function(event) {
+                            if (event.message && event.message.includes('network')) {
+                                console.error('🌐 [Network Error] Network error detected:', {
+                                    message: event.message,
+                                    filename: event.filename,
+                                    lineno: event.lineno
                                 });
-                        });
-
-                        // Final status report
-                        setTimeout(() => {
-                            console.log('📊 [Popup Resource Test] Final Report:');
-                            console.log('   - Success:', successCount + '/' + testCount);
-                            console.log('   - Failed resources:', failedResources);
-
-                            if (successCount === 0) {
-                                console.warn('⚠️ [Popup Resource Test] ALL RESOURCES FAILED - This indicates a serious extension serving issue');
-
-                                // Try to diagnose the problem
-                                console.log('🔍 [Popup Resource Test] Diagnosing extension serving...');
-
-                                // Check if we can access basic extension APIs
-                                if (typeof chrome !== 'undefined' && chrome.runtime) {
-                                    console.log('✅ [Popup Resource Test] Chrome APIs available');
-                                    console.log('   Extension ID:', chrome.runtime.id);
-
-                                    // Test if the extension URL scheme works
-                                    const testUrl = chrome.runtime.getURL('/');
-                                    console.log('   Extension base URL:', testUrl);
-
-                                    // Try a simple XHR to test connectivity
-                                    try {
-                                        const xhr = new XMLHttpRequest();
-                                        xhr.open('GET', testUrl, true);
-                                        xhr.onload = function() {
-                                            if (xhr.status === 200) {
-                                                console.log('✅ [Popup Resource Test] XHR to extension base successful');
-                                            } else {
-                                                console.log('❌ [Popup Resource Test] XHR to extension base failed:', xhr.status);
-                                            }
-                                        };
-                                        xhr.onerror = function() {
-                                            console.error('❌ [Popup Resource Test] XHR to extension base network error');
-                                        };
-                                        xhr.send();
-                                    } catch (xhrError) {
-                                        console.error('❌ [Popup Resource Test] XHR creation failed:', xhrError);
-                                    }
-                                } else {
-                                    console.error('❌ [Popup Resource Test] Chrome APIs not available');
-                                }
-                            } else {
-                                console.log('✅ [Popup Resource Test] Some resources loaded successfully - extension serving is working');
                             }
-                        }, 8000); // Wait 8 seconds for all tests to complete
+                        }, true);
 
-                        // Test external API access
-                        console.log('🌐 [Popup API Test] Testing external API access...');
-                        fetch('https://api.sprig.com/sdk/1/visitors/test/events', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ test: true })
-                        })
-                        .then(response => {
-                            console.log('✅ [Popup API Test] External API response:', response.status);
-                        })
-                        .catch(err => {
-                            console.error('❌ [Popup API Test] External API error:', err);
-                        });
-
-                        // CRITICAL FIX: WebAssembly MIME type workaround
-                        console.log('🔧 [WebAssembly MIME Fix] Applying WebAssembly MIME type workaround...');
-
-                        // Override WebAssembly.instantiateStreaming to handle MIME type issues
                         if (typeof WebAssembly !== 'undefined' && WebAssembly.instantiateStreaming) {
+                            console.log('🔧 [WebAssembly MIME Fix] Applying WebAssembly MIME type workaround...');
+                            
                             const originalInstantiateStreaming = WebAssembly.instantiateStreaming;
 
                             WebAssembly.instantiateStreaming = function(responseSource, importObject) {
-                                console.log('🔧 [WebAssembly MIME Fix] Intercepted instantiateStreaming call');
-
                                 return Promise.resolve(responseSource)
                                     .then(source => {
-                                        // If source is a Response object, check its MIME type
                                         if (source instanceof Response) {
                                             const contentType = source.headers.get('Content-Type');
-                                            console.log('🔧 [WebAssembly MIME Fix] Response Content-Type:', contentType);
-
-                                            // If MIME type is incorrect or missing, fix it
+                                            
+                                            // Fix incorrect MIME type
                                             if (!contentType || !contentType.includes('application/wasm')) {
-                                                console.warn('⚠️ [WebAssembly MIME Fix] Incorrect MIME type detected, applying workaround');
-
-                                                // Create a new Response with the correct MIME type
+                                                console.warn('⚠️ [WebAssembly MIME Fix] Incorrect MIME type, applying workaround');
+                                                
                                                 return source.arrayBuffer().then(buffer => {
                                                     return new Response(buffer, {
                                                         status: source.status,
                                                         statusText: source.statusText,
                                                         headers: {
-                                                            'Content-Type': 'application/wasm',
-                                                            'Content-Length': buffer.byteLength.toString()
+                                                            ...Object.fromEntries(source.headers.entries()),
+                                                            'Content-Type': 'application/wasm'
                                                         }
                                                     });
                                                 });
@@ -2531,76 +2430,50 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                                         }
                                         return source;
                                     })
-                                    .then(fixedSource => {
-                                        // Call the original function with the fixed source
-                                        return originalInstantiateStreaming.call(this, fixedSource, importObject);
-                                    })
-                                    .catch(error => {
-                                        console.error('❌ [WebAssembly MIME Fix] instantiateStreaming failed:', error);
-                                        console.log('🔄 [WebAssembly MIME Fix] Falling back to instantiate + compile');
-
-                                        // Fallback: fetch as arrayBuffer and use instantiate
-                                        if (responseSource instanceof Response) {
-                                            return responseSource.arrayBuffer()
-                                                .then(buffer => WebAssembly.compile(buffer))
-                                                .then(module => WebAssembly.instantiate(module, importObject));
-                                        }
-
-                                        throw error;
+                                    .then(source => originalInstantiateStreaming.call(this, source, importObject))
+                                    .catch(err => {
+                                        console.error('❌ [WebAssembly MIME Fix] Error:', err);
+                                        throw err;
                                     });
                             };
 
-                            console.log('✅ [WebAssembly MIME Fix] WebAssembly.instantiateStreaming workaround installed');
-                        } else {
-                            console.log('ℹ️ [WebAssembly MIME Fix] WebAssembly.instantiateStreaming not available');
+                            console.log('✅ [WebAssembly MIME Fix] Workaround applied');
                         }
 
-                        // Also add a fetch interceptor for .wasm files to fix MIME types
+                        // Fetch interceptor for .wasm files
                         const originalFetch = window.fetch;
                         window.fetch = function(input, init) {
                             const url = typeof input === 'string' ? input : input.url;
 
                             // Intercept .wasm file requests
                             if (url && url.endsWith('.wasm')) {
-                                console.log('🔧 [WebAssembly MIME Fix] Intercepting .wasm fetch request:', url);
-
                                 return originalFetch.call(this, input, init)
                                     .then(response => {
                                         const contentType = response.headers.get('Content-Type');
 
                                         // Fix MIME type if needed
                                         if (!contentType || !contentType.includes('application/wasm')) {
-                                            console.warn('⚠️ [WebAssembly MIME Fix] Fixing WASM MIME type from:', contentType);
-
                                             return response.arrayBuffer().then(buffer => {
                                                 return new Response(buffer, {
                                                     status: response.status,
                                                     statusText: response.statusText,
                                                     headers: {
-                                                        'Content-Type': 'application/wasm',
-                                                        'Content-Length': buffer.byteLength.toString(),
-                                                        // Copy other important headers
-                                                        'Cache-Control': response.headers.get('Cache-Control') || 'public, max-age=3600',
-                                                        'ETag': response.headers.get('ETag') || '',
-                                                        'Last-Modified': response.headers.get('Last-Modified') || ''
+                                                        ...Object.fromEntries(response.headers.entries()),
+                                                        'Content-Type': 'application/wasm'
                                                     }
                                                 });
                                             });
                                         }
-
                                         return response;
                                     });
                             }
 
-                            // For non-wasm requests, use original fetch
-                            return originalFetch.apply(this, arguments);
+                            return originalFetch.call(this, input, init);
                         };
 
-                        console.log('✅ [WebAssembly MIME Fix] WebAssembly MIME type workarounds installed successfully');
-
+                        console.log('✅ [Popup Resource Fix] Initialization complete');
                     })();
                     """
-
                     // Inject both scripts at different times for debugging
                     let simpleTestUserScript = WKUserScript(source: simpleTestScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
                     let resourceFixUserScript = WKUserScript(source: resourceFixScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
@@ -4024,7 +3897,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         return windowAdapter != nil ? [windowAdapter!] : []
     }
 
-    // CRITICAL FIX: Handle extension content script communication
     @available(macOS 15.4, *)
     func webExtensionController(_ controller: WKWebExtensionController, sendMessageToContentScript message: [String : Any]?, toTabWithID tabID: String, in extensionContext: WKWebExtensionContext, completionHandler: @escaping (Result<Any?, Error>) -> Void) {
         print("📨 [ExtensionManager] sendMessageToContentScript called for tabID: \(tabID)")
@@ -4049,7 +3921,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
 
         // Ensure the tab's WebView has the extension controller
         if webView.configuration.webExtensionController !== controller {
-            print("  🔧 [ExtensionManager] CRITICAL FIX: Adding missing extension controller for message handling")
             webView.configuration.webExtensionController = controller
         }
 
@@ -4092,7 +3963,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         }
     }
 
-    // CRITICAL FIX: Handle extension port connections for runtime.connect()
     @available(macOS 15.4, *)
     func webExtensionController(_ controller: WKWebExtensionController, openPortToExtensionContext extensionContext: WKWebExtensionContext, completionHandler: @escaping (Result<Any, Error>) -> Void) {
         print("🔌 [ExtensionManager] openPortToExtensionContext called")
@@ -4106,7 +3976,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         completionHandler(.success(portInfo))
     }
 
-    // CRITICAL FIX: Handle tab requests for extension contexts
     @available(macOS 15.4, *)
     func webExtensionController(_ controller: WKWebExtensionController, tabWithID tabID: String, in extensionContext: WKWebExtensionContext, completionHandler: @escaping (Result<(any WKWebExtensionTab)?, Error>) -> Void) {
         print("🔍 [ExtensionManager] tabWithID called for tabID: \(tabID)")
@@ -4139,6 +4008,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
 
     /// Called when an extension context wants to send a one-time message to an application
     /// This is the CRITICAL method that handles popup-to-service-worker communication
+    /// AND receives responses from the service worker back to the popup
     @available(macOS 15.4, *)
     func webExtensionController(
         _ controller: WKWebExtensionController,
@@ -4161,8 +4031,34 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
 
         print("✅ [ExtensionManager] Extension ID resolved: \(extensionId)")
 
-        // CRITICAL: Route the message to the appropriate context
-        // This handles popup-to-service-worker communication
+        // CRITICAL: Check if this is a response to a pending runtime.sendMessage() call
+        if let messageDict = sendMessage as? [String: Any] {
+            // Check if this message has an ID that matches a pending response
+            if let messageId = messageDict["id"] as? String {
+                print("🔍 [ExtensionManager] Checking for pending response handler for ID: \(messageId)")
+                
+                if let responseHandler = retrieveAndRemovePendingResponse(messageId: messageId) {
+                    // This is a response! Route it back to the original caller
+                    print("📥 [ExtensionManager] ✅ RESPONSE MATCHED! Routing back to original caller")
+                    print("   Response data: \(messageDict)")
+                    
+                    // Extract the response payload
+                    let responseData = messageDict["response"] ?? messageDict
+                    responseHandler(responseData, nil)
+                    
+                    // Acknowledge to the service worker that we received the response
+                    replyHandler(["success": true], nil)
+                    return
+                } else {
+                    print("   ℹ️ No pending response handler found - treating as new message from background")
+                }
+            } else {
+                print("   ℹ️ Message has no ID - treating as new message from background")
+            }
+        }
+
+        // Not a response to a pending request - handle as a new message FROM the background
+        // This handles background-to-popup/content-script communication
         if let messageData = sendMessage as? [String: Any] {
             print("🔧 [ExtensionManager] Routing structured message: \(messageData.keys)")
 
@@ -4195,17 +4091,23 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     @available(macOS 15.4, *)
     func webExtensionController(
         _ controller: WKWebExtensionController,
-        connectUsing: WKWebExtension.MessagePort,
+        connectUsing port: WKWebExtension.MessagePort,
         for extensionContext: WKWebExtensionContext,
         completionHandler: @escaping ((any Error)?) -> Void
     ) {
+        let extensionId = extensionContext.uniqueIdentifier
+        let displayName = extensionContext.webExtension.displayName ?? "Unknown Extension"
+        
         print("🔗 [ExtensionManager] Extension connection request received")
-        print("   Extension: \(extensionContext.webExtension.displayName ?? extensionContext.uniqueIdentifier)")
-        print("   Port: \(connectUsing)")
-
-        // For now, just complete the connection successfully
-        // In a full implementation, we'd manage persistent connections
-        print("✅ [ExtensionManager] Connection established")
+        print("   Extension: \(displayName)")
+        print("   Extension ID: \(extensionId)")
+        print("   Port: \(port)")
+        
+        // Register the message port for this extension
+        // The port name will be extracted from the connection or default to "background"
+        registerMessagePort(port, for: extensionContext, portName: nil)
+        
+        print("✅ [ExtensionManager] Connection established and port registered")
         completionHandler(nil)
     }
 

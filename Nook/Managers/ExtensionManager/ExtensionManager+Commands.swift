@@ -315,37 +315,67 @@ extension ExtensionManager {
             return
         }
         
-        guard let webView = getBackgroundWebView(for: context) else {
-            print("❌ [ExtensionManager+Commands] No background page for extension: \(extensionId)")
-            return
-        }
+        // Use MessagePort to send action click event to background service worker
+        let tabInfo = getCurrentTabInfo() ?? [:]
+        let eventData: [String: Any] = [
+            "tab": tabInfo
+        ]
         
-        let script = """
-        (function() {
-            if (window.chrome && window.chrome.action && window.chrome.action.onClicked) {
-                window.chrome.action.onClicked._trigger({
-                    id: 0,
-                    url: '',
-                    title: '',
-                    active: true,
-                    windowId: 0,
-                    index: 0
-                });
-            }
-        })();
-        """
-        
-        webView.evaluateJavaScript(script) { _, error in
+        sendEventToBackground(eventType: "action.onClicked", 
+                            eventData: eventData, 
+                            for: context) { response, error in
             if let error = error {
-                print("❌ [ExtensionManager+Commands] Error triggering action: \(error)")
+                print("❌ [ExtensionManager+Commands] Error triggering action via MessagePort: \(error.localizedDescription)")
             } else {
-                print("✅ [ExtensionManager+Commands] Action triggered")
+                print("✅ [ExtensionManager+Commands] Action click event sent to background via MessagePort")
             }
         }
     }
     
     private func notifyExtensionOfCommand(command: ChromeCommand) {
         print("📢 [ExtensionManager+Commands] Notifying extension of command: \(command.name)")
+        
+        guard let context = getExtensionContext(for: command.extensionId) else {
+            print("❌ [ExtensionManager+Commands] No context found for extension: \(command.extensionId)")
+            return
+        }
+        
+        // Use MessagePort to send command event to background service worker
+        let eventData: [String: Any] = [
+            "command": command.name,
+            "shortcut": command.shortcut ?? ""
+        ]
+        
+        sendEventToBackground(eventType: "commands.onCommand",
+                            eventData: eventData,
+                            for: context) { response, error in
+            if let error = error {
+                print("❌ [ExtensionManager+Commands] Error sending command via MessagePort: \(error.localizedDescription)")
+            } else {
+                print("✅ [ExtensionManager+Commands] Command '\(command.name)' sent to background via MessagePort")
+            }
+        }
+    }
+    
+    // Helper function for getting current tab info (if not already defined)
+    private func getCurrentTabInfo() -> [String: Any]? {
+        guard let browserManager = browserManagerAccess,
+              let currentTab = browserManager.currentTabForActiveWindow() else {
+            return nil
+        }
+        
+        return [
+            "id": currentTab.id.uuidString,
+            "url": currentTab.url.absoluteString,
+            "title": currentTab.name,
+            "active": true,
+            "windowId": 1 // Simplified window ID
+        ]
+    }
+    
+    // DEPRECATED: WebView approach - replaced by MessagePort system
+    private func notifyExtensionOfCommand_DEPRECATED(command: ChromeCommand) {
+        print("⚠️ [ExtensionManager+Commands] DEPRECATED: Using old WebView injection method")
         
         guard let context = getExtensionContext(for: command.extensionId) else {
             print("❌ [ExtensionManager+Commands] No context found for extension: \(command.extensionId)")
@@ -558,4 +588,3 @@ extension ExtensionManager {
         return string
     }
 }
-
