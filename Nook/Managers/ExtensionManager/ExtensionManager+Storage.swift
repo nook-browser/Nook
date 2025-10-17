@@ -3,7 +3,7 @@
 //  Nook
 //
 //  Chrome Storage API Bridge for WKWebExtension support
-//  Implements chrome.storage.* APIs for Bitwarden compatibility
+//  Implements chrome.storage.* APIs for web extension compatibility
 //
 
 import Foundation

@@ -94,6 +94,7 @@ struct WindowView: View {
                     }
                 }
 
+                
                 // Toast overlays (matches WebsitePopup style/presentation)
                 VStack {
                     HStack {
@@ -137,6 +138,38 @@ struct WindowView: View {
                                     .onTapGesture {
                                         browserManager.hideTabClosureToast()
                                     }
+                            }
+
+                            // Zoom popup toast
+                            if browserManager.shouldShowZoomPopup {
+                                ZoomPopupView(
+                                    zoomManager: browserManager.zoomManager,
+                                    onZoomIn: {
+                                        browserManager.zoomInCurrentTab()
+                                    },
+                                    onZoomOut: {
+                                        browserManager.zoomOutCurrentTab()
+                                    },
+                                    onZoomReset: {
+                                        browserManager.resetZoomCurrentTab()
+                                    },
+                                    onZoomPresetSelected: { zoomLevel in
+                                        browserManager.applyZoomLevel(zoomLevel)
+                                    },
+                                    onDismiss: {
+                                        browserManager.shouldShowZoomPopup = false
+                                    }
+                                )
+                                .animation(
+                                    .spring(
+                                        response: 0.5,
+                                        dampingFraction: 0.8
+                                    ),
+                                    value: browserManager.shouldShowZoomPopup
+                                )
+                                .onTapGesture {
+                                    browserManager.shouldShowZoomPopup = false
+                                }
                             }
                         }
                         .padding(10)

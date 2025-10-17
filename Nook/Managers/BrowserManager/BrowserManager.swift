@@ -322,6 +322,8 @@ class BrowserManager: ObservableObject {
     @Published var shouldNavigateCurrentTab: Bool = false
     // Frame of the URL bar within the window; used to anchor the mini palette precisely
     @Published var urlBarFrame: CGRect = .zero
+    @Published var shouldShowZoomPopup: Bool = false
+    private var zoomPopupHideTimer: Timer?
     @Published var currentProfile: Profile?
     // Indicates an in-progress animated profile transition for coordinating UI
     @Published var isTransitioningProfile: Bool = false
@@ -373,6 +375,7 @@ class BrowserManager: ObservableObject {
     var trackingProtectionManager: TrackingProtectionManager
     var findManager: FindManager
     var importManager: ImportManager
+    var zoomManager = ZoomManager()
 
     var externalMiniWindowManager = ExternalMiniWindowManager()
     @Published var peekManager = PeekManager()
@@ -2483,18 +2486,36 @@ class BrowserManager: ObservableObject {
             let result = await importManager.importArcSidebarData()
             
             for space in result.spaces {
-                self.tabManager.createSpace(name: space.title, icon: space.icon ?? "person")
+                print("========== \(space.title)")
+                self.tabManager.createSpace(name: space.title, icon: space.emoji ?? "person.fill")
                 
                 guard let createdSpace = self.tabManager.spaces.first(where: { $0.name == space.title }) else {
-                    continue
-                }
+                                continue
+                                    }
                 
-                for tab in space.tabs {
+                
+                for tab in space.unpinnedTabs {
+                    print("Unpinned tab - \(tab.title)")
                     self.tabManager.createNewTab(url: tab.url, in: createdSpace)
                 }
+                
+                for tab in space.pinnedTabs {
+                    print("Pinned tab - \(tab.title)")
+                    let newtab = self.tabManager.createNewTab(url: tab.url, in: createdSpace)
+                    self.tabManager.pinTabToSpace(newtab, spaceId: createdSpace.id)
+                }
+                for folder in space.folders {
+                    print("Folder - \(folder.title)")
+                    let newFolder = self.tabManager.createFolder(for: createdSpace.id, name: folder.title)
+                    
+                    for tab in folder.tabs {
+                        let newtab = self.tabManager.createNewTab(url: tab.url, in: createdSpace)
+                        self.tabManager.moveTabToFolder(tab: newtab, folderId: newFolder.id)
+                    }
+                }
             }
-            
             for topTab in result.topTabs {
+                print("TopTab - \(topTab.title)")
                 let tab = self.tabManager.createNewTab(url: topTab.url, in: self.tabManager.spaces.first!)
                 self.tabManager.addToEssentials(tab)
             }
@@ -2703,6 +2724,134 @@ extension BrowserManager {
 
     func installPendingUpdateIfAvailable() {
         appDelegate?.updaterController.checkForUpdates(nil)
+    }
+
+    // MARK: - Zoom Management
+
+    /// Zoom in for the current tab
+    func zoomInCurrentTab() {
+        guard let windowState = activeWindowState,
+              let currentTab = currentTabForActiveWindow(),
+              let webView = getWebView(for: currentTab.id, in: windowState.id) else {
+            return
+        }
+
+        let domain = currentTab.url.host ?? currentTab.url.absoluteString
+        zoomManager.zoomIn(for: webView, domain: domain, tabId: currentTab.id)
+
+        // Show zoom popup feedback
+        shouldShowZoomPopup = true
+
+        // Cancel any existing hide timer
+        zoomPopupHideTimer?.invalidate()
+
+        // Schedule new hide timer
+        zoomPopupHideTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { _ in
+            DispatchQueue.main.async {
+                self.shouldShowZoomPopup = false
+                self.zoomPopupHideTimer = nil
+            }
+        }
+    }
+
+    /// Zoom out for the current tab
+    func zoomOutCurrentTab() {
+        guard let windowState = activeWindowState,
+              let currentTab = currentTabForActiveWindow(),
+              let webView = getWebView(for: currentTab.id, in: windowState.id) else {
+            return
+        }
+
+        let domain = currentTab.url.host ?? currentTab.url.absoluteString
+        zoomManager.zoomOut(for: webView, domain: domain, tabId: currentTab.id)
+
+        // Show zoom popup feedback
+        shouldShowZoomPopup = true
+
+        // Cancel any existing hide timer
+        zoomPopupHideTimer?.invalidate()
+
+        // Schedule new hide timer
+        zoomPopupHideTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { _ in
+            DispatchQueue.main.async {
+                self.shouldShowZoomPopup = false
+                self.zoomPopupHideTimer = nil
+            }
+        }
+    }
+
+    /// Reset zoom to 100% for the current tab
+    func resetZoomCurrentTab() {
+        guard let windowState = activeWindowState,
+              let currentTab = currentTabForActiveWindow(),
+              let webView = getWebView(for: currentTab.id, in: windowState.id) else {
+            return
+        }
+
+        let domain = currentTab.url.host ?? currentTab.url.absoluteString
+        zoomManager.resetZoom(for: webView, domain: domain, tabId: currentTab.id)
+
+        // Show zoom popup feedback
+        shouldShowZoomPopup = true
+
+        // Cancel any existing hide timer
+        zoomPopupHideTimer?.invalidate()
+
+        // Schedule new hide timer
+        zoomPopupHideTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { _ in
+            DispatchQueue.main.async {
+                self.shouldShowZoomPopup = false
+                self.zoomPopupHideTimer = nil
+            }
+        }
+    }
+
+    /// Apply a specific zoom level to the current tab
+    func applyZoomLevel(_ zoomLevel: Double, to tabId: UUID? = nil) {
+        guard let windowState = activeWindowState else { return }
+
+        let targetTabId = tabId ?? (currentTabForActiveWindow()?.id)
+        guard let tabId = targetTabId,
+              let webView = getWebView(for: tabId, in: windowState.id),
+              let tab = tabManager.tabs.first(where: { $0.id == tabId }) else {
+            return
+        }
+
+        let domain = tab.url.host ?? tab.url.absoluteString
+        zoomManager.applyZoom(zoomLevel, to: webView, domain: domain, tabId: tabId)
+    }
+
+    /// Load saved zoom level when a tab navigates to a new domain
+    func loadZoomForTab(_ tabId: UUID) {
+        guard let windowState = activeWindowState,
+              let webView = getWebView(for: tabId, in: windowState.id),
+              let tab = tabManager.tabs.first(where: { $0.id == tabId }),
+              let domain = tab.url.host else {
+            return
+        }
+
+        zoomManager.loadSavedZoom(for: webView, domain: domain, tabId: tabId)
+    }
+
+    /// Clean up zoom data when a tab is closed
+    func cleanupZoomForTab(_ tabId: UUID) {
+        zoomManager.removeTabZoomLevel(for: tabId)
+    }
+
+    /// Get current zoom level for display
+    func getCurrentZoomLevel() -> Double {
+        return zoomManager.currentZoomLevel
+    }
+
+    /// Get current zoom percentage for display
+    func getCurrentZoomPercentage() -> String {
+        return zoomManager.getZoomPercentageDisplay()
+    }
+
+    /// Show zoom popup (for external components to trigger)
+    func showZoomPopup() {
+        // This will be handled by the UI layer (TopBarView) observing zoom changes
+        // For now, we'll rely on the zoom button to show the popup
     }
 
     // MARK: - Default Browser

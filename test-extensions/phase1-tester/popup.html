@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Phase 1 Tester</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      width: 600px;
+      min-height: 500px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 16px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+    }
+    
+    h1 {
+      font-size: 24px;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    
+    .subtitle {
+      font-size: 14px;
+      opacity: 0.9;
+      margin-bottom: 20px;
+    }
+    
+    .test-section {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .test-section h2 {
+      font-size: 18px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .status-badge {
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.2);
+      font-weight: 500;
+    }
+    
+    .status-badge.success {
+      background: rgba(16, 185, 129, 0.3);
+      border: 1px solid rgba(16, 185, 129, 0.5);
+    }
+    
+    .status-badge.warning {
+      background: rgba(245, 158, 11, 0.3);
+      border: 1px solid rgba(245, 158, 11, 0.5);
+    }
+    
+    .status-badge.error {
+      background: rgba(239, 68, 68, 0.3);
+      border: 1px solid rgba(239, 68, 68, 0.5);
+    }
+    
+    button {
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: white;
+      padding: 10px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s;
+      margin: 4px 4px 4px 0;
+    }
+    
+    button:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateY(-1px);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+    
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .result {
+      margin-top: 12px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+      line-height: 1.5;
+    }
+    
+    .result:empty {
+      display: none;
+    }
+    
+    .result .success {
+      color: #10b981;
+    }
+    
+    .result .error {
+      color: #ef4444;
+    }
+    
+    .result .info {
+      color: #60a5fa;
+    }
+    
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+    }
+    
+    .stat-item {
+      background: rgba(0, 0, 0, 0.2);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    
+    .stat-label {
+      opacity: 0.7;
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+    
+    .stat-value {
+      font-size: 18px;
+      font-weight: 600;
+    }
+    
+    .log-entry {
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .log-entry:last-child {
+      border-bottom: none;
+    }
+    
+    .timestamp {
+      opacity: 0.6;
+      font-size: 11px;
+    }
+    
+    .button-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    
+    .clear-btn {
+      background: rgba(239, 68, 68, 0.3);
+      border-color: rgba(239, 68, 68, 0.5);
+    }
+  </style>
+</head>
+<body>
+  <h1>🧪 Phase 1 Tester</h1>
+  <p class="subtitle">Comprehensive test suite for MessagePorts, Runtime Messaging, Commands & Context Menus</p>
+  
+  <!-- Task 1.1: MessagePort Tests -->
+  <div class="test-section">
+    <h2>
+      📬 Task 1.1: MessagePort Management
+      <span class="status-badge" id="task11-status">Pending</span>
+    </h2>
+    <div class="button-group">
+      <button id="connect-port-btn">Connect Port</button>
+      <button id="send-port-message-btn" disabled>Send Port Message</button>
+      <button id="disconnect-port-btn" disabled>Disconnect Port</button>
+    </div>
+    <div id="port-result" class="result"></div>
+    <div class="stats">
+      <div class="stat-item">
+        <div class="stat-label">Active Ports</div>
+        <div class="stat-value" id="port-count">0</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Messages Sent</div>
+        <div class="stat-value" id="port-messages">0</div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Task 1.2: Runtime Message Tests -->
+  <div class="test-section">
+    <h2>
+      💬 Task 1.2: Runtime Messaging
+      <span class="status-badge" id="task12-status">Pending</span>
+    </h2>
+    <div class="button-group">
+      <button id="ping-btn">Send Ping</button>
+      <button id="get-data-btn">Get Data</button>
+      <button id="store-test-btn">Storage Test</button>
+      <button id="round-trip-btn">Round Trip Test</button>
+    </div>
+    <div id="runtime-result" class="result"></div>
+    <div class="stats">
+      <div class="stat-item">
+        <div class="stat-label">Messages Sent</div>
+        <div class="stat-value" id="runtime-sent">0</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Responses Received</div>
+        <div class="stat-value" id="runtime-received">0</div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Task 1.3: Commands Tests -->
+  <div class="test-section">
+    <h2>
+      ⌨️ Task 1.3: Commands
+      <span class="status-badge" id="task13a-status">Pending</span>
+    </h2>
+    <p style="font-size: 13px; opacity: 0.9; margin-bottom: 12px;">
+      Press keyboard shortcuts: Cmd+Shift+1, Cmd+Shift+2, or Cmd+Shift+3
+    </p>
+    <button id="refresh-commands-btn">Refresh Command History</button>
+    <div id="commands-result" class="result"></div>
+    <div class="stats">
+      <div class="stat-item">
+        <div class="stat-label">Total Triggers</div>
+        <div class="stat-value" id="command-count">0</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Last Command</div>
+        <div class="stat-value" id="last-command" style="font-size: 14px;">None</div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Task 1.3: Context Menu Tests -->
+  <div class="test-section">
+    <h2>
+      🖱️ Task 1.3: Context Menus
+      <span class="status-badge" id="task13b-status">Pending</span>
+    </h2>
+    <p style="font-size: 13px; opacity: 0.9; margin-bottom: 12px;">
+      Right-click on any page and select a "Test Menu Item"
+    </p>
+    <button id="refresh-menu-btn">Refresh Menu History</button>
+    <button id="clear-menu-btn" class="clear-btn">Clear History</button>
+    <div id="menu-result" class="result"></div>
+    <div class="stats">
+      <div class="stat-item">
+        <div class="stat-label">Total Clicks</div>
+        <div class="stat-value" id="menu-count">0</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Last Menu</div>
+        <div class="stat-value" id="last-menu" style="font-size: 14px;">None</div>
+      </div>
+    </div>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
+

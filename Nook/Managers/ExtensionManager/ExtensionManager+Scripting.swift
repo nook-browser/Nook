@@ -3,7 +3,7 @@
 //  Nook
 //
 //  Chrome Scripting API Bridge for WKWebExtension support
-//  Implements chrome.scripting.* APIs for Bitwarden compatibility
+//  Implements chrome.scripting.* APIs for web extension compatibility
 //
 
 import Foundation
@@ -273,143 +273,6 @@ extension ExtensionManager {
         }
     }
 
-    // MARK: - Content Script Registration
-
-    /// Registers content scripts from the extension manifest
-    func registerContentScripts(from manifest: [String: Any], extensionContext: WKWebExtensionContext) {
-        guard let contentScripts = manifest["content_scripts"] as? [[String: Any]] else {
-            return
-        }
-
-        print("[ExtensionManager+Scripting] Registering \(contentScripts.count) content script declarations")
-
-        for scriptDeclaration in contentScripts {
-            registerContentScript(scriptDeclaration, extensionContext: extensionContext)
-        }
-    }
-
-    private func registerContentScript(_ declaration: [String: Any], extensionContext: WKWebExtensionContext) {
-        guard let matches = declaration["matches"] as? [String] else { return }
-
-        let contentScript = ContentScriptDeclaration(
-            matches: matches,
-            js: declaration["js"] as? [String] ?? [],
-            css: declaration["css"] as? [String] ?? [],
-            runAt: declaration["run_at"] as? String ?? "document_idle",
-            allFrames: declaration["all_frames"] as? Bool ?? false,
-            matchAboutBlank: declaration["match_about_blank"] as? Bool ?? false
-        )
-
-        // Store for later injection when pages load
-        if extensionContentScripts[getExtensionId(for: extensionContext) ?? ""] == nil {
-            extensionContentScripts[getExtensionId(for: extensionContext) ?? ""] = []
-        }
-        extensionContentScripts[getExtensionId(for: extensionContext) ?? ""]?.append(contentScript)
-
-        print("[ExtensionManager+Scripting] Registered content script for: \(matches.joined(separator: ", "))")
-    }
-
-    /// Injects content scripts when a page loads
-    func injectContentScriptsForURL(_ url: URL, in webView: WKWebView, extensionContext: WKWebExtensionContext) {
-        let extensionId = getExtensionId(for: extensionContext) ?? ""
-        guard let contentScripts = extensionContentScripts[extensionId] else { return }
-
-        print("[ExtensionManager+Scripting] Checking content scripts for URL: \(url.absoluteString)")
-
-        for scriptDeclaration in contentScripts {
-            if shouldInjectContentScript(scriptDeclaration, for: url) {
-                injectContentScript(scriptDeclaration, in: webView, extensionContext: extensionContext)
-            }
-        }
-    }
-
-    private func shouldInjectContentScript(_ script: ContentScriptDeclaration, for url: URL) -> Bool {
-        // Simple URL pattern matching - could be enhanced with proper pattern matching
-        for pattern in script.matches {
-            if urlMatchesPattern(url, pattern: pattern) {
-                return true
-            }
-        }
-        return false
-    }
-
-    private func urlMatchesPattern(_ url: URL, pattern: String) -> Bool {
-        // Simplified pattern matching for common cases
-        if pattern == "<all_urls>" {
-            return true
-        }
-
-        if pattern.contains("*") {
-            let wildcardPattern = pattern.replacingOccurrences(of: "*", with: ".*")
-            let regex = try? NSRegularExpression(pattern: wildcardPattern, options: .caseInsensitive)
-            let range = NSRange(location: 0, length: url.absoluteString.utf16.count)
-            return regex?.firstMatch(in: url.absoluteString, options: [], range: range) != nil
-        }
-
-        return url.absoluteString.hasPrefix(pattern)
-    }
-
-    private func injectContentScript(_ script: ContentScriptDeclaration, in webView: WKWebView, extensionContext: WKWebExtensionContext) {
-        print("[ExtensionManager+Scripting] Injecting content script: \(script)")
-
-        Task { @MainActor in
-            // Inject CSS files first
-            for cssFile in script.css {
-                do {
-                    try await insertCSSFile(cssFile, in: webView, frameId: nil, extensionContext: extensionContext)
-                } catch {
-                    print("[ExtensionManager+Scripting] Failed to inject CSS file \(cssFile): \(error)")
-                }
-            }
-
-            // Inject JS files based on run timing
-            let injectionScript: String
-            switch script.runAt {
-            case "document_start":
-                injectionScript = "(function() { /* Document start scripts */ })();"
-            case "document_end":
-                injectionScript = """
-                (function() {
-                    if (document.readyState === 'loading') {
-                        document.addEventListener('DOMContentLoaded', function() {
-                            /* Document end scripts */
-                        });
-                    } else {
-                        /* Document end scripts */
-                    }
-                })();
-                """
-            default: // document_idle
-                injectionScript = """
-                (function() {
-                    if (document.readyState === 'complete') {
-                        /* Document idle scripts */
-                    } else {
-                        document.addEventListener('load', function() {
-                            /* Document idle scripts */
-                        });
-                    }
-                })();
-                """
-            }
-
-            do {
-                try await executeScriptInFrame(injectionScript, in: webView, frameId: nil)
-            } catch {
-                print("[ExtensionManager+Scripting] Failed to inject content script timing: \(error)")
-            }
-
-            // Inject actual JS files
-            for jsFile in script.js {
-                do {
-                    _ = try await executeFileInjection(jsFile, in: webView, frameId: nil, extensionContext: extensionContext)
-                } catch {
-                    print("[ExtensionManager+Scripting] Failed to inject JS file \(jsFile): \(error)")
-                }
-            }
-        }
-    }
-
     // MARK: - JavaScript API Injection
 
     /// Injects the Chrome Scripting API bridge into a web view
@@ -521,37 +384,10 @@ struct ScriptingResult {
 }
 
 @available(macOS 15.4, *)
-struct ContentScriptDeclaration {
-    let matches: [String]
-    let js: [String]
-    let css: [String]
-    let runAt: String
-    let allFrames: Bool
-    let matchAboutBlank: Bool
-}
-
-@available(macOS 15.4, *)
 enum ScriptingError: Error {
     case fileNotFound
     case fileLoadFailed
     case scriptExecutionFailed
-}
-
-// MARK: - Storage for Content Scripts
-@available(macOS 15.4, *)
-extension ExtensionManager {
-    private var extensionContentScripts: [String: [ContentScriptDeclaration]] {
-        get {
-            return objc_getAssociatedObject(self, &AssociatedKeys.contentScripts) as? [String: [ContentScriptDeclaration]] ?? [:]
-        }
-        set {
-            objc_setAssociatedObject(self, &AssociatedKeys.contentScripts, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-        }
-    }
-}
-
-private struct AssociatedKeys {
-    static var contentScripts = "extensionContentScripts"
 }
 
 // MARK: - WKScriptMessageHandler for Scripting

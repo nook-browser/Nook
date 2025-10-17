@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Clipboard API Test Extension",
+  "version": "1.0.0",
+  "description": "Test extension for validating navigator.clipboard API implementation in Nook",
+  "permissions": [
+    "clipboardRead",
+    "clipboardWrite"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Clipboard API Tester"
+  },
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  }
+}
+

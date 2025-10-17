@@ -823,25 +823,24 @@ class TabManager: ObservableObject {
 
     // MARK: - Folder Management
 
-    func createFolder(for spaceId: UUID) {
+    func createFolder(for spaceId: UUID, name: String = "New Folder") -> TabFolder {
         print("📁 Creating folder for spaceId: \(spaceId.uuidString)")
         let folder = TabFolder(
-            name: "New Folder",
+            name: name,
             spaceId: spaceId,
             color: spaces.first(where: { $0.id == spaceId })?.color ?? .controlAccentColor
         )
         print("   Created folder: \(folder.name) (id: \(folder.id.uuidString.prefix(8))...)")
 
         var folders = foldersBySpace[spaceId] ?? []
-        let oldCount = folders.count
         folders.append(folder)
         setFolders(folders, for: spaceId)
-        print("   Added to foldersBySpace[\(spaceId.uuidString.prefix(8))...]: \(oldCount) → \(folders.count) folders")
 
         // Send notification for SpaceView folderChangeCount
         NotificationCenter.default.post(name: .init("TabFoldersDidChange"), object: nil)
 
         persistSnapshot()
+        return folder
     }
 
     func renameFolder(_ folderId: UUID, newName: String) {
@@ -878,7 +877,6 @@ class TabManager: ObservableObject {
                 var mutableFolders = folders
                 mutableFolders.remove(at: index)
                 setFolders(mutableFolders, for: spaceId)
-                print("   Removed folder from foldersBySpace[\(spaceId.uuidString.prefix(8))...]: \(folders.count) → \(mutableFolders.count) folders")
 
                 // Send notification for SpaceView folderChangeCount
                 NotificationCenter.default.post(name: .init("TabFoldersDidChange"), object: nil)
@@ -902,6 +900,17 @@ class TabManager: ObservableObject {
                 break
             }
         }
+    }
+    func moveTabToFolder(tab: Tab, folderId: UUID) {
+        let newTab = tab
+        removeFromCurrentContainer(newTab)
+        newTab.folderId = folderId
+        newTab.isSpacePinned = true
+        var sp = spacePinnedTabs[tab.spaceId!] ?? []
+        sp.append(tab)
+        // Reindex
+        for (i, t) in sp.enumerated() { t.index = i }
+        setSpacePinnedTabs(sp, for: tab.spaceId!)
     }
 
     // MARK: - Tab Management (Normal within current space)

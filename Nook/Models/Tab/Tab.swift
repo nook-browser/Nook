@@ -435,12 +435,9 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
         print("Created WebView for tab: \(name)")
 
-        // CRITICAL FIX: Double-check extension controller association before notifying extensions
-        // This ensures content scripts can find their tab when injected
         if #available(macOS 15.5, *) {
             if let controller = ExtensionManager.shared.nativeController {
                 if _webView?.configuration.webExtensionController !== controller {
-                    print("  🔧 [Tab] CRITICAL FIX: Adding missing extension controller to WebView")
                     _webView?.configuration.webExtensionController = controller
                 }
             }
@@ -504,7 +501,10 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         hasPiPActive = false
         loadingState = .idle
 
-        // 12. FORCE COMPOSITOR UPDATE
+        // 13. CLEANUP ZOOM DATA
+        browserManager?.cleanupZoomForTab(self.id)
+
+        // 14. FORCE COMPOSITOR UPDATE
         // Note: This is called during tab loading, so we use the global current tab
         // The compositor will handle window-specific visibility in its update methods
         browserManager?.compositorManager.updateTabVisibility(currentTabId: browserManager?.tabManager.currentTab?.id)
@@ -2009,6 +2009,9 @@ extension Tab: WKNavigationDelegate {
                 ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
             }
             browserManager?.syncTabAcrossWindows(self.id)
+
+            // Load saved zoom level for the new domain
+            browserManager?.loadZoomForTab(self.id)
             
             // CHROME WEB STORE INTEGRATION: Inject script after navigation
             injectWebStoreScriptIfNeeded(for: newURL, in: webView)
@@ -2098,7 +2101,6 @@ extension Tab: WKNavigationDelegate {
         print("   Error: \(error.localizedDescription)")
         loadingState = .didFailProvisionalNavigation(error)
 
-        // CRITICAL FIX: Handle CORS failures for extension API access
         let nsError = error as NSError
         if nsError.domain == NSURLErrorDomain && (nsError.code == NSURLErrorNotConnectedToInternet || nsError.code == NSURLErrorNetworkConnectionLost || nsError.code == NSURLErrorResourceUnavailable) {
             if let failedURL = nsError.userInfo[NSURLErrorFailingURLStringErrorKey] as? String,

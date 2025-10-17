@@ -398,28 +398,35 @@ extension ExtensionManager {
             return
         }
         
-        guard let webView = getBackgroundWebView(for: context) else {
-            print("❌ [ExtensionManager+Notifications] No background page for extension: \(extensionId)")
-            return
-        }
-        
-        let buttonIndexValue = buttonIndex ?? -1
-        let script = """
-        (function() {
-            if (window.chrome && window.chrome.notifications && window.chrome.notifications.onClicked) {
-                window.chrome.notifications.onClicked._trigger('\(notificationId)');
+        // Use MessagePort to send notification click events to background service worker
+        if let buttonIdx = buttonIndex {
+            // Button click event
+            let eventData: [String: Any] = [
+                "notificationId": notificationId,
+                "buttonIndex": buttonIdx
+            ]
+            sendEventToBackground(eventType: "notifications.onButtonClicked",
+                                eventData: eventData,
+                                for: context) { response, error in
+                if let error = error {
+                    print("❌ [ExtensionManager+Notifications] Error sending button click via MessagePort: \(error.localizedDescription)")
+                } else {
+                    print("✅ [ExtensionManager+Notifications] Button click event sent to background via MessagePort")
+                }
             }
-            if (\(buttonIndexValue) >= 0 && window.chrome && window.chrome.notifications && window.chrome.notifications.onButtonClicked) {
-                window.chrome.notifications.onButtonClicked._trigger('\(notificationId)', \(buttonIndexValue));
-            }
-        })();
-        """
-        
-        webView.evaluateJavaScript(script) { _, error in
-            if let error = error {
-                print("❌ [ExtensionManager+Notifications] Error notifying extension: \(error)")
-            } else {
-                print("✅ [ExtensionManager+Notifications] Extension notified of click")
+        } else {
+            // Notification click event
+            let eventData: [String: Any] = [
+                "notificationId": notificationId
+            ]
+            sendEventToBackground(eventType: "notifications.onClicked",
+                                eventData: eventData,
+                                for: context) { response, error in
+                if let error = error {
+                    print("❌ [ExtensionManager+Notifications] Error sending notification click via MessagePort: \(error.localizedDescription)")
+                } else {
+                    print("✅ [ExtensionManager+Notifications] Notification click event sent to background via MessagePort")
+                }
             }
         }
     }
@@ -432,24 +439,19 @@ extension ExtensionManager {
             return
         }
         
-        guard let webView = getBackgroundWebView(for: context) else {
-            print("❌ [ExtensionManager+Notifications] No background page for extension: \(extensionId)")
-            return
-        }
+        // Use MessagePort to send notification closed event to background service worker
+        let eventData: [String: Any] = [
+            "notificationId": notificationId,
+            "byUser": byUser
+        ]
         
-        let script = """
-        (function() {
-            if (window.chrome && window.chrome.notifications && window.chrome.notifications.onClosed) {
-                window.chrome.notifications.onClosed._trigger('\(notificationId)', \(byUser));
-            }
-        })();
-        """
-        
-        webView.evaluateJavaScript(script) { _, error in
+        sendEventToBackground(eventType: "notifications.onClosed",
+                            eventData: eventData,
+                            for: context) { response, error in
             if let error = error {
-                print("❌ [ExtensionManager+Notifications] Error notifying extension: \(error)")
+                print("❌ [ExtensionManager+Notifications] Error sending notification closed via MessagePort: \(error.localizedDescription)")
             } else {
-                print("✅ [ExtensionManager+Notifications] Extension notified of closed")
+                print("✅ [ExtensionManager+Notifications] Notification closed event sent to background via MessagePort")
             }
         }
     }
@@ -724,4 +726,3 @@ extension ExtensionManager {
         return string
     }
 }
-
