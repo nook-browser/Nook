@@ -430,12 +430,18 @@ struct SpaceView: View {
             Color.clear
                 .frame(height: 4)
                 .overlay(alignment: .center) {
-                    RoundedRectangle(cornerRadius: 1.5)
-                        .fill(AppColors.textSecondary)
-                        .frame(height: isActive ? 3 : 0)
-                        .padding(.horizontal, 8)
-                        .opacity(isActive ? 0.8 : 0)
-                        .animation(.easeInOut(duration: 0.15), value: isActive)
+                    HStack(spacing: 0) {
+                        Circle()
+                            .stroke(gradientColorManager.primaryColor , lineWidth: 2)
+                            .frame(width: isActive ? 8 : 0 , height: isActive ? 8 : 0)
+                            
+                        Rectangle()
+                            .fill(gradientColorManager.primaryColor)
+                            .frame(height: isActive ? 2 : 0)
+                    }
+                    .padding(.horizontal, 8)
+                    .opacity(isActive ? 0.8 : 0)
+                    .animation(.easeInOut(duration: 0.15), value: isActive)
                 }
 
             Color.clear
