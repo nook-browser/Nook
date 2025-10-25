@@ -30,7 +30,7 @@ struct WindowView: View {
                 // Gradient background for the current space (bottom-most layer)
                 SpaceGradientBackgroundView()
                     .environmentObject(windowState)
-                
+
                 // Attach background context menu to the window background layer
                 Color.white.opacity(isDark ? 0.3 : 0.4)
                     .ignoresSafeArea(.all)
@@ -49,10 +49,8 @@ struct WindowView: View {
                             .environmentObject(browserManager)
                             .environmentObject(windowState)
                             .background(Color.clear)
-                        
                         mainLayout
                     }
-                    
                     // TopBar Command Palette overlay
                     TopBarCommandPalette()
                         .environmentObject(browserManager)
@@ -94,7 +92,7 @@ struct WindowView: View {
                     }
                 }
 
-                
+
                 // Toast overlays (matches WebsitePopup style/presentation)
                 VStack {
                     HStack {
@@ -219,8 +217,8 @@ struct WindowView: View {
                 sidebarColumn
             }
         }
-        .padding(.trailing, windowState.isFullScreen ? 0 : (windowState.isSidebarVisible && browserManager.settingsManager.sidebarPosition == .right ? 0 : aiVisible ? 0 : 8))
-        .padding(.leading, windowState.isFullScreen ? 0 : (windowState.isSidebarVisible && browserManager.settingsManager.sidebarPosition == .left ? 0 : aiVisible ? 0 : 8))
+        .padding(.trailing, (windowState.isFullScreen || browserManager.settingsManager.borderless) ? 0 : (windowState.isSidebarVisible && browserManager.settingsManager.sidebarPosition == .right ? 0 : aiVisible ? 0 : 8))
+        .padding(.leading, (windowState.isFullScreen || browserManager.settingsManager.borderless) ? 0 : (windowState.isSidebarVisible && browserManager.settingsManager.sidebarPosition == .left ? 0 : aiVisible ? 0 : 8))
     }
 
     private var sidebarColumn: some View {
@@ -230,7 +228,7 @@ struct WindowView: View {
             if windowState.isSidebarVisible {
                 // Position to span 14pts into sidebar and 2pts into web content (moved 6pts left)
                 SidebarResizeView()
-                
+
                     .frame(maxHeight: .infinity)
                     .environmentObject(browserManager)
                     .environmentObject(windowState)
