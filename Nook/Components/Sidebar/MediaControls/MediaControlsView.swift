@@ -19,6 +19,19 @@ struct MediaControlsView: View {
     @State private var mediaControlsManager: MediaControlsManager?
     @State private var updateTask: Task<Void, Never>?
 
+    // Width thresholds for collapsing behavior
+    private var effectiveWidth: CGFloat {
+        windowState.sidebarWidth - 16 // Account for horizontal padding
+    }
+
+    private var shouldShowFavicon: Bool {
+        effectiveWidth >= 200
+    }
+
+    private var shouldShowPreviousButton: Bool {
+        effectiveWidth >= 150
+    }
+
     // Check if media is currently playing (derived from Tab state)
     private var isPlaying: Bool {
         if let overrideIsPlaying {
@@ -49,31 +62,41 @@ struct MediaControlsView: View {
                             .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .leading)))
                     }
                     HStack(spacing: 0) {
-                        // Tab favicon
-                        tab.favicon
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 20, height: 20)
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                        // Tab favicon (collapses first)
+                        if shouldShowFavicon {
+                            tab.favicon
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 20, height: 20)
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                                .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                        }
 
-                        Spacer()
+                        if shouldShowFavicon {
+                            Spacer()
+                        }
 
-                        // Previous button
-                        Button("Previous", systemImage: "backward.fill") {
-                            Task {
-                                guard let manager = mediaControlsManager else { return }
-                                await manager.previous(tab: tab)
-                                await MainActor.run {
-                                    updateMediaState()
+                        // Previous button (collapses second)
+                        if shouldShowPreviousButton {
+                            Button("Previous", systemImage: "backward.fill") {
+                                Task {
+                                    guard let manager = mediaControlsManager else { return }
+                                    await manager.previous(tab: tab)
+                                    await MainActor.run {
+                                        updateMediaState()
+                                    }
                                 }
                             }
+                            .labelStyle(.iconOnly)
+                            .buttonStyle(NavButtonStyle())
+                            .foregroundStyle(Color.white)
+                            .help("Previous")
+                            .transition(.opacity.combined(with: .scale(scale: 0.8)))
                         }
-                        .labelStyle(.iconOnly)
-                        .buttonStyle(NavButtonStyle())
-                        .foregroundStyle(Color.white)
-                        .help("Previous")
 
-                        Spacer()
+                        if shouldShowPreviousButton || shouldShowFavicon {
+                            Spacer()
+                        }
 
                         // Play/Pause button
                         Button(isPlaying ? "Pause" : "Play", systemImage: isPlaying ? "pause.fill" : "play.fill") {
@@ -152,6 +175,8 @@ struct MediaControlsView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: hasActiveMedia)
+        .animation(.easeInOut(duration: 0.2), value: shouldShowFavicon)
+        .animation(.easeInOut(duration: 0.2), value: shouldShowPreviousButton)
         .onAppear {
             if mediaControlsManager == nil {
                 mediaControlsManager = MediaControlsManager(browserManager: browserManager, windowState: windowState)
@@ -171,6 +196,11 @@ struct MediaControlsView: View {
             if newPhase == .active {
                 updateMediaState()
             }
+        }
+        // Trigger when sidebar width changes to update collapsing behavior
+        .onChange(of: windowState.sidebarWidth) { _, _ in
+            // SwiftUI automatically recomputes shouldShowFavicon and shouldShowPreviousButton
+            // when windowState.sidebarWidth changes, so no explicit update needed
         }
         // Slower fallback timer (10 seconds) - catches edge cases where events don't fire
         // Tab's JavaScript already checks every 5 seconds, so this is just a safety net
