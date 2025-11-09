@@ -70,9 +70,6 @@ struct WebsiteView: View {
                         .background(shouldShowSplit ? Color.clear : Color(nsColor: .windowBackgroundColor))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .clipShape(RoundedRectangle(cornerRadius: {
-                            if windowState.isFullScreen {
-                                return 0
-                            }
                             if #available(macOS 26.0, *) {
                                 return 12
                             } else {
