@@ -1,4 +1,5 @@
 import AppKit
+import WebKit
 
 final class SplitDropCaptureView: NSView {
     weak var browserManager: BrowserManager?
@@ -26,7 +27,14 @@ final class SplitDropCaptureView: NSView {
     }
 
     // Only intercept events during an active drag; otherwise pass through
-    override func hitTest(_ point: NSPoint) -> NSView? { isDragActive ? self : nil }
+    override func hitTest(_ point: NSPoint) -> NSView? { 
+        // Return nil to pass through all mouse events when not dragging
+        // This allows right-clicks to reach the webview below for context menus
+        return isDragActive ? self : nil 
+    }
+    
+    // Override acceptsFirstResponder to prevent this view from intercepting events
+    override var acceptsFirstResponder: Bool { false }
 
     // MARK: - Dragging
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
