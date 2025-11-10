@@ -2240,12 +2240,14 @@ class BrowserManager: ObservableObject {
         }
         
         // Create the new web view
-        let newWebView = WKWebView(frame: .zero, configuration: configuration)
+        let newWebView = FocusableWKWebView(frame: .zero, configuration: configuration)
         newWebView.navigationDelegate = tab
         newWebView.uiDelegate = tab
         newWebView.allowsBackForwardNavigationGestures = true
         newWebView.allowsMagnification = true
         newWebView.setValue(false, forKey: "drawsBackground")
+        newWebView.owningTab = tab
+        newWebView.contextMenuBridge = WebContextMenuBridge(tab: tab, configuration: configuration)
         
         // Set up message handlers
         newWebView.configuration.userContentController.add(tab, name: "linkHover")

@@ -132,6 +132,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
 
     private var _webView: WKWebView?
+    var pendingContextMenuPayload: WebContextMenuPayload?
     var didNotifyOpenToExtensions: Bool = false
     var webView: WKWebView? {
         if _webView == nil {
@@ -371,7 +372,10 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         }
 
         _webView = FocusableWKWebView(frame: .zero, configuration: configuration)
-        if let fv = _webView as? FocusableWKWebView { fv.owningTab = self }
+        if let fv = _webView as? FocusableWKWebView {
+            fv.owningTab = self
+            fv.contextMenuBridge = WebContextMenuBridge(tab: self, configuration: configuration)
+        }
         _webView?.navigationDelegate = self
         _webView?.uiDelegate = self
         _webView?.allowsBackForwardNavigationGestures = true
@@ -1666,7 +1670,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             }
         }
     }
-    
+
+
     private func injectHistoryStateObserver(into webView: WKWebView) {
         let historyScript = """
         (function() {
@@ -2249,7 +2254,8 @@ extension Tab: WKNavigationDelegate {
         }
         
         print("🔽 [Tab] Download destination set: \(dest.path)")
-        completionHandler(dest, false) // false = don't allow overwrite
+        // Return true to grant sandbox extension - this allows WebKit to write to the destination
+        completionHandler(dest, true)
     }
     
     public func download(_ download: WKDownload, didFinishDownloadingTo location: URL) {
@@ -3014,6 +3020,15 @@ extension Tab {
 
     public override var hash: Int {
         return id.hashValue
+    }
+}
+
+extension Tab {
+    func deliverContextMenuPayload(_ payload: WebContextMenuPayload?) {
+        pendingContextMenuPayload = payload
+        if let webView = _webView as? FocusableWKWebView {
+            webView.contextMenuPayloadDidUpdate(payload)
+        }
     }
 }
 
