@@ -2600,6 +2600,46 @@ extension Tab: WKUIDelegate {
         alert.runModal()
         completionHandler()
     }
+    
+    public func webView(
+        _ webView: WKWebView,
+        runJavaScriptConfirmPanelWithMessage message: String,
+        initiatedByFrame frame: WKFrameInfo,
+        completionHandler: @escaping (Bool) -> Void
+    ) {
+        let alert = NSAlert()
+        alert.messageText = "JavaScript Confirm"
+        alert.informativeText = message
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Cancel")
+        let result = alert.runModal()
+        completionHandler(result == .alertFirstButtonReturn)
+    }
+    
+    public func webView(
+        _ webView: WKWebView,
+        runJavaScriptTextInputPanelWithPrompt prompt: String,
+        defaultText: String?,
+        initiatedByFrame frame: WKFrameInfo,
+        completionHandler: @escaping (String?) -> Void
+    ) {
+        let alert = NSAlert()
+        alert.messageText = "JavaScript Prompt"
+        alert.informativeText = prompt
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Cancel")
+        
+        let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+        textField.stringValue = defaultText ?? ""
+        alert.accessoryView = textField
+        
+        let result = alert.runModal()
+        if result == .alertFirstButtonReturn {
+            completionHandler(textField.stringValue)
+        } else {
+            completionHandler(nil)
+        }
+    }
 
     // MARK: - File Upload Support
     public func webView(
@@ -2700,6 +2740,24 @@ extension Tab: WKUIDelegate {
         
         // Call completion handler immediately - WebKit will handle the actual full-screen transition
         completionHandler(true, nil)
+    }
+    
+    // MARK: - WebAuthn / Passkey Support
+    
+    /// Handle requests for media capture authorization (including WebAuthn/passkey requests)
+    @available(macOS 13.0, *)
+    public func webView(
+        _ webView: WKWebView,
+        requestMediaCaptureAuthorization type: WKMediaCaptureType,
+        for origin: WKSecurityOrigin,
+        initiatedByFrame frame: WKFrameInfo,
+        decisionHandler: @escaping (WKPermissionDecision) -> Void
+    ) {
+        print("🔐 [Tab] Media capture authorization requested for type: \(type.rawValue) from origin: \(origin)")
+        
+        // For passkeys/WebAuthn, we want to grant permission
+        // The system will handle the actual Touch ID/Face ID prompt
+        decisionHandler(.grant)
     }
 }
 
