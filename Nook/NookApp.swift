@@ -5,12 +5,12 @@
 //  Created by Maciek Bagiński on 28/07/2025.
 //
 
-import SwiftUI
-import WebKit
-import OSLog
 import AppKit
 import Carbon
+import OSLog
 import Sparkle
+import SwiftUI
+import WebKit
 
 @main
 struct NookApp: App {
@@ -29,7 +29,8 @@ struct NookApp: App {
                     browserManager.appDelegate = appDelegate
 
                     // Initialize keyboard shortcut manager
-                    browserManager.settingsManager.keyboardShortcutManager.setBrowserManager(browserManager)
+                    browserManager.settingsManager.keyboardShortcutManager.setBrowserManager(
+                        browserManager)
                 }
         }
         .windowStyle(.hiddenTitleBar)
@@ -47,7 +48,8 @@ struct NookApp: App {
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
-    private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "AppTermination")
+    private static let log = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "AppTermination")
     weak var browserManager: BrowserManager?
     private let urlEventClass = AEEventClass(kInternetEventClass)
     private let urlEventID = AEEventID(kAEGetURL)
@@ -55,7 +57,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
 
     // Sparkle updater controller
     lazy var updaterController: SPUStandardUpdaterController = {
-        return SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: self, userDriverDelegate: nil)
+        return SPUStandardUpdaterController(
+            startingUpdater: true, updaterDelegate: self, userDriverDelegate: nil)
     }()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -65,68 +68,70 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             forEventClass: urlEventClass,
             andEventID: urlEventID
         )
-        
-        mouseEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .otherMouseDown) { [weak self] event in
-                    guard let self = self, let manager = self.browserManager else { return event }
-                    
-                    switch event.buttonNumber {
-                    case 2:
-                        manager.openCommandPalette()
-                    case 3:
-                        guard
-                            let windowState = manager.activeWindowState,
-                            let currentTab = manager.currentTabForActiveWindow(),
-                            let webView = manager.getWebView(for: currentTab.id, in: windowState.id)
-                        else {
-                            return event
-                        }
 
-                        webView.goBack()
-                    case 4:
-                        guard
-                            let windowState = manager.activeWindowState,
-                            let currentTab = manager.currentTabForActiveWindow(),
-                            let webView = manager.getWebView(for: currentTab.id, in: windowState.id)
-                        else {
-                            return event
-                        }
-                        webView.goForward()
-                    default:
-                        break
-                    }
+        mouseEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .otherMouseDown) {
+            [weak self] event in
+            guard let self = self, let manager = self.browserManager else { return event }
+
+            switch event.buttonNumber {
+            case 2:
+                manager.openCommandPalette()
+            case 3:
+                guard
+                    let windowState = manager.activeWindowState,
+                    let currentTab = manager.currentTabForActiveWindow(),
+                    let webView = manager.getWebView(for: currentTab.id, in: windowState.id)
+                else {
                     return event
                 }
+
+                webView.goBack()
+            case 4:
+                guard
+                    let windowState = manager.activeWindowState,
+                    let currentTab = manager.currentTabForActiveWindow(),
+                    let webView = manager.getWebView(for: currentTab.id, in: windowState.id)
+                else {
+                    return event
+                }
+                webView.goForward()
+            default:
+                break
+            }
+            return event
+        }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
         urls.forEach { handleIncoming(url: $0) }
     }
-    
+
     // Prefer async termination path to avoid MainActor deadlocks
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let reason = NSAppleEventManager.shared()
             .currentAppleEvent?
             .attributeDescriptor(forKeyword: kAEQuitReason)
-        
+
         switch reason?.enumCodeValue {
         case nil: self.handletermination(sender: sender, shouldTerminate: true)
 
         default:
             handletermination(sender: sender, shouldTerminate: true)
         }
-        
+
         return .terminateLater
     }
-    
+
     private func handletermination(sender: NSApplication, shouldTerminate: Bool) {
-        AppDelegate.log.info("applicationShouldTerminate: returning terminateLater and starting async persistence")
-    
+        AppDelegate.log.info(
+            "applicationShouldTerminate: returning terminateLater and starting async persistence")
+
         Task { @MainActor in
             guard shouldTerminate else {
                 sender.reply(toApplicationShouldTerminate: false)
                 return
             }
-            
+
             // Minimal fallback if BrowserManager is unavailable
             guard let manager = browserManager else {
                 // Attempt a best-effort save via shared persistence container
@@ -135,12 +140,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
                     try ctx.save()
                     AppDelegate.log.info("Fallback save without BrowserManager succeeded")
                 } catch {
-                    AppDelegate.log.error("Fallback save without BrowserManager failed: \(String(describing: error))")
+                    AppDelegate.log.error(
+                        "Fallback save without BrowserManager failed: \(String(describing: error))")
                 }
                 sender.reply(toApplicationShouldTerminate: true)
                 return
             }
-            
+
             let overallStart = CFAbsoluteTimeGetCurrent()
             AppDelegate.log.info("Termination task started on MainActor")
 
@@ -148,7 +154,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             let persistStart = CFAbsoluteTimeGetCurrent()
             let atomic: Bool = await manager.tabManager.persistSnapshotAwaitingResult()
             let pdt = CFAbsoluteTimeGetCurrent() - persistStart
-            AppDelegate.log.info("Atomic persistence \(atomic ? "succeeded" : "did not run; fallback used") in \(String(format: "%.3f", pdt))s")
+            AppDelegate.log.info(
+                "Atomic persistence \(atomic ? "succeeded" : "did not run; fallback used") in \(String(format: "%.3f", pdt))s"
+            )
 
             // Phase 2: Ensure SwiftData changes are committed
             let contextSaveStart = CFAbsoluteTimeGetCurrent()
@@ -158,7 +166,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
                 AppDelegate.log.info("Context save completed in \(String(format: "%.3f", sdt))s")
             } catch {
                 let sdt = CFAbsoluteTimeGetCurrent() - contextSaveStart
-                AppDelegate.log.error("Context save failed in \(String(format: "%.3f", sdt))s: \(String(describing: error))")
+                AppDelegate.log.error(
+                    "Context save failed in \(String(format: "%.3f", sdt))s: \(String(describing: error))"
+                )
             }
 
             // Phase 3: Graceful cleanup
@@ -166,7 +176,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             AppDelegate.log.info("Cleanup completed; WKWebView processes terminated")
 
             let total = CFAbsoluteTimeGetCurrent() - overallStart
-            AppDelegate.log.info("Termination task finished in \(String(format: "%.3f", total))s; replying to terminate")
+            AppDelegate.log.info(
+                "Termination task finished in \(String(format: "%.3f", total))s; replying to terminate"
+            )
             sender.reply(toApplicationShouldTerminate: true)
         }
     }
@@ -177,9 +189,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     }
 
     // MARK: - External URL Handling
-    @objc private func handleGetURLEvent(_ event: NSAppleEventDescriptor, withReplyEvent replyEvent: NSAppleEventDescriptor) {
+    @objc private func handleGetURLEvent(
+        _ event: NSAppleEventDescriptor, withReplyEvent replyEvent: NSAppleEventDescriptor
+    ) {
         guard let stringValue = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue,
-              let url = URL(string: stringValue) else {
+            let url = URL(string: stringValue)
+        else {
             return
         }
         handleIncoming(url: url)
@@ -228,7 +243,10 @@ extension AppDelegate {
         }
     }
 
-    func updater(_ updater: SPUUpdater, willInstallUpdateOnQuit item: SUAppcastItem, immediateInstallationInvocation: @escaping () -> Void) {
+    func updater(
+        _ updater: SPUUpdater, willInstallUpdateOnQuit item: SUAppcastItem,
+        immediateInstallationInvocation: @escaping () -> Void
+    ) {
         Task { @MainActor in
             browserManager?.handleUpdaterWillInstallOnQuit(item)
         }
@@ -272,7 +290,7 @@ struct NookCommands: Commands {
                 appDelegate.updaterController.checkForUpdates(nil)
             }
             .keyboardShortcut("u", modifiers: [.command, .shift])
-            
+
             Button("Import from another Browser") {
                 browserManager.dialogManager.showDialog(
                     BrowserImportDialog(
@@ -296,10 +314,11 @@ struct NookCommands: Commands {
                     backing: .buffered,
                     defer: false
                 )
-                newWindow.contentView = NSHostingView(rootView: ContentView()
-                    .background(BackgroundWindowModifier())
-                    .ignoresSafeArea(.all)
-                    .environmentObject(browserManager))
+                newWindow.contentView = NSHostingView(
+                    rootView: ContentView()
+                        .background(BackgroundWindowModifier())
+                        .ignoresSafeArea(.all)
+                        .environmentObject(browserManager))
                 newWindow.title = "Nook"
                 newWindow.minSize = NSSize(width: 470, height: 382)
                 newWindow.contentMinSize = NSSize(width: 470, height: 382)
@@ -317,7 +336,7 @@ struct NookCommands: Commands {
             }
             .keyboardShortcut("w", modifiers: .command)
             .disabled(browserManager.tabManager.tabs.isEmpty)
-            
+
             Button("Copy Current URL") {
                 browserManager.copyCurrentURL()
             }
@@ -325,7 +344,7 @@ struct NookCommands: Commands {
             .disabled(browserManager.currentTabForActiveWindow() == nil)
 
         }
-        
+
         // Sidebar commands
         CommandGroup(after: .sidebar) {
             Button("Toggle Sidebar") {
@@ -343,9 +362,11 @@ struct NookCommands: Commands {
                 browserManager.requestPiPForCurrentTabInActiveWindow()
             }
             .keyboardShortcut("p", modifiers: [.command, .shift])
-            .disabled(browserManager.currentTabForActiveWindow() == nil ||
-                     !(browserManager.currentTabHasVideoContent() ||
-                       browserManager.currentTabHasPiPActive()))
+            .disabled(
+                browserManager.currentTabForActiveWindow() == nil
+                    || !(browserManager.currentTabHasVideoContent()
+                        || browserManager.currentTabHasPiPActive())
+            )
         }
 
         // View commands
@@ -354,13 +375,13 @@ struct NookCommands: Commands {
                 browserManager.openCommandPaletteWithCurrentURL()
             }
             .keyboardShortcut("l", modifiers: .command)
-            
+
             Button("Find in Page") {
                 browserManager.showFindBar()
             }
             .keyboardShortcut("f", modifiers: .command)
             .disabled(browserManager.currentTabForActiveWindow() == nil)
-            
+
             Button("Reload Page") {
                 browserManager.refreshCurrentTabInActiveWindow()
             }
@@ -397,30 +418,31 @@ struct NookCommands: Commands {
             .disabled(browserManager.currentTabForActiveWindow() == nil)
 
             Divider()
-            
+
             Button("Web Inspector") {
                 browserManager.openWebInspector()
             }
             .keyboardShortcut("i", modifiers: [.command, .option])
             .disabled(browserManager.currentTabForActiveWindow() == nil)
-            
+
             Divider()
-            
+
             Button("Force Quit App") {
                 browserManager.showQuitDialog()
             }
             .keyboardShortcut("q", modifiers: .command)
-            
+
             Divider()
-            
+
             Button(browserManager.currentTabIsMuted() ? "Unmute Audio" : "Mute Audio") {
                 browserManager.toggleMuteCurrentTabInActiveWindow()
             }
             .keyboardShortcut("m", modifiers: .command)
-            .disabled(browserManager.currentTabForActiveWindow() == nil ||
-                     !browserManager.currentTabHasAudioContent())
+            .disabled(
+                browserManager.currentTabForActiveWindow() == nil
+                    || !browserManager.currentTabHasAudioContent())
         }
-        
+
         // Privacy/Cookie Commands
         CommandMenu("Privacy") {
             Menu("Clear Cookies") {
@@ -428,73 +450,73 @@ struct NookCommands: Commands {
                     browserManager.clearCurrentPageCookies()
                 }
                 .disabled(browserManager.currentTabForActiveWindow()?.url.host == nil)
-                
+
                 Button("Clear Expired Cookies") {
                     browserManager.clearExpiredCookies()
                 }
-                
+
                 Divider()
-                
+
                 Button("Clear All Cookies") {
                     browserManager.clearAllCookies()
                 }
-                
+
                 Divider()
-                
+
                 Button("Clear Third-Party Cookies") {
                     browserManager.clearThirdPartyCookies()
                 }
-                
+
                 Button("Clear High-Risk Cookies") {
                     browserManager.clearHighRiskCookies()
                 }
             }
-            
+
             Menu("Clear Cache") {
                 Button("Clear Cache for Current Site") {
                     browserManager.clearCurrentPageCache()
                 }
                 .disabled(browserManager.currentTabForActiveWindow()?.url.host == nil)
-                
+
                 Button("Clear Stale Cache") {
                     browserManager.clearStaleCache()
                 }
-                
+
                 Button("Clear Disk Cache") {
                     browserManager.clearDiskCache()
                 }
-                
+
                 Button("Clear Memory Cache") {
                     browserManager.clearMemoryCache()
                 }
-                
+
                 Divider()
-                
+
                 Button("Clear All Cache") {
                     browserManager.clearAllCache()
                 }
-                
+
                 Divider()
-                
+
                 Button("Clear Personal Data Cache") {
                     browserManager.clearPersonalDataCache()
                 }
-                
+
                 Button("Clear Favicon Cache") {
                     browserManager.clearFaviconCache()
                 }
             }
-            
+
             Divider()
-            
+
             Button("Privacy Cleanup") {
                 browserManager.performPrivacyCleanup()
             }
-            
+
             Button("Clear Browsing History") {
                 browserManager.historyManager.clearHistory()
             }
-            
+
             Button("Clear All Website Data") {
                 Task {
                     let dataStore = WKWebsiteDataStore.default()
@@ -503,7 +525,7 @@ struct NookCommands: Commands {
                 }
             }
         }
-        
+
         // Extensions Commands
         if browserManager.settingsManager.experimentalExtensions {
             CommandMenu("Extensions") {
@@ -526,7 +548,7 @@ struct NookCommands: Commands {
                 }
             }
         }
-        
+
         // Appearance Commands
         CommandMenu("Appearance") {
             Button("Customize Space Gradient...") {
@@ -534,6 +556,14 @@ struct NookCommands: Commands {
             }
             .keyboardShortcut("g", modifiers: [.command, .shift])
             .disabled(browserManager.tabManager.currentSpace == nil)
+
+            Divider()
+
+            Button("Create Boosts") {
+                browserManager.showBoostsDialog()
+            }
+            .keyboardShortcut("b", modifiers: [.command, .shift])
+            .disabled(browserManager.currentTabForActiveWindow() == nil)
         }
     }
 }
