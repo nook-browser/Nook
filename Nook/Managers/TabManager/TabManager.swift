@@ -1074,6 +1074,23 @@ class TabManager: ObservableObject {
         print("✅ currentTab set successfully to: \(currentTab?.name ?? "nil")")
         // Do not auto-exit split when leaving split panes; preserve split state
 
+        // Update active side in split view for all windows that contain this tab
+        // Also update windowState.currentTabId for windows that have this tab in split view
+        if let bm = browserManager {
+            for (windowId, windowState) in bm.windowStates {
+                // Check if this tab is in split view for this window
+                if bm.splitManager.isSplit(for: windowId) {
+                    let state = bm.splitManager.getSplitState(for: windowId)
+                    // If tab is on left or right side, update active side and window's current tab
+                    if state.leftTabId == tab.id || state.rightTabId == tab.id {
+                        bm.splitManager.updateActiveSide(for: tab.id, in: windowId)
+                        // Update window's current tab ID so other UI components work correctly
+                        windowState.currentTabId = tab.id
+                    }
+                }
+            }
+        }
+
         // Save this tab as the active tab for the appropriate space
         print("💾 Saving tab as active for space...")
         if let sid = tab.spaceId, let space = spaces.first(where: { $0.id == sid }) {

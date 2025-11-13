@@ -285,7 +285,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
             let rightId = split.rightTabId(for: windowState.id)
 
             // Add pane containers with rounded corners and background
-            let activeId = browserManager.currentTab(for: windowState)?.id
+            let activeSide = split.activeSide(for: windowState.id)
             let accent = browserManager.gradientColorManager.displayGradient.primaryNSColor
             // Resolve pane tabs across ALL tabs (not just current space)
             let allKnownTabs = browserManager.tabManager.allTabs()
@@ -293,7 +293,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
             if let lId = leftId, let leftTab = allKnownTabs.first(where: { $0.id == lId }) {
                 // Force-create/ensure loaded when visible in split
                 let lWeb = webView(for: leftTab, windowId: windowState.id)
-                let pane = makePaneContainer(frame: leftRect, isActive: (activeId == lId), accent: accent)
+                let pane = makePaneContainer(frame: leftRect, isActive: (activeSide == .left), accent: accent)
                 containerView.addSubview(pane)
                 lWeb.frame = pane.bounds
                 lWeb.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
@@ -305,7 +305,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
             if let rId = rightId, let rightTab = allKnownTabs.first(where: { $0.id == rId }) {
                 // Force-create/ensure loaded when visible in split
                 let rWeb = webView(for: rightTab, windowId: windowState.id)
-                let pane = makePaneContainer(frame: rightRect, isActive: (activeId == rId), accent: accent)
+                let pane = makePaneContainer(frame: rightRect, isActive: (activeSide == .right), accent: accent)
                 containerView.addSubview(pane)
                 rWeb.frame = pane.bounds
                 rWeb.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
