@@ -2251,6 +2251,9 @@ class BrowserManager: ObservableObject {
     func selectTab(_ tab: Tab, in windowState: BrowserWindowState) {
         windowState.currentTabId = tab.id
 
+        // Update active side in split view if applicable
+        splitManager.updateActiveSide(for: tab.id, in: windowState.id)
+
         // Update space if the tab belongs to a different space
         if let spaceId = tab.spaceId, windowState.currentSpaceId != spaceId {
             windowState.currentSpaceId = spaceId
