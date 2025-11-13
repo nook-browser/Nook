@@ -29,6 +29,8 @@ struct WindowView: View {
             ZStack {
                 // Gradient background for the current space (bottom-most layer)
                 SpaceGradientBackgroundView()
+                    .environmentObject(browserManager)
+                    .environmentObject(browserManager.gradientColorManager)
                     .environmentObject(windowState)
                 
                 // Attach background context menu to the window background layer
