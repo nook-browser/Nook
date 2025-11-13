@@ -15,150 +15,56 @@ struct ExtensionPermissionView: View {
     let optionalPermissions: [String]
     let requestedHostPermissions: [String]
     let optionalHostPermissions: [String]
-    let onGrant: (Set<String>, Set<String>) -> Void
+    let onGrant: () -> Void
     let onDeny: () -> Void
-    
-    @State private var selectedPermissions: Set<String> = []
-    @State private var selectedHostPermissions: Set<String> = []
+    let extensionLogo: NSImage
+
     
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(alignment: .leading, spacing: 20) {
             VStack(spacing: 8) {
-                Image(systemName: "puzzlepiece.extension")
-                    .font(.system(size: 48))
-                    .foregroundColor(.blue)
-                
-                Text("Extension Permission Request")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                
-                Text("\"\(extensionName)\" wants to:")
-                    .font(.headline)
-                    .foregroundColor(.secondary)
-            }
-            
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    if !requestedPermissions.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Requested Permissions")
-                                .font(.headline)
-                            ForEach(requestedPermissions, id: \.self) { permission in
-                                PermissionRowView(
-                                    permission: permission,
-                                    description: getPermissionDescription(permission),
-                                    isSelected: Binding(
-                                        get: { selectedPermissions.contains(permission) },
-                                        set: { isSelected in
-                                            if isSelected {
-                                                selectedPermissions.insert(permission)
-                                            } else {
-                                                selectedPermissions.remove(permission)
-                                            }
-                                        }
-                                    )
-                                )
-                            }
-                        }
-                    }
-                    if !optionalPermissions.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Optional Permissions")
-                                .font(.headline)
-                            ForEach(optionalPermissions, id: \.self) { permission in
-                                PermissionRowView(
-                                    permission: permission,
-                                    description: getPermissionDescription(permission),
-                                    isSelected: Binding(
-                                        get: { selectedPermissions.contains(permission) },
-                                        set: { isSelected in
-                                            if isSelected {
-                                                selectedPermissions.insert(permission)
-                                            } else {
-                                                selectedPermissions.remove(permission)
-                                            }
-                                        }
-                                    )
-                                )
-                            }
-                        }
-                    }
-                    
-                    if !requestedHostPermissions.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Requested Website Access")
-                                .font(.headline)
-                            ForEach(requestedHostPermissions, id: \.self) { host in
-                                PermissionRowView(
-                                    permission: host,
-                                    description: getHostPermissionDescription(host),
-                                    isSelected: Binding(
-                                        get: { selectedHostPermissions.contains(host) },
-                                        set: { isSelected in
-                                            if isSelected {
-                                                selectedHostPermissions.insert(host)
-                                            } else {
-                                                selectedHostPermissions.remove(host)
-                                            }
-                                        }
-                                    )
-                                )
-                            }
-                        }
-                    }
-                    if !optionalHostPermissions.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Optional Website Access")
-                                .font(.headline)
-                            ForEach(optionalHostPermissions, id: \.self) { host in
-                                PermissionRowView(
-                                    permission: host,
-                                    description: getHostPermissionDescription(host),
-                                    isSelected: Binding(
-                                        get: { selectedHostPermissions.contains(host) },
-                                        set: { isSelected in
-                                            if isSelected {
-                                                selectedHostPermissions.insert(host)
-                                            } else {
-                                                selectedHostPermissions.remove(host)
-                                            }
-                                        }
-                                    )
-                                )
-                            }
-                        }
-                    }
+                HStack(spacing: 24) {
+                    Image("nook-logo-1024")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 64, height: 64)
+                    Image(systemName: "arrow.left")
+                        .font(.system(size: 28, weight: .medium))
+                        .foregroundColor(.secondary)
+                    Image(nsImage: extensionLogo)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 64, height: 64)
                 }
-                .padding()
-            }
-            .frame(maxHeight: 300)
+
+                
             
-            HStack(spacing: 12) {
-                Button("Deny") {
+            }
+            Text("Add the \"\(extensionName)\"extension to Nook?")
+                .font(.system(size: 16, weight: .semibold))
+            
+            Text("It can:")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.secondary)
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(requestedPermissions, id: \.self) { permission in
+                    let message = getPermissionDescription(permission)
+                    Text("•  \(message)")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            HStack{
+                Button("Cancel") {
                     onDeny()
                 }
-                .buttonStyle(.bordered)
-                .keyboardShortcut(.escape)
-                
                 Spacer()
-                
-                Button("Allow Selected") {
-                    onGrant(selectedPermissions, selectedHostPermissions)
+                Button("Add Extension") {
+                    onGrant()
                 }
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.return)
-                .disabled(selectedPermissions.isEmpty && selectedHostPermissions.isEmpty)
             }
         }
         .padding(20)
-        .frame(width: 500, height: 600)
-        .onAppear {
-            for permission in requestedPermissions {
-                if isSafePermission(permission) {
-                    selectedPermissions.insert(permission)
-                }
-            }
-        }
     }
     
     private func getPermissionDescription(_ permission: String) -> String {
@@ -185,62 +91,17 @@ struct ExtensionPermissionView: View {
             return "Access \(permission) functionality"
         }
     }
-    
-    private func getHostPermissionDescription(_ host: String) -> String {
-        if host == "<all_urls>" {
-            return "Access all websites"
-        } else if host.hasPrefix("*://") {
-            let domain = String(host.dropFirst(4))
-            return "Access all pages on \(domain)"
-        } else {
-            return "Access \(host)"
-        }
-    }
-    
-    private func isSafePermission(_ permission: String) -> Bool {
-        let safePermissions = ["storage", "notifications"]
-        return safePermissions.contains(permission)
-    }
 }
 
-struct PermissionRowView: View {
-    let permission: String
-    let description: String
-    @Binding var isSelected: Bool
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            Toggle("", isOn: $isSelected)
-                .toggleStyle(.checkbox)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(permission)
-                    .font(.headline)
-                
-                Text(description)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-        }
-        .padding(8)
-        .background(Color(.controlBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-    }
-}
-
-@available(macOS 15.4, *)
-struct ExtensionPermissionView_Previews: PreviewProvider {
-    static var previews: some View {
-        ExtensionPermissionView(
-            extensionName: "Sample Extension",
-            requestedPermissions: ["storage", "activeTab", "tabs"],
-            optionalPermissions: ["notifications"],
-            requestedHostPermissions: ["https://*.google.com/*"],
-            optionalHostPermissions: ["https://github.com/*"],
-            onGrant: { _, _ in },
-            onDeny: { }
-        )
-    }
+#Preview {
+    ExtensionPermissionView(
+        extensionName: "Sample Extension",
+        requestedPermissions: ["storage", "activeTab", "tabs"],
+        optionalPermissions: ["notifications"],
+        requestedHostPermissions: ["https://*.google.com/*"],
+        optionalHostPermissions: ["https://github.com/*"],
+        onGrant: { },
+        onDeny: { },
+        extensionLogo: NSImage(imageLiteralResourceName: "nook-logo-1024")
+    )
 }
