@@ -179,12 +179,18 @@ struct SidebarView: View {
             }
             // Container to support PinnedGrid slide transitions without clipping
             ZStack {
-                PinnedGrid(
-                    width: availableContentWidth,
-                    profileId: effectiveProfileId
-                )
-                .environmentObject(browserManager)
-                .environmentObject(windowState)
+                ForEach([effectiveProfileId?.uuidString ?? "none"], id: \.self) { _ in
+                    PinnedGrid(
+                        width: availableContentWidth,
+                        profileId: effectiveProfileId
+                    )
+                    .environmentObject(browserManager)
+                    .environmentObject(windowState)
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .move(edge: .top)).animation(.easeIn(duration: 0.3)),
+                        removal: .opacity.animation(.easeOut(duration: 0.2))
+                    ))
+                }
             }
             .padding(.horizontal, 8)
             .modifier(FallbackDropBelowEssentialsModifier())

@@ -78,7 +78,7 @@ struct MediaControlsView: View {
 
                         // Previous button (collapses second)
                         if shouldShowPreviousButton {
-                            Button("Previous", systemImage: "backward.fill") {
+                            Button("Previous", systemImage: "backward.end.fill") {
                                 Task {
                                     guard let manager = mediaControlsManager else { return }
                                     await manager.previous(tab: tab)
@@ -119,7 +119,7 @@ struct MediaControlsView: View {
                         Spacer()
 
                         // Next button
-                        Button("Next", systemImage: "forward.fill") {
+                        Button("Next", systemImage: "forward.end.fill") {
                             Task {
                                 guard let manager = mediaControlsManager else { return }
                                 await manager.next(tab: tab)
@@ -154,8 +154,8 @@ struct MediaControlsView: View {
                         .help(isMuted ? "Unmute" : "Mute")
                     }
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 2)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
                 .background(
                     RoundedRectangle(cornerRadius: 10)
                         .fill(Color.black)
@@ -174,6 +174,7 @@ struct MediaControlsView: View {
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }
+        .controlSize(.mini)
         .animation(.easeInOut(duration: 0.25), value: hasActiveMedia)
         .animation(.easeInOut(duration: 0.2), value: shouldShowFavicon)
         .animation(.easeInOut(duration: 0.2), value: shouldShowPreviousButton)

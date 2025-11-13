@@ -152,7 +152,9 @@ struct SpaceView: View {
             folderChangeCount += 1
         }
         .onHover { state in
-            isHovered = state
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovered = state
+            }
         }
       }
     
@@ -501,6 +503,7 @@ struct SpaceView: View {
                 browserManager.tabManager.clearRegularTabs(for: space.id)
             }
             .padding(.horizontal, 8)
+            .padding(.top, 4)
 
             newTabButtonSection
         }
@@ -541,7 +544,7 @@ struct SpaceView: View {
         }
         .frame(minWidth: 0, maxWidth: innerWidth, alignment: .leading)
         .contentShape(Rectangle())
-        .padding(.top, 8)
+        .padding(.top, 2)
         .onDrop(
             of: [.text],
             delegate: SidebarSectionDropDelegateSimple(
@@ -659,7 +662,7 @@ struct SpaceView: View {
                         .animation(.easeInOut(duration: 0.15), value: isActive)
                 }
         }
-        .padding(.top, 8)
+        .padding(.top, 2)
         .contentShape(Rectangle())
         .onDrop(
             of: [.text],

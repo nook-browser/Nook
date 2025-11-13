@@ -15,6 +15,7 @@ struct ContentView: View {
     var body: some View {
         WindowView()
             .environmentObject(windowState)
+            .environmentObject(browserManager.gradientColorManager)
             .background(WindowFocusBridge(windowState: windowState, browserManager: browserManager))
             .frame(minWidth: 470, minHeight: 382)
             .onAppear {

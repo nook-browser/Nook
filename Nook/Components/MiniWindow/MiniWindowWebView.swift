@@ -16,12 +16,8 @@ struct MiniWindowWebView: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> WKWebView {
-        let configuration: WKWebViewConfiguration
-        if let profile = session.profile {
-            configuration = BrowserConfiguration.shared.webViewConfiguration(for: profile)
-        } else {
-            configuration = BrowserConfiguration.shared.cacheOptimizedWebViewConfiguration()
-        }
+        // Mini windows use isolated process pools (not shared) for security/isolation
+        let configuration = BrowserConfiguration.shared.miniWindowWebViewConfiguration(for: session.profile)
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator

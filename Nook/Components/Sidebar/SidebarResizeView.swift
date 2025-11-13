@@ -16,6 +16,7 @@ struct SidebarResizeView: View {
     @State private var startingMouseX: CGFloat = 0
     @StateObject private var dragLockManager = DragLockManager.shared
     @State private var dragSessionID: String = UUID().uuidString
+    @Environment(\.colorScheme) var colorScheme
 
     private let minWidth: CGFloat = 180
     private let maxWidth: CGFloat = 520
@@ -35,9 +36,9 @@ struct SidebarResizeView: View {
     var body: some View {
         ZStack {
             if isHovering || isResizing {
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(Color.accentColor)
-                    .frame(width: 2)
+                RoundedRectangle(cornerRadius: 100)
+                    .fill(colorScheme == .dark  ? .white.opacity(0.45) : .black.opacity(0.45))
+                    .frame(width: 4)
                     .frame(maxHeight: .infinity)
                     .offset(x: indicatorOffset)
                     .animation(.easeInOut(duration: 0.15), value: isResizing)

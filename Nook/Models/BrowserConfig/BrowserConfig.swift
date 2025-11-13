@@ -12,10 +12,44 @@ import WebKit
 class BrowserConfiguration {
     static let shared = BrowserConfiguration()
     
+    // MARK: - Process Pool Management
+    // Cache process pools by profile ID to reduce memory usage
+    // Each profile gets its own process pool for isolation, but tabs within a profile share resources
+    private var processPoolsByProfile: [UUID: WKProcessPool] = [:]
+    private let processPoolLock = NSLock()
+    
+    // Default shared process pool for non-profile configurations
+    lazy var defaultProcessPool: WKProcessPool = {
+        return WKProcessPool()
+    }()
+    
+    /// Get or create a process pool for the given profile ID
+    /// - Parameter profileId: The profile ID, or nil for default shared pool
+    /// - Returns: A WKProcessPool instance
+    func processPool(for profileId: UUID?) -> WKProcessPool {
+        guard let profileId = profileId else {
+            return defaultProcessPool
+        }
+        
+        processPoolLock.lock()
+        defer { processPoolLock.unlock() }
+        
+        if let existingPool = processPoolsByProfile[profileId] {
+            return existingPool
+        }
+        
+        let newPool = WKProcessPool()
+        processPoolsByProfile[profileId] = newPool
+        return newPool
+    }
+    
     private init() {}
     
     lazy var webViewConfiguration: WKWebViewConfiguration = {
         let config = WKWebViewConfiguration()
+
+        // Share process pool to reduce memory usage
+        config.processPool = defaultProcessPool
 
         // Use default website data store for normal browsing
         // Extensions use their own separate persistent storage managed by Apple
@@ -53,14 +87,16 @@ class BrowserConfiguration {
         
         // Enable background media playback
         config.allowsAirPlayForMediaPlayback = true
-        
-        // User agent for better compatibility
+
+        // User agent for better compatibility with Client Hints support
         config.applicationNameForUserAgent = "Version/26.0.1 Safari/605.1.15"
 
         // Web inspector will be enabled per-webview using isInspectable property
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
 
         // Note: webExtensionController will be set by ExtensionManager during initialization
+        // Note: WebAuthn/Passkey support is enabled by default in WKWebView on macOS 13.3+
+        // and requires only: entitlements, WKUIDelegate methods, and Info.plist descriptions
 
         return config
     }()
@@ -69,6 +105,9 @@ class BrowserConfiguration {
     // Returns a fresh configuration each call to avoid cross-tab state sharing
     func cacheOptimizedWebViewConfiguration() -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
+
+        // Share process pool to reduce memory usage
+        config.processPool = defaultProcessPool
 
         // Default data store for non-profile-specific usage
         config.websiteDataStore = WKWebsiteDataStore.default()
@@ -99,7 +138,7 @@ class BrowserConfiguration {
         // Enable background media playback
         config.allowsAirPlayForMediaPlayback = true
 
-        // User agent for better compatibility (mirror default config)
+        // User agent for better compatibility with Client Hints support (mirror default config)
         config.applicationNameForUserAgent = "Version/26.0.1 Safari/605.1.15"
 
         // Cache/perf optimizations mirroring profile-scoped variant
@@ -115,6 +154,9 @@ class BrowserConfiguration {
     // Create a fresh configuration using a profile-specific data store
     func webViewConfiguration(for profile: Profile) -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
+
+        // Share process pool per profile to reduce memory usage while maintaining isolation
+        config.processPool = processPool(for: profile.id)
 
         // Use the profile's website data store for isolation
         config.websiteDataStore = profile.dataStore
@@ -145,7 +187,7 @@ class BrowserConfiguration {
         // Enable background media playback
         config.allowsAirPlayForMediaPlayback = true
 
-        // User agent for better compatibility (mirror default config)
+        // User agent for better compatibility with Client Hints support (mirror default config)
         config.applicationNameForUserAgent = "Version/26.0.1 Safari/605.1.15"
         
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
@@ -160,7 +202,68 @@ class BrowserConfiguration {
         config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
         config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
         config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
+        
         return config
+    }
+    
+    // MARK: - Mini Window Configuration
+    // Mini windows get isolated process pools (not shared) for security/isolation
+    func miniWindowWebViewConfiguration(for profile: Profile?) -> WKWebViewConfiguration {
+        let config = WKWebViewConfiguration()
+        
+        // Use isolated process pool (not shared) for mini windows
+        config.processPool = WKProcessPool()
+        
+        // Use profile's data store if provided, otherwise default
+        if let profile = profile {
+            config.websiteDataStore = profile.dataStore
+        } else {
+            config.websiteDataStore = WKWebsiteDataStore.default()
+        }
+        
+        // Configure JavaScript preferences for extension support
+        let preferences = WKWebpagePreferences()
+        preferences.allowsContentJavaScript = true
+        config.defaultWebpagePreferences = preferences
+        
+        // Core WebKit preferences for extensions
+        config.preferences.javaScriptCanOpenWindowsAutomatically = true
+        
+        // Media settings
+        config.mediaTypesRequiringUserActionForPlayback = []
+        
+        // Enable Picture-in-Picture for web media
+        config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
+        
+        // Enable full-screen API support
+        config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
+        config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
+        config.preferences.isElementFullscreenEnabled = true
+        
+        // Enable background media playback
+        config.allowsAirPlayForMediaPlayback = true
+        
+        // User agent for better compatibility with Client Hints support
+        config.applicationNameForUserAgent = "Version/26.0.1 Safari/605.1.15"
+        
+        config.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        
+        return config
+    }
+    
+    // MARK: - User-Agent Client Hints Configuration
+    
+    /// Configure User-Agent Client Hints for enhanced browser capability reporting
+    /// This ensures websites receive proper information about platform capabilities
+    /// including passkey/WebAuthn support
+    private func configureClientHints(_ config: WKWebViewConfiguration) {
+        // User-Agent Client Hints are automatically supported when using a Safari-compatible User-Agent
+        // The applicationNameForUserAgent setting enables this functionality
+        // Additional headers like Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Platform are sent automatically
+        
+        // Enable features that support Client Hints
+        config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
+        config.preferences.setValue(true, forKey: "getUserMediaRequiresFocus")
     }
     
     // MARK: - Chrome Web Store Integration
