@@ -246,6 +246,22 @@ struct GeneralSettingsView: View {
                                     .foregroundStyle(.secondary)
                                 }
                             }.frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            Divider().opacity(0.4)
+                            
+                            Toggle(
+                                isOn: $browserManager.settingsManager
+                                    .showLinkStatusBar
+                            ) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Link Status Bar")
+                                    Text(
+                                        "Show URL preview when hovering over links"
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+                            }.frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
 
