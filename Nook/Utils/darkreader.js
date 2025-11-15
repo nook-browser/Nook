@@ -1,6 +1,10 @@
 /**
- * Dark Reader v4.9.113
+ * Adapted from Dark Reader v4.9.113
+ * Modified by Jude for colour tinting and more
  * https://darkreader.org/
+ *
+ * [Dark Reader] Licensed under MIT https://github.com/darkreader/darkreader/blob/main/LICENSE
+ * [Nook Browser] Licensed under GNU General Public License v3.0 https://github.com/nook-browser/nook/blob/main/LICENSE
  */
 
 (function (global, factory) {
@@ -8050,27 +8054,10 @@
     return text.replace(blobRegex, () => `url("${data.shift()}")`);
   }
   const banner = `/*
-                        _______
-                       /       \\
-                      .==.    .==.
-                     ((  ))==((  ))
-                    / "=="    "=="\\
-                   /____|| || ||___\\
-       ________     ____    ________  ___    ___
-       |  ___  \\   /    \\   |  ___  \\ |  |  /  /
-       |  |  \\  \\ /  /\\  \\  |  |  \\  \\|  |_/  /
-       |  |   )  /  /__\\  \\ |  |__/  /|  ___  \\
-       |  |__/  /  ______  \\|  ____  \\|  |  \\  \\
-_______|_______/__/ ____ \\__\\__|___\\__\\__|___\\__\\____
-|  ___  \\ |  ____/ /    \\   |  ___  \\ |  ____|  ___  \\
-|  |  \\  \\|  |___ /  /\\  \\  |  |  \\  \\|  |___|  |  \\  \\
-|  |__/  /|  ____/  /__\\  \\ |  |   )  |  ____|  |__/  /
-|  ____  \\|  |__/  ______  \\|  |__/  /|  |___|  ____  \\
-|__|   \\__\\____/__/      \\__\\_______/ |______|__|   \\__\\
-                https://darkreader.org
+  Nook Browser Boosts
 */
 
-/*! Dark reader generated CSS | Licensed under MIT https://github.com/darkreader/darkreader/blob/main/LICENSE */
+/*! Nook Browser Boosts (adapted and powered by Dark reader) generated CSS | Licensed under MIT https://github.com/darkreader/darkreader/blob/main/LICENSE */
 `;
   async function collectCSS() {
     const css = [banner];
