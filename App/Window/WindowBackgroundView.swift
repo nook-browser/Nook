@@ -10,12 +10,16 @@ import SwiftUI
 import UniversalGlass
 struct WindowBackgroundView: View {
     @EnvironmentObject var browserManager: BrowserManager
-
+    
     var body: some View {
-        Rectangle()
-            .fill(Color.clear)
-            .universalGlassEffect(.regular.tint(Color(.windowBackgroundColor).opacity(0.35)), in: .rect(cornerRadius: 0))
-            .clipped()
+        ZStack{
+            SpaceGradientBackgroundView()
+            
+            Rectangle()
+                .fill(Color.clear)
+                .universalGlassEffect(.regular.tint(Color(.windowBackgroundColor).opacity(0.35)), in: .rect(cornerRadius: 0))
+                .clipped()
+        }
         .backgroundDraggable()
     }
 }
