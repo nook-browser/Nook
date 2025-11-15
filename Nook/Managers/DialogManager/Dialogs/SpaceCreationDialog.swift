@@ -11,16 +11,18 @@ import SwiftUI
 struct SpaceCreationDialog: DialogPresentable {
     @State private var spaceName: String
     @State private var spaceIcon: String
+    @State private var selectedProfileId: UUID?
 
-    let onCreate: (String, String) -> Void
+    let onCreate: (String, String, UUID?) -> Void
     let onCancel: () -> Void
 
     init(
-        onCreate: @escaping (String, String) -> Void,
+        onCreate: @escaping (String, String, UUID?) -> Void,
         onCancel: @escaping () -> Void
     ) {
         _spaceName = State(initialValue: "")
         _spaceIcon = State(initialValue: "")
+        _selectedProfileId = State(initialValue: nil)
         self.onCreate = onCreate
         self.onCancel = onCancel
     }
@@ -37,7 +39,8 @@ struct SpaceCreationDialog: DialogPresentable {
     func dialogContent() -> some View {
         SpaceCreationContent(
             spaceName: $spaceName,
-            spaceIcon: $spaceIcon
+            spaceIcon: $spaceIcon,
+            selectedProfileId: $selectedProfileId
         )
     }
 
@@ -63,14 +66,16 @@ struct SpaceCreationDialog: DialogPresentable {
 
     private func handleCreate() {
         let trimmedName = spaceName.trimmingCharacters(in: .whitespacesAndNewlines)
-        onCreate(trimmedName, spaceIcon)
+        onCreate(trimmedName, spaceIcon, selectedProfileId)
     }
 }
 
 struct SpaceCreationContent: View {
     @Binding var spaceName: String
     @Binding var spaceIcon: String
+    @Binding var selectedProfileId: UUID?
     @StateObject private var emojiManager = EmojiPickerManager()
+    @EnvironmentObject var browserManager: BrowserManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -116,6 +121,29 @@ struct SpaceCreationContent: View {
                         .lineLimit(2)
                 }
             }
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Profile")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                Picker(
+                    currentProfileName,
+                    systemImage: currentProfileIcon,
+                    selection: Binding(
+                        get: {
+                            selectedProfileId ?? browserManager.profileManager.profiles.first?.id ?? UUID()
+                        },
+                        set: { newId in
+                            selectedProfileId = newId
+                        }
+                    )
+                ) {
+                    ForEach(browserManager.profileManager.profiles, id: \.id) { profile in
+                        Label(profile.name, systemImage: profile.icon).tag(profile.id)
+                    }
+                }
+            }
         }
         .padding(.horizontal, 4)
         .onAppear {
@@ -126,6 +154,24 @@ struct SpaceCreationContent: View {
         .onChange(of: emojiManager.selectedEmoji) { _, newValue in
             spaceIcon = newValue
         }
+    }
+
+    private var currentProfileName: String {
+        guard let profileId = selectedProfileId,
+              let profile = browserManager.profileManager.profiles.first(where: { $0.id == profileId })
+        else {
+            return browserManager.profileManager.profiles.first?.name ?? "Default"
+        }
+        return profile.name
+    }
+
+    private var currentProfileIcon: String {
+        guard let profileId = selectedProfileId,
+              let profile = browserManager.profileManager.profiles.first(where: { $0.id == profileId })
+        else {
+            return browserManager.profileManager.profiles.first?.icon ?? "person.circle"
+        }
+        return profile.icon
     }
 }
 

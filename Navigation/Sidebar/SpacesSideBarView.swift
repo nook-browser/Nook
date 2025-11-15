@@ -324,13 +324,18 @@ struct SpacesSideBarView: View {
     private func showSpaceCreationDialog() {
         browserManager.dialogManager.showDialog(
             SpaceCreationDialog(
-                onCreate: { name, icon in
+                onCreate: { name, icon, profileId in
                     let finalName = name.isEmpty ? "New Space" : name
                     let finalIcon = icon.isEmpty ? "✨" : icon
                     let newSpace = browserManager.tabManager.createSpace(
                         name: finalName,
                         icon: finalIcon
                     )
+
+                    // Assign profile if one was selected
+                    if let profileId = profileId {
+                        browserManager.tabManager.assign(spaceId: newSpace.id, toProfile: profileId)
+                    }
 
                     if let targetIndex = browserManager.tabManager.spaces.firstIndex(where: { $0.id == newSpace.id }) {
                         activeSpaceIndex = targetIndex
