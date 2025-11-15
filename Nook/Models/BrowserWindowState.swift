@@ -79,9 +79,6 @@ class BrowserWindowState {
     /// Compositor version counter for this window (incremented when tab ownership changes)
     var compositorVersion: Int = 0
 
-    /// Gradient currently displayed for this window's active space
-    var activeGradient: SpaceGradient = .default
-
     /// Reference to the actual NSWindow for this window state
     var window: NSWindow?
 
