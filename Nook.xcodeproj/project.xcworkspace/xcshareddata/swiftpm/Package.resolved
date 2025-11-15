@@ -1,5 +1,5 @@
 {
-  "originHash" : "b3f6cf132b3ba09497e7069230e4ea9692433d5eeecca13eb31e6e3c2a7d3a76",
+  "originHash" : "02b3b749b12538f2d1b5c0db6c7a77c6deede4699eaffe60c00ce06d0e061ef2",
   "pins" : [
     {
       "identity" : "faviconfinder",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "9279f4371f4877ca302ba3bf1015f3f58ae4a56c",
         "version" : "5.1.4"
+      }
+    },
+    {
+      "identity" : "fuzi",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/cezheng/Fuzi",
+      "state" : {
+        "revision" : "f08c8323da21e985f3772610753bcfc652c2103f",
+        "version" : "3.1.3"
       }
     },
     {
@@ -20,12 +29,66 @@
       }
     },
     {
+      "identity" : "highlightr",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/raspu/Highlightr/",
+      "state" : {
+        "revision" : "05e7fcc63b33925cd0c1faaa205cdd5681e7bbef",
+        "version" : "2.3.0"
+      }
+    },
+    {
+      "identity" : "lrucache",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/nicklockwood/LRUCache.git",
+      "state" : {
+        "revision" : "0d91406ecd4d6c1c56275866f00508d9aeacc92a",
+        "version" : "1.2.0"
+      }
+    },
+    {
+      "identity" : "motion",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/b3ll/Motion",
+      "state" : {
+        "branch" : "main",
+        "revision" : "c9a57f9d2b9d0a1e1b905753175e75a422d381d5"
+      }
+    },
+    {
+      "identity" : "reeeed",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/nate-parrott/reeeed",
+      "state" : {
+        "revision" : "567e2f50592f8a5fe41e9ff64784b42c77f35433",
+        "version" : "1.0.1"
+      }
+    },
+    {
       "identity" : "sparkle",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/sparkle-project/Sparkle",
       "state" : {
         "revision" : "9a1d2a19d3595fcf8d9c447173f9a1687b3dcadb",
         "version" : "2.8.0"
+      }
+    },
+    {
+      "identity" : "swift-atomics",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-atomics.git",
+      "state" : {
+        "revision" : "b601256eab081c0f92f059e12818ac1d4f178ff7",
+        "version" : "1.3.0"
+      }
+    },
+    {
+      "identity" : "swift-numerics",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-numerics.git",
+      "state" : {
+        "revision" : "0c0290ff6b24942dadb83a929ffaaa1481df04a2",
+        "version" : "1.1.1"
       }
     },
     {
