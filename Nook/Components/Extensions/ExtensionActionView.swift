@@ -40,6 +40,9 @@ struct ExtensionActionButton: View {
                    let nsImage = NSImage(contentsOfFile: iconPath) {
                     Image(nsImage: nsImage)
                         .resizable()
+                        .interpolation(.high)
+                        .antialiased(true)
+                        .scaledToFit()
                 } else {
                     Image(systemName: "puzzlepiece.extension")
                         .foregroundColor(.white)
@@ -49,7 +52,7 @@ struct ExtensionActionButton: View {
             .padding(6)
             .background(isHovering ? .white.opacity(0.1) : .clear)
             .background(ActionAnchorView(extensionId: ext.id))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: 7))
         }
         .buttonStyle(.plain)
         .help(ext.name)

@@ -20,25 +20,25 @@ struct SpaceSeparator: View {
             RoundedRectangle(cornerRadius: 100)
                 .fill(Color.white.opacity(0.1))
                 .frame(height: 2)
-                .frame(maxWidth: showClearButton ? .infinity : .infinity)
                 .padding(.trailing, showClearButton ? 8 : 0)
-                .animation(.easeInOut(duration: 0.15), value: showClearButton)
+                .animation(.easeInOut(duration: 0.05), value: showClearButton)
             
             if hasTabs {
                 Button(action: onClear) {
-                    Text("↓ Clear")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(isClearHovered ? Color.white.opacity(0.6) : Color.white.opacity(0.2))
-                        .padding(.horizontal, 4)
+                    HStack(spacing: 2) {
+                        Image(systemName: "arrow.down")
+                            .font(.system(size: 10, weight: .bold))
+                        Text("Clear")
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                    .foregroundStyle(isClearHovered ? Color.white.opacity(0.8) : Color.white.opacity(0.3))
+                    .padding(.horizontal, 4)
                 }
                 .buttonStyle(PlainButtonStyle())
                 .help("Clear all regular tabs")
                 .opacity(showClearButton ? 1 : 0)
-                .offset(x: showClearButton ? 0 : 20)
-                .frame(width: showClearButton ? nil : 0)
-                .animation(.easeInOut(duration: 0.15), value: showClearButton)
                 .onHover { state in
-                    withAnimation(.easeInOut(duration: 0.15)) {
+                    withAnimation(.easeInOut(duration: 0.05)) {
                         isClearHovered = state
                     }
                 }

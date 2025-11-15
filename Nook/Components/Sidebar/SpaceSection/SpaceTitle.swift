@@ -101,8 +101,6 @@ struct SpaceTitle: View {
                     Label("Rename Space", systemImage: "pencil")
                 }
                 Button {
-//                    emojiFieldFocused = true
-//                    NSApp.orderFrontCharacterPalette(nil)
                     emojiManager.toggle()
                 } label: {
                     Label("Change Icon", systemImage: "face.smiling")
@@ -123,18 +121,21 @@ struct SpaceTitle: View {
             } label: {
                 ZStack {
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(isEllipsisHovering ? (isHovering ? AppColors.controlBackgroundActive : AppColors.controlBackgroundHoverLight) : Color.clear)
-                        .frame(width: 24, height: 24)
+                        .fill(isEllipsisHovering ? .white.opacity(0.07) : .clear)
                     Image(systemName: "ellipsis")
                         .font(.system(size: 16))
                         .foregroundStyle(AppColors.textSecondary)
                         .opacity(isHovering ? 1.0 : 0.0)
                 }
+                .frame(width: 24, height: 24)
+                .contentShape(RoundedRectangle(cornerRadius: 6))
                 .onHover { hovering in
                     isEllipsisHovering = hovering
                 }
             }
+            .menuStyle(.button)
             .buttonStyle(PlainButtonStyle())
+
         }
         // Match tabs' internal left/right padding so text aligns
         .overlay {
@@ -178,7 +179,7 @@ struct SpaceTitle: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .contentShape(RoundedRectangle(cornerRadius: 12))
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(.easeInOut(duration: 0.1)) {
                 isHovering = hovering
             }
         }
