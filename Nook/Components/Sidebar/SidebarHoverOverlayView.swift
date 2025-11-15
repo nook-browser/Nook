@@ -44,7 +44,7 @@ struct SidebarHoverOverlayView: View {
                         .environmentObject(windowState)
                         .frame(width: overlayWidth)
                         .frame(maxHeight: .infinity)
-                        .universalGlassEffect(.regular.tint(gradientColorManager.primaryColor.mix(with: Color(.windowBackground), by: 0.8).opacity(0.7)), in: .rect(cornerRadius: cornerRadius))
+                        .universalGlassEffect(.regular.tint(browserManager.gradientColorManager.primaryColor.mix(with: Color(.windowBackground), by: 0.8).opacity(0.7)), in: .rect(cornerRadius: cornerRadius))
 //                        .contentShape(.rect)
                     
 //                        .universalGlassEffect(.regular.tint(Color(.black)), in: .rect(cornerRadius: cornerRadius))
