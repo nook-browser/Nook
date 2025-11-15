@@ -1893,11 +1893,12 @@ class BrowserManager: ObservableObject {
             windowState.currentProfileId = currentProfile?.id
         }
         adoptProfileIfNeeded(for: windowState, context: .windowActivation)
-        if let currentId = windowState.currentTabId,
-            let tab = tabManager.allTabs().first(where: { $0.id == currentId })
-        {
-            enforceExclusiveAudio(for: tab, activeWindowId: windowState.id)
-        }
+        // DISABLED: Exclusive audio enforcement - use standard browser behavior instead
+        // if let currentId = windowState.currentTabId,
+        //     let tab = tabManager.allTabs().first(where: { $0.id == currentId })
+        // {
+        //     enforceExclusiveAudio(for: tab, activeWindowId: windowState.id)
+        // }
     }
 
     // MARK: - Window-Aware Tab Operations
@@ -1966,7 +1967,8 @@ class BrowserManager: ObservableObject {
         // Refresh compositor for this window
         windowState.refreshCompositor()
 
-        enforceExclusiveAudio(for: tab, activeWindowId: windowState.id)
+        // DISABLED: Exclusive audio enforcement - use standard browser behavior instead
+        // enforceExclusiveAudio(for: tab, activeWindowId: windowState.id)
 
         print("🪟 [BrowserManager] Selected tab \(tab.name) in window \(windowState.id)")
 
@@ -2039,43 +2041,24 @@ class BrowserManager: ObservableObject {
         return coordinator.createWebView(for: tab, in: windowId)
     }
 
-    /// DEPRECATED: These functions should not exist - cross-window sync is an antipattern
+    /// DEPRECATED: This should not go through BrowserManager
     func syncTabAcrossWindows(_ tabId: UUID) {
-        // Prevent recursive sync calls
-        guard !isSyncingTab.contains(tabId) else {
-            print("🪟 [BrowserManager] Skipping recursive sync for tab \(tabId)")
-            return
-        }
-
         guard let tab = tabManager.allTabs().first(where: { $0.id == tabId }),
               let webViewCoordinator = webViewCoordinator else { return }
 
-        isSyncingTab.insert(tabId)
-        defer { isSyncingTab.remove(tabId) }
-
-        // Get all web views for this tab across all windows
-        let allWebViews = webViewCoordinator.getAllWebViews(for: tabId)
-
-        for webView in allWebViews {
-            // Sync the URL if it's different
-            let currentURL = tab.url
-            if webView.url != currentURL {
-                print("🔄 [BrowserManager] Syncing tab \(tabId) to URL: \(currentURL)")
-                webView.load(URLRequest(url: currentURL))
-            }
-        }
+        webViewCoordinator.syncTab(tabId, to: tab.url)
     }
 
     func navigateTabAcrossWindows(_ tabId: UUID, to url: URL) {
-        // NO-OP: This should not be needed
+        webViewCoordinator?.syncTab(tabId, to: url)
     }
 
     func reloadTabAcrossWindows(_ tabId: UUID) {
-        // NO-OP: This should not be needed
+        webViewCoordinator?.reloadTab(tabId)
     }
 
     func setMuteState(_ muted: Bool, for tabId: UUID, originatingWindowId: UUID?) {
-        // NO-OP: This should not be needed
+        webViewCoordinator?.setMuteState(muted, for: tabId, excludingWindow: originatingWindowId)
     }
 
     /// Set active space for a specific window
