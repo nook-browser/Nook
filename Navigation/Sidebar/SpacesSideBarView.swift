@@ -3,7 +3,7 @@
 //  Nook
 //
 //  Created by Maciek Bagiński on 30/07/2025.
-//  Refactored by Claude on 15/11/2025.
+//  Refactored by Aether on 15/11/2025.
 //
 
 import AppKit
@@ -28,29 +28,14 @@ struct SpacesSideBarView: View {
     @State private var showDownloadsMenu = false
     @State private var animateDownloadsMenu: Bool = false
 
-    // Force rendering when sidebar is collapsed (used by hover overlay)
-    var forceVisible: Bool = false
-    // Override width for overlay use
-    var forcedWidth: CGFloat? = nil
-
-    private var effectiveWidth: CGFloat {
-        forcedWidth ?? windowState.sidebarWidth
-    }
-
-    private var availableContentWidth: CGFloat {
-        effectiveWidth - 16 // Account for horizontal padding
-    }
-
     var body: some View {
-        if windowState.isSidebarVisible || forceVisible {
-            sidebarContent
-                .contextMenu {
-                    sidebarContextMenu
-                }
-                .onHover { state in
-                    isSidebarHovered = state
-                }
-        }
+        sidebarContent
+            .contextMenu {
+                sidebarContextMenu
+            }
+            .onHover { state in
+                isSidebarHovered = state
+            }
     }
 
     // MARK: - Main Content
@@ -65,7 +50,6 @@ struct SpacesSideBarView: View {
                     .transition(.opacity)
             }
         }
-        .frame(width: effectiveWidth)
     }
 
     private var mainSidebarContent: some View {
@@ -75,16 +59,13 @@ struct SpacesSideBarView: View {
 
         return VStack(spacing: 8) {
             // Header (window controls, nav buttons, URL bar)
-            SidebarHeader(
-                sidebarWidth: effectiveWidth,
-                isSidebarHovered: isSidebarHovered
-            )
-            .environmentObject(browserManager)
-            .environment(windowState)
+            SidebarHeader(isSidebarHovered: isSidebarHovered)
+                .environmentObject(browserManager)
+                .environment(windowState)
 
             // Pinned tabs grid
             PinnedGrid(
-                width: availableContentWidth,
+                width: windowState.sidebarContentWidth,
                 profileId: effectiveProfileId
             )
             .environmentObject(browserManager)
@@ -135,7 +116,6 @@ struct SpacesSideBarView: View {
         }
         .padding(.top, 8)
         .padding(.bottom, 8)
-        .frame(width: effectiveWidth)
         .animation(
             shouldAnimate ? .easeInOut(duration: 0.18) : nil,
             value: essentialsCount
@@ -166,7 +146,6 @@ struct SpacesSideBarView: View {
                 }
             }
         }
-        .frame(width: effectiveWidth)
         .pageViewStyle(.scroll)
         .contentShape(Rectangle())
         .id(activeTabRefreshTrigger)
@@ -207,7 +186,6 @@ struct SpacesSideBarView: View {
             }
             .buttonStyle(.borderedProminent)
         }
-        .frame(width: effectiveWidth)
         .padding()
     }
 
@@ -344,7 +322,6 @@ struct SpacesSideBarView: View {
             .id(space.id.uuidString + "-w\(Int(windowState.sidebarContentWidth))")
             Spacer()
         }
-        .frame(width: effectiveWidth, alignment: .leading)
         .tag(index)
     }
 

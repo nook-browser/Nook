@@ -15,9 +15,6 @@ struct SidebarHoverOverlayView: View {
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.nookSettings) var nookSettings
 
-    private var overlayWidth: CGFloat {
-        windowState.isSidebarVisible ? windowState.sidebarWidth : browserManager.getSavedSidebarWidth(for: windowState)
-    }
     private let cornerRadius: CGFloat = 12
     private let horizontalInset: CGFloat = 7
     private let verticalInset: CGFloat = 7
@@ -40,10 +37,10 @@ struct SidebarHoverOverlayView: View {
                     }
 
                 if hoverManager.isOverlayVisible {
-                    SpacesSideBarView(forceVisible: true, forcedWidth: overlayWidth)
+                    SpacesSideBarView()
+                        .frame(width: windowState.sidebarWidth)
                         .environmentObject(browserManager)
                         .environment(windowState)
-                        .frame(width: overlayWidth)
                         .frame(maxHeight: .infinity)
                         .background{
                             

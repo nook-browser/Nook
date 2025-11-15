@@ -2,7 +2,7 @@
 //  SidebarHeader.swift
 //  Nook
 //
-//  Created by Claude on 15/11/2025.
+//  Created by Aether on 15/11/2025.
 //
 
 import SwiftUI
@@ -12,8 +12,8 @@ struct SidebarHeader: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.nookSettings) var nookSettings
-    let sidebarWidth: CGFloat
     let isSidebarHovered: Bool
+    @State private var sidebarWidth: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 8) {
@@ -25,6 +25,11 @@ struct SidebarHeader: View {
                 navigationButtons
                 urlBar
             }
+        }
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+        } action: { newWidth in
+            sidebarWidth = newWidth
         }
     }
 
