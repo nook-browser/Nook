@@ -42,21 +42,6 @@ struct WindowView: View {
 
                 // Main layout (webview extends full height when top bar is enabled)
                 mainLayout
-                
-                // TopBar Command Palette overlay
-                if browserManager.settingsManager.topBarAddressView {
-                    TopBarCommandPalette()
-                        .environmentObject(browserManager)
-                        .environment(windowState)
-                        .zIndex(3000)
-                }
-
-                // Mini command palette anchored exactly to URL bar's top-left
-                // Only show when topbar is disabled
-                if !browserManager.settingsManager.topBarAddressView {
-                    MiniCommandPaletteOverlay()
-                        .environment(windowState)
-                }
 
                 // Hover-reveal Sidebar overlay (slides in over web content)
                 SidebarHoverOverlayView()
@@ -330,52 +315,5 @@ private struct ProfileSwitchToastView: View {
                 .stroke(.white.opacity(0.2), lineWidth: 2)
         }
         .transition(.scale(scale: 0.0, anchor: .top))
-    }
-}
-
-// MARK: - Mini Command Palette Overlay (above sidebar and webview)
-private struct MiniCommandPaletteOverlay: View {
-    @EnvironmentObject var browserManager: BrowserManager
-    @Environment(BrowserWindowState.self) private var windowState
-    @Environment(CommandPaletteState.self) private var commandPalette
-
-    var body: some View {
-        let isVisible =
-              commandPalette.isMiniVisible
-            && !commandPalette.isVisible
-
-        ZStack(alignment: browserManager.settingsManager.sidebarPosition == .left ? .topLeading : .topTrailing) {
-            if isVisible {
-                // Click-away hit target
-                Color.clear
-                    .contentShape(Rectangle())
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        commandPalette.hideMini()
-                    }
-
-                // Use reported URL bar frame when reliable; otherwise compute manual fallback
-                let barFrame = windowState.urlBarFrame
-                let hasFrame = barFrame.width > 1 && barFrame.height > 1
-                // Match sidebar's internal 8pt padding when geometry is unavailable
-                let fallbackX: CGFloat = 8
-                let topBarHeight: CGFloat = browserManager.settingsManager.topBarAddressView ? TopBarMetrics.height : 0
-                let fallbackY: CGFloat =
-                    8 /* sidebar top padding */ + 30 /* nav bar */
-                    + 8 /* vstack spacing */ + topBarHeight
-                let anchorX = hasFrame ? barFrame.minX : fallbackX
-                let anchorY = hasFrame ? barFrame.minY : fallbackY
-                // let width = hasFrame ? barFrame.width : browserManager.sidebarWidth
-
-                MiniCommandPaletteView(
-                    forcedWidth: 400,
-                    forcedCornerRadius: 12
-                )
-                .offset(x: browserManager.settingsManager.sidebarPosition == .left ? anchorX : -anchorX, y: anchorY)
-                .zIndex(1)
-            }
-        }
-        .allowsHitTesting(isVisible)
-        .zIndex(999) // ensure above web content
     }
 }
