@@ -27,8 +27,7 @@ struct WindowView: View {
     
     var body: some View {
         ZStack {
-            WindowBackgroundView()
-                .environment(windowState)
+            WindowBackground()
                 .contextMenu {
                     Button("Customize Space Gradient...") {
                         browserManager.showGradientEditor()
@@ -36,8 +35,7 @@ struct WindowView: View {
                     .disabled(browserManager.tabManager.currentSpace == nil)
                 }
             
-            // Main layout (webview extends full height when top bar is enabled)
-            mainLayout
+            SidebarWebViewStack()
             
             // Hover-reveal Sidebar overlay (slides in over web content)
             SidebarHoverOverlayView()
@@ -164,41 +162,54 @@ struct WindowView: View {
     }
     
     @ViewBuilder
-    private var mainLayout: some View {
+    func WindowBackground() -> some View{
+        ZStack{
+            SpaceGradientBackgroundView()
+            
+            Rectangle()
+                .fill(Color.clear)
+                .universalGlassEffect(.regular.tint(Color(.windowBackgroundColor).opacity(0.35)), in: .rect(cornerRadius: 0))
+                .clipped()
+        }
+        .backgroundDraggable()
+        .environment(windowState)
+    }
+    
+    
+    @ViewBuilder
+    func SidebarWebViewStack() -> some View{
         let aiVisible = windowState.isSidebarAIChatVisible
         let aiAppearsOnTrailingEdge = browserManager.settingsManager.sidebarPosition == .left
         
         HStack(spacing: 0) {
             if aiAppearsOnTrailingEdge {
-                sidebarColumn
-                websiteColumn
+                SpacesSidebar()
+                WebContent()
                 if aiVisible {
-                    aiSidebar
+                    AISidebar()
                 }
             } else {
                 if aiVisible {
-                    aiSidebar
+                    AISidebar()
                 }
-                websiteColumn
-                sidebarColumn
+                WebContent()
+                SpacesSidebar()
             }
         }
         .padding(.trailing, windowState.isSidebarVisible && browserManager.settingsManager.sidebarPosition == .right ? 0 : aiVisible ? 0 : 8)
         .padding(.leading, windowState.isSidebarVisible && browserManager.settingsManager.sidebarPosition == .left ? 0 : aiVisible ? 0 : 8)
     }
     
-    private var sidebarColumn: some View {
+    @ViewBuilder
+    func SpacesSidebar() -> some View{
         SidebarView()
-        // Overlay the resize handle spanning the sidebar/webview boundary
             .overlay(alignment: browserManager.settingsManager.sidebarPosition == .left ? .trailing : .leading) {
                 if windowState.isSidebarVisible {
-                    // Position to span 14pts into sidebar and 2pts into web content (moved 6pts left)
                     SidebarResizeView()
-                    
                         .frame(maxHeight: .infinity)
                         .environmentObject(browserManager)
                         .environment(windowState)
-                        .zIndex(2000)  // Higher z-index to ensure it's above all other elements
+                        .zIndex(2000)
                         .environment(windowState)
                 }
             }
@@ -207,7 +218,7 @@ struct WindowView: View {
     }
     
     @ViewBuilder
-    private var websiteColumn: some View {
+    func WebContent() -> some View{
         let cornerRadius: CGFloat = {
             if #available(macOS 26.0, *) {
                 return 12
@@ -239,22 +250,8 @@ struct WindowView: View {
         .clipShape(websiteColumnClipShape(cornerRadius: cornerRadius, hasTopBar: hasTopBar))
     }
     
-    private func websiteColumnClipShape(cornerRadius: CGFloat, hasTopBar: Bool) -> AnyShape {
-        if hasTopBar {
-            return AnyShape(UnevenRoundedRectangle(
-                topLeadingRadius: 0,
-                bottomLeadingRadius: cornerRadius,
-                bottomTrailingRadius: cornerRadius,
-                topTrailingRadius: 0,
-                style: .continuous
-            ))
-        } else {
-            return AnyShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        }
-    }
-    
     @ViewBuilder
-    private var aiSidebar: some View {
+    func AISidebar() -> some View{
         let handleAlignment: Alignment = browserManager.settingsManager.sidebarPosition == .left ? .leading : .trailing
         
         SidebarAIChat()
@@ -272,6 +269,20 @@ struct WindowView: View {
             .environmentObject(browserManager)
             .environment(windowState)
             .environment(browserManager.settingsManager)
+    }
+    
+    private func websiteColumnClipShape(cornerRadius: CGFloat, hasTopBar: Bool) -> AnyShape {
+        if hasTopBar {
+            return AnyShape(UnevenRoundedRectangle(
+                topLeadingRadius: 0,
+                bottomLeadingRadius: cornerRadius,
+                bottomTrailingRadius: cornerRadius,
+                topTrailingRadius: 0,
+                style: .continuous
+            ))
+        } else {
+            return AnyShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        }
     }
     
 }
