@@ -242,7 +242,8 @@ struct ArcSpace {
     let title: String
     let icon: String?
     let emoji: String?
-    let tabs: [ArcTab]
+    let pinnedTabs: [ArcTab]
+    let unpinnedTabs: [ArcTab]
     let folders: [ArcFolder]
 }
 
@@ -267,7 +268,7 @@ func parseArcSidebarData(from fileURL: URL) throws -> ArcImportResult {
     let data = try Data(contentsOf: fileURL)
     let sidebarData = try JSONDecoder().decode(SidebarData.self, from: data)
     
-    var spacesDict: [String: (id: String, title: String, icon: String?, emoji: String?)] = [:]
+    var spacesDict: [String: (id: String, title: String, icon: String?, emoji: String?, containerIDs: [String]?)] = [:]
     var allItems: [String: SidebarItem] = [:]
     var containerToSpaceMap: [String: String] = [:]
     
@@ -279,7 +280,8 @@ func parseArcSidebarData(from fileURL: URL) throws -> ArcImportResult {
                         id: spaceInfo.id,
                         title: spaceInfo.title,
                         icon: spaceInfo.customInfo?.iconType?.icon,
-                        emoji: spaceInfo.customInfo?.iconType?.emoji_v2
+                        emoji: spaceInfo.customInfo?.iconType?.emoji_v2,
+                        containerIDs: spaceInfo.containerIDs
                     )
                 }
                 
@@ -328,11 +330,33 @@ func parseArcSidebarData(from fileURL: URL) throws -> ArcImportResult {
     }
     
     for spaceInfo in spacesDict.values {
-        var spaceTabs: [ArcTab] = []
+        var pinnedTabs: [ArcTab] = []
+        var unpinnedTabs: [ArcTab] = []
         var spaceFolders: [ArcFolder] = []
         
+        var pinnedContainerID: String?
+        var unpinnedContainerID: String?
+        
+        if let containerIDs = spaceInfo.containerIDs {
+            var i = 0
+            while i < containerIDs.count {
+                if i + 1 < containerIDs.count {
+                    if containerIDs[i] == "pinned" {
+                        pinnedContainerID = containerIDs[i + 1]
+                    } else if containerIDs[i] == "unpinned" {
+                        unpinnedContainerID = containerIDs[i + 1]
+                    }
+                }
+                i += 2
+            }
+        }
+        
         for (_, item) in allItems {
-            let spaceContext = findSpaceContext(for: item.parentID, in: containerToSpaceMap, spaces: Array(spacesDict.values))
+            let spaceContext = findSpaceContext(
+                for: item.parentID,
+                in: containerToSpaceMap,
+                spaceID: spaceInfo.id
+            )
             
             guard spaceContext == spaceInfo.id else { continue }
             
@@ -355,7 +379,13 @@ func parseArcSidebarData(from fileURL: URL) throws -> ArcImportResult {
                     isUnread: item.isUnread
                 )
                 
-                spaceTabs.append(tab)
+                if let pinnedContainerID = pinnedContainerID,
+                   item.parentID == pinnedContainerID {
+                    pinnedTabs.append(tab)
+                } else if let unpinnedContainerID = unpinnedContainerID,
+                          item.parentID == unpinnedContainerID {
+                    unpinnedTabs.append(tab)
+                }
                 
             } else if (item.data.list != nil || item.data.itemContainer != nil) && !item.childrenIds.isEmpty {
                 let folderTabs = item.childrenIds.compactMap { childId -> ArcTab? in
@@ -392,7 +422,8 @@ func parseArcSidebarData(from fileURL: URL) throws -> ArcImportResult {
             title: spaceInfo.title,
             icon: spaceInfo.icon,
             emoji: spaceInfo.emoji,
-            tabs: spaceTabs,
+            pinnedTabs: pinnedTabs,
+            unpinnedTabs: unpinnedTabs,
             folders: spaceFolders
         )
         
@@ -407,7 +438,11 @@ private func extractDomain(from url: String) -> String {
     return url.host ?? ""
 }
 
-private func findSpaceContext(for parentID: String?, in containerToSpaceMap: [String: String], spaces: [(id: String, title: String, icon: String?, emoji: String?)]) -> String? {
+private func findSpaceContext(
+    for parentID: String?,
+    in containerToSpaceMap: [String: String],
+    spaceID: String
+) -> String? {
     guard let parentID = parentID else { return nil }
     return containerToSpaceMap[parentID]
 }

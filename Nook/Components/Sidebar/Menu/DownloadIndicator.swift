@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct DownloadIndicator: View {
-    @Environment(BrowserManager.self) private var browserManager
+    @EnvironmentObject var browserManager: BrowserManager
 
     var currentDownload: Download? {
         browserManager.downloadManager.activeDownloads.first

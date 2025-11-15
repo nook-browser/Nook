@@ -8,13 +8,11 @@
 import Foundation
 import SwiftUI
 import SwiftData
-import Observation
 
 @MainActor
-@Observable
-final class ProfileManager {
+final class ProfileManager: ObservableObject {
     let context: ModelContext
-    var profiles: [Profile] = []
+    @Published var profiles: [Profile] = []
 
     init(context: ModelContext) {
         self.context = context

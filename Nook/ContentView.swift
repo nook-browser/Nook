@@ -9,12 +9,13 @@ import SwiftUI
 import AppKit
 
 struct ContentView: View {
-    @Environment(BrowserManager.self) private var browserManager
-    @State private var windowState = BrowserWindowState()
+    @EnvironmentObject var browserManager: BrowserManager
+    @StateObject private var windowState = BrowserWindowState()
     
     var body: some View {
         WindowView()
-            .environment(windowState)
+            .environmentObject(windowState)
+            .environmentObject(browserManager.gradientColorManager)
             .background(WindowFocusBridge(windowState: windowState, browserManager: browserManager))
             .frame(minWidth: 470, minHeight: 382)
             .onAppear {

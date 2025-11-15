@@ -8,5 +8,14 @@
 	</array>
 	<key>com.apple.security.automation.apple-events</key>
 	<true/>
+	<!-- PENDING APPLE APPROVAL: this key has been requested from Apple HQ -->
+	<!-- <key>com.apple.developer.web-browser</key>
+	<true/> -->
+	<key>com.apple.developer.authentication-services.autofill-credential-provider</key>
+	<true/>
+	<key>com.apple.security.device.bluetooth</key>
+	<true/>
+	<key>com.apple.security.device.usb</key>
+	<true/>
 </dict>
 </plist>

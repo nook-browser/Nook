@@ -1,0 +1,14 @@
+name: Enforce PR base branch
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  check-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if PR targets main
+        if: github.event.pull_request.base.ref == 'main'
+        run: |
+          echo "PRs must target dev, not main."
+          exit 1

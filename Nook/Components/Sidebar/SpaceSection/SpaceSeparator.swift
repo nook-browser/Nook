@@ -10,14 +10,21 @@ struct SpaceSeparator: View {
     var isHovering: Bool = false
     let onClear: () -> Void
     @State private var isClearHovered: Bool = false
-    @Environment(BrowserManager.self) private var browserManager
+    @EnvironmentObject var browserManager: BrowserManager
 
     var body: some View {
-        HStack {
+        let hasTabs = !browserManager.tabManager.tabs(in: browserManager.tabManager.currentSpace!).isEmpty
+        let showClearButton = isHovering && hasTabs
+        
+        HStack(spacing: 0) {
             RoundedRectangle(cornerRadius: 100)
                 .fill(Color.white.opacity(0.1))
                 .frame(height: 2)
-            if(isHovering && !browserManager.tabManager.tabs(in: browserManager.tabManager.currentSpace!).isEmpty) {
+                .frame(maxWidth: showClearButton ? .infinity : .infinity)
+                .padding(.trailing, showClearButton ? 8 : 0)
+                .animation(.easeInOut(duration: 0.15), value: showClearButton)
+            
+            if hasTabs {
                 Button(action: onClear) {
                     Text("↓ Clear")
                         .font(.system(size: 12, weight: .medium))
@@ -26,9 +33,14 @@ struct SpaceSeparator: View {
                 }
                 .buttonStyle(PlainButtonStyle())
                 .help("Clear all regular tabs")
+                .opacity(showClearButton ? 1 : 0)
+                .offset(x: showClearButton ? 0 : 20)
+                .frame(width: showClearButton ? nil : 0)
+                .animation(.easeInOut(duration: 0.15), value: showClearButton)
                 .onHover { state in
-                    isClearHovered = state
-                    
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        isClearHovered = state
+                    }
                 }
             }
         }

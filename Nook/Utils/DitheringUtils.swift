@@ -1,5 +1,4 @@
 import SwiftUI
-import Observation
 import CoreGraphics
 import simd
 
@@ -93,8 +92,8 @@ fileprivate func cachedNSColor(hex: String) -> NSColor {
 // Uses a renderer to generate a dithered image off the main thread; falls back to SwiftUI gradient.
 struct DitheredGradientView: View {
     let gradient: SpaceGradient
-    @State private var renderer = DitheredGradientRenderer()
-    @Environment(GradientColorManager.self) private var gradientColorManager
+    @StateObject private var renderer = DitheredGradientRenderer()
+    @EnvironmentObject var gradientColorManager: GradientColorManager
     @Environment(\.backingScale) private var backingScale
 
     var body: some View {
@@ -458,9 +457,8 @@ private func drawLinearGradientCG(gradientNodes: [GradientNode], angle: Double, 
 }
 
 // MARK: - Renderer with caching and background generation
-@Observable
-final class DitheredGradientRenderer {
-    var image: CGImage?
+final class DitheredGradientRenderer: ObservableObject {
+    @Published var image: CGImage?
     private var workItem: DispatchWorkItem?
     private static var cache = NSCache<NSString, CGImage>()
 

@@ -15,8 +15,9 @@ struct PinnedGrid: View {
     let rowSpacing: CGFloat = 6
     let maxColumns: Int = 3
 
-    @Environment(BrowserManager.self) private var browserManager
-    @Environment(BrowserWindowState.self) private var windowState
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(\.colorScheme) var colorScheme
     @State private var draggedItem: UUID? = nil
     
     init(width: CGFloat, profileId: UUID? = nil) {
@@ -37,9 +38,16 @@ struct PinnedGrid: View {
 
         // For embedded use, return proper sized container even when empty to support transitions
         if items.isEmpty {
+            let isDragging = draggedItem != nil
+            let backgroundColor = isDragging
+                ? (colorScheme == .dark ? AppColors.pinnedTabHoverLight : AppColors.pinnedTabHoverDark)
+                : Color.clear
+
             return AnyView(
-                Color.clear
-                    .frame(height: 44)
+                backgroundColor
+                    .frame(height: isDragging ? 44 : 10)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .animation(.easeInOut(duration: 0.15), value: isDragging)
                     .onDrop(
                         of: [.text],
                         delegate: SidebarSectionDropDelegateSimple(
@@ -75,7 +83,7 @@ struct PinnedGrid: View {
                                 onSplitRight: { browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState) },
                                 onSplitLeft: { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) }
                             )
-                            .environment(browserManager)
+                            .environmentObject(browserManager)
                             .onTabDrag(tab.id, draggedItem: $draggedItem)
                             .opacity(draggedItem == tab.id ? 0.0 : 1.0)
                             .onDrop(

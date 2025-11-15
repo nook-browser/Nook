@@ -126,7 +126,7 @@ class MacButtonsViewModel {
 // MARK: - MacButtonsView
 
 struct MacButtonsView: View {
-    @Environment(BrowserManager.self) private var browserManager
+    @EnvironmentObject var browserManager: BrowserManager
     let viewModel = MacButtonsViewModel()
 
     var body: some View {
@@ -159,7 +159,7 @@ struct MacButtonsView: View {
 // MARK: - MacButtonView
 
 struct MacButtonView: View {
-    @Environment(BrowserManager.self) private var browserManager
+    @EnvironmentObject var browserManager: BrowserManager
     var viewModel: MacButtonsViewModel
     var buttonType: MacButtonsViewModel.ButtonType
 

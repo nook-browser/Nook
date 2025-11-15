@@ -5,13 +5,11 @@
 //  Created by Maciek Bagiński on 30/07/2025.
 //
 import SwiftUI
-import Observation
 
 // Wrapper to properly observe Tab object and use active window's WebView
 @MainActor
-@Observable
-class ObservableTabWrapper {
-    var tab: Tab?
+class ObservableTabWrapper: ObservableObject {
+    @Published var tab: Tab?
     weak var browserManager: BrowserManager?
     weak var windowState: BrowserWindowState?
     
@@ -46,20 +44,22 @@ class ObservableTabWrapper {
 }
 
 struct NavButtonsView: View {
-    @Environment(BrowserManager.self) private var browserManager
-    @Environment(BrowserWindowState.self) private var windowState
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     var effectiveSidebarWidth: CGFloat?
-    @State private var tabWrapper = ObservableTabWrapper()
+    @StateObject private var tabWrapper = ObservableTabWrapper()
     @State private var isMenuHovered = false
     
     var body: some View {
         let sidebarOnLeft = browserManager.settingsManager.sidebarPosition == .left
         let sidebarWidthForLayout = effectiveSidebarWidth ?? windowState.sidebarWidth
-        let navigationCollapseThreshold: CGFloat = 250
-        let refreshCollapseThreshold: CGFloat = 210
-        
+        let navigationCollapseThreshold: CGFloat = 280
+        let refreshCollapseThreshold: CGFloat = 240
+        let aiChatCollapseThreshold: CGFloat = 220
+
         let shouldCollapseNavigation = sidebarWidthForLayout < navigationCollapseThreshold
         let shouldCollapseRefresh = sidebarWidthForLayout < refreshCollapseThreshold
+        let shouldCollapseAIChat = sidebarWidthForLayout < aiChatCollapseThreshold
         
         HStack(spacing: 2) {
             if sidebarOnLeft {
@@ -74,7 +74,7 @@ struct NavButtonsView: View {
             .buttonStyle(NavButtonStyle())
             .foregroundStyle(Color.primary)
             
-            if browserManager.settingsManager.showAIAssistant {
+            if browserManager.settingsManager.showAIAssistant && !shouldCollapseAIChat {
                 Button("Toggle AI Assistant", systemImage: "sparkle") {
                     browserManager.toggleAISidebar(for: windowState)
                 }
@@ -89,7 +89,8 @@ struct NavButtonsView: View {
                 if shouldCollapseNavigation {
                     collapsedMenu(
                         includeNavigation: true,
-                        includeRefresh: shouldCollapseRefresh
+                        includeRefresh: shouldCollapseRefresh,
+                        includeAIChat: shouldCollapseAIChat && browserManager.settingsManager.showAIAssistant
                     )
                 } else {
                     HStack(alignment: .center, spacing: 8) {
@@ -118,10 +119,11 @@ struct NavButtonsView: View {
                             }
                     }
                     
-                    if shouldCollapseRefresh {
+                    if shouldCollapseRefresh || shouldCollapseAIChat {
                         collapsedMenu(
                             includeNavigation: false,
-                            includeRefresh: true
+                            includeRefresh: shouldCollapseRefresh,
+                            includeAIChat: shouldCollapseAIChat && browserManager.settingsManager.showAIAssistant
                         )
                     }
                 }
@@ -187,23 +189,32 @@ struct NavButtonsView: View {
     }
     
     @ViewBuilder
-    private func collapsedMenu(includeNavigation: Bool, includeRefresh: Bool) -> some View {
-        if includeNavigation || includeRefresh {
+    private func collapsedMenu(includeNavigation: Bool, includeRefresh: Bool, includeAIChat: Bool = false) -> some View {
+        if includeNavigation || includeRefresh || includeAIChat {
             Menu {
                 if includeNavigation {
                     Button(action: goBack) {
                         Label("Go Back", systemImage: "arrow.backward")
                     }
                     .disabled(!tabWrapper.canGoBack)
-                    
+
                     Button(action: goForward) {
                         Label("Go Forward", systemImage: "arrow.forward")
                     }
                     .disabled(!tabWrapper.canGoForward)
                 }
-                
-                if includeRefresh {
+
+                if includeAIChat {
                     if includeNavigation {
+                        Divider()
+                    }
+                    Button(action: { browserManager.toggleAISidebar(for: windowState) }) {
+                        Label("Toggle AI Assistant", systemImage: "sparkle")
+                    }
+                }
+
+                if includeRefresh {
+                    if includeNavigation || includeAIChat {
                         Divider()
                     }
                     Button(action: refreshCurrentTab) {
