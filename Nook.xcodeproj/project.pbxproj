@@ -54,6 +54,8 @@
 		2D0834D12EC8E0AD00C302AC /* Exceptions for "Navigation" folder in "Nook" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Sidebar/SidebarBottomBar.swift,
+				Sidebar/SidebarHeader.swift,
 				Sidebar/SpacesSideBarView.swift,
 			);
 			target = 7F8340FB2E37F39400674A5D /* Nook */;
