@@ -270,3 +270,55 @@ private struct ProfileSwitchToastView: View {
         .transition(.scale(scale: 0.0, anchor: .top))
     }
 }
+
+// MARK: - Previews
+
+#Preview("Window View") {
+    @Previewable @State var browserManager = BrowserManager()
+    @Previewable @State var windowState = BrowserWindowState()
+    @Previewable @State var windowRegistry = WindowRegistry()
+    @Previewable @State var webViewCoordinator = WebViewCoordinator()
+    @Previewable @State var nookSettings = NookSettingsService()
+
+    WindowView()
+        .environmentObject(browserManager)
+        .environment(windowState)
+        .environment(windowState.commandPalette)
+        .environment(windowRegistry)
+        .environment(\.nookSettings, nookSettings)
+        .frame(width: 1200, height: 800)
+}
+
+#Preview("Window View - Sidebar Collapsed") {
+    @Previewable @State var browserManager = BrowserManager()
+    @Previewable @State var windowState = BrowserWindowState()
+    @Previewable @State var windowRegistry = WindowRegistry()
+    @Previewable @State var nookSettings = NookSettingsService()
+
+    windowState.isSidebarVisible = false
+
+    return WindowView()
+        .environmentObject(browserManager)
+        .environment(windowState)
+        .environment(windowState.commandPalette)
+        .environment(windowRegistry)
+        .environment(\.nookSettings, nookSettings)
+        .frame(width: 1200, height: 800)
+}
+
+#Preview("Window View - AI Chat Visible") {
+    @Previewable @State var browserManager = BrowserManager()
+    @Previewable @State var windowState = BrowserWindowState()
+    @Previewable @State var windowRegistry = WindowRegistry()
+    @Previewable @State var nookSettings = NookSettingsService()
+
+    windowState.isSidebarAIChatVisible = true
+
+    return WindowView()
+        .environmentObject(browserManager)
+        .environment(windowState)
+        .environment(windowState.commandPalette)
+        .environment(windowRegistry)
+        .environment(\.nookSettings, nookSettings)
+        .frame(width: 1400, height: 800)
+}
