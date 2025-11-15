@@ -176,7 +176,7 @@ struct CommandPaletteView: View {
                 searchManager.updateProfileContext()
 
                 // Pre-fill text if provided and select all for easy replacement
-                text = windowState.commandPalettePrefilledText
+                text = commandPalette.prefilledText
 
                 DispatchQueue.main.async {
                     isSearchFocused = true
@@ -216,7 +216,7 @@ struct CommandPaletteView: View {
             }
         }
         .animation(.easeInOut(duration: 0.15), value: selectedSuggestionIndex)
-        .onChange(of: windowState.commandPalettePrefilledText) { _, newValue in
+        .onChange(of: commandPalette.prefilledText) { _, newValue in
             if isVisible {
                 text = newValue
                 DispatchQueue.main.async {
