@@ -3,122 +3,131 @@
 //  Nook
 //
 //  Created by Maciek Bagiński on 04/08/2025.
+//  Refactored by Aether on 15/11/2025.
 //
+
 import SwiftUI
 
 struct SpacesListItem: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
-    var space: Space
-    var isActive: Bool
-    var compact: Bool
+
+    let space: Space
+    let isActive: Bool
+    let compact: Bool
+    let isFaded: Bool
+
     @State private var isHovering: Bool = false
-    @State private var selectedEmoji: String = ""
-    @FocusState private var emojiFieldFocused: Bool
 
-    private var currentSpaceID: UUID? {
-        windowState.currentSpaceId
-    }
-
-    private var cellSize: CGFloat { compact && !isActive ? 16 : 32 }
-    private let dotVisualSize: CGFloat = 6
-    private let cornerRadius: CGFloat = 6
+    private let dotSize: CGFloat = 6
 
     var body: some View {
         Button {
-            withAnimation(.easeOut(duration: 0.2)){
+            withAnimation(.easeOut(duration: 0.2)) {
                 browserManager.setActiveSpace(space, in: windowState)
             }
         } label: {
-            if compact && !isActive {
-                Circle()
-                    .fill(iconColor)
-                    .frame(width: dotVisualSize, height: dotVisualSize)
-            } else {
-                if isEmoji(space.icon) {
-                    // Fixed inner content size to avoid glyph cropping
-                    Text(space.icon)
-                } else {
-                    Image(systemName: space.icon)
-                        .foregroundStyle(iconColor)
-                }
-            }
+            spaceIcon
         }
-        
         .labelStyle(.iconOnly)
         .buttonStyle(NavButtonStyle())
         .foregroundStyle(Color.primary)
         .layoutPriority(isActive ? 1 : 0)
+        .opacity(isFaded ? 0.3 : 1.0)
         .onHover { hovering in
             isHovering = hovering
         }
-        // Removed profile badge overlay to reduce UI noise
-        .overlay(
-            // Hidden TextField for capturing emoji selection
-            TextField("", text: $selectedEmoji)
-                .frame(width: 0, height: 0)
-                .opacity(0)
-                .focused($emojiFieldFocused)
-                .onChange(of: selectedEmoji) { _, newValue in
-                    if !newValue.isEmpty {
-                        // Safely unwrap the last character
-                        guard let lastChar = newValue.last else { return }
-                        space.icon = String(lastChar)
-                        browserManager.tabManager.persistSnapshot()
-                        selectedEmoji = ""
-                    }
-                }
-        )
         .contextMenu {
-            // Profile assignment
-            let currentName =
-                resolvedProfileName(for: space.profileId) ?? browserManager
-                .profileManager.profiles.first?.name ?? "Default"
-            Text("Current Profile: \(currentName)")
-                .foregroundStyle(.secondary)
-            Divider()
-            ProfilePickerView(
-                selectedProfileId: Binding(
-                    get: {
-                        space.profileId ?? browserManager.profileManager
-                            .profiles.first?.id ?? UUID()
-                    },
-                    set: { assignProfile($0) }
-                ),
-                onSelect: { _ in },
-                compact: true
-            )
-            .environmentObject(browserManager)
+            spaceContextMenu
+        }
+    }
 
-            Divider()
-            Button("Change Icon...") {
-                emojiFieldFocused = true
-                NSApp.orderFrontCharacterPalette(nil)
+    // MARK: - Icon
+
+    @ViewBuilder
+    private var spaceIcon: some View {
+        if compact && !isActive {
+            // Compact mode: show dot
+            Circle()
+                .fill(iconColor)
+                .frame(width: dotSize, height: dotSize)
+        } else {
+            // Normal mode: show icon or emoji
+            if isEmoji(space.icon) {
+                Text(space.icon)
+            } else {
+                Image(systemName: space.icon)
+                    .foregroundStyle(iconColor)
             }
         }
     }
 
     private var iconColor: Color {
-        return browserManager.gradientColorManager.isDark
-            ? AppColors.spaceTabTextDark : AppColors.spaceTabTextLight
+        browserManager.gradientColorManager.isDark
+            ? AppColors.spaceTabTextDark
+            : AppColors.spaceTabTextLight
     }
 
-    private func isEmoji(_ string: String) -> Bool {
-        return string.unicodeScalars.contains { scalar in
-            (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF)
-                || (scalar.value >= 0x2600 && scalar.value <= 0x26FF)
-                || (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
+    // MARK: - Context Menu
+
+    @ViewBuilder
+    private var spaceContextMenu: some View {
+        Button {
+            showSpaceEditDialog()
+        } label: {
+            Label("Edit Space", systemImage: "square.and.pencil")
+        }
+
+        if browserManager.tabManager.spaces.count > 1 {
+            Divider()
+            Button(role: .destructive) {
+                browserManager.tabManager.removeSpace(space.id)
+            } label: {
+                Label("Delete Space", systemImage: "trash")
+            }
         }
     }
 
-    private func assignProfile(_ id: UUID) {
-        browserManager.tabManager.assign(spaceId: space.id, toProfile: id)
+    // MARK: - Helper Methods
+
+    private func showSpaceEditDialog() {
+        browserManager.dialogManager.showDialog(
+            SpaceEditDialog(
+                space: space,
+                mode: .icon,
+                onSave: { newName, newIcon in
+                    do {
+                        if newIcon != space.icon {
+                            try browserManager.tabManager.updateSpaceIcon(
+                                spaceId: space.id,
+                                icon: newIcon
+                            )
+                        }
+
+                        if newName != space.name {
+                            try browserManager.tabManager.renameSpace(
+                                spaceId: space.id,
+                                newName: newName
+                            )
+                        }
+
+                        browserManager.dialogManager.closeDialog()
+                    } catch {
+                        print("⚠️ Failed to update space \(space.id.uuidString):", error)
+                    }
+                },
+                onCancel: {
+                    browserManager.dialogManager.closeDialog()
+                }
+            )
+        )
     }
 
-    private func resolvedProfileName(for id: UUID?) -> String? {
-        guard let id else { return nil }
-        return browserManager.profileManager.profiles.first(where: {
-            $0.id == id
-        })?.name
+    private func isEmoji(_ string: String) -> Bool {
+        string.unicodeScalars.contains { scalar in
+            (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF) // Emoticons & pictographs
+                || (scalar.value >= 0x2600 && scalar.value <= 0x26FF) // Miscellaneous symbols
+                || (scalar.value >= 0x2700 && scalar.value <= 0x27BF) // Dingbats
+        }
     }
 }

@@ -208,6 +208,8 @@ struct SpacesSideBarView: View {
 
     private var sidebarContextMenu: some View {
         Group {
+            // add tab action here
+            Divider()
             Menu {
                 ForEach(SidebarPosition.allCases) { position in
                     Toggle(isOn: Binding(
@@ -226,21 +228,8 @@ struct SpacesSideBarView: View {
             Button {
                 showSpaceEditDialog(mode: .rename)
             } label: {
-                Label("Rename Space", systemImage: "square.and.pencil")
+                Label("Edit Space", systemImage: "square.and.pencil")
             }
-
-            Button {
-                showSpaceEditDialog(mode: .icon)
-            } label: {
-                Label("Change Space Icon", systemImage: "pencil")
-            }
-
-            Button {
-                browserManager.showGradientEditor()
-            } label: {
-                Label("Edit Theme Color", systemImage: "paintpalette")
-            }
-
             if browserManager.tabManager.spaces.count > 1 {
                 Divider()
                 Button(role: .destructive) {
