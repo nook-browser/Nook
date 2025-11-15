@@ -8,6 +8,7 @@
 
 import SwiftUI
 
+/// Main window view that orchestrates the browser UI layout
 struct WindowView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
@@ -16,16 +17,6 @@ struct WindowView: View {
     @Environment(\.nookSettings) var nookSettings
     @StateObject private var hoverSidebarManager = HoverSidebarManager()
     @Environment(\.colorScheme) var colorScheme
-
-    // Calculate webview Y offset (where the web content starts)
-    private var webViewYOffset: CGFloat {
-        // Approximate Y offset for web content start (nav bar + URL bar + padding)
-        if nookSettings.topBarAddressView {
-            return TopBarMetrics.height  // Top bar height
-        } else {
-            return 20  // Accounts for navigation area height
-        }
-    }
     
     var body: some View {
         ZStack {
@@ -63,7 +54,6 @@ struct WindowView: View {
                     Spacer()
                 }
             }
-            
             
             // Toast overlays (matches WebsitePopup style/presentation)
             VStack {
@@ -161,14 +151,15 @@ struct WindowView: View {
         .environmentObject(browserManager.gradientColorManager)
         .environmentObject(browserManager.splitManager)
         .environmentObject(hoverSidebarManager)
-        
     }
-    
+
+    // MARK: - Layout Components
+
     @ViewBuilder
-    func WindowBackground() -> some View{
-        ZStack{
+    private func WindowBackground() -> some View {
+        ZStack {
             SpaceGradientBackgroundView()
-            
+
             Rectangle()
                 .fill(Color.clear)
                 .universalGlassEffect(.regular.tint(Color(.windowBackgroundColor).opacity(0.35)), in: .rect(cornerRadius: 0))
@@ -177,10 +168,9 @@ struct WindowView: View {
         .backgroundDraggable()
         .environment(windowState)
     }
-    
-    
+
     @ViewBuilder
-    func SidebarWebViewStack() -> some View{
+    private func SidebarWebViewStack() -> some View {
         let aiVisible = windowState.isSidebarAIChatVisible
         let aiAppearsOnTrailingEdge = nookSettings.sidebarPosition == .left
         
@@ -202,9 +192,9 @@ struct WindowView: View {
         .padding(.trailing, windowState.isSidebarVisible && nookSettings.sidebarPosition == .right ? 0 : aiVisible ? 0 : 8)
         .padding(.leading, windowState.isSidebarVisible && nookSettings.sidebarPosition == .left ? 0 : aiVisible ? 0 : 8)
     }
-    
+
     @ViewBuilder
-    func SpacesSidebar() -> some View{
+    private func SpacesSidebar() -> some View {
         SidebarView()
             .overlay(alignment: nookSettings.sidebarPosition == .left ? .trailing : .leading) {
                 if windowState.isSidebarVisible {
@@ -219,9 +209,9 @@ struct WindowView: View {
             .environmentObject(browserManager)
             .environment(windowState)
     }
-    
+
     @ViewBuilder
-    func WebContent() -> some View{
+    private func WebContent() -> some View {
         let cornerRadius: CGFloat = {
             if #available(macOS 26.0, *) {
                 return 12
@@ -252,9 +242,9 @@ struct WindowView: View {
         .padding(.bottom, 8)
         .clipShape(websiteColumnClipShape(cornerRadius: cornerRadius, hasTopBar: hasTopBar))
     }
-    
+
     @ViewBuilder
-    func AISidebar() -> some View{
+    private func AISidebar() -> some View {
         let handleAlignment: Alignment = nookSettings.sidebarPosition == .left ? .leading : .trailing
         
         SidebarAIChat()
@@ -273,7 +263,7 @@ struct WindowView: View {
             .environment(windowState)
             .environment(nookSettings)
     }
-    
+
     private func websiteColumnClipShape(cornerRadius: CGFloat, hasTopBar: Bool) -> AnyShape {
         if hasTopBar {
             return AnyShape(UnevenRoundedRectangle(
@@ -287,7 +277,6 @@ struct WindowView: View {
             return AnyShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         }
     }
-    
 }
 
 // MARK: - Profile Switch Toast View
