@@ -14,6 +14,7 @@ struct NookCommands: Commands {
     let windowRegistry: WindowRegistry
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.nookSettings) var nookSettings
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     init(browserManager: BrowserManager, windowRegistry: WindowRegistry) {
@@ -99,7 +100,7 @@ struct NookCommands: Commands {
                 browserManager.toggleAISidebar()
             }
             .keyboardShortcut("a", modifiers: [.command, .shift])
-            .disabled(!browserManager.settingsManager.showAIAssistant)
+            .disabled(!nookSettings.showAIAssistant)
 
             Button("Toggle Picture in Picture") {
                 browserManager.requestPiPForCurrentTabInActiveWindow()
@@ -270,7 +271,7 @@ struct NookCommands: Commands {
         }
 
         // Extensions Commands
-        if browserManager.settingsManager.experimentalExtensions {
+        if nookSettings.experimentalExtensions {
             CommandMenu("Extensions") {
                 Button("Install Extension...") {
                     browserManager.showExtensionInstallDialog()
@@ -280,7 +281,7 @@ struct NookCommands: Commands {
                 Button("Manage Extensions...") {
                     // Open native Settings to Extensions pane
                     openSettings()
-                    browserManager.settingsManager.currentSettingsTab = .extensions
+                    nookSettings.currentSettingsTab = .extensions
                 }
 
                 if #available(macOS 15.5, *) {

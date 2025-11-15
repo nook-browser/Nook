@@ -336,3 +336,15 @@ extension Notification.Name {
     static let blockCrossSiteTrackingChanged = Notification.Name("blockCrossSiteTrackingChanged")
 }
 
+// MARK: - Environment Key
+private struct SettingsManagerKey: EnvironmentKey {
+    static let defaultValue = SettingsManager()
+}
+
+extension EnvironmentValues {
+    var nookSettings: SettingsManager {
+        get { self[SettingsManagerKey.self] }
+        set { self[SettingsManagerKey.self] = newValue }
+    }
+}
+
