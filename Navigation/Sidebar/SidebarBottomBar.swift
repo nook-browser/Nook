@@ -57,10 +57,27 @@ struct SidebarBottomBar: View {
     }
 
     private var newSpaceButton: some View {
-        Button("New Space", systemImage: "plus") {
-            onNewSpaceTap()
+        Menu{
+            Button("New Space", systemImage: "square.grid.2x2") {
+                onNewSpaceTap()
+            }
+
+            Button("New Folder", systemImage: "folder.badge.plus") {
+                if let currentSpace = browserManager.tabManager.currentSpace {
+                    browserManager.tabManager.createFolder(for: currentSpace.id)
+                }
+            }
+
+            Divider()
+
+            Button("New Profile", systemImage: "person.badge.plus") {
+                // TODO: Show profile creation dialog
+            }
+        } label:{
+            Label("Actions", systemImage: "plus")
+                .labelStyle(.iconOnly)
         }
-        .labelStyle(.iconOnly)
+        .menuStyle(.button)
         .buttonStyle(NavButtonStyle())
         .foregroundStyle(Color.primary)
     }
