@@ -73,19 +73,22 @@ struct SpacesListItem: View {
     @ViewBuilder
     private var spaceContextMenu: some View {
         // Profile picker
-        ProfilePickerView(
-            selectedProfileId: Binding(
+        Picker(
+            currentProfileName,
+            systemImage: currentProfileIcon,
+            selection: Binding(
                 get: {
                     space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID()
                 },
                 set: { newProfileId in
                     browserManager.tabManager.assign(spaceId: space.id, toProfile: newProfileId)
                 }
-            ),
-            onSelect: { _ in },
-            compact: true
-        )
-        .environmentObject(browserManager)
+            )
+        ) {
+            ForEach(browserManager.profileManager.profiles, id: \.id) { profile in
+                Label(profile.name, systemImage: profile.icon).tag(profile.id)
+            }
+        }
 
         Divider()
 
@@ -111,6 +114,15 @@ struct SpacesListItem: View {
             return browserManager.profileManager.profiles.first?.name ?? "Default"
         }
         return profile.name
+    }
+
+    private var currentProfileIcon: String {
+        guard let profileId = space.profileId,
+              let profile = browserManager.profileManager.profiles.first(where: { $0.id == profileId })
+        else {
+            return browserManager.profileManager.profiles.first?.icon ?? "person.circle"
+        }
+        return profile.icon
     }
 
     // MARK: - Helper Methods
