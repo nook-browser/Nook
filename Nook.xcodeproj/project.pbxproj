@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		2C16A0262E87430B0070894B /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 2C16A0252E87430B0070894B /* Sparkle */; };
+		2D0822D82EC8A61800C302AC /* UniversalGlass in Frameworks */ = {isa = PBXBuildFile; productRef = 2D0822D72EC8A61800C302AC /* UniversalGlass */; };
 		3600212C2EC6EADB0016A41E /* ComplexModule in Frameworks */ = {isa = PBXBuildFile; productRef = 3600212B2EC6EADB0016A41E /* ComplexModule */; };
 		3600212E2EC6EADB0016A41E /* Numerics in Frameworks */ = {isa = PBXBuildFile; productRef = 3600212D2EC6EADB0016A41E /* Numerics */; };
 		360021302EC6EADB0016A41E /* RealModule in Frameworks */ = {isa = PBXBuildFile; productRef = 3600212F2EC6EADB0016A41E /* RealModule */; };
@@ -81,6 +82,7 @@
 				360021362EC6EC150016A41E /* Highlightr in Frameworks */,
 				360021422EC6EC7F0016A41E /* Graphing in Frameworks */,
 				3600212C2EC6EADB0016A41E /* ComplexModule in Frameworks */,
+				2D0822D82EC8A61800C302AC /* UniversalGlass in Frameworks */,
 				3600212E2EC6EADB0016A41E /* Numerics in Frameworks */,
 				360021332EC6EAEB0016A41E /* Atomics in Frameworks */,
 			);
@@ -140,6 +142,7 @@
 				3600213E2EC6EC710016A41E /* LRUCache */,
 				360021412EC6EC7F0016A41E /* Graphing */,
 				360021432EC6EC7F0016A41E /* Motion */,
+				2D0822D72EC8A61800C302AC /* UniversalGlass */,
 			);
 			productName = Pulse;
 			productReference = 7F8340FC2E37F39400674A5D /* Nook.app */;
@@ -180,6 +183,7 @@
 				3600213A2EC6EC450016A41E /* XCRemoteSwiftPackageReference "reeeed" */,
 				3600213D2EC6EC710016A41E /* XCRemoteSwiftPackageReference "LRUCache" */,
 				360021402EC6EC7F0016A41E /* XCRemoteSwiftPackageReference "Motion" */,
+				2D0822D62EC8A61800C302AC /* XCRemoteSwiftPackageReference "universalglass" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7F8340FD2E37F39400674A5D /* Products */;
@@ -344,8 +348,7 @@
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 104;
-				DEVELOPMENT_TEAM = 8JTS5XWJJN;
-				"DEVELOPMENT_TEAM[sdk=macosx*]" = 8JTS5XWJJN;
+				DEVELOPMENT_TEAM = 3ST82B3Y8M;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -361,7 +364,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0.4;
-				PRODUCT_BUNDLE_IDENTIFIER = io.browsewithnook.nook;
+				PRODUCT_BUNDLE_IDENTIFIER = io.browsewithnook.nooks;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "";
@@ -390,8 +393,7 @@
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 104;
-				DEVELOPMENT_TEAM = 8JTS5XWJJN;
-				"DEVELOPMENT_TEAM[sdk=macosx*]" = 8JTS5XWJJN;
+				DEVELOPMENT_TEAM = 3ST82B3Y8M;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -412,7 +414,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0.4;
-				PRODUCT_BUNDLE_IDENTIFIER = io.browsewithnook.nook;
+				PRODUCT_BUNDLE_IDENTIFIER = io.browsewithnook.nooks;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "";
@@ -459,6 +461,14 @@
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 2.8.0;
+			};
+		};
+		2D0822D62EC8A61800C302AC /* XCRemoteSwiftPackageReference "universalglass" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/aeastr/universalglass.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
 			};
 		};
 		3600212A2EC6EADB0016A41E /* XCRemoteSwiftPackageReference "swift-numerics" */ = {
@@ -540,6 +550,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 2C16A0242E87430B0070894B /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
+		};
+		2D0822D72EC8A61800C302AC /* UniversalGlass */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2D0822D62EC8A61800C302AC /* XCRemoteSwiftPackageReference "universalglass" */;
+			productName = UniversalGlass;
 		};
 		3600212B2EC6EADB0016A41E /* ComplexModule */ = {
 			isa = XCSwiftPackageProductDependency;
