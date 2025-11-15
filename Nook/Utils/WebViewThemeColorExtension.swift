@@ -103,7 +103,92 @@ extension WKWebView {
                 return null;
             }
 
-            return candidateColors();
+            function runExtraction() {
+                try {
+                    return candidateColors();
+                } catch (_) {
+                    return null;
+                }
+            }
+
+            function waitForDarkReader(timeoutMs = 1500) {
+                return new Promise((resolve) => {
+                    const start = Date.now();
+
+                    function done() { resolve(); }
+
+                    if (typeof window.DarkReader === 'undefined' || !window.DarkReader) {
+                        return done();
+                    }
+
+                    try {
+                        if (typeof window.DarkReader.ready === 'function') {
+                            const r = window.DarkReader.ready();
+                            if (r && typeof r.then === 'function') {
+                                r.then(done).catch(done);
+                                return;
+                            }
+                        }
+                    } catch (_) 
+    
+                    const isDarkReaderStyle = (node) => (
+                        node && node.nodeType === Node.ELEMENT_NODE &&
+                        node.tagName === 'STYLE' &&
+                        (node.classList.contains('darkreader') || /darkreader/i.test(node.getAttribute('media') || '') || /darkreader/i.test(node.getAttribute('id') || ''))
+                    );
+
+                    let settleTimer = null;
+                    const settleDelay = 100;
+
+                    const observer = new MutationObserver(() => {
+                        if (settleTimer) { clearTimeout(settleTimer); }
+                        settleTimer = setTimeout(() => {
+                            observer.disconnect();
+                            done();
+                        }, settleDelay);
+                    });
+
+                    let sawDarkReader = false;
+                    try {
+                        const styles = document.querySelectorAll('style, link[rel="stylesheet"]');
+                        styles.forEach((el) => { if (isDarkReaderStyle(el)) { sawDarkReader = true; } });
+                    } catch (_) { /* ignore */ }
+
+                    observer.observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['media', 'class', 'id'] });
+
+                    if (sawDarkReader) {
+                        settleTimer = setTimeout(() => {
+                            observer.disconnect();
+                            done();
+                        }, settleDelay);
+                    }
+
+                    const t = setInterval(() => {
+                        if (Date.now() - start >= timeoutMs) {
+                            try { observer.disconnect(); } catch (_) {}
+                            clearInterval(t);
+                            done();
+                        }
+                    }, 50);
+                });
+            }
+
+            function waitForLoad() {
+                return new Promise((resolve) => {
+                    if (document.readyState === 'complete') { resolve(); return; }
+                    window.addEventListener('load', () => resolve(), { once: true });
+                });
+            }
+
+            return (async function() {
+                try {
+                    await waitForLoad();
+                    await waitForDarkReader(1500);
+                    return runExtraction();
+                } catch (_) {
+                    return null;
+                }
+            })();
         })();
     """
 }
