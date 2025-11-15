@@ -12,6 +12,7 @@ struct SidebarView: View {
     @State private var hasTriggeredHaptic = false
     @State private var sidebarDraggedItem: UUID? = nil
     @State private var activeTabRefreshTrigger: Bool = false
+    @State private var isSidebarHovered: Bool = false
     
     // Downloads Menu Hover
     @State private var isMenuButtonHovered = false
@@ -147,6 +148,9 @@ struct SidebarView: View {
                         }
                     }
                 }
+                .onHover { state in
+                    isSidebarHovered = state
+                }
         }
     }
     
@@ -181,7 +185,7 @@ struct SidebarView: View {
             
             // Only show URL bar in sidebar if top bar address view is disabled
             if !browserManager.settingsManager.topBarAddressView {
-                URLBarView()
+                URLBarView(isSidebarHovered: isSidebarHovered)
                     .padding(.horizontal, 8)
             }
             // Container to support PinnedGrid slide transitions without clipping
