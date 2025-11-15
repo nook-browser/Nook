@@ -84,7 +84,8 @@ struct URLBarView: View {
         // Focus URL bar when tapping anywhere in the bar
         .contentShape(Rectangle())
         .onTapGesture {
-            browserManager.focusURLBar()
+            let currentURL = browserManager.currentTab(for: windowState)?.url.absoluteString ?? ""
+            windowState.commandPalette?.open(prefill: currentURL, navigateCurrentTab: true)
         }
         
     }

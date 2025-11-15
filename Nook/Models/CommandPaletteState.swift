@@ -11,11 +11,8 @@ import SwiftUI
 @MainActor
 @Observable
 class CommandPaletteState {
-    /// Whether the full command palette is visible
+    /// Whether the command palette is visible
     var isVisible: Bool = false
-
-    /// Whether the mini command palette (URL bar popup) is visible
-    var isMiniVisible: Bool = false
 
     /// Text to prefill in the command palette
     var prefilledText: String = ""
@@ -25,27 +22,23 @@ class CommandPaletteState {
 
     // MARK: - Actions
 
-    /// Open the full command palette with optional prefill text
+    /// Open the command palette with optional prefill text
     func open(prefill: String = "", navigateCurrentTab: Bool = false) {
-        print("🎨 [CommandPaletteState] Opening command palette")
         prefilledText = prefill
         self.shouldNavigateCurrentTab = navigateCurrentTab
-        isMiniVisible = false
         DispatchQueue.main.async {
             self.isVisible = true
-            print("🎨 [CommandPaletteState] isVisible set to true")
         }
     }
 
-    /// Open the full command palette with the current tab's URL
+    /// Open the command palette with the current tab's URL
     func openWithCurrentURL(_ url: URL) {
         open(prefill: url.absoluteString, navigateCurrentTab: true)
     }
 
-    /// Close the full command palette
+    /// Close the command palette
     func close() {
         isVisible = false
-        isMiniVisible = false
         shouldNavigateCurrentTab = false
         prefilledText = ""
     }
@@ -57,22 +50,5 @@ class CommandPaletteState {
         } else {
             open()
         }
-    }
-
-    /// Show the mini command palette (URL bar popup)
-    func showMini(prefill: String = "") {
-        prefilledText = prefill
-        shouldNavigateCurrentTab = true
-        isVisible = false
-        DispatchQueue.main.async {
-            self.isMiniVisible = true
-        }
-    }
-
-    /// Hide the mini command palette
-    func hideMini() {
-        isMiniVisible = false
-        shouldNavigateCurrentTab = false
-        prefilledText = ""
     }
 }

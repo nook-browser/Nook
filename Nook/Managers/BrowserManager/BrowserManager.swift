@@ -365,8 +365,6 @@ class BrowserManager: ObservableObject {
     @Published var sidebarContentWidth: CGFloat = 234
     @Published var isSidebarVisible: Bool = true
     @Published var isCommandPaletteVisible: Bool = false
-    // Mini palette shown when clicking the URL bar
-    @Published var isMiniCommandPaletteVisible: Bool = false
     @Published var didCopyURL: Bool = false
     @Published var commandPalettePrefilledText: String = ""
     @Published var shouldNavigateCurrentTab: Bool = false
@@ -917,7 +915,7 @@ class BrowserManager: ObservableObject {
 
     func closeCurrentTab() {
         if let activeWindow = activeWindowState,
-            activeWindow.isCommandPaletteVisible || activeWindow.isMiniCommandPaletteVisible
+            activeWindow.isCommandPaletteVisible
         {
             return
         }
@@ -932,12 +930,6 @@ class BrowserManager: ObservableObject {
         }
     }
 
-    func focusURLBar() {
-        // Open the mini palette anchored to the URL bar
-        // Pre-fill with current tab's URL and set to navigate current tab
-        guard let target = activeWindowState ?? windowRegistry?.windows.values.first else { return }
-        let prefill = currentTab(for: target)?.url.absoluteString ?? ""
-    }
 
     // MARK: - Dialog Methods
 
@@ -1846,7 +1838,6 @@ class BrowserManager: ObservableObject {
         windowState.isSidebarVisible = isSidebarVisible
         windowState.savedSidebarWidth = savedSidebarWidth
         windowState.isCommandPaletteVisible = false
-        windowState.isMiniCommandPaletteVisible = false
         windowState.didCopyURL = false
         windowState.commandPalettePrefilledText = ""
         windowState.shouldNavigateCurrentTab = false
@@ -1886,7 +1877,6 @@ class BrowserManager: ObservableObject {
         gradientColorManager.setImmediate(windowState.gradient)
         splitManager.refreshPublishedState(for: windowState.id)
         isCommandPaletteVisible = windowState.isCommandPaletteVisible
-        isMiniCommandPaletteVisible = windowState.isMiniCommandPaletteVisible
         commandPalettePrefilledText = windowState.commandPalettePrefilledText
         shouldNavigateCurrentTab = windowState.shouldNavigateCurrentTab
         if windowState.currentProfileId == nil {
