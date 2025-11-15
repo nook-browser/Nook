@@ -21,28 +21,41 @@ struct PinnedTabView: View {
 
     // Layout tunables
     private let corner: CGFloat = 16
-    private let iconSize: CGFloat = 20
+    private let iconSize: CGFloat = 16
     private let innerPadding: CGFloat = 16
 
     // Stroke overlay tunables
-    private let strokeThickness: CGFloat = 2.5   // ring thickness
+    private let strokeThickness: CGFloat = 2 // ring thickness
     private let faviconScale: CGFloat = 10.0      // favicon scale to fit the ring
     private let faviconBlur: CGFloat = 80.0      // blur applied to favicon
 
     var body: some View {
         Button(action: action) {
             ZStack {
-                RoundedRectangle(cornerRadius: corner, style: .continuous)
-                    .fill(backgroundColor)
-                    .animation(.easeInOut(duration: 0.2), value: isHovered)
-                    .shadow(color: shadowColor, radius: 1, y: 2)
+                ZStack {
+                    RoundedRectangle(cornerRadius: corner, style: .continuous)
+                        .fill(
+                            backgroundColor
+                        )
+                        .animation(.easeInOut(duration: 0.1), value: isHovered)
+                        .overlay {
+                            if isActive {
+                                tabIcon
+                                    .blur(radius: 30)
+                                    .opacity(0.5)
+                            }
+          
+                        }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
+
 
                 tabIcon
                     .resizable()
                     .interpolation(.high)
                     .antialiased(true)
                     .scaledToFit()
-                    .frame(width: iconSize, height: iconSize)
+                    .frame(height: iconSize)
                     .padding(.vertical, innerPadding)
 
                 // Favicon-based stroke overlay

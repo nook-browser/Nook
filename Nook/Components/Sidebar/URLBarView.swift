@@ -11,6 +11,7 @@ struct URLBarView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var windowState: BrowserWindowState
     @State private var isHovering: Bool = false
+    var isSidebarHovered: Bool
 
     var body: some View {
         ZStack {
@@ -49,14 +50,17 @@ struct URLBarView: View {
                     }
                     
                     // Extension action buttons
-                    if #available(macOS 15.5, *),
-                       let extensionManager = browserManager.extensionManager,
-                       browserManager.settingsManager.experimentalExtensions {
-                        ExtensionActionView(extensions: extensionManager.installedExtensions)
-                            .environmentObject(browserManager)
+                    if isSidebarHovered {
+                        if #available(macOS 15.5, *),
+                           let extensionManager = browserManager.extensionManager,
+                           browserManager.settingsManager.experimentalExtensions {
+                            ExtensionActionView(extensions: extensionManager.installedExtensions)
+                                .environmentObject(browserManager)
+                        }
                     }
                 }
-                .padding(.horizontal, 12)
+                .padding(.leading, 12)
+                .padding(.trailing, 5)
         }
         .frame(maxWidth: .infinity, minHeight: 36, maxHeight: 36)
         .background(
@@ -73,7 +77,7 @@ struct URLBarView: View {
             }
         )
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(.easeInOut(duration: 0.1)) {
                 isHovering = hovering
             }
         }
@@ -93,7 +97,7 @@ struct URLBarView: View {
         }
     }
     private var textColor: Color {
-        return browserManager.gradientColorManager.isDark ? AppColors.spaceTabTextDark : AppColors.spaceTabTextLight
+        return browserManager.gradientColorManager.isDark ? AppColors.iconActiveDark : AppColors.iconActiveLight
     }
     
     private var displayURL: String {

@@ -16,6 +16,7 @@ struct SidebarResizeView: View {
     @State private var startingMouseX: CGFloat = 0
     @StateObject private var dragLockManager = DragLockManager.shared
     @State private var dragSessionID: String = UUID().uuidString
+    @State private var hoverTask: Task<Void, Never>?
     @Environment(\.colorScheme) var colorScheme
 
     private let minWidth: CGFloat = 180
@@ -55,12 +56,20 @@ struct SidebarResizeView: View {
                 .onHover { hovering in
                     guard windowState.isSidebarVisible else { return }
 
-                    isHovering = hovering
+                    hoverTask?.cancel()
 
                     if hovering && !isResizing {
-                        NSCursor.resizeLeftRight.set()
-                    } else if !hovering && !isResizing {
-                        NSCursor.arrow.set()
+                        hoverTask = Task {
+                            try? await Task.sleep(for: .seconds(0.1))
+                            guard !Task.isCancelled else { return }
+                            isHovering = true
+                            NSCursor.resizeLeftRight.set()
+                        }
+                    } else {
+                        isHovering = false
+                        if !isResizing {
+                            NSCursor.arrow.set()
+                        }
                     }
                 }
                 .gesture(
