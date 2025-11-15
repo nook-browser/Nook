@@ -79,6 +79,7 @@ struct NookApp: App {
         browserManager.webViewCoordinator = webViewCoordinator
         browserManager.windowRegistry = windowRegistry
         browserManager.nookSettings = settingsManager
+        browserManager.tabManager.nookSettings = settingsManager
 
         // Configure managers that depend on settings
         browserManager.compositorManager.setUnloadTimeout(settingsManager.tabUnloadTimeout)
