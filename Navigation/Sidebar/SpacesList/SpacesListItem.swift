@@ -72,6 +72,23 @@ struct SpacesListItem: View {
 
     @ViewBuilder
     private var spaceContextMenu: some View {
+        // Profile picker
+        ProfilePickerView(
+            selectedProfileId: Binding(
+                get: {
+                    space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID()
+                },
+                set: { newProfileId in
+                    browserManager.tabManager.assign(spaceId: space.id, toProfile: newProfileId)
+                }
+            ),
+            onSelect: { _ in },
+            compact: true
+        )
+        .environmentObject(browserManager)
+
+        Divider()
+
         Button {
             showSpaceEditDialog()
         } label: {
@@ -79,13 +96,21 @@ struct SpacesListItem: View {
         }
 
         if browserManager.tabManager.spaces.count > 1 {
-            Divider()
             Button(role: .destructive) {
                 browserManager.tabManager.removeSpace(space.id)
             } label: {
                 Label("Delete Space", systemImage: "trash")
             }
         }
+    }
+
+    private var currentProfileName: String {
+        guard let profileId = space.profileId,
+              let profile = browserManager.profileManager.profiles.first(where: { $0.id == profileId })
+        else {
+            return browserManager.profileManager.profiles.first?.name ?? "Default"
+        }
+        return profile.name
     }
 
     // MARK: - Helper Methods
