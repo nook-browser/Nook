@@ -310,8 +310,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     private func injectWebStoreScriptIfNeeded(for url: URL, in webView: WKWebView) {
         // Only inject if experimental extensions are enabled
         guard let browserManager = browserManager,
-            let settingsManager = settingsManager,
-            settingsManager.experimentalExtensions
+            let nookSettings = nookSettings,
+            nookSettings.experimentalExtensions
         else {
             return
         }
@@ -476,8 +476,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
         // Add Web Store integration handler (only if experimental extensions are enabled)
         if let browserManager = browserManager,
-            let settingsManager = settingsManager,
-            settingsManager.experimentalExtensions
+            let nookSettings = nookSettings,
+            nookSettings.experimentalExtensions
         {
             webStoreHandler = WebStoreScriptHandler(browserManager: browserManager)
             _webView?.configuration.userContentController.add(
