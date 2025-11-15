@@ -119,7 +119,7 @@ struct OllamaModel: Identifiable, Equatable {
 struct SidebarAIChat: View {
     @Environment(BrowserWindowState.self) private var windowState
     @EnvironmentObject var browserManager: BrowserManager
-    @Environment(SettingsManager.self) var settingsManager
+    @Environment(NookSettingsService.self) var settingsManager
     
     @State private var messageText: String = ""
     @State private var messages: [ChatMessage] = []
@@ -1367,7 +1367,7 @@ struct CitationView: View {
 // MARK: - AI Settings Dialog
 
 struct AISettingsDialog: View {
-    @Bindable var settingsManager: SettingsManager
+    @Bindable var settingsManager: NookSettingsService
     let ollamaModels: [OllamaModel]
     let isFetchingModels: Bool
     let onFetchModels: () -> Void
