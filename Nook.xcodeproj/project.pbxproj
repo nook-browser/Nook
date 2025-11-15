@@ -56,6 +56,7 @@
 			membershipExceptions = (
 				Sidebar/SidebarBottomBar.swift,
 				Sidebar/SidebarHeader.swift,
+				Sidebar/SpaceContextMenu.swift,
 				Sidebar/SpacesList/SpacesList.swift,
 				Sidebar/SpacesList/SpacesListItem.swift,
 				Sidebar/SpacesSideBarView.swift,
