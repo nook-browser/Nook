@@ -215,7 +215,16 @@ struct SpacesSideBarView: View {
                 Label("New Tab", systemImage: "plus")
             }
 
+            Button {
+                if let currentSpace = browserManager.tabManager.currentSpace {
+                    browserManager.tabManager.createFolder(for: currentSpace.id)
+                }
+            } label: {
+                Label("New Folder", systemImage: "folder.badge.plus")
+            }
+
             Divider()
+
             Menu {
                 ForEach(SidebarPosition.allCases) { position in
                     Toggle(isOn: Binding(

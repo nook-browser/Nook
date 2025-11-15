@@ -7,17 +7,15 @@
 
 import SwiftUI
 
-/// Shared context menu for spaces (used in SpaceTitle, SpacesList, and Sidebar)
+/// Shared context menu for spaces (used in SpaceTitle and SpacesList)
 struct SpaceContextMenu: View {
     @EnvironmentObject var browserManager: BrowserManager
 
     let space: Space
     let canDelete: Bool
-    let showNewFolder: Bool
 
     let onEditSpace: () -> Void
     let onDeleteSpace: () -> Void
-    let onNewFolder: (() -> Void)?
 
     var body: some View {
         Group {
@@ -53,16 +51,6 @@ struct SpaceContextMenu: View {
                 browserManager.showGradientEditor()
             } label: {
                 Label("Edit Theme Color", systemImage: "paintpalette")
-            }
-
-            // New folder (optional)
-            if showNewFolder, let onNewFolder = onNewFolder {
-                Divider()
-                Button {
-                    onNewFolder()
-                } label: {
-                    Label("New Folder", systemImage: "folder.badge.plus")
-                }
             }
 
             // Delete space
