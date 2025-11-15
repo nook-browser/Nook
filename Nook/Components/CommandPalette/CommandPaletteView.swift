@@ -103,13 +103,6 @@ struct CommandPaletteView: View {
                                         searchManager.searchSuggestions(
                                             for: newValue
                                         )
-                                        if windowState.commandPalettePrefilledText
-                                            != newValue
-                                        {
-                                            windowState
-                                                .commandPalettePrefilledText =
-                                                newValue
-                                        }
                                     }
                             }
                             .padding(.vertical, 8)

@@ -366,7 +366,6 @@ class BrowserManager: ObservableObject {
     @Published var isSidebarVisible: Bool = true
     @Published var isCommandPaletteVisible: Bool = false
     @Published var didCopyURL: Bool = false
-    @Published var commandPalettePrefilledText: String = ""
     @Published var shouldNavigateCurrentTab: Bool = false
     // Frame of the URL bar within the window; used to anchor the mini palette precisely
     @Published var urlBarFrame: CGRect = .zero
@@ -1839,8 +1838,6 @@ class BrowserManager: ObservableObject {
         windowState.savedSidebarWidth = savedSidebarWidth
         windowState.isCommandPaletteVisible = false
         windowState.didCopyURL = false
-        windowState.commandPalettePrefilledText = ""
-        windowState.shouldNavigateCurrentTab = false
 
         // Set the NSWindow reference for keyboard shortcuts
         if let window = NSApplication.shared.windows.first(where: {
@@ -1877,7 +1874,6 @@ class BrowserManager: ObservableObject {
         gradientColorManager.setImmediate(windowState.gradient)
         splitManager.refreshPublishedState(for: windowState.id)
         isCommandPaletteVisible = windowState.isCommandPaletteVisible
-        commandPalettePrefilledText = windowState.commandPalettePrefilledText
         shouldNavigateCurrentTab = windowState.shouldNavigateCurrentTab
         if windowState.currentProfileId == nil {
             windowState.currentProfileId = currentProfile?.id
