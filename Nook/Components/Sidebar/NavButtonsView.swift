@@ -224,21 +224,10 @@ struct NavButtonsView: View {
                 }
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.primary)
-                    .frame(width: 32, height: 32)
-                    .contentShape(RoundedRectangle(cornerRadius: 6))
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(isMenuHovered ? Color.gray.opacity(0.1) : Color.clear)
-                    )
-                    .onHover { isHovered in
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            isMenuHovered = isHovered
-                        }
-                    }
             }
-            .buttonStyle(PlainButtonStyle())
+            .labelStyle(.iconOnly)
+            .menuStyle(.button)
+            .buttonStyle(NavButtonStyle())
         }
     }
 }

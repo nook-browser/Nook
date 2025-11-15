@@ -494,8 +494,7 @@ struct SpaceView: View {
                 Spacer()
             }
         }
-        .buttonStyle(NavButtonStyle())
-        .controlSize(.large)
+        .buttonStyle(RectNavButtonStyle())
         .padding(.top, 8)
         .onDrop(
             of: [.text],
