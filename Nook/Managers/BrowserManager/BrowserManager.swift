@@ -1243,7 +1243,9 @@ class BrowserManager: ObservableObject {
 
     func showBoostsDialog() {
         guard let currentTab = currentTabForActiveWindow(),
-            let domain = currentTab.url.host
+            let domain = currentTab.url.host,
+            let activeWindow = activeWindowState,
+            let webView = getWebView(for: currentTab.id, in: activeWindow.id)
         else {
             dialogManager.showDialog {
                 StandardDialog(
@@ -1269,115 +1271,12 @@ class BrowserManager: ObservableObject {
             return
         }
 
-        let normalizedDomain =
-            boostsManager.getBoost(for: domain) != nil ? domain : currentTab.url.host ?? domain
-        let existingConfig = boostsManager.getBoost(for: normalizedDomain) ?? BoostConfig()
-
-        // Create a draft config that we'll modify
-        final class BoostDraft: ObservableObject {
-            @Published var config: BoostConfig
-            init(_ config: BoostConfig) { self.config = config }
-        }
-        let draft = BoostDraft(existingConfig)
-        let configBinding = Binding<BoostConfig>(
-            get: { draft.config },
-            set: { draft.config = $0 }
+        // Show the boost window
+        BoostsWindowManager.shared.show(
+            for: webView,
+            domain: domain,
+            boostsManager: boostsManager
         )
-
-        dialogManager.showDialog {
-            StandardDialog(
-                header: {
-                    DialogHeader(
-                        icon: "bolt.circle.fill",
-                        title: "Boost for \(normalizedDomain)",
-                        subtitle: "Customize the color tint for this website"
-                    )
-                },
-                content: {
-                    BoostsDialog(
-                        config: configBinding,
-                        onApplyLive: { [weak self] config in
-                            guard let self = self else { return }
-
-                            // Apply boost live to current tab for preview
-                            if let activeWindow = self.activeWindowState,
-                                let currentTab = self.currentTab(for: activeWindow),
-                                let webView = self.getWebView(
-                                    for: currentTab.id, in: activeWindow.id)
-                            {
-                                self.boostsManager.injectBoost(config, into: webView)
-                            }
-                        }
-                    )
-                    .environmentObject(self.gradientColorManager)
-                },
-                footer: {
-                    DialogFooter(
-                        leftButton: boostsManager.hasBoost(for: normalizedDomain)
-                            ? DialogButton(
-                                text: "Delete Boost",
-                                iconName: "trash",
-                                variant: .secondary,
-                                action: { [weak self] in
-                                    guard let self = self else { return }
-                                    self.boostsManager.removeBoost(for: normalizedDomain)
-
-                                    // Disable DarkReader on current tab
-                                    if let activeWindow = self.activeWindowState,
-                                        let currentTab = self.currentTab(for: activeWindow),
-                                        let webView = self.getWebView(
-                                            for: currentTab.id, in: activeWindow.id)
-                                    {
-                                        self.boostsManager.disableBoost(in: webView)
-                                    }
-
-                                    self.closeDialog()
-                                }
-                            ) : nil,
-                        rightButtons: [
-                            DialogButton(
-                                text: "Cancel",
-                                variant: .secondary,
-                                action: { [weak self] in
-                                    guard let self = self else { return }
-
-                                    // Restore original state when canceling
-                                    if let activeWindow = self.activeWindowState,
-                                        let currentTab = self.currentTab(for: activeWindow),
-                                        let webView = self.getWebView(
-                                            for: currentTab.id, in: activeWindow.id)
-                                    {
-                                        if let existing = self.boostsManager.getBoost(
-                                            for: normalizedDomain)
-                                        {
-                                            // Restore existing boost
-                                            self.boostsManager.injectBoost(existing, into: webView)
-                                        } else {
-                                            // No existing boost, disable
-                                            webView.evaluateJavaScript(
-                                                "if (typeof DarkReader !== 'undefined') { DarkReader.disable(); }"
-                                            )
-                                        }
-                                    }
-                                    self.closeDialog()
-                                }
-                            ),
-                            DialogButton(
-                                text: "Save Boost",
-                                iconName: "checkmark",
-                                variant: .primary,
-                                action: { [weak self] in
-                                    guard let self = self else { return }
-                                    self.boostsManager.saveBoost(
-                                        draft.config, for: normalizedDomain)
-                                    self.closeDialog()
-                                }
-                            ),
-                        ]
-                    )
-                }
-            )
-        }
     }
 
     func closeDialog() {
