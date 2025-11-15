@@ -2,7 +2,7 @@
 //  SidebarBottomBar.swift
 //  Nook
 //
-//  Created by Claude on 15/11/2025.
+//  Created by Aether on 15/11/2025.
 //
 
 import SwiftUI

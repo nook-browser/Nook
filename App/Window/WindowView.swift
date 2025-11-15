@@ -155,9 +155,10 @@ struct WindowView: View {
 
     @ViewBuilder
     private func SpacesSidebar() -> some View {
-        SpacesSideBarView()
-            .overlay(alignment: nookSettings.sidebarPosition == .left ? .trailing : .leading) {
-                if windowState.isSidebarVisible {
+        if windowState.isSidebarVisible {
+            SpacesSideBarView()
+                .frame(width: windowState.sidebarWidth)
+                .overlay(alignment: nookSettings.sidebarPosition == .left ? .trailing : .leading) {
                     SidebarResizeView()
                         .frame(maxHeight: .infinity)
                         .environmentObject(browserManager)
@@ -165,9 +166,9 @@ struct WindowView: View {
                         .zIndex(2000)
                         .environment(windowState)
                 }
-            }
-            .environmentObject(browserManager)
-            .environment(windowState)
+                .environmentObject(browserManager)
+                .environment(windowState)
+        }
     }
 
     @ViewBuilder
