@@ -406,6 +406,7 @@ class BrowserManager: ObservableObject {
     var importManager: ImportManager
     var zoomManager = ZoomManager()
     var boostsManager = BoostsManager()
+    weak var nookSettings: NookSettingsService?
 
     var externalMiniWindowManager = ExternalMiniWindowManager()
     @Published var peekManager = PeekManager()
@@ -496,7 +497,7 @@ class BrowserManager: ObservableObject {
         self.currentProfile = initialProfile
 
         self.tabManager = TabManager(browserManager: nil, context: modelContext)
-        self.settingsManager = SettingsManager()
+        // settingsManager will be injected from NookApp
         self.dialogManager = DialogManager()
         self.downloadManager = DownloadManager.shared
         self.authenticationManager = AuthenticationManager()
@@ -515,7 +516,7 @@ class BrowserManager: ObservableObject {
         self.compositorManager.browserManager = self
         self.splitManager.browserManager = self
         self.splitManager.windowRegistry = self.windowRegistry
-        self.compositorManager.setUnloadTimeout(self.settingsManager.tabUnloadTimeout)
+        // Note: settingsManager will be injected later, so we skip initialization here
         self.tabManager.browserManager = self
         self.tabManager.reattachBrowserManager(self)
         bindTabManagerUpdates()
@@ -532,7 +533,7 @@ class BrowserManager: ObservableObject {
             self.gradientColorManager.setImmediate(.default)
         }
         self.trackingProtectionManager.attach(browserManager: self)
-        self.trackingProtectionManager.setEnabled(self.settingsManager.blockCrossSiteTracking)
+        // Note: tracking protection will be configured after settingsManager injection
 
         self.externalMiniWindowManager.attach(browserManager: self)
         self.peekManager.attach(browserManager: self)
@@ -580,7 +581,7 @@ class BrowserManager: ObservableObject {
     // MARK: - OAuth Assist Controls
     func maybeShowOAuthAssist(for url: URL, in tab: Tab) {
         // Only when protection is enabled and not already disabled for this tab
-        guard settingsManager.blockCrossSiteTracking, trackingProtectionManager.isEnabled else {
+        guard settingsManager?.blockCrossSiteTracking == true, trackingProtectionManager.isEnabled else {
             return
         }
         guard !trackingProtectionManager.isTemporarilyDisabled(tabId: tab.id) else { return }
@@ -790,14 +791,14 @@ class BrowserManager: ObservableObject {
     }
 
     func toggleAISidebar() {
-        guard settingsManager.showAIAssistant else { return }
+        guard settingsManager?.showAIAssistant == true else { return }
         if let windowState = windowRegistry?.activeWindow {
             toggleAISidebar(for: windowState)
         }
     }
 
     func toggleAISidebar(for windowState: BrowserWindowState) {
-        guard settingsManager.showAIAssistant else { return }
+        guard settingsManager?.showAIAssistant == true else { return }
 
         withAnimation(.easeInOut(duration: 0.2)) {
             if windowState.isSidebarAIChatVisible {
@@ -824,7 +825,7 @@ class BrowserManager: ObservableObject {
 
     func toggleTopBarAddressView() {
         withAnimation(.easeInOut(duration: 0.2)) {
-            settingsManager.topBarAddressView.toggle()
+            settingsManager?.topBarAddressView.toggle()
         }
     }
 
@@ -928,7 +929,7 @@ class BrowserManager: ObservableObject {
     // MARK: - Dialog Methods
 
     func showQuitDialog() {
-        if self.settingsManager.askBeforeQuit {
+        if self.settingsManager?.askBeforeQuit == true {
             dialogManager.showQuitDialog(
                 onAlwaysQuit: {
                     self.quitApplication()

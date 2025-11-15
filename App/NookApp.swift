@@ -16,7 +16,7 @@ import WebKit
 struct NookApp: App {
     @State private var windowRegistry = WindowRegistry()
     @State private var webViewCoordinator = WebViewCoordinator()
-    @State private var settingsManager = SettingsManager()
+    @State private var settingsManager = NookSettingsService()
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     // TEMPORARY: BrowserManager will be phased out as a global singleton.
@@ -78,7 +78,11 @@ struct NookApp: App {
         // TODO: Remove these connections - coordinators should be independent
         browserManager.webViewCoordinator = webViewCoordinator
         browserManager.windowRegistry = windowRegistry
-        nookSettings = settingsManager
+        browserManager.settingsManager = settingsManager
+
+        // Configure managers that depend on settings
+        browserManager.compositorManager.setUnloadTimeout(settingsManager.tabUnloadTimeout)
+        browserManager.trackingProtectionManager.setEnabled(settingsManager.blockCrossSiteTracking)
 
         // Initialize keyboard shortcut manager
         settingsManager.keyboardShortcutManager.setBrowserManager(browserManager)
