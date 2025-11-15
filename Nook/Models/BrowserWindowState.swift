@@ -55,12 +55,6 @@ class BrowserWindowState {
     /// Whether the URL was recently copied (for toast feedback)
     var didCopyURL: Bool = false
 
-    /// Prefilled text for command palette in this window
-    var commandPalettePrefilledText: String = ""
-
-    /// Whether command palette should navigate current tab vs create new
-    var shouldNavigateCurrentTab: Bool = false
-
     /// Frame of the URL bar within this window
     var urlBarFrame: CGRect = .zero
 
