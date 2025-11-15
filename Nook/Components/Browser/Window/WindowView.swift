@@ -22,23 +22,10 @@ struct WindowView: View {
             return 20  // Accounts for navigation area height
         }
     }
-
-    
-    private var isActiveWindow: Bool {
-        browserManager.activeWindowState?.id == windowState.id
-    }
-
-    private var gradient: SpaceGradient {
-        isActiveWindow ? browserManager.gradientColorManager.displayGradient : windowState.activeGradient
-    }
     
     var body: some View {
-        let isDark = colorScheme == .dark
         GeometryReader { geometry in
             ZStack {
-                // Gradient background for the current space (bottom-most layer)
-                Color(.windowBackgroundColor).opacity(max(0, (0.35 - gradient.opacity)))
-                
                 SpaceGradientBackgroundView()
                     .environmentObject(browserManager)
                     .environmentObject(browserManager.gradientColorManager)

@@ -44,11 +44,19 @@ struct SidebarHoverOverlayView: View {
                         .environmentObject(windowState)
                         .frame(width: overlayWidth)
                         .frame(maxHeight: .infinity)
-                        .universalGlassEffect(.regular.tint(browserManager.gradientColorManager.primaryColor.mix(with: Color(.windowBackground), by: 0.8).opacity(0.7)), in: .rect(cornerRadius: cornerRadius))
-//                        .contentShape(.rect)
-                    
-//                        .universalGlassEffect(.regular.tint(Color(.black)), in: .rect(cornerRadius: cornerRadius))
-                        // Force arrow cursor for the entire overlay region
+                        .background{
+                            
+                            
+                            SpaceGradientBackgroundView()
+                                .environmentObject(browserManager)
+                                .environmentObject(browserManager.gradientColorManager)
+                                .environmentObject(windowState)
+                                .clipShape(.rect(cornerRadius: cornerRadius))
+                            
+                                Rectangle()
+                                    .fill(Color.clear)
+                                    .universalGlassEffect(.regular.tint(Color(.windowBackgroundColor).opacity(0.35)), in: .rect(cornerRadius: cornerRadius))
+                        }
                         .alwaysArrowCursor()
                         .padding(browserManager.settingsManager.sidebarPosition == .left ? .leading : .trailing, horizontalInset)
                         .padding(.vertical, verticalInset)
