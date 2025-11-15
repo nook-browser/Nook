@@ -357,7 +357,7 @@ struct SpacesSideBarView: View {
             SpaceEditDialog(
                 space: targetSpace,
                 mode: mode,
-                onSave: { newName, newIcon in
+                onSave: { newName, newIcon, newProfileId in
                     let spaceId = targetSpace.id
 
                     do {
@@ -373,6 +373,11 @@ struct SpacesSideBarView: View {
                                 spaceId: spaceId,
                                 newName: newName
                             )
+                        }
+
+                        // Update profile if changed
+                        if newProfileId != targetSpace.profileId, let profileId = newProfileId {
+                            browserManager.tabManager.assign(spaceId: spaceId, toProfile: profileId)
                         }
 
                         browserManager.dialogManager.closeDialog()
