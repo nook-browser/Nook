@@ -12,7 +12,7 @@ import AppKit
 struct SidebarHoverOverlayView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var hoverManager: HoverSidebarManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
 
     private var overlayWidth: CGFloat {
         windowState.isSidebarVisible ? windowState.sidebarWidth : browserManager.getSavedSidebarWidth(for: windowState)
@@ -41,7 +41,7 @@ struct SidebarHoverOverlayView: View {
                 if hoverManager.isOverlayVisible {
                     SidebarView(forceVisible: true, forcedWidth: overlayWidth)
                         .environmentObject(browserManager)
-                        .environmentObject(windowState)
+                        .environment(windowState)
                         .frame(width: overlayWidth)
                         .frame(maxHeight: .infinity)
                         .background{
@@ -50,7 +50,7 @@ struct SidebarHoverOverlayView: View {
                             SpaceGradientBackgroundView()
                                 .environmentObject(browserManager)
                                 .environmentObject(browserManager.gradientColorManager)
-                                .environmentObject(windowState)
+                                .environment(windowState)
                                 .clipShape(.rect(cornerRadius: cornerRadius))
                             
                                 Rectangle()

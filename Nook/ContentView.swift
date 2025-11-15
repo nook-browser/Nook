@@ -10,11 +10,11 @@ import AppKit
 
 struct ContentView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @StateObject private var windowState = BrowserWindowState()
-    
+    @State private var windowState = BrowserWindowState()
+
     var body: some View {
         WindowView()
-            .environmentObject(windowState)
+            .environment(windowState)
             .environmentObject(browserManager.gradientColorManager)
             .background(WindowFocusBridge(windowState: windowState, browserManager: browserManager))
             .frame(minWidth: 470, minHeight: 382)

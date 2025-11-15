@@ -28,7 +28,7 @@ struct ExtensionActionView: View {
 struct ExtensionActionButton: View {
     let ext: InstalledExtension
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
     @State private var isHovering: Bool = false
     
     var body: some View {

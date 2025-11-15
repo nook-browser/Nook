@@ -5,7 +5,7 @@ import Sparkle
 
 struct SidebarView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.tabDragManager) private var dragManager
     @State private var activeSpaceIndex: Int = 0
     @State private var currentScrollID: Int? = nil
@@ -170,7 +170,7 @@ struct SidebarView: View {
             if browserManager.settingsManager.topBarAddressView {
                 SidebarWindowControlsView()
                     .environmentObject(browserManager)
-                    .environmentObject(windowState)
+                    .environment(windowState)
                     .padding(.horizontal, 8)
             }
             
@@ -195,7 +195,7 @@ struct SidebarView: View {
                     profileId: effectiveProfileId
                 )
                 .environmentObject(browserManager)
-                .environmentObject(windowState)
+                .environment(windowState)
             }
             .padding(.horizontal, 8)
             .modifier(FallbackDropBelowEssentialsModifier())
@@ -231,7 +231,7 @@ struct SidebarView: View {
             // Update notification overlay
             SidebarUpdateNotification(downloadsMenuVisible: showDownloadsMenu)
                 .environmentObject(browserManager)
-                .environmentObject(windowState)
+                .environment(windowState)
                 .environment(browserManager.settingsManager)
                 .padding(.horizontal, 8)
                 .padding(.bottom, 8)
@@ -239,7 +239,7 @@ struct SidebarView: View {
             // Media controls - appears when media is actively playing
             MediaControlsView()
                 .environmentObject(browserManager)
-                .environmentObject(windowState)
+                .environment(windowState)
 
             // MARK: - Bottom
             ZStack {
@@ -280,7 +280,7 @@ struct SidebarView: View {
                 // Center content - space indicators
                 SpacesList()
                     .environmentObject(browserManager)
-                    .environmentObject(windowState)
+                    .environment(windowState)
                 
                 // Right side icons - anchored to right
                 HStack {
@@ -490,7 +490,7 @@ struct SidebarView: View {
                 onMuteTab: { $0.toggleMute() }
             )
             .environmentObject(browserManager)
-            .environmentObject(windowState)
+            .environment(windowState)
             .environmentObject(browserManager.splitManager)
             .id(space.id.uuidString + "-w\(Int(windowState.sidebarContentWidth))")
             Spacer()
@@ -555,7 +555,7 @@ struct SidebarView: View {
 // MARK: - Sidebar Window Controls (Top Bar Mode)
 private struct SidebarWindowControlsView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
     
     var body: some View {
         HStack(spacing: 8) {

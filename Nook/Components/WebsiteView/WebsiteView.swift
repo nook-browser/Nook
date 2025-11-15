@@ -165,7 +165,7 @@ struct LinkStatusBar: View {
 
 struct WebsiteView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
     @EnvironmentObject var splitManager: SplitViewManager
     @State private var hoveredLink: String?
     @State private var isCommandPressed: Bool = false
@@ -220,7 +220,7 @@ struct WebsiteView: View {
                                 SplitControlsOverlay()
                                     .environmentObject(browserManager)
                                     .environmentObject(splitManager)
-                                    .environmentObject(windowState)
+                                    .environment(windowState)
                             }
                         }
                         // Critical: Use allowsHitTesting to prevent SwiftUI from intercepting mouse events
@@ -611,7 +611,7 @@ private class ContainerView: NSView {
 private struct SplitControlsOverlay: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var splitManager: SplitViewManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
 
     @State private var dragOffset: CGFloat = 0
 

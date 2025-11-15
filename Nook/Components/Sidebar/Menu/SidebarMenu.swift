@@ -34,7 +34,7 @@ public enum SidebarPosition: String, CaseIterable, Identifiable {
 
 struct SidebarMenu: View {
     @State private var selectedTab: Tabs = .history
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
     @EnvironmentObject var browserManager: BrowserManager
     
     var body: some View {

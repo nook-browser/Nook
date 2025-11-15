@@ -16,7 +16,7 @@ struct PinnedGrid: View {
     let maxColumns: Int = 3
 
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.colorScheme) var colorScheme
     @State private var draggedItem: UUID? = nil
     
