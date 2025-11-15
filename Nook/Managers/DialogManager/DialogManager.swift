@@ -122,7 +122,8 @@ struct DialogCard<Content: View>: View {
         content
             .padding(16)
             .frame(maxWidth: 500, alignment: .leading)
-            .universalGlassEffect(.regular.tint(Color(.windowBackgroundColor).opacity(0.7)), in: .rect(cornerRadius: 26))
+            .background(Color(.windowBackgroundColor).opacity(0.35), in: .rect(cornerRadius: 26))
+            .universalGlassEffect(.regular.tint(Color(.windowBackgroundColor).opacity(0.35)), in: .rect(cornerRadius: 26))
             .alwaysArrowCursor()
     }
 }
@@ -213,7 +214,7 @@ struct DialogHeader: View {
 
 struct DialogFooter: View {
     @Environment(\.colorScheme) var colorScheme
-    @Environment(GradientColorManager.self) var gradientColorManager
+    @EnvironmentObject var gradientColorManager: GradientColorManager
     let leftButton: DialogButton?
     let rightButtons: [DialogButton]
 
@@ -256,7 +257,7 @@ struct DialogFooter: View {
             Spacer()
 
             HStack(spacing: 8) {
-                ForEach(rightButtons.indices, id: \.self) { index in
+                ForEach(Array(rightButtons.indices), id: \.self) { index in
                     let button = rightButtons[index]
 
                     if let iconName = button.iconName {
