@@ -226,24 +226,7 @@ struct SpacesSideBarView: View {
                     }
                 }
             } label: {
-                Label("Sidebar Position", systemImage: nookSettings.sidebarPosition.icon)
-            }
-
-            Divider()
-
-            Button {
-                showSpaceEditDialog(mode: .rename)
-            } label: {
-                Label("Edit Space", systemImage: "pencil")
-            }
-            if browserManager.tabManager.spaces.count > 1 {
-                Button(role: .destructive) {
-                    if let spaceId = browserManager.tabManager.currentSpace?.id {
-                        browserManager.tabManager.removeSpace(spaceId)
-                    }
-                } label: {
-                    Label("Delete Space", systemImage: "trash")
-                }
+                Label("Position", systemImage: nookSettings.sidebarPosition.icon)
             }
         }
     }
