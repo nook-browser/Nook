@@ -6,6 +6,7 @@ import Sparkle
 struct SidebarView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(WindowRegistry.self) private var windowRegistry
     @Environment(\.tabDragManager) private var dragManager
     @State private var activeSpaceIndex: Int = 0
     @State private var currentScrollID: Int? = nil
@@ -163,7 +164,7 @@ struct SidebarView: View {
         } ?? 0
         
         let shouldAnimate =
-        (browserManager.activeWindowState?.id == windowState.id)
+        (windowRegistry.activeWindow?.id == windowState.id)
         && !browserManager.isTransitioningProfile
         
         let content = VStack(spacing: 8) {
@@ -306,13 +307,16 @@ struct SidebarView: View {
         let finalContent = ZStack {
             if windowState.isSidebarMenuVisible {
                 SidebarMenu()
-                    .transition(.move(edge: browserManager.settingsManager.sidebarPosition == .left ? .leading : .trailing).combined(with: .opacity))
+                    .transition(
+                        .move(edge: browserManager.settingsManager.sidebarPosition == .left ? .leading : .trailing)
+                        .combined(with: .opacity)
+                    )
             } else {
                 content
-                    .transition(.opacity)
+                    .transition(AnyTransition.opacity)
             }
         }
-            .frame(width: effectiveWidth)
+        .frame(width: effectiveWidth)
         
         return finalContent
     }

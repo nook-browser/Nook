@@ -36,7 +36,7 @@ struct NookApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .commands {
-            NookCommands(browserManager: browserManager)
+            NookCommands(browserManager: browserManager, windowRegistry: windowRegistry)
         }
 
         // Native macOS Settings window
@@ -68,6 +68,7 @@ struct NookApp: App {
     private func setupApplicationLifecycle() {
         // Connect AppDelegate for termination and updates
         appDelegate.browserManager = browserManager
+        appDelegate.windowRegistry = windowRegistry
         browserManager.appDelegate = appDelegate
 
         // TEMPORARY: Wire coordinators to BrowserManager

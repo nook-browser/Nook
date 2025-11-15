@@ -17,6 +17,7 @@ struct PinnedGrid: View {
 
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(WindowRegistry.self) private var windowRegistry
     @Environment(\.colorScheme) var colorScheme
     @State private var draggedItem: UUID? = nil
     
@@ -34,7 +35,7 @@ struct PinnedGrid: View {
         let colsCount: Int = columnCount(for: width, itemCount: items.count)
         let columns: [GridItem] = makeColumns(count: colsCount)
         
-        let shouldAnimate = (browserManager.activeWindowState?.id == windowState.id) && !browserManager.isTransitioningProfile
+        let shouldAnimate = (windowRegistry.activeWindow?.id == windowState.id) && !browserManager.isTransitioningProfile
 
         // For embedded use, return proper sized container even when empty to support transitions
         if items.isEmpty {

@@ -668,7 +668,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         // In multi-window setup, we need to work with the WebView that's actually visible
         // in the current window, not just the first WebView created
         if let browserManager = browserManager,
-            let activeWindowId = browserManager.activeWindowState?.id,
+            let activeWindowId = browserManager?.windowRegistry?.activeWindow?.id,
             let activeWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
         {
             // Use the WebView that's actually visible in the current window
@@ -1242,7 +1242,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         }
 
         browserManager?.setMuteState(
-            muted, for: id, originatingWindowId: browserManager?.activeWindowState?.id)
+            muted, for: id, originatingWindowId: browserManager?.windowRegistry?.activeWindow?.id)
 
         // Update our internal state
         DispatchQueue.main.async { [weak self] in
@@ -3028,7 +3028,7 @@ extension Tab {
         // Use the WebView that's actually visible in the current window
         let targetWebView: WKWebView?
         if let browserManager = browserManager,
-            let activeWindowId = browserManager.activeWindowState?.id
+            let activeWindowId = browserManager?.windowRegistry?.activeWindow?.id
         {
             targetWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
         } else {
@@ -3164,7 +3164,7 @@ extension Tab {
         // Use the WebView that's actually visible in the current window
         let targetWebView: WKWebView?
         if let browserManager = browserManager,
-            let activeWindowId = browserManager.activeWindowState?.id
+            let activeWindowId = browserManager?.windowRegistry?.activeWindow?.id
         {
             targetWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
         } else {
@@ -3241,7 +3241,7 @@ extension Tab {
         // Use the WebView that's actually visible in the current window
         let targetWebView: WKWebView?
         if let browserManager = browserManager,
-            let activeWindowId = browserManager.activeWindowState?.id
+            let activeWindowId = browserManager?.windowRegistry?.activeWindow?.id
         {
             targetWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
         } else {
@@ -3318,7 +3318,7 @@ extension Tab {
         // Use the WebView that's actually visible in the current window
         let targetWebView: WKWebView?
         if let browserManager = browserManager,
-            let activeWindowId = browserManager.activeWindowState?.id
+            let activeWindowId = browserManager?.windowRegistry?.activeWindow?.id
         {
             targetWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
         } else {

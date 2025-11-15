@@ -27,6 +27,7 @@ final class HoverSidebarManager: ObservableObject {
 
     // MARK: - Dependencies
     weak var browserManager: BrowserManager?
+    weak var windowRegistry: WindowRegistry?
 
     // MARK: - Monitors
     private var globalMonitor: Any?
@@ -73,7 +74,9 @@ final class HoverSidebarManager: ObservableObject {
 
     @MainActor
     private func handleMouseMovementOnMain() {
-        guard let bm = browserManager, let activeState = bm.activeWindowState else { return }
+        guard let bm = browserManager,
+              let registry = windowRegistry,
+              let activeState = registry.activeWindow else { return }
 
         // Never show overlay while the real sidebar is visible
         if activeState.isSidebarVisible {
