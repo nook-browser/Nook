@@ -366,7 +366,6 @@ class BrowserManager: ObservableObject {
     @Published var isSidebarVisible: Bool = true
     @Published var isCommandPaletteVisible: Bool = false
     @Published var didCopyURL: Bool = false
-    @Published var shouldNavigateCurrentTab: Bool = false
     // Frame of the URL bar within the window; used to anchor the mini palette precisely
     @Published var urlBarFrame: CGRect = .zero
     @Published var shouldShowZoomPopup: Bool = false
@@ -1874,7 +1873,6 @@ class BrowserManager: ObservableObject {
         gradientColorManager.setImmediate(windowState.gradient)
         splitManager.refreshPublishedState(for: windowState.id)
         isCommandPaletteVisible = windowState.isCommandPaletteVisible
-        shouldNavigateCurrentTab = windowState.shouldNavigateCurrentTab
         if windowState.currentProfileId == nil {
             windowState.currentProfileId = currentProfile?.id
         }
