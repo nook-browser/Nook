@@ -119,7 +119,7 @@ struct OllamaModel: Identifiable, Equatable {
 struct SidebarAIChat: View {
     @Environment(BrowserWindowState.self) private var windowState
     @EnvironmentObject var browserManager: BrowserManager
-    @Environment(NookSettingsService.self) var settingsManager
+    @Environment(NookSettingsService.self) var nookSettings
     
     @State private var messageText: String = ""
     @State private var messages: [ChatMessage] = []
@@ -130,11 +130,11 @@ struct SidebarAIChat: View {
     @FocusState private var isTextFieldFocused: Bool
     
     private var hasApiKey: Bool {
-        switch settingsManager.aiProvider {
+        switch nookSettings.aiProvider {
         case .gemini:
-            return !settingsManager.geminiApiKey.isEmpty
+            return !nookSettings.geminiApiKey.isEmpty
         case .openRouter:
-            return !settingsManager.openRouterApiKey.isEmpty
+            return !nookSettings.openRouterApiKey.isEmpty
         case .ollama:
             return true // Ollama doesn't require an API key!!!! YAYYYYYYY
         }
@@ -210,15 +210,15 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                             .padding(.top, 60)
                         } else if messages.isEmpty {
                             VStack(spacing: 12) {
-                                Image(systemName: webSearchConfig.enabled && (settingsManager.aiProvider == .openRouter || settingsManager.aiProvider == .gemini) ? "globe" : "sparkle")
+                                Image(systemName: webSearchConfig.enabled && (nookSettings.aiProvider == .openRouter || nookSettings.aiProvider == .gemini) ? "globe" : "sparkle")
                                     .font(.system(size: 32))
-                                    .foregroundStyle(webSearchConfig.enabled && (settingsManager.aiProvider == .openRouter || settingsManager.aiProvider == .gemini) ? .green.opacity(0.6) : .white.opacity(0.3))
+                                    .foregroundStyle(webSearchConfig.enabled && (nookSettings.aiProvider == .openRouter || nookSettings.aiProvider == .gemini) ? .green.opacity(0.6) : .white.opacity(0.3))
                                 
                                 Text("Ask Nook")
                                     .font(.system(size: 14, weight: .semibold))
                                     .foregroundStyle(.white.opacity(0.8))
                                 
-                                if webSearchConfig.enabled && (settingsManager.aiProvider == .openRouter || settingsManager.aiProvider == .gemini) {
+                                if webSearchConfig.enabled && (nookSettings.aiProvider == .openRouter || nookSettings.aiProvider == .gemini) {
                                     VStack(spacing: 6) {
                                         Text("Questions about this page, or just curious? I'm here.")
                                             .font(.system(size: 12))
@@ -262,7 +262,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                                     Text("Thinking...")
                                         .font(.system(size: 12, weight: .medium))
                                         .foregroundStyle(.white.opacity(0.5))
-                                    if webSearchConfig.enabled && (settingsManager.aiProvider == .openRouter || settingsManager.aiProvider == .gemini) {
+                                    if webSearchConfig.enabled && (nookSettings.aiProvider == .openRouter || nookSettings.aiProvider == .gemini) {
                                         Text("Searching the web...")
                                             .font(.system(size: 10))
                                             .foregroundStyle(.white.opacity(0.4))
@@ -346,28 +346,28 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                     }
                 
                 HStack(spacing: 8) {
-                    switch settingsManager.aiProvider {
+                    switch nookSettings.aiProvider {
                     case .gemini:
-                        Menu(settingsManager.geminiModel.displayName) {
+                        Menu(nookSettings.geminiModel.displayName) {
                             ForEach(GeminiModel.allCases) { model in
                                 Toggle(isOn: Binding(get: {
-                                    return settingsManager.geminiModel == model
+                                    return nookSettings.geminiModel == model
                                 }, set: { Value in
-                                    settingsManager.geminiModel = model
+                                    nookSettings.geminiModel = model
                                 })) {
                                     Label(model.displayName, systemImage: model.icon)
                                 }
                             }
                         }
                     case .openRouter:
-                        Menu(settingsManager.openRouterModel.displayName) {
+                        Menu(nookSettings.openRouterModel.displayName) {
                             ForEach(OpenRouterModel.allCases) { model in
                                 Button(action: {
-                                    settingsManager.openRouterModel = model
+                                    nookSettings.openRouterModel = model
                                 }) {
                                     HStack {
                                         Text(model.displayName)
-                                        if settingsManager.openRouterModel == model {
+                                        if nookSettings.openRouterModel == model {
                                             Spacer()
                                             Image(systemName: "checkmark")
                                         }
@@ -377,10 +377,10 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                         }
                     case .ollama:
                         if !ollamaModels.isEmpty {
-                            Menu(settingsManager.ollamaModel.isEmpty ? "Select Model" : settingsManager.ollamaModel) {
+                            Menu(nookSettings.ollamaModel.isEmpty ? "Select Model" : nookSettings.ollamaModel) {
                                 ForEach(ollamaModels) { model in
                                     Button(action: {
-                                        settingsManager.ollamaModel = model.name
+                                        nookSettings.ollamaModel = model.name
                                     }) {
                                         HStack {
                                             VStack(alignment: .leading, spacing: 2) {
@@ -389,7 +389,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                                                     .font(.system(size: 10))
                                                     .foregroundStyle(.white.opacity(0.5))
                                             }
-                                            if settingsManager.ollamaModel == model.name {
+                                            if nookSettings.ollamaModel == model.name {
                                                 Spacer()
                                                 Image(systemName: "checkmark")
                                             }
@@ -405,7 +405,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                     }
                     
                     // Web search toggle (for Gemini and OpenRouter)
-                    if settingsManager.aiProvider == .gemini || settingsManager.aiProvider == .openRouter {
+                    if nookSettings.aiProvider == .gemini || nookSettings.aiProvider == .openRouter {
                         Button(action: {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 webSearchConfig.enabled.toggle()
@@ -515,18 +515,18 @@ To enhance the web browsing experience by providing intelligent, context-aware s
             isTextFieldFocused = true
             
             // Load web search config from settings
-            webSearchConfig.enabled = settingsManager.webSearchEnabled
-            webSearchConfig.engine = WebSearchConfig.WebSearchEngine(rawValue: settingsManager.webSearchEngine) ?? .auto
-            webSearchConfig.maxResults = settingsManager.webSearchMaxResults
-            webSearchConfig.searchContextSize = WebSearchConfig.SearchContextSize(rawValue: settingsManager.webSearchContextSize) ?? .medium
+            webSearchConfig.enabled = nookSettings.webSearchEnabled
+            webSearchConfig.engine = WebSearchConfig.WebSearchEngine(rawValue: nookSettings.webSearchEngine) ?? .auto
+            webSearchConfig.maxResults = nookSettings.webSearchMaxResults
+            webSearchConfig.searchContextSize = WebSearchConfig.SearchContextSize(rawValue: nookSettings.webSearchContextSize) ?? .medium
             
-            if settingsManager.aiProvider == .ollama {
+            if nookSettings.aiProvider == .ollama {
                 Task {
                     await fetchOllamaModels()
                 }
             }
         }
-        .onChange(of: settingsManager.aiProvider) { _, newProvider in
+        .onChange(of: nookSettings.aiProvider) { _, newProvider in
             if newProvider == .ollama {
                 Task {
                     await fetchOllamaModels()
@@ -534,23 +534,23 @@ To enhance the web browsing experience by providing intelligent, context-aware s
             }
         }
         .onChange(of: webSearchConfig.enabled) { _, newValue in
-            settingsManager.webSearchEnabled = newValue
+            nookSettings.webSearchEnabled = newValue
         }
         .onChange(of: webSearchConfig.engine) { _, newValue in
-            settingsManager.webSearchEngine = newValue.rawValue
+            nookSettings.webSearchEngine = newValue.rawValue
         }
         .onChange(of: webSearchConfig.maxResults) { _, newValue in
-            settingsManager.webSearchMaxResults = newValue
+            nookSettings.webSearchMaxResults = newValue
         }
         .onChange(of: webSearchConfig.searchContextSize) { _, newValue in
-            settingsManager.webSearchContextSize = newValue.rawValue
+            nookSettings.webSearchContextSize = newValue.rawValue
         }
     }
     
     private func showApiKeyDialog() {
         browserManager.dialogManager.showDialog {
             AISettingsDialog(
-                settingsManager: settingsManager,
+                nookSettings: nookSettings,
                 ollamaModels: ollamaModels,
                 isFetchingModels: isFetchingModels,
                 onFetchModels: {
@@ -612,7 +612,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
         }
         
         do {
-            let endpoint = settingsManager.ollamaEndpoint
+            let endpoint = nookSettings.ollamaEndpoint
             let url = URL(string: "\(endpoint)/api/tags")!
             
             var request = URLRequest(url: url)
@@ -655,8 +655,8 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                     
                     // If no model is selected or the selected model isn't in the list, select the first one
                     if !fetchedModels.isEmpty {
-                        if settingsManager.ollamaModel.isEmpty || !fetchedModels.contains(where: { $0.name == settingsManager.ollamaModel }) {
-                            settingsManager.ollamaModel = fetchedModels[0].name
+                        if nookSettings.ollamaModel.isEmpty || !fetchedModels.contains(where: { $0.name == nookSettings.ollamaModel }) {
+                            nookSettings.ollamaModel = fetchedModels[0].name
                         }
                     }
                 }
@@ -697,7 +697,7 @@ To enhance the web browsing experience by providing intelligent, context-aware s
                 var citations: [URLCitation] = []
                 var usedWebSearch = false
                 
-                switch settingsManager.aiProvider {
+                switch nookSettings.aiProvider {
                 case .gemini:
                     // Build conversation history for Gemini API
                     var conversationHistory: [[String: Any]] = []
@@ -813,8 +813,8 @@ To enhance the web browsing experience by providing intelligent, context-aware s
     }
     
     private func sendToGemini(conversationHistory: [[String: Any]]) async throws -> (content: String, citations: [URLCitation]) {
-        let apiKey = settingsManager.geminiApiKey
-        let model = settingsManager.geminiModel.rawValue
+        let apiKey = nookSettings.geminiApiKey
+        let model = nookSettings.geminiModel.rawValue
         let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent")!
         
         var request = URLRequest(url: url)
@@ -912,8 +912,8 @@ To enhance the web browsing experience by providing intelligent, context-aware s
     }
     
     private func sendToOpenRouter(userPrompt: String) async throws -> (content: String, citations: [URLCitation]) {
-        let apiKey = settingsManager.openRouterApiKey
-        var model = settingsManager.openRouterModel.rawValue
+        let apiKey = nookSettings.openRouterApiKey
+        var model = nookSettings.openRouterModel.rawValue
         let url = URL(string: "https://openrouter.ai/api/v1/chat/completions")!
         
         // Apply :online suffix if web search is enabled and using that method
@@ -1026,8 +1026,8 @@ To enhance the web browsing experience by providing intelligent, context-aware s
     }
     
     private func sendToOllama(userPrompt: String) async throws -> String {
-        let endpoint = settingsManager.ollamaEndpoint
-        let model = settingsManager.ollamaModel
+        let endpoint = nookSettings.ollamaEndpoint
+        let model = nookSettings.ollamaModel
         let url = URL(string: "\(endpoint)/api/generate")!
         
         var request = URLRequest(url: url)
@@ -1367,7 +1367,7 @@ struct CitationView: View {
 // MARK: - AI Settings Dialog
 
 struct AISettingsDialog: View {
-    @Bindable var settingsManager: NookSettingsService
+    @Bindable var nookSettings: NookSettingsService
     let ollamaModels: [OllamaModel]
     let isFetchingModels: Bool
     let onFetchModels: () -> Void
@@ -1398,7 +1398,7 @@ struct AISettingsDialog: View {
                                 ForEach(AIProvider.allCases) { provider in
                                     Button(action: {
                                         withAnimation(.easeInOut(duration: 0.2)) {
-                                            settingsManager.aiProvider = provider
+                                            nookSettings.aiProvider = provider
                                         }
                                     }) {
                                         HStack(spacing: 6) {
@@ -1410,16 +1410,16 @@ struct AISettingsDialog: View {
                                             Text(provider.displayName)
                                                 .font(.system(size: 12, weight: .medium))
                                         }
-                                        .foregroundStyle(settingsManager.aiProvider == provider ? .primary : .secondary)
+                                        .foregroundStyle(nookSettings.aiProvider == provider ? .primary : .secondary)
                                         .padding(.horizontal, 12)
                                         .padding(.vertical, 8)
                                         .background(
                                             RoundedRectangle(cornerRadius: 8)
-                                                .fill(settingsManager.aiProvider == provider ? Color.accentColor.opacity(0.15) : Color.gray.opacity(0.1))
+                                                .fill(nookSettings.aiProvider == provider ? Color.accentColor.opacity(0.15) : Color.gray.opacity(0.1))
                                         )
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 8)
-                                                .stroke(settingsManager.aiProvider == provider ? Color.accentColor : Color.clear, lineWidth: 1.5)
+                                                .stroke(nookSettings.aiProvider == provider ? Color.accentColor : Color.clear, lineWidth: 1.5)
                                         )
                                     }
                                     .buttonStyle(.plain)
@@ -1431,7 +1431,7 @@ struct AISettingsDialog: View {
                     Divider()
                     
                     // Provider-specific settings
-                    switch settingsManager.aiProvider {
+                    switch nookSettings.aiProvider {
                     case .gemini:
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Gemini API Key")
@@ -1472,8 +1472,8 @@ struct AISettingsDialog: View {
                                 }
                                 
                                 Toggle(isOn: Binding(
-                                    get: { settingsManager.webSearchEnabled },
-                                    set: { settingsManager.webSearchEnabled = $0 }
+                                    get: { nookSettings.webSearchEnabled },
+                                    set: { nookSettings.webSearchEnabled = $0 }
                                 )) {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("Enable Web Search")
@@ -1481,7 +1481,7 @@ struct AISettingsDialog: View {
                                     }
                                 }
                                 
-                                if settingsManager.webSearchEnabled {
+                                if nookSettings.webSearchEnabled {
                                     VStack(alignment: .leading, spacing: 8) {
                                         // Search Engine Picker
                                         VStack(alignment: .leading, spacing: 4) {
@@ -1490,8 +1490,8 @@ struct AISettingsDialog: View {
                                                 .foregroundStyle(.secondary)
                                             
                                             Picker("", selection: Binding(
-                                                get: { settingsManager.webSearchEngine },
-                                                set: { settingsManager.webSearchEngine = $0 }
+                                                get: { nookSettings.webSearchEngine },
+                                                set: { nookSettings.webSearchEngine = $0 }
                                             )) {
                                                 Text("Auto").tag("auto")
                                                 Text("Native").tag("native")
@@ -1511,8 +1511,8 @@ struct AISettingsDialog: View {
                                                 .foregroundStyle(.secondary)
                                             
                                             Picker("", selection: Binding(
-                                                get: { settingsManager.webSearchContextSize },
-                                                set: { settingsManager.webSearchContextSize = $0 }
+                                                get: { nookSettings.webSearchContextSize },
+                                                set: { nookSettings.webSearchContextSize = $0 }
                                             )) {
                                                 Text("Low").tag("low")
                                                 Text("Medium").tag("medium")
@@ -1532,8 +1532,8 @@ struct AISettingsDialog: View {
                                                 .foregroundStyle(.secondary)
                                             
                                             Picker("", selection: Binding(
-                                                get: { settingsManager.webSearchMaxResults },
-                                                set: { settingsManager.webSearchMaxResults = $0 }
+                                                get: { nookSettings.webSearchMaxResults },
+                                                set: { nookSettings.webSearchMaxResults = $0 }
                                             )) {
                                                 Text("3").tag(3)
                                                 Text("5").tag(5)
@@ -1606,25 +1606,25 @@ struct AISettingsDialog: View {
         )
         .onAppear {
             // Load current settings
-            switch settingsManager.aiProvider {
+            switch nookSettings.aiProvider {
             case .gemini:
-                apiKeyInput = settingsManager.geminiApiKey
+                apiKeyInput = nookSettings.geminiApiKey
             case .openRouter:
-                apiKeyInput = settingsManager.openRouterApiKey
+                apiKeyInput = nookSettings.openRouterApiKey
             case .ollama:
-                endpointInput = settingsManager.ollamaEndpoint
+                endpointInput = nookSettings.ollamaEndpoint
             }
         }
     }
     
     private func saveSettings() {
-        switch settingsManager.aiProvider {
+        switch nookSettings.aiProvider {
         case .gemini:
-            settingsManager.geminiApiKey = apiKeyInput
+            nookSettings.geminiApiKey = apiKeyInput
         case .openRouter:
-            settingsManager.openRouterApiKey = apiKeyInput
+            nookSettings.openRouterApiKey = apiKeyInput
         case .ollama:
-            settingsManager.ollamaEndpoint = endpointInput
+            nookSettings.ollamaEndpoint = endpointInput
         }
     }
 }

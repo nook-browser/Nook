@@ -348,7 +348,7 @@ struct GeneralSettingsView: View {
                                         get: {
                                             nearestTimeoutOption(
                                                 to: browserManager
-                                                    .settingsManager
+                                                    .nookSettings
                                                     .tabUnloadTimeout
                                             )
                                         },

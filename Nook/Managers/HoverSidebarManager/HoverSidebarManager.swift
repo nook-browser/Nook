@@ -28,6 +28,7 @@ final class HoverSidebarManager: ObservableObject {
     // MARK: - Dependencies
     weak var browserManager: BrowserManager?
     weak var windowRegistry: WindowRegistry?
+    weak var nookSettings: NookSettingsService?
 
     // MARK: - Monitors
     private var globalMonitor: Any?
@@ -114,7 +115,7 @@ final class HoverSidebarManager: ObservableObject {
         var inKeepOpenZone = false
 
         // Right Side Calculations (if flag is true)
-        if bm.settingsManager?.sidebarPosition == .left {
+        if nookSettings?.sidebarPosition == .left {
             inTriggerZone = (mouse.x >= frame.minX - overshootSlack) && (mouse.x <= frame.minX + triggerWidth)
             inKeepOpenZone = (mouse.x >= frame.minX) && (mouse.x <= frame.minX + overlayWidth + keepOpenHysteresis)
         } else {

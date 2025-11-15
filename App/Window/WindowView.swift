@@ -150,6 +150,7 @@ struct WindowView: View {
         .onAppear {
             hoverSidebarManager.attach(browserManager: browserManager)
             hoverSidebarManager.windowRegistry = windowRegistry
+            hoverSidebarManager.nookSettings = nookSettings
             hoverSidebarManager.start()
         }
         .onDisappear {

@@ -171,7 +171,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
 
     weak var browserManager: BrowserManager?
-    weak var settingsManager: NookSettingsService?
+    weak var nookSettings: NookSettingsService?
 
     // MARK: - Link Hover Callback
     var onLinkHover: ((String?) -> Void)? = nil
@@ -655,7 +655,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     /// Navigate to a new URL with proper search engine normalization
     func navigateToURL(_ input: String) {
-        let engine = settingsManager?.searchEngine ?? .google
+        let engine = nookSettings?.searchEngine ?? .google
         let normalizedUrl = normalizeURL(input, provider: engine)
 
         guard let validURL = URL(string: normalizedUrl) else {
