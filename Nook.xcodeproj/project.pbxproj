@@ -55,6 +55,8 @@
 			membershipExceptions = (
 				Sidebar/SidebarBottomBar.swift,
 				Sidebar/SidebarHeader.swift,
+				Sidebar/SpacesList/SpacesList.swift,
+				Sidebar/SpacesList/SpacesListItem.swift,
 				Sidebar/SpacesSideBarView.swift,
 			);
 			target = 7F8340FB2E37F39400674A5D /* Nook */;

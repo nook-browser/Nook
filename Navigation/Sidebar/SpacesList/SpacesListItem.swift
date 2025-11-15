@@ -26,44 +26,28 @@ struct SpacesListItem: View {
 
     var body: some View {
         Button {
-            browserManager.setActiveSpace(space, in: windowState)
+            withAnimation(.easeOut(duration: 0.2)){
+                browserManager.setActiveSpace(space, in: windowState)
+            }
         } label: {
-            ZStack {
-                if compact && !isActive {
-                    Circle()
-                        .fill(iconColor)
-                        .frame(width: dotVisualSize, height: dotVisualSize)
+            if compact && !isActive {
+                Circle()
+                    .fill(iconColor)
+                    .frame(width: dotVisualSize, height: dotVisualSize)
+            } else {
+                if isEmoji(space.icon) {
+                    // Fixed inner content size to avoid glyph cropping
+                    Text(space.icon)
                 } else {
-                    if isEmoji(space.icon) {
-                        // Fixed inner content size to avoid glyph cropping
-                        Text(space.icon)
-                            .font(.system(size: 14))
-                            .frame(width: 20, height: 20)
-                    } else {
-                        Image(systemName: space.icon)
-                            .font(.system(size: 14))
-                            .foregroundStyle(iconColor)
-                            .frame(width: 20, height: 20)
-                            .contentTransition(
-                                .symbolEffect(
-                                    .replace.upUp.byLayer,
-                                    options: .nonRepeating
-                                )
-                            )
-                    }
+                    Image(systemName: space.icon)
+                        .foregroundStyle(iconColor)
                 }
             }
-            .frame(width: cellSize, height: cellSize)
-            .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
         }
-        .buttonStyle(.plain)
-        .background(
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(
-                    backgroundColor
-                )
-        )
-        .frame(width: cellSize, height: cellSize)
+        
+        .labelStyle(.iconOnly)
+        .buttonStyle(NavButtonStyle())
+        .foregroundStyle(Color.primary)
         .layoutPriority(isActive ? 1 : 0)
         .onHover { hovering in
             isHovering = hovering
@@ -114,25 +98,9 @@ struct SpacesListItem: View {
         }
     }
 
-    private var backgroundColor: Color {
-        if isHovering {
-            return browserManager.gradientColorManager.isDark
-                ? AppColors.spaceTabHoverDark : AppColors.spaceTabHoverLight
-        } else {
-            return Color.clear
-        }
-    }
     private var iconColor: Color {
         return browserManager.gradientColorManager.isDark
             ? AppColors.spaceTabTextDark : AppColors.spaceTabTextLight
-    }
-
-    private func changeIcon() {
-        let emojis = ["🚀", "💡", "🎯", "⚡️", "🔥", "🌟", "💼", "🏠", "🎨", "📱"]
-        let randomEmoji = emojis.randomElement() ?? "🚀"
-
-        space.icon = randomEmoji
-        browserManager.tabManager.persistSnapshot()
     }
 
     private func isEmoji(_ string: String) -> Bool {
