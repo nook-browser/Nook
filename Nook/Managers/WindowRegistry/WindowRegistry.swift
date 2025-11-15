@@ -29,6 +29,9 @@ class WindowRegistry {
     /// Callback for post-registration setup (e.g., setting TabManager reference)
     var onWindowRegister: ((BrowserWindowState) -> Void)?
 
+    /// Callback when active window changes
+    var onActiveWindowChange: ((BrowserWindowState) -> Void)?
+
     /// Register a new window
     func register(_ window: BrowserWindowState) {
         windows[window.id] = window
@@ -54,6 +57,7 @@ class WindowRegistry {
     /// Set the active (focused) window
     func setActive(_ window: BrowserWindowState) {
         activeWindowId = window.id
+        onActiveWindowChange?(window)
         print("🪟 [WindowRegistry] Active window: \(window.id)")
     }
 

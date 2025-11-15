@@ -64,7 +64,7 @@ struct TopBarCommandPalette: View {
                 DispatchQueue.main.async { isSearchFocused = true }
             }
         }
-        .onChange(of: windowState.isMiniCommandPaletteVisible) { _, newVisible in
+        .onChange(of: commandPalette.isMiniVisible) { _, newVisible in
             if newVisible && isActiveWindow && browserManager.settingsManager.topBarAddressView {
                 searchManager.setTabManager(browserManager.tabManager)
                 searchManager.setHistoryManager(browserManager.historyManager)

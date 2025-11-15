@@ -49,6 +49,10 @@ struct NookApp: App {
                         webViewCoordinator.cleanupWindow(windowId, tabManager: browserManager!.tabManager)
                         browserManager?.splitManager.cleanupWindow(windowId)
                     }
+
+                    windowRegistry.onActiveWindowChange = { [weak browserManager] windowState in
+                        browserManager?.setActiveWindowState(windowState)
+                    }
                 }
         }
         .windowStyle(.hiddenTitleBar)
@@ -276,7 +280,6 @@ struct NookCommands: Commands {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @FocusedValue(\.commandPalette) private var commandPalette: CommandPaletteState?
 
     init(browserManager: BrowserManager) {
         self.browserManager = browserManager
@@ -322,27 +325,12 @@ struct NookCommands: Commands {
             Divider()
 
             Button("New Tab") {
-                commandPalette?.open()
+                print("🍔 [Menu] New Tab button pressed - activeWindowState: \(String(describing: browserManager.activeWindowState?.id))")
+                browserManager.activeWindowState?.commandPalette?.open()
             }
             .keyboardShortcut("t", modifiers: .command)
             Button("New Window") {
-                // Create a new window using SwiftUI's WindowGroup
-                let newWindow = NSWindow(
-                    contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800),
-                    styleMask: [.titled, .closable, .miniaturizable, .resizable],
-                    backing: .buffered,
-                    defer: false
-                )
-                newWindow.contentView = NSHostingView(
-                    rootView: ContentView()
-                        .background(BackgroundWindowModifier())
-                        .ignoresSafeArea(.all)
-                        .environmentObject(browserManager))
-                newWindow.title = "Nook"
-                newWindow.minSize = NSSize(width: 470, height: 382)
-                newWindow.contentMinSize = NSSize(width: 470, height: 382)
-                newWindow.center()
-                newWindow.makeKeyAndOrderFront(nil)
+                browserManager.createNewWindow()
             }
             .keyboardShortcut("n", modifiers: .command)
 

@@ -10,14 +10,14 @@ import SwiftUI
 struct NewTabButton: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
-    @Environment(CommandPaletteState.self) private var commandPaletteState
+    @Environment(CommandPaletteState.self) private var commandPalette
     
     @Environment(\.colorScheme) var colorScheme
     @State private var isHovering: Bool = false
 
     var body: some View {
         Button {
-            commandPaletteState.open()
+            commandPalette.open()
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "plus")
@@ -50,7 +50,7 @@ struct NewTabButton: View {
     }
 
     private var backgroundColor: Color {
-        if windowState.isCommandPaletteVisible {
+        if commandPalette.isVisible {
             return colorScheme == .dark ? AppColors.spaceTabActiveLight : AppColors.spaceTabActiveDark
         } else if isHovering {
             return colorScheme == .dark ? AppColors.spaceTabHoverLight : AppColors.spaceTabHoverDark

@@ -2294,20 +2294,28 @@ class BrowserManager: ObservableObject {
 
     /// Create a new window
     func createNewWindow() {
-        // This is handled by the Command+N shortcut in NookApp.swift
-        // For consistency, we'll trigger the same menu action
-        // Create new window using the same approach as NookApp.swift
+        guard let windowRegistry = windowRegistry,
+              let webViewCoordinator = webViewCoordinator else {
+            print("⚠️ [BrowserManager] Cannot create window - missing WindowRegistry or WebViewCoordinator")
+            return
+        }
+
         let newWindow = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
-        newWindow.contentView = NSHostingView(
-            rootView: ContentView()
-                .background(BackgroundWindowModifier())
-                .ignoresSafeArea(.all)
-                .environmentObject(self))
+
+        let contentView = ContentView()
+            .background(BackgroundWindowModifier())
+            .ignoresSafeArea(.all)
+            .environmentObject(self)
+            .environment(windowRegistry)
+            .environment(webViewCoordinator)
+            .environmentObject(gradientColorManager)
+
+        newWindow.contentView = NSHostingView(rootView: contentView)
         newWindow.title = "Nook"
         newWindow.minSize = NSSize(width: 470, height: 382)
         newWindow.contentMinSize = NSSize(width: 470, height: 382)
