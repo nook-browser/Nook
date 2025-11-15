@@ -3,7 +3,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 import Sparkle
 
-struct SidebarView: View {
+struct SpacesSideBarView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(WindowRegistry.self) private var windowRegistry
