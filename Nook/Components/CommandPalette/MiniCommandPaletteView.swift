@@ -38,23 +38,8 @@ struct MiniCommandPaletteView: View {
         let symbolName = isLikelyURL(text) ? "globe" : "magnifyingglass"
         let isActiveWindow = browserManager.activeWindowState?.id == windowState.id
         let suggestions = searchManager.suggestions
-        let strokeOpacity: Double = isDark ? 0.3 : 0.6
-        let strokeColor = Color.white.opacity(strokeOpacity)
 
-        return VStack(spacing: 6) {
-            inputRow(symbolName: symbolName)
-            separatorIfNeeded(hasSuggestions: !suggestions.isEmpty)
-            suggestionsListView(suggestions: suggestions)
-        }
-        .padding(10)
-        .frame(width: forcedWidth ?? 460)
-        .background(.thickMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(strokeColor, lineWidth: 0.5)
-        )
-        .shadow(color: .black.opacity(0.4), radius: 50, x: 0, y: 4)
+        styledContent(symbolName: symbolName, suggestions: suggestions, isDark: isDark)
         .onAppear {
             // Wire managers
             searchManager.setTabManager(browserManager.tabManager)
@@ -65,7 +50,7 @@ struct MiniCommandPaletteView: View {
             text = windowState.commandPalettePrefilledText
             DispatchQueue.main.async { isSearchFocused = true }
         }
-        .onChange(of: windowState.isMiniCommandPaletteVisible) { _, newVisible in
+        .onChange(of: commandPalette.isMiniVisible) { _, newVisible in
             if newVisible && isActiveWindow {
                 searchManager.setTabManager(browserManager.tabManager)
                 searchManager.setHistoryManager(browserManager.historyManager)
@@ -81,7 +66,7 @@ struct MiniCommandPaletteView: View {
             }
         }
         .onKeyPress(.escape) {
-            DispatchQueue.main.async { browserManager.hideMiniCommandPalette(for: windowState) }
+            commandPalette.hideMini()
             return .handled
         }
         .onChange(of: searchManager.suggestions.count) { _, newCount in
@@ -92,15 +77,41 @@ struct MiniCommandPaletteView: View {
             }
         }
         .onChange(of: windowState.commandPalettePrefilledText) { _, newValue in
-            if isActiveWindow && windowState.isMiniCommandPaletteVisible {
+            if isActiveWindow && commandPalette.isMiniVisible {
                 text = newValue
             }
         }
         .onChange(of: browserManager.currentProfile?.id) { _, _ in
-            if isActiveWindow && windowState.isMiniCommandPaletteVisible {
+            if isActiveWindow && commandPalette.isMiniVisible {
                 searchManager.updateProfileContext()
                 searchManager.clearSuggestions()
             }
+        }
+    }
+
+    @ViewBuilder
+    private func styledContent(symbolName: String, suggestions: [SearchManager.SearchSuggestion], isDark: Bool) -> some View {
+        let strokeOpacity: Double = isDark ? 0.3 : 0.6
+        let strokeColor = Color.white.opacity(strokeOpacity)
+
+        contentStack(symbolName: symbolName, suggestions: suggestions)
+            .padding(10)
+            .frame(width: forcedWidth ?? 460)
+            .background(.thickMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(strokeColor, lineWidth: 0.5)
+            )
+            .shadow(color: .black.opacity(0.4), radius: 50, x: 0, y: 4)
+    }
+
+    @ViewBuilder
+    private func contentStack(symbolName: String, suggestions: [SearchManager.SearchSuggestion]) -> some View {
+        VStack(spacing: 6) {
+            inputRow(symbolName: symbolName)
+            separatorIfNeeded(hasSuggestions: !suggestions.isEmpty)
+            suggestionsListView(suggestions: suggestions)
         }
     }
 

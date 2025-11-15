@@ -8,19 +8,6 @@
 import Foundation
 import SwiftUI
 
-// MARK: - FocusedValue Key
-
-extension FocusedValues {
-    var commandPalette: CommandPaletteState? {
-        get { self[CommandPaletteKey.self] }
-        set { self[CommandPaletteKey.self] = newValue }
-    }
-}
-
-private struct CommandPaletteKey: FocusedValueKey {
-    typealias Value = CommandPaletteState
-}
-
 @MainActor
 @Observable
 class CommandPaletteState {
@@ -40,11 +27,13 @@ class CommandPaletteState {
 
     /// Open the full command palette with optional prefill text
     func open(prefill: String = "", navigateCurrentTab: Bool = false) {
+        print("🎨 [CommandPaletteState] Opening command palette")
         prefilledText = prefill
         self.shouldNavigateCurrentTab = navigateCurrentTab
         isMiniVisible = false
         DispatchQueue.main.async {
             self.isVisible = true
+            print("🎨 [CommandPaletteState] isVisible set to true")
         }
     }
 

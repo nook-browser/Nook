@@ -19,7 +19,6 @@ struct ContentView: View {
             .environment(windowState)
             .environment(commandPalette)
             .environmentObject(browserManager.gradientColorManager)
-            .focusedValue(\.commandPalette, commandPalette)
             .background(WindowFocusBridge(windowState: windowState, windowRegistry: windowRegistry))
             .frame(minWidth: 470, minHeight: 382)
             .onAppear {

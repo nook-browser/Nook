@@ -343,8 +343,8 @@ private struct MiniCommandPaletteOverlay: View {
         let isActiveWindow =
             browserManager.activeWindowState?.id == windowState.id
         let isVisible =
-            isActiveWindow && windowState.isMiniCommandPaletteVisible
-            && !windowState.isCommandPaletteVisible
+            isActiveWindow && commandPalette.isMiniVisible
+            && !commandPalette.isVisible
 
         ZStack(alignment: browserManager.settingsManager.sidebarPosition == .left ? .topLeading : .topTrailing) {
             if isVisible {

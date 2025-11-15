@@ -52,7 +52,13 @@ struct CommandPaletteView: View {
             browserManager.activeWindowState?.id == windowState.id
         let isVisible = isActiveWindow && commandPalette.isVisible
 
-        ZStack {
+        print("🎨 [CommandPaletteView] body evaluated - isActiveWindow: \(isActiveWindow), commandPalette.isVisible: \(commandPalette.isVisible), isVisible: \(isVisible)")
+
+        let textFieldColor: Color = text.isEmpty
+            ? (isDark ? .white.opacity(0.25) : .black.opacity(0.25))
+            : (isDark ? .white.opacity(0.9) : .black.opacity(0.9))
+
+        return ZStack {
             Color.clear
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
@@ -82,16 +88,7 @@ struct CommandPaletteView: View {
                                 TextField("Search or enter URL...", text: $text)
                                     .textFieldStyle(.plain)
                                     .font(.system(size: 18, weight: .medium))
-                                    .foregroundColor(
-                                        text.isEmpty
-                                            ? isDark
-                                                ? .white.opacity(0.25)
-                                                : .black.opacity(0.25)
-                                            : isDark
-                                                ? .white.opacity(0.9)
-                                                : .black.opacity(0.9)
-
-                                    )
+                                    .foregroundColor(textFieldColor)
                                     .tint(gradientColorManager.primaryColor)
                                     .focused($isSearchFocused)
                                     .onKeyPress(.return) {
@@ -177,7 +174,7 @@ struct CommandPaletteView: View {
         }
         .allowsHitTesting(isVisible)
         .opacity(isVisible ? 1.0 : 0.0)
-        .onChange(of: windowState.isCommandPaletteVisible) { _, newVisible in
+        .onChange(of: commandPalette.isVisible) { _, newVisible in
             if newVisible && isActiveWindow {
                 searchManager.setTabManager(browserManager.tabManager)
                 searchManager.setHistoryManager(browserManager.historyManager)
@@ -206,16 +203,14 @@ struct CommandPaletteView: View {
         }
         // Keep search profile context updated while palette is open
         .onChange(of: browserManager.currentProfile?.id) { _, _ in
-            if windowState.isCommandPaletteVisible {
+            if commandPalette.isVisible {
                 searchManager.updateProfileContext()
                 // Clear suggestions to avoid cross-profile residue
                 searchManager.clearSuggestions()
             }
         }
         .onKeyPress(.escape) {
-            DispatchQueue.main.async {
-                browserManager.closeCommandPalette(for: windowState)
-            }
+            commandPalette.close()
             return .handled
         }
         .onChange(of: searchManager.suggestions.count) { _, newCount in

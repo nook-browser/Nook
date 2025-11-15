@@ -183,6 +183,7 @@ class KeyboardShortcutManager: ObservableObject {
 
             // Tab Management
             case .newTab:
+                print("⌨️ [KeyboardShortcutManager] .newTab triggered - activeWindowState: \(String(describing: browserManager.activeWindowState?.id)), commandPalette: \(String(describing: browserManager.activeWindowState?.commandPalette))")
                 browserManager.activeWindowState?.commandPalette?.open()
             case .closeTab:
                 browserManager.closeCurrentTab()
