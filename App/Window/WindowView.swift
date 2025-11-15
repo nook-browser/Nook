@@ -27,117 +27,77 @@ struct WindowView: View {
                     }
                     .disabled(browserManager.tabManager.currentSpace == nil)
                 }
-            
+
             SidebarWebViewStack()
-            
+
             // Hover-reveal Sidebar overlay (slides in over web content)
             SidebarHoverOverlayView()
                 .environmentObject(hoverSidebarManager)
                 .environment(windowState)
-            
+
             CommandPaletteView()
             DialogView()
-            
+
             // Peek overlay for external link previews
             PeekOverlayView()
-            
-            // Find bar overlay - centered top bar
+        }
+        // Find bar overlay - centered at top
+        .overlay(alignment: .top) {
             if browserManager.findManager.isFindBarVisible {
-                VStack {
-                    HStack {
-                        Spacer()
-                        FindBarView(findManager: browserManager.findManager)
-                            .frame(maxWidth: 500)
-                        Spacer()
-                    }
+                FindBarView(findManager: browserManager.findManager)
+                    .frame(maxWidth: 500)
                     .padding(.top, 20)
-                    Spacer()
-                }
-            }
-            
-            // Toast overlays (matches WebsitePopup style/presentation)
-            VStack {
-                HStack {
-                    Spacer()
-                    VStack(spacing: 8) {
-                        // Profile switch toast
-                        if windowState.isShowingProfileSwitchToast,
-                           let toast = windowState.profileSwitchToast
-                        {
-                            ProfileSwitchToastView(toast: toast)
-                                .animation(
-                                    .spring(
-                                        response: 0.5,
-                                        dampingFraction: 0.8
-                                    ),
-                                    value: windowState
-                                        .isShowingProfileSwitchToast
-                                )
-                                .onTapGesture {
-                                    browserManager.hideProfileSwitchToast(
-                                        for: windowState
-                                    )
-                                }
-                        }
-                        
-                        // Tab closure toast
-                        if browserManager.showTabClosureToast
-                            && browserManager.tabClosureToastCount > 0
-                        {
-                            TabClosureToast()
-                                .environmentObject(browserManager)
-                                .environment(windowState)
-                                .animation(
-                                    .spring(
-                                        response: 0.5,
-                                        dampingFraction: 0.8
-                                    ),
-                                    value: browserManager
-                                        .showTabClosureToast
-                                )
-                                .onTapGesture {
-                                    browserManager.hideTabClosureToast()
-                                }
-                        }
-                        
-                        // Zoom popup toast
-                        if browserManager.shouldShowZoomPopup {
-                            ZoomPopupView(
-                                zoomManager: browserManager.zoomManager,
-                                onZoomIn: {
-                                    browserManager.zoomInCurrentTab()
-                                },
-                                onZoomOut: {
-                                    browserManager.zoomOutCurrentTab()
-                                },
-                                onZoomReset: {
-                                    browserManager.resetZoomCurrentTab()
-                                },
-                                onZoomPresetSelected: { zoomLevel in
-                                    browserManager.applyZoomLevel(zoomLevel)
-                                },
-                                onDismiss: {
-                                    browserManager.shouldShowZoomPopup = false
-                                }
-                            )
-                            .animation(
-                                .spring(
-                                    response: 0.5,
-                                    dampingFraction: 0.8
-                                ),
-                                value: browserManager.shouldShowZoomPopup
-                            )
-                            .onTapGesture {
-                                browserManager.shouldShowZoomPopup = false
-                            }
-                        }
-                    }
-                    .padding(10)
-                }
-                Spacer()
             }
         }
-        // Attach hover sidebar manager lifecycle
+        // System notification toasts - top trailing corner
+        .overlay(alignment: .topTrailing) {
+            VStack(spacing: 8) {
+                // Profile switch toast
+                if windowState.isShowingProfileSwitchToast,
+                   let toast = windowState.profileSwitchToast
+                {
+                    ProfileSwitchToastView(toast: toast)
+                        .transition(.scale(scale: 0.0, anchor: .top))
+                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: windowState.isShowingProfileSwitchToast)
+                        .onTapGesture {
+                            browserManager.hideProfileSwitchToast(for: windowState)
+                        }
+                }
+
+                // Tab closure toast
+                if browserManager.showTabClosureToast && browserManager.tabClosureToastCount > 0 {
+                    TabClosureToast()
+                        .environmentObject(browserManager)
+                        .environment(windowState)
+                        .transition(.scale(scale: 0.0, anchor: .top))
+                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: browserManager.showTabClosureToast)
+                        .onTapGesture {
+                            browserManager.hideTabClosureToast()
+                        }
+                }
+            }
+            .padding(10)
+        }
+        // Zoom control popup - separate from system toasts
+        .overlay(alignment: .topTrailing) {
+            if browserManager.shouldShowZoomPopup {
+                ZoomPopupView(
+                    zoomManager: browserManager.zoomManager,
+                    onZoomIn: { browserManager.zoomInCurrentTab() },
+                    onZoomOut: { browserManager.zoomOutCurrentTab() },
+                    onZoomReset: { browserManager.resetZoomCurrentTab() },
+                    onZoomPresetSelected: { zoomLevel in browserManager.applyZoomLevel(zoomLevel) },
+                    onDismiss: { browserManager.shouldShowZoomPopup = false }
+                )
+                .transition(.scale(scale: 0.0, anchor: .top))
+                .animation(.spring(response: 0.5, dampingFraction: 0.8), value: browserManager.shouldShowZoomPopup)
+                .onTapGesture {
+                    browserManager.shouldShowZoomPopup = false
+                }
+                .padding(10)
+            }
+        }
+        // Lifecycle management
         .onAppear {
             hoverSidebarManager.attach(browserManager: browserManager)
             hoverSidebarManager.windowRegistry = windowRegistry
