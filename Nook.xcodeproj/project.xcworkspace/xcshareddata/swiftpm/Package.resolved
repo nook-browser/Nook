@@ -1,5 +1,5 @@
 {
-  "originHash" : "02b3b749b12538f2d1b5c0db6c7a77c6deede4699eaffe60c00ce06d0e061ef2",
+  "originHash" : "ee6ba56fa92d8209bf89f941deadc8e113e950a5b9ba50f02b45c8dc9c9db736",
   "pins" : [
     {
       "identity" : "faviconfinder",
@@ -103,10 +103,10 @@
     {
       "identity" : "universalglass",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/Aeastr/UniversalGlass",
+      "location" : "https://github.com/aeastr/universalglass.git",
       "state" : {
-        "branch" : "main",
-        "revision" : "c751250ba9ab002447732f2fc10debbd9103f99b"
+        "revision" : "bb27ffe16a33c9e48d65111331ce4cfb519e0e92",
+        "version" : "1.0.0"
       }
     }
   ],
