@@ -170,6 +170,30 @@ struct WebsiteView: View {
     @State private var hoveredLink: String?
     @State private var isCommandPressed: Bool = false
     @State private var isDropTargeted: Bool = false
+    
+    private var cornerRadius: CGFloat {
+        if #available(macOS 26.0, *) {
+            return 12
+        } else {
+            return 6
+        }
+    }
+    
+    private var webViewClipShape: AnyShape {
+        let hasTopBar = browserManager.settingsManager.topBarAddressView
+        
+        if hasTopBar {
+            return AnyShape(UnevenRoundedRectangle(
+                topLeadingRadius: 0,
+                bottomLeadingRadius: cornerRadius,
+                bottomTrailingRadius: cornerRadius,
+                topTrailingRadius: 0,
+                style: .continuous
+            ))
+        } else {
+            return AnyShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        }
+    }
 
     var body: some View {
         ZStack() {
@@ -188,13 +212,7 @@ struct WebsiteView: View {
                         )
                         .background(shouldShowSplit ? Color.clear : Color(nsColor: .windowBackgroundColor))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: {
-                            if #available(macOS 26.0, *) {
-                                return 12
-                            } else {
-                                return 6
-                            }
-                        }(), style: .continuous))
+                        .clipShape(webViewClipShape)
                         .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 0)
                         // Divider + pane close overlay
                         .overlay(alignment: .top) {

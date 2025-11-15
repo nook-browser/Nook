@@ -51,13 +51,29 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }()
 
     // MARK: - Loading State
-    enum LoadingState {
+    enum LoadingState: Equatable {
         case idle
         case didStartProvisionalNavigation
         case didCommit
         case didFinish
         case didFail(Error)
         case didFailProvisionalNavigation(Error)
+
+        static func == (lhs: LoadingState, rhs: LoadingState) -> Bool {
+            switch (lhs, rhs) {
+            case (.idle, .idle),
+                 (.didStartProvisionalNavigation, .didStartProvisionalNavigation),
+                 (.didCommit, .didCommit),
+                 (.didFinish, .didFinish):
+                return true
+            case (.didFail, .didFail),
+                 (.didFailProvisionalNavigation, .didFailProvisionalNavigation):
+                // Compare error descriptions for equality
+                return lhs.description == rhs.description
+            default:
+                return false
+            }
+        }
 
         var isLoading: Bool {
             switch self {
@@ -111,6 +127,9 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         }
     }
     @Published var pageBackgroundColor: NSColor? = nil
+    
+    // Track the last domain/subdomain we sampled color for
+    private var lastSampledDomain: String? = nil
 
     // MARK: - Rename State
     @Published var isRenaming: Bool = false
@@ -1527,6 +1546,22 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
 
     private func updateBackgroundColor(from webView: WKWebView) {
+        // Check if we should sample based on domain change
+        guard let currentURL = webView.url,
+              let currentDomain = extractDomain(from: currentURL) else {
+            // If no URL/domain, still try theme color but skip pixel sampling
+            if #available(macOS 12.0, *), let themeColor = webView.themeColor {
+                DispatchQueue.main.async { [weak self] in
+                    self?.pageBackgroundColor = themeColor
+                    webView.underPageBackgroundColor = themeColor
+                }
+            }
+            return
+        }
+        
+        // Only sample if domain changed or we haven't sampled yet
+        let shouldSample = lastSampledDomain != currentDomain
+        
         var newColor: NSColor? = nil
 
         if #available(macOS 12.0, *) {
@@ -1537,13 +1572,74 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             DispatchQueue.main.async { [weak self] in
                 self?.pageBackgroundColor = themeColor
                 webView.underPageBackgroundColor = themeColor
+                // Update sampled domain even for theme color
+                if shouldSample {
+                    self?.lastSampledDomain = currentDomain
+                }
             }
-        } else {
+        } else if shouldSample {
+            // Only extract via pixel sampling if domain changed
             extractBackgroundColorWithJavaScript(from: webView)
         }
     }
+    
+    /// Extract domain and subdomain from URL (e.g., "subdomain.example.com" -> "subdomain.example.com")
+    private func extractDomain(from url: URL) -> String? {
+        guard let host = url.host else { return nil }
+        return host
+    }
 
     private func extractBackgroundColorWithJavaScript(from webView: WKWebView) {
+        guard let sampleRect = colorSampleRect(for: webView) else {
+            runLegacyBackgroundColorScript(on: webView)
+            return
+        }
+
+        let configuration = WKSnapshotConfiguration()
+        configuration.rect = sampleRect
+        configuration.afterScreenUpdates = true
+        configuration.snapshotWidth = 1
+
+        webView.takeSnapshot(with: configuration) { [weak self, weak webView] image, error in
+            guard let self = self, let webView = webView else { return }
+
+            if let color = image?.singlePixelColor {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    self.pageBackgroundColor = color
+                    webView.underPageBackgroundColor = color
+                    // Update sampled domain after successful extraction
+                    if let currentURL = webView.url,
+                       let currentDomain = self.extractDomain(from: currentURL) {
+                        self.lastSampledDomain = currentDomain
+                    }
+                }
+            } else {
+                self.runLegacyBackgroundColorScript(on: webView)
+            }
+        }
+    }
+
+    private func colorSampleRect(for webView: WKWebView) -> CGRect? {
+        let bounds = webView.bounds
+        guard bounds.width >= 1, bounds.height >= 1 else { return nil }
+
+        var sampleX = bounds.midX
+        sampleX = min(max(bounds.minX, sampleX), bounds.maxX - 1)
+
+        let offset: CGFloat = 2.0
+        let yCandidate: CGFloat
+        if webView.isFlipped {
+            yCandidate = bounds.minY + offset
+        } else {
+            yCandidate = bounds.maxY - offset - 1
+        }
+        let sampleY = min(max(yCandidate, bounds.minY), bounds.maxY - 1)
+
+        return CGRect(x: sampleX, y: sampleY, width: 1, height: 1)
+    }
+
+    private func runLegacyBackgroundColorScript(on webView: WKWebView) {
         let colorExtractionScript = """
             (function() {
                 function rgbToHex(r, g, b) {
@@ -2032,6 +2128,11 @@ extension Tab: WKNavigationDelegate {
                 print(
                     "🔄 [Tab] Swift reset audio tracking for navigation to: \(newURL.absoluteString)"
                 )
+                // Reset sampled domain to force resampling on new page
+                if let newDomain = extractDomain(from: newURL),
+                   newDomain != lastSampledDomain {
+                    lastSampledDomain = nil
+                }
                 // Update URL but don't persist yet - wait for navigation to complete
                 self.url = newURL
             } else {
@@ -2137,8 +2238,15 @@ extension Tab: WKNavigationDelegate {
         injectHistoryStateObserver(into: webView)
         updateNavigationStateEnhanced(source: "didCommit")
 
-        // Trigger background color extraction
-        updateBackgroundColor(from: webView)
+        // Trigger background color extraction after page fully loads
+        // Wait a bit for boosts to apply and rendering to complete
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self, weak webView] in
+            guard let self = self, let webView = webView else { return }
+            // Only sample if page is still loaded (not navigating away)
+            if self.loadingState == .didFinish {
+                self.updateBackgroundColor(from: webView)
+            }
+        }
 
         // Apply mute state using MuteableWKWebView if the tab was previously muted
         if isAudioMuted {
@@ -2418,6 +2526,11 @@ extension Tab: WKScriptMessageHandler {
                     self.pageBackgroundColor = NSColor(hex: colorHex)
                     if let webView = self._webView, let color = NSColor(hex: colorHex) {
                         webView.underPageBackgroundColor = color
+                        // Update sampled domain after successful extraction
+                        if let currentURL = webView.url,
+                           let currentDomain = self.extractDomain(from: currentURL) {
+                            self.lastSampledDomain = currentDomain
+                        }
                     }
                 }
             }
@@ -3251,6 +3364,47 @@ extension Tab {
         if let webView = _webView as? FocusableWKWebView {
             webView.contextMenuPayloadDidUpdate(payload)
         }
+    }
+}
+
+private extension NSImage {
+    var singlePixelColor: NSColor? {
+        guard let cgImage = self.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            return nil
+        }
+        
+        // Create a bitmap context to read pixel data
+        let width = 1
+        let height = 1
+        let bitsPerComponent = 8
+        let bytesPerPixel = 4
+        let bytesPerRow = bytesPerPixel
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        
+        var pixelData: [UInt8] = [0, 0, 0, 0]
+        
+        guard let context = CGContext(
+            data: &pixelData,
+            width: width,
+            height: height,
+            bitsPerComponent: bitsPerComponent,
+            bytesPerRow: bytesPerRow,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return nil
+        }
+        
+        // Draw the image into the context
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        
+        // Extract RGB values (pixelData is RGBA format with premultipliedLast)
+        let red = CGFloat(pixelData[0]) / 255.0
+        let green = CGFloat(pixelData[1]) / 255.0
+        let blue = CGFloat(pixelData[2]) / 255.0
+        let alpha = CGFloat(pixelData[3]) / 255.0
+        
+        return NSColor(red: red, green: green, blue: blue, alpha: alpha)
     }
 }
 
