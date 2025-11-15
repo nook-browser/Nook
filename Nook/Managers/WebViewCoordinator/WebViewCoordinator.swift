@@ -163,6 +163,75 @@ class WebViewCoordinator {
         print("✅ [WebViewCoordinator] Completed comprehensive cleanup for ALL WebViews")
     }
 
+    // MARK: - WebView Creation & Cross-Window Sync
+
+    /// Create a new web view for a specific tab in a specific window
+    func createWebView(for tab: Tab, in windowId: UUID) -> WKWebView {
+        let tabId = tab.id
+
+        // Create configuration
+        let configuration = WKWebViewConfiguration()
+
+        if let originalWebView = tab.webView {
+            configuration.websiteDataStore = originalWebView.configuration.websiteDataStore
+            configuration.preferences = originalWebView.configuration.preferences
+            configuration.defaultWebpagePreferences = originalWebView.configuration.defaultWebpagePreferences
+            configuration.mediaTypesRequiringUserActionForPlayback = originalWebView.configuration.mediaTypesRequiringUserActionForPlayback
+            configuration.allowsAirPlayForMediaPlayback = originalWebView.configuration.allowsAirPlayForMediaPlayback
+            configuration.applicationNameForUserAgent = originalWebView.configuration.applicationNameForUserAgent
+            if #available(macOS 15.5, *) {
+                configuration.webExtensionController = originalWebView.configuration.webExtensionController
+            }
+        } else {
+            let resolvedProfile = tab.resolveProfile()
+            configuration.websiteDataStore = resolvedProfile?.dataStore ?? WKWebsiteDataStore.default()
+
+            let preferences = WKWebpagePreferences()
+            preferences.allowsContentJavaScript = true
+            configuration.defaultWebpagePreferences = preferences
+
+            configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
+            configuration.mediaTypesRequiringUserActionForPlayback = []
+            configuration.allowsAirPlayForMediaPlayback = true
+            configuration.applicationNameForUserAgent = "Version/17.4.1 Safari/605.1.15"
+            configuration.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
+            configuration.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
+            configuration.preferences.setValue(true, forKey: "mediaDevicesEnabled")
+            configuration.preferences.isElementFullscreenEnabled = true
+            configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        }
+
+        let newWebView = FocusableWKWebView(frame: .zero, configuration: configuration)
+        newWebView.navigationDelegate = tab
+        newWebView.uiDelegate = tab
+        newWebView.allowsBackForwardNavigationGestures = true
+        newWebView.allowsMagnification = true
+        newWebView.setValue(false, forKey: "drawsBackground")
+        newWebView.owningTab = tab
+        newWebView.contextMenuBridge = WebContextMenuBridge(tab: tab, configuration: configuration)
+
+        newWebView.configuration.userContentController.add(tab, name: "linkHover")
+        newWebView.configuration.userContentController.add(tab, name: "commandHover")
+        newWebView.configuration.userContentController.add(tab, name: "commandClick")
+        newWebView.configuration.userContentController.add(tab, name: "pipStateChange")
+        newWebView.configuration.userContentController.add(tab, name: "mediaStateChange_\(tabId.uuidString)")
+        newWebView.configuration.userContentController.add(tab, name: "backgroundColor_\(tabId.uuidString)")
+        newWebView.configuration.userContentController.add(tab, name: "historyStateDidChange")
+        newWebView.configuration.userContentController.add(tab, name: "NookIdentity")
+
+        tab.setupThemeColorObserver(for: newWebView)
+
+        if let url = URL(string: tab.url.absoluteString) {
+            newWebView.load(URLRequest(url: url))
+        }
+        newWebView.isMuted = tab.isAudioMuted
+
+        setWebView(newWebView, for: tabId, in: windowId)
+
+        print("🪟 [WebViewCoordinator] Created new web view for tab \(tab.name) in window \(windowId)")
+        return newWebView
+    }
+
     // MARK: - Private Helpers
 
     private func performFallbackWebViewCleanup(_ webView: WKWebView, tabId: UUID) {

@@ -26,9 +26,13 @@ class WindowRegistry {
     /// Callback for window cleanup (set by whoever needs to clean up resources)
     var onWindowClose: ((UUID) -> Void)?
 
+    /// Callback for post-registration setup (e.g., setting TabManager reference)
+    var onWindowRegister: ((BrowserWindowState) -> Void)?
+
     /// Register a new window
     func register(_ window: BrowserWindowState) {
         windows[window.id] = window
+        onWindowRegister?(window)
         print("🪟 [WindowRegistry] Registered window: \(window.id)")
     }
 

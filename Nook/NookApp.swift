@@ -32,11 +32,19 @@ struct NookApp: App {
                     appDelegate.browserManager = browserManager
                     browserManager.appDelegate = appDelegate
 
+                    // TEMPORARY: Connect WebViewCoordinator and WindowRegistry to BrowserManager
+                    browserManager.webViewCoordinator = webViewCoordinator
+                    browserManager.windowRegistry = windowRegistry
+
                     // Initialize keyboard shortcut manager
                     browserManager.settingsManager.keyboardShortcutManager.setBrowserManager(
                         browserManager)
 
-                    // Set up window cleanup callback
+                    // Set up window registry callbacks
+                    windowRegistry.onWindowRegister = { [weak browserManager] windowState in
+                        browserManager?.setupWindowState(windowState)
+                    }
+
                     windowRegistry.onWindowClose = { [webViewCoordinator, weak browserManager] windowId in
                         webViewCoordinator.cleanupWindow(windowId, tabManager: browserManager!.tabManager)
                         browserManager?.splitManager.cleanupWindow(windowId)

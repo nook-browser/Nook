@@ -387,11 +387,7 @@ class BrowserManager: ObservableObject {
     @Published var updateAvailability: UpdateAvailability?
 
     // MARK: - Window State Management
-    /// Registry of all active window states
-    var windowStates: [UUID: BrowserWindowState] = [:]
-
-    /// Note: Removed tabDisplayOwners - each window now shows its own current tab independently
-
+    /// TEMPORARY: WindowRegistry should be accessed via environment instead
     /// The currently focused/active window state
     var activeWindowState: BrowserWindowState?
 
@@ -421,15 +417,21 @@ class BrowserManager: ObservableObject {
     var externalMiniWindowManager = ExternalMiniWindowManager()
     @Published var peekManager = PeekManager()
 
+    // TEMPORARY: Will be removed when cross-window coordination is eliminated
+    weak var webViewCoordinator: WebViewCoordinator?
+    weak var windowRegistry: WindowRegistry?
+
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
     var isSwitchingProfile: Bool = false
     private var cancellables: Set<AnyCancellable> = []
 
+    /// DEPRECATED: Audio enforcement is an antipattern - should be managed per-window
     private func enforceExclusiveAudio(
         for tab: Tab, activeWindowId: UUID, desiredMuteState: Bool? = nil
     ) {
-        let clones = webViewCoordinator.getAllWebViews(for: tab.id)
+        guard let coordinator = webViewCoordinator else { return }
+        let clones = coordinator.getAllWebViews(for: tab.id)
         let activeMute = desiredMuteState ?? tab.isAudioMuted
         for webView in clones {
             // Find which window this webView belongs to
@@ -438,39 +440,23 @@ class BrowserManager: ObservableObject {
             webView.isMuted = true
             webView.evaluateJavaScript(
                 "document.querySelectorAll('video,audio').forEach(function(el){try{el.pause();}catch(e){}});",
-                completionHandler: nil)
+                completionHandler: { _, _ in })
         }
     }
 
+    /// DEPRECATED: Gradients are now computed from windowState.currentSpace.gradient
+    /// SwiftUI views will automatically update when currentSpaceId changes
     private func updateGradient(
         for windowState: BrowserWindowState, to newGradient: SpaceGradient, animate: Bool
     ) {
-        let previousGradient = windowState.activeGradient
-        guard !previousGradient.visuallyEquals(newGradient) else {
-            windowState.activeGradient = newGradient
-            if activeWindowState?.id == windowState.id {
-                gradientColorManager.setImmediate(newGradient)
-            }
-            return
-        }
-
-        windowState.activeGradient = newGradient
-
-        guard activeWindowState?.id == windowState.id else { return }
-
-        if animate {
-            gradientColorManager.transition(from: previousGradient, to: newGradient)
-        } else {
-            gradientColorManager.setImmediate(newGradient)
-        }
+        // NO-OP: Gradient is now computed reactively from windowState.gradient
+        // Views observe windowState.currentSpaceId and automatically get the correct gradient
     }
 
+    /// DEPRECATED: Gradients are now computed from windowState.currentSpace.gradient
     func refreshGradientsForSpace(_ space: Space, animate: Bool) {
-        for (_, state) in windowStates where state.currentSpaceId == space.id {
-            updateGradient(
-                for: state, to: space.gradient,
-                animate: animate && activeWindowState?.id == state.id)
-        }
+        // NO-OP: Gradient is now computed reactively from windowState.gradient
+        // Views observe windowState.currentSpaceId and automatically get the correct gradient
     }
 
     private func adoptProfileIfNeeded(
@@ -844,7 +830,7 @@ class BrowserManager: ObservableObject {
     private func showCommandPalette(
         in windowState: BrowserWindowState, prefill: String, navigateCurrentTab: Bool
     ) {
-        for state in windowStates.values where state.id != windowState.id {
+        for state in windowRegistry?.windows.values ?? [] where state.id != windowState.id {
             state.isCommandPaletteVisible = false
             state.isMiniCommandPaletteVisible = false
         }
@@ -863,7 +849,7 @@ class BrowserManager: ObservableObject {
     }
 
     func openCommandPalette() {
-        guard let target = activeWindowState ?? windowStates.values.first else {
+        guard let target = activeWindowState ?? windowRegistry?.windows.values.first else {
             commandPalettePrefilledText = ""
             shouldNavigateCurrentTab = false
             isMiniCommandPaletteVisible = false
@@ -876,7 +862,7 @@ class BrowserManager: ObservableObject {
     /// Opens the full command palette prefilled with the current tab's URL,
     /// with Return navigating the current tab (not creating a new one).
     func openCommandPaletteWithCurrentURL() {
-        guard let target = activeWindowState ?? windowStates.values.first else {
+        guard let target = activeWindowState ?? windowRegistry?.windows.values.first else {
             openCommandPalette()
             return
         }
@@ -889,7 +875,7 @@ class BrowserManager: ObservableObject {
         if let windowState {
             targets = [windowState]
         } else {
-            targets = Array(windowStates.values)
+            targets = Array(windowRegistry?.windows.values ?? [])
         }
 
         for state in targets {
@@ -926,7 +912,7 @@ class BrowserManager: ObservableObject {
     }
 
     private func showMiniCommandPalette(in windowState: BrowserWindowState, prefill: String) {
-        for state in windowStates.values where state.id != windowState.id {
+        for state in windowRegistry?.windows.values ?? [] where state.id != windowState.id {
             state.isMiniCommandPaletteVisible = false
         }
 
@@ -948,7 +934,7 @@ class BrowserManager: ObservableObject {
         if let windowState {
             targets = [windowState]
         } else {
-            targets = Array(windowStates.values)
+            targets = Array(windowRegistry?.windows.values ?? [])
         }
 
         for state in targets {
@@ -1064,7 +1050,7 @@ class BrowserManager: ObservableObject {
     func focusURLBar() {
         // Open the mini palette anchored to the URL bar
         // Pre-fill with current tab's URL and set to navigate current tab
-        guard let target = activeWindowState ?? windowStates.values.first else { return }
+        guard let target = activeWindowState ?? windowRegistry?.windows.values.first else { return }
         let prefill = currentTab(for: target)?.url.absoluteString ?? ""
         showMiniCommandPalette(in: target, prefill: prefill)
     }
@@ -1630,7 +1616,7 @@ class BrowserManager: ObservableObject {
 
     private func hideProfileSwitchToast(forWindowId windowId: UUID) {
         guard
-            let window = windowStates[windowId]
+            let window = windowRegistry?.windows[windowId]
                 ?? (activeWindowState?.id == windowId ? activeWindowState : nil)
         else { return }
         withAnimation(.spring(response: 0.45, dampingFraction: 0.9)) {
@@ -1964,7 +1950,9 @@ class BrowserManager: ObservableObject {
     // MARK: - Window State Management
 
     /// Register a new window state
-    func registerWindowState(_ windowState: BrowserWindowState) {
+    /// TEMPORARY: Setup window state with initial values
+    /// This will be removed once we eliminate duplicate global state
+    func setupWindowState(_ windowState: BrowserWindowState) {
         // Set TabManager reference for computed properties
         windowState.tabManager = tabManager
 
@@ -1988,7 +1976,6 @@ class BrowserManager: ObservableObject {
             windowState.window = window
         }
         windowState.urlBarFrame = urlBarFrame
-        windowState.activeGradient = tabManager.currentSpace?.gradient ?? .default
         windowState.currentProfileId = currentProfile?.id
 
         // Set initial tab and space
@@ -1998,13 +1985,9 @@ class BrowserManager: ObservableObject {
             let space = tabManager.spaces.first(where: { $0.id == spaceId })
         {
             windowState.currentProfileId = space.profileId ?? currentProfile?.id
-            windowState.activeGradient = space.gradient
         }
 
-        windowStates[windowState.id] = windowState
-        setActiveWindowState(windowState)
-
-        print("🪟 [BrowserManager] Registered window state: \(windowState.id)")
+        print("🪟 [BrowserManager] Setup window state: \(windowState.id)")
     }
 
 
@@ -2016,7 +1999,7 @@ class BrowserManager: ObservableObject {
         sidebarContentWidth = windowState.sidebarContentWidth
         isSidebarVisible = windowState.isSidebarVisible
         urlBarFrame = windowState.urlBarFrame
-        gradientColorManager.setImmediate(windowState.activeGradient)
+        gradientColorManager.setImmediate(windowState.gradient)
         splitManager.refreshPublishedState(for: windowState.id)
         isCommandPaletteVisible = windowState.isCommandPaletteVisible
         isMiniCommandPaletteVisible = windowState.isMiniCommandPaletteVisible
@@ -2158,206 +2141,35 @@ class BrowserManager: ObservableObject {
         windowState.refreshCompositor()
     }
 
-    /// Get a web view for a specific tab in a specific window
+    /// DEPRECATED: Use WebViewCoordinator.getWebView() directly via environment
     func getWebView(for tabId: UUID, in windowId: UUID) -> WKWebView? {
-        return webViewsByTabAndWindow[tabId]?[windowId]
+        return webViewCoordinator?.getWebView(for: tabId, in: windowId)
     }
 
-    /// Get all web views for a specific tab across all windows
-    func getAllWebViews(for tabId: UUID) -> [WKWebView] {
-        return webViewsByTabAndWindow[tabId]?.values.map { $0 } ?? []
-    }
-
-    /// Create a new web view for a specific tab in a specific window
+    /// DEPRECATED: Use WebViewCoordinator directly
     func createWebView(for tabId: UUID, in windowId: UUID) -> WKWebView {
-        // Get the tab
-        guard let tab = tabManager.allTabs().first(where: { $0.id == tabId }) else {
-            fatalError("Tab not found: \(tabId)")
+        guard let tab = tabManager.allTabs().first(where: { $0.id == tabId }),
+              let coordinator = webViewCoordinator else {
+            fatalError("Tab or WebViewCoordinator not found")
         }
-
-        // Create a new web view configuration based on the tab's original web view
-        let configuration = WKWebViewConfiguration()
-
-        // Copy configuration from the original tab's web view if it exists
-        if let originalWebView = tab.webView {
-            configuration.websiteDataStore = originalWebView.configuration.websiteDataStore
-            // CRITICAL: Copy all preferences including PiP settings
-            configuration.preferences = originalWebView.configuration.preferences
-            configuration.defaultWebpagePreferences =
-                originalWebView.configuration.defaultWebpagePreferences
-            configuration.mediaTypesRequiringUserActionForPlayback =
-                originalWebView.configuration.mediaTypesRequiringUserActionForPlayback
-            configuration.allowsAirPlayForMediaPlayback =
-                originalWebView.configuration.allowsAirPlayForMediaPlayback
-            configuration.applicationNameForUserAgent =
-                originalWebView.configuration.applicationNameForUserAgent
-            if #available(macOS 15.5, *) {
-                configuration.webExtensionController =
-                    originalWebView.configuration.webExtensionController
-            }
-        } else {
-            // Use the tab's resolved profile data store and apply proper configuration
-            let resolvedProfile = tab.resolveProfile()
-            configuration.websiteDataStore =
-                resolvedProfile?.dataStore ?? WKWebsiteDataStore.default()
-
-            // Apply the same configuration as BrowserConfiguration
-            let preferences = WKWebpagePreferences()
-            preferences.allowsContentJavaScript = true
-            configuration.defaultWebpagePreferences = preferences
-
-            configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
-            configuration.mediaTypesRequiringUserActionForPlayback = []
-            configuration.allowsAirPlayForMediaPlayback = true
-            configuration.applicationNameForUserAgent = "Version/17.4.1 Safari/605.1.15"
-
-            // CRITICAL: Enable Picture-in-Picture
-            configuration.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
-
-            // CRITICAL: Enable full-screen API support
-            configuration.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
-            configuration.preferences.setValue(true, forKey: "mediaDevicesEnabled")
-
-            // CRITICAL: Enable HTML5 Fullscreen API
-            configuration.preferences.isElementFullscreenEnabled = true
-
-            configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
-        }
-
-        // Create the new web view
-        let newWebView = FocusableWKWebView(frame: .zero, configuration: configuration)
-        newWebView.navigationDelegate = tab
-        newWebView.uiDelegate = tab
-        newWebView.allowsBackForwardNavigationGestures = true
-        newWebView.allowsMagnification = true
-        newWebView.setValue(false, forKey: "drawsBackground")
-        newWebView.owningTab = tab
-        newWebView.contextMenuBridge = WebContextMenuBridge(tab: tab, configuration: configuration)
-
-        // Set up message handlers
-        newWebView.configuration.userContentController.add(tab, name: "linkHover")
-        newWebView.configuration.userContentController.add(tab, name: "commandHover")
-        newWebView.configuration.userContentController.add(tab, name: "commandClick")
-        newWebView.configuration.userContentController.add(tab, name: "pipStateChange")
-        newWebView.configuration.userContentController.add(
-            tab, name: "mediaStateChange_\(tabId.uuidString)")
-        newWebView.configuration.userContentController.add(
-            tab, name: "backgroundColor_\(tabId.uuidString)")
-        newWebView.configuration.userContentController.add(tab, name: "historyStateDidChange")
-        newWebView.configuration.userContentController.add(tab, name: "NookIdentity")
-
-        tab.setupThemeColorObserver(for: newWebView)
-
-        // Load the same URL as the original tab
-        if let url = URL(string: tab.url.absoluteString) {
-            newWebView.load(URLRequest(url: url))
-        }
-        newWebView.isMuted = tab.isAudioMuted
-
-        // Store the web view
-        if webViewsByTabAndWindow[tabId] == nil {
-            webViewsByTabAndWindow[tabId] = [:]
-        }
-        webViewsByTabAndWindow[tabId]?[windowId] = newWebView
-
-        if let activeId = activeWindowState?.id {
-            enforceExclusiveAudio(for: tab, activeWindowId: activeId)
-        } else {
-            enforceExclusiveAudio(for: tab, activeWindowId: windowId)
-        }
-
-        print("🪟 [BrowserManager] Created new web view for tab \(tab.name) in window \(windowId)")
-        return newWebView
+        return coordinator.createWebView(for: tab, in: windowId)
     }
 
-    /// Synchronize a tab's state across all windows that are displaying it
+    /// DEPRECATED: These functions should not exist - cross-window sync is an antipattern
     func syncTabAcrossWindows(_ tabId: UUID) {
-        // Prevent recursive sync calls
-        guard !isSyncingTab.contains(tabId) else {
-            print("🪟 [BrowserManager] Skipping recursive sync for tab \(tabId)")
-            return
-        }
-
-        guard let tab = tabManager.allTabs().first(where: { $0.id == tabId }) else { return }
-
-        isSyncingTab.insert(tabId)
-        defer { isSyncingTab.remove(tabId) }
-
-        // Get all web views for this tab across all windows
-        let allWebViews: [WKWebView]
-        if let webViews = webViewsByTabAndWindow[tabId] {
-            allWebViews = Array(webViews.values)
-        } else {
-            allWebViews = []
-        }
-
-        for webView in allWebViews {
-            // Sync the URL if it's different
-            let currentURL = tab.url
-            if webView.url != currentURL {
-                webView.load(URLRequest(url: currentURL))
-            }
-
-            // Sync other state as needed (loading state, etc.)
-            // Note: Navigation state (back/forward) is handled by the Tab's navigationDelegate
-        }
-
-        print("🪟 [BrowserManager] Synchronized tab \(tab.name) across \(allWebViews.count) windows")
+        // NO-OP: This should not be needed
     }
 
-    /// Navigate a tab across all windows that are displaying it
     func navigateTabAcrossWindows(_ tabId: UUID, to url: URL) {
-        guard let tab = tabManager.allTabs().first(where: { $0.id == tabId }) else { return }
-
-        // Update the tab's URL
-        tab.url = url
-
-        // Get all web views for this tab across all windows
-        let allWebViews: [WKWebView]
-        if let webViews = webViewsByTabAndWindow[tabId] {
-            allWebViews = Array(webViews.values)
-        } else {
-            allWebViews = []
-        }
-
-        for webView in allWebViews {
-            webView.load(URLRequest(url: url))
-        }
-
-        print(
-            "🪟 [BrowserManager] Navigated tab \(tab.name) to \(url.absoluteString) across \(allWebViews.count) windows"
-        )
+        // NO-OP: This should not be needed
     }
 
-    /// Reload a tab across all windows that are displaying it
     func reloadTabAcrossWindows(_ tabId: UUID) {
-        guard let tab = tabManager.allTabs().first(where: { $0.id == tabId }) else { return }
-
-        // Get all web views for this tab across all windows
-        let allWebViews: [WKWebView]
-        if let webViews = webViewsByTabAndWindow[tabId] {
-            allWebViews = Array(webViews.values)
-        } else {
-            allWebViews = []
-        }
-
-        for webView in allWebViews {
-            webView.reload()
-        }
-
-        print("🪟 [BrowserManager] Reloaded tab \(tab.name) across \(allWebViews.count) windows")
+        // NO-OP: This should not be needed
     }
 
-    /// Apply mute state to all window-specific web views for a tab
     func setMuteState(_ muted: Bool, for tabId: UUID, originatingWindowId: UUID?) {
-        guard let tab = tabManager.allTabs().first(where: { $0.id == tabId }) else { return }
-        if let origin = originatingWindowId {
-            enforceExclusiveAudio(for: tab, activeWindowId: origin, desiredMuteState: muted)
-        } else if let webViews = webViewsByTabAndWindow[tabId] {
-            for webView in webViews.values {
-                webView.isMuted = muted
-            }
-        }
+        // NO-OP: This should not be needed
     }
 
     /// Set active space for a specific window
@@ -2414,7 +2226,7 @@ class BrowserManager: ObservableObject {
 
     /// Validate and fix window states after tab/space mutations
     func validateWindowStates() {
-        for (_, windowState) in windowStates {
+        for (_, windowState) in windowRegistry?.windows ?? [:] {
             var needsUpdate = false
 
             // Check if current tab still exists
