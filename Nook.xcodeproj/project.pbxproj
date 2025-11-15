@@ -57,6 +57,11 @@
 			path = Nook;
 			sourceTree = "<group>";
 		};
+		2D0834B32EC8C43B00C302AC /* App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = App;
+			sourceTree = "<group>";
+		};
 		564997D02E9B125200D89F78 /* UI */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -99,6 +104,7 @@
 				7F8340FD2E37F39400674A5D /* Products */,
 				564997D02E9B125200D89F78 /* UI */,
 				2CAC4D282E82457B00870189 /* Nook */,
+				2D0834B32EC8C43B00C302AC /* App */,
 			);
 			sourceTree = "<group>";
 		};
@@ -127,6 +133,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				2CAC4D282E82457B00870189 /* Nook */,
+				2D0834B32EC8C43B00C302AC /* App */,
 				564997D02E9B125200D89F78 /* UI */,
 			);
 			name = Nook;
