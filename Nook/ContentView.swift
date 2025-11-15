@@ -12,16 +12,21 @@ struct ContentView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(WindowRegistry.self) private var windowRegistry
     @State private var windowState = BrowserWindowState()
+    @State private var commandPalette = CommandPaletteState()
 
     var body: some View {
         WindowView()
             .environment(windowState)
+            .environment(commandPalette)
             .environmentObject(browserManager.gradientColorManager)
+            .focusedValue(\.commandPalette, commandPalette)
             .background(WindowFocusBridge(windowState: windowState, windowRegistry: windowRegistry))
             .frame(minWidth: 470, minHeight: 382)
             .onAppear {
                 // Set TabManager reference for computed properties
                 windowState.tabManager = browserManager.tabManager
+                // Set CommandPalette reference for global shortcuts
+                windowState.commandPalette = commandPalette
                 // Register this window state with the registry
                 windowRegistry.register(windowState)
             }

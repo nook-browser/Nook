@@ -76,7 +76,7 @@ final class SplitDropCaptureView: NSView {
                 return true
             }
         }
-        if let windowState = bm.windowStates[windowId] {
+        if let windowState = bm.windowRegistry?.windows[windowId] {
             sm.enterSplit(with: tab, placeOn: side, in: windowState)
         }
         // Cancel any in-progress sidebar/tab drag to prevent unintended reorder/removal

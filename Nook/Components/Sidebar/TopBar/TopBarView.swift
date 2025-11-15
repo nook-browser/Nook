@@ -17,6 +17,7 @@ enum TopBarMetrics {
 struct TopBarView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(CommandPaletteState.self) private var commandPalette
     @StateObject private var tabWrapper = ObservableTabWrapper()
     @State private var isHovering: Bool = false
     @State private var previousTabId: UUID? = nil
@@ -158,7 +159,11 @@ struct TopBarView: View {
         .animation(shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil, value: urlBarBackgroundColor)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .onTapGesture {
-            browserManager.openCommandPaletteWithCurrentURL()
+            if let currentTab = browserManager.currentTab(for: windowState) {
+                commandPalette.openWithCurrentURL(currentTab.url)
+            } else {
+                commandPalette.open()
+            }
         }
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {

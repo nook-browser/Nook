@@ -702,8 +702,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     func checkMediaState() {
         // Get all web views for this tab across all windows
         let allWebViews: [WKWebView]
-        if let browserManager = browserManager {
-            allWebViews = browserManager.getAllWebViews(for: id)
+        if let coordinator = browserManager?.webViewCoordinator {
+            allWebViews = coordinator.getAllWebViews(for: id)
         } else if let webView = _webView {
             // Fallback to original web view for backward compatibility
             allWebViews = [webView]
@@ -1505,7 +1505,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         webView.removeFromSuperview()
 
         // 7. Force remove from compositor
-        browserManager?.removeWebViewFromContainers(webView)
+        browserManager?.webViewCoordinator?.removeWebViewFromContainers(webView)
 
         print("✅ [Tab] WebView cleanup completed for: \(name)")
     }

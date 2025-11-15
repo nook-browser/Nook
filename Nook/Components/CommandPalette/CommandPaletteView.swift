@@ -13,6 +13,7 @@ import Garnish
 struct CommandPaletteView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(CommandPaletteState.self) private var commandPalette
     @EnvironmentObject var gradientColorManager: GradientColorManager
     @State private var searchManager = SearchManager()
     @Environment(\.colorScheme) var colorScheme
@@ -49,14 +50,14 @@ struct CommandPaletteView: View {
         let isDark = colorScheme == .dark
         let isActiveWindow =
             browserManager.activeWindowState?.id == windowState.id
-        let isVisible = isActiveWindow && windowState.isCommandPaletteVisible
+        let isVisible = isActiveWindow && commandPalette.isVisible
 
         ZStack {
             Color.clear
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    browserManager.closeCommandPalette(for: windowState)
+                    commandPalette.close()
                 }
                 .gesture(WindowDragGesture())
 
@@ -380,7 +381,7 @@ struct CommandPaletteView: View {
 
         text = ""
         selectedSuggestionIndex = -1
-        browserManager.closeCommandPalette(for: windowState)
+        commandPalette.close()
     }
 
     private func navigateSuggestions(direction: Int) {
