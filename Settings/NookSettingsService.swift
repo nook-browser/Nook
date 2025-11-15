@@ -339,7 +339,12 @@ extension Notification.Name {
 
 // MARK: - Environment Key
 private struct NookSettingsServiceKey: EnvironmentKey {
-    static let defaultValue = NookSettingsService()
+    @MainActor
+    static var defaultValue: NookSettingsService {
+        // This should never be called since we always inject from NookApp
+        // But EnvironmentKey protocol requires a default value
+        return NookSettingsService()
+    }
 }
 
 extension EnvironmentValues {
