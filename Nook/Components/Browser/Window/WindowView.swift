@@ -17,23 +17,22 @@ struct WindowView: View {
     private var webViewYOffset: CGFloat {
         // Approximate Y offset for web content start (nav bar + URL bar + padding)
         if browserManager.settingsManager.topBarAddressView {
-            return 44  // Top bar height
+            return TopBarMetrics.height  // Top bar height
         } else {
             return 20  // Accounts for navigation area height
         }
     }
-
+    
     var body: some View {
-        let isDark = colorScheme == .dark
         GeometryReader { geometry in
             ZStack {
-                // Gradient background for the current space (bottom-most layer)
                 SpaceGradientBackgroundView()
+                    .environmentObject(browserManager)
+                    .environmentObject(browserManager.gradientColorManager)
                     .environmentObject(windowState)
-                
-                // Attach background context menu to the window background layer
-                Color.white.opacity(isDark ? 0.3 : 0.4)
-                    .ignoresSafeArea(.all)
+//                // Attach background context menu to the window background layer
+//                Color.white.opacity(isDark ? 0.3 : 0.4)
+//                    .ignoresSafeArea(.all)
                 WindowBackgroundView()
                     .contextMenu {
                         Button("Customize Space Gradient...") {
@@ -42,24 +41,15 @@ struct WindowView: View {
                         .disabled(browserManager.tabManager.currentSpace == nil)
                     }
 
-                // Top bar when enabled
+                // Main layout (webview extends full height when top bar is enabled)
+                mainLayout
+                
+                // TopBar Command Palette overlay
                 if browserManager.settingsManager.topBarAddressView {
-                    VStack(spacing: 0) {
-                        TopBarView()
-                            .environmentObject(browserManager)
-                            .environmentObject(windowState)
-                            .background(Color.clear)
-                        
-                        mainLayout
-                    }
-                    
-                    // TopBar Command Palette overlay
                     TopBarCommandPalette()
                         .environmentObject(browserManager)
                         .environmentObject(windowState)
                         .zIndex(3000)
-                } else {
-                    mainLayout
                 }
 
                 // Mini command palette anchored exactly to URL bar's top-left
@@ -242,13 +232,51 @@ struct WindowView: View {
             .environmentObject(windowState)
     }
 
+    @ViewBuilder
     private var websiteColumn: some View {
+        let cornerRadius: CGFloat = {
+            if #available(macOS 26.0, *) {
+                return 12
+            } else {
+                return 6
+            }
+        }()
+        
+        let hasTopBar = browserManager.settingsManager.topBarAddressView
+        
         VStack(spacing: 0) {
-            WebsiteLoadingIndicator()
+            if hasTopBar {
+                WebsiteLoadingIndicator()
+                    .zIndex(3000)
+                
+                TopBarView()
+                    .environmentObject(browserManager)
+                    .environmentObject(windowState)
+                    .zIndex(2500)
+            } else {
+                WebsiteLoadingIndicator()
+            }
+            
             WebsiteView()
+                .zIndex(2000)
         }
+        .padding(.top, 0)
         .padding(.bottom, 8)
-        .zIndex(2000)
+        .clipShape(websiteColumnClipShape(cornerRadius: cornerRadius, hasTopBar: hasTopBar))
+    }
+    
+    private func websiteColumnClipShape(cornerRadius: CGFloat, hasTopBar: Bool) -> AnyShape {
+        if hasTopBar {
+            return AnyShape(UnevenRoundedRectangle(
+                topLeadingRadius: 0,
+                bottomLeadingRadius: cornerRadius,
+                bottomTrailingRadius: cornerRadius,
+                topTrailingRadius: 0,
+                style: .continuous
+            ))
+        } else {
+            return AnyShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        }
     }
 
     @ViewBuilder
@@ -333,7 +361,7 @@ private struct MiniCommandPaletteOverlay: View {
                 let hasFrame = barFrame.width > 1 && barFrame.height > 1
                 // Match sidebar's internal 8pt padding when geometry is unavailable
                 let fallbackX: CGFloat = 8
-                let topBarHeight: CGFloat = browserManager.settingsManager.topBarAddressView ? 44 : 0
+                let topBarHeight: CGFloat = browserManager.settingsManager.topBarAddressView ? TopBarMetrics.height : 0
                 let fallbackY: CGFloat =
                     8 /* sidebar top padding */ + 30 /* nav bar */
                     + 8 /* vstack spacing */ + topBarHeight

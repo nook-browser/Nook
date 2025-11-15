@@ -9,6 +9,7 @@ final class SplitViewManager: ObservableObject {
     @Published var leftTabId: UUID? = nil
     @Published var rightTabId: UUID? = nil
     @Published private(set) var dividerFraction: CGFloat = 0.5 // 0.0 = all left, 1.0 = all right
+    @Published var activeSide: Side? = nil
 
     // Preview state during drag-over of the web content
     @Published var isPreviewActive: Bool = false
@@ -30,6 +31,7 @@ final class SplitViewManager: ObservableObject {
         var dividerFraction: CGFloat = 0.5
         var isPreviewActive: Bool = false
         var previewSide: Side? = nil
+        var activeSide: Side? = nil
     }
 
     init(browserManager: BrowserManager? = nil) {
@@ -92,6 +94,7 @@ final class SplitViewManager: ObservableObject {
         dividerFraction = state.dividerFraction
         isPreviewActive = state.isPreviewActive
         previewSide = state.previewSide
+        activeSide = state.activeSide
     }
 
     func refreshPublishedState(for windowId: UUID) {
@@ -105,6 +108,15 @@ final class SplitViewManager: ObservableObject {
         state.leftTabId = leftTabId
         state.rightTabId = rightTabId
         state.dividerFraction = 0.5
+        // Set active side based on which tab is currently active in this window
+        if let windowState = browserManager?.windowStates[windowId],
+           let currentTabId = windowState.currentTabId {
+            if currentTabId == leftTabId {
+                state.activeSide = .left
+            } else if currentTabId == rightTabId {
+                state.activeSide = .right
+            }
+        }
         setSplitState(state, for: windowId)
         
         // Note: No need to update tab display ownership since windows are independent
@@ -126,6 +138,7 @@ final class SplitViewManager: ObservableObject {
         state.rightTabId = nil
         state.isPreviewActive = false
         state.previewSide = nil
+        state.activeSide = nil
         setSplitState(state, for: windowId)
         
         // Note: No need to update tab display ownership since windows are independent
@@ -194,6 +207,49 @@ final class SplitViewManager: ObservableObject {
         if rightTabId == tabId { return .right }
         return nil
     }
+    
+    /// Get which side a tab is on for a specific window
+    func side(for tabId: UUID, in windowId: UUID) -> Side? {
+        let state = getSplitState(for: windowId)
+        if state.leftTabId == tabId { return .left }
+        if state.rightTabId == tabId { return .right }
+        return nil
+    }
+    
+    /// Get the active side for a specific window
+    func activeSide(for windowId: UUID) -> Side? {
+        return getSplitState(for: windowId).activeSide
+    }
+    
+    /// Set the active side for a specific window
+    func setActiveSide(_ side: Side?, for windowId: UUID) {
+        var state = getSplitState(for: windowId)
+        state.activeSide = side
+        setSplitState(state, for: windowId)
+    }
+    
+    /// Update the active side based on which tab is currently active
+    /// This should be called whenever a tab becomes active
+    func updateActiveSide(for tabId: UUID, in windowId: UUID) {
+        let state = getSplitState(for: windowId)
+        guard state.isSplit else {
+            // Not in split view, clear active side
+            if state.activeSide != nil {
+                var updatedState = state
+                updatedState.activeSide = nil
+                setSplitState(updatedState, for: windowId)
+            }
+            return
+        }
+        
+        // Determine which side this tab is on
+        let side = self.side(for: tabId, in: windowId)
+        if state.activeSide != side {
+            var updatedState = state
+            updatedState.activeSide = side
+            setSplitState(updatedState, for: windowId)
+        }
+    }
 
     // MARK: - Entry points
     func enterSplit(with tab: Tab, placeOn side: Side = .right, animate: Bool = true) {
@@ -222,6 +278,8 @@ final class SplitViewManager: ObservableObject {
             case .left: state.leftTabId = resolved.id
             case .right: state.rightTabId = resolved.id
             }
+            // Set active side to the side we're placing the tab on
+            state.activeSide = side
             setSplitState(state, for: windowId)
             bm.compositorManager.loadTab(resolved)
             if let ws = bm.windowStates[windowId] {
@@ -250,6 +308,8 @@ final class SplitViewManager: ObservableObject {
         state.isSplit = true
         state.leftTabId = leftResolved.id
         state.rightTabId = rightResolved.id
+        // Set active side to the side containing the current tab (opposite of where new tab is placed)
+        state.activeSide = (side == .left) ? .right : .left
         setSplitState(state, for: windowId)
 
         bm.compositorManager.loadTab(leftResolved)
@@ -288,6 +348,10 @@ final class SplitViewManager: ObservableObject {
         let l = state.leftTabId
         state.leftTabId = state.rightTabId
         state.rightTabId = l
+        // Swap active side too
+        if let currentActiveSide = state.activeSide {
+            state.activeSide = (currentActiveSide == .left) ? .right : .left
+        }
         setSplitState(state, for: windowId)
         if let windowState = browserManager?.windowStates[windowId] {
             browserManager?.refreshCompositor(for: windowState)

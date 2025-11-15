@@ -13,33 +13,152 @@ import AppKit
 struct LinkStatusBar: View {
     let hoveredLink: String?
     let isCommandPressed: Bool
+    let accentColor: Color
+    @Environment(\.colorScheme) var colorScheme
+    @State private var shouldShow: Bool = false
+    @State private var hoverTask: Task<Void, Never>?
+    @State private var displayedLink: String? = nil
     
     var body: some View {
-        if let link = hoveredLink, !link.isEmpty {
-            Text(isCommandPressed ? "Open \(link) in a new tab and focus it" : link)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.secondary)
+        // Show the view if we have a link to display (current or last shown)
+        if let link = displayedLink, !link.isEmpty {
+            Text(displayText(for: link))
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(textColor)
                 .lineLimit(1)
-                .truncationMode(.middle)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .background(
-                    LinearGradient(
-                        gradient: Gradient(colors: [
-                            Color(hex: "3E4D2E"),
-                            Color(hex: "2E2E2E")
-                        ]),
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
+                .padding(.horizontal, 7)
+                .padding(.vertical, 5)
+                .background(backgroundColor)
                 .clipShape(RoundedRectangle(cornerRadius: 999))
                 .overlay(
                     RoundedRectangle(cornerRadius: 999)
-                        .stroke(.white.opacity(0.2), lineWidth: 1)
+                        .stroke(borderColor, lineWidth: 1)
                 )
-                .opacity(hoveredLink != nil && !hoveredLink!.isEmpty ? 1 : 0)
-                .animation(.easeInOut(duration: 0.2), value: hoveredLink)
+                .opacity(shouldShow ? 1 : 0)
+                .animation(.easeOut(duration: 0.25), value: shouldShow)
+                .onChange(of: hoveredLink) { newLink in
+                    handleHoverChange(newLink: newLink)
+                }
+                .onAppear {
+                    handleHoverChange(newLink: hoveredLink)
+                }
+                .onDisappear {
+                    hoverTask?.cancel()
+                    hoverTask = nil
+                    shouldShow = false
+                    displayedLink = nil
+                }
+        } else {
+            Color.clear
+                .onChange(of: hoveredLink) { newLink in
+                    handleHoverChange(newLink: newLink)
+                }
+        }
+    }
+    
+    private func displayText(for link: String) -> String {
+        let truncatedLink = truncateLink(link)
+        if isCommandPressed {
+            return "Open \(truncatedLink) in a new tab and focus it"
+        } else {
+            return truncatedLink
+        }
+    }
+    
+    private func handleHoverChange(newLink: String?) {
+        // Cancel any existing task
+        hoverTask?.cancel()
+        hoverTask = nil
+        
+        if let link = newLink, !link.isEmpty {
+            // New link - update displayed link immediately
+            displayedLink = link
+            
+            // Wait then show if not already showing
+            if !shouldShow {
+                hoverTask = Task {
+                    try? await Task.sleep(nanoseconds: 500_000_000) // 500ms
+                    if !Task.isCancelled {
+                        await MainActor.run { shouldShow = true }
+                    }
+                }
+            }
+        } else {
+            // Link cleared - wait then hide
+            hoverTask = Task {
+                try? await Task.sleep(nanoseconds: 250_000_000) // 0.25s delay
+                if !Task.isCancelled {
+                    await MainActor.run {
+                        shouldShow = false
+                    }
+                    // Clear displayed link after fade out animation completes
+                    try? await Task.sleep(nanoseconds: 250_000_000) // 0.25s for fade out
+                    if !Task.isCancelled {
+                        await MainActor.run {
+                            displayedLink = nil
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func truncateLink(_ link: String) -> String {
+        if link.count > 60 {
+            let firstPart = String(link.prefix(30))
+            let lastPart = String(link.suffix(30))
+            return "\(firstPart)...\(lastPart)"
+        }
+        return link
+    }
+    
+    private var backgroundColor: some View {
+        Group {
+            if colorScheme == .dark {
+                // Dark mode: gradient background using accent color
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        accentColor,
+                        lighterAccentColor
+                    ]),
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            } else {
+                // Light mode: white background
+                Color.white
+            }
+        }
+    }
+    
+    private var lighterAccentColor: Color {
+        #if os(macOS)
+        // Blend the accent color with white for lighter variant
+        let nsColor = NSColor(accentColor)
+        if let blended = nsColor.blended(withFraction: 0.35, of: .white) {
+            return Color(nsColor: blended)
+        } else {
+            return accentColor
+        }
+        #else
+        return accentColor
+        #endif
+    }
+    
+    private var textColor: Color {
+        if colorScheme == .dark {
+            return Color.white
+        } else {
+            // Light mode: colored text using accent color
+            return accentColor
+        }
+    }
+    
+    private var borderColor: Color {
+        if colorScheme == .dark {
+            return .white.opacity(0.2)
+        } else {
+            return accentColor.opacity(0.3)
         }
     }
 }
@@ -51,6 +170,30 @@ struct WebsiteView: View {
     @State private var hoveredLink: String?
     @State private var isCommandPressed: Bool = false
     @State private var isDropTargeted: Bool = false
+    
+    private var cornerRadius: CGFloat {
+        if #available(macOS 26.0, *) {
+            return 12
+        } else {
+            return 6
+        }
+    }
+    
+    private var webViewClipShape: AnyShape {
+        let hasTopBar = browserManager.settingsManager.topBarAddressView
+        
+        if hasTopBar {
+            return AnyShape(UnevenRoundedRectangle(
+                topLeadingRadius: 0,
+                bottomLeadingRadius: cornerRadius,
+                bottomTrailingRadius: cornerRadius,
+                topTrailingRadius: 0,
+                style: .continuous
+            ))
+        } else {
+            return AnyShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        }
+    }
 
     var body: some View {
         ZStack() {
@@ -69,13 +212,7 @@ struct WebsiteView: View {
                         )
                         .background(shouldShowSplit ? Color.clear : Color(nsColor: .windowBackgroundColor))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: {
-                            if #available(macOS 26.0, *) {
-                                return 12
-                            } else {
-                                return 6
-                            }
-                        }(), style: .continuous))
+                        .clipShape(webViewClipShape)
                         .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 0)
                         // Divider + pane close overlay
                         .overlay(alignment: .top) {
@@ -114,11 +251,17 @@ struct WebsiteView: View {
                     }
                 }
                 Spacer()
-//                HStack {
-//                    LinkStatusBar(hoveredLink: hoveredLink, isCommandPressed: isCommandPressed)
-//                        .padding(10)
-//                    Spacer()
-//                }
+                if browserManager.settingsManager.showLinkStatusBar {
+                    HStack {
+                        LinkStatusBar(
+                            hoveredLink: hoveredLink,
+                            isCommandPressed: isCommandPressed,
+                            accentColor: browserManager.gradientColorManager.primaryColor
+                        )
+                        .padding(10)
+                        Spacer()
+                    }
+                }
                 
             }
             
@@ -285,7 +428,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
             let rightId = split.rightTabId(for: windowState.id)
 
             // Add pane containers with rounded corners and background
-            let activeId = browserManager.currentTab(for: windowState)?.id
+            let activeSide = split.activeSide(for: windowState.id)
             let accent = browserManager.gradientColorManager.displayGradient.primaryNSColor
             // Resolve pane tabs across ALL tabs (not just current space)
             let allKnownTabs = browserManager.tabManager.allTabs()
@@ -293,7 +436,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
             if let lId = leftId, let leftTab = allKnownTabs.first(where: { $0.id == lId }) {
                 // Force-create/ensure loaded when visible in split
                 let lWeb = webView(for: leftTab, windowId: windowState.id)
-                let pane = makePaneContainer(frame: leftRect, isActive: (activeId == lId), accent: accent)
+                let pane = makePaneContainer(frame: leftRect, isActive: (activeSide == .left), accent: accent)
                 containerView.addSubview(pane)
                 lWeb.frame = pane.bounds
                 lWeb.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
@@ -305,7 +448,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
             if let rId = rightId, let rightTab = allKnownTabs.first(where: { $0.id == rId }) {
                 // Force-create/ensure loaded when visible in split
                 let rWeb = webView(for: rightTab, windowId: windowState.id)
-                let pane = makePaneContainer(frame: rightRect, isActive: (activeId == rId), accent: accent)
+                let pane = makePaneContainer(frame: rightRect, isActive: (activeSide == .right), accent: accent)
                 containerView.addSubview(pane)
                 rWeb.frame = pane.bounds
                 rWeb.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
@@ -586,3 +729,4 @@ struct TabWebViewWrapper: NSViewRepresentable {
         // The webView is managed by the Tab
     }
 }
+

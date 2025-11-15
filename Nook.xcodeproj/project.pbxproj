@@ -19,6 +19,7 @@
 		360021422EC6EC7F0016A41E /* Graphing in Frameworks */ = {isa = PBXBuildFile; productRef = 360021412EC6EC7F0016A41E /* Graphing */; };
 		360021442EC6EC7F0016A41E /* Motion in Frameworks */ = {isa = PBXBuildFile; productRef = 360021432EC6EC7F0016A41E /* Motion */; };
 		564997D82E9B24CC00D89F78 /* Garnish in Frameworks */ = {isa = PBXBuildFile; productRef = 564997D72E9B24CC00D89F78 /* Garnish */; };
+		56C82BA92E9C2DB500DDD0D6 /* UniversalGlass in Frameworks */ = {isa = PBXBuildFile; productRef = 56C82BA82E9C2DB500DDD0D6 /* UniversalGlass */; };
 		7FAFC5DA2E3ADDCD009D7DC4 /* FaviconFinder in Frameworks */ = {isa = PBXBuildFile; productRef = 7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */; };
 /* End PBXBuildFile section */
 
@@ -74,6 +75,7 @@
 				3600213C2EC6EC450016A41E /* Reeeed in Frameworks */,
 				3600213F2EC6EC710016A41E /* LRUCache in Frameworks */,
 				564997D82E9B24CC00D89F78 /* Garnish in Frameworks */,
+				56C82BA92E9C2DB500DDD0D6 /* UniversalGlass in Frameworks */,
 				7FAFC5DA2E3ADDCD009D7DC4 /* FaviconFinder in Frameworks */,
 				360021302EC6EADB0016A41E /* RealModule in Frameworks */,
 				360021392EC6EC2F0016A41E /* Fuzi in Frameworks */,
@@ -340,8 +342,7 @@
 				AUTOMATION_APPLE_EVENTS = NO;
 				CODE_SIGN_ENTITLEMENTS = Nook/Nook.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 104;
 				DEVELOPMENT_TEAM = 8JTS5XWJJN;
@@ -386,8 +387,7 @@
 				AUTOMATION_APPLE_EVENTS = NO;
 				CODE_SIGN_ENTITLEMENTS = Nook/Nook.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 104;
 				DEVELOPMENT_TEAM = 8JTS5XWJJN;
@@ -525,6 +525,14 @@
 				minimumVersion = 0.0.4;
 			};
 		};
+		56C82BA72E9C2DB500DDD0D6 /* XCRemoteSwiftPackageReference "UniversalGlass" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Aeastr/UniversalGlass";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
 		7FAFC5D82E3ADDCD009D7DC4 /* XCRemoteSwiftPackageReference "FaviconFinder" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/will-lumley/FaviconFinder";
@@ -595,6 +603,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 564997D62E9B24CC00D89F78 /* XCRemoteSwiftPackageReference "Garnish" */;
 			productName = Garnish;
+		};
+		56C82BA82E9C2DB500DDD0D6 /* UniversalGlass */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 56C82BA72E9C2DB500DDD0D6 /* XCRemoteSwiftPackageReference "UniversalGlass" */;
+			productName = UniversalGlass;
 		};
 		7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */ = {
 			isa = XCSwiftPackageProductDependency;

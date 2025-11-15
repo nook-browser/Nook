@@ -99,6 +99,15 @@
         "revision" : "a81b1a5ac933dee8c6cfccf05d5ffcc5eb8c7ec4",
         "version" : "2.10.0"
       }
+    },
+    {
+      "identity" : "universalglass",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Aeastr/UniversalGlass",
+      "state" : {
+        "branch" : "main",
+        "revision" : "c751250ba9ab002447732f2fc10debbd9103f99b"
+      }
     }
   ],
   "version" : 3

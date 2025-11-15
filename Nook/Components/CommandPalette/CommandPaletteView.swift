@@ -7,6 +7,8 @@
 
 import AppKit
 import SwiftUI
+import UniversalGlass
+import Garnish
 
 struct CommandPaletteView: View {
     @EnvironmentObject var browserManager: BrowserManager
@@ -149,16 +151,11 @@ struct CommandPaletteView: View {
                         .padding(10)
                         .frame(maxWidth: .infinity)
                         .frame(width: effectiveCommandPaletteWidth)
-                        .background(.thickMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(
-                                    Color.white.opacity(isDark ? 0.3 : 0.6),
-                                    lineWidth: 0.5
-                                )
-                        )
-                        .shadow(color: .black.opacity(0.4), radius: 50, x: 0, y: 4)
+                        .background(Color(.windowBackgroundColor).opacity(0.35))
+                        .clipShape(.rect(cornerRadius: 26))
+                        .universalGlassEffect(
+                            .regular.tint(Color(.windowBackgroundColor).opacity(0.35)),
+                            in: .rect(cornerRadius: 26))
                         .animation(
                             .easeInOut(duration: 0.15),
                             value: searchManager.suggestions.count
@@ -461,4 +458,16 @@ struct CommandPaletteView: View {
             return false
         }
     }
+}
+
+struct BackdropView: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .popover
+        view.blendingMode = .withinWindow
+        view.state = .active
+        return view
+    }
+    
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) { }
 }

@@ -181,21 +181,6 @@ struct GeneralSettingsView: View {
                             .frame(width: 220)
                         }
 
-                        Divider().opacity(0.4)
-
-                        Toggle(
-                            isOn: $browserManager.settingsManager
-                                .isLiquidGlassEnabled
-                        ) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Liquid Glass")
-                                Text(
-                                    "Enable frosted translucency for UI surfaces"
-                                )
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            }
-                        }
                     }
                     
                     SettingsSectionCard(
@@ -241,6 +226,22 @@ struct GeneralSettingsView: View {
                                     Text("Top Bar Address View")
                                     Text(
                                         "Show address bar and navigation buttons at the top of the window"
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+                            }.frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            Divider().opacity(0.4)
+                            
+                            Toggle(
+                                isOn: $browserManager.settingsManager
+                                    .showLinkStatusBar
+                            ) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Link Status Bar")
+                                    Text(
+                                        "Show URL preview when hovering over links"
                                     )
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
