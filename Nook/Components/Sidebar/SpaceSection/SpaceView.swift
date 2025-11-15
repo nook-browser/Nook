@@ -35,6 +35,7 @@ struct SpaceView: View {
     let isActive: Bool
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(CommandPalette.self) private var commandPalette
     @EnvironmentObject var gradientColorManager: GradientColorManager
     @State private var draggedItem: UUID? = nil
     @State private var dropPreviewIndex: Int? = nil
@@ -484,17 +485,27 @@ struct SpaceView: View {
     }
  
     private var newTabButtonSection: some View {
-        NewTabButton()
-            .padding(.top, 8)
-            .onDrop(
-                of: [.text],
-                delegate: SidebarSectionDropDelegateSimple(
-                    itemsCount: { tabs.count },
-                    draggedItem: $draggedItem,
-                    targetSection: .spaceRegular(space.id),
-                    tabManager: browserManager.tabManager
-                )
+        Button {
+            commandPalette.open()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "plus")
+                Text("New Tab")
+                Spacer()
+            }
+        }
+        .buttonStyle(NavButtonStyle())
+        .controlSize(.large)
+        .padding(.top, 8)
+        .onDrop(
+            of: [.text],
+            delegate: SidebarSectionDropDelegateSimple(
+                itemsCount: { tabs.count },
+                draggedItem: $draggedItem,
+                targetSection: .spaceRegular(space.id),
+                tabManager: browserManager.tabManager
             )
+        )
     }
 
     private var newTabButtonSectionWithClear: some View {

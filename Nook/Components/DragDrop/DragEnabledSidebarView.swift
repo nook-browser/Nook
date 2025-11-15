@@ -1,5 +1,5 @@
 //
-//  DragEnabledSidebarView.swift
+//  DragEnabledSpacesSideBarView.swift
 //  Nook
 //
 //  Main sidebar with advanced drag & drop functionality
@@ -7,12 +7,12 @@
 
 import SwiftUI
 
-struct DragEnabledSidebarView: View {
+struct DragEnabledSpacesSideBarView: View {
     @EnvironmentObject var browserManager: BrowserManager
     private var dragManager = TabDragManager.shared
     
     var body: some View {
-        SidebarView()
+        SpacesSideBarView()
             .environmentObject(browserManager)
             .environmentObject(dragManager)
             .tabDragManager(dragManager)

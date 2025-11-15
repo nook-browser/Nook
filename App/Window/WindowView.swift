@@ -155,7 +155,7 @@ struct WindowView: View {
 
     @ViewBuilder
     private func SpacesSidebar() -> some View {
-        SidebarView()
+        SpacesSideBarView()
             .overlay(alignment: nookSettings.sidebarPosition == .left ? .trailing : .leading) {
                 if windowState.isSidebarVisible {
                     SidebarResizeView()
@@ -269,22 +269,4 @@ private struct ProfileSwitchToastView: View {
         }
         .transition(.scale(scale: 0.0, anchor: .top))
     }
-}
-
-// MARK: - Previews
-
-#Preview("Window View") {
-    @Previewable @State var browserManager = BrowserManager()
-    @Previewable @State var windowState = BrowserWindowState()
-    @Previewable @State var windowRegistry = WindowRegistry()
-    @Previewable @State var webViewCoordinator = WebViewCoordinator()
-    @Previewable @State var nookSettings = NookSettingsService()
-
-    WindowView()
-        .environmentObject(browserManager)
-        .environment(windowState)
-        .environment(windowState.commandPalette)
-        .environment(windowRegistry)
-        .environment(\.nookSettings, nookSettings)
-        .frame(width: 1200, height: 800)
 }
