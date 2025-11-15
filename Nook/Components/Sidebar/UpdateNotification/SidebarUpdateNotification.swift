@@ -10,7 +10,7 @@ import SwiftUI
 struct SidebarUpdateNotification: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
-    @Environment(NookSettingsService.self) var settingsManager
+    @Environment(\.nookSettings) var settingsManager
     let downloadsMenuVisible: Bool
     @State private var isVisible: Bool = false
     @State private var isExpanded: Bool = false
