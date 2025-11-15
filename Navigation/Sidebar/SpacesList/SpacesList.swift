@@ -51,6 +51,7 @@ struct SpacesList: View {
                 ))
             }
         }
+        .frame(maxWidth: .infinity)
         .onGeometryChange(for: CGFloat.self) { proxy in
             proxy.size.width
         } action: { newWidth in
