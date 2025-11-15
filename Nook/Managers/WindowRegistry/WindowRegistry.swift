@@ -7,29 +7,39 @@
 
 import Foundation
 import SwiftUI
+import Observation
 
 @MainActor
 @Observable
 class WindowRegistry {
-    /// All registered window states
-    private(set) var windows: [UUID: BrowserWindowState] = [:]
+    /// All registered window states (ignored from observation to avoid actor isolation issues)
+    @ObservationIgnored
+    private var _windows: [UUID: BrowserWindowState] = [:]
 
-    /// ID of the currently focused window
-    private(set) var activeWindowId: UUID?
+    var windows: [UUID: BrowserWindowState] {
+        get { _windows }
+        set { _windows = newValue }
+    }
 
-    /// The currently focused window state
+    /// ID of the currently focused window (the only thing we actually observe)
+    var activeWindowId: UUID?
+
+    /// The currently focused window state (computed, not observed)
     var activeWindow: BrowserWindowState? {
         guard let id = activeWindowId else { return nil }
-        return windows[id]
+        return _windows[id]
     }
 
     /// Callback for window cleanup (set by whoever needs to clean up resources)
+    @ObservationIgnored
     var onWindowClose: ((UUID) -> Void)?
 
     /// Callback for post-registration setup (e.g., setting TabManager reference)
+    @ObservationIgnored
     var onWindowRegister: ((BrowserWindowState) -> Void)?
 
     /// Callback when active window changes
+    @ObservationIgnored
     var onActiveWindowChange: ((BrowserWindowState) -> Void)?
 
     /// Register a new window
