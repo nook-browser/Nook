@@ -189,43 +189,30 @@ struct SpaceTitle: View {
                 commitRename()
             }
         }
-        // Provide a right-click context menu mirroring the hover menu
+        // Provide a right-click context menu
         .contextMenu {
-            Button {
-                emojiFieldFocused = true
-                NSApp.orderFrontCharacterPalette(nil)
-            } label: {
-                Label("Change Space Icon", systemImage: "face.smiling")
-            }
-            Button {
-                startRenaming()
-            } label: {
-                Label("Rename Space", systemImage: "pencil")
-            }
-            Button {
-                browserManager.showGradientEditor()
-            } label: {
-                Label("Edit Theme Color", systemImage: "paintpalette")
-            }
-            SpaceProfileDropdown(
-                currentProfileId: space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID(),
-                onProfileSelected: { assignProfile($0) }
+            SpaceContextMenu(
+                space: space,
+                canDelete: canDeleteSpace,
+                showNewFolder: true,
+                onEditSpace: {
+                    browserManager.dialogManager.showDialog(
+                        SpaceEditDialog(
+                            space: space,
+                            mode: .icon,
+                            onSave: { newName, newIcon, newProfileId in
+                                updateSpace(name: newName, icon: newIcon, profileId: newProfileId)
+                            },
+                            onCancel: {
+                                browserManager.dialogManager.closeDialog()
+                            }
+                        )
+                    )
+                },
+                onDeleteSpace: deleteSpace,
+                onNewFolder: createFolder
             )
             .environmentObject(browserManager)
-            Divider()
-            Button {
-                createFolder()
-            } label : {
-                Label("New Folder", systemImage: "folder.badge.plus")
-            }
-            if canDeleteSpace {
-                Divider()
-                Button(role: .destructive) {
-                    deleteSpace()
-                } label: {
-                    Label("Delete Space", systemImage: "trash")
-                }
-            }
         }
     }
     
@@ -287,7 +274,24 @@ struct SpaceTitle: View {
     private func assignProfile(_ id: UUID) {
         browserManager.tabManager.assign(spaceId: space.id, toProfile: id)
     }
-    
+
+    private func updateSpace(name: String, icon: String, profileId: UUID?) {
+        do {
+            if icon != space.icon {
+                try browserManager.tabManager.updateSpaceIcon(spaceId: space.id, icon: icon)
+            }
+            if name != space.name {
+                try browserManager.tabManager.renameSpace(spaceId: space.id, newName: name)
+            }
+            if profileId != space.profileId, let profileId = profileId {
+                browserManager.tabManager.assign(spaceId: space.id, toProfile: profileId)
+            }
+            browserManager.dialogManager.closeDialog()
+        } catch {
+            print("⚠️ Failed to update space \(space.id.uuidString):", error)
+        }
+    }
+
     private func resolvedProfileName(for id: UUID?) -> String? {
         guard let id else { return nil }
         return browserManager.profileManager.profiles.first(where: { $0.id == id })?.name

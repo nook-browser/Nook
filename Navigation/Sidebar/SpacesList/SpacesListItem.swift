@@ -72,57 +72,17 @@ struct SpacesListItem: View {
 
     @ViewBuilder
     private var spaceContextMenu: some View {
-        // Profile picker
-        Picker(
-            currentProfileName,
-            systemImage: currentProfileIcon,
-            selection: Binding(
-                get: {
-                    space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID()
-                },
-                set: { newProfileId in
-                    browserManager.tabManager.assign(spaceId: space.id, toProfile: newProfileId)
-                }
-            )
-        ) {
-            ForEach(browserManager.profileManager.profiles, id: \.id) { profile in
-                Label(profile.name, systemImage: profile.icon).tag(profile.id)
-            }
-        }
-
-        Divider()
-
-        Button {
-            showSpaceEditDialog()
-        } label: {
-            Label("Edit Space", systemImage: "square.and.pencil")
-        }
-
-        if browserManager.tabManager.spaces.count > 1 {
-            Button(role: .destructive) {
+        SpaceContextMenu(
+            space: space,
+            canDelete: browserManager.tabManager.spaces.count > 1,
+            showNewFolder: false,
+            onEditSpace: showSpaceEditDialog,
+            onDeleteSpace: {
                 browserManager.tabManager.removeSpace(space.id)
-            } label: {
-                Label("Delete Space", systemImage: "trash")
-            }
-        }
-    }
-
-    private var currentProfileName: String {
-        guard let profileId = space.profileId,
-              let profile = browserManager.profileManager.profiles.first(where: { $0.id == profileId })
-        else {
-            return browserManager.profileManager.profiles.first?.name ?? "Default"
-        }
-        return profile.name
-    }
-
-    private var currentProfileIcon: String {
-        guard let profileId = space.profileId,
-              let profile = browserManager.profileManager.profiles.first(where: { $0.id == profileId })
-        else {
-            return browserManager.profileManager.profiles.first?.icon ?? "person.circle"
-        }
-        return profile.icon
+            },
+            onNewFolder: nil
+        )
+        .environmentObject(browserManager)
     }
 
     // MARK: - Helper Methods
