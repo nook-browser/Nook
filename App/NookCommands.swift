@@ -11,12 +11,14 @@ import WebKit
 
 struct NookCommands: Commands {
     let browserManager: BrowserManager
+    let windowRegistry: WindowRegistry
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
-    init(browserManager: BrowserManager) {
+    init(browserManager: BrowserManager, windowRegistry: WindowRegistry) {
         self.browserManager = browserManager
+        self.windowRegistry = windowRegistry
     }
 
     var body: some Commands {
@@ -59,8 +61,7 @@ struct NookCommands: Commands {
             Divider()
 
             Button("New Tab") {
-                print("🍔 [Menu] New Tab button pressed - activeWindowState: \(String(describing: browserManager.activeWindowState?.id))")
-                browserManager.activeWindowState?.commandPalette?.open()
+                windowRegistry.activeWindow?.commandPalette?.open()
             }
             .keyboardShortcut("t", modifiers: .command)
             Button("New Window") {
@@ -69,8 +70,9 @@ struct NookCommands: Commands {
             .keyboardShortcut("n", modifiers: .command)
 
             Button("Close Tab") {
-                if browserManager.activeWindowState?.isCommandPaletteVisible == true {
-//                    browserManager.closeCommandPalette(for: browserManager.activeWindowState)
+                if windowRegistry.activeWindow?.isCommandPaletteVisible == true {
+                    // Command palette is open, close it instead
+                    windowRegistry.activeWindow?.commandPalette?.close()
                 } else {
                     browserManager.closeCurrentTab()
                 }

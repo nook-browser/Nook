@@ -31,6 +31,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     // TODO: Replace with direct access to independent managers (TabManager, etc.)
     weak var browserManager: BrowserManager?
 
+    // Window registry for accessing active window state
+    weak var windowRegistry: WindowRegistry?
+
     private let urlEventClass = AEEventClass(kInternetEventClass)
     private let urlEventID = AEEventID(kAEGetURL)
     private var mouseEventMonitor: Any?
@@ -71,17 +74,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     private func setupMouseButtonHandling() {
         mouseEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .otherMouseDown) {
             [weak self] event in
-            guard let self = self, let manager = self.browserManager else { return event }
+            guard let self = self,
+                  let manager = self.browserManager,
+                  let registry = self.windowRegistry else { return event }
 
             // Mouse events are delivered on the main thread, so we can safely assume main actor isolation
             MainActor.assumeIsolated {
                 switch event.buttonNumber {
                 case 2:  // Middle mouse button
-                    manager.activeWindowState?.commandPalette?.open()
+                    registry.activeWindow?.commandPalette?.open()
                 case 3:  // Back button
                     guard
-                        let windowState = manager.activeWindowState,
-                        let currentTab = manager.currentTabForActiveWindow(),
+                        let windowState = registry.activeWindow,
+                        let currentTab = manager.currentTab(for: windowState),
                         let webView = manager.getWebView(for: currentTab.id, in: windowState.id)
                     else {
                         return
@@ -89,8 +94,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
                     webView.goBack()
                 case 4:  // Forward button
                     guard
-                        let windowState = manager.activeWindowState,
-                        let currentTab = manager.currentTabForActiveWindow(),
+                        let windowState = registry.activeWindow,
+                        let currentTab = manager.currentTab(for: windowState),
                         let webView = manager.getWebView(for: currentTab.id, in: windowState.id)
                     else {
                         return

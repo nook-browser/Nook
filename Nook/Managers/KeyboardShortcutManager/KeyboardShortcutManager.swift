@@ -9,6 +9,7 @@ import Foundation
 import AppKit
 import SwiftUI
 
+@MainActor
 @Observable
 class KeyboardShortcutManager: ObservableObject {
     private let userDefaults = UserDefaults.standard
@@ -19,6 +20,7 @@ class KeyboardShortcutManager: ObservableObject {
 
     var shortcuts: [KeyboardShortcut] = []
     weak var browserManager: BrowserManager?
+    weak var windowRegistry: WindowRegistry?
 
     init() {
         loadShortcuts()
@@ -27,6 +29,7 @@ class KeyboardShortcutManager: ObservableObject {
 
     func setBrowserManager(_ manager: BrowserManager) {
         self.browserManager = manager
+        self.windowRegistry = manager.windowRegistry
     }
 
     // MARK: - Persistence
@@ -168,7 +171,8 @@ class KeyboardShortcutManager: ObservableObject {
     private func executeAction(_ action: ShortcutAction) {
         guard let browserManager = browserManager else { return }
 
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
             switch action {
             // Navigation
             case .goBack:
@@ -183,8 +187,8 @@ class KeyboardShortcutManager: ObservableObject {
 
             // Tab Management
             case .newTab:
-                print("⌨️ [KeyboardShortcutManager] .newTab triggered - activeWindowState: \(String(describing: browserManager.activeWindowState?.id)), commandPalette: \(String(describing: browserManager.activeWindowState?.commandPalette))")
-                browserManager.activeWindowState?.commandPalette?.open()
+                print("⌨️ [KeyboardShortcutManager] .newTab triggered - activeWindow: \(String(describing: self.windowRegistry?.activeWindow?.id)), commandPalette: \(String(describing: self.windowRegistry?.activeWindow?.commandPalette))")
+                self.windowRegistry?.activeWindow?.commandPalette?.open()
             case .closeTab:
                 browserManager.closeCurrentTab()
             case .undoCloseTab:
@@ -222,7 +226,7 @@ class KeyboardShortcutManager: ObservableObject {
 
             // Tools & Features
             case .openCommandPalette:
-                browserManager.activeWindowState?.commandPalette?.open()
+                self.windowRegistry?.activeWindow?.commandPalette?.open()
             case .openDevTools:
                 browserManager.openWebInspector()
             case .viewDownloads:
@@ -247,7 +251,7 @@ class KeyboardShortcutManager: ObservableObject {
 
     // MARK: - Global Event Monitoring
 
-    private var eventMonitor: Any?
+    nonisolated(unsafe) private var eventMonitor: Any?
 
     private func setupGlobalMonitor() {
         let monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in

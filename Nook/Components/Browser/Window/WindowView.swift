@@ -11,6 +11,7 @@ struct WindowView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(CommandPaletteState.self) private var commandPalette
+    @Environment(WindowRegistry.self) private var windowRegistry
     @StateObject private var hoverSidebarManager = HoverSidebarManager()
     @Environment(\.colorScheme) var colorScheme
 
@@ -161,6 +162,7 @@ struct WindowView: View {
             // Attach hover sidebar manager lifecycle
             .onAppear {
                 hoverSidebarManager.attach(browserManager: browserManager)
+                hoverSidebarManager.windowRegistry = windowRegistry
                 hoverSidebarManager.start()
             }
             .onDisappear {

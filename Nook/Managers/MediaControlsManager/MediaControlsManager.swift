@@ -14,6 +14,7 @@ import Observation
 final class MediaControlsManager {
     weak var browserManager: BrowserManager?
     weak var windowState: BrowserWindowState?
+    weak var windowRegistry: WindowRegistry?
 
     /// List of media host domains that support media controls
     /// Add new domains here to expand support to other platforms
@@ -255,7 +256,7 @@ final class MediaControlsManager {
 
         if let browserManager = browserManager,
            let windowId = windowState?.id,
-           browserManager.activeWindowState?.id != windowId {
+           windowRegistry?.activeWindow?.id != windowId {
             browserManager.setMuteState(newMutedState, for: tab.id, originatingWindowId: windowId)
         }
 

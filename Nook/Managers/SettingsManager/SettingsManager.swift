@@ -8,6 +8,7 @@
 import AppKit
 import SwiftUI
 
+@MainActor
 @Observable
 class SettingsManager {
     let keyboardShortcutManager = KeyboardShortcutManager()

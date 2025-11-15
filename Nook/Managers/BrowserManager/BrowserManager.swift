@@ -382,11 +382,6 @@ class BrowserManager: ObservableObject {
     @Published var tabClosureToastCount: Int = 0
     @Published var updateAvailability: UpdateAvailability?
 
-    // MARK: - Window State Management
-    /// TEMPORARY: WindowRegistry should be accessed via environment instead
-    /// The currently focused/active window state
-    var activeWindowState: BrowserWindowState?
-
     /// Track tabs currently being synced to prevent recursive sync calls
     private var isSyncingTab: Set<UUID> = []
 
@@ -469,8 +464,8 @@ class BrowserManager: ObservableObject {
         Task { [weak self] in
             await self?.switchToProfile(targetProfile, context: context, in: windowState)
             await MainActor.run {
-                if let activeId = self?.activeWindowState?.id, activeId == windowState.id {
-                    self?.activeWindowState?.currentProfileId = targetProfileId
+                if let activeId = self?.windowRegistry?.activeWindow?.id, activeId == windowState.id {
+                    self?.windowRegistry?.activeWindow?.currentProfileId = targetProfileId
                 }
             }
         }
@@ -520,6 +515,7 @@ class BrowserManager: ObservableObject {
         // Phase 2: wire dependencies and perform side effects (safe to use self)
         self.compositorManager.browserManager = self
         self.splitManager.browserManager = self
+        self.splitManager.windowRegistry = self.windowRegistry
         self.compositorManager.setUnloadTimeout(self.settingsManager.tabUnloadTimeout)
         self.tabManager.browserManager = self
         self.tabManager.reattachBrowserManager(self)
@@ -541,6 +537,7 @@ class BrowserManager: ObservableObject {
 
         self.externalMiniWindowManager.attach(browserManager: self)
         self.peekManager.attach(browserManager: self)
+        self.peekManager.windowRegistry = self.windowRegistry
         bindPeekManagerUpdates()
         self.authenticationManager.attach(browserManager: self)
         // Migrate legacy history entries (with nil profile) to default profile to avoid cross-profile leakage
@@ -690,7 +687,7 @@ class BrowserManager: ObservableObject {
                     self.isTransitioningProfile = false
                 }
                 self.currentProfile = profile
-                self.activeWindowState?.currentProfileId = profile.id
+                self.windowRegistry?.activeWindow?.currentProfileId = profile.id
                 // Switch data stores for cookie/cache
                 self.cookieManager.switchDataStore(profile.dataStore, profileId: profile.id)
                 self.cacheManager.switchDataStore(profile.dataStore, profileId: profile.id)
@@ -714,7 +711,7 @@ class BrowserManager: ObservableObject {
 
             if context.shouldProvideFeedback {
                 self.showProfileSwitchToast(
-                    from: previousProfile, to: profile, in: windowState ?? self.activeWindowState)
+                    from: previousProfile, to: profile, in: windowState ?? self.windowRegistry?.activeWindow)
                 NSHapticFeedbackManager.defaultPerformer.perform(
                     .generic, performanceTime: .drawCompleted)
             }
@@ -728,7 +725,7 @@ class BrowserManager: ObservableObject {
     }
 
     func updateSidebarWidth(_ width: CGFloat) {
-        if let activeWindow = activeWindowState {
+        if let activeWindow = windowRegistry?.activeWindow {
             updateSidebarWidth(width, for: activeWindow)
             return
         }
@@ -741,7 +738,7 @@ class BrowserManager: ObservableObject {
         windowState.sidebarWidth = width
         windowState.savedSidebarWidth = width
         windowState.sidebarContentWidth = max(width - 16, 0)
-        if activeWindowState?.id == windowState.id {
+        if windowRegistry?.activeWindow?.id == windowState.id {
             sidebarWidth = width
             savedSidebarWidth = width
             sidebarContentWidth = max(width - 16, 0)
@@ -753,7 +750,7 @@ class BrowserManager: ObservableObject {
     }
 
     func toggleSidebar() {
-        if let windowState = activeWindowState {
+        if let windowState = windowRegistry?.activeWindow {
             toggleSidebar(for: windowState)
         } else {
             withAnimation(.easeInOut(duration: 0.1)) {
@@ -784,7 +781,7 @@ class BrowserManager: ObservableObject {
                 windowState.sidebarContentWidth = 0
             }
         }
-        if activeWindowState?.id == windowState.id {
+        if windowRegistry?.activeWindow?.id == windowState.id {
             isSidebarVisible = windowState.isSidebarVisible
             sidebarWidth = windowState.sidebarWidth
             savedSidebarWidth = windowState.savedSidebarWidth
@@ -795,7 +792,7 @@ class BrowserManager: ObservableObject {
 
     func toggleAISidebar() {
         guard settingsManager.showAIAssistant else { return }
-        if let windowState = activeWindowState {
+        if let windowState = windowRegistry?.activeWindow {
             toggleAISidebar(for: windowState)
         }
     }
@@ -819,7 +816,7 @@ class BrowserManager: ObservableObject {
         if let state = windowState {
             return state.savedSidebarWidth
         }
-        if let active = activeWindowState {
+        if let active = windowRegistry?.activeWindow {
             return active.savedSidebarWidth
         }
         return savedSidebarWidth
@@ -873,7 +870,7 @@ class BrowserManager: ObservableObject {
 
         // Get the current space for the active window
         let targetSpace =
-            activeWindowState?.currentSpaceId.flatMap { id in
+            windowRegistry?.activeWindow?.currentSpaceId.flatMap { id in
                 tabManager.spaces.first(where: { $0.id == id })
             } ?? tabManager.currentSpace
 
@@ -900,7 +897,7 @@ class BrowserManager: ObservableObject {
         }
 
         // Set as active tab in the current window
-        if let windowState = activeWindowState {
+        if let windowState = windowRegistry?.activeWindow {
             selectTab(newTab, in: windowState)
         } else {
             selectTab(newTab)
@@ -912,13 +909,13 @@ class BrowserManager: ObservableObject {
     }
 
     func closeCurrentTab() {
-        if let activeWindow = activeWindowState,
+        if let activeWindow = windowRegistry?.activeWindow,
             activeWindow.isCommandPaletteVisible
         {
             return
         }
         // Close tab in the active window
-        if let activeWindow = activeWindowState,
+        if let activeWindow = windowRegistry?.activeWindow,
             let currentTab = currentTab(for: activeWindow)
         {
             tabManager.removeTab(currentTab.id)
@@ -1038,7 +1035,7 @@ class BrowserManager: ObservableObject {
     func showBoostsDialog() {
         guard let currentTab = currentTabForActiveWindow(),
             let domain = currentTab.url.host,
-            let activeWindow = activeWindowState,
+            let activeWindow = windowRegistry?.activeWindow,
             let webView = getWebView(for: currentTab.id, in: activeWindow.id)
         else {
             dialogManager.showDialog {
@@ -1170,7 +1167,7 @@ class BrowserManager: ObservableObject {
     func hardReloadCurrentPage() {
         guard let currentTab = currentTabForActiveWindow(),
             let host = currentTab.url.host,
-            let activeWindowId = activeWindowState?.id
+            let activeWindowId = windowRegistry?.activeWindow?.id
         else { return }
         Task { @MainActor in
             await cacheManager.clearCacheForDomainExcludingCookies(host)
@@ -1344,7 +1341,7 @@ class BrowserManager: ObservableObject {
 
     /// Get the current tab for the active window (used by keyboard shortcuts)
     func currentTabForActiveWindow() -> Tab? {
-        if let activeWindow = activeWindowState {
+        if let activeWindow = windowRegistry?.activeWindow {
             return currentTab(for: activeWindow)
         }
         // Fallback to global current tab for backward compatibility
@@ -1416,7 +1413,7 @@ class BrowserManager: ObservableObject {
     // MARK: - Web Inspector
     func openWebInspector() {
         guard let currentTab = currentTabForActiveWindow(),
-            let activeWindowId = activeWindowState?.id
+            let activeWindowId = windowRegistry?.activeWindow?.id
         else {
             print("No current tab to inspect")
             return
@@ -1471,7 +1468,7 @@ class BrowserManager: ObservableObject {
 
     // MARK: - Profile Switch Toast
     func showProfileSwitchToast(from: Profile?, to: Profile, in windowState: BrowserWindowState?) {
-        guard let targetWindow = windowState ?? activeWindowState else { return }
+        guard let targetWindow = windowState ?? windowRegistry?.activeWindow else { return }
         let toast = ProfileSwitchToast(fromProfile: from, toProfile: to, timestamp: Date())
         let windowId = targetWindow.id
         targetWindow.profileSwitchToast = toast
@@ -1484,14 +1481,14 @@ class BrowserManager: ObservableObject {
     }
 
     func hideProfileSwitchToast(for windowState: BrowserWindowState? = nil) {
-        guard let window = windowState ?? activeWindowState else { return }
+        guard let window = windowState ?? windowRegistry?.activeWindow else { return }
         hideProfileSwitchToast(forWindowId: window.id)
     }
 
     private func hideProfileSwitchToast(forWindowId windowId: UUID) {
         guard
             let window = windowRegistry?.windows[windowId]
-                ?? (activeWindowState?.id == windowId ? activeWindowState : nil)
+                ?? (windowRegistry?.activeWindow?.id == windowId ? windowRegistry?.activeWindow : nil)
         else { return }
         withAnimation(.spring(response: 0.45, dampingFraction: 0.9)) {
             window.isShowingProfileSwitchToast = false
@@ -1864,7 +1861,7 @@ class BrowserManager: ObservableObject {
 
     /// Set the active window state (called when a window gains focus)
     func setActiveWindowState(_ windowState: BrowserWindowState) {
-        activeWindowState = windowState
+        windowRegistry?.setActive(windowState)
         sidebarWidth = windowState.sidebarWidth
         savedSidebarWidth = windowState.savedSidebarWidth
         sidebarContentWidth = windowState.sidebarContentWidth
@@ -1895,7 +1892,7 @@ class BrowserManager: ObservableObject {
 
     /// Select a tab in the active window (convenience method for sidebar clicks)
     func selectTab(_ tab: Tab) {
-        guard let activeWindow = activeWindowState else {
+        guard let activeWindow = windowRegistry?.activeWindow else {
             print("⚠️ [BrowserManager] No active window for tab selection")
             return
         }
@@ -1957,7 +1954,7 @@ class BrowserManager: ObservableObject {
         print("🪟 [BrowserManager] Selected tab \(tab.name) in window \(windowState.id)")
 
         // Update global tab state for the active window
-        if activeWindowState?.id == windowState.id {
+        if windowRegistry?.activeWindow?.id == windowState.id {
             // Only update the global state, don't trigger UI operations again
             tabManager.updateActiveTabState(tab)
         }
@@ -2047,7 +2044,7 @@ class BrowserManager: ObservableObject {
 
     /// Set active space for a specific window
     func setActiveSpace(_ space: Space, in windowState: BrowserWindowState) {
-        let isActiveWindow = activeWindowState?.id == windowState.id
+        let isActiveWindow = windowRegistry?.activeWindow?.id == windowState.id
         if isActiveWindow {
             tabManager.setActiveSpace(space)
         }
@@ -2212,7 +2209,7 @@ class BrowserManager: ObservableObject {
 
     /// Select the next tab in the active window
     func selectNextTabInActiveWindow() {
-        guard let activeWindow = activeWindowState else { return }
+        guard let activeWindow = windowRegistry?.activeWindow else { return }
         let currentTabs = tabsForDisplay(in: activeWindow)
         guard let currentTab = currentTab(for: activeWindow),
             let currentIndex = currentTabs.firstIndex(where: { $0.id == currentTab.id })
@@ -2226,7 +2223,7 @@ class BrowserManager: ObservableObject {
 
     /// Select the previous tab in the active window
     func selectPreviousTabInActiveWindow() {
-        guard let activeWindow = activeWindowState else { return }
+        guard let activeWindow = windowRegistry?.activeWindow else { return }
         let currentTabs = tabsForDisplay(in: activeWindow)
         guard let currentTab = currentTab(for: activeWindow),
             let currentIndex = currentTabs.firstIndex(where: { $0.id == currentTab.id })
@@ -2240,7 +2237,7 @@ class BrowserManager: ObservableObject {
 
     /// Select tab by index in the active window
     func selectTabByIndexInActiveWindow(_ index: Int) {
-        guard let activeWindow = activeWindowState else { return }
+        guard let activeWindow = windowRegistry?.activeWindow else { return }
         let currentTabs = tabsForDisplay(in: activeWindow)
         guard currentTabs.indices.contains(index) else { return }
 
@@ -2250,7 +2247,7 @@ class BrowserManager: ObservableObject {
 
     /// Select the last tab in the active window
     func selectLastTabInActiveWindow() {
-        guard let activeWindow = activeWindowState else { return }
+        guard let activeWindow = windowRegistry?.activeWindow else { return }
         let currentTabs = tabsForDisplay(in: activeWindow)
         guard let lastTab = currentTabs.last else { return }
 
@@ -2259,7 +2256,7 @@ class BrowserManager: ObservableObject {
 
     /// Select the next space in the active window
     func selectNextSpaceInActiveWindow() {
-        guard let activeWindow = activeWindowState,
+        guard let activeWindow = windowRegistry?.activeWindow,
             let currentSpaceId = activeWindow.currentSpaceId,
             let currentSpaceIndex = tabManager.spaces.firstIndex(where: { $0.id == currentSpaceId })
         else { return }
@@ -2272,7 +2269,7 @@ class BrowserManager: ObservableObject {
 
     /// Select the previous space in the active window
     func selectPreviousSpaceInActiveWindow() {
-        guard let activeWindow = activeWindowState,
+        guard let activeWindow = windowRegistry?.activeWindow,
             let currentSpaceId = activeWindow.currentSpaceId,
             let currentSpaceIndex = tabManager.spaces.firstIndex(where: { $0.id == currentSpaceId })
         else { return }
@@ -2317,13 +2314,13 @@ class BrowserManager: ObservableObject {
 
     /// Close the active window
     func closeActiveWindow() {
-        guard let activeWindow = activeWindowState?.window else { return }
+        guard let activeWindow = windowRegistry?.activeWindow?.window else { return }
         activeWindow.close()
     }
 
     /// Toggle full screen for the active window
     func toggleFullScreenForActiveWindow() {
-        guard let activeWindow = activeWindowState?.window else { return }
+        guard let activeWindow = windowRegistry?.activeWindow?.window else { return }
         activeWindow.toggleFullScreen(nil)
     }
 
@@ -2428,7 +2425,7 @@ extension BrowserManager {
 
     /// Zoom in for the current tab
     func zoomInCurrentTab() {
-        guard let windowState = activeWindowState,
+        guard let windowState = windowRegistry?.activeWindow,
             let currentTab = currentTabForActiveWindow(),
             let webView = getWebView(for: currentTab.id, in: windowState.id)
         else {
@@ -2455,7 +2452,7 @@ extension BrowserManager {
 
     /// Zoom out for the current tab
     func zoomOutCurrentTab() {
-        guard let windowState = activeWindowState,
+        guard let windowState = windowRegistry?.activeWindow,
             let currentTab = currentTabForActiveWindow(),
             let webView = getWebView(for: currentTab.id, in: windowState.id)
         else {
@@ -2482,7 +2479,7 @@ extension BrowserManager {
 
     /// Reset zoom to 100% for the current tab
     func resetZoomCurrentTab() {
-        guard let windowState = activeWindowState,
+        guard let windowState = windowRegistry?.activeWindow,
             let currentTab = currentTabForActiveWindow(),
             let webView = getWebView(for: currentTab.id, in: windowState.id)
         else {
@@ -2509,7 +2506,7 @@ extension BrowserManager {
 
     /// Apply a specific zoom level to the current tab
     func applyZoomLevel(_ zoomLevel: Double, to tabId: UUID? = nil) {
-        guard let windowState = activeWindowState else { return }
+        guard let windowState = windowRegistry?.activeWindow else { return }
 
         let targetTabId = tabId ?? (currentTabForActiveWindow()?.id)
         guard let tabId = targetTabId,
@@ -2525,7 +2522,7 @@ extension BrowserManager {
 
     /// Load saved zoom level when a tab navigates to a new domain
     func loadZoomForTab(_ tabId: UUID) {
-        guard let windowState = activeWindowState,
+        guard let windowState = windowRegistry?.activeWindow,
             let webView = getWebView(for: tabId, in: windowState.id),
             let tab = tabManager.tabs.first(where: { $0.id == tabId }),
             let domain = tab.url.host
