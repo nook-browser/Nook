@@ -18,6 +18,7 @@ struct NookApp: App {
     @State private var windowRegistry = WindowRegistry()
     @State private var webViewCoordinator = WebViewCoordinator()
     @State private var settingsManager = NookSettingsService()
+    @State private var keyboardShortcutManager = KeyboardShortcutManager()
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     // TEMPORARY: BrowserManager will be phased out as a global singleton.
@@ -33,6 +34,7 @@ struct NookApp: App {
                 .environment(windowRegistry)
                 .environment(webViewCoordinator)
                 .environment(\.nookSettings, settingsManager)
+                .environment(keyboardShortcutManager)
                 .onAppear {
                     setupApplicationLifecycle()
                 }
@@ -48,6 +50,7 @@ struct NookApp: App {
                 .environmentObject(browserManager)
                 .environmentObject(browserManager.gradientColorManager)
                 .environment(\.nookSettings, settingsManager)
+                .environment(keyboardShortcutManager)
         }
     }
 
@@ -87,7 +90,7 @@ struct NookApp: App {
         browserManager.trackingProtectionManager.setEnabled(settingsManager.blockCrossSiteTracking)
 
         // Initialize keyboard shortcut manager
-        settingsManager.keyboardShortcutManager.setBrowserManager(browserManager)
+        keyboardShortcutManager.setBrowserManager(browserManager)
 
         // Set up window lifecycle callbacks
         windowRegistry.onWindowRegister = { [weak browserManager] windowState in

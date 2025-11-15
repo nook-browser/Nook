@@ -1027,13 +1027,10 @@ struct ShortcutsSettingsView: View {
     @Environment(\.nookSettings) var nookSettings
     @State private var searchText = ""
     @State private var selectedCategory: ShortcutCategory? = nil
-
-    private var shortcutManager: KeyboardShortcutManager {
-        nookSettings.keyboardShortcutManager
-    }
+    @Environment(KeyboardShortcutManager.self) var keyboardShortcutManager
 
     private var filteredShortcuts: [KeyboardShortcut] {
-        var filtered = shortcutManager.shortcuts
+        var filtered = keyboardShortcutManager.shortcuts
 
         // Filter by category
         if let category = selectedCategory {
@@ -1073,7 +1070,7 @@ struct ShortcutsSettingsView: View {
                 }
                 Spacer()
                 Button("Reset to Defaults") {
-                    shortcutManager.resetToDefaults()
+                    keyboardShortcutManager.resetToDefaults()
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -1117,8 +1114,7 @@ struct ShortcutsSettingsView: View {
                         if let categoryShortcuts = shortcutsByCategory[category], !categoryShortcuts.isEmpty {
                             CategorySection(
                                 category: category,
-                                shortcuts: categoryShortcuts,
-                                shortcutManager: shortcutManager
+                                shortcuts: categoryShortcuts
                             )
                         }
                     }
@@ -1130,11 +1126,10 @@ struct ShortcutsSettingsView: View {
     }
 }
 
-// MARK: - Category Section
+/// MARK: - Category Section
 private struct CategorySection: View {
     let category: ShortcutCategory
     let shortcuts: [KeyboardShortcut]
-    @ObservedObject var shortcutManager: KeyboardShortcutManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1146,10 +1141,7 @@ private struct CategorySection: View {
 
             VStack(spacing: 8) {
                 ForEach(shortcuts, id: \.id) { shortcut in
-                    ShortcutRowView(
-                        shortcut: shortcut,
-                        shortcutManager: shortcutManager
-                    )
+                    ShortcutRowView(shortcut: shortcut)
                 }
             }
         }
@@ -1157,15 +1149,14 @@ private struct CategorySection: View {
     }
 }
 
-// MARK: - Shortcut Row
+/// MARK: - Shortcut Row
 private struct ShortcutRowView: View {
     let shortcut: KeyboardShortcut
-    @ObservedObject var shortcutManager: KeyboardShortcutManager
+    @Environment(KeyboardShortcutManager.self) var keyboardShortcutManager
     @State private var localKeyCombination: KeyCombination
 
-    init(shortcut: KeyboardShortcut, shortcutManager: KeyboardShortcutManager) {
+    init(shortcut: KeyboardShortcut) {
         self.shortcut = shortcut
-        self.shortcutManager = shortcutManager
         self._localKeyCombination = State(initialValue: shortcut.keyCombination)
     }
 
@@ -1188,7 +1179,7 @@ private struct ShortcutRowView: View {
                 ShortcutRecorderView(
                     keyCombination: $localKeyCombination,
                     action: shortcut.action,
-                    shortcutManager: shortcutManager,
+                    shortcutManager: keyboardShortcutManager,
                     onRecordingComplete: {
                         updateShortcut()
                     }
@@ -1207,7 +1198,7 @@ private struct ShortcutRowView: View {
                 Toggle("", isOn: Binding(
                     get: { shortcut.isEnabled },
                     set: { newValue in
-                        shortcutManager.toggleShortcut(action: shortcut.action, isEnabled: newValue)
+                        keyboardShortcutManager.toggleShortcut(action: shortcut.action, isEnabled: newValue)
                     }
                 ))
                 .toggleStyle(.switch)
@@ -1220,7 +1211,7 @@ private struct ShortcutRowView: View {
     }
 
     private func updateShortcut() {
-        shortcutManager.updateShortcut(action: shortcut.action, keyCombination: localKeyCombination)
+        keyboardShortcutManager.updateShortcut(action: shortcut.action, keyCombination: localKeyCombination)
     }
 }
 

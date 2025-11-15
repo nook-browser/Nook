@@ -50,8 +50,8 @@ struct NavButtonStyle: ButtonStyle {
         case .mini: 12
         case .small: 14
         case .regular: 16
-        case .large: 20
-        case .extraLarge: 24
+        case .large: 18
+        case .extraLarge: 20
         @unknown default: 16
         }
     }

@@ -11,7 +11,7 @@ import SwiftUI
 
 @MainActor
 @Observable
-class KeyboardShortcutManager: ObservableObject {
+class KeyboardShortcutManager {
     private let userDefaults = UserDefaults.standard
     private let shortcutsKey = "keyboard.shortcuts"
     private let shortcutsVersionKey = "keyboard.shortcuts.version"
@@ -23,13 +23,17 @@ class KeyboardShortcutManager: ObservableObject {
     weak var windowRegistry: WindowRegistry?
 
     init() {
+        print("🔧 [KeyboardShortcutManager] NEW INSTANCE CREATED: \(ObjectIdentifier(self))")
         loadShortcuts()
         setupGlobalMonitor()
     }
 
     func setBrowserManager(_ manager: BrowserManager) {
+        print("🔧 [KeyboardShortcutManager] setBrowserManager called")
         self.browserManager = manager
         self.windowRegistry = manager.windowRegistry
+        print("🔧 [KeyboardShortcutManager] browserManager set to: \(ObjectIdentifier(manager))")
+        print("🔧 [KeyboardShortcutManager] windowRegistry set to: \(String(describing: self.windowRegistry))")
     }
 
     // MARK: - Persistence
@@ -169,10 +173,18 @@ class KeyboardShortcutManager: ObservableObject {
     }
 
     private func executeAction(_ action: ShortcutAction) {
-        guard let browserManager = browserManager else { return }
+        print("🔧 [KeyboardShortcutManager] executeAction called with: \(action.rawValue)")
+        guard let browserManager = browserManager else {
+            print("🔧 [KeyboardShortcutManager] browserManager is nil!")
+            return
+        }
 
         DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
+            guard let self else {
+                print("🔧 [KeyboardShortcutManager] self is nil in async!")
+                return
+            }
+            print("🔧 [KeyboardShortcutManager] About to switch on action: \(action.rawValue)")
             switch action {
             // Navigation
             case .goBack:
