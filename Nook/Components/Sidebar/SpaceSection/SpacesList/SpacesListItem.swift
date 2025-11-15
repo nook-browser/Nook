@@ -8,7 +8,7 @@ import SwiftUI
 
 struct SpacesListItem: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
     var space: Space
     var isActive: Bool
     var compact: Bool

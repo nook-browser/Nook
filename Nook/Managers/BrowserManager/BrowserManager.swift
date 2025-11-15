@@ -2031,6 +2031,9 @@ class BrowserManager: ObservableObject {
 
     /// Register a new window state
     func registerWindowState(_ windowState: BrowserWindowState) {
+        // Set TabManager reference for computed properties
+        windowState.tabManager = tabManager
+
         // Initialize window state with current global state for backward compatibility
         windowState.sidebarWidth = sidebarWidth
         windowState.sidebarContentWidth = max(sidebarWidth - 16, 0)

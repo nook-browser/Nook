@@ -9,7 +9,7 @@ import SwiftUI
 
 struct MediaControlsView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.scenePhase) private var scenePhase
     @State private var hasActiveMedia: Bool = false
     @State private var activeMediaTab: Tab?

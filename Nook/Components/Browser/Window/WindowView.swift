@@ -9,7 +9,7 @@ import SwiftUI
 
 struct WindowView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
     @StateObject private var hoverSidebarManager = HoverSidebarManager()
     @Environment(\.colorScheme) var colorScheme
 
@@ -27,9 +27,7 @@ struct WindowView: View {
         GeometryReader { geometry in
             ZStack {
                 SpaceGradientBackgroundView()
-                    .environmentObject(browserManager)
-                    .environmentObject(browserManager.gradientColorManager)
-                    .environmentObject(windowState)
+                    .environment(windowState)
 //                // Attach background context menu to the window background layer
 //                Color.white.opacity(isDark ? 0.3 : 0.4)
 //                    .ignoresSafeArea(.all)
@@ -48,7 +46,7 @@ struct WindowView: View {
                 if browserManager.settingsManager.topBarAddressView {
                     TopBarCommandPalette()
                         .environmentObject(browserManager)
-                        .environmentObject(windowState)
+                        .environment(windowState)
                         .zIndex(3000)
                 }
 
@@ -56,13 +54,13 @@ struct WindowView: View {
                 // Only show when topbar is disabled
                 if !browserManager.settingsManager.topBarAddressView {
                     MiniCommandPaletteOverlay()
-                        .environmentObject(windowState)
+                        .environment(windowState)
                 }
 
                 // Hover-reveal Sidebar overlay (slides in over web content)
                 SidebarHoverOverlayView()
                     .environmentObject(hoverSidebarManager)
-                    .environmentObject(windowState)
+                    .environment(windowState)
 
                 CommandPaletteView()
                 DialogView()
@@ -116,7 +114,7 @@ struct WindowView: View {
                             {
                                 TabClosureToast()
                                     .environmentObject(browserManager)
-                                    .environmentObject(windowState)
+                                    .environment(windowState)
                                     .animation(
                                         .spring(
                                             response: 0.5,
@@ -223,13 +221,13 @@ struct WindowView: View {
                 
                     .frame(maxHeight: .infinity)
                     .environmentObject(browserManager)
-                    .environmentObject(windowState)
+                    .environment(windowState)
                     .zIndex(2000)  // Higher z-index to ensure it's above all other elements
-                    .environmentObject(windowState)
+                    .environment(windowState)
             }
         }
             .environmentObject(browserManager)
-            .environmentObject(windowState)
+            .environment(windowState)
     }
 
     @ViewBuilder
@@ -251,7 +249,7 @@ struct WindowView: View {
                 
                 TopBarView()
                     .environmentObject(browserManager)
-                    .environmentObject(windowState)
+                    .environment(windowState)
                     .zIndex(2500)
             } else {
                 WebsiteLoadingIndicator()
@@ -289,14 +287,14 @@ struct WindowView: View {
                 AISidebarResizeView()
                     .frame(maxHeight: .infinity)
                     .environmentObject(browserManager)
-                    .environmentObject(windowState)
+                    .environment(windowState)
             }
             .transition(
                 .move(edge: browserManager.settingsManager.sidebarPosition == .left ? .trailing : .leading)
                     .combined(with: .opacity)
             )
             .environmentObject(browserManager)
-            .environmentObject(windowState)
+            .environment(windowState)
             .environment(browserManager.settingsManager)
     }
 
@@ -337,7 +335,7 @@ private struct ProfileSwitchToastView: View {
 // MARK: - Mini Command Palette Overlay (above sidebar and webview)
 private struct MiniCommandPaletteOverlay: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
 
     var body: some View {
         let isActiveWindow =

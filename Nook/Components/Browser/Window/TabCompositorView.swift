@@ -4,7 +4,7 @@ import WebKit
 
 struct TabCompositorView: NSViewRepresentable {
     let browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
     
     func makeNSView(context: Context) -> NSView {
         let view = NSView()

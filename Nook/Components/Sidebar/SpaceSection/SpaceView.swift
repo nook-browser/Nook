@@ -34,7 +34,7 @@ struct SpaceView: View {
     let space: Space
     let isActive: Bool
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
     @EnvironmentObject var gradientColorManager: GradientColorManager
     @State private var draggedItem: UUID? = nil
     @State private var dropPreviewIndex: Int? = nil
@@ -277,7 +277,7 @@ struct SpaceView: View {
                         onActivateTab: { onActivateTab($0) }
                     )
                     .environmentObject(browserManager)
-                    .environmentObject(windowState)
+                    .environment(windowState)
                     .transition(.asymmetric(
                         insertion: .scale.combined(with: .opacity).animation(.easeInOut(duration: 0.3)),
                         removal: .scale.combined(with: .opacity).animation(.easeInOut(duration: 0.2))

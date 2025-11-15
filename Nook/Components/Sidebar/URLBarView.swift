@@ -9,7 +9,7 @@ import SwiftUI
 
 struct URLBarView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
     @State private var isHovering: Bool = false
     var isSidebarHovered: Bool
 
