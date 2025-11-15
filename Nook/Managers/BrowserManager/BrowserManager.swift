@@ -391,6 +391,9 @@ class BrowserManager: ObservableObject {
     /// The currently focused/active window state
     var activeWindowState: BrowserWindowState?
 
+    /// Track tabs currently being synced to prevent recursive sync calls
+    private var isSyncingTab: Set<UUID> = []
+
     /// Reference to the app delegate for Sparkle integration
     weak var appDelegate: AppDelegate?
 
@@ -2038,7 +2041,29 @@ class BrowserManager: ObservableObject {
 
     /// DEPRECATED: These functions should not exist - cross-window sync is an antipattern
     func syncTabAcrossWindows(_ tabId: UUID) {
-        // NO-OP: This should not be needed
+        // Prevent recursive sync calls
+        guard !isSyncingTab.contains(tabId) else {
+            print("🪟 [BrowserManager] Skipping recursive sync for tab \(tabId)")
+            return
+        }
+
+        guard let tab = tabManager.allTabs().first(where: { $0.id == tabId }),
+              let webViewCoordinator = webViewCoordinator else { return }
+
+        isSyncingTab.insert(tabId)
+        defer { isSyncingTab.remove(tabId) }
+
+        // Get all web views for this tab across all windows
+        let allWebViews = webViewCoordinator.getAllWebViews(for: tabId)
+
+        for webView in allWebViews {
+            // Sync the URL if it's different
+            let currentURL = tab.url
+            if webView.url != currentURL {
+                print("🔄 [BrowserManager] Syncing tab \(tabId) to URL: \(currentURL)")
+                webView.load(URLRequest(url: currentURL))
+            }
+        }
     }
 
     func navigateTabAcrossWindows(_ tabId: UUID, to url: URL) {
