@@ -19,7 +19,6 @@ struct TopBarView: View {
     @EnvironmentObject var windowState: BrowserWindowState
     @StateObject private var tabWrapper = ObservableTabWrapper()
     @State private var isHovering: Bool = false
-    @State private var showZoomPopup: Bool = false
     @State private var previousTabId: UUID? = nil
     
     var body: some View {
@@ -40,10 +39,6 @@ struct TopBarView: View {
                 
                 if hasPiPControl, let tab = currentTab {
                     pipButton(for: tab)
-                }
-                
-                if currentTab != nil {
-                    zoomButton
                 }
                 
                 Spacer()
@@ -91,36 +86,6 @@ struct TopBarView: View {
         .onReceive(Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()) { _ in
             updateCurrentTab()
         }
-        .overlay(
-            Group {
-                if showZoomPopup {
-                    ZoomPopupView(
-                        zoomManager: browserManager.zoomManager,
-                        onZoomIn: {
-                            browserManager.zoomInCurrentTab()
-                        },
-                        onZoomOut: {
-                            browserManager.zoomOutCurrentTab()
-                        },
-                        onZoomReset: {
-                            browserManager.resetZoomCurrentTab()
-                        },
-                        onZoomPresetSelected: { zoomLevel in
-                            browserManager.applyZoomLevel(zoomLevel)
-                        },
-                        onDismiss: {
-                            showZoomPopup = false
-                        }
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                    .padding(.trailing, 16)
-                    .padding(.top, 60)
-                    .transition(.opacity.combined(with: .scale))
-                    .zIndex(1000)
-                }
-            }
-            .animation(.easeInOut(duration: 0.2), value: showZoomPopup)
-        )
     }
 
     private var navigationControls: some View {
@@ -340,29 +305,6 @@ struct TopBarView: View {
                 .animation(shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil, value: urlBarTextColor)
                 .frame(width: 16, height: 16)
                 .contentShape(RoundedRectangle(cornerRadius: 3))
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-    
-    private var zoomButton: some View {
-        Button(action: {
-            showZoomPopup.toggle()
-        }) {
-            HStack(spacing: 2) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 10, weight: .medium))
-                Text(browserManager.getCurrentZoomPercentage())
-                    .font(.system(size: 10, weight: .medium))
-            }
-            .foregroundStyle(urlBarTextColor)
-            .animation(shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil, value: urlBarTextColor)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 2)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(urlBarBackgroundColor.opacity(0.9))
-            )
-            .animation(shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil, value: urlBarBackgroundColor)
         }
         .buttonStyle(PlainButtonStyle())
     }
