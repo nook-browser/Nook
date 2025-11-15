@@ -37,11 +37,14 @@ struct SpaceTitle: View {
                             selectedEmoji = ""
                         }
                     }
-                
+
                 if isEmoji(space.icon) {
                     Text(space.icon)
                         .font(.system(size: iconSize))
                         .background(EmojiPickerAnchor(manager: emojiManager))
+                        .onTapGesture(count: 2) {
+                            emojiManager.toggle()
+                        }
                         .onChange(of: emojiManager.selectedEmoji) { _, newValue in
                             print(newValue)
                             space.icon = newValue
@@ -50,8 +53,17 @@ struct SpaceTitle: View {
                 } else {
                     Image(systemName: space.icon)
                         .font(.system(size: iconSize))
+                        .background(EmojiPickerAnchor(manager: emojiManager))
+                        .onTapGesture(count: 2) {
+                            emojiManager.toggle()
+                        }
+                        .onChange(of: emojiManager.selectedEmoji) { _, newValue in
+                            print(newValue)
+                            space.icon = newValue
+                            browserManager.tabManager.persistSnapshot()
+                         }
                 }
-                
+
             }
 
 
@@ -81,6 +93,9 @@ struct SpaceTitle: View {
                         .foregroundStyle(textColor)
                         .lineLimit(1)
                         .truncationMode(.tail)
+                        .onTapGesture(count: 2) {
+                            startRenaming()
+                        }
                 }
             }
 
