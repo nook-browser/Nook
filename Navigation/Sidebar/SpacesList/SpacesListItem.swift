@@ -132,7 +132,7 @@ struct SpacesListItem: View {
             SpaceEditDialog(
                 space: space,
                 mode: .icon,
-                onSave: { newName, newIcon in
+                onSave: { newName, newIcon, newProfileId in
                     do {
                         if newIcon != space.icon {
                             try browserManager.tabManager.updateSpaceIcon(
@@ -146,6 +146,11 @@ struct SpacesListItem: View {
                                 spaceId: space.id,
                                 newName: newName
                             )
+                        }
+
+                        // Update profile if changed
+                        if newProfileId != space.profileId, let profileId = newProfileId {
+                            browserManager.tabManager.assign(spaceId: space.id, toProfile: profileId)
                         }
 
                         browserManager.dialogManager.closeDialog()

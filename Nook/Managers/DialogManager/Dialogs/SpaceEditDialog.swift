@@ -105,11 +105,13 @@ struct SpaceEditDialog: DialogPresentable {
 private struct SpaceEditContent: View {
     @Binding var spaceName: String
     @Binding var spaceIcon: String
+    @Binding var selectedProfileId: UUID?
 
     let originalIcon: String
     let mode: SpaceEditDialog.Mode
 
     @StateObject private var emojiManager = EmojiPickerManager()
+    @EnvironmentObject var browserManager: BrowserManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -153,6 +155,29 @@ private struct SpaceEditContent: View {
                         .lineLimit(2)
                 }
             }
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Profile")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                Picker(
+                    currentProfileName,
+                    systemImage: currentProfileIcon,
+                    selection: Binding(
+                        get: {
+                            selectedProfileId ?? browserManager.profileManager.profiles.first?.id ?? UUID()
+                        },
+                        set: { newId in
+                            selectedProfileId = newId
+                        }
+                    )
+                ) {
+                    ForEach(browserManager.profileManager.profiles, id: \.id) { profile in
+                        Label(profile.name, systemImage: profile.icon).tag(profile.id)
+                    }
+                }
+            }
         }
         .padding(.horizontal, 4)
         .onAppear {
@@ -174,6 +199,24 @@ private struct SpaceEditContent: View {
             return spaceIcon
         }
         return originalIcon
+    }
+
+    private var currentProfileName: String {
+        guard let profileId = selectedProfileId,
+              let profile = browserManager.profileManager.profiles.first(where: { $0.id == profileId })
+        else {
+            return browserManager.profileManager.profiles.first?.name ?? "Default"
+        }
+        return profile.name
+    }
+
+    private var currentProfileIcon: String {
+        guard let profileId = selectedProfileId,
+              let profile = browserManager.profileManager.profiles.first(where: { $0.id == profileId })
+        else {
+            return browserManager.profileManager.profiles.first?.icon ?? "person.circle"
+        }
+        return profile.icon
     }
 }
 
