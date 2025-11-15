@@ -323,7 +323,7 @@ struct CommandPaletteView: View {
             browserManager.selectTab(existingTab, in: windowState)
             print("Switched to existing tab: \(existingTab.name)")
         case .history(let historyEntry):
-            if windowState.shouldNavigateCurrentTab
+            if commandPalette.shouldNavigateCurrentTab
                 && browserManager.currentTab(for: windowState) != nil
             {
                 // Navigate current tab to history URL
@@ -344,7 +344,7 @@ struct CommandPaletteView: View {
                 )
             }
         case .url, .search:
-            if windowState.shouldNavigateCurrentTab
+            if commandPalette.shouldNavigateCurrentTab
                 && browserManager.currentTab(for: windowState) != nil
             {
                 // Navigate current tab to new URL with proper normalization
