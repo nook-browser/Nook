@@ -16,6 +16,7 @@ import WebKit
 struct NookApp: App {
     @StateObject private var browserManager = BrowserManager()
     @State private var windowRegistry = WindowRegistry()
+    @State private var webViewCoordinator = WebViewCoordinator()
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
@@ -25,6 +26,7 @@ struct NookApp: App {
                 .ignoresSafeArea(.all)
                 .environmentObject(browserManager)
                 .environment(windowRegistry)
+                .environment(webViewCoordinator)
                 .onAppear {
                     // Connect browser manager to app delegate for cleanup and Sparkle integration
                     appDelegate.browserManager = browserManager
@@ -35,8 +37,9 @@ struct NookApp: App {
                         browserManager)
 
                     // Set up window cleanup callback
-                    windowRegistry.onWindowClose = { [weak browserManager] windowId in
-                        browserManager?.cleanupWindow(windowId)
+                    windowRegistry.onWindowClose = { [webViewCoordinator, weak browserManager] windowId in
+                        webViewCoordinator.cleanupWindow(windowId, tabManager: browserManager!.tabManager)
+                        browserManager?.splitManager.cleanupWindow(windowId)
                     }
                 }
         }

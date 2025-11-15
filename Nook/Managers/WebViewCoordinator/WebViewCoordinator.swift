@@ -1,0 +1,200 @@
+//
+//  WebViewCoordinator.swift
+//  Nook
+//
+//  Manages WebView instances across multiple windows
+//
+
+import Foundation
+import AppKit
+import WebKit
+
+@MainActor
+@Observable
+class WebViewCoordinator {
+    /// Window-specific web views: tabId -> windowId -> WKWebView
+    private var webViewsByTabAndWindow: [UUID: [UUID: WKWebView]] = [:]
+
+    /// Prevent recursive sync calls
+    private var isSyncingTab: Set<UUID> = []
+
+    /// Weak wrapper for NSView references stored per window
+    private struct WeakNSView { weak var view: NSView? }
+
+    /// Container views per window so the compositor can manage multiple windows safely
+    private var compositorContainerViews: [UUID: WeakNSView] = [:]
+
+    // MARK: - Compositor Container Management
+
+    func setCompositorContainerView(_ view: NSView?, for windowId: UUID) {
+        if let view {
+            compositorContainerViews[windowId] = WeakNSView(view: view)
+        } else {
+            compositorContainerViews.removeValue(forKey: windowId)
+        }
+    }
+
+    func compositorContainerView(for windowId: UUID) -> NSView? {
+        if let view = compositorContainerViews[windowId]?.view {
+            return view
+        }
+        compositorContainerViews.removeValue(forKey: windowId)
+        return nil
+    }
+
+    func removeCompositorContainerView(for windowId: UUID) {
+        compositorContainerViews.removeValue(forKey: windowId)
+    }
+
+    func compositorContainers() -> [(UUID, NSView)] {
+        var result: [(UUID, NSView)] = []
+        var staleIdentifiers: [UUID] = []
+        for (windowId, entry) in compositorContainerViews {
+            if let view = entry.view {
+                result.append((windowId, view))
+            } else {
+                staleIdentifiers.append(windowId)
+            }
+        }
+        for id in staleIdentifiers {
+            compositorContainerViews.removeValue(forKey: id)
+        }
+        return result
+    }
+
+    // MARK: - WebView Pool Management
+
+    func getWebView(for tabId: UUID, in windowId: UUID) -> WKWebView? {
+        return webViewsByTabAndWindow[tabId]?[windowId]
+    }
+
+    func getAllWebViews(for tabId: UUID) -> [WKWebView] {
+        return Array(webViewsByTabAndWindow[tabId]?.values ?? [])
+    }
+
+    func setWebView(_ webView: WKWebView, for tabId: UUID, in windowId: UUID) {
+        if webViewsByTabAndWindow[tabId] == nil {
+            webViewsByTabAndWindow[tabId] = [:]
+        }
+        webViewsByTabAndWindow[tabId]?[windowId] = webView
+    }
+
+    func removeWebViewFromContainers(_ webView: WKWebView) {
+        for (windowId, entry) in compositorContainerViews {
+            guard let container = entry.view else {
+                compositorContainerViews.removeValue(forKey: windowId)
+                continue
+            }
+            for subview in container.subviews where subview === webView {
+                subview.removeFromSuperview()
+            }
+        }
+    }
+
+    func removeAllWebViews(for tab: Tab) {
+        guard let entries = webViewsByTabAndWindow.removeValue(forKey: tab.id) else { return }
+        for (_, webView) in entries {
+            tab.cleanupCloneWebView(webView)
+            removeWebViewFromContainers(webView)
+        }
+    }
+
+    // MARK: - Window Cleanup
+
+    func cleanupWindow(_ windowId: UUID, tabManager: TabManager) {
+        let webViewsToCleanup = webViewsByTabAndWindow.compactMap {
+            (tabId, windowWebViews) -> (UUID, WKWebView)? in
+            guard let webView = windowWebViews[windowId] else { return nil }
+            return (tabId, webView)
+        }
+
+        print("🧹 [WebViewCoordinator] Cleaning up \(webViewsToCleanup.count) WebViews for window \(windowId)")
+
+        for (tabId, webView) in webViewsToCleanup {
+            // Use comprehensive cleanup from Tab class
+            if let tab = tabManager.allTabs().first(where: { $0.id == tabId }) {
+                tab.cleanupCloneWebView(webView)
+            } else {
+                // Fallback cleanup if tab is not found
+                performFallbackWebViewCleanup(webView, tabId: tabId)
+            }
+
+            // Remove from containers
+            removeWebViewFromContainers(webView)
+
+            // Remove from tracking
+            webViewsByTabAndWindow[tabId]?.removeValue(forKey: windowId)
+            if webViewsByTabAndWindow[tabId]?.isEmpty == true {
+                webViewsByTabAndWindow.removeValue(forKey: tabId)
+            }
+
+            print("✅ [WebViewCoordinator] Cleaned up WebView for tab \(tabId) in window \(windowId)")
+        }
+    }
+
+    func cleanupAllWebViews(tabManager: TabManager) {
+        print("🧹 [WebViewCoordinator] Starting comprehensive cleanup for ALL WebViews")
+
+        let totalWebViews = webViewsByTabAndWindow.values.flatMap { $0.values }.count
+        print("🧹 [WebViewCoordinator] Cleaning up \(totalWebViews) WebViews across all windows")
+
+        // Clean up all WebViews for all tabs in all windows
+        for (tabId, windowWebViews) in webViewsByTabAndWindow {
+            for (windowId, webView) in windowWebViews {
+                // Use comprehensive cleanup from Tab class
+                if let tab = tabManager.allTabs().first(where: { $0.id == tabId }) {
+                    tab.cleanupCloneWebView(webView)
+                } else {
+                    // Fallback cleanup if tab is not found
+                    performFallbackWebViewCleanup(webView, tabId: tabId)
+                }
+
+                // Remove from containers
+                removeWebViewFromContainers(webView)
+
+                print("✅ [WebViewCoordinator] Cleaned up WebView for tab \(tabId) in window \(windowId)")
+            }
+        }
+
+        // Clear all tracking
+        webViewsByTabAndWindow.removeAll()
+        compositorContainerViews.removeAll()
+
+        print("✅ [WebViewCoordinator] Completed comprehensive cleanup for ALL WebViews")
+    }
+
+    // MARK: - Private Helpers
+
+    private func performFallbackWebViewCleanup(_ webView: WKWebView, tabId: UUID) {
+        print("🧹 [WebViewCoordinator] Performing fallback WebView cleanup for tab: \(tabId)")
+
+        // Stop loading
+        webView.stopLoading()
+
+        // Remove all message handlers
+        let controller = webView.configuration.userContentController
+        let allMessageHandlers = [
+            "linkHover",
+            "commandHover",
+            "commandClick",
+            "pipStateChange",
+            "mediaStateChange_\(tabId.uuidString)",
+            "backgroundColor_\(tabId.uuidString)",
+            "historyStateDidChange",
+            "NookIdentity",
+        ]
+
+        for handlerName in allMessageHandlers {
+            controller.removeScriptMessageHandler(forName: handlerName)
+        }
+
+        // Clear delegates
+        webView.navigationDelegate = nil
+        webView.uiDelegate = nil
+
+        // Remove from view hierarchy
+        webView.removeFromSuperview()
+
+        print("✅ [WebViewCoordinator] Fallback WebView cleanup completed for tab: \(tabId)")
+    }
+}
