@@ -12,7 +12,7 @@ struct ContentView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(WindowRegistry.self) private var windowRegistry
     @State private var windowState = BrowserWindowState()
-    @State private var commandPalette = CommandPaletteState()
+    @State private var commandPalette = CommandPalette()
 
     var body: some View {
         WindowView()

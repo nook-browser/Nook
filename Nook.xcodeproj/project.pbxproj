@@ -39,6 +39,18 @@
 			);
 			target = 7F8340FB2E37F39400674A5D /* Nook */;
 		};
+		2D0834BF2EC8CE1300C302AC /* Exceptions for "CommandPalette" folder in "Nook" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"CommandPalette Accessories/CommandPaletteSuggestionView.swift",
+				"CommandPalette Accessories/GenericSuggestionItem.swift",
+				"CommandPalette Accessories/HistorySuggestionItem.swift",
+				"CommandPalette Accessories/TabSuggestionItem.swift",
+				CommandPalette.swift,
+				CommandPaletteView.swift,
+			);
+			target = 7F8340FB2E37F39400674A5D /* Nook */;
+		};
 		564997D22E9B125200D89F78 /* Exceptions for "UI" folder in "Nook" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -60,6 +72,14 @@
 		2D0834B32EC8C43B00C302AC /* App */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = App;
+			sourceTree = "<group>";
+		};
+		2D0834BE2EC8CE0C00C302AC /* CommandPalette */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				2D0834BF2EC8CE1300C302AC /* Exceptions for "CommandPalette" folder in "Nook" target */,
+			);
+			path = CommandPalette;
 			sourceTree = "<group>";
 		};
 		564997D02E9B125200D89F78 /* UI */ = {
@@ -98,9 +118,18 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		2D0834C02EC8CE6800C302AC /* Sidebar */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Sidebar;
+			sourceTree = "<group>";
+		};
 		7F8340F32E37F39400674A5D = {
 			isa = PBXGroup;
 			children = (
+				2D0834C02EC8CE6800C302AC /* Sidebar */,
+				2D0834BE2EC8CE0C00C302AC /* CommandPalette */,
 				7F8340FD2E37F39400674A5D /* Products */,
 				564997D02E9B125200D89F78 /* UI */,
 				2CAC4D282E82457B00870189 /* Nook */,
