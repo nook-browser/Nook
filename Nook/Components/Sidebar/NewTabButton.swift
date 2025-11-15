@@ -10,7 +10,7 @@ import SwiftUI
 struct NewTabButton: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
-    @Environment(CommandPaletteState.self) private var commandPalette
+    @Environment(CommandPalette.self) private var commandPalette
     
     @Environment(\.colorScheme) var colorScheme
     @State private var isHovering: Bool = false

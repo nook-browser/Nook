@@ -1,5 +1,5 @@
 //
-//  CommandPaletteState.swift
+//  CommandPalette.swift
 //  Nook
 //
 //  Per-window command palette state and actions
@@ -10,7 +10,7 @@ import SwiftUI
 
 @MainActor
 @Observable
-class CommandPaletteState {
+class CommandPalette {
     /// Whether the command palette is visible
     var isVisible: Bool = false
 

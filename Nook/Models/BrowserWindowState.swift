@@ -77,8 +77,8 @@ class BrowserWindowState {
     /// Set by BrowserManager during window registration
     weak var tabManager: TabManager?
 
-    /// Reference to this window's CommandPaletteState for global shortcuts
-    weak var commandPalette: CommandPaletteState?
+    /// Reference to this window's CommandPalette for global shortcuts
+    weak var commandPalette: CommandPalette?
 
     /// Computed property: the actual Space object for this window's current space
     var currentSpace: Space? {
