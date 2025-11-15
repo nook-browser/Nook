@@ -22,9 +22,10 @@ struct NavButtonStyle: ButtonStyle {
 
             configuration.label
                 .foregroundStyle(.primary)
-                .font(.system(size: iconSize))
+//                .font(.system(size: iconSize))
         }
         .opacity(isEnabled ? 1.0 : 0.3)
+        
         .contentTransition(.symbolEffect(.replace.upUp.byLayer, options: .nonRepeating))
         .scaleEffect(configuration.isPressed && isEnabled ? 0.95 : 1.0)
         .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
@@ -45,19 +46,19 @@ struct NavButtonStyle: ButtonStyle {
         }
     }
     
-    private var iconSize: CGFloat {
-        switch controlSize {
-        case .mini: 12
-        case .small: 14
-        case .regular: 16
-        case .large: 18
-        case .extraLarge: 20
-        @unknown default: 16
-        }
-    }
+//    private var iconSize: CGFloat {
+//        switch controlSize {
+//        case .mini: 12
+//        case .small: 14
+//        case .regular: 16
+//        case .large: 18
+//        case .extraLarge: 20
+//        @unknown default: 16
+//        }
+//    }
     
     private var cornerRadius: CGFloat {
-        6
+        8
     }
     
     private func backgroundColorOpacity(isPressed: Bool) -> Double {
@@ -69,7 +70,70 @@ struct NavButtonStyle: ButtonStyle {
     }
 }
 
-#Preview {
+/// Rectangular variant of NavButtonStyle that allows custom widths
+/// Use this for buttons that need to be wider than square (e.g., "New Space" button)
+struct RectNavButtonStyle: ButtonStyle {
+    @Environment(\.colorScheme) var colorScheme
+    @Environment(\.isEnabled) var isEnabled
+    @Environment(\.controlSize) var controlSize
+    @State private var isHovering: Bool = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(.primary)
+            .padding(.horizontal, horizontalPadding)
+            .frame(height: height)
+            .background {
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(.primary.opacity(backgroundColorOpacity(isPressed: configuration.isPressed)))
+            }
+            .contentShape(.rect)
+            .opacity(isEnabled ? 1.0 : 0.3)
+            .contentTransition(.symbolEffect(.replace.upUp.byLayer, options: .nonRepeating))
+            .scaleEffect(configuration.isPressed && isEnabled ? 0.95 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
+            .animation(.easeInOut(duration: 0.15), value: isHovering)
+            .onHover { hovering in
+                isHovering = hovering
+            }
+    }
+
+    private var height: CGFloat {
+        switch controlSize {
+        case .mini: 24
+        case .small: 28
+        case .regular: 32
+        case .large: 40
+        case .extraLarge: 48
+        @unknown default: 32
+        }
+    }
+
+    private var horizontalPadding: CGFloat {
+        switch controlSize {
+        case .mini: 8
+        case .small: 10
+        case .regular: 12
+        case .large: 16
+        case .extraLarge: 20
+        @unknown default: 12
+        }
+    }
+
+    private var cornerRadius: CGFloat {
+        8
+    }
+
+    private func backgroundColorOpacity(isPressed: Bool) -> Double {
+        if (isHovering || isPressed) && isEnabled {
+            return colorScheme == .dark ? 0.2 : 0.1
+        } else {
+            return 0.0
+        }
+    }
+}
+
+#Preview("Square Buttons") {
     VStack(spacing: 20) {
         // Default
         Button {
@@ -79,7 +143,7 @@ struct NavButtonStyle: ButtonStyle {
         }
         .buttonStyle(NavButtonStyle())
         .foregroundStyle(Color.primary)
-        
+
         // With foregroundStyle
         Button {
             print("Tapped")
@@ -88,29 +152,29 @@ struct NavButtonStyle: ButtonStyle {
         }
         .buttonStyle(NavButtonStyle())
         .foregroundStyle(.red)
-        
+
         // Different sizes
         HStack {
             Button { } label: { Image(systemName: "star") }
                 .buttonStyle(NavButtonStyle())
                 .foregroundStyle(Color.pink)
                 .controlSize(.mini)
-            
+
             Button { } label: { Image(systemName: "star") }
                 .buttonStyle(NavButtonStyle())
                 .foregroundStyle(Color.purple)
                 .controlSize(.small)
-            
+
             Button { } label: { Image(systemName: "star") }
                 .buttonStyle(NavButtonStyle())
                 .foregroundStyle(Color.yellow)
-            
+
             Button { } label: { Image(systemName: "star") }
                 .buttonStyle(NavButtonStyle())
                 .foregroundStyle(Color.orange)
                 .controlSize(.large)
         }
-        
+
         // Disabled
         Button {
             print("Tapped")
@@ -118,6 +182,61 @@ struct NavButtonStyle: ButtonStyle {
             Image(systemName: "trash")
         }
         .buttonStyle(NavButtonStyle())
+        .foregroundStyle(Color.primary)
+        .disabled(true)
+    }
+    .padding()
+}
+
+#Preview("Rectangular Buttons") {
+    VStack(spacing: 20) {
+        // Icon with text
+        Button {
+            print("New Space")
+        } label: {
+            Label("New Space", systemImage: "plus")
+        }
+        .buttonStyle(RectNavButtonStyle())
+        .foregroundStyle(Color.primary)
+
+        // Icon only (still rectangular due to padding)
+        Button {
+            print("Add")
+        } label: {
+            Image(systemName: "plus")
+        }
+        .buttonStyle(RectNavButtonStyle())
+        .foregroundStyle(Color.primary)
+
+        // Different sizes
+        VStack(spacing: 12) {
+            Button { } label: { Label("Mini", systemImage: "star") }
+                .buttonStyle(RectNavButtonStyle())
+                .foregroundStyle(Color.pink)
+                .controlSize(.mini)
+
+            Button { } label: { Label("Small", systemImage: "star") }
+                .buttonStyle(RectNavButtonStyle())
+                .foregroundStyle(Color.purple)
+                .controlSize(.small)
+
+            Button { } label: { Label("Regular", systemImage: "star") }
+                .buttonStyle(RectNavButtonStyle())
+                .foregroundStyle(Color.yellow)
+
+            Button { } label: { Label("Large", systemImage: "star") }
+                .buttonStyle(RectNavButtonStyle())
+                .foregroundStyle(Color.orange)
+                .controlSize(.large)
+        }
+
+        // Disabled
+        Button {
+            print("Disabled")
+        } label: {
+            Label("Disabled", systemImage: "xmark")
+        }
+        .buttonStyle(RectNavButtonStyle())
         .foregroundStyle(Color.primary)
         .disabled(true)
     }

@@ -58,13 +58,6 @@
 			);
 			target = 7F8340FB2E37F39400674A5D /* Nook */;
 		};
-		564997D22E9B125200D89F78 /* Exceptions for "UI" folder in "Nook" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Buttons/NavButtons/NavMenuStyle.swift,
-			);
-			target = 7F8340FB2E37F39400674A5D /* Nook */;
-		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -104,9 +97,6 @@
 		};
 		564997D02E9B125200D89F78 /* UI */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				564997D22E9B125200D89F78 /* Exceptions for "UI" folder in "Nook" target */,
-			);
 			path = UI;
 			sourceTree = "<group>";
 		};

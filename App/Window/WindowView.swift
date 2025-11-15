@@ -198,9 +198,7 @@ struct WindowView: View {
             WebsiteView()
                 .zIndex(2000)
         }
-        .padding(.top, 0)
         .padding(.bottom, 8)
-        .clipShape(websiteColumnClipShape(cornerRadius: cornerRadius, hasTopBar: hasTopBar))
     }
 
     @ViewBuilder
