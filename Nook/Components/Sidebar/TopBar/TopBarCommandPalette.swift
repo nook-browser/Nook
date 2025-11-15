@@ -18,9 +18,8 @@ struct TopBarCommandPalette: View {
     @State private var selectedSuggestionIndex: Int = -1
 
     var body: some View {
-        let isActiveWindow = browserManager.activeWindowState?.id == windowState.id
-        let shouldShow = isActiveWindow && commandPalette.isMiniVisible && browserManager.settingsManager.topBarAddressView
-        
+        let shouldShow = commandPalette.isMiniVisible && browserManager.settingsManager.topBarAddressView
+
         ZStack {
             if shouldShow {
                 // Background overlay
@@ -65,7 +64,7 @@ struct TopBarCommandPalette: View {
             }
         }
         .onChange(of: commandPalette.isMiniVisible) { _, newVisible in
-            if newVisible && isActiveWindow && browserManager.settingsManager.topBarAddressView {
+            if newVisible && browserManager.settingsManager.topBarAddressView {
                 searchManager.setTabManager(browserManager.tabManager)
                 searchManager.setHistoryManager(browserManager.historyManager)
                 searchManager.updateProfileContext()

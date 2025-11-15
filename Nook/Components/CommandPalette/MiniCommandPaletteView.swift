@@ -36,7 +36,6 @@ struct MiniCommandPaletteView: View {
     var body: some View {
         let isDark = colorScheme == .dark
         let symbolName = isLikelyURL(text) ? "globe" : "magnifyingglass"
-        let isActiveWindow = browserManager.activeWindowState?.id == windowState.id
         let suggestions = searchManager.suggestions
 
         styledContent(symbolName: symbolName, suggestions: suggestions, isDark: isDark)
@@ -51,7 +50,7 @@ struct MiniCommandPaletteView: View {
             DispatchQueue.main.async { isSearchFocused = true }
         }
         .onChange(of: commandPalette.isMiniVisible) { _, newVisible in
-            if newVisible && isActiveWindow {
+            if newVisible {
                 searchManager.setTabManager(browserManager.tabManager)
                 searchManager.setHistoryManager(browserManager.historyManager)
                 searchManager.updateProfileContext()
@@ -77,12 +76,12 @@ struct MiniCommandPaletteView: View {
             }
         }
         .onChange(of: windowState.commandPalettePrefilledText) { _, newValue in
-            if isActiveWindow && commandPalette.isMiniVisible {
+            if commandPalette.isMiniVisible {
                 text = newValue
             }
         }
         .onChange(of: browserManager.currentProfile?.id) { _, _ in
-            if isActiveWindow && commandPalette.isMiniVisible {
+            if commandPalette.isMiniVisible {
                 searchManager.updateProfileContext()
                 searchManager.clearSuggestions()
             }
