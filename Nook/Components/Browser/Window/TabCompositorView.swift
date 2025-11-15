@@ -167,9 +167,10 @@ class TabCompositorManager: ObservableObject {
     
     // MARK: - Public Interface
     func updateTabVisibility(currentTabId: UUID?) {
-        guard let browserManager = browserManager else { return }
-        for (windowId, _) in browserManager.compositorContainers() {
-            guard let windowState = browserManager.windowStates[windowId] else { continue }
+        guard let browserManager = browserManager,
+              let coordinator = browserManager.webViewCoordinator else { return }
+        for (windowId, _) in coordinator.compositorContainers() {
+            guard let windowState = browserManager.windowRegistry?.windows[windowId] else { continue }
             browserManager.refreshCompositor(for: windowState)
         }
     }

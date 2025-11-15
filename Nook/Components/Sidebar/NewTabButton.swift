@@ -10,12 +10,14 @@ import SwiftUI
 struct NewTabButton: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(CommandPaletteState.self) private var commandPaletteState
+    
     @Environment(\.colorScheme) var colorScheme
     @State private var isHovering: Bool = false
 
     var body: some View {
         Button {
-            browserManager.openCommandPalette()
+            commandPaletteState.open()
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "plus")

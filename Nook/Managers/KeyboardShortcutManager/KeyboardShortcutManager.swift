@@ -183,7 +183,7 @@ class KeyboardShortcutManager: ObservableObject {
 
             // Tab Management
             case .newTab:
-                browserManager.openCommandPalette()
+                browserManager.activeWindowState?.commandPalette?.open()
             case .closeTab:
                 browserManager.closeCurrentTab()
             case .undoCloseTab:
@@ -221,7 +221,7 @@ class KeyboardShortcutManager: ObservableObject {
 
             // Tools & Features
             case .openCommandPalette:
-                browserManager.openCommandPalette()
+                browserManager.activeWindowState?.commandPalette?.open()
             case .openDevTools:
                 browserManager.openWebInspector()
             case .viewDownloads:

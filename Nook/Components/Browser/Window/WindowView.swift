@@ -10,6 +10,7 @@ import SwiftUI
 struct WindowView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(CommandPaletteState.self) private var commandPalette
     @StateObject private var hoverSidebarManager = HoverSidebarManager()
     @Environment(\.colorScheme) var colorScheme
 
@@ -336,6 +337,7 @@ private struct ProfileSwitchToastView: View {
 private struct MiniCommandPaletteOverlay: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(CommandPaletteState.self) private var commandPalette
 
     var body: some View {
         let isActiveWindow =
@@ -351,7 +353,7 @@ private struct MiniCommandPaletteOverlay: View {
                     .contentShape(Rectangle())
                     .ignoresSafeArea()
                     .onTapGesture {
-                        browserManager.hideMiniCommandPalette(for: windowState)
+                        commandPalette.hideMini()
                     }
 
                 // Use reported URL bar frame when reliable; otherwise compute manual fallback

@@ -992,7 +992,7 @@ class TabManager: ObservableObject {
 
         // Force unload the tab from compositor before removing
         browserManager?.compositorManager.unloadTab(tab)
-        browserManager?.removeAllWebViews(for: tab)
+        browserManager?.webViewCoordinator?.removeAllWebViews(for: tab)
 
         if #available(macOS 15.5, *) {
             ExtensionManager.shared.notifyTabClosed(tab)
@@ -1077,7 +1077,7 @@ class TabManager: ObservableObject {
         // Update active side in split view for all windows that contain this tab
         // Also update windowState.currentTabId for windows that have this tab in split view
         if let bm = browserManager {
-            for (windowId, windowState) in bm.windowStates {
+            for (windowId, windowState) in bm.windowRegistry?.windows ?? [:] {
                 // Check if this tab is in split view for this window
                 if bm.splitManager.isSplit(for: windowId) {
                     let state = bm.splitManager.getSplitState(for: windowId)
@@ -1505,7 +1505,7 @@ class TabManager: ObservableObject {
         // Keep the opposite side focused so the remaining pane stays visible.
         if let sm = browserManager?.splitManager, let bm = browserManager {
             // Check all windows for split state
-            for (windowId, _) in bm.windowStates {
+            for (windowId, _) in bm.windowRegistry?.windows ?? [:] {
                 if sm.isSplit(for: windowId) {
                     if sm.leftTabId(for: windowId) == tab.id {
                         sm.exitSplit(keep: .right, for: windowId)
@@ -2618,7 +2618,7 @@ extension TabManager {
 
         // Force unload the tab from compositor before removing
         browserManager?.compositorManager.unloadTab(tab)
-        browserManager?.removeAllWebViews(for: tab)
+        browserManager?.webViewCoordinator?.removeAllWebViews(for: tab)
 
         if #available(macOS 15.5, *) {
             ExtensionManager.shared.notifyTabClosed(tab)

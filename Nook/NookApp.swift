@@ -93,7 +93,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
 
             switch event.buttonNumber {
             case 2:
-                manager.openCommandPalette()
+                manager.activeWindowState?.commandPalette?.open()
             case 3:
                 guard
                     let windowState = manager.activeWindowState,
@@ -276,6 +276,7 @@ struct NookCommands: Commands {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @FocusedValue(\.commandPalette) private var commandPalette: CommandPaletteState?
 
     init(browserManager: BrowserManager) {
         self.browserManager = browserManager
@@ -321,7 +322,7 @@ struct NookCommands: Commands {
             Divider()
 
             Button("New Tab") {
-                browserManager.openCommandPalette()
+                commandPalette?.open()
             }
             .keyboardShortcut("t", modifiers: .command)
             Button("New Window") {
@@ -347,7 +348,7 @@ struct NookCommands: Commands {
 
             Button("Close Tab") {
                 if browserManager.activeWindowState?.isCommandPaletteVisible == true {
-                    browserManager.closeCommandPalette(for: browserManager.activeWindowState)
+//                    browserManager.closeCommandPalette(for: browserManager.activeWindowState)
                 } else {
                     browserManager.closeCurrentTab()
                 }
@@ -390,7 +391,7 @@ struct NookCommands: Commands {
         // View commands
         CommandGroup(after: .windowSize) {
             Button("New URL / Search") {
-                browserManager.openCommandPaletteWithCurrentURL()
+//                browserManager.openCommandPaletteWithCurrentURL()
             }
             .keyboardShortcut("l", modifiers: .command)
 

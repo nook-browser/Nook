@@ -9,16 +9,17 @@ import SwiftUI
 struct TopBarCommandPalette: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(CommandPaletteState.self) private var commandPalette
     @Environment(\.colorScheme) var colorScheme
-    
+
     @State private var searchManager = SearchManager()
     @State private var text: String = ""
     @FocusState private var isSearchFocused: Bool
     @State private var selectedSuggestionIndex: Int = -1
-    
+
     var body: some View {
         let isActiveWindow = browserManager.activeWindowState?.id == windowState.id
-        let shouldShow = isActiveWindow && windowState.isMiniCommandPaletteVisible && browserManager.settingsManager.topBarAddressView
+        let shouldShow = isActiveWindow && commandPalette.isMiniVisible && browserManager.settingsManager.topBarAddressView
         
         ZStack {
             if shouldShow {
@@ -27,7 +28,7 @@ struct TopBarCommandPalette: View {
                     .ignoresSafeArea()
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        browserManager.closeCommandPalette(for: windowState)
+                        commandPalette.close()
                     }
                 
                 // Command palette in center with proper animation
@@ -78,7 +79,7 @@ struct TopBarCommandPalette: View {
             }
         }
         .onKeyPress(.escape) {
-            browserManager.closeCommandPalette(for: windowState)
+            commandPalette.close()
             return .handled
         }
         .onChange(of: searchManager.suggestions.count) { _, newCount in
@@ -196,8 +197,8 @@ struct TopBarCommandPalette: View {
         if let currentTab = browserManager.currentTab(for: windowState) {
             currentTab.navigateToURL(text)
         }
-        
-        browserManager.closeCommandPalette(for: windowState)
+
+        commandPalette.close()
     }
 }
 

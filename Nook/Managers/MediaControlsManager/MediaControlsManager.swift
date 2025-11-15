@@ -71,9 +71,11 @@ final class MediaControlsManager {
                 webViews.append(windowWebView)
             }
 
-            let additional = browserManager.getAllWebViews(for: tab.id)
-            for candidate in additional where !webViews.contains(where: { $0 === candidate }) {
-                webViews.append(candidate)
+            if let coordinator = browserManager.webViewCoordinator {
+                let additional = coordinator.getAllWebViews(for: tab.id)
+                for candidate in additional where !webViews.contains(where: { $0 === candidate }) {
+                    webViews.append(candidate)
+                }
             }
         }
 

@@ -311,8 +311,8 @@ struct TabCompositorWrapper: NSViewRepresentable {
         containerView.layer?.backgroundColor = NSColor.clear.cgColor
         containerView.postsFrameChangedNotifications = true
 
-        // Store reference to container view in browser manager
-        browserManager.setCompositorContainerView(containerView, for: windowState.id)
+        // Store reference to container view in WebViewCoordinator
+        browserManager.webViewCoordinator?.setCompositorContainerView(containerView, for: windowState.id)
         
         // Install AppKit drag-capture overlay above all webviews
         let overlay = SplitDropCaptureView(frame: containerView.bounds)
@@ -376,7 +376,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
     }
 
     static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
-        coordinator.browserManager?.removeCompositorContainerView(for: coordinator.windowState.id)
+        coordinator.browserManager?.webViewCoordinator?.removeCompositorContainerView(for: coordinator.windowState.id)
     }
 
     private func updateCompositor(_ containerView: NSView) {

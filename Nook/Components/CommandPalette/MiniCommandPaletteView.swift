@@ -19,6 +19,7 @@ import SwiftUI
 struct MiniCommandPaletteView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(CommandPaletteState.self) private var commandPalette
     @EnvironmentObject var gradientColorManager: GradientColorManager
     @State private var searchManager = SearchManager()
     @Environment(\.colorScheme) var colorScheme
@@ -37,8 +38,10 @@ struct MiniCommandPaletteView: View {
         let symbolName = isLikelyURL(text) ? "globe" : "magnifyingglass"
         let isActiveWindow = browserManager.activeWindowState?.id == windowState.id
         let suggestions = searchManager.suggestions
+        let strokeOpacity: Double = isDark ? 0.3 : 0.6
+        let strokeColor = Color.white.opacity(strokeOpacity)
 
-        VStack(spacing: 6) {
+        return VStack(spacing: 6) {
             inputRow(symbolName: symbolName)
             separatorIfNeeded(hasSuggestions: !suggestions.isEmpty)
             suggestionsListView(suggestions: suggestions)
@@ -49,10 +52,7 @@ struct MiniCommandPaletteView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(
-                    Color.white.opacity(isDark ? 0.3 : 0.6),
-                    lineWidth: 0.5
-                )
+                .stroke(strokeColor, lineWidth: 0.5)
         )
         .shadow(color: .black.opacity(0.4), radius: 50, x: 0, y: 4)
         .onAppear {
@@ -234,7 +234,7 @@ struct MiniCommandPaletteView: View {
 
         text = ""
         selectedSuggestionIndex = -1
-        browserManager.hideMiniCommandPalette(for: windowState)
+        commandPalette.hideMini()
     }
 
     private func navigateSuggestions(direction: Int) {
