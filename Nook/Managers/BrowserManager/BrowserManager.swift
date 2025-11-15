@@ -1860,8 +1860,10 @@ class BrowserManager: ObservableObject {
 
 
     /// Set the active window state (called when a window gains focus)
+    /// NOTE: This is called BY the WindowRegistry callback, so we don't call setActive again
     func setActiveWindowState(_ windowState: BrowserWindowState) {
-        windowRegistry?.setActive(windowState)
+        // DO NOT call windowRegistry?.setActive(windowState) here - that would cause infinite recursion!
+        // This method is called FROM the onActiveWindowChange callback
         sidebarWidth = windowState.sidebarWidth
         savedSidebarWidth = windowState.savedSidebarWidth
         sidebarContentWidth = windowState.sidebarContentWidth
