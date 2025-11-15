@@ -22,20 +22,17 @@ struct WindowView: View {
             return 20  // Accounts for navigation area height
         }
     }
-
+    
     var body: some View {
-        let isDark = colorScheme == .dark
         GeometryReader { geometry in
             ZStack {
-                // Gradient background for the current space (bottom-most layer)
                 SpaceGradientBackgroundView()
                     .environmentObject(browserManager)
                     .environmentObject(browserManager.gradientColorManager)
                     .environmentObject(windowState)
-                
-                // Attach background context menu to the window background layer
-                Color.white.opacity(isDark ? 0.3 : 0.4)
-                    .ignoresSafeArea(.all)
+//                // Attach background context menu to the window background layer
+//                Color.white.opacity(isDark ? 0.3 : 0.4)
+//                    .ignoresSafeArea(.all)
                 WindowBackgroundView()
                     .contextMenu {
                         Button("Customize Space Gradient...") {
