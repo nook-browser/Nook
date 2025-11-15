@@ -163,6 +163,13 @@ struct SidebarView: View {
         && !browserManager.isTransitioningProfile
         
         let content = VStack(spacing: 8) {
+            if browserManager.settingsManager.topBarAddressView {
+                SidebarWindowControlsView()
+                    .environmentObject(browserManager)
+                    .environmentObject(windowState)
+                    .padding(.horizontal, 8)
+            }
+            
             // Only show navigation buttons if top bar address view is disabled
             if !browserManager.settingsManager.topBarAddressView {
                 HStack(spacing: 2) {
@@ -538,6 +545,38 @@ struct SidebarView: View {
     private func updateSidebarPosition(_ position: SidebarPosition) {
         guard browserManager.settingsManager.sidebarPosition != position else { return }
         browserManager.settingsManager.sidebarPosition = position
+    }
+}
+
+// MARK: - Sidebar Window Controls (Top Bar Mode)
+private struct SidebarWindowControlsView: View {
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            MacButtonsView()
+                .frame(width: 70)
+            
+            Button("Toggle Sidebar", systemImage: browserManager.settingsManager.sidebarPosition == .left ? "sidebar.left" : "sidebar.right") {
+                browserManager.toggleSidebar(for: windowState)
+            }
+            .labelStyle(.iconOnly)
+            .buttonStyle(NavButtonStyle())
+            .foregroundStyle(Color.primary)
+            
+            if browserManager.settingsManager.showAIAssistant {
+                Button("Toggle AI Assistant", systemImage: "sparkle") {
+                    browserManager.toggleAISidebar(for: windowState)
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(NavButtonStyle())
+                .foregroundStyle(Color.primary)
+            }
+            
+            Spacer()
+        }
+        .frame(height: 28)
     }
 }
 
