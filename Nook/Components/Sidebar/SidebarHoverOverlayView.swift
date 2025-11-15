@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UniversalGlass
 import AppKit
 
 struct SidebarHoverOverlayView: View {
@@ -43,15 +44,20 @@ struct SidebarHoverOverlayView: View {
                         .environmentObject(windowState)
                         .frame(width: overlayWidth)
                         .frame(maxHeight: .infinity)
-                        .background(BlurEffectView(material: .contentBackground, state: .active))
-                        .mask(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                                .stroke(.white.opacity(0.12), lineWidth: 1)
-                        )
-                        // Force arrow cursor for the entire overlay region
+                        .background{
+                            
+                            
+                            SpaceGradientBackgroundView()
+                                .environmentObject(browserManager)
+                                .environmentObject(browserManager.gradientColorManager)
+                                .environmentObject(windowState)
+                                .clipShape(.rect(cornerRadius: cornerRadius))
+                            
+                                Rectangle()
+                                    .fill(Color.clear)
+                                    .universalGlassEffect(.regular.tint(Color(.windowBackgroundColor).opacity(0.35)), in: .rect(cornerRadius: cornerRadius))
+                        }
                         .alwaysArrowCursor()
-                        .shadow(color: Color.black.opacity(0.14), radius: 14, x: 0, y: 0)
                         .padding(browserManager.settingsManager.sidebarPosition == .left ? .leading : .trailing, horizontalInset)
                         .padding(.vertical, verticalInset)
                         .transition(
