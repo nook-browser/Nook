@@ -267,4 +267,49 @@ class WebViewCoordinator {
 
         print("✅ [WebViewCoordinator] Fallback WebView cleanup completed for tab: \(tabId)")
     }
+
+    // MARK: - Cross-Window Sync
+
+    /// Sync a tab's URL across all windows displaying it
+    func syncTab(_ tabId: UUID, to url: URL) {
+        // Prevent recursive sync calls
+        guard !isSyncingTab.contains(tabId) else {
+            print("🪟 [WebViewCoordinator] Skipping recursive sync for tab \(tabId)")
+            return
+        }
+
+        isSyncingTab.insert(tabId)
+        defer { isSyncingTab.remove(tabId) }
+
+        // Get all web views for this tab across all windows
+        let allWebViews = getAllWebViews(for: tabId)
+
+        for webView in allWebViews {
+            // Sync the URL if it's different
+            if webView.url != url {
+                print("🔄 [WebViewCoordinator] Syncing tab \(tabId) to URL: \(url)")
+                webView.load(URLRequest(url: url))
+            }
+        }
+    }
+
+    /// Reload a tab across all windows displaying it
+    func reloadTab(_ tabId: UUID) {
+        let allWebViews = getAllWebViews(for: tabId)
+        for webView in allWebViews {
+            print("🔄 [WebViewCoordinator] Reloading tab \(tabId) across windows")
+            webView.reload()
+        }
+    }
+
+    /// Set mute state for a tab across all windows
+    func setMuteState(_ muted: Bool, for tabId: UUID, excludingWindow originatingWindowId: UUID?) {
+        guard let windowWebViews = webViewsByTabAndWindow[tabId] else { return }
+
+        for (windowId, webView) in windowWebViews {
+            // Simple: just set all webviews to the same mute state
+            webView.isMuted = muted
+            print("🔇 [WebViewCoordinator] Window \(windowId): muted=\(muted)")
+        }
+    }
 }
