@@ -209,7 +209,6 @@ struct SpaceTitle: View {
             SpaceContextMenu(
                 space: space,
                 canDelete: canDeleteSpace,
-                showNewFolder: true,
                 onEditSpace: {
                     browserManager.dialogManager.showDialog(
                         SpaceEditDialog(
@@ -224,8 +223,7 @@ struct SpaceTitle: View {
                         )
                     )
                 },
-                onDeleteSpace: deleteSpace,
-                onNewFolder: createFolder
+                onDeleteSpace: deleteSpace
             )
             .environmentObject(browserManager)
         }

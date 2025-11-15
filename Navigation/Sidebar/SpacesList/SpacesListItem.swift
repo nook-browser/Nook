@@ -75,12 +75,10 @@ struct SpacesListItem: View {
         SpaceContextMenu(
             space: space,
             canDelete: browserManager.tabManager.spaces.count > 1,
-            showNewFolder: false,
             onEditSpace: showSpaceEditDialog,
             onDeleteSpace: {
                 browserManager.tabManager.removeSpace(space.id)
-            },
-            onNewFolder: nil
+            }
         )
         .environmentObject(browserManager)
     }
