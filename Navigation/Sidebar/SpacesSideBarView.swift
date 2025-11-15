@@ -16,6 +16,7 @@ struct SpacesSideBarView: View {
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(WindowRegistry.self) private var windowRegistry
     @Environment(\.nookSettings) var nookSettings
+    @Environment(CommandPalette.self) var commandPalette
 
     // Space navigation
     @State private var activeSpaceIndex: Int = 0
@@ -208,7 +209,12 @@ struct SpacesSideBarView: View {
 
     private var sidebarContextMenu: some View {
         Group {
-            // add tab action here
+            Button {
+                commandPalette.open()
+            } label: {
+                Label("New Tab", systemImage: "plus")
+            }
+
             Divider()
             Menu {
                 ForEach(SidebarPosition.allCases) { position in
@@ -228,10 +234,9 @@ struct SpacesSideBarView: View {
             Button {
                 showSpaceEditDialog(mode: .rename)
             } label: {
-                Label("Edit Space", systemImage: "square.and.pencil")
+                Label("Edit Space", systemImage: "pencil")
             }
             if browserManager.tabManager.spaces.count > 1 {
-                Divider()
                 Button(role: .destructive) {
                     if let spaceId = browserManager.tabManager.currentSpace?.id {
                         browserManager.tabManager.removeSpace(spaceId)
