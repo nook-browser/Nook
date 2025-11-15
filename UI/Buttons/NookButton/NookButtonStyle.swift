@@ -263,9 +263,3 @@ private struct ButtonPreviewSection: View {
         }
     }
 }
-#if DEBUG
-#Preview("Dialog Example") {
-    DialogManagerPreviewSurface()
-        .environment(GradientColorManager())
-}
-#endif
