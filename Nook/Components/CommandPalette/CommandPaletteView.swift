@@ -48,12 +48,7 @@ struct CommandPaletteView: View {
 
     var body: some View {
         let isDark = colorScheme == .dark
-        let isActiveWindow =
-            browserManager.activeWindowState?.id == windowState.id
-        let isVisible = isActiveWindow && commandPalette.isVisible
-
-        print("🎨 [CommandPaletteView] body evaluated - isActiveWindow: \(isActiveWindow), commandPalette.isVisible: \(commandPalette.isVisible), isVisible: \(isVisible)")
-
+        let isVisible = commandPalette.isVisible
         let textFieldColor: Color = text.isEmpty
             ? (isDark ? .white.opacity(0.25) : .black.opacity(0.25))
             : (isDark ? .white.opacity(0.9) : .black.opacity(0.9))
@@ -175,7 +170,7 @@ struct CommandPaletteView: View {
         .allowsHitTesting(isVisible)
         .opacity(isVisible ? 1.0 : 0.0)
         .onChange(of: commandPalette.isVisible) { _, newVisible in
-            if newVisible && isActiveWindow {
+            if newVisible {
                 searchManager.setTabManager(browserManager.tabManager)
                 searchManager.setHistoryManager(browserManager.historyManager)
                 searchManager.updateProfileContext()
