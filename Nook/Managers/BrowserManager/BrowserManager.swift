@@ -2074,12 +2074,9 @@ class BrowserManager: ObservableObject {
     }
 
     /// MEMORY LEAK FIX: Comprehensive cleanup for a specific window
-    func unregisterWindowState(_ windowId: UUID) {
-        guard let windowState = windowStates[windowId] else { return }
-
+    /// Called by WindowRegistry when a window closes
+    func cleanupWindow(_ windowId: UUID) {
         print("🧹 [BrowserManager] Starting comprehensive cleanup for window: \(windowId)")
-
-        closeCommandPalette(for: windowState)
 
         // MEMORY LEAK FIX: Enhanced cleanup for window-specific web views
         cleanupWebViewsForWindow(windowId)
@@ -2087,22 +2084,6 @@ class BrowserManager: ObservableObject {
         // Clean up split state for this window
         splitManager.cleanupWindow(windowId)
         removeCompositorContainerView(for: windowId)
-
-        windowStates.removeValue(forKey: windowId)
-
-        // If this was the active window, switch to another window
-        if activeWindowState?.id == windowId {
-            if let newActive = windowStates.values.first {
-                setActiveWindowState(newActive)
-            } else {
-                activeWindowState = nil
-                splitManager.refreshPublishedState(for: windowId)
-                isCommandPaletteVisible = false
-                isMiniCommandPaletteVisible = false
-                commandPalettePrefilledText = ""
-                shouldNavigateCurrentTab = false
-            }
-        }
 
         print("✅ [BrowserManager] Completed comprehensive cleanup for window: \(windowId)")
     }

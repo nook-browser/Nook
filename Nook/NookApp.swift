@@ -15,6 +15,7 @@ import WebKit
 @main
 struct NookApp: App {
     @StateObject private var browserManager = BrowserManager()
+    @State private var windowRegistry = WindowRegistry()
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
@@ -23,6 +24,7 @@ struct NookApp: App {
                 .background(BackgroundWindowModifier())
                 .ignoresSafeArea(.all)
                 .environmentObject(browserManager)
+                .environment(windowRegistry)
                 .onAppear {
                     // Connect browser manager to app delegate for cleanup and Sparkle integration
                     appDelegate.browserManager = browserManager
@@ -31,6 +33,11 @@ struct NookApp: App {
                     // Initialize keyboard shortcut manager
                     browserManager.settingsManager.keyboardShortcutManager.setBrowserManager(
                         browserManager)
+
+                    // Set up window cleanup callback
+                    windowRegistry.onWindowClose = { [weak browserManager] windowId in
+                        browserManager?.cleanupWindow(windowId)
+                    }
                 }
         }
         .windowStyle(.hiddenTitleBar)
