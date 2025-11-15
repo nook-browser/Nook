@@ -9,8 +9,8 @@ import SwiftUI
 import AppKit
 
 struct PeekOverlayView: View {
-    @Environment(BrowserManager.self) private var browserManager
-    @Environment(BrowserWindowState.self) private var windowState
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     @Environment(\.colorScheme) var colorScheme
         @State private var webView: PeekWebView?
     @State private var scale: CGFloat = 0.001
@@ -113,16 +113,22 @@ struct PeekOverlayView: View {
 
     @MainActor
     private func dismissPeek() {
+        // Animate web content opacity out first (reverse of appearing)
+        withAnimation(.easeOut(duration: 0.15)) {
+            webContentOpacity = 0.0
+        }
+
+        // Then animate the main overlay elements with spring animation
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
             scale = 0.001
             opacity = 0.0
             backgroundOpacity = 0.0
         }
 
-        // Cleanup after animation completes
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+        // Schedule cleanup after the spring animation completes
+        // Using a slightly longer delay to ensure animation fully completes
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
             webView = nil
-            webContentOpacity = 0.0
         }
     }
 
@@ -130,8 +136,9 @@ struct PeekOverlayView: View {
     private var backgroundOverlay: some View {
         Color.black.opacity(0.3)
             .contentShape(Rectangle()) // Ensure proper hit testing
-            .allowsHitTesting(true) // Always block background interactions when Peek is active
+            .allowsHitTesting(isActive) // Only allow hit testing when peek is active
             .onTapGesture {
+                // Simple dismiss on background tap
                 browserManager.peekManager.dismissPeek()
             }
     }
@@ -157,15 +164,6 @@ struct PeekOverlayView: View {
                         x: 0,
                         y: 10
                     )
-                    .overlay(
-                        // Invisible overlay that blocks all background webview interactions within Peek bounds
-                        Color.clear
-                            .contentShape(Rectangle())
-                            .allowsHitTesting(true)
-                            .onHover { hovering in
-                                if hovering { NSCursor.arrow.set() }
-                            }
-                    )
 
                 // Action buttons positioned outside the main content but within the scaled area
                 actionButtons(session: session)
@@ -187,6 +185,7 @@ struct PeekOverlayView: View {
         Group {
             if webView != nil {
                 webView
+                    .allowsHitTesting(true) // Ensure webview is interactable
                     .onAppear {
                         withAnimation(.easeIn(duration: 0.15)) {
                             webContentOpacity = 1.0
@@ -201,6 +200,7 @@ struct PeekOverlayView: View {
                     .fill(colorScheme == .dark ? Color.black : Color.white)
             }
         }
+        .allowsHitTesting(true) // Ensure container allows hit testing
         .onAppear {
             if webView == nil {
                 // Use the pre-created WebView from PeekManager

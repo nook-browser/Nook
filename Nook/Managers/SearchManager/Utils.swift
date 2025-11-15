@@ -63,6 +63,7 @@ public enum SearchProvider: String, CaseIterable, Identifiable, Codable, Sendabl
   case perplexity
   case unduck
   case ecosia
+  case kagi
 
   public var id: String { rawValue }
 
@@ -76,6 +77,7 @@ public enum SearchProvider: String, CaseIterable, Identifiable, Codable, Sendabl
     case .perplexity: return "Perplexity"
     case .unduck: return "Unduck"
     case .ecosia: return "Ecosia"
+    case .kagi: return "Kagi"
     }
   }
 
@@ -89,6 +91,7 @@ public enum SearchProvider: String, CaseIterable, Identifiable, Codable, Sendabl
     case .perplexity: return "www.perplexity.ai"
     case .unduck: return "duckduckgo.com"
     case .ecosia: return "www.ecosia.org"
+    case .kagi: return "kagi.com"
     }
   }
 
@@ -110,6 +113,8 @@ public enum SearchProvider: String, CaseIterable, Identifiable, Codable, Sendabl
       return "https://unduck.link?q=%@"
     case .ecosia:
       return "https://www.ecosia.org/search?q=%@"
+    case .kagi:
+      return "https://kagi.com/search?q=%@"
     }
   }
 }

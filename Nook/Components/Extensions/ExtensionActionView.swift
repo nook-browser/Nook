@@ -12,13 +12,13 @@ import AppKit
 @available(macOS 15.5, *)
 struct ExtensionActionView: View {
     let extensions: [InstalledExtension]
-    @Environment(BrowserManager.self) private var browserManager
+    @EnvironmentObject var browserManager: BrowserManager
     
     var body: some View {
         HStack(spacing: 4) {
             ForEach(extensions.filter { $0.isEnabled }, id: \.id) { ext in
                 ExtensionActionButton(ext: ext)
-                    .environment(browserManager)
+                    .environmentObject(browserManager)
             }
         }
     }
@@ -27,8 +27,9 @@ struct ExtensionActionView: View {
 @available(macOS 15.5, *)
 struct ExtensionActionButton: View {
     let ext: InstalledExtension
-    @Environment(BrowserManager.self) private var browserManager
-    @Environment(BrowserWindowState.self) private var windowState
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
+    @State private var isHovering: Bool = false
     
     var body: some View {
         Button(action: {
@@ -41,14 +42,21 @@ struct ExtensionActionButton: View {
                         .resizable()
                 } else {
                     Image(systemName: "puzzlepiece.extension")
-                        .foregroundColor(.blue)
+                        .foregroundColor(.white)
                 }
             }
-            .frame(width: 20, height: 20)
+            .frame(width: 16, height: 16)
+            .padding(6)
+            .background(isHovering ? .white.opacity(0.1) : .clear)
             .background(ActionAnchorView(extensionId: ext.id))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
         .help(ext.name)
+        .onHover { state in
+            isHovering = state
+            
+        }
     }
     
     private func showExtensionPopup() {

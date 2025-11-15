@@ -403,8 +403,7 @@ import OSLog
 }
 
 @MainActor
-@Observable
-class TabManager {
+class TabManager: ObservableObject {
     enum TabManagerError: LocalizedError {
         case spaceNotFound(UUID)
 
@@ -429,20 +428,20 @@ class TabManager {
     private let toastCooldown: TimeInterval = 2 * 60 * 60 // 2 hours in seconds
 
     // Spaces
-    public private(set) var spaces: [Space] = []
-    public private(set) var currentSpace: Space?
+    @Published public private(set) var spaces: [Space] = []
+    @Published public private(set) var currentSpace: Space?
 
     // Normal tabs per space
-    private var tabsBySpace: [UUID: [Tab]] = [:]
+    @Published private var tabsBySpace: [UUID: [Tab]] = [:]
 
     // Space-level pinned tabs per space
-    private var spacePinnedTabs: [UUID: [Tab]] = [:]
+    @Published private var spacePinnedTabs: [UUID: [Tab]] = [:]
 
     // Folders per space
-    private var foldersBySpace: [UUID: [TabFolder]] = [:]
+    @Published private var foldersBySpace: [UUID: [TabFolder]] = [:]
 
     // Global pinned (essentials), isolated per profile
-    private var pinnedByProfile: [UUID: [Tab]] = [:]
+    @Published private var pinnedByProfile: [UUID: [Tab]] = [:]
     // Pinned tabs encountered during load that have no profile assignment yet
     private var pendingPinnedWithoutProfile: [Tab] = []
     // Space activation to resume after a deferred profile switch
@@ -824,25 +823,24 @@ class TabManager {
 
     // MARK: - Folder Management
 
-    func createFolder(for spaceId: UUID) {
+    func createFolder(for spaceId: UUID, name: String = "New Folder") -> TabFolder {
         print("📁 Creating folder for spaceId: \(spaceId.uuidString)")
         let folder = TabFolder(
-            name: "New Folder",
+            name: name,
             spaceId: spaceId,
             color: spaces.first(where: { $0.id == spaceId })?.color ?? .controlAccentColor
         )
         print("   Created folder: \(folder.name) (id: \(folder.id.uuidString.prefix(8))...)")
 
         var folders = foldersBySpace[spaceId] ?? []
-        let oldCount = folders.count
         folders.append(folder)
         setFolders(folders, for: spaceId)
-        print("   Added to foldersBySpace[\(spaceId.uuidString.prefix(8))...]: \(oldCount) → \(folders.count) folders")
 
         // Send notification for SpaceView folderChangeCount
         NotificationCenter.default.post(name: .init("TabFoldersDidChange"), object: nil)
 
         persistSnapshot()
+        return folder
     }
 
     func renameFolder(_ folderId: UUID, newName: String) {
@@ -879,7 +877,6 @@ class TabManager {
                 var mutableFolders = folders
                 mutableFolders.remove(at: index)
                 setFolders(mutableFolders, for: spaceId)
-                print("   Removed folder from foldersBySpace[\(spaceId.uuidString.prefix(8))...]: \(folders.count) → \(mutableFolders.count) folders")
 
                 // Send notification for SpaceView folderChangeCount
                 NotificationCenter.default.post(name: .init("TabFoldersDidChange"), object: nil)
@@ -903,6 +900,17 @@ class TabManager {
                 break
             }
         }
+    }
+    func moveTabToFolder(tab: Tab, folderId: UUID) {
+        let newTab = tab
+        removeFromCurrentContainer(newTab)
+        newTab.folderId = folderId
+        newTab.isSpacePinned = true
+        var sp = spacePinnedTabs[tab.spaceId!] ?? []
+        sp.append(tab)
+        // Reindex
+        for (i, t) in sp.enumerated() { t.index = i }
+        setSpacePinnedTabs(sp, for: tab.spaceId!)
     }
 
     // MARK: - Tab Management (Normal within current space)
@@ -1722,10 +1730,6 @@ class TabManager {
     func spacePinnedTabs(for spaceId: UUID) -> [Tab] {
         // Create a copy of the array before sorting to prevent race conditions
         let tabs = Array(spacePinnedTabs[spaceId] ?? []).sorted { $0.index < $1.index }
-        print("📌 spacePinnedTabs(for: \(spaceId.uuidString.prefix(8))...) returning \(tabs.count) tabs:")
-        for tab in tabs {
-            print("   - \(tab.name) (id: \(tab.id.uuidString.prefix(8))..., folderId: \(tab.folderId?.uuidString.prefix(8) ?? "nil"))")
-        }
         return tabs
     }
     

@@ -33,9 +33,9 @@ struct TabPositionPreferenceKey: PreferenceKey {
 struct SpaceView: View {
     let space: Space
     let isActive: Bool
-    @Environment(BrowserManager.self) private var browserManager
-    @Environment(BrowserWindowState.self) private var windowState
-    @Environment(GradientColorManager.self) private var gradientColorManager
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
+    @EnvironmentObject var gradientColorManager: GradientColorManager
     @State private var draggedItem: UUID? = nil
     @State private var dropPreviewIndex: Int? = nil
     @State private var dropPreviewSection: SidebarTargetSection? = nil
@@ -64,7 +64,7 @@ struct SpaceView: View {
     let onMoveTabUp: (Tab) -> Void
     let onMoveTabDown: (Tab) -> Void
     let onMuteTab: (Tab) -> Void
-    @Environment(SplitViewManager.self) private var splitManager
+    @EnvironmentObject var splitManager: SplitViewManager
     
     private var outerWidth: CGFloat {
         let visibleWidth = windowState.sidebarWidth
@@ -79,10 +79,6 @@ struct SpaceView: View {
         max(outerWidth - 16, 0)
     }
     
-    private let dropZoneVerticalPadding: CGFloat = 12
-    private let dropZoneBaseHeight: CGFloat = 6
-    private let spacerBaseHeight: CGFloat = 2
-    
     private var tabs: [Tab] {
         browserManager.tabManager.tabs(in: space)
     }
@@ -92,9 +88,7 @@ struct SpaceView: View {
     }
 
     private var folders: [TabFolder] {
-        let folders = browserManager.tabManager.folders(for: space.id)
-        print("🔄 SpaceView.folders recomputed: \(folders.count) folders")
-        return folders
+        browserManager.tabManager.folders(for: space.id)
     }
 
     private var hasSpacePinnedContent: Bool {
@@ -102,16 +96,23 @@ struct SpaceView: View {
     }
     
     private var spacePinnedItems: [AnyHashable] {
-        // Force dependency tracking for both folder changes and tab changes
+        // Force dependency tracking for folder changes
         _ = folderChangeCount
+
         let currentFolders = folders
+        let currentSpacePinnedTabs = spacePinnedTabs
+
+        // Early return if no content
+        guard !currentSpacePinnedTabs.isEmpty || !currentFolders.isEmpty else {
+            return []
+        }
 
         var items: [AnyHashable] = []
 
-        // CRITICAL FIX: Filter out folder tabs from spacePinnedTabs before processing
+        // Filter out folder tabs from spacePinnedTabs before processing
         // Only tabs with folderId == nil should appear outside folders
-        let nonFolderSpacePinnedTabs = spacePinnedTabs.filter { $0.folderId == nil }
-        let folderSpacePinnedTabs = spacePinnedTabs.filter { $0.folderId != nil }
+        let nonFolderSpacePinnedTabs = currentSpacePinnedTabs.filter { $0.folderId == nil }
+        let folderSpacePinnedTabs = currentSpacePinnedTabs.filter { $0.folderId != nil }
 
         // Group folder tabs by their folderId
         let tabsByFolderId = Dictionary(grouping: folderSpacePinnedTabs) { tab in
@@ -128,9 +129,6 @@ struct SpaceView: View {
         let sortedNonFolderTabs = nonFolderSpacePinnedTabs.sorted { $0.index < $1.index }
         items.append(contentsOf: sortedNonFolderTabs)
 
-        print("🔄 spacePinnedItems recomputed: \(items.count) items (folderChangeCount: \(folderChangeCount), folders: \(currentFolders.count))")
-        print("   - nonFolderSpacePinnedTabs: \(nonFolderSpacePinnedTabs.count)")
-        print("   - folderSpacePinnedTabs: \(folderSpacePinnedTabs.count)")
         return items
     }
     
@@ -139,12 +137,7 @@ struct SpaceView: View {
         VStack(spacing: 4) {
             SpaceTitle(space: space)
 
-            if hasSpacePinnedContent || !tabs.isEmpty {
-                mainContentContainer
-            } else {
-                // Always show new tab button and separator even when empty
-                newTabButtonSectionWithClear
-            }
+            mainContentContainer
         }
         .padding(.horizontal, 8)
         .frame(minWidth: 0, maxWidth: outerWidth, alignment: .leading)
@@ -159,7 +152,9 @@ struct SpaceView: View {
             folderChangeCount += 1
         }
         .onHover { state in
-            isHovered = state
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovered = state
+            }
         }
       }
     
@@ -277,13 +272,12 @@ struct SpaceView: View {
                     TabFolderView(
                         folder: folderWithTabs.folder,
                         space: space,
-                        onRename: { renameFolder(folderWithTabs.folder) },
                         onDelete: { deleteFolder(folderWithTabs.folder) },
                         onAddTab: { addTabToFolder(folderWithTabs.folder) },
                         onActivateTab: { onActivateTab($0) }
                     )
-                    .environment(browserManager)
-                    .environment(windowState)
+                    .environmentObject(browserManager)
+                    .environmentObject(windowState)
                     .transition(.asymmetric(
                         insertion: .scale.combined(with: .opacity).animation(.easeInOut(duration: 0.3)),
                         removal: .scale.combined(with: .opacity).animation(.easeInOut(duration: 0.2))
@@ -438,17 +432,22 @@ struct SpaceView: View {
             Color.clear
                 .frame(height: 4)
                 .overlay(alignment: .center) {
-                    RoundedRectangle(cornerRadius: 1.5)
-                        .fill(AppColors.textSecondary)
-                        .frame(height: isActive ? 3 : 0)
-                        .padding(.horizontal, 8)
-                        .opacity(isActive ? 0.8 : 0)
-                        .animation(.easeInOut(duration: 0.15), value: isActive)
+                    HStack(spacing: 0) {
+                        Circle()
+                            .stroke(gradientColorManager.primaryColor , lineWidth: 2)
+                            .frame(width: isActive ? 8 : 0 , height: isActive ? 8 : 0)
+                            
+                        Rectangle()
+                            .fill(gradientColorManager.primaryColor)
+                            .frame(height: isActive ? 2 : 0)
+                    }
+                    .padding(.horizontal, 8)
+                    .opacity(isActive ? 0.8 : 0)
+                    .animation(.easeInOut(duration: 0.15), value: isActive)
                 }
 
             Color.clear
                 .frame(height: 28)
-                .contentShape(Rectangle())
                 .onDrop(
                     of: [.text],
                     delegate: SidebarSectionDropDelegateSimple(
@@ -504,6 +503,7 @@ struct SpaceView: View {
                 browserManager.tabManager.clearRegularTabs(for: space.id)
             }
             .padding(.horizontal, 8)
+            .padding(.top, 4)
 
             newTabButtonSection
         }
@@ -544,7 +544,7 @@ struct SpaceView: View {
         }
         .frame(minWidth: 0, maxWidth: innerWidth, alignment: .leading)
         .contentShape(Rectangle())
-        .padding(.top, 8)
+        .padding(.top, 2)
         .onDrop(
             of: [.text],
             delegate: SidebarSectionDropDelegateSimple(
@@ -574,7 +574,7 @@ struct SpaceView: View {
                     onActivate: onActivateTab,
                     onClose: onCloseTab
                 )
-                .environment(browserManager)
+                .environmentObject(browserManager)
             } else if idx == secondIdx {
                 EmptyView()
             } else {
@@ -648,26 +648,51 @@ struct SpaceView: View {
     }
     
     private var emptyRegularTabsDropTarget: some View {
-        ZStack { Color.clear.frame(height: 50) }
-            .padding(.top, 8)
-            .contentShape(Rectangle())
-            .onDrop(
-                of: [.text],
-                delegate: SidebarSectionDropDelegateSimple(
-                    itemsCount: { 0 },
-                    draggedItem: $draggedItem,
-                    targetSection: .spaceRegular(space.id),
-                    tabManager: browserManager.tabManager
-                )
+        let isActive = dropPreviewIndex == 0 && dropPreviewSection == .spaceRegular(space.id)
+
+        return ZStack {
+            Color.clear
+                .frame(minHeight: 100, maxHeight: .infinity)
+                .overlay(alignment: .top) {
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(AppColors.textSecondary)
+                        .frame(height: isActive ? 3 : 0)
+                        .padding(.horizontal, 8)
+                        .opacity(isActive ? 0.8 : 0)
+                        .animation(.easeInOut(duration: 0.15), value: isActive)
+                }
+        }
+        .padding(.top, 2)
+        .contentShape(Rectangle())
+        .onDrop(
+            of: [.text],
+            delegate: SidebarSectionDropDelegateSimple(
+                itemsCount: { 0 },
+                draggedItem: $draggedItem,
+                targetSection: .spaceRegular(space.id),
+                tabManager: browserManager.tabManager,
+                targetIndex: nil,
+                onDropEntered: {
+                    dropPreviewIndex = 0
+                    dropPreviewSection = .spaceRegular(space.id)
+                    NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                },
+                onDropCompleted: {
+                    dropPreviewIndex = nil
+                    dropPreviewSection = nil
+                },
+                onDropExited: {
+                    if dropPreviewIndex == 0 && dropPreviewSection == .spaceRegular(space.id) {
+                        dropPreviewIndex = nil
+                        dropPreviewSection = nil
+                    }
+                }
             )
+        )
     }
     
     // MARK: - Folder Management
-    
-    private func renameFolder(_ folder: TabFolder) {
-        print("Rename folder: \(folder.name)")
-    }
-    
+
     private func deleteFolder(_ folder: TabFolder) {
         browserManager.tabManager.deleteFolder(folder.id)
     }

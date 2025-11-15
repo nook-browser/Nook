@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct SpaceTab: View {
-    var tab: Tab
+    @ObservedObject var tab: Tab
     var action: () -> Void
     var onClose: () -> Void
     var onMute: () -> Void
@@ -16,12 +16,11 @@ struct SpaceTab: View {
     @State private var isCloseHovering: Bool = false
     @State private var isSpeakerHovering: Bool = false
     @FocusState private var isTextFieldFocused: Bool
-    @Environment(BrowserManager.self) private var browserManager
-    @Environment(BrowserWindowState.self) private var windowState
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     @Environment(\.colorScheme) var colorScheme
 
     var body: some View {
-        @Bindable var tab = tab
         Button(action: {
             if isCurrentTab {
                 print("🔄 [SpaceTab] Starting rename for tab '\(tab.name)' in window \(windowState.id)")
@@ -52,7 +51,7 @@ struct SpaceTab: View {
                             .offset(x: 6, y: -6)
                     }
                 }
-                if tab.hasAudioContent || tab.isAudioMuted {
+                if tab.hasAudioContent || tab.hasPlayingAudio || tab.isAudioMuted {
                     Button(action: {
                         onMute()
                     }) {
@@ -129,7 +128,6 @@ struct SpaceTab: View {
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(PlainButtonStyle())
-        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.05)) {
                 isHovering = hovering
@@ -164,7 +162,7 @@ struct SpaceTab: View {
                 }
                 Divider()
             }
-            if tab.hasAudioContent || tab.isAudioMuted {
+            if tab.hasAudioContent || tab.hasPlayingAudio || tab.isAudioMuted {
                 Button(action: onMute) {
                     Label(tab.isAudioMuted ? "Unmute Audio" : "Mute Audio",
                           systemImage: tab.isAudioMuted ? "speaker.wave.2" : "speaker.slash")

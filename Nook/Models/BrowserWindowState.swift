@@ -7,13 +7,12 @@
 
 import SwiftUI
 import Foundation
-import Observation
 
 /// Represents the state of a single browser window, allowing multiple windows
 /// to have independent tab selections and UI states while sharing the same tab data.
 @MainActor
 @Observable
-class BrowserWindowState {
+class BrowserWindowState: ObservableObject {
     /// Unique identifier for this window instance
     let id: UUID
     
@@ -82,42 +81,12 @@ class BrowserWindowState {
 
     /// Gradient currently displayed for this window's active space
     var activeGradient: SpaceGradient = .default
-    
-    var isFullScreen: Bool = false
 
     /// Reference to the actual NSWindow for this window state
     var window: NSWindow?
-    
-    @objc private func windowDidEnterFullScreen(_ notification: Notification) {
-        if notification.object is NSWindow {
-            isFullScreen = true
-        }
-    }
-
-    @objc private func windowDidExitFullScreen(_ notification: Notification) {
-        if notification.object is NSWindow {
-            isFullScreen = false
-        }
-    }
 
     init(id: UUID = UUID()) {
         self.id = id
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(windowDidEnterFullScreen),
-            name: NSWindow.didEnterFullScreenNotification,
-            object: nil
-        )
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(windowDidExitFullScreen),
-            name: NSWindow.didExitFullScreenNotification,
-            object: nil
-        )
-    }
-    
-    deinit {
-        NotificationCenter.default.removeObserver(self)
     }
     
     /// Increment the compositor version to trigger UI updates

@@ -54,13 +54,15 @@ class BrowserConfiguration {
         // Enable background media playback
         config.allowsAirPlayForMediaPlayback = true
         
-        // User agent for better compatibility
+        // User agent for better compatibility with Client Hints support
         config.applicationNameForUserAgent = "Version/26.0.1 Safari/605.1.15"
 
         // Web inspector will be enabled per-webview using isInspectable property
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
 
         // Note: webExtensionController will be set by ExtensionManager during initialization
+        // Note: WebAuthn/Passkey support is enabled by default in WKWebView on macOS 13.3+
+        // and requires only: entitlements, WKUIDelegate methods, and Info.plist descriptions
 
         return config
     }()
@@ -99,7 +101,7 @@ class BrowserConfiguration {
         // Enable background media playback
         config.allowsAirPlayForMediaPlayback = true
 
-        // User agent for better compatibility (mirror default config)
+        // User agent for better compatibility with Client Hints support (mirror default config)
         config.applicationNameForUserAgent = "Version/26.0.1 Safari/605.1.15"
 
         // Cache/perf optimizations mirroring profile-scoped variant
@@ -145,7 +147,7 @@ class BrowserConfiguration {
         // Enable background media playback
         config.allowsAirPlayForMediaPlayback = true
 
-        // User agent for better compatibility (mirror default config)
+        // User agent for better compatibility with Client Hints support (mirror default config)
         config.applicationNameForUserAgent = "Version/26.0.1 Safari/605.1.15"
         
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
@@ -160,7 +162,23 @@ class BrowserConfiguration {
         config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
         config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
         config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
+        
         return config
+    }
+    
+    // MARK: - User-Agent Client Hints Configuration
+    
+    /// Configure User-Agent Client Hints for enhanced browser capability reporting
+    /// This ensures websites receive proper information about platform capabilities
+    /// including passkey/WebAuthn support
+    private func configureClientHints(_ config: WKWebViewConfiguration) {
+        // User-Agent Client Hints are automatically supported when using a Safari-compatible User-Agent
+        // The applicationNameForUserAgent setting enables this functionality
+        // Additional headers like Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Platform are sent automatically
+        
+        // Enable features that support Client Hints
+        config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
+        config.preferences.setValue(true, forKey: "getUserMediaRequiresFocus")
     }
     
     // MARK: - Chrome Web Store Integration

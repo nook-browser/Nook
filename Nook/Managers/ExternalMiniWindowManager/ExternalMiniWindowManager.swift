@@ -8,11 +8,9 @@
 import SwiftUI
 import WebKit
 import AppKit
-import Observation
 
 @MainActor
-@Observable
-final class MiniWindowSession: Identifiable {
+final class MiniWindowSession: ObservableObject, Identifiable {
     let id = UUID()
     let profile: Profile?
     let originName: String
@@ -20,13 +18,13 @@ final class MiniWindowSession: Identifiable {
     private let adoptHandler: (MiniWindowSession) -> Void
     private let authCompletionHandler: ((Bool, URL?) -> Void)?
 
-    var currentURL: URL
-    var title: String
-    var isLoading: Bool = true
-    var estimatedProgress: Double = 0
-    var isAuthComplete: Bool = false
-    var authSuccess: Bool = false
-    var toolbarColor: NSColor?
+    @Published var currentURL: URL
+    @Published var title: String
+    @Published var isLoading: Bool = true
+    @Published var estimatedProgress: Double = 0
+    @Published var isAuthComplete: Bool = false
+    @Published var authSuccess: Bool = false
+    @Published var toolbarColor: NSColor?
 
     init(
         url: URL,
@@ -192,7 +190,7 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
                 onClose(session)
             }
         )
-        .environment(gradientColorManager)
+        .environmentObject(gradientColorManager)
 
         let hostingController = NSHostingController(rootView: contentView)
         let window = NSWindow(

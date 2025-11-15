@@ -45,9 +45,9 @@ struct LinkStatusBar: View {
 }
 
 struct WebsiteView: View {
-    @Environment(BrowserManager.self) private var browserManager
-    @Environment(BrowserWindowState.self) private var windowState
-    @Environment(SplitViewManager.self) private var splitManager
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
+    @EnvironmentObject var splitManager: SplitViewManager
     @State private var hoveredLink: String?
     @State private var isCommandPressed: Bool = false
     @State private var isDropTargeted: Bool = false
@@ -70,9 +70,6 @@ struct WebsiteView: View {
                         .background(shouldShowSplit ? Color.clear : Color(nsColor: .windowBackgroundColor))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .clipShape(RoundedRectangle(cornerRadius: {
-                            if windowState.isFullScreen {
-                                return 0
-                            }
                             if #available(macOS 26.0, *) {
                                 return 12
                             } else {
@@ -84,19 +81,18 @@ struct WebsiteView: View {
                         .overlay(alignment: .top) {
                             if shouldShowSplit {
                                 SplitControlsOverlay()
-                                    .environment(browserManager)
-                                    .environment(splitManager)
-                                    .environment(windowState)
+                                    .environmentObject(browserManager)
+                                    .environmentObject(splitManager)
+                                    .environmentObject(windowState)
                             }
                         }
+                        // Critical: Use allowsHitTesting to prevent SwiftUI from intercepting mouse events
+                        // This allows right-clicks to pass through to the underlying NSView (WKWebView)
+                        .allowsHitTesting(true)
+                        .contentShape(Rectangle())
                     }
-                    .contextMenu {
-                        // Divider + close buttons overlay when split is active
-                        if splitManager.isSplit(for: windowState.id) {
-                            Button("Exit Split View") { splitManager.exitSplit(keep: .left, for: windowState.id) }
-                            Button("Swap Sides") { splitManager.swapSides(for: windowState.id) }
-                        }
-                    }
+                    // Removed SwiftUI contextMenu - it intercepts ALL right-clicks
+                    // WKWebView's willOpenMenu will handle context menus for images
                 } else {
                     EmptyWebsiteView()
                 }
@@ -112,7 +108,7 @@ struct WebsiteView: View {
                     if let assist = browserManager.oauthAssist,
                        browserManager.currentTab(for: windowState)?.id == assist.tabId {
                         OAuthAssistBanner(host: assist.host)
-                            .environment(browserManager)
+                            .environmentObject(browserManager)
                             .animation(.spring(response: 0.5, dampingFraction: 0.8), value: browserManager.oauthAssist)
                             .padding(10)
                     }
@@ -167,7 +163,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(browserManager: browserManager, windowState: windowState) }
 
     func makeNSView(context: Context) -> NSView {
-        let containerView = NSView()
+        let containerView = ContainerView()
         containerView.wantsLayer = true
         containerView.layer?.backgroundColor = NSColor.clear.cgColor
         containerView.postsFrameChangedNotifications = true
@@ -411,11 +407,68 @@ private extension WebsiteView {
     }
 }
 
+// MARK: - Container View that forwards right-clicks to webviews
+
+private class ContainerView: NSView {
+    // Don't intercept events - let them pass through to webviews
+    override var acceptsFirstResponder: Bool { false }
+    
+    // Forward right-clicks to the webview below so context menus work
+    override func rightMouseDown(with event: NSEvent) {
+        print("🔽 [ContainerView] rightMouseDown received, forwarding to webview")
+        // Find the webview at this point and forward the event
+        let point = convert(event.locationInWindow, from: nil)
+        // Use hitTest to find the actual view at this point (will skip overlay if hitTest returns nil)
+        if let hitView = hitTest(point) {
+            if let webView = hitView as? WKWebView {
+                print("🔽 [ContainerView] Found webview via hitTest, forwarding rightMouseDown")
+                webView.rightMouseDown(with: event)
+                return
+            }
+            // Check if hitView contains a webview
+            if let webView = findWebView(in: hitView, at: point) {
+                print("🔽 [ContainerView] Found nested webview, forwarding rightMouseDown")
+                webView.rightMouseDown(with: event)
+                return
+            }
+        }
+        // Fallback: search all subviews
+        for subview in subviews.reversed() {
+            if let webView = findWebView(in: subview, at: point) {
+                print("🔽 [ContainerView] Found webview in subviews, forwarding rightMouseDown")
+                webView.rightMouseDown(with: event)
+                return
+            }
+        }
+        print("🔽 [ContainerView] No webview found, calling super")
+        super.rightMouseDown(with: event)
+    }
+    
+    private func findWebView(in view: NSView, at point: NSPoint) -> WKWebView? {
+        let pointInView = view.convert(point, from: self)
+        if view.bounds.contains(pointInView) {
+            if let webView = view as? WKWebView {
+                return webView
+            }
+            for subview in view.subviews {
+                if let webView = findWebView(in: subview, at: point) {
+                    return webView
+                }
+            }
+        }
+        return nil
+    }
+}
+
+// Split view context menu is handled via buttons in SplitControlsOverlay
+// We don't use SwiftUI's contextMenu modifier because it intercepts all right-clicks
+// and prevents WKWebView's willOpenMenu from being called
+
 // MARK: - Split Controls Overlay
 private struct SplitControlsOverlay: View {
-    @Environment(BrowserManager.self) private var browserManager
-    @Environment(SplitViewManager.self) private var splitManager
-    @Environment(BrowserWindowState.self) private var windowState
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var splitManager: SplitViewManager
+    @EnvironmentObject var windowState: BrowserWindowState
 
     @State private var dragOffset: CGFloat = 0
 

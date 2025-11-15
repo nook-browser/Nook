@@ -7,15 +7,13 @@
 
 import SwiftUI
 import AppKit
-import Observation
 
 /// Manages reveal/hide of the overlay sidebar when the real sidebar is collapsed.
 /// Uses a global mouse-move monitor to handle edge hover, including slight overshoot
 /// beyond the window's left boundary.
-@Observable
-final class HoverSidebarManager {
+final class HoverSidebarManager: ObservableObject {
     // MARK: - Published State
-    var isOverlayVisible: Bool = false
+    @Published var isOverlayVisible: Bool = false
 
     // MARK: - Configuration
     /// Width inside the window that triggers reveal when hovered.

@@ -4,8 +4,8 @@ import UniformTypeIdentifiers
 import Sparkle
 
 struct SidebarView: View {
-    @Environment(BrowserManager.self) private var browserManager
-    @Environment(BrowserWindowState.self) private var windowState
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     @Environment(\.tabDragManager) private var dragManager
     @State private var activeSpaceIndex: Int = 0
     @State private var currentScrollID: Int? = nil
@@ -183,8 +183,8 @@ struct SidebarView: View {
                     width: availableContentWidth,
                     profileId: effectiveProfileId
                 )
-                .environment(browserManager)
-                .environment(windowState)
+                .environmentObject(browserManager)
+                .environmentObject(windowState)
             }
             .padding(.horizontal, 8)
             .modifier(FallbackDropBelowEssentialsModifier())
@@ -219,12 +219,17 @@ struct SidebarView: View {
             
             // Update notification overlay
             SidebarUpdateNotification(downloadsMenuVisible: showDownloadsMenu)
-                .environment(browserManager)
-                .environment(windowState)
+                .environmentObject(browserManager)
+                .environmentObject(windowState)
                 .environment(browserManager.settingsManager)
                 .padding(.horizontal, 8)
                 .padding(.bottom, 8)
-            
+
+            // Media controls - appears when media is actively playing
+            MediaControlsView()
+                .environmentObject(browserManager)
+                .environmentObject(windowState)
+
             // MARK: - Bottom
             ZStack {
                 // Left side icons - anchored to left
@@ -263,8 +268,8 @@ struct SidebarView: View {
                 
                 // Center content - space indicators
                 SpacesList()
-                    .environment(browserManager)
-                    .environment(windowState)
+                    .environmentObject(browserManager)
+                    .environmentObject(windowState)
                 
                 // Right side icons - anchored to right
                 HStack {
@@ -293,7 +298,7 @@ struct SidebarView: View {
                     .transition(.move(edge: browserManager.settingsManager.sidebarPosition == .left ? .leading : .trailing).combined(with: .opacity))
             } else {
                 content
-                    .transition(.blur)
+                    .transition(.opacity)
             }
         }
             .frame(width: effectiveWidth)
@@ -473,9 +478,9 @@ struct SidebarView: View {
                 onMoveTabDown: { browserManager.tabManager.moveTabDown($0.id) },
                 onMuteTab: { $0.toggleMute() }
             )
-            .environment(browserManager)
-            .environment(windowState)
-            .environment(browserManager.splitManager)
+            .environmentObject(browserManager)
+            .environmentObject(windowState)
+            .environmentObject(browserManager.splitManager)
             .id(space.id.uuidString + "-w\(Int(windowState.sidebarContentWidth))")
             Spacer()
         }

@@ -7,18 +7,16 @@
 
 import SwiftUI
 import AppKit
-import Observation
 
 @MainActor
-@Observable
-class DragLockManager {
+class DragLockManager: ObservableObject {
     // MARK: - Shared Instance
     static let shared = DragLockManager()
 
     // MARK: - Drag Lock State
-    var isLocked: Bool = false
-    var lockOwner: String? = nil
-    var lockStartTime: Date? = nil
+    @Published var isLocked: Bool = false
+    @Published var lockOwner: String? = nil
+    @Published var lockStartTime: Date? = nil
 
     // MARK: - Lock Operations
 

@@ -7,10 +7,9 @@
 
 import SwiftUI
 import WebKit
-import Observation
 
 struct PeekWebView: NSViewRepresentable {
-    var session: PeekSession
+    @ObservedObject var session: PeekSession
     weak var peekManager: PeekManager?
 
     func makeCoordinator() -> Coordinator {

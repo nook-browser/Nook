@@ -8,16 +8,17 @@
 import SwiftUI
 
 struct SidebarResizeView: View {
-    @Environment(BrowserManager.self) private var browserManager
-    @Environment(BrowserWindowState.self) private var windowState
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
     @State private var isResizing = false
     @State private var isHovering = false
     @State private var startingWidth: CGFloat = 0
     @State private var startingMouseX: CGFloat = 0
-    @State private var dragLockManager = DragLockManager.shared
+    @StateObject private var dragLockManager = DragLockManager.shared
     @State private var dragSessionID: String = UUID().uuidString
+    @Environment(\.colorScheme) var colorScheme
 
-    private let minWidth: CGFloat = 260
+    private let minWidth: CGFloat = 180
     private let maxWidth: CGFloat = 520
 
     private var sitsOnRight: Bool {
@@ -35,9 +36,9 @@ struct SidebarResizeView: View {
     var body: some View {
         ZStack {
             if isHovering || isResizing {
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(Color.accentColor)
-                    .frame(width: 2)
+                RoundedRectangle(cornerRadius: 100)
+                    .fill(colorScheme == .dark  ? .white.opacity(0.45) : .black.opacity(0.45))
+                    .frame(width: 4)
                     .frame(maxHeight: .infinity)
                     .offset(x: indicatorOffset)
                     .animation(.easeInOut(duration: 0.15), value: isResizing)

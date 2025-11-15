@@ -8,8 +8,8 @@
 import SwiftUI
 
 struct TabClosureToast: View {
-    @Environment(BrowserManager.self) private var browserManager
-    @Environment(BrowserWindowState.self) private var windowState
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
 
     @State private var isVisible: Bool = false
     @State private var isHovering: Bool = false

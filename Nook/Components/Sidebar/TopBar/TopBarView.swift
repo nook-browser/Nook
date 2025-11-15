@@ -8,10 +8,11 @@
 import SwiftUI
 
 struct TopBarView: View {
-    @Environment(BrowserManager.self) private var browserManager
-    @Environment(BrowserWindowState.self) private var windowState
-    @State private var tabWrapper = ObservableTabWrapper()
+    @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var windowState: BrowserWindowState
+    @StateObject private var tabWrapper = ObservableTabWrapper()
     @State private var isHovering: Bool = false
+    @State private var showZoomPopup: Bool = false
     
     var body: some View {
         HStack(spacing: 8) {
@@ -114,6 +115,29 @@ struct TopBarView: View {
                             }
                         }
                     }
+
+                    // Zoom button (always show when there's a current tab)
+                    if browserManager.currentTab(for: windowState) != nil {
+                        Button(action: {
+                            showZoomPopup.toggle()
+                        }) {
+                            HStack(spacing: 2) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 10, weight: .medium))
+                                Text(browserManager.getCurrentZoomPercentage())
+                                    .font(.system(size: 10, weight: .medium))
+                            }
+                            .foregroundStyle(textColor)
+                            .frame(width: 50, height: 20)
+                            .contentShape(RoundedRectangle(cornerRadius: 4))
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .onHover { hovering in
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                isHovering = hovering
+                            }
+                        }
+                    }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -151,6 +175,37 @@ struct TopBarView: View {
         .onReceive(Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()) { _ in
             updateCurrentTab()
         }
+        .overlay(
+            // Zoom popup overlay for button click (shows when showZoomPopup is true)
+            Group {
+                if showZoomPopup {
+                    ZoomPopupView(
+                        zoomManager: browserManager.zoomManager,
+                        onZoomIn: {
+                            browserManager.zoomInCurrentTab()
+                        },
+                        onZoomOut: {
+                            browserManager.zoomOutCurrentTab()
+                        },
+                        onZoomReset: {
+                            browserManager.resetZoomCurrentTab()
+                        },
+                        onZoomPresetSelected: { zoomLevel in
+                            browserManager.applyZoomLevel(zoomLevel)
+                        },
+                        onDismiss: {
+                            showZoomPopup = false
+                        }
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .padding(.trailing, 16)
+                    .padding(.top, 60)
+                    .transition(.opacity.combined(with: .scale))
+                    .zIndex(1000)
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: showZoomPopup)
+        )
     }
     
     private func updateCurrentTab() {
