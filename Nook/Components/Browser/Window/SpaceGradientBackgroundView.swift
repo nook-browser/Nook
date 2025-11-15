@@ -19,6 +19,7 @@ struct SpaceGradientBackgroundView: View {
 
     var body: some View {
         ZStack {
+            
             // Always use BarycentricGradientView for active window - it handles 1-3 colors smoothly
             // For inactive windows, also use Barycentric since spaces only have 1-3 colors max
             BarycentricGradientView(gradient: gradient)

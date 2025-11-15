@@ -151,10 +151,10 @@ struct CommandPaletteView: View {
                         .padding(10)
                         .frame(maxWidth: .infinity)
                         .frame(width: effectiveCommandPaletteWidth)
+                        .background(Color(.windowBackgroundColor).opacity(0.35))
+                        .clipShape(.rect(cornerRadius: 26))
                         .universalGlassEffect(
-                            .regular.tint(
-                                gradientColorManager.primaryColor.adjustedLuminance(by: colorScheme == .light ? 0.4 : 0.2).opacity( colorScheme == .light ? 0.05 : 0.55)
-                            ),
+                            .regular.tint(Color(.windowBackgroundColor).opacity(0.35)),
                             in: .rect(cornerRadius: 26))
                         .animation(
                             .easeInOut(duration: 0.15),
@@ -458,4 +458,16 @@ struct CommandPaletteView: View {
             return false
         }
     }
+}
+
+struct BackdropView: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .popover
+        view.blendingMode = .withinWindow
+        view.state = .active
+        return view
+    }
+    
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) { }
 }
