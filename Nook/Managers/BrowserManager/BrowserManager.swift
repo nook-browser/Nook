@@ -391,7 +391,6 @@ class BrowserManager: ObservableObject {
     var modelContext: ModelContext
     var tabManager: TabManager
     var profileManager: ProfileManager
-    var settingsManager: SettingsManager
     var dialogManager: DialogManager
     var downloadManager: DownloadManager
     var authenticationManager: AuthenticationManager

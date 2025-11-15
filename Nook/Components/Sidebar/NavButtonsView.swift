@@ -46,12 +46,13 @@ class ObservableTabWrapper: ObservableObject {
 struct NavButtonsView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(\.nookSettings) var nookSettings
     var effectiveSidebarWidth: CGFloat?
     @StateObject private var tabWrapper = ObservableTabWrapper()
     @State private var isMenuHovered = false
-    
+
     var body: some View {
-        let sidebarOnLeft = browserManager.settingsManager.sidebarPosition == .left
+        let sidebarOnLeft = nookSettings.sidebarPosition == .left
         let sidebarWidthForLayout = effectiveSidebarWidth ?? windowState.sidebarWidth
         let navigationCollapseThreshold: CGFloat = 280
         let refreshCollapseThreshold: CGFloat = 240
@@ -74,7 +75,7 @@ struct NavButtonsView: View {
             .buttonStyle(NavButtonStyle())
             .foregroundStyle(Color.primary)
             
-            if browserManager.settingsManager.showAIAssistant && !shouldCollapseAIChat {
+            if nookSettings.showAIAssistant && !shouldCollapseAIChat {
                 Button("Toggle AI Assistant", systemImage: "sparkle") {
                     browserManager.toggleAISidebar(for: windowState)
                 }
@@ -90,7 +91,7 @@ struct NavButtonsView: View {
                     collapsedMenu(
                         includeNavigation: true,
                         includeRefresh: shouldCollapseRefresh,
-                        includeAIChat: shouldCollapseAIChat && browserManager.settingsManager.showAIAssistant
+                        includeAIChat: shouldCollapseAIChat && nookSettings.showAIAssistant
                     )
                 } else {
                     HStack(alignment: .center, spacing: 8) {
@@ -123,7 +124,7 @@ struct NavButtonsView: View {
                         collapsedMenu(
                             includeNavigation: false,
                             includeRefresh: shouldCollapseRefresh,
-                            includeAIChat: shouldCollapseAIChat && browserManager.settingsManager.showAIAssistant
+                            includeAIChat: shouldCollapseAIChat && nookSettings.showAIAssistant
                         )
                     }
                 }

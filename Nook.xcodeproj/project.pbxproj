@@ -125,9 +125,17 @@
 			path = Sidebar;
 			sourceTree = "<group>";
 		};
+		2D0834C52EC8D49600C302AC /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
 		7F8340F32E37F39400674A5D = {
 			isa = PBXGroup;
 			children = (
+				2D0834C52EC8D49600C302AC /* Settings */,
 				2D0834C02EC8CE6800C302AC /* Sidebar */,
 				2D0834BE2EC8CE0C00C302AC /* CommandPalette */,
 				7F8340FD2E37F39400674A5D /* Products */,

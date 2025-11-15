@@ -167,10 +167,11 @@ struct WebsiteView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
     @EnvironmentObject var splitManager: SplitViewManager
+    @Environment(\.nookSettings) var nookSettings
     @State private var hoveredLink: String?
     @State private var isCommandPressed: Bool = false
     @State private var isDropTargeted: Bool = false
-    
+
     private var cornerRadius: CGFloat {
         if #available(macOS 26.0, *) {
             return 12
@@ -180,7 +181,7 @@ struct WebsiteView: View {
     }
     
     private var webViewClipShape: AnyShape {
-        let hasTopBar = browserManager.settingsManager.topBarAddressView
+        let hasTopBar = nookSettings.topBarAddressView
         
         if hasTopBar {
             return AnyShape(UnevenRoundedRectangle(
@@ -251,7 +252,7 @@ struct WebsiteView: View {
                     }
                 }
                 Spacer()
-                if browserManager.settingsManager.showLinkStatusBar {
+                if nookSettings.showLinkStatusBar {
                     HStack {
                         LinkStatusBar(
                             hoveredLink: hoveredLink,

@@ -530,6 +530,7 @@ class TabManager: ObservableObject {
 
     private func attach(_ tab: Tab) {
         tab.browserManager = browserManager
+        tab.settingsManager = browserManager?.settingsManager
     }
 
     private func allTabsAllSpaces() -> [Tab] {
