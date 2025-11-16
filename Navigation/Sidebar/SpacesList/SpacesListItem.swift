@@ -18,6 +18,7 @@ struct SpacesListItem: View {
     let isFaded: Bool
 
     @State private var isHovering: Bool = false
+    @StateObject private var emojiManager = EmojiPickerManager()
 
     private let dotSize: CGFloat = 6
 
@@ -55,9 +56,25 @@ struct SpacesListItem: View {
             // Normal mode: show icon or emoji
             if isEmoji(space.icon) {
                 Text(space.icon)
+                    .background(EmojiPickerAnchor(manager: emojiManager))
+                    .onTapGesture(count: 2) {
+                        emojiManager.toggle()
+                    }
+                    .onChange(of: emojiManager.selectedEmoji) { _, newValue in
+                        space.icon = newValue
+                        browserManager.tabManager.persistSnapshot()
+                    }
             } else {
                 Image(systemName: space.icon)
                     .foregroundStyle(iconColor)
+                    .background(EmojiPickerAnchor(manager: emojiManager))
+                    .onTapGesture(count: 2) {
+                        emojiManager.toggle()
+                    }
+                    .onChange(of: emojiManager.selectedEmoji) { _, newValue in
+                        space.icon = newValue
+                        browserManager.tabManager.persistSnapshot()
+                    }
             }
         }
     }
@@ -75,7 +92,11 @@ struct SpacesListItem: View {
         SpaceContextMenu(
             space: space,
             canDelete: browserManager.tabManager.spaces.count > 1,
-            onEditSpace: showSpaceEditDialog,
+            onEditName: nil,
+            onEditIcon: {
+                emojiManager.toggle()
+            },
+            onOpenSettings: showSpaceEditDialog,
             onDeleteSpace: {
                 browserManager.tabManager.removeSpace(space.id)
             }

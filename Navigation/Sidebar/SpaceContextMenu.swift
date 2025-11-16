@@ -13,8 +13,9 @@ struct SpaceContextMenu: View {
 
     let space: Space
     let canDelete: Bool
-
-    let onEditSpace: () -> Void
+    let onEditName: (() -> Void)?
+    let onEditIcon: (() -> Void)?
+    let onOpenSettings: () -> Void
     let onDeleteSpace: () -> Void
 
     var body: some View {
@@ -39,23 +40,52 @@ struct SpaceContextMenu: View {
 
             Divider()
 
-            // Edit space
-            Button {
-                onEditSpace()
-            } label: {
-                Label("Edit Space", systemImage: "square.and.pencil")
+            // Rename (optional - only available for SpaceTitle)
+            if let onEditName = onEditName {
+                Button {
+                    onEditName()
+                } label: {
+                    Label("Rename", systemImage: "textformat")
+                }
             }
 
-            // Theme color
+            // Change icon (optional - only available for SpaceTitle)
+            if let onEditIcon = onEditIcon {
+                Button {
+                    onEditIcon()
+                } label: {
+                    Label("Change Icon", systemImage: "face.smiling")
+                }
+            }
+
+            // Customize appearance
             Button {
                 browserManager.showGradientEditor()
             } label: {
-                Label("Edit Theme Color", systemImage: "paintpalette")
+                Label("Customize Appearance", systemImage: "paintpalette")
             }
+
+            Divider()
+
+            // Space settings
+            Button {
+                onOpenSettings()
+            } label: {
+                Label("Space Settings", systemImage: "gear")
+            }
+
+            Divider()
+
+            // Duplicate space (TODO)
+            Button {
+                // TODO: Implement duplicate space
+            } label: {
+                Label("Duplicate Space", systemImage: "plus.square.on.square")
+            }
+            .disabled(true)
 
             // Delete space
             if canDelete {
-                Divider()
                 Button(role: .destructive) {
                     onDeleteSpace()
                 } label: {

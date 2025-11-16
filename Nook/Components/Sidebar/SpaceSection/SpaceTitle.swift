@@ -104,52 +104,39 @@ struct SpaceTitle: View {
 
 
             Menu {
-                SpaceProfileDropdown(
-                    currentProfileId: space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID(),
-                    onProfileSelected: { assignProfile($0) }
+                SpaceContextMenu(
+                    space: space,
+                    canDelete: canDeleteSpace,
+                    onEditName: {
+                        startRenaming()
+                    },
+                    onEditIcon: {
+                        emojiManager.toggle()
+                    },
+                    onOpenSettings: {
+                        browserManager.dialogManager.showDialog(
+                            SpaceEditDialog(
+                                space: space,
+                                mode: .icon,
+                                onSave: { newName, newIcon, newProfileId in
+                                    updateSpace(name: newName, icon: newIcon, profileId: newProfileId)
+                                },
+                                onCancel: {
+                                    browserManager.dialogManager.closeDialog()
+                                }
+                            )
+                        )
+                    },
+                    onDeleteSpace: deleteSpace
                 )
                 .environmentObject(browserManager)
-                Divider()
-                Button {
-                    startRenaming()
-                } label: {
-                    Label("Rename Space", systemImage: "pencil")
-                }
-                Button {
-                    emojiManager.toggle()
-                } label: {
-                    Label("Change Icon", systemImage: "face.smiling")
-                }
-                Divider()
-                Button {
-                    createFolder()
-                } label: {
-                    Label("Create Folder", systemImage: "folder.badge.plus")
-                }
-                if canDeleteSpace {
-                    Button(role: .destructive) {
-                        deleteSpace()
-                    } label: {
-                        Label("Delete Space", systemImage: "trash")
-                    }
-                }
             } label: {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(isEllipsisHovering ? .white.opacity(0.07) : .clear)
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 16))
-                        .foregroundStyle(AppColors.textSecondary)
-                        .opacity(isHovering ? 1.0 : 0.0)
-                }
-                .frame(width: 24, height: 24)
-                .contentShape(RoundedRectangle(cornerRadius: 6))
-                .onHover { hovering in
-                    isEllipsisHovering = hovering
-                }
+                Label("Configure Space", systemImage: "ellipsis")
+                    .labelStyle(.iconOnly)
+                    .opacity(isHovering ? 1.0 : 0.0)
             }
             .menuStyle(.button)
-            .buttonStyle(PlainButtonStyle())
+            .buttonStyle(NavButtonStyle())
 
         }
         // Match tabs' internal left/right padding so text aligns
@@ -185,10 +172,12 @@ struct SpaceTitle: View {
                             }
                         )
                     )
+                    .allowsHitTesting(false)
             }
         }
-        .padding(.horizontal, 10)
-        .frame(height: 40)
+        .padding(.leading, 10)
+        .padding(.trailing, 5)
+        .padding(.vertical, 5)
         .frame(maxWidth: .infinity)
         .background(hoverColor)
         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -209,7 +198,13 @@ struct SpaceTitle: View {
             SpaceContextMenu(
                 space: space,
                 canDelete: canDeleteSpace,
-                onEditSpace: {
+                onEditName: {
+                    startRenaming()
+                },
+                onEditIcon: {
+                    emojiManager.toggle()
+                },
+                onOpenSettings: {
                     browserManager.dialogManager.showDialog(
                         SpaceEditDialog(
                             space: space,
