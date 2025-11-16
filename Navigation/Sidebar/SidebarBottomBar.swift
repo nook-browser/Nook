@@ -17,7 +17,7 @@ struct SidebarBottomBar: View {
     let onMenuHover: (Bool) -> Void
     
     var body: some View {
-        HStack(alignment: .bottom, spacing: 0) {
+        HStack(alignment: .bottom, spacing: 10) {
             menuButton
             
             SpacesList()
@@ -26,7 +26,7 @@ struct SidebarBottomBar: View {
                 .environment(windowState)
             
             newSpaceButton
-        }
+        }.fixedSize(horizontal: false, vertical: true)
         .padding(.horizontal, 8)
     }
     
