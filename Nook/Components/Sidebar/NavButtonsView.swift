@@ -54,8 +54,11 @@ struct NavButtonsView: View {
     var body: some View {
         let sidebarOnLeft = nookSettings.sidebarPosition == .left
         let sidebarWidthForLayout = effectiveSidebarWidth ?? windowState.sidebarWidth
-        let navigationCollapseThreshold: CGFloat = 280
-        let refreshCollapseThreshold: CGFloat = 240
+
+        // Adjust thresholds based on whether AI button is shown
+        // When AI is disabled, we have more space, so thresholds are lower
+        let navigationCollapseThreshold: CGFloat = nookSettings.showAIAssistant ? 280 : 250
+        let refreshCollapseThreshold: CGFloat = nookSettings.showAIAssistant ? 240 : 210
         let aiChatCollapseThreshold: CGFloat = 220
 
         let shouldCollapseNavigation = sidebarWidthForLayout < navigationCollapseThreshold
