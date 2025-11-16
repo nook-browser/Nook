@@ -31,11 +31,13 @@ struct SpacesSideBarView: View {
 
     var body: some View {
         sidebarContent
+            .contentShape(Rectangle())
+            .onHover { state in
+                print("hovering: \(state)")
+                isSidebarHovered = state
+            }
             .contextMenu {
                 sidebarContextMenu
-            }
-            .onHover { state in
-                isSidebarHovered = state
             }
     }
 
@@ -290,11 +292,13 @@ struct SpacesSideBarView: View {
         browserManager.setActiveSpace(space, in: windowState)
     }
 
+    @ViewBuilder
     private func makeSpaceView(for space: Space, index: Int) -> some View {
         VStack(spacing: 0) {
             SpaceView(
                 space: space,
                 isActive: windowState.currentSpaceId == space.id,
+                isSidebarHovered: $isSidebarHovered,
                 onActivateTab: { browserManager.selectTab($0, in: windowState) },
                 onCloseTab: { browserManager.tabManager.removeTab($0.id) },
                 onPinTab: { browserManager.tabManager.pinTab($0) },

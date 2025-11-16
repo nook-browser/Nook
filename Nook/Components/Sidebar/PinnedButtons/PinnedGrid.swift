@@ -40,28 +40,53 @@ struct PinnedGrid: View {
         // For embedded use, return proper sized container even when empty to support transitions
         if items.isEmpty {
             let isDragging = draggedItem != nil
-            let backgroundColor = isDragging
-                ? (colorScheme == .dark ? AppColors.pinnedTabHoverLight : AppColors.pinnedTabHoverDark)
-                : Color.clear
 
             return AnyView(
-                backgroundColor
-                    .frame(height: isDragging ? 44 : 10)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .animation(.easeInOut(duration: 0.15), value: isDragging)
-                    .onDrop(
-                        of: [.text],
-                        delegate: SidebarSectionDropDelegateSimple(
-                            itemsCount: { 0 },
-                            draggedItem: $draggedItem,
-                            targetSection: .essentials,
-                            tabManager: browserManager.tabManager,
-                            targetIndex: nil,
-                            onDropEntered: {
-                                NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
-                            }
+                VStack(spacing: 8) {
+                    Image(systemName: "star.fill")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+
+                    VStack(spacing: 4) {
+                        Text("Drag to add Favorites")
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+
+//                        Text("Favorites keep your most\nused sites and apps close")
+//                            .font(.caption)
+//                            .foregroundStyle(.secondary)
+//                            .multilineTextAlignment(.center)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .padding(.horizontal, 12)
+                .background {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
+                        .foregroundStyle(isDragging ? Color.primary.opacity(0.4) : Color.secondary.opacity(0.3))
+                }
+                .background {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(isDragging
+                            ? (colorScheme == .dark ? AppColors.pinnedTabHoverLight : AppColors.pinnedTabHoverDark)
+                            : Color.clear
                         )
+                }
+                .animation(.easeInOut(duration: 0.15), value: isDragging)
+                .onDrop(
+                    of: [.text],
+                    delegate: SidebarSectionDropDelegateSimple(
+                        itemsCount: { 0 },
+                        draggedItem: $draggedItem,
+                        targetSection: .essentials,
+                        tabManager: browserManager.tabManager,
+                        targetIndex: nil,
+                        onDropEntered: {
+                            NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                        }
                     )
+                )
             )
         }
         

@@ -33,6 +33,7 @@ struct TabPositionPreferenceKey: PreferenceKey {
 struct SpaceView: View {
     let space: Space
     let isActive: Bool
+    @Binding var isSidebarHovered: Bool
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(CommandPalette.self) private var commandPalette
@@ -509,7 +510,7 @@ struct SpaceView: View {
 
     private var newTabButtonSectionWithClear: some View {
         VStack(spacing: 0) {
-            SpaceSeparator(isHovering: isHovered) {
+            SpaceSeparator(isHovering: $isSidebarHovered) {
                 browserManager.tabManager.clearRegularTabs(for: space.id)
             }
             .padding(.horizontal, 8)
