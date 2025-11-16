@@ -7,41 +7,35 @@
 import SwiftUI
 
 struct SpaceSeparator: View {
-    var isHovering: Bool = false
+    @Binding var isHovering: Bool
     let onClear: () -> Void
-    @State private var isClearHovered: Bool = false
     @EnvironmentObject var browserManager: BrowserManager
 
     var body: some View {
         let hasTabs = !browserManager.tabManager.tabs(in: browserManager.tabManager.currentSpace!).isEmpty
-        let showClearButton = isHovering && hasTabs
-        
+        let _ = print("SpaceSeparator isHovering: \(isHovering), hasTabs: \(hasTabs)")
+
         HStack(spacing: 0) {
             RoundedRectangle(cornerRadius: 100)
                 .fill(Color.white.opacity(0.1))
-                .frame(height: 2)
-                .padding(.trailing, showClearButton ? 8 : 0)
-                .animation(.easeInOut(duration: 0.05), value: showClearButton)
+                .frame(height: 1)
+                .padding(.trailing, isHovering ? 8 : 0)
+                .animation(.smooth(duration: 0.1), value: isHovering)
             
-            if hasTabs {
+            if hasTabs && isHovering {
                 Button(action: onClear) {
-                    HStack(spacing: 2) {
+                    HStack(spacing: 7) {
                         Image(systemName: "arrow.down")
                             .font(.system(size: 10, weight: .bold))
                         Text("Clear")
                             .font(.system(size: 10, weight: .bold))
                     }
-                    .foregroundStyle(isClearHovered ? Color.white.opacity(0.8) : Color.white.opacity(0.3))
+                    .foregroundStyle(Color.white.opacity(0.8))
                     .padding(.horizontal, 4)
                 }
                 .buttonStyle(PlainButtonStyle())
                 .help("Clear all regular tabs")
-                .opacity(showClearButton ? 1 : 0)
-                .onHover { state in
-                    withAnimation(.easeInOut(duration: 0.05)) {
-                        isClearHovered = state
-                    }
-                }
+                .transition(.blur.animation(.smooth(duration: 0.1)))
             }
         }
         .frame(height: 2)

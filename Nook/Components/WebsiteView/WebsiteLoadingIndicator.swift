@@ -9,7 +9,7 @@ import SwiftUI
 
 struct WebsiteLoadingIndicator: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
     
     var body: some View {
         HStack {

@@ -3,6 +3,7 @@
 //  Nook
 //
 //  Created by Maciek Bagiński on 28/07/2025.
+//  Updated by Aether Aurelia on 15/11/2025.
 //
 
 import SwiftUI
@@ -10,31 +11,38 @@ import AppKit
 
 struct ContentView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @StateObject private var windowState = BrowserWindowState()
-    
+    @Environment(WindowRegistry.self) private var windowRegistry
+    @State private var windowState = BrowserWindowState()
+    @State private var commandPalette = CommandPalette()
+
     var body: some View {
         WindowView()
-            .environmentObject(windowState)
+            .environment(windowState)
+            .environment(commandPalette)
             .environmentObject(browserManager.gradientColorManager)
-            .background(WindowFocusBridge(windowState: windowState, browserManager: browserManager))
+            .background(WindowFocusBridge(windowState: windowState, windowRegistry: windowRegistry))
             .frame(minWidth: 470, minHeight: 382)
             .onAppear {
-                // Register this window state with the browser manager
-                browserManager.registerWindowState(windowState)
+                // Set TabManager reference for computed properties
+                windowState.tabManager = browserManager.tabManager
+                // Set CommandPalette reference for global shortcuts
+                windowState.commandPalette = commandPalette
+                // Register this window state with the registry
+                windowRegistry.register(windowState)
             }
             .onDisappear {
                 // Unregister this window state when the window closes
-                browserManager.unregisterWindowState(windowState.id)
+                windowRegistry.unregister(windowState.id)
             }
     }
 }
 
 private struct WindowFocusBridge: NSViewRepresentable {
     let windowState: BrowserWindowState
-    unowned let browserManager: BrowserManager
-    
+    let windowRegistry: WindowRegistry
+
     func makeCoordinator() -> Coordinator {
-        Coordinator(windowState: windowState, browserManager: browserManager)
+        Coordinator(windowState: windowState, windowRegistry: windowRegistry)
     }
     
     func makeNSView(context: Context) -> NSView {
@@ -57,13 +65,13 @@ private struct WindowFocusBridge: NSViewRepresentable {
 
     final class Coordinator: NSObject {
         let windowState: BrowserWindowState
-        weak var browserManager: BrowserManager?
+        let windowRegistry: WindowRegistry
         private weak var window: NSWindow?
         private var keyObserver: Any?
 
-        init(windowState: BrowserWindowState, browserManager: BrowserManager) {
+        init(windowState: BrowserWindowState, windowRegistry: WindowRegistry) {
             self.windowState = windowState
-            self.browserManager = browserManager
+            self.windowRegistry = windowRegistry
         }
 
         func attach(to window: NSWindow?) {
@@ -79,13 +87,13 @@ private struct WindowFocusBridge: NSViewRepresentable {
             ) { [weak self] _ in
                 guard let self else { return }
                 Task { @MainActor in
-                    self.browserManager?.setActiveWindowState(self.windowState)
+                    self.windowRegistry.setActive(self.windowState)
                 }
             }
 
             if window.isKeyWindow {
                 Task { @MainActor in
-                    browserManager?.setActiveWindowState(windowState)
+                    windowRegistry.setActive(windowState)
                 }
             }
         }

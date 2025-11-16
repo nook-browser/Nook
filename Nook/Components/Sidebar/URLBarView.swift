@@ -9,7 +9,8 @@ import SwiftUI
 
 struct URLBarView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
+    @Environment(\.nookSettings) var nookSettings
     @State private var isHovering: Bool = false
     var isSidebarHovered: Bool
 
@@ -53,7 +54,7 @@ struct URLBarView: View {
                     if isSidebarHovered {
                         if #available(macOS 15.5, *),
                            let extensionManager = browserManager.extensionManager,
-                           browserManager.settingsManager.experimentalExtensions {
+                           nookSettings.experimentalExtensions {
                             ExtensionActionView(extensions: extensionManager.installedExtensions)
                                 .environmentObject(browserManager)
                         }
@@ -84,7 +85,8 @@ struct URLBarView: View {
         // Focus URL bar when tapping anywhere in the bar
         .contentShape(Rectangle())
         .onTapGesture {
-            browserManager.focusURLBar()
+            let currentURL = browserManager.currentTab(for: windowState)?.url.absoluteString ?? ""
+            windowState.commandPalette?.open(prefill: currentURL, navigateCurrentTab: true)
         }
         
     }

@@ -5,23 +5,16 @@ import CoreGraphics
 
 // Renders the current space's gradient as a bottom background layer
 struct SpaceGradientBackgroundView: View {
-    @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var gradientColorManager: GradientColorManager
-    @EnvironmentObject var windowState: BrowserWindowState
-
-    private var isActiveWindow: Bool {
-        browserManager.activeWindowState?.id == windowState.id
-    }
+    @Environment(BrowserWindowState.self) private var windowState
 
     private var gradient: SpaceGradient {
-        isActiveWindow ? gradientColorManager.displayGradient : windowState.activeGradient
+        windowState.gradient
     }
 
     var body: some View {
         ZStack {
             Color(.windowBackgroundColor).opacity(max(0, (0.35 - gradient.opacity)))
-            // Always use BarycentricGradientView for active window - it handles 1-3 colors smoothly
-            // For inactive windows, also use Barycentric since spaces only have 1-3 colors max
+            // Always use BarycentricGradientView - it handles 1-3 colors smoothly
             BarycentricGradientView(gradient: gradient)
                 .opacity(max(0.0, min(1.0, gradient.opacity)))
                 .allowsHitTesting(false) // Entire background should not intercept input

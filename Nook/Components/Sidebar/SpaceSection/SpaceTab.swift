@@ -17,7 +17,7 @@ struct SpaceTab: View {
     @State private var isSpeakerHovering: Bool = false
     @FocusState private var isTextFieldFocused: Bool
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.colorScheme) var colorScheme
 
     var body: some View {
@@ -145,62 +145,161 @@ struct SpaceTab: View {
             }
         )
         .contextMenu {
-            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState) }
-            label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
-            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) }
-            label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
-            
-            Button { browserManager.duplicateCurrentTab() }
-            label: { Label("Duplicate Tab", systemImage: "doc.on.doc") }
-            
-            Divider()
-            if !tab.isPinned && !tab.isSpacePinned {
-                Button(action: {
-                    browserManager.tabManager.pinTab(tab)
-                }) {
-                    Label("Pin to Favorites", systemImage: "pin")
-                }
-                Divider()
-            }
-            if tab.hasAudioContent || tab.hasPlayingAudio || tab.isAudioMuted {
-                Button(action: onMute) {
-                    Label(tab.isAudioMuted ? "Unmute Audio" : "Mute Audio",
-                          systemImage: tab.isAudioMuted ? "speaker.wave.2" : "speaker.slash")
-                }
-
-                Divider()
-            }
-            Button(action: {
-                browserManager.tabManager.unloadTab(tab)
-            }) {
-                Label("Unload Tab", systemImage: "arrow.down.circle")
-            }
-            .disabled(tab.isUnloaded)
-
-            Button(action: {
-                browserManager.tabManager.unloadAllInactiveTabs()
-            }) {
-                Label("Unload All Inactive Tabs", systemImage: "arrow.down.circle.fill")
-            }
-
-            Divider()
-
-            if !tab.isPinned && !tab.isSpacePinned && tab.spaceId != nil {
-                Button(action: {
-                    browserManager.tabManager.closeAllTabsBelow(tab)
-                }) {
-                    Label("Close All Tabs Below", systemImage: "xmark.square.fill")
-                }
-                .help("Close all tabs that appear below this one in the sidebar")
-
-                Divider()
-            }
-
-            Button(action: onClose) {
-                Label("Close Tab", systemImage: "xmark.circle")
-            }
+            Options()
         }
         .shadow(color: isActive ? shadowColor : Color.clear, radius: isActive ? 1 : 0, y: 2)
+    }
+    
+    @ViewBuilder
+    func Options() -> some View {
+        Group {
+            addToMenuSection
+            Divider()
+            editMenuSection
+            Divider()
+            actionsMenuSection
+            Divider()
+            closeMenuSection
+        }
+    }
+
+    @ViewBuilder
+    private var addToMenuSection: some View {
+        let spaceId = tab.spaceId ?? UUID()
+        let folders = browserManager.tabManager.folders(for: spaceId)
+
+        Menu {
+            ForEach(folders, id: \.id) { folder in
+                Button {
+                    // TODO: Add tab to folder
+                } label: {
+                    Label(folder.name, systemImage: "folder.fill")
+                }
+            }
+        } label: {
+            Label("Add to Folder", systemImage: "folder.badge.plus")
+        }
+
+        if !tab.isPinned && !tab.isSpacePinned {
+            Button {
+                browserManager.tabManager.pinTab(tab)
+            } label: {
+                Label("Add to Favorites", systemImage: "star.fill")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var editMenuSection: some View {
+        Button {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(tab.url.absoluteString, forType: .string)
+        } label: {
+            Label("Copy Link", systemImage: "link")
+        }
+
+        Button {
+            // TODO: Implement share
+        } label: {
+            Label("Share", systemImage: "square.and.arrow.up")
+        }
+        .disabled(true)
+
+        Button {
+            tab.startRenaming()
+            isTextFieldFocused = true
+        } label: {
+            Label("Rename", systemImage: "character.cursor.ibeam")
+        }
+    }
+
+    @ViewBuilder
+    private var actionsMenuSection: some View {
+        splitMenu
+        duplicateButton
+        moveToSpaceMenu
+    }
+
+    @ViewBuilder
+    private var splitMenu: some View {
+        Menu {
+            Button {
+                browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState)
+            } label: {
+                Label("Right", systemImage: "rectangle.righthalf.filled")
+            }
+
+            Button {
+                browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState)
+            } label: {
+                Label("Left", systemImage: "rectangle.lefthalf.filled")
+            }
+        } label: {
+            Label("Open in Split", systemImage: "rectangle.split.2x1")
+        }
+    }
+
+    @ViewBuilder
+    private var duplicateButton: some View {
+        Button {
+            browserManager.duplicateCurrentTab()
+        } label: {
+            Label("Duplicate", systemImage: "plus.square.on.square")
+        }
+    }
+
+    @ViewBuilder
+    private var moveToSpaceMenu: some View {
+        let spaces = browserManager.tabManager.spaces
+        Menu {
+            ForEach(spaces, id: \.id) { space in
+                Button {
+                    browserManager.tabManager.moveTab(tab.id, to: space.id)
+                } label: {
+                    spaceLabel(for: space)
+                }
+                .disabled(space.id == tab.spaceId)
+            }
+        } label: {
+            Label("Move to Space", systemImage: "square.grid.2x2")
+        }
+    }
+
+    @ViewBuilder
+    private func spaceLabel(for space: Space) -> some View {
+        if space.icon.unicodeScalars.first?.properties.isEmoji == true {
+            Label {
+                Text(space.name)
+            } icon: {
+                Text(space.icon)
+            }
+        } else {
+            Label(space.name, systemImage: space.icon)
+        }
+    }
+
+    @ViewBuilder
+    private var closeMenuSection: some View {
+        if !tab.isPinned && !tab.isSpacePinned && tab.spaceId != nil {
+            Button {
+                browserManager.tabManager.closeAllTabsBelow(tab)
+            } label: {
+                Label("Close All Below", systemImage: "arrow.down.to.line")
+            }
+        }
+
+        Button {
+            // TODO: Implement close all except this
+        } label: {
+            Label("Close Others", systemImage: "xmark.circle")
+        }
+        .disabled(true)
+
+        Button(role: .destructive) {
+            onClose()
+        } label: {
+            Label("Close", systemImage: "xmark")
+        }
     }
 
     private var isActive: Bool {

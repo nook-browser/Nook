@@ -171,6 +171,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
 
     weak var browserManager: BrowserManager?
+    weak var nookSettings: NookSettingsService?
 
     // MARK: - Link Hover Callback
     var onLinkHover: ((String?) -> Void)? = nil
@@ -309,7 +310,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     private func injectWebStoreScriptIfNeeded(for url: URL, in webView: WKWebView) {
         // Only inject if experimental extensions are enabled
         guard let browserManager = browserManager,
-            browserManager.settingsManager.experimentalExtensions
+            let nookSettings = nookSettings,
+            nookSettings.experimentalExtensions
         else {
             return
         }
@@ -474,7 +476,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
         // Add Web Store integration handler (only if experimental extensions are enabled)
         if let browserManager = browserManager,
-            browserManager.settingsManager.experimentalExtensions
+            let nookSettings = nookSettings,
+            nookSettings.experimentalExtensions
         {
             webStoreHandler = WebStoreScriptHandler(browserManager: browserManager)
             _webView?.configuration.userContentController.add(
@@ -652,7 +655,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     /// Navigate to a new URL with proper search engine normalization
     func navigateToURL(_ input: String) {
-        let engine = browserManager?.settingsManager.searchEngine ?? .google
+        let engine = nookSettings?.searchEngine ?? .google
         let normalizedUrl = normalizeURL(input, provider: engine)
 
         guard let validURL = URL(string: normalizedUrl) else {
@@ -668,7 +671,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         // In multi-window setup, we need to work with the WebView that's actually visible
         // in the current window, not just the first WebView created
         if let browserManager = browserManager,
-            let activeWindowId = browserManager.activeWindowState?.id,
+           let activeWindowId = browserManager.windowRegistry?.activeWindow?.id,
             let activeWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
         {
             // Use the WebView that's actually visible in the current window
@@ -702,8 +705,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     func checkMediaState() {
         // Get all web views for this tab across all windows
         let allWebViews: [WKWebView]
-        if let browserManager = browserManager {
-            allWebViews = browserManager.getAllWebViews(for: id)
+        if let coordinator = browserManager?.webViewCoordinator {
+            allWebViews = coordinator.getAllWebViews(for: id)
         } else if let webView = _webView {
             // Fallback to original web view for backward compatibility
             allWebViews = [webView]
@@ -1242,7 +1245,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         }
 
         browserManager?.setMuteState(
-            muted, for: id, originatingWindowId: browserManager?.activeWindowState?.id)
+            muted, for: id, originatingWindowId: browserManager?.windowRegistry?.activeWindow?.id)
 
         // Update our internal state
         DispatchQueue.main.async { [weak self] in
@@ -1505,7 +1508,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         webView.removeFromSuperview()
 
         // 7. Force remove from compositor
-        browserManager?.removeWebViewFromContainers(webView)
+        browserManager?.webViewCoordinator?.removeWebViewFromContainers(webView)
 
         print("✅ [Tab] WebView cleanup completed for: \(name)")
     }
@@ -3028,7 +3031,7 @@ extension Tab {
         // Use the WebView that's actually visible in the current window
         let targetWebView: WKWebView?
         if let browserManager = browserManager,
-            let activeWindowId = browserManager.activeWindowState?.id
+            let activeWindowId = browserManager.windowRegistry?.activeWindow?.id
         {
             targetWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
         } else {
@@ -3164,7 +3167,7 @@ extension Tab {
         // Use the WebView that's actually visible in the current window
         let targetWebView: WKWebView?
         if let browserManager = browserManager,
-            let activeWindowId = browserManager.activeWindowState?.id
+            let activeWindowId = browserManager.windowRegistry?.activeWindow?.id
         {
             targetWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
         } else {
@@ -3241,7 +3244,7 @@ extension Tab {
         // Use the WebView that's actually visible in the current window
         let targetWebView: WKWebView?
         if let browserManager = browserManager,
-            let activeWindowId = browserManager.activeWindowState?.id
+            let activeWindowId = browserManager.windowRegistry?.activeWindow?.id
         {
             targetWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
         } else {
@@ -3318,7 +3321,7 @@ extension Tab {
         // Use the WebView that's actually visible in the current window
         let targetWebView: WKWebView?
         if let browserManager = browserManager,
-            let activeWindowId = browserManager.activeWindowState?.id
+            let activeWindowId = browserManager.windowRegistry?.activeWindow?.id
         {
             targetWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
         } else {

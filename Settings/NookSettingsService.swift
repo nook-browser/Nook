@@ -1,16 +1,17 @@
 //
-//  SettingsManager.swift
+//  NookSettingsService.swift
 //  Nook
 //
 //  Created by Maciek Bagiński on 03/08/2025.
+//  Updated by Aether Aurelia on 15/11/2025.
 //
 
 import AppKit
 import SwiftUI
 
+@MainActor
 @Observable
-class SettingsManager {
-    let keyboardShortcutManager = KeyboardShortcutManager()
+class NookSettingsService {
     private let userDefaults = UserDefaults.standard
     private let materialKey = "settings.currentMaterialRaw"
     private let searchEngineKey = "settings.searchEngine"
@@ -335,3 +336,44 @@ extension Notification.Name {
     static let blockCrossSiteTrackingChanged = Notification.Name("blockCrossSiteTrackingChanged")
 }
 
+// MARK: - Environment Key
+private struct NookSettingsServiceKey: EnvironmentKey {
+    @MainActor
+    static var defaultValue: NookSettingsService {
+        // This should never be called since we always inject from NookApp
+        // But EnvironmentKey protocol requires a default value
+        return NookSettingsService()
+    }
+}
+
+extension EnvironmentValues {
+    var nookSettings: NookSettingsService {
+        get { self[NookSettingsServiceKey.self] }
+        set { self[NookSettingsServiceKey.self] = newValue }
+    }
+}
+
+
+import AppKit
+import Foundation
+
+public let materials: [(name: String, value: NSVisualEffectView.Material)] = [
+    ("titlebar", .titlebar),
+    ("menu", .menu),
+    ("popover", .popover),
+    ("sidebar", .sidebar),
+    ("headerView", .headerView),
+    ("sheet", .sheet),
+    ("windowBackground", .windowBackground),
+    ("Arc", .hudWindow),
+    ("fullScreenUI", .fullScreenUI),
+    ("toolTip", .toolTip),
+    ("contentBackground", .contentBackground),
+    ("underWindowBackground", .underWindowBackground),
+    ("underPageBackground", .underPageBackground),
+]
+
+public func nameForMaterial(_ material: NSVisualEffectView.Material) -> String {
+    materials.first(where: { $0.value == material })?.name
+        ?? "raw(\(material.rawValue))"
+}

@@ -165,12 +165,13 @@ struct LinkStatusBar: View {
 
 struct WebsiteView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
     @EnvironmentObject var splitManager: SplitViewManager
+    @Environment(\.nookSettings) var nookSettings
     @State private var hoveredLink: String?
     @State private var isCommandPressed: Bool = false
     @State private var isDropTargeted: Bool = false
-    
+
     private var cornerRadius: CGFloat {
         if #available(macOS 26.0, *) {
             return 12
@@ -180,7 +181,7 @@ struct WebsiteView: View {
     }
     
     private var webViewClipShape: AnyShape {
-        let hasTopBar = browserManager.settingsManager.topBarAddressView
+        let hasTopBar = nookSettings.topBarAddressView
         
         if hasTopBar {
             return AnyShape(UnevenRoundedRectangle(
@@ -220,7 +221,7 @@ struct WebsiteView: View {
                                 SplitControlsOverlay()
                                     .environmentObject(browserManager)
                                     .environmentObject(splitManager)
-                                    .environmentObject(windowState)
+                                    .environment(windowState)
                             }
                         }
                         // Critical: Use allowsHitTesting to prevent SwiftUI from intercepting mouse events
@@ -251,7 +252,7 @@ struct WebsiteView: View {
                     }
                 }
                 Spacer()
-                if browserManager.settingsManager.showLinkStatusBar {
+                if nookSettings.showLinkStatusBar {
                     HStack {
                         LinkStatusBar(
                             hoveredLink: hoveredLink,
@@ -311,8 +312,8 @@ struct TabCompositorWrapper: NSViewRepresentable {
         containerView.layer?.backgroundColor = NSColor.clear.cgColor
         containerView.postsFrameChangedNotifications = true
 
-        // Store reference to container view in browser manager
-        browserManager.setCompositorContainerView(containerView, for: windowState.id)
+        // Store reference to container view in WebViewCoordinator
+        browserManager.webViewCoordinator?.setCompositorContainerView(containerView, for: windowState.id)
         
         // Install AppKit drag-capture overlay above all webviews
         let overlay = SplitDropCaptureView(frame: containerView.bounds)
@@ -376,7 +377,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
     }
 
     static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
-        coordinator.browserManager?.removeCompositorContainerView(for: coordinator.windowState.id)
+        coordinator.browserManager?.webViewCoordinator?.removeCompositorContainerView(for: coordinator.windowState.id)
     }
 
     private func updateCompositor(_ containerView: NSView) {
@@ -611,7 +612,7 @@ private class ContainerView: NSView {
 private struct SplitControlsOverlay: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var splitManager: SplitViewManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
 
     @State private var dragOffset: CGFloat = 0
 

@@ -45,16 +45,20 @@ class ObservableTabWrapper: ObservableObject {
 
 struct NavButtonsView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
+    @Environment(\.nookSettings) var nookSettings
     var effectiveSidebarWidth: CGFloat?
     @StateObject private var tabWrapper = ObservableTabWrapper()
     @State private var isMenuHovered = false
-    
+
     var body: some View {
-        let sidebarOnLeft = browserManager.settingsManager.sidebarPosition == .left
+        let sidebarOnLeft = nookSettings.sidebarPosition == .left
         let sidebarWidthForLayout = effectiveSidebarWidth ?? windowState.sidebarWidth
-        let navigationCollapseThreshold: CGFloat = 280
-        let refreshCollapseThreshold: CGFloat = 240
+
+        // Adjust thresholds based on whether AI button is shown
+        // When AI is disabled, we have more space, so thresholds are lower
+        let navigationCollapseThreshold: CGFloat = nookSettings.showAIAssistant ? 280 : 250
+        let refreshCollapseThreshold: CGFloat = nookSettings.showAIAssistant ? 240 : 210
         let aiChatCollapseThreshold: CGFloat = 220
 
         let shouldCollapseNavigation = sidebarWidthForLayout < navigationCollapseThreshold
@@ -74,7 +78,7 @@ struct NavButtonsView: View {
             .buttonStyle(NavButtonStyle())
             .foregroundStyle(Color.primary)
             
-            if browserManager.settingsManager.showAIAssistant && !shouldCollapseAIChat {
+            if nookSettings.showAIAssistant && !shouldCollapseAIChat {
                 Button("Toggle AI Assistant", systemImage: "sparkle") {
                     browserManager.toggleAISidebar(for: windowState)
                 }
@@ -90,7 +94,7 @@ struct NavButtonsView: View {
                     collapsedMenu(
                         includeNavigation: true,
                         includeRefresh: shouldCollapseRefresh,
-                        includeAIChat: shouldCollapseAIChat && browserManager.settingsManager.showAIAssistant
+                        includeAIChat: shouldCollapseAIChat && nookSettings.showAIAssistant
                     )
                 } else {
                     HStack(alignment: .center, spacing: 8) {
@@ -123,7 +127,7 @@ struct NavButtonsView: View {
                         collapsedMenu(
                             includeNavigation: false,
                             includeRefresh: shouldCollapseRefresh,
-                            includeAIChat: shouldCollapseAIChat && browserManager.settingsManager.showAIAssistant
+                            includeAIChat: shouldCollapseAIChat && nookSettings.showAIAssistant
                         )
                     }
                 }
@@ -222,22 +226,11 @@ struct NavButtonsView: View {
                     }
                 }
             } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.primary)
-                    .frame(width: 32, height: 32)
-                    .contentShape(RoundedRectangle(cornerRadius: 6))
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(isMenuHovered ? Color.gray.opacity(0.1) : Color.clear)
-                    )
-                    .onHover { isHovered in
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            isMenuHovered = isHovered
-                        }
-                    }
+                Label("Navigation", systemImage: "ellipsis")
+                .labelStyle(.iconOnly)
             }
-            .buttonStyle(PlainButtonStyle())
+            .menuStyle(.button)
+            .buttonStyle(NavButtonStyle())
         }
     }
 }
