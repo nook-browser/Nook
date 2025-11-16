@@ -12,6 +12,9 @@ struct SpacesList: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
     @State private var availableWidth: CGFloat = 0
+    @State private var hoveredSpaceId: UUID?
+    @State private var showPreview: Bool = false
+    @State private var isHoveringList: Bool = false
 
     private var layoutMode: SpacesListLayoutMode {
         SpacesListLayoutMode.determine(
@@ -34,31 +37,87 @@ struct SpacesList: View {
     }
 
     var body: some View {
-        HStack(spacing: layoutMode == .compact ? 4 : 8) {
-            ForEach(Array(visibleSpaces.enumerated()), id: \.element.id) { index, space in
-                SpacesListItem(
-                    space: space,
-                    isActive: windowState.currentSpaceId == space.id,
-                    compact: layoutMode == .compact || layoutMode == .minimal,
-                    isFaded: layoutMode == .minimal && windowState.currentSpaceId != space.id
-                )
-                .environmentObject(browserManager)
-                .environment(windowState)
-                .id(space.id)
-                .transition(.asymmetric(
-                    insertion: .scale.combined(with: .opacity),
-                    removal: .scale.combined(with: .opacity)
-                ))
+        VStack(spacing: 8) {
+            // Preview text for hovered non-active space
+            if showPreview,
+               let hoveredId = hoveredSpaceId,
+               hoveredId != windowState.currentSpaceId,
+               let hoveredSpace = browserManager.tabManager.spaces.first(where: { $0.id == hoveredId }) {
+                Text(hoveredSpace.name)
+                    .font(.caption)
+                    .foregroundStyle(previewTextColor)
+                    .opacity(0.7)
+                    .lineLimit(1)
+                    .id(hoveredSpace.id)
+                    .transition(.blur.animation(.smooth(duration: 0.2)))
+            } else {
+                // Placeholder to maintain layout
+                Text(" ")
+                    .font(.caption)
             }
-        }
-        .frame(maxWidth: .infinity)
-        .onGeometryChange(for: CGFloat.self) { proxy in
-            proxy.size.width
-        } action: { newWidth in
-            availableWidth = newWidth
+
+            HStack(spacing: layoutMode == .compact ? 4 : 8) {
+                ForEach(Array(visibleSpaces.enumerated()), id: \.element.id) { index, space in
+                    SpacesListItem(
+                        space: space,
+                        isActive: windowState.currentSpaceId == space.id,
+                        compact: layoutMode == .compact || layoutMode == .minimal,
+                        isFaded: layoutMode == .minimal && windowState.currentSpaceId != space.id,
+                        onHoverChange: { isHovering in
+                            if isHovering {
+                                hoveredSpaceId = space.id
+                                // If preview is already showing, update immediately
+                                // Otherwise, show after delay
+                                if showPreview {
+                                    // Already showing, just swap the space
+                                } else {
+                                    // First time showing, add delay
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+                                        if hoveredSpaceId == space.id && isHoveringList {
+                                            withAnimation(.easeInOut(duration: 0.2)) {
+                                                showPreview = true
+                                            }
+                                        }
+                                    }
+                                }
+                            } else if hoveredSpaceId == space.id {
+                                hoveredSpaceId = nil
+                            }
+                        }
+                    )
+                    .environmentObject(browserManager)
+                    .environment(windowState)
+                    .id(space.id)
+                    .transition(.asymmetric(
+                        insertion: .scale.combined(with: .opacity),
+                        removal: .scale.combined(with: .opacity)
+                    ))
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.width
+            } action: { newWidth in
+                availableWidth = newWidth
+            }
+            .onHover { hovering in
+                isHoveringList = hovering
+                if !hovering {
+                    showPreview = false
+                    hoveredSpaceId = nil
+                }
+            }
         }
         .animation(.easeInOut(duration: 0.3), value: visibleSpaces.count)
         .animation(.easeInOut(duration: 0.3), value: visibleSpaces.map(\.id))
+    }
+
+    // MARK: - Colors
+
+    private var previewTextColor: Color {
+        browserManager.gradientColorManager.isDark
+            ? AppColors.spaceTabTextDark
+            : AppColors.spaceTabTextLight
     }
 
     // MARK: - Helper Methods
