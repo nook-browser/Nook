@@ -23,14 +23,6 @@ struct SpacesList: View {
         )
     }
 
-    private var dynamicSpacing: CGFloat {
-        SpacesListLayoutMode.calculateSpacing(
-            for: layoutMode,
-            spacesCount: browserManager.tabManager.spaces.count,
-            availableWidth: availableWidth
-        )
-    }
-
     private var visibleSpaces: [Space] {
         return browserManager.tabManager.spaces
     }
@@ -43,8 +35,7 @@ struct SpacesList: View {
                 availableWidth = newWidth
             }
             .overlay{
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: dynamicSpacing) {
+                    HStack(spacing: 0) {
                         ForEach(Array(visibleSpaces.enumerated()), id: \.element.id) { index, space in
                             SpacesListItem(
                                 space: space,
@@ -80,6 +71,12 @@ struct SpacesList: View {
                                 insertion: .scale.combined(with: .opacity),
                                 removal: .scale.combined(with: .opacity)
                             ))
+                            
+                            if index != Array(visibleSpaces.enumerated()).count - 1{
+                                Spacer()
+                                    .frame(minWidth: 1, maxWidth: 8)
+                                    .layoutPriority(-1)
+                            }
                         }
                     }
                     .onHover { hovering in
@@ -105,9 +102,6 @@ struct SpacesList: View {
                                 .offset(y: -20)
                         }
                     }
-                }
-                .defaultScrollAnchor(.center)
-                .scrollBounceBehavior(.basedOnSize)
             }
             .animation(.easeInOut(duration: 0.3), value: visibleSpaces.count)
             .animation(.easeInOut(duration: 0.3), value: visibleSpaces.map(\.id))
@@ -136,50 +130,23 @@ enum SpacesListLayoutMode {
         let buttonSize: CGFloat = 32.0  // NavButtonStyle .regular = 32pt
         let minSpacing: CGFloat = 4.0
 
-        // Normal mode: all icons visible
-        let normalTotalWidth = (CGFloat(spacesCount) * buttonSize) + (CGFloat(spacesCount - 1) * minSpacing)
+        // Normal mode: all icons visible with minimum spacing
+        let normalMinWidth = (CGFloat(spacesCount) * buttonSize) + (CGFloat(spacesCount - 1) * minSpacing)
 
-        // Compact mode: 1 active icon + (n-1) dots
+        // Compact mode: 1 active icon + (n-1) dots with minimum spacing
         let dotSize: CGFloat = 6.0
         let totalDots = spacesCount - 1
-        let compactTotalWidth = buttonSize + (CGFloat(totalDots) * dotSize) + (CGFloat(spacesCount - 1) * minSpacing)
+        let compactMinWidth = buttonSize + (CGFloat(totalDots) * dotSize) + (CGFloat(totalDots) * minSpacing)
 
-        // Choose mode based on what fits
-        if availableWidth >= normalTotalWidth {
+        // Choose mode: switch to compact only when normal mode would be too cramped
+        // Stay in normal as long as we have at least minimum spacing
+        if availableWidth >= normalMinWidth {
             return .normal
-        } else if availableWidth >= compactTotalWidth {
+        } else if availableWidth >= compactMinWidth {
             return .compact
         } else {
             // Even compact doesn't fit perfectly, but use compact anyway
             return .compact
-        }
-    }
-
-    static func calculateSpacing(for mode: Self, spacesCount: Int, availableWidth: CGFloat) -> CGFloat {
-        guard spacesCount > 1 else { return 8.0 }
-
-        let maxSpacing: CGFloat = 8.0
-        let minSpacing: CGFloat = 4.0
-
-        switch mode {
-        case .normal:
-            let buttonSize: CGFloat = 32.0
-            let totalButtonSpace = CGFloat(spacesCount) * buttonSize
-            let remainingSpace = availableWidth - totalButtonSpace
-            let gapCount = CGFloat(max(1, spacesCount - 1))
-            let calculatedSpacing = remainingSpace / gapCount
-            return max(minSpacing, min(maxSpacing, calculatedSpacing))
-
-        case .compact:
-            // In compact mode, try to distribute space more evenly
-            let buttonSize: CGFloat = 32.0
-            let dotSize: CGFloat = 6.0
-            // 1 icon + (n-1) dots
-            let totalItemSpace = buttonSize + (CGFloat(spacesCount - 1) * dotSize)
-            let remainingSpace = availableWidth - totalItemSpace
-            let gapCount = CGFloat(max(1, spacesCount - 1))
-            let calculatedSpacing = remainingSpace / gapCount
-            return max(minSpacing, min(maxSpacing, calculatedSpacing))
         }
     }
 }
