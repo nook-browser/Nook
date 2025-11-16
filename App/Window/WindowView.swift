@@ -133,8 +133,8 @@ struct WindowView: View {
 
             Rectangle()
                 .fill(Color.clear)
-                // .universalGlassEffect(.regular.tint(Color(.windowBackgroundColor).opacity(0.35)), in: .rect(cornerRadius: 0)) // COMMENTED OUT: Requires Swift 6.2
-                .background(.regularMaterial, in: Rectangle()) // Temporary replacement
+                .universalGlassEffect(.regular.tint(Color(.windowBackgroundColor).opacity(0.35)), in: .rect(cornerRadius: 0))
+                
                 .clipped()
         }
         .backgroundDraggable()
@@ -217,7 +217,7 @@ struct WindowView: View {
                 .zIndex(2000)
         }
         .padding(.bottom, 8)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)  // Constrain to prevent overflow when AI sidebar appears
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder
