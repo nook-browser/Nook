@@ -47,21 +47,9 @@ struct SpaceEditDialog: DialogPresentable {
     }
 
     func dialogHeader() -> DialogHeader {
-        let iconName: String
-        let title: String
-
-        switch mode {
-        case .rename:
-            iconName = "pencil"
-            title = "Rename Space"
-        case .icon:
-            iconName = "face.smiling"
-            title = "Change Space Icon"
-        }
-
-        return DialogHeader(
-            icon: iconName,
-            title: title,
+        DialogHeader(
+            icon: "GEAR",
+            title: "Space Settings",
             subtitle: originalSpaceName
         )
     }

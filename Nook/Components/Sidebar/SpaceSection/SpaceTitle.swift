@@ -130,13 +130,15 @@ struct SpaceTitle: View {
                     onDeleteSpace: deleteSpace
                 )
                 .environmentObject(browserManager)
+                .environment(\.controlSize, .regular)
             } label: {
                 Label("Configure Space", systemImage: "ellipsis")
+                    .font(.body.weight(.semibold))
                     .labelStyle(.iconOnly)
-                    .opacity(isHovering ? 1.0 : 0.0)
             }
             .menuStyle(.button)
-            .buttonStyle(NavButtonStyle())
+            .buttonStyle(NavButtonStyle(size: .small))
+            .opacity(isHovering ? 1.0 : 0.0)
 
         }
         // Match tabs' internal left/right padding so text aligns

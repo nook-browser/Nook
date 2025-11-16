@@ -13,7 +13,13 @@ struct NavButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) var isEnabled
     @Environment(\.controlSize) var controlSize
     @State private var isHovering: Bool = false
-    
+
+    let overrideSize: ControlSize?
+
+    init(size: ControlSize? = nil) {
+        self.overrideSize = size
+    }
+
     func makeBody(configuration: Configuration) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: cornerRadius)
@@ -36,7 +42,8 @@ struct NavButtonStyle: ButtonStyle {
     }
     
     private var size: CGFloat {
-        switch controlSize {
+        let effectiveSize = overrideSize ?? controlSize
+        return switch effectiveSize {
         case .mini: 24
         case .small: 28
         case .regular: 32

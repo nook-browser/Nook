@@ -44,6 +44,7 @@ struct SpacesListItem: View {
             }
         } label: {
             spaceIcon
+                .opacity(isActive ? 1.0 : 0.7)
                 .frame(maxWidth: .infinity)
         }
         .labelStyle(.iconOnly)
