@@ -1599,6 +1599,17 @@ class TabManager: ObservableObject {
 
     // MARK: - Tab Ordering
 
+    /// Moves a tab to a different space
+    func moveTab(_ tabId: UUID, to targetSpaceId: UUID) {
+        guard let tab = allTabs().first(where: { $0.id == tabId }),
+              let currentSpaceId = tab.spaceId,
+              currentSpaceId != targetSpaceId else { return }
+
+        // Move to target space at the end of regular tabs
+        let targetTabs = tabsBySpace[targetSpaceId] ?? []
+        moveTabBetweenSpaces(tab, from: currentSpaceId, to: targetSpaceId, asSpacePinned: false, toIndex: targetTabs.count)
+    }
+
     func moveTabUp(_ tabId: UUID) {
         guard let spaceId = findSpaceForTab(tabId) else { return }
         let tabs = tabsBySpace[spaceId] ?? []
