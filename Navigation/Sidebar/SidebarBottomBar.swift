@@ -15,29 +15,21 @@ struct SidebarBottomBar: View {
     let onMenuTap: () -> Void
     let onNewSpaceTap: () -> Void
     let onMenuHover: (Bool) -> Void
-
+    
     var body: some View {
-        ZStack {
-            // Left side - Menu button
-            HStack {
-                menuButton
-                Spacer()
-            }
-
-            // Center - Space indicators
+        HStack(alignment: .bottom, spacing: 0) {
+            menuButton
+            
             SpacesList()
+                .frame(maxWidth: .infinity)
                 .environmentObject(browserManager)
                 .environment(windowState)
-
-            // Right side - New space button
-            HStack {
-                Spacer()
-                newSpaceButton
-            }
+            
+            newSpaceButton
         }
         .padding(.horizontal, 8)
     }
-
+    
     private var menuButton: some View {
         ZStack {
             Button("Menu", systemImage: "archivebox") {
@@ -50,26 +42,26 @@ struct SidebarBottomBar: View {
                 isMenuButtonHovered = isHovered
                 onMenuHover(isHovered)
             }
-
+            
             DownloadIndicator()
                 .offset(x: 12, y: -12)
         }
     }
-
+    
     private var newSpaceButton: some View {
         Menu{
             Button("New Space", systemImage: "square.grid.2x2") {
                 onNewSpaceTap()
             }
-
+            
             Button("New Folder", systemImage: "folder.badge.plus") {
                 if let currentSpace = browserManager.tabManager.currentSpace {
                     browserManager.tabManager.createFolder(for: currentSpace.id)
                 }
             }
-
+            
             Divider()
-
+            
             Button("New Profile", systemImage: "person.badge.plus") {
                 // TODO: Show profile creation dialog
             }

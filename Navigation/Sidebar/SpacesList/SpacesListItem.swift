@@ -16,11 +16,26 @@ struct SpacesListItem: View {
     let isActive: Bool
     let compact: Bool
     let isFaded: Bool
+    let onHoverChange: ((Bool) -> Void)?
 
     @State private var isHovering: Bool = false
     @StateObject private var emojiManager = EmojiPickerManager()
 
     private let dotSize: CGFloat = 6
+
+    init(
+        space: Space,
+        isActive: Bool,
+        compact: Bool,
+        isFaded: Bool,
+        onHoverChange: ((Bool) -> Void)? = nil
+    ) {
+        self.space = space
+        self.isActive = isActive
+        self.compact = compact
+        self.isFaded = isFaded
+        self.onHoverChange = onHoverChange
+    }
 
     var body: some View {
         Button {
@@ -37,6 +52,7 @@ struct SpacesListItem: View {
         .opacity(isFaded ? 0.3 : 1.0)
         .onHover { hovering in
             isHovering = hovering
+            onHoverChange?(hovering)
         }
         .contextMenu {
             spaceContextMenu
