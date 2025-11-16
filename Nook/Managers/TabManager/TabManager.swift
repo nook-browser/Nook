@@ -433,7 +433,7 @@ class TabManager: ObservableObject {
     @Published public private(set) var currentSpace: Space?
 
     // Normal tabs per space
-    @Published private var tabsBySpace: [UUID: [Tab]] = [:]
+    @Published var tabsBySpace: [UUID: [Tab]] = [:]
 
     // Space-level pinned tabs per space
     @Published private var spacePinnedTabs: [UUID: [Tab]] = [:]

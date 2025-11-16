@@ -98,8 +98,10 @@ struct SpaceContextMenu: View {
     // MARK: - Helper Methods
 
     private func showDeleteConfirmation() {
-        let tabsCount = browserManager.tabManager.spaceUnpinnedTabs(for: space.id).count +
-                        browserManager.tabManager.spacePinnedTabs(for: space.id).count
+        // Count both regular and space-pinned tabs
+        let regularTabsCount = browserManager.tabManager.tabsBySpace[space.id]?.count ?? 0
+        let spacePinnedTabsCount = browserManager.tabManager.spacePinnedTabs(for: space.id).count
+        let tabsCount = regularTabsCount + spacePinnedTabsCount
 
         browserManager.dialogManager.showDialog(
             SpaceDeleteConfirmationDialog(

@@ -83,22 +83,45 @@ struct SpacesListItem: View {
 
     @ViewBuilder
     private var spaceContextMenu: some View {
-        SpaceContextMenu(
-            space: space,
-            canDelete: browserManager.tabManager.spaces.count > 1,
-            onEditName: nil,
-            onEditIcon: {
-                emojiManager.toggle()
-            },
-            onOpenSettings: showSpaceEditDialog,
-            onDeleteSpace: {
-                browserManager.tabManager.removeSpace(space.id)
+        Button {
+            showSpaceEditDialog()
+        } label: {
+            Label("Space Settings", systemImage: "gear")
+        }
+
+        if browserManager.tabManager.spaces.count > 1 {
+            Button(role: .destructive) {
+                showDeleteConfirmation()
+            } label: {
+                Label("Delete Space", systemImage: "trash")
             }
-        )
-        .environmentObject(browserManager)
+        }
     }
 
     // MARK: - Helper Methods
+
+    private func showDeleteConfirmation() {
+        // Count both regular and space-pinned tabs
+        let regularTabsCount = browserManager.tabManager.tabsBySpace[space.id]?.count ?? 0
+        let spacePinnedTabsCount = browserManager.tabManager.spacePinnedTabs(for: space.id).count
+        let tabsCount = regularTabsCount + spacePinnedTabsCount
+
+        browserManager.dialogManager.showDialog(
+            SpaceDeleteConfirmationDialog(
+                spaceName: space.name,
+                spaceIcon: space.icon,
+                tabsCount: tabsCount,
+                isLastSpace: browserManager.tabManager.spaces.count <= 1,
+                onDelete: {
+                    browserManager.tabManager.removeSpace(space.id)
+                    browserManager.dialogManager.closeDialog()
+                },
+                onCancel: {
+                    browserManager.dialogManager.closeDialog()
+                }
+            )
+        )
+    }
 
     private func showSpaceEditDialog() {
         browserManager.dialogManager.showDialog(
