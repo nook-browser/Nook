@@ -23,93 +23,94 @@ struct SpacesList: View {
         )
     }
 
+    private var dynamicSpacing: CGFloat {
+        SpacesListLayoutMode.calculateSpacing(
+            for: layoutMode,
+            spacesCount: browserManager.tabManager.spaces.count,
+            availableWidth: availableWidth
+        )
+    }
+
     private var visibleSpaces: [Space] {
-        let allSpaces = browserManager.tabManager.spaces
-
-        guard layoutMode == .minimal,
-              let currentSpaceId = windowState.currentSpaceId,
-              let currentIndex = allSpaces.firstIndex(where: { $0.id == currentSpaceId })
-        else {
-            return allSpaces
-        }
-
-        return buildCarousel(from: allSpaces, currentIndex: currentIndex)
+        return browserManager.tabManager.spaces
     }
 
     var body: some View {
-        VStack(spacing: 8) {
-            // Preview text for hovered non-active space
-            if showPreview,
-               let hoveredId = hoveredSpaceId,
-               hoveredId != windowState.currentSpaceId,
-               let hoveredSpace = browserManager.tabManager.spaces.first(where: { $0.id == hoveredId }) {
-                Text(hoveredSpace.name)
-                    .font(.caption)
-                    .foregroundStyle(previewTextColor)
-                    .opacity(0.7)
-                    .lineLimit(1)
-                    .id(hoveredSpace.id)
-                    .transition(.blur.animation(.smooth(duration: 0.2)))
-            } else {
-                // Placeholder to maintain layout
-                Text(" ")
-                    .font(.caption)
-            }
-
-            HStack(spacing: layoutMode == .compact ? 4 : 8) {
-                ForEach(Array(visibleSpaces.enumerated()), id: \.element.id) { index, space in
-                    SpacesListItem(
-                        space: space,
-                        isActive: windowState.currentSpaceId == space.id,
-                        compact: layoutMode == .compact || layoutMode == .minimal,
-                        isFaded: layoutMode == .minimal && windowState.currentSpaceId != space.id,
-                        onHoverChange: { isHovering in
-                            if isHovering {
-                                hoveredSpaceId = space.id
-                                // If preview is already showing, update immediately
-                                // Otherwise, show after delay
-                                if showPreview {
-                                    // Already showing, just swap the space
-                                } else {
-                                    // First time showing, add delay
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-                                        if hoveredSpaceId == space.id && isHoveringList {
-                                            withAnimation(.easeInOut(duration: 0.2)) {
-                                                showPreview = true
-                                            }
-                                        }
-                                    }
-                                }
-                            } else if hoveredSpaceId == space.id {
-                                hoveredSpaceId = nil
-                            }
-                        }
-                    )
-                    .environmentObject(browserManager)
-                    .environment(windowState)
-                    .id(space.id)
-                    .transition(.asymmetric(
-                        insertion: .scale.combined(with: .opacity),
-                        removal: .scale.combined(with: .opacity)
-                    ))
-                }
-            }
-            .frame(maxWidth: .infinity)
+        Color.clear
             .onGeometryChange(for: CGFloat.self) { proxy in
                 proxy.size.width
             } action: { newWidth in
                 availableWidth = newWidth
             }
-            .onHover { hovering in
-                isHoveringList = hovering
-                if !hovering {
-                    showPreview = false
-                    hoveredSpaceId = nil
+            .overlay{
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: dynamicSpacing) {
+                        ForEach(Array(visibleSpaces.enumerated()), id: \.element.id) { index, space in
+                            SpacesListItem(
+                                space: space,
+                                isActive: windowState.currentSpaceId == space.id,
+                                compact: layoutMode == .compact,
+                                isFaded: false,
+                                onHoverChange: { isHovering in
+                                    if isHovering {
+                                        hoveredSpaceId = space.id
+                                        // If preview is already showing, update immediately
+                                        // Otherwise, show after delay
+                                        if showPreview {
+                                            // Already showing, just swap the space
+                                        } else {
+                                            // First time showing, add delay
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+                                                if hoveredSpaceId == space.id && isHoveringList {
+                                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                                        showPreview = true
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } else if hoveredSpaceId == space.id {
+                                        hoveredSpaceId = nil
+                                    }
+                                }
+                            )
+                            .environmentObject(browserManager)
+                            .environment(windowState)
+                            .id(space.id)
+                            .transition(.asymmetric(
+                                insertion: .scale.combined(with: .opacity),
+                                removal: .scale.combined(with: .opacity)
+                            ))
+                        }
+                    }
+                    .onHover { hovering in
+                        isHoveringList = hovering
+                        if !hovering {
+                            showPreview = false
+                            hoveredSpaceId = nil
+                        }
+                    }
+                    .overlay(alignment: .top) {
+                        // Preview text positioned above the icons
+                        if showPreview,
+                           let hoveredId = hoveredSpaceId,
+                           hoveredId != windowState.currentSpaceId,
+                           let hoveredSpace = browserManager.tabManager.spaces.first(where: { $0.id == hoveredId }) {
+                            Text(hoveredSpace.name)
+                                .font(.caption)
+                                .foregroundStyle(previewTextColor)
+                                .opacity(0.7)
+                                .lineLimit(1)
+                                .id(hoveredSpace.id)
+                                .transition(.blur.animation(.smooth(duration: 0.2)))
+                                .offset(y: -20)
+                        }
+                    }
                 }
+                .defaultScrollAnchor(.center)
+                .scrollBounceBehavior(.basedOnSize)
             }
-        }
-        .animation(.easeInOut(duration: 0.3), value: visibleSpaces.count)
-        .animation(.easeInOut(duration: 0.3), value: visibleSpaces.map(\.id))
+            .animation(.easeInOut(duration: 0.3), value: visibleSpaces.count)
+            .animation(.easeInOut(duration: 0.3), value: visibleSpaces.map(\.id))
     }
 
     // MARK: - Colors
@@ -120,27 +121,6 @@ struct SpacesList: View {
             : AppColors.spaceTabTextLight
     }
 
-    // MARK: - Helper Methods
-
-    /// Build a carousel of 2-3 spaces centered on the current space
-    private func buildCarousel(from spaces: [Space], currentIndex: Int) -> [Space] {
-        var result: [Space] = []
-
-        // Add left space if not at beginning
-        if currentIndex > 0 {
-            result.append(spaces[currentIndex - 1])
-        }
-
-        // Current space (always included)
-        result.append(spaces[currentIndex])
-
-        // Add right space if not at end
-        if currentIndex < spaces.count - 1 {
-            result.append(spaces[currentIndex + 1])
-        }
-
-        return result
-    }
 }
 
 // MARK: - Layout Mode
@@ -148,26 +128,58 @@ struct SpacesList: View {
 enum SpacesListLayoutMode {
     case normal    // Full icons with spacing
     case compact   // Dots for inactive, icons for active
-    case minimal   // Only show 3 spaces (carousel)
 
     static func determine(spacesCount: Int, availableWidth: CGFloat) -> Self {
         guard spacesCount > 0 else { return .normal }
 
-        // Reserve space for left/right controls
-        let availableForSpaces = max(availableWidth - 120, 0)
+        // Measurements for NavButtonStyle button with default .regular control size
+        let buttonSize: CGFloat = 32.0  // NavButtonStyle .regular = 32pt
+        let minSpacing: CGFloat = 4.0
 
-        // Each full icon needs ~32pt (24 cell + ~8 spacing)
-        let neededForFull = CGFloat(spacesCount) * 32.0
+        // Normal mode: all icons visible
+        let normalTotalWidth = (CGFloat(spacesCount) * buttonSize) + (CGFloat(spacesCount - 1) * minSpacing)
 
-        // When compact, dots need ~16pt each
-        let neededForDots = CGFloat(spacesCount) * 16.0
+        // Compact mode: 1 active icon + (n-1) dots
+        let dotSize: CGFloat = 6.0
+        let totalDots = spacesCount - 1
+        let compactTotalWidth = buttonSize + (CGFloat(totalDots) * dotSize) + (CGFloat(spacesCount - 1) * minSpacing)
 
-        if neededForDots > availableForSpaces && spacesCount > 3 {
-            return .minimal
-        } else if neededForFull > availableForSpaces {
+        // Choose mode based on what fits
+        if availableWidth >= normalTotalWidth {
+            return .normal
+        } else if availableWidth >= compactTotalWidth {
             return .compact
         } else {
-            return .normal
+            // Even compact doesn't fit perfectly, but use compact anyway
+            return .compact
+        }
+    }
+
+    static func calculateSpacing(for mode: Self, spacesCount: Int, availableWidth: CGFloat) -> CGFloat {
+        guard spacesCount > 1 else { return 8.0 }
+
+        let maxSpacing: CGFloat = 8.0
+        let minSpacing: CGFloat = 4.0
+
+        switch mode {
+        case .normal:
+            let buttonSize: CGFloat = 32.0
+            let totalButtonSpace = CGFloat(spacesCount) * buttonSize
+            let remainingSpace = availableWidth - totalButtonSpace
+            let gapCount = CGFloat(max(1, spacesCount - 1))
+            let calculatedSpacing = remainingSpace / gapCount
+            return max(minSpacing, min(maxSpacing, calculatedSpacing))
+
+        case .compact:
+            // In compact mode, try to distribute space more evenly
+            let buttonSize: CGFloat = 32.0
+            let dotSize: CGFloat = 6.0
+            // 1 icon + (n-1) dots
+            let totalItemSpace = buttonSize + (CGFloat(spacesCount - 1) * dotSize)
+            let remainingSpace = availableWidth - totalItemSpace
+            let gapCount = CGFloat(max(1, spacesCount - 1))
+            let calculatedSpacing = remainingSpace / gapCount
+            return max(minSpacing, min(maxSpacing, calculatedSpacing))
         }
     }
 }
