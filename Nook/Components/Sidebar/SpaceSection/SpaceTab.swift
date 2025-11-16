@@ -267,13 +267,14 @@ struct SpaceTab: View {
 
     @ViewBuilder
     private func spaceLabel(for space: Space) -> some View {
-        HStack {
-            if space.icon.unicodeScalars.first?.properties.isEmoji == true {
+        if space.icon.unicodeScalars.first?.properties.isEmoji == true {
+            Label {
+                Text(space.name)
+            } icon: {
                 Text(space.icon)
-            } else {
-                Image(systemName: space.icon)
             }
-            Text(space.name)
+        } else {
+            Label(space.name, systemImage: space.icon)
         }
     }
 
