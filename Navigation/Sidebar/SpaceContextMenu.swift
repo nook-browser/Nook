@@ -87,12 +87,35 @@ struct SpaceContextMenu: View {
             // Delete space
             if canDelete {
                 Button(role: .destructive) {
-                    onDeleteSpace()
+                    showDeleteConfirmation()
                 } label: {
                     Label("Delete Space", systemImage: "trash")
                 }
             }
         }
+    }
+
+    // MARK: - Helper Methods
+
+    private func showDeleteConfirmation() {
+        let tabsCount = browserManager.tabManager.spaceUnpinnedTabs(for: space.id).count +
+                        browserManager.tabManager.spacePinnedTabs(for: space.id).count
+
+        browserManager.dialogManager.showDialog(
+            SpaceDeleteConfirmationDialog(
+                spaceName: space.name,
+                spaceIcon: space.icon,
+                tabsCount: tabsCount,
+                isLastSpace: browserManager.tabManager.spaces.count <= 1,
+                onDelete: {
+                    onDeleteSpace()
+                    browserManager.dialogManager.closeDialog()
+                },
+                onCancel: {
+                    browserManager.dialogManager.closeDialog()
+                }
+            )
+        )
     }
 
     // MARK: - Helper Properties

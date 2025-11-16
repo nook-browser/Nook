@@ -223,9 +223,9 @@ struct NavButtonsView: View {
                     }
                 }
             } label: {
-                Image(systemName: "ellipsis")
+                Label("Navigation", systemImage: "ellipsis")
+                .labelStyle(.iconOnly)
             }
-            .labelStyle(.iconOnly)
             .menuStyle(.button)
             .buttonStyle(NavButtonStyle())
         }

@@ -57,9 +57,6 @@ struct SpacesListItem: View {
             if isEmoji(space.icon) {
                 Text(space.icon)
                     .background(EmojiPickerAnchor(manager: emojiManager))
-                    .onTapGesture(count: 2) {
-                        emojiManager.toggle()
-                    }
                     .onChange(of: emojiManager.selectedEmoji) { _, newValue in
                         space.icon = newValue
                         browserManager.tabManager.persistSnapshot()
@@ -68,9 +65,6 @@ struct SpacesListItem: View {
                 Image(systemName: space.icon)
                     .foregroundStyle(iconColor)
                     .background(EmojiPickerAnchor(manager: emojiManager))
-                    .onTapGesture(count: 2) {
-                        emojiManager.toggle()
-                    }
                     .onChange(of: emojiManager.selectedEmoji) { _, newValue in
                         space.icon = newValue
                         browserManager.tabManager.persistSnapshot()
