@@ -44,9 +44,11 @@ struct SpacesListItem: View {
             }
         } label: {
             spaceIcon
+                .frame(maxWidth: .infinity)
         }
         .labelStyle(.iconOnly)
-        .buttonStyle(NavButtonStyle())
+        .buttonStyle(SpaceListItemButtonStyle())
+        .layoutPriority(2)
         .foregroundStyle(Color.primary)
         .layoutPriority(isActive ? 1 : 0)
         .opacity(isFaded ? 0.3 : 1.0)
@@ -182,6 +184,68 @@ struct SpacesListItem: View {
             (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF) // Emoticons & pictographs
                 || (scalar.value >= 0x2600 && scalar.value <= 0x26FF) // Miscellaneous symbols
                 || (scalar.value >= 0x2700 && scalar.value <= 0x27BF) // Dingbats
+        }
+    }
+}
+
+struct SpaceListItemButtonStyle: ButtonStyle {
+    @Environment(\.colorScheme) var colorScheme
+    @Environment(\.isEnabled) var isEnabled
+    @Environment(\.controlSize) var controlSize
+    @State private var isHovering: Bool = false
+    
+    func makeBody(configuration: Configuration) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .fill(.primary.opacity(backgroundColorOpacity(isPressed: configuration.isPressed)))
+
+            configuration.label
+                .foregroundStyle(.primary)
+        }
+        .frame(height: size)
+        .frame(maxWidth: size)
+        .opacity(isEnabled ? 1.0 : 0.3)
+        
+        .contentTransition(.symbolEffect(.replace.upUp.byLayer, options: .nonRepeating))
+        .scaleEffect(configuration.isPressed && isEnabled ? 0.95 : 1.0)
+        .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
+        .animation(.easeInOut(duration: 0.15), value: isHovering)
+        .onHover { hovering in
+            isHovering = hovering
+        }
+    }
+    
+    private var size: CGFloat {
+        switch controlSize {
+        case .mini: 24
+        case .small: 28
+        case .regular: 32
+        case .large: 40
+        case .extraLarge: 48
+        @unknown default: 32
+        }
+    }
+    
+//    private var iconSize: CGFloat {
+//        switch controlSize {
+//        case .mini: 12
+//        case .small: 14
+//        case .regular: 16
+//        case .large: 18
+//        case .extraLarge: 20
+//        @unknown default: 16
+//        }
+//    }
+    
+    private var cornerRadius: CGFloat {
+        8
+    }
+    
+    private func backgroundColorOpacity(isPressed: Bool) -> Double {
+        if (isHovering || isPressed) && isEnabled {
+            return colorScheme == .dark ? 0.2 : 0.1
+        } else {
+            return 0.0
         }
     }
 }
