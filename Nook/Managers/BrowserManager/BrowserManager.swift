@@ -438,19 +438,35 @@ class BrowserManager: ObservableObject {
         }
     }
 
-    /// DEPRECATED: Gradients are now computed from windowState.currentSpace.gradient
-    /// SwiftUI views will automatically update when currentSpaceId changes
+    /// Updates the gradient for a window, animating the transition if requested
     private func updateGradient(
         for windowState: BrowserWindowState, to newGradient: SpaceGradient, animate: Bool
     ) {
-        // NO-OP: Gradient is now computed reactively from windowState.gradient
-        // Views observe windowState.currentSpaceId and automatically get the correct gradient
+        // Only animate if this is the active window (to avoid animating all windows simultaneously)
+        let isActiveWindow = windowRegistry?.activeWindow?.id == windowState.id
+        if animate && isActiveWindow {
+            gradientColorManager.transition(to: newGradient, duration: 0.45)
+        } else {
+            gradientColorManager.setImmediate(newGradient)
+        }
     }
 
-    /// DEPRECATED: Gradients are now computed from windowState.currentSpace.gradient
+    /// Updates gradients for all windows using the specified space
     func refreshGradientsForSpace(_ space: Space, animate: Bool) {
-        // NO-OP: Gradient is now computed reactively from windowState.gradient
-        // Views observe windowState.currentSpaceId and automatically get the correct gradient
+        guard let windowRegistry = windowRegistry else { return }
+        let activeWindowId = windowRegistry.activeWindow?.id
+        
+        // Update gradients for all windows using this space
+        for (_, windowState) in windowRegistry.windows {
+            if windowState.currentSpaceId == space.id {
+                let isActiveWindow = windowState.id == activeWindowId
+                if animate && isActiveWindow {
+                    gradientColorManager.transition(to: space.gradient, duration: 0.45)
+                } else {
+                    gradientColorManager.setImmediate(space.gradient)
+                }
+            }
+        }
     }
 
     private func adoptProfileIfNeeded(
