@@ -10,8 +10,6 @@ struct GradientEditorView: View {
     @State private var selectedNodeID: UUID?
     @EnvironmentObject var gradientColorManager: GradientColorManager
 
-    // No throttling: update in real time
-
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             GradientCanvasEditor(gradient: $gradient, selectedNodeID: $selectedNodeID, showDitherOverlay: false)
@@ -78,7 +76,11 @@ struct GradientEditorView: View {
         newNS?.getRed(&nr, green: &ng, blue: &nb, alpha: &na)
 
         let combined = NSColor(srgbRed: nr, green: ng, blue: nb, alpha: oldA)
-        gradient.nodes[idx].colorHex = combined.toHexString(includeAlpha: true) ?? gradient.nodes[idx].colorHex
+        let newHex = combined.toHexString(includeAlpha: true) ?? gradient.nodes[idx].colorHex
+        
+        var updatedNodes = gradient.nodes
+        updatedNodes[idx].colorHex = newHex
+        gradient = SpaceGradient(angle: gradient.angle, nodes: updatedNodes, grain: gradient.grain, opacity: gradient.opacity)
         #endif
     }
 

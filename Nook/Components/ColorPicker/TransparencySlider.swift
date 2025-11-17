@@ -30,8 +30,7 @@ struct TransparencySlider: View {
         .onAppear { localOpacity = clamp(gradient.opacity) }
         .onChange(of: gradient.opacity) { _, newValue in localOpacity = clamp(newValue) }
         .onChange(of: localOpacity) { _, newValue in
-            gradient.opacity = clamp(newValue)
-            // Push live background update immediately
+            gradient = SpaceGradient(angle: gradient.angle, nodes: gradient.nodes, grain: gradient.grain, opacity: clamp(newValue))
             gradientColorManager.setImmediate(gradient)
         }
     }
