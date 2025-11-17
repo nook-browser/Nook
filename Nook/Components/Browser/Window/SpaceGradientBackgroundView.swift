@@ -9,7 +9,7 @@ struct SpaceGradientBackgroundView: View {
     @EnvironmentObject var gradientColorManager: GradientColorManager
 
     private var gradient: SpaceGradient {
-        gradientColorManager.isEditing ? gradientColorManager.displayGradient : windowState.gradient
+        gradientColorManager.displayGradient
     }
 
     var body: some View {
