@@ -36,7 +36,7 @@ struct BoostOptions: View {
                 OptionButton(icon: "slider.horizontal.3", isActive: showAdvancedOptions) {
                     showAdvancedOptions.toggle()
                 }
-                .popover(isPresented: $showAdvancedOptions) {
+                .popover(isPresented: $showAdvancedOptions, arrowEdge: .bottom) {
                     VStack(alignment: .leading, spacing: 16) {
                         Text("Advanced Options")
                             .font(.system(size: 14, weight: .semibold))
@@ -132,6 +132,8 @@ struct BoostOptions: View {
                     }
                     .padding(20)
                     .frame(width: 280)
+                    .fixedSize()
+                    .interactionActivityTrackingTag("boost-advanced-options")
                 }
 
                 OptionButton(icon: "arrow.counterclockwise", isActive: false) {
