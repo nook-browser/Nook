@@ -14,6 +14,7 @@ final class BoostsWindowManager: NSObject {
     static let shared = BoostsWindowManager()
 
     private var window: NSWindow?
+    private weak var parentWindow: NSWindow?
     private weak var currentWebView: WKWebView?
     private var currentDomain: String?
     private var boostsManager: BoostsManager?
@@ -26,6 +27,9 @@ final class BoostsWindowManager: NSObject {
         self.currentWebView = webView
         self.currentDomain = domain
         self.boostsManager = boostsManager
+        
+        // Get the parent window from the webView
+        self.parentWindow = webView.window
 
         // Get existing boost or create new one
         let existingBoost = boostsManager.getBoost(for: domain)
@@ -34,18 +38,33 @@ final class BoostsWindowManager: NSObject {
         if window == nil {
             let win = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 185, height: 600),
-                styleMask: [.borderless, .fullSizeContentView],
+                styleMask: [.titled, .closable, .fullSizeContentView],
                 backing: .buffered,
                 defer: false
             )
-            win.isMovableByWindowBackground = false
+            win.titleVisibility = .hidden
+            win.titlebarAppearsTransparent = true
+            win.isMovableByWindowBackground = true  // Let the whole window be draggable
             win.backgroundColor = .clear
             win.isOpaque = false
             win.hasShadow = true
-            win.level = .floating
+            win.level = .normal  // Normal level for child windows
+            win.hidesOnDeactivate = false  // Prevent hiding when parent is clicked
+            win.isReleasedWhenClosed = false  // Keep window object alive for reuse
+            win.standardWindowButton(.closeButton)?.isHidden = true
+            win.standardWindowButton(.miniaturizeButton)?.isHidden = true
+            win.standardWindowButton(.zoomButton)?.isHidden = true
 
-            // Center the window on screen
-            win.center()
+            // Position relative to parent window (right side)
+            if let parentWindow = self.parentWindow {
+                let parentFrame = parentWindow.frame
+                let xPos = parentFrame.maxX - 185 - 20  // 20pt from right edge
+                let yPos = parentFrame.maxY - 600 - 60  // 60pt from top (accounting for titlebar)
+                win.setFrameOrigin(NSPoint(x: xPos, y: yPos))
+            } else {
+                // Fallback to center if no parent
+                win.center()
+            }
 
             // Create SwiftUI hosting controller
             let hostingController = NSHostingController(
@@ -89,8 +108,15 @@ final class BoostsWindowManager: NSObject {
             window?.contentViewController = hostingController
         }
 
+        // Add as child window if we have a parent
+        if let parentWindow = self.parentWindow, let window = self.window {
+            // Remove from any previous parent first
+            window.parent?.removeChildWindow(window)
+            // Add as child window
+            parentWindow.addChildWindow(window, ordered: .above)
+        }
+        
         window?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
 
         // Apply existing boost if available
         if let existingBoost = existingBoost {
@@ -144,6 +170,7 @@ final class BoostsWindowManager: NSObject {
 
         // Store references we need to clean up
         let windowToClose = window
+        let parent = self.parentWindow
 
         // Immediately nil out our reference to prevent reuse
         self.window = nil
@@ -151,10 +178,16 @@ final class BoostsWindowManager: NSObject {
         // Clear other references immediately (these are safe)
         self.currentWebView = nil
         self.currentDomain = nil
+        self.parentWindow = nil
 
         // Delay the actual window closing and manager cleanup
         // This ensures the button's event handler completes before deallocation
         DispatchQueue.main.async { [weak self] in
+            // Remove from parent window first if it's a child
+            if let parent = parent {
+                parent.removeChildWindow(windowToClose)
+            }
+            
             // First remove content view controller to break SwiftUI references
             windowToClose.contentViewController = nil
 
@@ -192,7 +225,7 @@ private struct BoostWindowContent: View {
                 .frame(height: 1)
                 .frame(maxWidth: .infinity)
 
-            // Main boost UI
+            // Main boost UI - wrapped to prevent window dragging
             VStack(spacing: 15) {
                 BoostColorPicker(
                     selectedColor: Binding(
@@ -236,6 +269,7 @@ private struct BoostWindowContent: View {
             .padding(.horizontal, 18)
             .padding(.top, 18)
             .padding(.bottom, 36)
+            .background(NonDraggableArea())
         }
         .frame(width: 185)
         .background(.white)
@@ -326,28 +360,24 @@ private struct BoostWindowHeader: View {
             }
         }
         .frame(width: 185, height: 40)
-        .background(BoostWindowDragView())
         .background(Color(hex: "F6F6F8"))
     }
 }
 
-// MARK: - Custom Drag View for Header Only
+// MARK: - Non-draggable content wrapper
 
-private struct BoostWindowDragView: NSViewRepresentable {
-    func makeNSView(context: Context) -> DraggableHeaderView {
-        return DraggableHeaderView()
+private struct NonDraggableArea: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NonDraggableNSView()
+        return view
     }
-
-    func updateNSView(_ nsView: DraggableHeaderView, context: Context) {}
+    
+    func updateNSView(_ nsView: NSView, context: Context) {}
 }
 
-private class DraggableHeaderView: NSView {
+private class NonDraggableNSView: NSView {
     override var mouseDownCanMoveWindow: Bool {
-        return true
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        // Allow window dragging
-        window?.performDrag(with: event)
+        return false
     }
 }
+
