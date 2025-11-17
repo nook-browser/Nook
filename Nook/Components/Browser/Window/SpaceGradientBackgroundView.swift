@@ -6,9 +6,10 @@ import CoreGraphics
 // Renders the current space's gradient as a bottom background layer
 struct SpaceGradientBackgroundView: View {
     @Environment(BrowserWindowState.self) private var windowState
+    @EnvironmentObject var gradientColorManager: GradientColorManager
 
     private var gradient: SpaceGradient {
-        windowState.gradient
+        gradientColorManager.isEditing ? gradientColorManager.displayGradient : windowState.gradient
     }
 
     var body: some View {

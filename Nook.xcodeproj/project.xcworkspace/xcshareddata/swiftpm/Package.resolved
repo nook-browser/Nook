@@ -103,7 +103,7 @@
     {
       "identity" : "universalglass",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/aeastr/universalglass.git",
+      "location" : "https://github.com/Aeastr/UniversalGlass",
       "state" : {
         "revision" : "bb27ffe16a33c9e48d65111331ce4cfb519e0e92",
         "version" : "1.0.0"
