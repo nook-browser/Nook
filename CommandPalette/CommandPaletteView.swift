@@ -68,7 +68,6 @@ struct CommandPaletteView: View {
                     Spacer()
                     VStack {
                         VStack(alignment: .center,spacing: 6) {
-                            // Input field - fixed at top of box
                             HStack(spacing: 15) {
                                 Image(
                                     systemName: isLikelyURL(text)
@@ -108,7 +107,6 @@ struct CommandPaletteView: View {
                             .padding(.vertical, 8)
                             .padding(.horizontal, 8)
 
-                            // Separator
                             if !searchManager.suggestions.isEmpty {
                                 RoundedRectangle(cornerRadius: 100)
                                     .fill(
@@ -121,7 +119,6 @@ struct CommandPaletteView: View {
 
                             }
 
-                            // Suggestions - expand the box downward
                             if !searchManager.suggestions.isEmpty {
                                 let suggestions = searchManager.suggestions
                                 CommandPaletteSuggestionsListView(
@@ -147,7 +144,6 @@ struct CommandPaletteView: View {
                             value: searchManager.suggestions.count
                         )
                         Spacer()
-                            .border(.red)
                     }
                     .frame(
                         width: effectiveCommandPaletteWidth,
@@ -168,12 +164,10 @@ struct CommandPaletteView: View {
                 searchManager.setHistoryManager(browserManager.historyManager)
                 searchManager.updateProfileContext()
 
-                // Pre-fill text if provided and select all for easy replacement
                 text = commandPalette.prefilledText
 
                 DispatchQueue.main.async {
                     isSearchFocused = true
-                    // Select all once focused so the URL is highlighted
                     DispatchQueue.main.async {
                         NSApplication.shared.sendAction(
                             #selector(NSText.selectAll(_:)),
@@ -189,11 +183,9 @@ struct CommandPaletteView: View {
                 selectedSuggestionIndex = -1
             }
         }
-        // Keep search profile context updated while palette is open
         .onChange(of: browserManager.currentProfile?.id) { _, _ in
             if commandPalette.isVisible {
                 searchManager.updateProfileContext()
-                // Clear suggestions to avoid cross-profile residue
                 searchManager.clearSuggestions()
             }
         }
@@ -306,7 +298,6 @@ struct CommandPaletteView: View {
             let suggestion = searchManager.suggestions[selectedSuggestionIndex]
             selectSuggestion(suggestion)
         } else {
-            // Create new suggestion from text input
             let newSuggestion = SearchManager.SearchSuggestion(
                 text: text,
                 type: isLikelyURL(text) ? .url : .search
@@ -319,14 +310,12 @@ struct CommandPaletteView: View {
     {
         switch suggestion.type {
         case .tab(let existingTab):
-            // Switch to existing tab in this window
             browserManager.selectTab(existingTab, in: windowState)
             print("Switched to existing tab: \(existingTab.name)")
         case .history(let historyEntry):
             if commandPalette.shouldNavigateCurrentTab
                 && browserManager.currentTab(for: windowState) != nil
             {
-                // Navigate current tab to history URL
                 browserManager.currentTab(for: windowState)?.loadURL(
                     historyEntry.url.absoluteString
                 )
@@ -334,7 +323,6 @@ struct CommandPaletteView: View {
                     "Navigated current tab to history URL: \(historyEntry.url)"
                 )
             } else {
-                // Create new tab from history entry
                 browserManager.createNewTab(in: windowState)
                 browserManager.currentTab(for: windowState)?.loadURL(
                     historyEntry.url.absoluteString
@@ -347,13 +335,11 @@ struct CommandPaletteView: View {
             if commandPalette.shouldNavigateCurrentTab
                 && browserManager.currentTab(for: windowState) != nil
             {
-                // Navigate current tab to new URL with proper normalization
                 browserManager.currentTab(for: windowState)?.navigateToURL(
                     suggestion.text
                 )
                 print("Navigated current tab to: \(suggestion.text)")
             } else {
-                // Create new tab
                 browserManager.createNewTab(in: windowState)
                 browserManager.currentTab(for: windowState)?.navigateToURL(
                     suggestion.text

@@ -339,7 +339,84 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
 
     // MARK: - Boosts Integration
+    
+    // Track boost scripts to optimize removal (only remove boost scripts, not all scripts)
+    // Use array instead of Set since WKUserScript doesn't conform to Hashable
+    private var currentBoostScripts: [WKUserScript] = []
+    
+    private func setupBoostUserScript(for url: URL, in webView: WKWebView) {
+        guard let browserManager = browserManager,
+            let domain = url.host
+        else {
+            return
+        }
+
+        let userContentController = webView.configuration.userContentController
+        let boostScriptIdentifier = "NOOK_BOOST_SCRIPT_IDENTIFIER"
+        
+        // Optimized: Only remove boost scripts, preserve other user scripts
+        // This is much faster than removing all scripts and re-adding them
+        if !currentBoostScripts.isEmpty {
+            // Remove only the boost scripts we previously added
+            // Compare by source content since WKUserScript doesn't conform to Equatable
+            let allScripts = userContentController.userScripts
+            userContentController.removeAllUserScripts()
+            
+            // Re-add only non-boost scripts (those not in our tracked list)
+            let boostScriptSources = Set(currentBoostScripts.map { $0.source })
+            for script in allScripts {
+                if !boostScriptSources.contains(script.source) {
+                    userContentController.addUserScript(script)
+                }
+            }
+            
+            currentBoostScripts.removeAll()
+        } else {
+            // First time setup - still need to check for any existing boost scripts
+            // (in case webview was reused or scripts were added elsewhere)
+            let existingBoostScripts = userContentController.userScripts.filter { script in
+                script.source.contains(boostScriptIdentifier)
+            }
+            
+            if !existingBoostScripts.isEmpty {
+                // Remove existing boost scripts
+                let remainingScripts = userContentController.userScripts.filter { script in
+                    !script.source.contains(boostScriptIdentifier)
+                }
+                userContentController.removeAllUserScripts()
+                remainingScripts.forEach { userContentController.addUserScript($0) }
+            }
+        }
+
+        // Check if this domain has a boost configured
+        guard let boostConfig = browserManager.boostsManager.getBoost(for: domain) else {
+            // No boost for this domain - scripts already removed above
+            return
+        }
+
+        print("🚀 [Tab] Setting up boost user scripts for domain: \(domain)")
+
+        // Create and add boost user scripts (will inject at document start)
+        // Returns array: [fontScript (optional), mainBoostScript]
+        let boostScripts = browserManager.boostsManager.createBoostUserScripts(for: boostConfig, domain: domain)
+        
+        // Track these scripts for efficient removal later
+        // Prevent duplicates by checking if script source already exists
+        let existingSources = Set(userContentController.userScripts.map { $0.source })
+        for script in boostScripts {
+            // Only add if not already present (prevents duplicates during rapid navigation)
+            if !existingSources.contains(script.source) {
+                currentBoostScripts.append(script)
+                userContentController.addUserScript(script)
+            }
+        }
+        print("✅ [Tab] Added \(boostScripts.count) boost script(s) for: \(domain)")
+    }
+    
     private func injectBoostIfNeeded(for url: URL, in webView: WKWebView) {
+        // This method is kept for backward compatibility but boost injection
+        // now happens via user scripts at document start
+        // Fallback: still inject if user script didn't work
         guard let browserManager = browserManager,
             let domain = url.host
         else {
@@ -351,15 +428,15 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             return
         }
 
-        print("🚀 [Tab] Injecting boost for domain: \(domain)")
+        print("🚀 [Tab] Fallback boost injection for domain: \(domain)")
 
         // Inject boost with a slight delay to ensure DOM is ready
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             browserManager.boostsManager.injectBoost(boostConfig, into: webView) { success in
                 if success {
-                    print("✅ [Tab] Boost injection successful for: \(domain)")
+                    print("✅ [Tab] Fallback boost injection successful for: \(domain)")
                 } else {
-                    print("❌ [Tab] Boost injection failed for: \(domain)")
+                    print("❌ [Tab] Fallback boost injection failed for: \(domain)")
                 }
             }
         }
@@ -2319,6 +2396,9 @@ extension Tab: WKNavigationDelegate {
             navigationAction.targetFrame?.isMainFrame == true
         {
             browserManager?.maybeShowOAuthAssist(for: url, in: self)
+            
+            // Setup boost user script before navigation starts
+            setupBoostUserScript(for: url, in: webView)
         }
 
         // Check for Option+click to trigger Peek for any link

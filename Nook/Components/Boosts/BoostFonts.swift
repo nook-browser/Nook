@@ -8,87 +8,110 @@
 import SwiftUI
 
 struct BoostFonts: View {
+    @Binding var config: BoostConfig
+    var onConfigChange: (BoostConfig) -> Void
+    
     var body: some View {
         VStack {
             HStack(spacing: 0) {
                 FontButton(font: .system(size: 11, weight: .medium)) {
-                    // Change website font
+                    config.fontFamily = nil
+                    onConfigChange(config)
                 }
                 FontButton(font: .custom("Helvetica Neue", size: 11)) {
-                    // Change website font
+                    config.fontFamily = "Helvetica Neue"
+                    onConfigChange(config)
                 }
                 FontButton(font: .custom("Avenir", size: 11)) {
-                    // Change website font
+                    config.fontFamily = "Avenir"
+                    onConfigChange(config)
                 }
                 FontButton(font: .custom("Futura", size: 11)) {
-                    // Change website font
+                    config.fontFamily = "Futura"
+                    onConfigChange(config)
                 }
 
                 FontButton(font: .custom("DIN Alternate", size: 11)) {
-                    // Change website font
+                    config.fontFamily = "DIN Alternate"
+                    onConfigChange(config)
                 }
             }
             HStack(spacing: 0) {
                 FontButton(font: .custom("Arial Rounded MT Bold", size: 11)) {
-                    // Change website font
+                    config.fontFamily = "Arial Rounded MT Bold"
+                    onConfigChange(config)
                 }
 
                 FontButton(font: .custom("PT Mono", size: 11)) {
-                    // Change website font
+                    config.fontFamily = "PT Mono"
+                    onConfigChange(config)
                 }
 
                 FontButton(font: .custom("Courier", size: 11)) {
-                    // Change website font
+                    config.fontFamily = "Courier"
+                    onConfigChange(config)
                 }
 
                 FontButton(font: .custom("Times New Roman", size: 11)) {
-                    // Change website font
+                    config.fontFamily = "Times New Roman"
+                    onConfigChange(config)
                 }
 
                 FontButton(font: .custom("Charter", size: 11)) {
-                    // Change website font
+                    config.fontFamily = "Charter"
+                    onConfigChange(config)
                 }
             }
             HStack(spacing: 0) {
                 FontButton(font: .custom("Baskerville", size: 11)) {
-                    // Change website font
+                    config.fontFamily = "Baskerville"
+                    onConfigChange(config)
                 }
 
                 FontButton(font: .custom("Hoefler Text", size: 11)) {
-                    // Change website font
+                    config.fontFamily = "Hoefler Text"
+                    onConfigChange(config)
                 }
 
                 FontButton(font: .custom("Palatino", size: 11)) {
-                    // Change website font
+                    config.fontFamily = "Palatino"
+                    onConfigChange(config)
                 }
 
                 FontButton(font: .custom("Chalkboard", size: 11)) {
-                    // Change website font
+                    config.fontFamily = "Chalkboard"
+                    onConfigChange(config)
                 }
 
                 FontButton(font: .custom("SignPainter", size: 11)) {
-                    // Change website font
+                    config.fontFamily = "SignPainter"
+                    onConfigChange(config)
                 }
             }
             HStack(spacing: 0) {
                 FontButton(font: .custom("Snell Roundhand", size: 11)) {
-                    // Change website font
+                    config.fontFamily = "Snell Roundhand"
+                    onConfigChange(config)
                 }
 
                 FontButton(font: .custom("Papyrus", size: 11)) {
-                    // Change website font
+                    config.fontFamily = "Papyrus"
+                    onConfigChange(config)
                 }
 
                 FontButton(font: .custom("Palatino", size: 11)) {
-                    // Change website font
+                    config.fontFamily = "Palatino"
+                    onConfigChange(config)
                 }
 
                 FontButton(font: .custom("Apple Chancery", size: 11)) {
-                    // Change website font
+                    config.fontFamily = "Apple Chancery"
+                    onConfigChange(config)
                 }
 
                 FontButton(font: .custom("Wingdings", size: 11)) {
-                    // Change website font
+                    config.fontFamily = "Wingdings"
+                    onConfigChange(config)
                 }
             }
         }
@@ -102,7 +125,8 @@ struct BoostFonts: View {
 }
 
 #Preview {
-    BoostFonts()
+    @Previewable @State var config = BoostConfig()
+    BoostFonts(config: $config) { _ in }
         .frame(width: 300, height: 300)
         .background(.white)
 }

@@ -160,17 +160,12 @@ class LineNumberRulerView: NSRulerView {
 }
 
 struct CodeView: View {
-    @State private var code = """
-    function greet(name) {
-        console.log(`Hello, ${name}!`);
-    }
-    
-    greet("World");
-    """
+    @Binding var code: String
+    var language: String
     
     var body: some View {
         VStack {
-            BoostCodeView(code: $code, language: "javascript", theme: "xcode")
+            BoostCodeView(code: $code, language: language, theme: "xcode")
                 .font(.system(size: 12, weight: .medium))
                 .background(Color.white)
         }
@@ -178,5 +173,12 @@ struct CodeView: View {
 }
 
 #Preview {
-    CodeView()
+    @Previewable @State var code = """
+    function greet(name) {
+        console.log(`Hello, ${name}!`);
+    }
+    
+    greet("World");
+    """
+    CodeView(code: $code, language: "javascript")
 }

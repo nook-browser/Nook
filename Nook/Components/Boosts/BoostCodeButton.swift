@@ -10,10 +10,11 @@ import SwiftUI
 struct BoostCodeButton: View {
     @State private var isHovered: Bool = false
     var isActive: Bool
+    var onClick: () -> Void
 
     var body: some View {
         Button {
-            // open code editor
+            onClick()
         } label: {
             HStack {
                 Text("Code")
@@ -48,4 +49,9 @@ struct BoostCodeButton: View {
             isHovered = state
         }
     }
+}
+
+#Preview {
+    BoostCodeButton(isActive: false, onClick: {})
+        .frame(width: 300, height: 300)
 }

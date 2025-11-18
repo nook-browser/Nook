@@ -14,14 +14,12 @@ enum Language {
 }
 
 struct CodeEditorHeader: View {
-    @State private var code = 0
-    @State private var selectedLanguage: Language = .css
+    @Binding var selectedLanguage: Language
+    var onBack: () -> Void
 
     var body: some View {
         HStack {
-            BackButton {
-
-            }
+            BackButton(action: onBack)
             Spacer()
             LanguagePicker(language: $selectedLanguage)
             Spacer()
@@ -36,7 +34,8 @@ struct CodeEditorHeader: View {
 }
 
 #Preview {
-    CodeEditorHeader()
+    @Previewable @State var language: Language = .css
+    CodeEditorHeader(selectedLanguage: $language, onBack: {})
         .padding(10)
         .frame(width: 480)
         .background(.white)
