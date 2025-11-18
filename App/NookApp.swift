@@ -98,8 +98,16 @@ struct NookApp: App {
         }
 
         windowRegistry.onWindowClose = { [webViewCoordinator, weak browserManager] windowId in
-            webViewCoordinator.cleanupWindow(windowId, tabManager: browserManager!.tabManager)
-            browserManager?.splitManager.cleanupWindow(windowId)
+            // Only cleanup if browserManager still exists (it's captured weakly)
+            if let browserManager = browserManager {
+                webViewCoordinator.cleanupWindow(windowId, tabManager: browserManager.tabManager)
+                browserManager.splitManager.cleanupWindow(windowId)
+            } else {
+                // BrowserManager was deallocated - perform minimal cleanup
+                // Remove compositor container view to prevent leaks
+                webViewCoordinator.removeCompositorContainerView(for: windowId)
+                print("⚠️ [NookApp] Window \(windowId) closed after BrowserManager deallocation - performed minimal cleanup")
+            }
         }
 
         windowRegistry.onActiveWindowChange = { [weak browserManager] windowState in

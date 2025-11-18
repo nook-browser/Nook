@@ -9,16 +9,14 @@ import SwiftUI
 
 
 struct CodeEditorFooter: View {
-    
+    var onRefresh: () -> Void
     
     var body: some View {
         HStack{
             HStack(spacing: 10) {
                 OptionButton(icon: "eyedropper", isActive: false) {
-                    
                 }
                 OptionButton(icon: "hammer", isActive: false) {
-                    
                 }
             }
             Spacer()
@@ -26,7 +24,7 @@ struct CodeEditorFooter: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.black.opacity(0.45))
             OptionButton(icon: "arrow.clockwise", isActive: false) {
-                
+                onRefresh()
             }
         }
         .padding(15)
@@ -35,7 +33,7 @@ struct CodeEditorFooter: View {
 }
 
 #Preview {
-    CodeEditorFooter()
+    CodeEditorFooter(onRefresh: {})
         .frame(width: 480, height: 70)
         .background(.white)
 }

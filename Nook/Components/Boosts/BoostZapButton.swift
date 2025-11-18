@@ -9,11 +9,13 @@ import SwiftUI
 
 struct BoostZapButton: View {
     @State private var isHovered: Bool = false
-    var isActive: Bool
+    @Binding var isActive: Bool
+    var onClick: () -> Void
 
     var body: some View {
         Button {
-            // inject zap js to the website
+            isActive.toggle()
+            onClick()
         } label: {
             HStack {
                 Text("Zap")
@@ -51,6 +53,7 @@ struct BoostZapButton: View {
 }
 
 #Preview {
-    BoostZapButton(isActive: false)
+    @Previewable @State var isActive = false
+    BoostZapButton(isActive: $isActive, onClick: {})
         .frame(width: 300, height: 300)
 }

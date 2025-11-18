@@ -8,17 +8,36 @@
 import SwiftUI
 
 struct BoostFontOptions: View {
+    @Binding var config: BoostConfig
+    var onConfigChange: (BoostConfig) -> Void
 
     var body: some View {
         HStack(spacing: 8) {
-            BoostFontOptionSize()
-            BoostFontOptionCase()
+            BoostFontOptionSize(
+                pageZoom: Binding(
+                    get: { config.pageZoom },
+                    set: {
+                        config.pageZoom = $0
+                        onConfigChange(config)
+                    }
+                )
+            )
+            BoostFontOptionCase(
+                textTransform: Binding(
+                    get: { config.textTransform },
+                    set: {
+                        config.textTransform = $0
+                        onConfigChange(config)
+                    }
+                )
+            )
         }
     }
 }
 
 #Preview {
-    BoostFontOptions()
+    @Previewable @State var config = BoostConfig()
+    BoostFontOptions(config: $config) { _ in }
         .frame(width: 300, height: 300)
         .background(.white)
 }
@@ -77,8 +96,12 @@ enum FontCases {
 }
 
 struct BoostFontOptionSize: View {
-    @State private var currentSize: FontSizes = .percent100
+    @Binding var pageZoom: Int
     @State private var isHovering: Bool = false
+    
+    private var currentSize: FontSizes {
+        FontSizes(rawValue: pageZoom) ?? .percent100
+    }
 
     var body: some View {
         Button {
@@ -102,7 +125,7 @@ struct BoostFontOptionSize: View {
                 }
         }
         .buttonStyle(ScaleButtonStyle())
-        .animation(.easeInOut(duration: 0.2), value: currentSize)
+        .animation(.easeInOut(duration: 0.2), value: pageZoom)
         .onHover { state in
             isHovering = state
         }
@@ -111,21 +134,30 @@ struct BoostFontOptionSize: View {
     private func cycleSize() {
         switch currentSize {
         case .percent100:
-            currentSize = .percent110
+            pageZoom = 110
         case .percent110:
-            currentSize = .percent125
+            pageZoom = 125
         case .percent125:
-            currentSize = .percent150
+            pageZoom = 150
         case .percent150:
-            currentSize = .percent90
+            pageZoom = 90
         case .percent90:
-            currentSize = .percent100
+            pageZoom = 100
         }
     }
 }
 struct BoostFontOptionCase: View {
-    @State private var currentCase: FontCases = .normal
+    @Binding var textTransform: String
     @State private var isHovering: Bool = false
+    
+    private var currentCase: FontCases {
+        switch textTransform {
+        case "uppercase": return .uppercase
+        case "lowercase": return .lowercase
+        case "capitalize": return .titlecase
+        default: return .normal
+        }
+    }
 
     var body: some View {
         Button {
@@ -149,7 +181,7 @@ struct BoostFontOptionCase: View {
                 }
         }
         .buttonStyle(ScaleButtonStyle())
-        .animation(.easeInOut(duration: 0.2), value: currentCase)
+        .animation(.easeInOut(duration: 0.2), value: textTransform)
         .onHover { state in
             isHovering = state
         }
@@ -158,13 +190,13 @@ struct BoostFontOptionCase: View {
     private func cycleCase() {
         switch currentCase {
         case .normal:
-            currentCase = .uppercase
+            textTransform = "uppercase"
         case .uppercase:
-            currentCase = .lowercase
+            textTransform = "lowercase"
         case .lowercase:
-            currentCase = .titlecase
+            textTransform = "capitalize"
         case .titlecase:
-            currentCase = .normal
+            textTransform = "none"
         }
     }
 }

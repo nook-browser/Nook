@@ -66,10 +66,18 @@ struct BoostUI: View {
                     }
                 )
 
-                BoostFonts()
-                BoostFontOptions()
-                BoostZapButton(isActive: false)
-                BoostCodeButton(isActive: false)
+                BoostFonts(config: $config, onConfigChange: { newConfig in
+                    config = newConfig
+                    applyConfigChangeDebounced()
+                })
+                BoostFontOptions(config: $config, onConfigChange: { newConfig in
+                    config = newConfig
+                    applyConfigChangeDebounced()
+                })
+                BoostZapButton(isActive: .constant(false), onClick: {
+                })
+                BoostCodeButton(isActive: false, onClick: {
+                })
             }
             .padding(.horizontal, 18)
             .padding(.top, 18)
@@ -79,16 +87,13 @@ struct BoostUI: View {
         .background(.white)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .onAppear {
-            // Apply initial config on appear
             onConfigChange?(config)
         }
     }
 
     private func applyConfigChangeDebounced() {
-        // Cancel previous work item
         updateWorkItem?.cancel()
 
-        // Create new work item
         let workItem = DispatchWorkItem { [config] in
             Task { @MainActor in
                 self.onConfigChange?(config)
@@ -96,8 +101,6 @@ struct BoostUI: View {
         }
 
         updateWorkItem = workItem
-
-        // Execute after short delay for smoothness
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: workItem)
     }
 }

@@ -14,10 +14,11 @@ final class BoostsWindowManager: NSObject {
     static let shared = BoostsWindowManager()
 
     private var window: NSWindow?
+    private var codeEditorWindow: NSWindow?
     private weak var parentWindow: NSWindow?
-    private weak var currentWebView: WKWebView?
+    weak var currentWebView: WKWebView?
     private var currentDomain: String?
-    private var boostsManager: BoostsManager?
+    var boostsManager: BoostsManager?
 
     private override init() {
         super.init()
@@ -28,10 +29,8 @@ final class BoostsWindowManager: NSObject {
         self.currentDomain = domain
         self.boostsManager = boostsManager
         
-        // Get the parent window from the webView
         self.parentWindow = webView.window
 
-        // Get existing boost or create new one
         let existingBoost = boostsManager.getBoost(for: domain)
         let config = existingBoost ?? BoostConfig()
 
@@ -44,29 +43,26 @@ final class BoostsWindowManager: NSObject {
             )
             win.titleVisibility = .hidden
             win.titlebarAppearsTransparent = true
-            win.isMovableByWindowBackground = true  // Let the whole window be draggable
+            win.isMovableByWindowBackground = true
             win.backgroundColor = .clear
             win.isOpaque = false
             win.hasShadow = true
-            win.level = .normal  // Normal level for child windows
-            win.hidesOnDeactivate = false  // Prevent hiding when parent is clicked
-            win.isReleasedWhenClosed = false  // Keep window object alive for reuse
+            win.level = .normal
+            win.hidesOnDeactivate = false
+            win.isReleasedWhenClosed = false
             win.standardWindowButton(.closeButton)?.isHidden = true
             win.standardWindowButton(.miniaturizeButton)?.isHidden = true
             win.standardWindowButton(.zoomButton)?.isHidden = true
 
-            // Position relative to parent window (right side)
             if let parentWindow = self.parentWindow {
                 let parentFrame = parentWindow.frame
-                let xPos = parentFrame.maxX - 185 - 20  // 20pt from right edge
-                let yPos = parentFrame.maxY - 600 - 60  // 60pt from top (accounting for titlebar)
+                let xPos = parentFrame.maxX - 185 - 20
+                let yPos = parentFrame.maxY - 600 - 60
                 win.setFrameOrigin(NSPoint(x: xPos, y: yPos))
             } else {
-                // Fallback to center if no parent
                 win.center()
             }
 
-            // Create SwiftUI hosting controller
             let hostingController = NSHostingController(
                 rootView: BoostWindowContent(
                     config: config,
@@ -87,7 +83,6 @@ final class BoostsWindowManager: NSObject {
             win.contentViewController = hostingController
             window = win
         } else {
-            // Recreate content with new config
             let hostingController = NSHostingController(
                 rootView: BoostWindowContent(
                     config: config,
@@ -108,17 +103,13 @@ final class BoostsWindowManager: NSObject {
             window?.contentViewController = hostingController
         }
 
-        // Add as child window if we have a parent
         if let parentWindow = self.parentWindow, let window = self.window {
-            // Remove from any previous parent first
             window.parent?.removeChildWindow(window)
-            // Add as child window
             parentWindow.addChildWindow(window, ordered: .above)
         }
         
         window?.makeKeyAndOrderFront(nil)
 
-        // Apply existing boost if available
         if let existingBoost = existingBoost {
             applyBoost(existingBoost)
         }
@@ -130,10 +121,8 @@ final class BoostsWindowManager: NSObject {
             let manager = boostsManager
         else { return }
 
-        // Save the boost config
         manager.saveBoost(config, for: domain)
 
-        // Apply to webview
         manager.injectBoost(config, into: webView) { success in
             if success {
                 print("✅ [BoostsWindowManager] Boost applied successfully")
@@ -149,10 +138,8 @@ final class BoostsWindowManager: NSObject {
             let manager = boostsManager
         else { return }
 
-        // Remove saved boost
         manager.removeBoost(for: domain)
 
-        // Disable DarkReader
         manager.disableBoost(in: webView) { success in
             if success {
                 print("✅ [BoostsWindowManager] Boost disabled successfully")
@@ -160,43 +147,107 @@ final class BoostsWindowManager: NSObject {
                 print("❌ [BoostsWindowManager] Failed to disable boost")
             }
         }
+        
+        manager.applyPageZoom(100, to: webView)
+        manager.injectCSS("", into: webView)
+        manager.injectJavaScript("", into: webView) { _ in }
 
-        // Close the window
         close()
     }
 
     func close() {
         guard let window = self.window else { return }
 
-        // Store references we need to clean up
         let windowToClose = window
         let parent = self.parentWindow
 
-        // Immediately nil out our reference to prevent reuse
         self.window = nil
-
-        // Clear other references immediately (these are safe)
         self.currentWebView = nil
         self.currentDomain = nil
         self.parentWindow = nil
 
-        // Delay the actual window closing and manager cleanup
-        // This ensures the button's event handler completes before deallocation
         DispatchQueue.main.async { [weak self] in
-            // Remove from parent window first if it's a child
             if let parent = parent {
                 parent.removeChildWindow(windowToClose)
             }
             
-            // First remove content view controller to break SwiftUI references
             windowToClose.contentViewController = nil
 
-            // Small delay to let SwiftUI fully tear down
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 windowToClose.close()
-
-                // Finally clear the manager reference
                 self?.boostsManager = nil
+            }
+        }
+    }
+    
+    func showCodeEditor(for config: Binding<BoostConfig>, onConfigChange: @escaping (BoostConfig) -> Void) {
+        closeCodeEditor()
+        
+        let win = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 480, height: 600),
+            styleMask: [.titled, .closable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        win.titleVisibility = .hidden
+        win.titlebarAppearsTransparent = true
+        win.isMovableByWindowBackground = true
+        win.backgroundColor = .clear
+        win.isOpaque = false
+        win.hasShadow = true
+        win.level = .normal
+        win.hidesOnDeactivate = false
+        win.isReleasedWhenClosed = false
+        win.standardWindowButton(.closeButton)?.isHidden = true
+        win.standardWindowButton(.miniaturizeButton)?.isHidden = true
+            win.standardWindowButton(.zoomButton)?.isHidden = true
+        
+        if let parentWindow = self.parentWindow {
+            let parentFrame = parentWindow.frame
+            let xPos = parentFrame.midX - 240
+            let yPos = parentFrame.midY - 300
+            win.setFrameOrigin(NSPoint(x: xPos, y: yPos))
+        } else {
+            win.center()
+        }
+        
+        let hostingController = NSHostingController(
+            rootView: CodeEditorContentView(
+                config: config,
+                onConfigChange: onConfigChange,
+                onClose: { [weak self] in
+                    self?.closeCodeEditor()
+                }
+            )
+        )
+        
+        win.contentViewController = hostingController
+        codeEditorWindow = win
+        
+        if let parentWindow = self.parentWindow {
+            parentWindow.addChildWindow(win, ordered: .above)
+        }
+        
+        win.makeKeyAndOrderFront(nil)
+    }
+    
+    func closeCodeEditor() {
+        guard let window = codeEditorWindow else { return }
+        
+        let windowToClose = window
+        let parent = self.parentWindow
+        
+        codeEditorWindow = nil
+        
+        DispatchQueue.main.async {
+            if let parent = parent {
+                parent.removeChildWindow(windowToClose)
+            }
+            
+            windowToClose.contentViewController = nil
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                windowToClose.close()
             }
         }
     }
@@ -210,12 +261,17 @@ private struct BoostWindowContent: View {
     let onConfigChange: (BoostConfig) -> Void
     let onReset: () -> Void
     let onClose: () -> Void
+    
+    @State private var isZapActive: Bool = false
+    @EnvironmentObject var boostsManager: BoostsManager
 
     var body: some View {
         VStack(spacing: 0) {
             // Custom header with close and reset buttons
             BoostWindowHeader(
-                domain: domain,
+                config: $config,
+                defaultDomain: domain,
+                onConfigChange: onConfigChange,
                 onReset: onReset,
                 onClose: onClose
             )
@@ -225,7 +281,6 @@ private struct BoostWindowContent: View {
                 .frame(height: 1)
                 .frame(maxWidth: .infinity)
 
-            // Main boost UI - wrapped to prevent window dragging
             VStack(spacing: 15) {
                 BoostColorPicker(
                     selectedColor: Binding(
@@ -261,10 +316,64 @@ private struct BoostWindowContent: View {
                     )
                 )
 
-                BoostFonts()
-                BoostFontOptions()
-                BoostZapButton(isActive: false)
-                BoostCodeButton(isActive: false)
+                BoostFonts(config: $config, onConfigChange: onConfigChange)
+                BoostFontOptions(config: $config, onConfigChange: onConfigChange)
+                BoostZapButton(
+                    isActive: $isZapActive,
+                    onClick: {
+                        let zapScript = """
+                            (function() {
+                                const adSelectors = [
+                                    '[class*="ad"]',
+                                    '[id*="ad"]',
+                                    '[class*="advertisement"]',
+                                    '[id*="advertisement"]',
+                                    'iframe[src*="ads"]',
+                                    'iframe[src*="advertisement"]'
+                                ];
+                                
+                                adSelectors.forEach(selector => {
+                                    try {
+                                        document.querySelectorAll(selector).forEach(el => el.remove());
+                                    } catch(e) {}
+                                });
+                                
+                                const adClasses = ['ad', 'ads', 'advertisement', 'ad-banner', 'ad-container'];
+                                adClasses.forEach(className => {
+                                    try {
+                                        document.querySelectorAll('.' + className).forEach(el => el.remove());
+                                    } catch(e) {}
+                                });
+                                
+                                console.log('✅ [Nook Boost] Zap applied - ads removed');
+                            })();
+                            """
+                        
+                        if let webView = BoostsWindowManager.shared.currentWebView,
+                           let manager = BoostsWindowManager.shared.boostsManager {
+                            manager.injectJavaScript(zapScript, into: webView) { success in
+                                if success {
+                                    print("✅ [BoostsWindowManager] Zap script injected")
+                                }
+                            }
+                        }
+                    }
+                )
+                BoostCodeButton(
+                    isActive: false,
+                    onClick: {
+                        BoostsWindowManager.shared.showCodeEditor(
+                            for: Binding(
+                                get: { config },
+                                set: { newConfig in
+                                    config = newConfig
+                                    onConfigChange(newConfig)
+                                }
+                            ),
+                            onConfigChange: onConfigChange
+                        )
+                    }
+                )
             }
             .padding(.horizontal, 18)
             .padding(.top, 18)
@@ -280,13 +389,22 @@ private struct BoostWindowContent: View {
 // MARK: - Custom Window Header
 
 private struct BoostWindowHeader: View {
-    let domain: String
+    @Binding var config: BoostConfig
+    let defaultDomain: String
+    let onConfigChange: (BoostConfig) -> Void
     let onReset: () -> Void
     let onClose: () -> Void
-
+    
+    private var displayDomain: String {
+        config.customName ?? defaultDomain
+    }
+    
     @State private var isXHovered: Bool = false
     @State private var isResetHovered: Bool = false
     @State private var isMenuHovered: Bool = false
+    @State private var showRenameDialog: Bool = false
+    @State private var renameText: String = ""
+    @EnvironmentObject var boostsManager: BoostsManager
 
     var body: some View {
         HStack {
@@ -307,10 +425,14 @@ private struct BoostWindowHeader: View {
 
             Menu {
                 Button("Rename this Boost...") {
-                    // TODO: Implement rename
+                    renameText = config.customName ?? defaultDomain
+                    showRenameDialog = true
                 }
                 Button("Shuffle") {
-                    // TODO: Implement shuffle colors
+                    // Generate random hex color
+                    let colors = ["#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", "#98D8C8", "#F7DC6F", "#BB8FCE", "#85C1E2", "#F8B739", "#E74C3C"]
+                    config.tintColor = colors.randomElement() ?? "#FF6B6B"
+                    onConfigChange(config)
                 }
                 Button("Reset all edits") {
                     onReset()
@@ -320,11 +442,14 @@ private struct BoostWindowHeader: View {
                 }
                 Divider()
                 Button("All Boosts...") {
-                    // TODO: Show all boosts list
+                    // Show all boosts - for now just print them
+                    let allBoosts = boostsManager.boosts.keys.sorted()
+                    print("📋 [BoostsWindowManager] All boosts: \(allBoosts.joined(separator: ", "))")
+                    // TODO: Show in a dialog or window
                 }
             } label: {
                 HStack(spacing: 4) {
-                    Text(domain)
+                    Text(displayDomain)
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.black)
                         .lineLimit(1)
@@ -340,6 +465,28 @@ private struct BoostWindowHeader: View {
             .clipShape(RoundedRectangle(cornerRadius: 5))
             .onHover { state in
                 isMenuHovered = state
+            }
+            .popover(isPresented: $showRenameDialog, arrowEdge: .bottom) {
+                VStack(spacing: 12) {
+                    Text("Rename Boost")
+                        .font(.system(size: 14, weight: .semibold))
+                    TextField("Boost name", text: $renameText)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 200)
+                    HStack(spacing: 8) {
+                        Button("Cancel") {
+                            showRenameDialog = false
+                        }
+                        .buttonStyle(.bordered)
+                        Button("Save") {
+                            config.customName = renameText.isEmpty ? nil : renameText
+                            onConfigChange(config)
+                            showRenameDialog = false
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                }
+                .padding(16)
             }
 
             Button {
@@ -378,6 +525,51 @@ private struct NonDraggableArea: NSViewRepresentable {
 private class NonDraggableNSView: NSView {
     override var mouseDownCanMoveWindow: Bool {
         return false
+    }
+}
+
+// MARK: - Code Editor Content View
+
+private struct CodeEditorContentView: View {
+    @Binding var config: BoostConfig
+    var onConfigChange: (BoostConfig) -> Void
+    var onClose: () -> Void
+    
+    @State private var cssCode: String
+    @State private var jsCode: String
+    @State private var selectedLanguage: Language = .css
+    
+    init(config: Binding<BoostConfig>, onConfigChange: @escaping (BoostConfig) -> Void, onClose: @escaping () -> Void) {
+        self._config = config
+        self.onConfigChange = onConfigChange
+        self.onClose = onClose
+        self._cssCode = State(initialValue: config.wrappedValue.customCSS)
+        self._jsCode = State(initialValue: config.wrappedValue.customJS)
+    }
+    
+    var body: some View {
+        CodeEditor(
+            cssCode: $cssCode,
+            jsCode: $jsCode,
+            selectedLanguage: $selectedLanguage,
+            onBack: onClose,
+            onRefresh: {
+                config.customCSS = cssCode
+                config.customJS = jsCode
+                onConfigChange(config)
+                
+                if let webView = BoostsWindowManager.shared.currentWebView,
+                   let manager = BoostsWindowManager.shared.boostsManager {
+                    if !cssCode.isEmpty {
+                        manager.injectCSS(cssCode, into: webView)
+                    }
+                    if !jsCode.isEmpty {
+                        manager.injectJavaScript(jsCode, into: webView) { _ in }
+                    }
+                }
+            }
+        )
+        .frame(width: 480, height: 600)
     }
 }
 
