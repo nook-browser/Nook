@@ -183,21 +183,41 @@ struct WindowView: View {
         
         let hasTopBar = nookSettings.topBarAddressView
         
-        VStack(spacing: 0) {
-            if hasTopBar {
-                WebsiteLoadingIndicator()
-                    .zIndex(3000)
+        ZStack(alignment: .top) {
+            VStack(spacing: 0) {
+                if hasTopBar {
+                    WebsiteLoadingIndicator()
+                        .zIndex(3000)
+                    
+                    TopBarView()
+                        .environmentObject(browserManager)
+                        .environment(windowState)
+                        .zIndex(2500)
+                } else {
+                    WebsiteLoadingIndicator()
+                }
                 
-                TopBarView()
-                    .environmentObject(browserManager)
-                    .environment(windowState)
-                    .zIndex(2500)
-            } else {
-                WebsiteLoadingIndicator()
+                WebsiteView()
+                    .zIndex(2000)
             }
             
-            WebsiteView()
-                .zIndex(2000)
+            // Shadow shape positioned behind both top bar and webview
+            // The webview will block the bottom shadow, leaving only top/left/right shadows visible
+            if hasTopBar {
+                UnevenRoundedRectangle(
+                    topLeadingRadius: cornerRadius + 1,
+                    bottomLeadingRadius: 0,
+                    bottomTrailingRadius: 0,
+                    topTrailingRadius: cornerRadius + 1,
+                    style: .continuous
+                )
+                .frame(height: TopBarMetrics.height)
+                .frame(maxWidth: .infinity)
+                .offset(y: 8)
+                .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 0)
+                .allowsHitTesting(false)
+                .zIndex(-1)
+            }
         }
         .padding(.bottom, 8)
     }
