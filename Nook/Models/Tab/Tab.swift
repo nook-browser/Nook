@@ -127,9 +127,12 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         }
     }
     @Published var pageBackgroundColor: NSColor? = nil
+    @Published var topBarBackgroundColor: NSColor? = nil
     
     // Track the last domain/subdomain we sampled color for
     private var lastSampledDomain: String? = nil
+    // Track the last URL we sampled top bar color for (lightweight - only sample once per page)
+    private var lastTopBarSampledURL: String? = nil
 
     // MARK: - Rename State
     @Published var isRenaming: Bool = false
@@ -550,7 +553,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             self, name: "backgroundColor_\(id.uuidString)")
         _webView?.configuration.userContentController.add(self, name: "historyStateDidChange")
         _webView?.configuration.userContentController.add(self, name: "NookIdentity")
-
+        
         // Add Web Store integration handler (only if experimental extensions are enabled)
         if let browserManager = browserManager,
             let nookSettings = nookSettings,
@@ -1718,6 +1721,57 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
         return CGRect(x: sampleX, y: sampleY, width: 1, height: 1)
     }
+    
+    private func topRightPixelRect(for webView: WKWebView) -> CGRect? {
+        let bounds = webView.bounds
+        guard bounds.width >= 1, bounds.height >= 1 else { return nil }
+        
+        // Sample the top-rightmost pixel
+        let sampleX = bounds.maxX - 1
+        let sampleY: CGFloat
+        if webView.isFlipped {
+            // In flipped coordinates, minY is at the top
+            sampleY = bounds.minY
+        } else {
+            // In non-flipped coordinates, maxY is at the top
+            sampleY = bounds.maxY - 1
+        }
+        
+        return CGRect(x: sampleX, y: sampleY, width: 1, height: 1)
+    }
+    
+    private func extractTopBarColor(from webView: WKWebView) {
+        // Lightweight check: only sample if URL changed
+        guard let currentURL = webView.url?.absoluteString else {
+            return
+        }
+        
+        // Skip if we've already sampled for this URL
+        if currentURL == lastTopBarSampledURL {
+            return
+        }
+        
+        guard let sampleRect = topRightPixelRect(for: webView) else {
+            return
+        }
+        
+        let configuration = WKSnapshotConfiguration()
+        configuration.rect = sampleRect
+        configuration.afterScreenUpdates = true
+        configuration.snapshotWidth = 1
+        
+        webView.takeSnapshot(with: configuration) { [weak self] image, error in
+            guard let self = self else { return }
+            
+            if let color = image?.singlePixelColor {
+                DispatchQueue.main.async {
+                    self.topBarBackgroundColor = color
+                    // Mark this URL as sampled
+                    self.lastTopBarSampledURL = currentURL
+                }
+            }
+        }
+    }
 
     private func runLegacyBackgroundColorScript(on webView: WKWebView) {
         let colorExtractionScript = """
@@ -2219,6 +2273,10 @@ extension Tab: WKNavigationDelegate {
                 self.url = newURL
             }
         }
+        
+        // Reset top bar sampled URL on ANY navigation start (including back/forward)
+        // This ensures we resample on page changes, not just URL changes
+        lastTopBarSampledURL = nil
     }
 
     // MARK: - Content Committed
@@ -2325,6 +2383,8 @@ extension Tab: WKNavigationDelegate {
             // Only sample if page is still loaded (not navigating away)
             if self.loadingState == .didFinish {
                 self.updateBackgroundColor(from: webView)
+                // Extract top bar color once per page load (resamples on any navigation)
+                self.extractTopBarColor(from: webView)
             }
         }
 
@@ -2617,6 +2677,7 @@ extension Tab: WKScriptMessageHandler {
                     }
                 }
             }
+            
 
         case "historyStateDidChange":
             if let href = message.body as? String, let url = URL(string: href) {

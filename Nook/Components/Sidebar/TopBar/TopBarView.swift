@@ -35,32 +35,42 @@ struct TopBarView: View {
         let hasPiPControl = currentTab?.hasVideoContent == true || browserManager.currentTabHasPiPActive()
         
         ZStack {
-            HStack(spacing: 12) {
-                navigationControls
-                
-                if hasPiPControl, let tab = currentTab {
-                    pipButton(for: tab)
+            // Main content
+            ZStack {
+                HStack(spacing: 12) {
+                    navigationControls
+                    
+                    if hasPiPControl, let tab = currentTab {
+                        pipButton(for: tab)
+                    }
+                    
+                    Spacer()
                 }
-                
-                Spacer()
-            }
-            .padding(.vertical, TopBarMetrics.verticalPadding)
-            
-            urlBar
                 .padding(.vertical, TopBarMetrics.verticalPadding)
+                
+                urlBar
+                    .padding(.vertical, TopBarMetrics.verticalPadding)
+            }
+            .padding(.horizontal, TopBarMetrics.horizontalPadding)
+            .frame(maxWidth: .infinity)
+            .frame(height: TopBarMetrics.height)
+            .background(topBarBackgroundColor)
+            .animation(shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil, value: topBarBackgroundColor)
+            .clipShape(UnevenRoundedRectangle(
+                topLeadingRadius: cornerRadius,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: cornerRadius,
+                style: .continuous
+            ))
+            .overlay(alignment: .bottom) {
+                // 1px bottom border - lighter when dark, darker when light
+                Rectangle()
+                    .fill(bottomBorderColor)
+                    .frame(height: 1)
+                    .animation(shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil, value: bottomBorderColor)
+            }
         }
-        .padding(.horizontal, TopBarMetrics.horizontalPadding)
-        .frame(maxWidth: .infinity)
-        .frame(height: TopBarMetrics.height)
-        .background(topBarBackgroundColor)
-        .animation(shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil, value: topBarBackgroundColor)
-        .clipShape(UnevenRoundedRectangle(
-            topLeadingRadius: cornerRadius,
-            bottomLeadingRadius: 0,
-            bottomTrailingRadius: 0,
-            topTrailingRadius: cornerRadius,
-            style: .continuous
-        ))
         .background(
             GeometryReader { geometry in
                 Color.clear
@@ -83,6 +93,9 @@ struct TopBarView: View {
         }
         .onChange(of: browserManager.currentTab(for: windowState)?.pageBackgroundColor) { _, _ in
             // Color changes will trigger animations automatically via computed properties
+        }
+        .onChange(of: browserManager.currentTab(for: windowState)?.topBarBackgroundColor) { _, _ in
+            // Top bar color changes will trigger animations automatically via computed properties
         }
         .onReceive(Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()) { _ in
             updateCurrentTab()
@@ -130,10 +143,16 @@ struct TopBarView: View {
     private var urlBar: some View {
         HStack(spacing: 8) {
             if browserManager.currentTab(for: windowState) != nil {
-                Image(systemName: "link")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(urlBarTextColor)
-                    .animation(shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil, value: urlBarTextColor)
+                Button(action: {
+                    browserManager.copyCurrentURL()
+                }) {
+                    Image(systemName: "link")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(urlBarTextColor)
+                        .animation(shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil, value: urlBarTextColor)
+                }
+                .buttonStyle(.plain)
+                .help("Copy URL")
                 
                 Text(displayURL)
                     .font(.system(size: 12, weight: .medium, design: .default))
@@ -204,21 +223,31 @@ struct TopBarView: View {
         return currentTabId == previousTabId
     }
     
-    // Top bar background color - matches webview background
+    // Top bar background color - matches top-right pixel of webview
     private var topBarBackgroundColor: Color {
+        if let currentTab = browserManager.currentTab(for: windowState),
+           let topBarColor = currentTab.topBarBackgroundColor {
+            return Color(nsColor: topBarColor)
+        }
+        // Fallback to page background color if top bar color not available yet
         if let currentTab = browserManager.currentTab(for: windowState),
            let pageColor = currentTab.pageBackgroundColor {
             return Color(nsColor: pageColor)
         }
-        // Fallback to gradient-based color when no tab or color available
-        // This ensures the top bar still has a background even before color extraction
-        return browserManager.gradientColorManager.isDark ? 
-            Color(nsColor: .windowBackgroundColor).opacity(0.95) : 
-            Color(nsColor: .windowBackgroundColor).opacity(0.98)
+        // Fallback to system theme colors when no tab or color available
+        // This ensures the top bar has a proper background even before page loads
+        return Color(nsColor: .windowBackgroundColor)
     }
     
     // Nav button color - light on dark backgrounds, dark on light backgrounds
     private var navButtonColor: Color {
+        if let currentTab = browserManager.currentTab(for: windowState),
+           let topBarColor = currentTab.topBarBackgroundColor {
+            return topBarColor.isPerceivedDark ? 
+                Color.white.opacity(0.9) : 
+                Color.black.opacity(0.8)
+        }
+        // Fallback to page background color
         if let currentTab = browserManager.currentTab(for: windowState),
            let pageColor = currentTab.pageBackgroundColor {
             return pageColor.isPerceivedDark ? 
@@ -234,6 +263,18 @@ struct TopBarView: View {
     
     // URL bar background color - slightly adjusted for visual distinction
     private var urlBarBackgroundColor: Color {
+        if let currentTab = browserManager.currentTab(for: windowState),
+           let topBarColor = currentTab.topBarBackgroundColor {
+            let baseColor = Color(nsColor: topBarColor)
+            if isHovering {
+                // Slightly lighter/darker on hover
+                return adjustColorBrightness(baseColor, factor: topBarColor.isPerceivedDark ? 1.15 : 0.95)
+            } else {
+                // Slightly darker/lighter for subtle distinction from top bar
+                return adjustColorBrightness(baseColor, factor: topBarColor.isPerceivedDark ? 1.1 : 0.98)
+            }
+        }
+        // Fallback to page background color
         if let currentTab = browserManager.currentTab(for: windowState),
            let pageColor = currentTab.pageBackgroundColor {
             let baseColor = Color(nsColor: pageColor)
@@ -256,6 +297,13 @@ struct TopBarView: View {
     // Text color for URL bar - ensures proper contrast
     private var urlBarTextColor: Color {
         if let currentTab = browserManager.currentTab(for: windowState),
+           let topBarColor = currentTab.topBarBackgroundColor {
+            return topBarColor.isPerceivedDark ? 
+                Color.white.opacity(0.9) : 
+                Color.black.opacity(0.8)
+        }
+        // Fallback to page background color
+        if let currentTab = browserManager.currentTab(for: windowState),
            let pageColor = currentTab.pageBackgroundColor {
             return pageColor.isPerceivedDark ? 
                 Color.white.opacity(0.9) : 
@@ -263,6 +311,24 @@ struct TopBarView: View {
         }
         // Fallback to original text color logic
         return browserManager.gradientColorManager.isDark ? AppColors.spaceTabTextDark : AppColors.spaceTabTextLight
+    }
+    
+    // Bottom border color - lighter when dark, darker when light
+    private var bottomBorderColor: Color {
+        if let currentTab = browserManager.currentTab(for: windowState),
+           let topBarColor = currentTab.topBarBackgroundColor {
+            let baseColor = Color(nsColor: topBarColor)
+            // Make lighter if dark, darker if light
+            return adjustColorBrightness(baseColor, factor: topBarColor.isPerceivedDark ? 1.2 : 0.85)
+        }
+        // Fallback to page background color
+        if let currentTab = browserManager.currentTab(for: windowState),
+           let pageColor = currentTab.pageBackgroundColor {
+            let baseColor = Color(nsColor: pageColor)
+            return adjustColorBrightness(baseColor, factor: pageColor.isPerceivedDark ? 1.2 : 0.85)
+        }
+        // Fallback to system separator color
+        return Color(nsColor: .separatorColor)
     }
     
     // Helper to adjust color brightness
