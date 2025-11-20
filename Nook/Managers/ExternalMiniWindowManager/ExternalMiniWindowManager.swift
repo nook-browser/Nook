@@ -76,6 +76,10 @@ final class MiniWindowSession: ObservableObject, Identifiable {
         }
     }
     
+    func updateToolbarColor(fromPixelColor color: NSColor) {
+        toolbarColor = color
+    }
+    
     func completeAuth(success: Bool, finalURL: URL? = nil) {
         isAuthComplete = true
         authSuccess = success
