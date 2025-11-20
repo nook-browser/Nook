@@ -131,8 +131,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     
     // Track the last domain/subdomain we sampled color for
     private var lastSampledDomain: String? = nil
-    // Track the last URL we sampled top bar color for (lightweight - only sample once per page)
-    private var lastTopBarSampledURL: String? = nil
 
     // MARK: - Rename State
     @Published var isRenaming: Bool = false
@@ -1741,16 +1739,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
     
     private func extractTopBarColor(from webView: WKWebView) {
-        // Lightweight check: only sample if URL changed
-        guard let currentURL = webView.url?.absoluteString else {
-            return
-        }
-        
-        // Skip if we've already sampled for this URL
-        if currentURL == lastTopBarSampledURL {
-            return
-        }
-        
         guard let sampleRect = topRightPixelRect(for: webView) else {
             return
         }
@@ -1766,8 +1754,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             if let color = image?.singlePixelColor {
                 DispatchQueue.main.async {
                     self.topBarBackgroundColor = color
-                    // Mark this URL as sampled
-                    self.lastTopBarSampledURL = currentURL
                 }
             }
         }
@@ -2273,10 +2259,6 @@ extension Tab: WKNavigationDelegate {
                 self.url = newURL
             }
         }
-        
-        // Reset top bar sampled URL on ANY navigation start (including back/forward)
-        // This ensures we resample on page changes, not just URL changes
-        lastTopBarSampledURL = nil
     }
 
     // MARK: - Content Committed
@@ -3508,47 +3490,6 @@ extension Tab {
         if let webView = _webView as? FocusableWKWebView {
             webView.contextMenuPayloadDidUpdate(payload)
         }
-    }
-}
-
-private extension NSImage {
-    var singlePixelColor: NSColor? {
-        guard let cgImage = self.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            return nil
-        }
-        
-        // Create a bitmap context to read pixel data
-        let width = 1
-        let height = 1
-        let bitsPerComponent = 8
-        let bytesPerPixel = 4
-        let bytesPerRow = bytesPerPixel
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        
-        var pixelData: [UInt8] = [0, 0, 0, 0]
-        
-        guard let context = CGContext(
-            data: &pixelData,
-            width: width,
-            height: height,
-            bitsPerComponent: bitsPerComponent,
-            bytesPerRow: bytesPerRow,
-            space: colorSpace,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else {
-            return nil
-        }
-        
-        // Draw the image into the context
-        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
-        
-        // Extract RGB values (pixelData is RGBA format with premultipliedLast)
-        let red = CGFloat(pixelData[0]) / 255.0
-        let green = CGFloat(pixelData[1]) / 255.0
-        let blue = CGFloat(pixelData[2]) / 255.0
-        let alpha = CGFloat(pixelData[3]) / 255.0
-        
-        return NSColor(red: red, green: green, blue: blue, alpha: alpha)
     }
 }
 
