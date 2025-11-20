@@ -175,7 +175,10 @@ struct GradientCanvasEditor: View {
             }
         }
 
-        for n in gradient.nodes {
+        var updatedNodes = gradient.nodes
+        var needsUpdate = false
+        
+        for (idx, n) in gradient.nodes.enumerated() {
             // Load saved positions from the model if available
             if let savedX = n.xPosition, let savedY = n.yPosition {
                 xPositions[n.id] = CGFloat(savedX)
@@ -186,10 +189,9 @@ struct GradientCanvasEditor: View {
                 if xPositions[n.id] == nil { xPositions[n.id] = CGFloat(n.location) }
                 
                 // Save the default positions to the model
-                if let idx = gradient.nodes.firstIndex(where: { $0.id == n.id }) {
-                    gradient.nodes[idx].xPosition = Double(xPositions[n.id] ?? CGFloat(n.location))
-                    gradient.nodes[idx].yPosition = Double(yPositions[n.id] ?? defaultY(for: n))
-                }
+                updatedNodes[idx].xPosition = Double(xPositions[n.id] ?? CGFloat(n.location))
+                updatedNodes[idx].yPosition = Double(yPositions[n.id] ?? defaultY(for: n))
+                needsUpdate = true
             }
             
             // keep points within circle
@@ -200,13 +202,28 @@ struct GradientCanvasEditor: View {
             yPositions[n.id] = clamped.y / height
             
             // Update the model with the clamped positions
-            if let idx = gradient.nodes.firstIndex(where: { $0.id == n.id }) {
-                gradient.nodes[idx].xPosition = Double(xPositions[n.id] ?? CGFloat(n.location))
-                gradient.nodes[idx].yPosition = Double(yPositions[n.id] ?? defaultY(for: n))
+            let newXPos = Double(xPositions[n.id] ?? CGFloat(n.location))
+            let newYPos = Double(yPositions[n.id] ?? defaultY(for: n))
+            if updatedNodes[idx].xPosition != newXPos || updatedNodes[idx].yPosition != newYPos {
+                updatedNodes[idx].xPosition = newXPos
+                updatedNodes[idx].yPosition = newYPos
+                needsUpdate = true
             }
             
             // Update color based on position to ensure consistency
-            updateNodeColorFromPosition(n, width: width, height: height, center: center, radius: radius)
+            let absolute = CGPoint(x: (xPositions[n.id] ?? CGFloat(n.location)) * width,
+                                  y: (yPositions[n.id] ?? defaultY(for: n)) * height)
+            let hsla = colorFromCircle(point: absolute, center: center, radius: radius, lightness: lightness)
+            let updated = colorWithPreservedAlpha(oldHex: updatedNodes[idx].colorHex, newColor: hsla)
+            if updatedNodes[idx].colorHex != updated {
+                updatedNodes[idx].colorHex = updated
+                needsUpdate = true
+            }
+        }
+        
+        // Reassign the entire gradient to trigger binding updates if anything changed
+        if needsUpdate {
+            gradient = SpaceGradient(angle: gradient.angle, nodes: updatedNodes, grain: gradient.grain, opacity: gradient.opacity)
         }
         // purge removed
         xPositions = xPositions.filter { pair in gradient.nodes.contains { $0.id == pair.key } }
@@ -222,8 +239,11 @@ struct GradientCanvasEditor: View {
         // Save visual positions in both the dictionaries (for immediate UI updates) and the model (for persistence)
         xPositions[node.id] = newX
         yPositions[node.id] = newY
-        gradient.nodes[idx].xPosition = Double(newX)
-        gradient.nodes[idx].yPosition = Double(newY)
+        
+        // Create a new nodes array with the updated node to trigger SwiftUI binding updates
+        var updatedNodes = gradient.nodes
+        updatedNodes[idx].xPosition = Double(newX)
+        updatedNodes[idx].yPosition = Double(newY)
         
         // DON'T update the persistent location - keep the node's role in the gradient fixed!
         // The location property determines the node's position in the gradient (primary, secondary, etc.)
@@ -237,21 +257,19 @@ struct GradientCanvasEditor: View {
             gradientColorManager.activePrimaryNodeID = node.id
         }
 
-        // Map position on circle to HSL color - this is the key fix
         let hsla = colorFromCircle(point: absolute, center: center, radius: radius, lightness: lightness)
-        let updated = colorWithPreservedAlpha(oldHex: gradient.nodes[idx].colorHex, newColor: hsla)
-        gradient.nodes[idx].colorHex = updated
-
-        // Auto-place companions only when dragging the designated primary
-        // But don't change their gradient positions - they should maintain their 1st, 2nd, 3rd roles
-        if gradient.nodes.count == 3, node.id == primaryNodeID() {
-            autoPlaceCompanions(primary: node, center: center, radius: radius)
-        } else if gradient.nodes.count == 2, node.id == primaryNodeID() {
-            autoPlaceCompanions(primary: node, center: center, radius: radius)
+        let updated = colorWithPreservedAlpha(oldHex: updatedNodes[idx].colorHex, newColor: hsla)
+        updatedNodes[idx].colorHex = updated
+        
+        if updatedNodes.count == 3, node.id == primaryNodeID() {
+            autoPlaceCompanions(primary: node, center: center, radius: radius, updatedNodes: &updatedNodes)
+        } else if updatedNodes.count == 2, node.id == primaryNodeID() {
+            autoPlaceCompanions(primary: node, center: center, radius: radius, updatedNodes: &updatedNodes)
         }
-
-        // Push live update to background
-        gradientColorManager.setImmediate(gradient)
+        
+        let updatedGradient = SpaceGradient(angle: gradient.angle, nodes: updatedNodes, grain: gradient.grain, opacity: gradient.opacity)
+        gradient = updatedGradient
+        gradientColorManager.setImmediate(updatedGradient)
     }
 
     private func checkHapticFeedback(newX: CGFloat, newY: CGFloat) {
@@ -301,10 +319,11 @@ struct GradientCanvasEditor: View {
         return CGPoint(x: center.x + cos(angle) * radius, y: center.y + sin(angle) * radius)
     }
 
-    private func autoPlaceCompanions(primary: GradientNode, center: CGPoint, radius: CGFloat) {
-        guard gradient.nodes.count > 1, let pX = xPositions[primary.id], let pY = yPositions[primary.id] else { return }
-        let others = gradient.nodes.filter { $0.id != primary.id }
-        if gradient.nodes.count == 3 {
+    private func autoPlaceCompanions(primary: GradientNode, center: CGPoint, radius: CGFloat, updatedNodes: inout [GradientNode]) {
+        guard updatedNodes.count > 1, let pX = xPositions[primary.id], let pY = yPositions[primary.id] else { return }
+        let others = updatedNodes.filter { $0.id != primary.id }
+        
+        if updatedNodes.count == 3 {
             // Place both companions on the same circular radius as primary, across with small angular spread
             let centerNorm = CGPoint(x: 0.5, y: 0.5)
             let dx = pX - centerNorm.x
@@ -323,15 +342,15 @@ struct GradientCanvasEditor: View {
                 // DON'T update gradient.nodes[idx].location - keep their 1st, 2nd, 3rd roles fixed!
                 
                 // Update the companion's color to match its new position
-                if let idx = gradient.nodes.firstIndex(where: { $0.id == other.id }) {
+                if let idx = updatedNodes.firstIndex(where: { $0.id == other.id }) {
                     // Save positions to the model
-                    gradient.nodes[idx].xPosition = Double(pos.x)
-                    gradient.nodes[idx].yPosition = Double(pos.y)
+                    updatedNodes[idx].xPosition = Double(pos.x)
+                    updatedNodes[idx].yPosition = Double(pos.y)
                     
                     let absolute = CGPoint(x: pos.x * (center.x * 2), y: pos.y * (center.y * 2))
                     let hsla = colorFromCircle(point: absolute, center: center, radius: radius, lightness: lightness)
-                    let updated = colorWithPreservedAlpha(oldHex: gradient.nodes[idx].colorHex, newColor: hsla)
-                    gradient.nodes[idx].colorHex = updated
+                    let updated = colorWithPreservedAlpha(oldHex: updatedNodes[idx].colorHex, newColor: hsla)
+                    updatedNodes[idx].colorHex = updated
                 }
             }
         } else {
@@ -348,15 +367,15 @@ struct GradientCanvasEditor: View {
                 // DON'T update gradient.nodes[idx].location - keep their 1st, 2nd roles fixed!
                 
                 // Update the companion's color to match its new position
-                if let idx = gradient.nodes.firstIndex(where: { $0.id == other.id }) {
+                if let idx = updatedNodes.firstIndex(where: { $0.id == other.id }) {
                     // Save positions to the model
-                    gradient.nodes[idx].xPosition = Double(pos.x)
-                    gradient.nodes[idx].yPosition = Double(pos.y)
+                    updatedNodes[idx].xPosition = Double(pos.x)
+                    updatedNodes[idx].yPosition = Double(pos.y)
                     
                     let absolute = CGPoint(x: pos.x * (center.x * 2), y: pos.y * (center.y * 2))
                     let hsla = colorFromCircle(point: absolute, center: center, radius: radius, lightness: lightness)
-                    let updated = colorWithPreservedAlpha(oldHex: gradient.nodes[idx].colorHex, newColor: hsla)
-                    gradient.nodes[idx].colorHex = updated
+                    let updated = colorWithPreservedAlpha(oldHex: updatedNodes[idx].colorHex, newColor: hsla)
+                    updatedNodes[idx].colorHex = updated
                 }
             }
         }
@@ -404,7 +423,11 @@ struct GradientCanvasEditor: View {
         let absolute = CGPoint(x: xPos * width, y: yPos * height)
         let hsla = colorFromCircle(point: absolute, center: center, radius: radius, lightness: lightness)
         let updated = colorWithPreservedAlpha(oldHex: gradient.nodes[idx].colorHex, newColor: hsla)
-        gradient.nodes[idx].colorHex = updated
+        
+        // Create a new nodes array with the updated color to trigger SwiftUI binding updates
+        var updatedNodes = gradient.nodes
+        updatedNodes[idx].colorHex = updated
+        gradient = SpaceGradient(angle: gradient.angle, nodes: updatedNodes, grain: gradient.grain, opacity: gradient.opacity)
     }
 
     private func colorWithPreservedAlpha(oldHex: String, newColor: String) -> String {
@@ -438,8 +461,13 @@ struct GradientCanvasEditor: View {
         }
         
         let new = GradientNode(id: UUID(), colorHex: color, location: gradientPosition, xPosition: 0.5, yPosition: 0.5)
-        gradient.nodes.append(new)
-        gradient.nodes.sort { $0.location < $1.location }
+        var updatedNodes = gradient.nodes
+        updatedNodes.append(new)
+        updatedNodes.sort { $0.location < $1.location }
+        
+        // Reassign the entire gradient to trigger binding updates
+        gradient = SpaceGradient(angle: gradient.angle, nodes: updatedNodes, grain: gradient.grain, opacity: gradient.opacity)
+        
         selectedNodeID = new.id
         xPositions[new.id] = 0.5
         yPositions[new.id] = 0.5
@@ -462,15 +490,22 @@ struct GradientCanvasEditor: View {
 
     private func removeNode() {
         guard gradient.nodes.count > 1 else { return }
+        var updatedNodes = gradient.nodes
         if let id = selectedNodeID {
-            gradient.nodes.removeAll { $0.id == id }
+            updatedNodes.removeAll { $0.id == id }
             yPositions.removeValue(forKey: id)
-            selectedNodeID = gradient.nodes.first?.id
+            xPositions.removeValue(forKey: id)
+            selectedNodeID = updatedNodes.first?.id
         } else {
-            let removed = gradient.nodes.removeLast()
+            let removed = updatedNodes.removeLast()
             yPositions.removeValue(forKey: removed.id)
-            selectedNodeID = gradient.nodes.last?.id
+            xPositions.removeValue(forKey: removed.id)
+            selectedNodeID = updatedNodes.last?.id
         }
+        
+        // Reassign the entire gradient to trigger binding updates
+        gradient = SpaceGradient(angle: gradient.angle, nodes: updatedNodes, grain: gradient.grain, opacity: gradient.opacity)
+        
         gradientColorManager.setImmediate(gradient)
         // Update preferred primary mapping based on new count
         if gradient.nodes.count == 3 {

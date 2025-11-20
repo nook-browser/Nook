@@ -8,7 +8,19 @@
 
 /* Begin PBXBuildFile section */
 		2C16A0262E87430B0070894B /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 2C16A0252E87430B0070894B /* Sparkle */; };
+		2D0822D82EC8A61800C302AC /* UniversalGlass in Frameworks */ = {isa = PBXBuildFile; productRef = 2D0822D72EC8A61800C302AC /* UniversalGlass */; };
+		3600212C2EC6EADB0016A41E /* ComplexModule in Frameworks */ = {isa = PBXBuildFile; productRef = 3600212B2EC6EADB0016A41E /* ComplexModule */; };
+		3600212E2EC6EADB0016A41E /* Numerics in Frameworks */ = {isa = PBXBuildFile; productRef = 3600212D2EC6EADB0016A41E /* Numerics */; };
+		360021302EC6EADB0016A41E /* RealModule in Frameworks */ = {isa = PBXBuildFile; productRef = 3600212F2EC6EADB0016A41E /* RealModule */; };
+		360021332EC6EAEB0016A41E /* Atomics in Frameworks */ = {isa = PBXBuildFile; productRef = 360021322EC6EAEB0016A41E /* Atomics */; };
+		360021362EC6EC150016A41E /* Highlightr in Frameworks */ = {isa = PBXBuildFile; productRef = 360021352EC6EC150016A41E /* Highlightr */; };
+		360021392EC6EC2F0016A41E /* Fuzi in Frameworks */ = {isa = PBXBuildFile; productRef = 360021382EC6EC2F0016A41E /* Fuzi */; };
+		3600213C2EC6EC450016A41E /* Reeeed in Frameworks */ = {isa = PBXBuildFile; productRef = 3600213B2EC6EC450016A41E /* Reeeed */; };
+		3600213F2EC6EC710016A41E /* LRUCache in Frameworks */ = {isa = PBXBuildFile; productRef = 3600213E2EC6EC710016A41E /* LRUCache */; };
+		360021422EC6EC7F0016A41E /* Graphing in Frameworks */ = {isa = PBXBuildFile; productRef = 360021412EC6EC7F0016A41E /* Graphing */; };
+		360021442EC6EC7F0016A41E /* Motion in Frameworks */ = {isa = PBXBuildFile; productRef = 360021432EC6EC7F0016A41E /* Motion */; };
 		564997D82E9B24CC00D89F78 /* Garnish in Frameworks */ = {isa = PBXBuildFile; productRef = 564997D72E9B24CC00D89F78 /* Garnish */; };
+		56C82BA92E9C2DB500DDD0D6 /* UniversalGlass in Frameworks */ = {isa = PBXBuildFile; productRef = 56C82BA82E9C2DB500DDD0D6 /* UniversalGlass */; };
 		7FAFC5DA2E3ADDCD009D7DC4 /* FaviconFinder in Frameworks */ = {isa = PBXBuildFile; productRef = 7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */; };
 /* End PBXBuildFile section */
 
@@ -27,10 +39,27 @@
 			);
 			target = 7F8340FB2E37F39400674A5D /* Nook */;
 		};
-		564997D22E9B125200D89F78 /* Exceptions for "UI" folder in "Nook" target */ = {
+		2D0834BF2EC8CE1300C302AC /* Exceptions for "CommandPalette" folder in "Nook" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Buttons/NavButtons/NavMenuStyle.swift,
+				"CommandPalette Accessories/CommandPaletteSuggestionView.swift",
+				"CommandPalette Accessories/GenericSuggestionItem.swift",
+				"CommandPalette Accessories/HistorySuggestionItem.swift",
+				"CommandPalette Accessories/TabSuggestionItem.swift",
+				CommandPalette.swift,
+				CommandPaletteView.swift,
+			);
+			target = 7F8340FB2E37F39400674A5D /* Nook */;
+		};
+		2D0834D12EC8E0AD00C302AC /* Exceptions for "Navigation" folder in "Nook" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Sidebar/SidebarBottomBar.swift,
+				Sidebar/SidebarHeader.swift,
+				Sidebar/SpaceContextMenu.swift,
+				Sidebar/SpacesList/SpacesList.swift,
+				Sidebar/SpacesList/SpacesListItem.swift,
+				Sidebar/SpacesSideBarView.swift,
 			);
 			target = 7F8340FB2E37F39400674A5D /* Nook */;
 		};
@@ -45,11 +74,34 @@
 			path = Nook;
 			sourceTree = "<group>";
 		};
-		564997D02E9B125200D89F78 /* UI */ = {
+		2D0834B32EC8C43B00C302AC /* App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = App;
+			sourceTree = "<group>";
+		};
+		2D0834BE2EC8CE0C00C302AC /* CommandPalette */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				564997D22E9B125200D89F78 /* Exceptions for "UI" folder in "Nook" target */,
+				2D0834BF2EC8CE1300C302AC /* Exceptions for "CommandPalette" folder in "Nook" target */,
 			);
+			path = CommandPalette;
+			sourceTree = "<group>";
+		};
+		2D0834C72EC8D90400C302AC /* Settings */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		2D0834CF2EC8E0AD00C302AC /* Navigation */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				2D0834D12EC8E0AD00C302AC /* Exceptions for "Navigation" folder in "Nook" target */,
+			);
+			path = Navigation;
+			sourceTree = "<group>";
+		};
+		564997D02E9B125200D89F78 /* UI */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
 			path = UI;
 			sourceTree = "<group>";
 		};
@@ -60,9 +112,21 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				360021442EC6EC7F0016A41E /* Motion in Frameworks */,
+				3600213C2EC6EC450016A41E /* Reeeed in Frameworks */,
+				3600213F2EC6EC710016A41E /* LRUCache in Frameworks */,
 				564997D82E9B24CC00D89F78 /* Garnish in Frameworks */,
+				56C82BA92E9C2DB500DDD0D6 /* UniversalGlass in Frameworks */,
 				7FAFC5DA2E3ADDCD009D7DC4 /* FaviconFinder in Frameworks */,
+				360021302EC6EADB0016A41E /* RealModule in Frameworks */,
+				360021392EC6EC2F0016A41E /* Fuzi in Frameworks */,
 				2C16A0262E87430B0070894B /* Sparkle in Frameworks */,
+				360021362EC6EC150016A41E /* Highlightr in Frameworks */,
+				360021422EC6EC7F0016A41E /* Graphing in Frameworks */,
+				3600212C2EC6EADB0016A41E /* ComplexModule in Frameworks */,
+				2D0822D82EC8A61800C302AC /* UniversalGlass in Frameworks */,
+				3600212E2EC6EADB0016A41E /* Numerics in Frameworks */,
+				360021332EC6EAEB0016A41E /* Atomics in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -72,9 +136,13 @@
 		7F8340F32E37F39400674A5D = {
 			isa = PBXGroup;
 			children = (
+				2D0834C72EC8D90400C302AC /* Settings */,
+				2D0834CF2EC8E0AD00C302AC /* Navigation */,
+				2D0834BE2EC8CE0C00C302AC /* CommandPalette */,
 				7F8340FD2E37F39400674A5D /* Products */,
 				564997D02E9B125200D89F78 /* UI */,
 				2CAC4D282E82457B00870189 /* Nook */,
+				2D0834B32EC8C43B00C302AC /* App */,
 			);
 			sourceTree = "<group>";
 		};
@@ -103,6 +171,8 @@
 			);
 			fileSystemSynchronizedGroups = (
 				2CAC4D282E82457B00870189 /* Nook */,
+				2D0834B32EC8C43B00C302AC /* App */,
+				2D0834C72EC8D90400C302AC /* Settings */,
 				564997D02E9B125200D89F78 /* UI */,
 			);
 			name = Nook;
@@ -110,6 +180,17 @@
 				7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */,
 				2C16A0252E87430B0070894B /* Sparkle */,
 				564997D72E9B24CC00D89F78 /* Garnish */,
+				3600212B2EC6EADB0016A41E /* ComplexModule */,
+				3600212D2EC6EADB0016A41E /* Numerics */,
+				3600212F2EC6EADB0016A41E /* RealModule */,
+				360021322EC6EAEB0016A41E /* Atomics */,
+				360021352EC6EC150016A41E /* Highlightr */,
+				360021382EC6EC2F0016A41E /* Fuzi */,
+				3600213B2EC6EC450016A41E /* Reeeed */,
+				3600213E2EC6EC710016A41E /* LRUCache */,
+				360021412EC6EC7F0016A41E /* Graphing */,
+				360021432EC6EC7F0016A41E /* Motion */,
+				2D0822D72EC8A61800C302AC /* UniversalGlass */,
 			);
 			productName = Pulse;
 			productReference = 7F8340FC2E37F39400674A5D /* Nook.app */;
@@ -143,6 +224,14 @@
 				7FAFC5D82E3ADDCD009D7DC4 /* XCRemoteSwiftPackageReference "FaviconFinder" */,
 				2C16A0242E87430B0070894B /* XCRemoteSwiftPackageReference "Sparkle" */,
 				564997D62E9B24CC00D89F78 /* XCRemoteSwiftPackageReference "Garnish" */,
+				3600212A2EC6EADB0016A41E /* XCRemoteSwiftPackageReference "swift-numerics" */,
+				360021312EC6EAEB0016A41E /* XCRemoteSwiftPackageReference "swift-atomics" */,
+				360021342EC6EC150016A41E /* XCRemoteSwiftPackageReference "Highlightr" */,
+				360021372EC6EC2F0016A41E /* XCRemoteSwiftPackageReference "Fuzi" */,
+				3600213A2EC6EC450016A41E /* XCRemoteSwiftPackageReference "reeeed" */,
+				3600213D2EC6EC710016A41E /* XCRemoteSwiftPackageReference "LRUCache" */,
+				360021402EC6EC7F0016A41E /* XCRemoteSwiftPackageReference "Motion" */,
+				2D0822D62EC8A61800C302AC /* XCRemoteSwiftPackageReference "universalglass" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7F8340FD2E37F39400674A5D /* Products */;
@@ -418,12 +507,84 @@
 				minimumVersion = 2.8.0;
 			};
 		};
+		2D0822D62EC8A61800C302AC /* XCRemoteSwiftPackageReference "universalglass" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/aeastr/universalglass.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
+		3600212A2EC6EADB0016A41E /* XCRemoteSwiftPackageReference "swift-numerics" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-numerics.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.1.1;
+			};
+		};
+		360021312EC6EAEB0016A41E /* XCRemoteSwiftPackageReference "swift-atomics" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-atomics.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.3.0;
+			};
+		};
+		360021342EC6EC150016A41E /* XCRemoteSwiftPackageReference "Highlightr" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/raspu/Highlightr/";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.3.0;
+			};
+		};
+		360021372EC6EC2F0016A41E /* XCRemoteSwiftPackageReference "Fuzi" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/cezheng/Fuzi";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.1.3;
+			};
+		};
+		3600213A2EC6EC450016A41E /* XCRemoteSwiftPackageReference "reeeed" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/nate-parrott/reeeed";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.1;
+			};
+		};
+		3600213D2EC6EC710016A41E /* XCRemoteSwiftPackageReference "LRUCache" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/nicklockwood/LRUCache.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.2.0;
+			};
+		};
+		360021402EC6EC7F0016A41E /* XCRemoteSwiftPackageReference "Motion" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/b3ll/Motion";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
 		564997D62E9B24CC00D89F78 /* XCRemoteSwiftPackageReference "Garnish" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/Aeastr/Garnish";
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 0.0.4;
+			};
+		};
+		56C82BA72E9C2DB500DDD0D6 /* XCRemoteSwiftPackageReference "UniversalGlass" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Aeastr/UniversalGlass";
+			requirement = {
+				branch = main;
+				kind = branch;
 			};
 		};
 		7FAFC5D82E3ADDCD009D7DC4 /* XCRemoteSwiftPackageReference "FaviconFinder" */ = {
@@ -442,10 +603,70 @@
 			package = 2C16A0242E87430B0070894B /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
 		};
+		2D0822D72EC8A61800C302AC /* UniversalGlass */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2D0822D62EC8A61800C302AC /* XCRemoteSwiftPackageReference "universalglass" */;
+			productName = UniversalGlass;
+		};
+		3600212B2EC6EADB0016A41E /* ComplexModule */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3600212A2EC6EADB0016A41E /* XCRemoteSwiftPackageReference "swift-numerics" */;
+			productName = ComplexModule;
+		};
+		3600212D2EC6EADB0016A41E /* Numerics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3600212A2EC6EADB0016A41E /* XCRemoteSwiftPackageReference "swift-numerics" */;
+			productName = Numerics;
+		};
+		3600212F2EC6EADB0016A41E /* RealModule */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3600212A2EC6EADB0016A41E /* XCRemoteSwiftPackageReference "swift-numerics" */;
+			productName = RealModule;
+		};
+		360021322EC6EAEB0016A41E /* Atomics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 360021312EC6EAEB0016A41E /* XCRemoteSwiftPackageReference "swift-atomics" */;
+			productName = Atomics;
+		};
+		360021352EC6EC150016A41E /* Highlightr */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 360021342EC6EC150016A41E /* XCRemoteSwiftPackageReference "Highlightr" */;
+			productName = Highlightr;
+		};
+		360021382EC6EC2F0016A41E /* Fuzi */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 360021372EC6EC2F0016A41E /* XCRemoteSwiftPackageReference "Fuzi" */;
+			productName = Fuzi;
+		};
+		3600213B2EC6EC450016A41E /* Reeeed */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3600213A2EC6EC450016A41E /* XCRemoteSwiftPackageReference "reeeed" */;
+			productName = Reeeed;
+		};
+		3600213E2EC6EC710016A41E /* LRUCache */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3600213D2EC6EC710016A41E /* XCRemoteSwiftPackageReference "LRUCache" */;
+			productName = LRUCache;
+		};
+		360021412EC6EC7F0016A41E /* Graphing */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 360021402EC6EC7F0016A41E /* XCRemoteSwiftPackageReference "Motion" */;
+			productName = Graphing;
+		};
+		360021432EC6EC7F0016A41E /* Motion */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 360021402EC6EC7F0016A41E /* XCRemoteSwiftPackageReference "Motion" */;
+			productName = Motion;
+		};
 		564997D72E9B24CC00D89F78 /* Garnish */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 564997D62E9B24CC00D89F78 /* XCRemoteSwiftPackageReference "Garnish" */;
 			productName = Garnish;
+		};
+		56C82BA82E9C2DB500DDD0D6 /* UniversalGlass */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 56C82BA72E9C2DB500DDD0D6 /* XCRemoteSwiftPackageReference "UniversalGlass" */;
+			productName = UniversalGlass;
 		};
 		7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */ = {
 			isa = XCSwiftPackageProductDependency;

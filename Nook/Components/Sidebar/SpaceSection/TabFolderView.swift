@@ -32,7 +32,7 @@ struct TabFolderView: View {
     @FocusState private var nameFieldFocused: Bool
 
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
   
 
     // Get tabs in this folder

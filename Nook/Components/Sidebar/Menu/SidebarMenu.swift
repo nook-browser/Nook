@@ -34,12 +34,13 @@ public enum SidebarPosition: String, CaseIterable, Identifiable {
 
 struct SidebarMenu: View {
     @State private var selectedTab: Tabs = .history
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
     @EnvironmentObject var browserManager: BrowserManager
-    
+    @Environment(\.nookSettings) var nookSettings
+
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
-            if browserManager.settingsManager.sidebarPosition == .left{
+            if nookSettings.sidebarPosition == .left{
                 tabs
             }
             VStack {
@@ -51,7 +52,7 @@ struct SidebarMenu: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            if browserManager.settingsManager.sidebarPosition == .right{
+            if nookSettings.sidebarPosition == .right{
                 tabs
             }
         }

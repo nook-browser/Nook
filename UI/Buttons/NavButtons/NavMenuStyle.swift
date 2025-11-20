@@ -16,19 +16,13 @@ struct NavMenuStyle: MenuStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         Menu(configuration)
-            .overlay {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(.primary.opacity(backgroundColorOpacity))
-                        .frame(width: size, height: size)
-
-                    configuration.label
-                        .font(.system(size: iconSize))
-                        .foregroundStyle(.primary)
-                }
-                .allowsHitTesting(false)
+            .menuIndicator(.hidden)
+            .background {
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(.primary.opacity(backgroundColorOpacity))
+                    .frame(width: size, height: size)
             }
-            .opacity(isEnabled ? 1.0 : 0.5)
+            .opacity(isEnabled ? 1.0 : 0.3)
             .contentTransition(.symbolEffect(.replace.upUp.byLayer, options: .nonRepeating))
             .scaleEffect(isPressed && isEnabled ? 0.95 : 1.0)
             .animation(.easeInOut(duration: 0.1), value: isPressed)
@@ -60,15 +54,8 @@ struct NavMenuStyle: MenuStyle {
         }
     }
 
-    private var iconSize: CGFloat {
-        switch controlSize {
-        case .mini: 12
-        case .small: 14
-        case .regular: 16
-        case .large: 20
-        case .extraLarge: 24
-        @unknown default: 16
-        }
+    private var cornerRadius: CGFloat {
+        8
     }
 
     private var backgroundColorOpacity: Double {

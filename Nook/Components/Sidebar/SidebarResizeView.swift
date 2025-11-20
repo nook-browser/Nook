@@ -9,20 +9,22 @@ import SwiftUI
 
 struct SidebarResizeView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
+    @Environment(\.nookSettings) var nookSettings
     @State private var isResizing = false
     @State private var isHovering = false
     @State private var startingWidth: CGFloat = 0
     @State private var startingMouseX: CGFloat = 0
     @StateObject private var dragLockManager = DragLockManager.shared
     @State private var dragSessionID: String = UUID().uuidString
+    @State private var hoverTask: Task<Void, Never>?
     @Environment(\.colorScheme) var colorScheme
 
     private let minWidth: CGFloat = 180
     private let maxWidth: CGFloat = 520
 
     private var sitsOnRight: Bool {
-        browserManager.settingsManager.sidebarPosition == .right
+        nookSettings.sidebarPosition == .right
     }
 
     private var indicatorOffset: CGFloat {
@@ -55,12 +57,20 @@ struct SidebarResizeView: View {
                 .onHover { hovering in
                     guard windowState.isSidebarVisible else { return }
 
-                    isHovering = hovering
+                    hoverTask?.cancel()
 
                     if hovering && !isResizing {
-                        NSCursor.resizeLeftRight.set()
-                    } else if !hovering && !isResizing {
-                        NSCursor.arrow.set()
+                        hoverTask = Task {
+                            try? await Task.sleep(for: .seconds(0.1))
+                            guard !Task.isCancelled else { return }
+                            isHovering = true
+                            NSCursor.resizeLeftRight.set()
+                        }
+                    } else {
+                        isHovering = false
+                        if !isResizing {
+                            NSCursor.arrow.set()
+                        }
                     }
                 }
                 .gesture(

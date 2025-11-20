@@ -15,6 +15,7 @@ final class PeekManager: ObservableObject {
     @Published var currentSession: PeekSession?
 
     weak var browserManager: BrowserManager?
+    weak var windowRegistry: WindowRegistry?
     var webView: PeekWebView?
 
     func attach(browserManager: BrowserManager) {
@@ -30,7 +31,7 @@ final class PeekManager: ObservableObject {
             return
         }
 
-        let windowId = browserManager.activeWindowState?.id ?? UUID()
+        let windowId = windowRegistry?.activeWindow?.id ?? UUID()
         let session = PeekSession(
             targetURL: url,
             sourceTabId: tab?.id,

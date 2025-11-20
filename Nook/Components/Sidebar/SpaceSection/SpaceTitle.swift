@@ -37,11 +37,14 @@ struct SpaceTitle: View {
                             selectedEmoji = ""
                         }
                     }
-                
+
                 if isEmoji(space.icon) {
                     Text(space.icon)
                         .font(.system(size: iconSize))
                         .background(EmojiPickerAnchor(manager: emojiManager))
+                        .onTapGesture(count: 2) {
+                            emojiManager.toggle()
+                        }
                         .onChange(of: emojiManager.selectedEmoji) { _, newValue in
                             print(newValue)
                             space.icon = newValue
@@ -50,8 +53,17 @@ struct SpaceTitle: View {
                 } else {
                     Image(systemName: space.icon)
                         .font(.system(size: iconSize))
+                        .background(EmojiPickerAnchor(manager: emojiManager))
+                        .onTapGesture(count: 2) {
+                            emojiManager.toggle()
+                        }
+                        .onChange(of: emojiManager.selectedEmoji) { _, newValue in
+                            print(newValue)
+                            space.icon = newValue
+                            browserManager.tabManager.persistSnapshot()
+                         }
                 }
-                
+
             }
 
 
@@ -81,6 +93,9 @@ struct SpaceTitle: View {
                         .foregroundStyle(textColor)
                         .lineLimit(1)
                         .truncationMode(.tail)
+                        .onTapGesture(count: 2) {
+                            startRenaming()
+                        }
                 }
             }
 
@@ -89,52 +104,42 @@ struct SpaceTitle: View {
 
 
             Menu {
-                SpaceProfileDropdown(
-                    currentProfileId: space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID(),
-                    onProfileSelected: { assignProfile($0) }
+                SpaceContextMenu(
+                    space: space,
+                    canDelete: canDeleteSpace,
+                    onEditName: {
+                        startRenaming()
+                    },
+                    onEditIcon: {
+                        emojiManager.toggle()
+                    },
+                    onOpenSettings: {
+                        browserManager.dialogManager.showDialog(
+                            SpaceEditDialog(
+                                space: space,
+                                mode: .icon,
+                                onSave: { newName, newIcon, newProfileId in
+                                    updateSpace(name: newName, icon: newIcon, profileId: newProfileId)
+                                },
+                                onCancel: {
+                                    browserManager.dialogManager.closeDialog()
+                                }
+                            )
+                        )
+                    },
+                    onDeleteSpace: deleteSpace
                 )
                 .environmentObject(browserManager)
-                Divider()
-                Button {
-                    startRenaming()
-                } label: {
-                    Label("Rename Space", systemImage: "pencil")
-                }
-                Button {
-//                    emojiFieldFocused = true
-//                    NSApp.orderFrontCharacterPalette(nil)
-                    emojiManager.toggle()
-                } label: {
-                    Label("Change Icon", systemImage: "face.smiling")
-                }
-                Divider()
-                Button {
-                    createFolder()
-                } label: {
-                    Label("Create Folder", systemImage: "folder.badge.plus")
-                }
-                if canDeleteSpace {
-                    Button(role: .destructive) {
-                        deleteSpace()
-                    } label: {
-                        Label("Delete Space", systemImage: "trash")
-                    }
-                }
+                .environment(\.controlSize, .regular)
             } label: {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(isEllipsisHovering ? (isHovering ? AppColors.controlBackgroundActive : AppColors.controlBackgroundHoverLight) : Color.clear)
-                        .frame(width: 24, height: 24)
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 16))
-                        .foregroundStyle(AppColors.textSecondary)
-                        .opacity(isHovering ? 1.0 : 0.0)
-                }
-                .onHover { hovering in
-                    isEllipsisHovering = hovering
-                }
+                Label("Configure Space", systemImage: "ellipsis")
+                    .font(.body.weight(.semibold))
+                    .labelStyle(.iconOnly)
             }
-            .buttonStyle(PlainButtonStyle())
+            .menuStyle(.button)
+            .buttonStyle(NavButtonStyle(size: .small))
+            .opacity(isHovering ? 1.0 : 0.0)
+
         }
         // Match tabs' internal left/right padding so text aligns
         .overlay {
@@ -169,16 +174,18 @@ struct SpaceTitle: View {
                             }
                         )
                     )
+                    .allowsHitTesting(false)
             }
         }
-        .padding(.horizontal, 10)
-        .frame(height: 40)
+        .padding(.leading, 10)
+        .padding(.trailing, 5)
+        .padding(.vertical, 5)
         .frame(maxWidth: .infinity)
         .background(hoverColor)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .contentShape(RoundedRectangle(cornerRadius: 12))
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(.easeInOut(duration: 0.1)) {
                 isHovering = hovering
             }
         }
@@ -188,43 +195,34 @@ struct SpaceTitle: View {
                 commitRename()
             }
         }
-        // Provide a right-click context menu mirroring the hover menu
+        // Provide a right-click context menu
         .contextMenu {
-            Button {
-                emojiFieldFocused = true
-                NSApp.orderFrontCharacterPalette(nil)
-            } label: {
-                Label("Change Space Icon", systemImage: "face.smiling")
-            }
-            Button {
-                startRenaming()
-            } label: {
-                Label("Rename Space", systemImage: "pencil")
-            }
-            Button {
-                browserManager.showGradientEditor()
-            } label: {
-                Label("Edit Theme Color", systemImage: "paintpalette")
-            }
-            SpaceProfileDropdown(
-                currentProfileId: space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID(),
-                onProfileSelected: { assignProfile($0) }
+            SpaceContextMenu(
+                space: space,
+                canDelete: canDeleteSpace,
+                onEditName: {
+                    startRenaming()
+                },
+                onEditIcon: {
+                    emojiManager.toggle()
+                },
+                onOpenSettings: {
+                    browserManager.dialogManager.showDialog(
+                        SpaceEditDialog(
+                            space: space,
+                            mode: .icon,
+                            onSave: { newName, newIcon, newProfileId in
+                                updateSpace(name: newName, icon: newIcon, profileId: newProfileId)
+                            },
+                            onCancel: {
+                                browserManager.dialogManager.closeDialog()
+                            }
+                        )
+                    )
+                },
+                onDeleteSpace: deleteSpace
             )
             .environmentObject(browserManager)
-            Divider()
-            Button {
-                createFolder()
-            } label : {
-                Label("New Folder", systemImage: "folder.badge.plus")
-            }
-            if canDeleteSpace {
-                Divider()
-                Button(role: .destructive) {
-                    deleteSpace()
-                } label: {
-                    Label("Delete Space", systemImage: "trash")
-                }
-            }
         }
     }
     
@@ -286,7 +284,24 @@ struct SpaceTitle: View {
     private func assignProfile(_ id: UUID) {
         browserManager.tabManager.assign(spaceId: space.id, toProfile: id)
     }
-    
+
+    private func updateSpace(name: String, icon: String, profileId: UUID?) {
+        do {
+            if icon != space.icon {
+                try browserManager.tabManager.updateSpaceIcon(spaceId: space.id, icon: icon)
+            }
+            if name != space.name {
+                try browserManager.tabManager.renameSpace(spaceId: space.id, newName: name)
+            }
+            if profileId != space.profileId, let profileId = profileId {
+                browserManager.tabManager.assign(spaceId: space.id, toProfile: profileId)
+            }
+            browserManager.dialogManager.closeDialog()
+        } catch {
+            print("⚠️ Failed to update space \(space.id.uuidString):", error)
+        }
+    }
+
     private func resolvedProfileName(for id: UUID?) -> String? {
         guard let id else { return nil }
         return browserManager.profileManager.profiles.first(where: { $0.id == id })?.name

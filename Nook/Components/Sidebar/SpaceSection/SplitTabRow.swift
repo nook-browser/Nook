@@ -10,7 +10,7 @@ struct SplitTabRow: View {
     let onClose: (Tab) -> Void
     
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
     
     var body: some View {
         HStack(spacing: 1) {
@@ -51,7 +51,7 @@ private struct SplitHalfTab: View {
     @State private var isHovering: Bool = false
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var splitManager: SplitViewManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
     
     var body: some View {
         ZStack {

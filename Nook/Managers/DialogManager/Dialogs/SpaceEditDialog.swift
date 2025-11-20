@@ -17,46 +17,39 @@ struct SpaceEditDialog: DialogPresentable {
     private let mode: Mode
     private let originalSpaceName: String
     private let originalSpaceIcon: String
+    private let originalProfileId: UUID?
 
     @State private var spaceName: String
     @State private var spaceIcon: String
+    @State private var selectedProfileId: UUID?
 
-    private let onSaveChanges: (String, String) -> Void
+    private let onSaveChanges: (String, String, UUID?) -> Void
     private let onCancelChanges: () -> Void
 
     init(
         space: Space,
         mode: Mode,
-        onSave: @escaping (String, String) -> Void,
+        onSave: @escaping (String, String, UUID?) -> Void,
         onCancel: @escaping () -> Void
     ) {
         let name = MainActor.assumeIsolated { space.name }
         let icon = MainActor.assumeIsolated { space.icon }
+        let profileId = MainActor.assumeIsolated { space.profileId }
         self.mode = mode
         self.originalSpaceName = name
         self.originalSpaceIcon = icon
+        self.originalProfileId = profileId
         _spaceName = State(initialValue: name)
         _spaceIcon = State(initialValue: icon)
+        _selectedProfileId = State(initialValue: profileId)
         self.onSaveChanges = onSave
         self.onCancelChanges = onCancel
     }
 
     func dialogHeader() -> DialogHeader {
-        let iconName: String
-        let title: String
-
-        switch mode {
-        case .rename:
-            iconName = "pencil"
-            title = "Rename Space"
-        case .icon:
-            iconName = "face.smiling"
-            title = "Change Space Icon"
-        }
-
-        return DialogHeader(
-            icon: iconName,
-            title: title,
+        DialogHeader(
+            icon: "GEAR",
+            title: "Space Settings",
             subtitle: originalSpaceName
         )
     }
@@ -66,6 +59,7 @@ struct SpaceEditDialog: DialogPresentable {
         SpaceEditContent(
             spaceName: $spaceName,
             spaceIcon: $spaceIcon,
+            selectedProfileId: $selectedProfileId,
             originalIcon: originalSpaceIcon,
             mode: mode
         )
@@ -88,7 +82,7 @@ struct SpaceEditDialog: DialogPresentable {
                     iconName: "checkmark",
                     variant: .primary,
                     action: {
-                        onSaveChanges(effectiveName, iconValue)
+                        onSaveChanges(effectiveName, iconValue, selectedProfileId)
                     }
                 )
             ]
@@ -99,11 +93,13 @@ struct SpaceEditDialog: DialogPresentable {
 private struct SpaceEditContent: View {
     @Binding var spaceName: String
     @Binding var spaceIcon: String
+    @Binding var selectedProfileId: UUID?
 
     let originalIcon: String
     let mode: SpaceEditDialog.Mode
 
     @StateObject private var emojiManager = EmojiPickerManager()
+    @EnvironmentObject var browserManager: BrowserManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -147,6 +143,29 @@ private struct SpaceEditContent: View {
                         .lineLimit(2)
                 }
             }
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Profile")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                Picker(
+                    currentProfileName,
+                    systemImage: currentProfileIcon,
+                    selection: Binding(
+                        get: {
+                            selectedProfileId ?? browserManager.profileManager.profiles.first?.id ?? UUID()
+                        },
+                        set: { newId in
+                            selectedProfileId = newId
+                        }
+                    )
+                ) {
+                    ForEach(browserManager.profileManager.profiles, id: \.id) { profile in
+                        Label(profile.name, systemImage: profile.icon).tag(profile.id)
+                    }
+                }
+            }
         }
         .padding(.horizontal, 4)
         .onAppear {
@@ -168,6 +187,24 @@ private struct SpaceEditContent: View {
             return spaceIcon
         }
         return originalIcon
+    }
+
+    private var currentProfileName: String {
+        guard let profileId = selectedProfileId,
+              let profile = browserManager.profileManager.profiles.first(where: { $0.id == profileId })
+        else {
+            return browserManager.profileManager.profiles.first?.name ?? "Default"
+        }
+        return profile.name
+    }
+
+    private var currentProfileIcon: String {
+        guard let profileId = selectedProfileId,
+              let profile = browserManager.profileManager.profiles.first(where: { $0.id == profileId })
+        else {
+            return browserManager.profileManager.profiles.first?.icon ?? "person.circle"
+        }
+        return profile.icon
     }
 }
 

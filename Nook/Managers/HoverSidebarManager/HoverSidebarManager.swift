@@ -27,6 +27,8 @@ final class HoverSidebarManager: ObservableObject {
 
     // MARK: - Dependencies
     weak var browserManager: BrowserManager?
+    weak var windowRegistry: WindowRegistry?
+    weak var nookSettings: NookSettingsService?
 
     // MARK: - Monitors
     private var globalMonitor: Any?
@@ -73,7 +75,9 @@ final class HoverSidebarManager: ObservableObject {
 
     @MainActor
     private func handleMouseMovementOnMain() {
-        guard let bm = browserManager, let activeState = bm.activeWindowState else { return }
+        guard let bm = browserManager,
+              let registry = windowRegistry,
+              let activeState = registry.activeWindow else { return }
 
         // Never show overlay while the real sidebar is visible
         if activeState.isSidebarVisible {
@@ -111,7 +115,7 @@ final class HoverSidebarManager: ObservableObject {
         var inKeepOpenZone = false
 
         // Right Side Calculations (if flag is true)
-        if bm.settingsManager.sidebarPosition == .left {
+        if nookSettings?.sidebarPosition == .left {
             inTriggerZone = (mouse.x >= frame.minX - overshootSlack) && (mouse.x <= frame.minX + triggerWidth)
             inKeepOpenZone = (mouse.x >= frame.minX) && (mouse.x <= frame.minX + overlayWidth + keepOpenHysteresis)
         } else {

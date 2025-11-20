@@ -33,8 +33,10 @@ struct TabPositionPreferenceKey: PreferenceKey {
 struct SpaceView: View {
     let space: Space
     let isActive: Bool
+    @Binding var isSidebarHovered: Bool
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
+    @Environment(CommandPalette.self) private var commandPalette
     @EnvironmentObject var gradientColorManager: GradientColorManager
     @State private var draggedItem: UUID? = nil
     @State private var dropPreviewIndex: Int? = nil
@@ -277,7 +279,7 @@ struct SpaceView: View {
                         onActivateTab: { onActivateTab($0) }
                     )
                     .environmentObject(browserManager)
-                    .environmentObject(windowState)
+                    .environment(windowState)
                     .transition(.asymmetric(
                         insertion: .scale.combined(with: .opacity).animation(.easeInOut(duration: 0.3)),
                         removal: .scale.combined(with: .opacity).animation(.easeInOut(duration: 0.2))
@@ -484,22 +486,31 @@ struct SpaceView: View {
     }
  
     private var newTabButtonSection: some View {
-        NewTabButton()
-            .padding(.top, 8)
-            .onDrop(
-                of: [.text],
-                delegate: SidebarSectionDropDelegateSimple(
-                    itemsCount: { tabs.count },
-                    draggedItem: $draggedItem,
-                    targetSection: .spaceRegular(space.id),
-                    tabManager: browserManager.tabManager
-                )
+        Button {
+            commandPalette.open()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "plus")
+                Text("New Tab")
+                Spacer()
+            }
+        }
+        .buttonStyle(RectNavButtonStyle())
+        .padding(.top, 8)
+        .onDrop(
+            of: [.text],
+            delegate: SidebarSectionDropDelegateSimple(
+                itemsCount: { tabs.count },
+                draggedItem: $draggedItem,
+                targetSection: .spaceRegular(space.id),
+                tabManager: browserManager.tabManager
             )
+        )
     }
 
     private var newTabButtonSectionWithClear: some View {
         VStack(spacing: 0) {
-            SpaceSeparator(isHovering: isHovered) {
+            SpaceSeparator(isHovering: $isSidebarHovered) {
                 browserManager.tabManager.clearRegularTabs(for: space.id)
             }
             .padding(.horizontal, 8)

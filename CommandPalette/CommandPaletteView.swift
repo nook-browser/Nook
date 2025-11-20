@@ -7,10 +7,13 @@
 
 import AppKit
 import SwiftUI
+import UniversalGlass
+import Garnish
 
 struct CommandPaletteView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
+    @Environment(CommandPalette.self) private var commandPalette
     @EnvironmentObject var gradientColorManager: GradientColorManager
     @State private var searchManager = SearchManager()
     @Environment(\.colorScheme) var colorScheme
@@ -45,16 +48,17 @@ struct CommandPaletteView: View {
 
     var body: some View {
         let isDark = colorScheme == .dark
-        let isActiveWindow =
-            browserManager.activeWindowState?.id == windowState.id
-        let isVisible = isActiveWindow && windowState.isCommandPaletteVisible
+        let isVisible = commandPalette.isVisible
+        let textFieldColor: Color = text.isEmpty
+            ? (isDark ? .white.opacity(0.25) : .black.opacity(0.25))
+            : (isDark ? .white.opacity(0.9) : .black.opacity(0.9))
 
-        ZStack {
+        return ZStack {
             Color.clear
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    browserManager.closeCommandPalette(for: windowState)
+                    commandPalette.close()
                 }
                 .gesture(WindowDragGesture())
 
@@ -64,7 +68,6 @@ struct CommandPaletteView: View {
                     Spacer()
                     VStack {
                         VStack(alignment: .center,spacing: 6) {
-                            // Input field - fixed at top of box
                             HStack(spacing: 15) {
                                 Image(
                                     systemName: isLikelyURL(text)
@@ -79,16 +82,7 @@ struct CommandPaletteView: View {
                                 TextField("Search or enter URL...", text: $text)
                                     .textFieldStyle(.plain)
                                     .font(.system(size: 18, weight: .medium))
-                                    .foregroundColor(
-                                        text.isEmpty
-                                            ? isDark
-                                                ? .white.opacity(0.25)
-                                                : .black.opacity(0.25)
-                                            : isDark
-                                                ? .white.opacity(0.9)
-                                                : .black.opacity(0.9)
-
-                                    )
+                                    .foregroundColor(textFieldColor)
                                     .tint(gradientColorManager.primaryColor)
                                     .focused($isSearchFocused)
                                     .onKeyPress(.return) {
@@ -108,19 +102,11 @@ struct CommandPaletteView: View {
                                         searchManager.searchSuggestions(
                                             for: newValue
                                         )
-                                        if windowState.commandPalettePrefilledText
-                                            != newValue
-                                        {
-                                            windowState
-                                                .commandPalettePrefilledText =
-                                                newValue
-                                        }
                                     }
                             }
                             .padding(.vertical, 8)
                             .padding(.horizontal, 8)
 
-                            // Separator
                             if !searchManager.suggestions.isEmpty {
                                 RoundedRectangle(cornerRadius: 100)
                                     .fill(
@@ -133,7 +119,6 @@ struct CommandPaletteView: View {
 
                             }
 
-                            // Suggestions - expand the box downward
                             if !searchManager.suggestions.isEmpty {
                                 let suggestions = searchManager.suggestions
                                 CommandPaletteSuggestionsListView(
@@ -149,22 +134,16 @@ struct CommandPaletteView: View {
                         .padding(10)
                         .frame(maxWidth: .infinity)
                         .frame(width: effectiveCommandPaletteWidth)
-                        .background(.thickMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(
-                                    Color.white.opacity(isDark ? 0.3 : 0.6),
-                                    lineWidth: 0.5
-                                )
-                        )
-                        .shadow(color: .black.opacity(0.4), radius: 50, x: 0, y: 4)
+                        .background(Color(.windowBackgroundColor).opacity(0.35))
+                        .clipShape(.rect(cornerRadius: 26))
+                        .universalGlassEffect(
+                            .regular.tint(Color(.windowBackgroundColor).opacity(0.35)),
+                            in: .rect(cornerRadius: 26))
                         .animation(
                             .easeInOut(duration: 0.15),
                             value: searchManager.suggestions.count
                         )
                         Spacer()
-                            .border(.red)
                     }
                     .frame(
                         width: effectiveCommandPaletteWidth,
@@ -179,18 +158,16 @@ struct CommandPaletteView: View {
         }
         .allowsHitTesting(isVisible)
         .opacity(isVisible ? 1.0 : 0.0)
-        .onChange(of: windowState.isCommandPaletteVisible) { _, newVisible in
-            if newVisible && isActiveWindow {
+        .onChange(of: commandPalette.isVisible) { _, newVisible in
+            if newVisible {
                 searchManager.setTabManager(browserManager.tabManager)
                 searchManager.setHistoryManager(browserManager.historyManager)
                 searchManager.updateProfileContext()
 
-                // Pre-fill text if provided and select all for easy replacement
-                text = windowState.commandPalettePrefilledText
+                text = commandPalette.prefilledText
 
                 DispatchQueue.main.async {
                     isSearchFocused = true
-                    // Select all once focused so the URL is highlighted
                     DispatchQueue.main.async {
                         NSApplication.shared.sendAction(
                             #selector(NSText.selectAll(_:)),
@@ -206,18 +183,14 @@ struct CommandPaletteView: View {
                 selectedSuggestionIndex = -1
             }
         }
-        // Keep search profile context updated while palette is open
         .onChange(of: browserManager.currentProfile?.id) { _, _ in
-            if windowState.isCommandPaletteVisible {
+            if commandPalette.isVisible {
                 searchManager.updateProfileContext()
-                // Clear suggestions to avoid cross-profile residue
                 searchManager.clearSuggestions()
             }
         }
         .onKeyPress(.escape) {
-            DispatchQueue.main.async {
-                browserManager.closeCommandPalette(for: windowState)
-            }
+            commandPalette.close()
             return .handled
         }
         .onChange(of: searchManager.suggestions.count) { _, newCount in
@@ -228,7 +201,7 @@ struct CommandPaletteView: View {
             }
         }
         .animation(.easeInOut(duration: 0.15), value: selectedSuggestionIndex)
-        .onChange(of: windowState.commandPalettePrefilledText) { _, newValue in
+        .onChange(of: commandPalette.prefilledText) { _, newValue in
             if isVisible {
                 text = newValue
                 DispatchQueue.main.async {
@@ -325,7 +298,6 @@ struct CommandPaletteView: View {
             let suggestion = searchManager.suggestions[selectedSuggestionIndex]
             selectSuggestion(suggestion)
         } else {
-            // Create new suggestion from text input
             let newSuggestion = SearchManager.SearchSuggestion(
                 text: text,
                 type: isLikelyURL(text) ? .url : .search
@@ -338,14 +310,12 @@ struct CommandPaletteView: View {
     {
         switch suggestion.type {
         case .tab(let existingTab):
-            // Switch to existing tab in this window
             browserManager.selectTab(existingTab, in: windowState)
             print("Switched to existing tab: \(existingTab.name)")
         case .history(let historyEntry):
-            if windowState.shouldNavigateCurrentTab
+            if commandPalette.shouldNavigateCurrentTab
                 && browserManager.currentTab(for: windowState) != nil
             {
-                // Navigate current tab to history URL
                 browserManager.currentTab(for: windowState)?.loadURL(
                     historyEntry.url.absoluteString
                 )
@@ -353,7 +323,6 @@ struct CommandPaletteView: View {
                     "Navigated current tab to history URL: \(historyEntry.url)"
                 )
             } else {
-                // Create new tab from history entry
                 browserManager.createNewTab(in: windowState)
                 browserManager.currentTab(for: windowState)?.loadURL(
                     historyEntry.url.absoluteString
@@ -363,16 +332,14 @@ struct CommandPaletteView: View {
                 )
             }
         case .url, .search:
-            if windowState.shouldNavigateCurrentTab
+            if commandPalette.shouldNavigateCurrentTab
                 && browserManager.currentTab(for: windowState) != nil
             {
-                // Navigate current tab to new URL with proper normalization
                 browserManager.currentTab(for: windowState)?.navigateToURL(
                     suggestion.text
                 )
                 print("Navigated current tab to: \(suggestion.text)")
             } else {
-                // Create new tab
                 browserManager.createNewTab(in: windowState)
                 browserManager.currentTab(for: windowState)?.navigateToURL(
                     suggestion.text
@@ -383,7 +350,7 @@ struct CommandPaletteView: View {
 
         text = ""
         selectedSuggestionIndex = -1
-        browserManager.closeCommandPalette(for: windowState)
+        commandPalette.close()
     }
 
     private func navigateSuggestions(direction: Int) {
@@ -461,4 +428,16 @@ struct CommandPaletteView: View {
             return false
         }
     }
+}
+
+struct BackdropView: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .popover
+        view.blendingMode = .withinWindow
+        view.state = .active
+        return view
+    }
+    
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) { }
 }

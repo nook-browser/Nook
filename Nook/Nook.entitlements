@@ -2,20 +2,19 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
-	<array>
-		<string>com.apple.PIPAgent</string>
-	</array>
-	<key>com.apple.security.automation.apple-events</key>
-	<true/>
-	<!-- PENDING APPLE APPROVAL: this key has been requested from Apple HQ -->
-	<!-- <key>com.apple.developer.web-browser</key>
-	<true/> -->
 	<key>com.apple.developer.authentication-services.autofill-credential-provider</key>
+	<true/>
+	<key>com.apple.developer.web-browser.public-key-credential</key>
+	<true/>
+	<key>com.apple.security.automation.apple-events</key>
 	<true/>
 	<key>com.apple.security.device.bluetooth</key>
 	<true/>
 	<key>com.apple.security.device.usb</key>
 	<true/>
+	<key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
+	<array>
+		<string>com.apple.PIPAgent</string>
+	</array>
 </dict>
 </plist>

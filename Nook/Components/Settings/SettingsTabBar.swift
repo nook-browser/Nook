@@ -8,18 +8,19 @@ import SwiftUI
 
 struct SettingsTabBar: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @Environment(\.nookSettings) var nookSettings
 
     var body: some View {
         ZStack {
             BlurEffectView(
-                material: browserManager.settingsManager.currentMaterial,
+                material: nookSettings.currentMaterial,
                 state: .active
             )
             HStack {
                 MacButtonsView()
                     .frame(width: 70, height: 32)
                 Spacer()
-                Text(browserManager.settingsManager.currentSettingsTab.name)
+                Text(nookSettings.currentSettingsTab.name)
                     .font(.headline)
                 Spacer()
             }

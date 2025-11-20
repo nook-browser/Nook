@@ -51,13 +51,29 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }()
 
     // MARK: - Loading State
-    enum LoadingState {
+    enum LoadingState: Equatable {
         case idle
         case didStartProvisionalNavigation
         case didCommit
         case didFinish
         case didFail(Error)
         case didFailProvisionalNavigation(Error)
+
+        static func == (lhs: LoadingState, rhs: LoadingState) -> Bool {
+            switch (lhs, rhs) {
+            case (.idle, .idle),
+                 (.didStartProvisionalNavigation, .didStartProvisionalNavigation),
+                 (.didCommit, .didCommit),
+                 (.didFinish, .didFinish):
+                return true
+            case (.didFail, .didFail),
+                 (.didFailProvisionalNavigation, .didFailProvisionalNavigation):
+                // Compare error descriptions for equality
+                return lhs.description == rhs.description
+            default:
+                return false
+            }
+        }
 
         var isLoading: Bool {
             switch self {
@@ -111,6 +127,10 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         }
     }
     @Published var pageBackgroundColor: NSColor? = nil
+    @Published var topBarBackgroundColor: NSColor? = nil
+    
+    // Track the last domain/subdomain we sampled color for
+    private var lastSampledDomain: String? = nil
 
     // MARK: - Rename State
     @Published var isRenaming: Bool = false
@@ -152,6 +172,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
 
     weak var browserManager: BrowserManager?
+    weak var nookSettings: NookSettingsService?
 
     // MARK: - Link Hover Callback
     var onLinkHover: ((String?) -> Void)? = nil
@@ -290,7 +311,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     private func injectWebStoreScriptIfNeeded(for url: URL, in webView: WKWebView) {
         // Only inject if experimental extensions are enabled
         guard let browserManager = browserManager,
-            browserManager.settingsManager.experimentalExtensions
+            let nookSettings = nookSettings,
+            nookSettings.experimentalExtensions
         else {
             return
         }
@@ -318,7 +340,84 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
 
     // MARK: - Boosts Integration
+    
+    // Track boost scripts to optimize removal (only remove boost scripts, not all scripts)
+    // Use array instead of Set since WKUserScript doesn't conform to Hashable
+    private var currentBoostScripts: [WKUserScript] = []
+    
+    private func setupBoostUserScript(for url: URL, in webView: WKWebView) {
+        guard let browserManager = browserManager,
+            let domain = url.host
+        else {
+            return
+        }
+
+        let userContentController = webView.configuration.userContentController
+        let boostScriptIdentifier = "NOOK_BOOST_SCRIPT_IDENTIFIER"
+        
+        // Optimized: Only remove boost scripts, preserve other user scripts
+        // This is much faster than removing all scripts and re-adding them
+        if !currentBoostScripts.isEmpty {
+            // Remove only the boost scripts we previously added
+            // Compare by source content since WKUserScript doesn't conform to Equatable
+            let allScripts = userContentController.userScripts
+            userContentController.removeAllUserScripts()
+            
+            // Re-add only non-boost scripts (those not in our tracked list)
+            let boostScriptSources = Set(currentBoostScripts.map { $0.source })
+            for script in allScripts {
+                if !boostScriptSources.contains(script.source) {
+                    userContentController.addUserScript(script)
+                }
+            }
+            
+            currentBoostScripts.removeAll()
+        } else {
+            // First time setup - still need to check for any existing boost scripts
+            // (in case webview was reused or scripts were added elsewhere)
+            let existingBoostScripts = userContentController.userScripts.filter { script in
+                script.source.contains(boostScriptIdentifier)
+            }
+            
+            if !existingBoostScripts.isEmpty {
+                // Remove existing boost scripts
+                let remainingScripts = userContentController.userScripts.filter { script in
+                    !script.source.contains(boostScriptIdentifier)
+                }
+                userContentController.removeAllUserScripts()
+                remainingScripts.forEach { userContentController.addUserScript($0) }
+            }
+        }
+
+        // Check if this domain has a boost configured
+        guard let boostConfig = browserManager.boostsManager.getBoost(for: domain) else {
+            // No boost for this domain - scripts already removed above
+            return
+        }
+
+        print("🚀 [Tab] Setting up boost user scripts for domain: \(domain)")
+
+        // Create and add boost user scripts (will inject at document start)
+        // Returns array: [fontScript (optional), mainBoostScript]
+        let boostScripts = browserManager.boostsManager.createBoostUserScripts(for: boostConfig, domain: domain)
+        
+        // Track these scripts for efficient removal later
+        // Prevent duplicates by checking if script source already exists
+        let existingSources = Set(userContentController.userScripts.map { $0.source })
+        for script in boostScripts {
+            // Only add if not already present (prevents duplicates during rapid navigation)
+            if !existingSources.contains(script.source) {
+                currentBoostScripts.append(script)
+                userContentController.addUserScript(script)
+            }
+        }
+        print("✅ [Tab] Added \(boostScripts.count) boost script(s) for: \(domain)")
+    }
+    
     private func injectBoostIfNeeded(for url: URL, in webView: WKWebView) {
+        // This method is kept for backward compatibility but boost injection
+        // now happens via user scripts at document start
+        // Fallback: still inject if user script didn't work
         guard let browserManager = browserManager,
             let domain = url.host
         else {
@@ -330,15 +429,15 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             return
         }
 
-        print("🚀 [Tab] Injecting boost for domain: \(domain)")
+        print("🚀 [Tab] Fallback boost injection for domain: \(domain)")
 
         // Inject boost with a slight delay to ensure DOM is ready
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             browserManager.boostsManager.injectBoost(boostConfig, into: webView) { success in
                 if success {
-                    print("✅ [Tab] Boost injection successful for: \(domain)")
+                    print("✅ [Tab] Fallback boost injection successful for: \(domain)")
                 } else {
-                    print("❌ [Tab] Boost injection failed for: \(domain)")
+                    print("❌ [Tab] Fallback boost injection failed for: \(domain)")
                 }
             }
         }
@@ -452,10 +551,11 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             self, name: "backgroundColor_\(id.uuidString)")
         _webView?.configuration.userContentController.add(self, name: "historyStateDidChange")
         _webView?.configuration.userContentController.add(self, name: "NookIdentity")
-
+        
         // Add Web Store integration handler (only if experimental extensions are enabled)
         if let browserManager = browserManager,
-            browserManager.settingsManager.experimentalExtensions
+            let nookSettings = nookSettings,
+            nookSettings.experimentalExtensions
         {
             webStoreHandler = WebStoreScriptHandler(browserManager: browserManager)
             _webView?.configuration.userContentController.add(
@@ -633,7 +733,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     /// Navigate to a new URL with proper search engine normalization
     func navigateToURL(_ input: String) {
-        let engine = browserManager?.settingsManager.searchEngine ?? .google
+        let engine = nookSettings?.searchEngine ?? .google
         let normalizedUrl = normalizeURL(input, provider: engine)
 
         guard let validURL = URL(string: normalizedUrl) else {
@@ -649,7 +749,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         // In multi-window setup, we need to work with the WebView that's actually visible
         // in the current window, not just the first WebView created
         if let browserManager = browserManager,
-            let activeWindowId = browserManager.activeWindowState?.id,
+           let activeWindowId = browserManager.windowRegistry?.activeWindow?.id,
             let activeWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
         {
             // Use the WebView that's actually visible in the current window
@@ -683,8 +783,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     func checkMediaState() {
         // Get all web views for this tab across all windows
         let allWebViews: [WKWebView]
-        if let browserManager = browserManager {
-            allWebViews = browserManager.getAllWebViews(for: id)
+        if let coordinator = browserManager?.webViewCoordinator {
+            allWebViews = coordinator.getAllWebViews(for: id)
         } else if let webView = _webView {
             // Fallback to original web view for backward compatibility
             allWebViews = [webView]
@@ -1223,7 +1323,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         }
 
         browserManager?.setMuteState(
-            muted, for: id, originatingWindowId: browserManager?.activeWindowState?.id)
+            muted, for: id, originatingWindowId: browserManager?.windowRegistry?.activeWindow?.id)
 
         // Update our internal state
         DispatchQueue.main.async { [weak self] in
@@ -1486,7 +1586,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         webView.removeFromSuperview()
 
         // 7. Force remove from compositor
-        browserManager?.removeWebViewFromContainers(webView)
+        browserManager?.webViewCoordinator?.removeWebViewFromContainers(webView)
 
         print("✅ [Tab] WebView cleanup completed for: \(name)")
     }
@@ -1527,6 +1627,22 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
 
     private func updateBackgroundColor(from webView: WKWebView) {
+        // Check if we should sample based on domain change
+        guard let currentURL = webView.url,
+              let currentDomain = extractDomain(from: currentURL) else {
+            // If no URL/domain, still try theme color but skip pixel sampling
+            if #available(macOS 12.0, *), let themeColor = webView.themeColor {
+                DispatchQueue.main.async { [weak self] in
+                    self?.pageBackgroundColor = themeColor
+                    webView.underPageBackgroundColor = themeColor
+                }
+            }
+            return
+        }
+        
+        // Only sample if domain changed or we haven't sampled yet
+        let shouldSample = lastSampledDomain != currentDomain
+        
         var newColor: NSColor? = nil
 
         if #available(macOS 12.0, *) {
@@ -1537,13 +1653,113 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             DispatchQueue.main.async { [weak self] in
                 self?.pageBackgroundColor = themeColor
                 webView.underPageBackgroundColor = themeColor
+                // Update sampled domain even for theme color
+                if shouldSample {
+                    self?.lastSampledDomain = currentDomain
+                }
             }
-        } else {
+        } else if shouldSample {
+            // Only extract via pixel sampling if domain changed
             extractBackgroundColorWithJavaScript(from: webView)
         }
     }
+    
+    /// Extract domain and subdomain from URL (e.g., "subdomain.example.com" -> "subdomain.example.com")
+    private func extractDomain(from url: URL) -> String? {
+        guard let host = url.host else { return nil }
+        return host
+    }
 
     private func extractBackgroundColorWithJavaScript(from webView: WKWebView) {
+        guard let sampleRect = colorSampleRect(for: webView) else {
+            runLegacyBackgroundColorScript(on: webView)
+            return
+        }
+
+        let configuration = WKSnapshotConfiguration()
+        configuration.rect = sampleRect
+        configuration.afterScreenUpdates = true
+        configuration.snapshotWidth = 1
+
+        webView.takeSnapshot(with: configuration) { [weak self, weak webView] image, error in
+            guard let self = self, let webView = webView else { return }
+
+            if let color = image?.singlePixelColor {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    self.pageBackgroundColor = color
+                    webView.underPageBackgroundColor = color
+                    // Update sampled domain after successful extraction
+                    if let currentURL = webView.url,
+                       let currentDomain = self.extractDomain(from: currentURL) {
+                        self.lastSampledDomain = currentDomain
+                    }
+                }
+            } else {
+                self.runLegacyBackgroundColorScript(on: webView)
+            }
+        }
+    }
+
+    private func colorSampleRect(for webView: WKWebView) -> CGRect? {
+        let bounds = webView.bounds
+        guard bounds.width >= 1, bounds.height >= 1 else { return nil }
+
+        var sampleX = bounds.midX
+        sampleX = min(max(bounds.minX, sampleX), bounds.maxX - 1)
+
+        let offset: CGFloat = 2.0
+        let yCandidate: CGFloat
+        if webView.isFlipped {
+            yCandidate = bounds.minY + offset
+        } else {
+            yCandidate = bounds.maxY - offset - 1
+        }
+        let sampleY = min(max(yCandidate, bounds.minY), bounds.maxY - 1)
+
+        return CGRect(x: sampleX, y: sampleY, width: 1, height: 1)
+    }
+    
+    private func topRightPixelRect(for webView: WKWebView) -> CGRect? {
+        let bounds = webView.bounds
+        guard bounds.width >= 1, bounds.height >= 1 else { return nil }
+        
+        // Sample the top-rightmost pixel
+        let sampleX = bounds.maxX - 1
+        let sampleY: CGFloat
+        if webView.isFlipped {
+            // In flipped coordinates, minY is at the top
+            sampleY = bounds.minY
+        } else {
+            // In non-flipped coordinates, maxY is at the top
+            sampleY = bounds.maxY - 1
+        }
+        
+        return CGRect(x: sampleX, y: sampleY, width: 1, height: 1)
+    }
+    
+    private func extractTopBarColor(from webView: WKWebView) {
+        guard let sampleRect = topRightPixelRect(for: webView) else {
+            return
+        }
+        
+        let configuration = WKSnapshotConfiguration()
+        configuration.rect = sampleRect
+        configuration.afterScreenUpdates = true
+        configuration.snapshotWidth = 1
+        
+        webView.takeSnapshot(with: configuration) { [weak self] image, error in
+            guard let self = self else { return }
+            
+            if let color = image?.singlePixelColor {
+                DispatchQueue.main.async {
+                    self.topBarBackgroundColor = color
+                }
+            }
+        }
+    }
+
+    private func runLegacyBackgroundColorScript(on webView: WKWebView) {
         let colorExtractionScript = """
             (function() {
                 function rgbToHex(r, g, b) {
@@ -2032,6 +2248,11 @@ extension Tab: WKNavigationDelegate {
                 print(
                     "🔄 [Tab] Swift reset audio tracking for navigation to: \(newURL.absoluteString)"
                 )
+                // Reset sampled domain to force resampling on new page
+                if let newDomain = extractDomain(from: newURL),
+                   newDomain != lastSampledDomain {
+                    lastSampledDomain = nil
+                }
                 // Update URL but don't persist yet - wait for navigation to complete
                 self.url = newURL
             } else {
@@ -2137,8 +2358,17 @@ extension Tab: WKNavigationDelegate {
         injectHistoryStateObserver(into: webView)
         updateNavigationStateEnhanced(source: "didCommit")
 
-        // Trigger background color extraction
-        updateBackgroundColor(from: webView)
+        // Trigger background color extraction after page fully loads
+        // Wait a bit for boosts to apply and rendering to complete
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self, weak webView] in
+            guard let self = self, let webView = webView else { return }
+            // Only sample if page is still loaded (not navigating away)
+            if self.loadingState == .didFinish {
+                self.updateBackgroundColor(from: webView)
+                // Extract top bar color once per page load (resamples on any navigation)
+                self.extractTopBarColor(from: webView)
+            }
+        }
 
         // Apply mute state using MuteableWKWebView if the tab was previously muted
         if isAudioMuted {
@@ -2208,6 +2438,9 @@ extension Tab: WKNavigationDelegate {
             navigationAction.targetFrame?.isMainFrame == true
         {
             browserManager?.maybeShowOAuthAssist(for: url, in: self)
+            
+            // Setup boost user script before navigation starts
+            setupBoostUserScript(for: url, in: webView)
         }
 
         // Check for Option+click to trigger Peek for any link
@@ -2418,9 +2651,15 @@ extension Tab: WKScriptMessageHandler {
                     self.pageBackgroundColor = NSColor(hex: colorHex)
                     if let webView = self._webView, let color = NSColor(hex: colorHex) {
                         webView.underPageBackgroundColor = color
+                        // Update sampled domain after successful extraction
+                        if let currentURL = webView.url,
+                           let currentDomain = self.extractDomain(from: currentURL) {
+                            self.lastSampledDomain = currentDomain
+                        }
                     }
                 }
             }
+            
 
         case "historyStateDidChange":
             if let href = message.body as? String, let url = URL(string: href) {
@@ -2915,7 +3154,7 @@ extension Tab {
         // Use the WebView that's actually visible in the current window
         let targetWebView: WKWebView?
         if let browserManager = browserManager,
-            let activeWindowId = browserManager.activeWindowState?.id
+            let activeWindowId = browserManager.windowRegistry?.activeWindow?.id
         {
             targetWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
         } else {
@@ -3051,7 +3290,7 @@ extension Tab {
         // Use the WebView that's actually visible in the current window
         let targetWebView: WKWebView?
         if let browserManager = browserManager,
-            let activeWindowId = browserManager.activeWindowState?.id
+            let activeWindowId = browserManager.windowRegistry?.activeWindow?.id
         {
             targetWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
         } else {
@@ -3128,7 +3367,7 @@ extension Tab {
         // Use the WebView that's actually visible in the current window
         let targetWebView: WKWebView?
         if let browserManager = browserManager,
-            let activeWindowId = browserManager.activeWindowState?.id
+            let activeWindowId = browserManager.windowRegistry?.activeWindow?.id
         {
             targetWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
         } else {
@@ -3205,7 +3444,7 @@ extension Tab {
         // Use the WebView that's actually visible in the current window
         let targetWebView: WKWebView?
         if let browserManager = browserManager,
-            let activeWindowId = browserManager.activeWindowState?.id
+            let activeWindowId = browserManager.windowRegistry?.activeWindow?.id
         {
             targetWebView = browserManager.getWebView(for: self.id, in: activeWindowId)
         } else {

@@ -9,7 +9,8 @@ import SwiftUI
 
 struct MediaControlsView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var windowState: BrowserWindowState
+    @Environment(BrowserWindowState.self) private var windowState
+    @Environment(WindowRegistry.self) private var windowRegistry
     @Environment(\.scenePhase) private var scenePhase
     @State private var hasActiveMedia: Bool = false
     @State private var activeMediaTab: Tab?
@@ -180,7 +181,9 @@ struct MediaControlsView: View {
         .animation(.easeInOut(duration: 0.2), value: shouldShowPreviousButton)
         .onAppear {
             if mediaControlsManager == nil {
-                mediaControlsManager = MediaControlsManager(browserManager: browserManager, windowState: windowState)
+                let manager = MediaControlsManager(browserManager: browserManager, windowState: windowState)
+                manager.windowRegistry = windowRegistry
+                mediaControlsManager = manager
             }
             updateMediaState()
         }
@@ -223,7 +226,9 @@ struct MediaControlsView: View {
 
             // Lazy initialization - create manager if it doesn't exist
             if mediaControlsManager == nil {
-                mediaControlsManager = MediaControlsManager(browserManager: browserManager, windowState: windowState)
+                let manager = MediaControlsManager(browserManager: browserManager, windowState: windowState)
+                manager.windowRegistry = windowRegistry
+                mediaControlsManager = manager
             }
 
             guard let manager = mediaControlsManager else {

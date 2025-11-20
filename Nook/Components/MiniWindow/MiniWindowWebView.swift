@@ -78,6 +78,45 @@ struct MiniWindowWebView: NSViewRepresentable {
             }
         }
         
+        private func topRightPixelRect(for webView: WKWebView) -> CGRect? {
+            let bounds = webView.bounds
+            guard bounds.width >= 1, bounds.height >= 1 else { return nil }
+            
+            // Sample the top-rightmost pixel
+            let sampleX = bounds.maxX - 1
+            let sampleY: CGFloat
+            if webView.isFlipped {
+                // In flipped coordinates, minY is at the top
+                sampleY = bounds.minY
+            } else {
+                // In non-flipped coordinates, maxY is at the top
+                sampleY = bounds.maxY - 1
+            }
+            
+            return CGRect(x: sampleX, y: sampleY, width: 1, height: 1)
+        }
+        
+        private func extractToolbarColor(from webView: WKWebView) {
+            guard let sampleRect = topRightPixelRect(for: webView) else {
+                return
+            }
+            
+            let configuration = WKSnapshotConfiguration()
+            configuration.rect = sampleRect
+            configuration.afterScreenUpdates = true
+            configuration.snapshotWidth = 1
+            
+            webView.takeSnapshot(with: configuration) { [weak self] image, error in
+                guard let self = self else { return }
+                
+                if let color = image?.singlePixelColor {
+                    DispatchQueue.main.async {
+                        self.session.updateToolbarColor(fromPixelColor: color)
+                    }
+                }
+            }
+        }
+        
         func installThemeColorExtraction(on webView: WKWebView) {
             // Use shared theme color extraction script
             let script = WKUserScript(
@@ -269,6 +308,12 @@ extension MiniWindowWebView.Coordinator: WKNavigationDelegate {
         }
 
         extractThemeColor(from: webView)
+        
+        // Extract top-right pixel color for toolbar (lightweight - only if URL changed)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self, weak webView] in
+            guard let self = self, let webView = webView else { return }
+            self.extractToolbarColor(from: webView)
+        }
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {

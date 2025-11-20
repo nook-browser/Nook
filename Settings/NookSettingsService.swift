@@ -1,20 +1,20 @@
 //
-//  SettingsManager.swift
+//  NookSettingsService.swift
 //  Nook
 //
 //  Created by Maciek Bagiński on 03/08/2025.
+//  Updated by Aether Aurelia on 15/11/2025.
 //
 
 import AppKit
 import SwiftUI
 
+@MainActor
 @Observable
-class SettingsManager {
-    let keyboardShortcutManager = KeyboardShortcutManager()
+class NookSettingsService {
     private let userDefaults = UserDefaults.standard
     private let materialKey = "settings.currentMaterialRaw"
     private let searchEngineKey = "settings.searchEngine"
-    private let liquidGlassKey = "settings.isLiquidGlassEnabled"
     private let tabUnloadTimeoutKey = "settings.tabUnloadTimeout"
     private let blockXSTKey = "settings.blockCrossSiteTracking"
     private let debugToggleUpdateNotificationKey = "settings.debugToggleUpdateNotification"
@@ -34,14 +34,8 @@ class SettingsManager {
     private let webSearchEngineKey = "settings.webSearchEngine"
     private let webSearchMaxResultsKey = "settings.webSearchMaxResults"
     private let webSearchContextSizeKey = "settings.webSearchContextSize"
+    private let showLinkStatusBarKey = "settings.showLinkStatusBar"
     var currentSettingsTab: SettingsTabs = .general
-
-    // Stored properties
-    var isLiquidGlassEnabled: Bool {
-        didSet {
-            userDefaults.set(isLiquidGlassEnabled, forKey: liquidGlassKey)
-        }
-    }
 
     var currentMaterialRaw: Int {
         didSet {
@@ -179,12 +173,17 @@ class SettingsManager {
             userDefaults.set(webSearchContextSize, forKey: webSearchContextSizeKey)
         }
     }
+    
+    var showLinkStatusBar: Bool {
+        didSet {
+            userDefaults.set(showLinkStatusBar, forKey: showLinkStatusBarKey)
+        }
+    }
 
     init() {
         // Register default values
         userDefaults.register(defaults: [
             materialKey: NSVisualEffectView.Material.hudWindow.rawValue,
-            liquidGlassKey: false,
             searchEngineKey: SearchProvider.google.rawValue,
             // Default tab unload timeout: 60 minutes
             tabUnloadTimeoutKey: 3600.0,
@@ -205,13 +204,13 @@ class SettingsManager {
             webSearchEnabledKey: false,
             webSearchEngineKey: "auto",
             webSearchMaxResultsKey: 5,
-            webSearchContextSizeKey: "medium"
+            webSearchContextSizeKey: "medium",
+            showLinkStatusBarKey: true
         ])
 
         // Initialize properties from UserDefaults
         // This will use the registered defaults if no value is set
         self.currentMaterialRaw = userDefaults.integer(forKey: materialKey)
-        self.isLiquidGlassEnabled = userDefaults.bool(forKey: liquidGlassKey)
 
         if let rawEngine = userDefaults.string(forKey: searchEngineKey),
            let provider = SearchProvider(rawValue: rawEngine)
@@ -242,6 +241,7 @@ class SettingsManager {
         self.webSearchEngine = userDefaults.string(forKey: webSearchEngineKey) ?? "auto"
         self.webSearchMaxResults = userDefaults.integer(forKey: webSearchMaxResultsKey)
         self.webSearchContextSize = userDefaults.string(forKey: webSearchContextSizeKey) ?? "medium"
+        self.showLinkStatusBar = userDefaults.bool(forKey: showLinkStatusBarKey)
     }
 }
 
@@ -336,3 +336,44 @@ extension Notification.Name {
     static let blockCrossSiteTrackingChanged = Notification.Name("blockCrossSiteTrackingChanged")
 }
 
+// MARK: - Environment Key
+private struct NookSettingsServiceKey: EnvironmentKey {
+    @MainActor
+    static var defaultValue: NookSettingsService {
+        // This should never be called since we always inject from NookApp
+        // But EnvironmentKey protocol requires a default value
+        return NookSettingsService()
+    }
+}
+
+extension EnvironmentValues {
+    var nookSettings: NookSettingsService {
+        get { self[NookSettingsServiceKey.self] }
+        set { self[NookSettingsServiceKey.self] = newValue }
+    }
+}
+
+
+import AppKit
+import Foundation
+
+public let materials: [(name: String, value: NSVisualEffectView.Material)] = [
+    ("titlebar", .titlebar),
+    ("menu", .menu),
+    ("popover", .popover),
+    ("sidebar", .sidebar),
+    ("headerView", .headerView),
+    ("sheet", .sheet),
+    ("windowBackground", .windowBackground),
+    ("Arc", .hudWindow),
+    ("fullScreenUI", .fullScreenUI),
+    ("toolTip", .toolTip),
+    ("contentBackground", .contentBackground),
+    ("underWindowBackground", .underWindowBackground),
+    ("underPageBackground", .underPageBackground),
+]
+
+public func nameForMaterial(_ material: NSVisualEffectView.Material) -> String {
+    materials.first(where: { $0.value == material })?.name
+        ?? "raw(\(material.rawValue))"
+}
