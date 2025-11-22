@@ -11,23 +11,24 @@ struct BoostOptions: View {
     @Binding var brightness: Int
     @Binding var contrast: Int
     @Binding var tintStrength: Int
+    @Binding var mode: Int
 
     @State private var showAdvancedOptions: Bool = false
-    @State private var isLightMode: Bool = true
 
     var onValueChange: (() -> Void)?
 
     var body: some View {
         VStack(spacing: 10) {
             HStack(spacing: 10) {
-                OptionButton(icon: "lightbulb", isActive: isLightMode) {
-                    // Toggle between light/dark mode presets
-                    isLightMode.toggle()
-                    if isLightMode {
+                OptionButton(icon: "lightbulb", isActive: mode == 1) {
+                    // Toggle between dark (1) and tint-only (2) mode
+                    if mode == 1 {
+                        mode = 2
                         brightness = 100
-                        contrast = 90
+                        contrast = 100
                     } else {
-                        brightness = 110
+                        mode = 1
+                        brightness = 100
                         contrast = 100
                     }
                     onValueChange?()
@@ -139,9 +140,9 @@ struct BoostOptions: View {
                 OptionButton(icon: "arrow.counterclockwise", isActive: false) {
                     // Reset to default values
                     brightness = 100
-                    contrast = 90
+                    contrast = 100
                     tintStrength = 30
-                    isLightMode = true
+                    mode = 2 // Default to tint-only
                     onValueChange?()
                 }
             }
@@ -153,11 +154,13 @@ struct BoostOptions: View {
     @Previewable @State var brightness = 100
     @Previewable @State var contrast = 90
     @Previewable @State var tintStrength = 30
+    @Previewable @State var mode = 2
 
-    return BoostOptions(
+    BoostOptions(
         brightness: $brightness,
         contrast: $contrast,
-        tintStrength: $tintStrength
+        tintStrength: $tintStrength,
+        mode: $mode
     )
     .frame(width: 300, height: 300)
     .background(.white)
