@@ -51,7 +51,7 @@ struct URLBarView: View {
                     }
                     
                     // Extension action buttons
-                    if isSidebarHovered {
+                    if isSidebarHovered || browserManager.isExtensionPopupActive {
                         if #available(macOS 15.5, *),
                            let extensionManager = browserManager.extensionManager,
                            nookSettings.experimentalExtensions {

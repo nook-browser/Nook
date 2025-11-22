@@ -381,6 +381,7 @@ class BrowserManager: ObservableObject {
     @Published var showTabClosureToast: Bool = false
     @Published var tabClosureToastCount: Int = 0
     @Published var updateAvailability: UpdateAvailability?
+    @Published var isExtensionPopupActive: Bool = false
 
     /// Track tabs currently being synced to prevent recursive sync calls
     private var isSyncingTab: Set<UUID> = []
@@ -542,6 +543,11 @@ class BrowserManager: ObservableObject {
             if let pid = currentProfile?.id {
                 mgr.switchProfile(pid)
             }
+            
+            // Bind popup active state
+            mgr.$isPopupActive
+                .receive(on: RunLoop.main)
+                .assign(to: &$isExtensionPopupActive)
         }
         if let g = self.tabManager.currentSpace?.gradient {
             self.gradientColorManager.setImmediate(g)

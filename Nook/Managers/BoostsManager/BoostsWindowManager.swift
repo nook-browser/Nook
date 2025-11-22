@@ -313,6 +313,13 @@ private struct BoostWindowContent: View {
                             config.tintStrength = $0
                             onConfigChange(config)
                         }
+                    ),
+                    mode: Binding(
+                        get: { config.mode },
+                        set: {
+                            config.mode = $0
+                            onConfigChange(config)
+                        }
                     )
                 )
 
