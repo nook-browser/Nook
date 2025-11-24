@@ -1185,6 +1185,58 @@ class TabManager: ObservableObject {
         return newTab
     }
 
+    // Create a new tab with an existing WebView (used for Peek transfers)
+    @discardableResult
+    func createNewTabWithWebView(
+        url: String = "https://www.google.com",
+        in space: Space? = nil,
+        existingWebView: WKWebView? = nil
+    ) -> Tab {
+        let engine = nookSettings?.searchEngine ?? .google
+        let normalizedUrl = normalizeURL(url, provider: engine)
+        guard let validURL = URL(string: normalizedUrl)
+        else {
+            print("Invalid URL: \(url). Falling back to default.")
+            return createNewTab(in: space)
+        }
+
+        let targetSpace: Space? = space ?? currentSpace ?? ensureDefaultSpaceIfNeeded()
+        // Ensure the target space has a profile assignment; backfill from currentProfile if missing
+        if let ts = targetSpace, ts.profileId == nil {
+            let defaultProfileId = browserManager?.currentProfile?.id ?? browserManager?.profileManager.profiles.first?.id
+            if let pid = defaultProfileId {
+                ts.profileId = pid
+                persistSnapshot()
+            }
+        }
+        let sid = targetSpace?.id
+
+        // Get existing tabs and increment their indices to make room for new tab at top
+        let existingTabs = sid.flatMap { tabsBySpace[$0] } ?? []
+        let incrementedTabs = existingTabs.map { tab in
+            tab.index += 1
+            return tab
+        }
+
+        // Update the tabs array with incremented indices
+        if let sid = sid {
+            setTabs(incrementedTabs, for: sid)
+        }
+
+        let newTab = Tab(
+            url: validURL,
+            name: "New Tab",
+            favicon: "globe",
+            spaceId: sid,
+            index: 0, // New tabs get index 0 to appear at top
+            browserManager: browserManager,
+            existingWebView: existingWebView
+        )
+        addTab(newTab)
+        setActiveTab(newTab)
+        return newTab
+    }
+
     // Create a new blank tab intended to host a popup window. The returned tab's
     // WKWebView is returned to WebKit so it can load popup content. No initial
     // navigation is performed to preserve window.opener scripting semantics.

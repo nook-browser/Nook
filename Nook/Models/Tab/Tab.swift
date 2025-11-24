@@ -153,6 +153,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
 
     private var _webView: WKWebView?
+    private var _existingWebView: WKWebView?
     var pendingContextMenuPayload: WebContextMenuPayload?
     var didNotifyOpenToExtensions: Bool = false
     var webView: WKWebView? {
@@ -209,7 +210,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         favicon: String = "globe",
         spaceId: UUID? = nil,
         index: Int = 0,
-        browserManager: BrowserManager? = nil
+        browserManager: BrowserManager? = nil,
+        existingWebView: WKWebView? = nil
     ) {
         self.id = id
         self.url = url
@@ -218,6 +220,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         self.spaceId = spaceId
         self.index = index
         self.browserManager = browserManager
+        self._existingWebView = existingWebView
         super.init()
 
         Task { @MainActor in
@@ -505,11 +508,18 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             }
         }
 
-        _webView = FocusableWKWebView(frame: .zero, configuration: configuration)
-        if let fv = _webView as? FocusableWKWebView {
-            fv.owningTab = self
-            fv.contextMenuBridge = WebContextMenuBridge(tab: self, configuration: configuration)
+        // Check if we have an existing WebView to inject
+        if let existingWebView = _existingWebView {
+            _webView = existingWebView
+            print("🔄 [Tab] Using existing WebView for: \(url.absoluteString)")
+        } else {
+            _webView = FocusableWKWebView(frame: .zero, configuration: configuration)
+            if let fv = _webView as? FocusableWKWebView {
+                fv.owningTab = self
+                fv.contextMenuBridge = WebContextMenuBridge(tab: self, configuration: configuration)
+            }
         }
+
         _webView?.navigationDelegate = self
         _webView?.uiDelegate = self
         _webView?.allowsBackForwardNavigationGestures = true
@@ -520,59 +530,63 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             setupNavigationStateObservers(for: webView)
         }
 
-        // Remove existing handlers first to prevent duplicates
-        _webView?.configuration.userContentController.removeScriptMessageHandler(
-            forName: "linkHover")
-        _webView?.configuration.userContentController.removeScriptMessageHandler(
-            forName: "commandHover")
-        _webView?.configuration.userContentController.removeScriptMessageHandler(
-            forName: "commandClick")
-        _webView?.configuration.userContentController.removeScriptMessageHandler(
-            forName: "pipStateChange")
-        _webView?.configuration.userContentController.removeScriptMessageHandler(
-            forName: "mediaStateChange_\(id.uuidString)")
-        _webView?.configuration.userContentController.removeScriptMessageHandler(
-            forName: "backgroundColor_\(id.uuidString)")
-        _webView?.configuration.userContentController.removeScriptMessageHandler(
-            forName: "historyStateDidChange")
-        _webView?.configuration.userContentController.removeScriptMessageHandler(
-            forName: "NookIdentity")
-        _webView?.configuration.userContentController.removeScriptMessageHandler(
-            forName: "nookWebStore")
+        // Only set up script handlers and user agent for new WebViews
+        // Existing WebViews (from Peek) already have these configured
+        if _existingWebView == nil {
+            // Remove existing handlers first to prevent duplicates
+            _webView?.configuration.userContentController.removeScriptMessageHandler(
+                forName: "linkHover")
+            _webView?.configuration.userContentController.removeScriptMessageHandler(
+                forName: "commandHover")
+            _webView?.configuration.userContentController.removeScriptMessageHandler(
+                forName: "commandClick")
+            _webView?.configuration.userContentController.removeScriptMessageHandler(
+                forName: "pipStateChange")
+            _webView?.configuration.userContentController.removeScriptMessageHandler(
+                forName: "mediaStateChange_\(id.uuidString)")
+            _webView?.configuration.userContentController.removeScriptMessageHandler(
+                forName: "backgroundColor_\(id.uuidString)")
+            _webView?.configuration.userContentController.removeScriptMessageHandler(
+                forName: "historyStateDidChange")
+            _webView?.configuration.userContentController.removeScriptMessageHandler(
+                forName: "NookIdentity")
+            _webView?.configuration.userContentController.removeScriptMessageHandler(
+                forName: "nookWebStore")
 
-        // Add handlers
-        _webView?.configuration.userContentController.add(self, name: "linkHover")
-        _webView?.configuration.userContentController.add(self, name: "commandHover")
-        _webView?.configuration.userContentController.add(self, name: "commandClick")
-        _webView?.configuration.userContentController.add(self, name: "pipStateChange")
-        _webView?.configuration.userContentController.add(
-            self, name: "mediaStateChange_\(id.uuidString)")
-        _webView?.configuration.userContentController.add(
-            self, name: "backgroundColor_\(id.uuidString)")
-        _webView?.configuration.userContentController.add(self, name: "historyStateDidChange")
-        _webView?.configuration.userContentController.add(self, name: "NookIdentity")
-        
-        // Add Web Store integration handler (only if experimental extensions are enabled)
-        if let browserManager = browserManager,
-            let nookSettings = nookSettings,
-            nookSettings.experimentalExtensions
-        {
-            webStoreHandler = WebStoreScriptHandler(browserManager: browserManager)
+            // Add handlers
+            _webView?.configuration.userContentController.add(self, name: "linkHover")
+            _webView?.configuration.userContentController.add(self, name: "commandHover")
+            _webView?.configuration.userContentController.add(self, name: "commandClick")
+            _webView?.configuration.userContentController.add(self, name: "pipStateChange")
             _webView?.configuration.userContentController.add(
-                webStoreHandler!, name: "nookWebStore")
+                self, name: "mediaStateChange_\(id.uuidString)")
+            _webView?.configuration.userContentController.add(
+                self, name: "backgroundColor_\(id.uuidString)")
+            _webView?.configuration.userContentController.add(self, name: "historyStateDidChange")
+            _webView?.configuration.userContentController.add(self, name: "NookIdentity")
 
-            // Inject Web Store script at setup time if already on Chrome Web Store
-            if BrowserConfiguration.isChromeWebStore(url),
-                let script = BrowserConfiguration.webStoreInjectorScript()
+            // Add Web Store integration handler (only if experimental extensions are enabled)
+            if let browserManager = browserManager,
+                let nookSettings = nookSettings,
+                nookSettings.experimentalExtensions
             {
-                _webView?.configuration.userContentController.addUserScript(script)
+                webStoreHandler = WebStoreScriptHandler(browserManager: browserManager)
+                _webView?.configuration.userContentController.add(
+                    webStoreHandler!, name: "nookWebStore")
+
+                // Inject Web Store script at setup time if already on Chrome Web Store
+                if BrowserConfiguration.isChromeWebStore(url),
+                    let script = BrowserConfiguration.webStoreInjectorScript()
+                {
+                    _webView?.configuration.userContentController.addUserScript(script)
+                }
             }
+
+            _webView?.customUserAgent =
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0.1 Safari/605.1.15"
+
+            _webView?.setValue(false, forKey: "drawsBackground")
         }
-
-        _webView?.customUserAgent =
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0.1 Safari/605.1.15"
-
-        _webView?.setValue(false, forKey: "drawsBackground")
 
         if let webView = _webView {
             if #available(macOS 13.3, *) {
@@ -587,7 +601,13 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             // No ad-hoc page script injection here; rely on WKWebExtension
         }
 
-        print("Created WebView for tab: \(name)")
+        // For existing WebViews, ensure the delegates are updated to point to this tab
+        if _existingWebView != nil {
+            print("🔄 [Tab] Updated delegates for existing WebView in tab: \(name)")
+        } else {
+            print("Created WebView for tab: \(name)")
+        }
+
         // Inform extensions that this tab's view is now open/available BEFORE loading,
         // so content scripts and messaging can resolve this tab during early document phases
         if #available(macOS 15.5, *), didNotifyOpenToExtensions == false {
@@ -596,8 +616,11 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         }
         // For popup-hosting tabs, don't trigger an initial navigation. WebKit will
         // drive the load into this returned webView from createWebViewWith:.
-        if !isPopupHost {
+        // Also don't reload if we're using an existing WebView (from Peek)
+        if !isPopupHost && _existingWebView == nil {
             loadURL(url)
+        } else if _existingWebView != nil {
+            print("🔄 [Tab] Skipping URL load for existing WebView in tab: \(name)")
         }
     }
 
