@@ -66,6 +66,9 @@ class BrowserWindowState {
 
     /// Presentation flag for the profile switch toast
     var isShowingProfileSwitchToast: Bool = false
+    
+    /// Presentation flag for the copy URL toast
+    var isShowingCopyURLToast: Bool = false
 
     /// Compositor version counter for this window (incremented when tab ownership changes)
     var compositorVersion: Int = 0

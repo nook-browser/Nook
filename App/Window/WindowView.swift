@@ -75,6 +75,17 @@ struct WindowView: View {
                             browserManager.hideTabClosureToast()
                         }
                 }
+                
+                // Copy URL toast
+                if windowState.isShowingCopyURLToast {
+                    CopyURLToast()
+                        .environment(windowState)
+                        .transition(.scale(scale: 0.0, anchor: .top))
+                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: windowState.isShowingCopyURLToast)
+                        .onTapGesture {
+                            windowState.isShowingCopyURLToast = false
+                        }
+                }
             }
             .padding(10)
         }
@@ -123,6 +134,7 @@ struct WindowView: View {
             Rectangle()
                 .fill(Color.clear)
                 .universalGlassEffect(.regular.tint(Color(.windowBackgroundColor).opacity(0.35)), in: .rect(cornerRadius: 0))
+                
                 .clipped()
         }
         .backgroundDraggable()
@@ -133,6 +145,9 @@ struct WindowView: View {
     private func SidebarWebViewStack() -> some View {
         let aiVisible = windowState.isSidebarAIChatVisible
         let aiAppearsOnTrailingEdge = nookSettings.sidebarPosition == .left
+        let sidebarVisible = windowState.isSidebarVisible
+        let sidebarOnRight = nookSettings.sidebarPosition == .right
+        let sidebarOnLeft = nookSettings.sidebarPosition == .left
         
         HStack(spacing: 0) {
             if aiAppearsOnTrailingEdge {
@@ -149,8 +164,10 @@ struct WindowView: View {
                 SpacesSidebar()
             }
         }
-        .padding(.trailing, windowState.isSidebarVisible && nookSettings.sidebarPosition == .right ? 0 : aiVisible ? 0 : 8)
-        .padding(.leading, windowState.isSidebarVisible && nookSettings.sidebarPosition == .left ? 0 : aiVisible ? 0 : 8)
+        // Apply padding similar to regular sidebar: remove padding when sidebar/AI is visible on that side
+        // When sidebar is on left, AI appears on right (trailing); when sidebar is on right, AI appears on left (leading)
+        .padding(.trailing, (sidebarVisible && sidebarOnRight) || (aiVisible && sidebarOnLeft) ? 0 : 8)
+        .padding(.leading, (sidebarVisible && sidebarOnLeft) || (aiVisible && sidebarOnRight) ? 0 : 8)
     }
 
     @ViewBuilder
@@ -220,6 +237,7 @@ struct WindowView: View {
             }
         }
         .padding(.bottom, 8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder
