@@ -228,7 +228,11 @@ class NookSettingsService {
         self.askBeforeQuit = userDefaults.bool(forKey: askBeforeQuitKey)
         self.sidebarPosition = SidebarPosition(rawValue: userDefaults.string(forKey: sidebarPositionKey) ?? "left") ?? SidebarPosition.left
         self.topBarAddressView = userDefaults.bool(forKey: topBarAddressViewKey)
-        self.experimentalExtensions = userDefaults.bool(forKey: experimentalExtensionsKey)
+        // DISABLED: Force disable experimental extensions (feature temporarily disabled)
+        // Override any stored value to prevent issues for users who had it enabled
+        self.experimentalExtensions = false
+        // Clear the stored value to prevent confusion
+        userDefaults.set(false, forKey: experimentalExtensionsKey)
         self.geminiApiKey = userDefaults.string(forKey: geminiApiKeyKey) ?? ""
         self.geminiModel = GeminiModel(rawValue: userDefaults.string(forKey: geminiModelKey) ?? GeminiModel.flash.rawValue) ?? .flash
         self.showAIAssistant = userDefaults.bool(forKey: showAIAssistantKey)

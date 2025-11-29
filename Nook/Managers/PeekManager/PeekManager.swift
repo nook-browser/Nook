@@ -17,6 +17,7 @@ final class PeekManager: ObservableObject {
     weak var browserManager: BrowserManager?
     weak var windowRegistry: WindowRegistry?
     var webView: PeekWebView?
+    var webViewCoordinator: PeekWebView.Coordinator?
 
     func attach(browserManager: BrowserManager) {
         self.browserManager = browserManager
@@ -57,6 +58,7 @@ final class PeekManager: ObservableObject {
 
         isActive = false
         webView = nil
+        webViewCoordinator = nil
 
         NotificationCenter.default.post(name: .peekDidDeactivate, object: self)
 
@@ -66,16 +68,30 @@ final class PeekManager: ObservableObject {
 
     func moveToSplitView() {
         guard let session = currentSession,
-              let browserManager else { return }
+              let browserManager,
+              let windowState = windowRegistry?.activeWindow else { return }
 
-        // Create a new tab with the peeked URL and integrate into tab management
-        let newTab = browserManager.tabManager.createNewTab(
-            url: session.currentURL.absoluteString,
-            in: browserManager.tabManager.currentSpace
-        )
+        // Try to get the WebView from coordinator, fall back to creating new WebView if not ready
+        let extractedWebView = webViewCoordinator?.webView
 
-        // Enter split view with the new tab
-        browserManager.splitManager.enterSplit(with: newTab, placeOn: .right)
+        // Create a new tab with the existing WebView (or create new one if coordinator not ready)
+        let newTab: Tab
+        if let webView = extractedWebView {
+            newTab = browserManager.tabManager.createNewTabWithWebView(
+                url: session.currentURL.absoluteString,
+                in: browserManager.tabManager.currentSpace,
+                existingWebView: webView
+            )
+        } else {
+            // Fallback: create new tab with fresh WebView if coordinator not available yet
+            newTab = browserManager.tabManager.createNewTab(
+                url: session.currentURL.absoluteString,
+                in: browserManager.tabManager.currentSpace
+            )
+        }
+
+        // Enter split view with the new tab using current active window state
+        browserManager.splitManager.enterSplit(with: newTab, placeOn: .right, in: windowState)
 
         // Activate the new tab using BrowserManager to update window UI state
         browserManager.selectTab(newTab)
@@ -84,13 +100,19 @@ final class PeekManager: ObservableObject {
 
     func moveToNewTab() {
         guard let session = currentSession,
-              let browserManager else { return }
+              let browserManager,
+              let coordinator = webViewCoordinator else { return }
 
-        // Create a new tab with the peeked URL and integrate into tab management
-        let newTab = browserManager.tabManager.createNewTab(
+        // Extract the WebView from the Peek coordinator for transfer
+        let extractedWebView = coordinator.webView
+
+        // Create a new tab with the existing WebView
+        let newTab = browserManager.tabManager.createNewTabWithWebView(
             url: session.currentURL.absoluteString,
-            in: browserManager.tabManager.currentSpace
+            in: browserManager.tabManager.currentSpace,
+            existingWebView: extractedWebView
         )
+
         // Activate via BrowserManager to ensure full UI updates
         browserManager.selectTab(newTab)
         dismissPeek()

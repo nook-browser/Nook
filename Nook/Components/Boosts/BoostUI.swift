@@ -61,6 +61,13 @@ struct BoostUI: View {
                             applyConfigChangeDebounced()
                         }
                     ),
+                    mode: Binding(
+                        get: { config.mode },
+                        set: {
+                            config.mode = $0
+                            applyConfigChangeDebounced()
+                        }
+                    ),
                     onValueChange: {
                         applyConfigChangeDebounced()
                     }

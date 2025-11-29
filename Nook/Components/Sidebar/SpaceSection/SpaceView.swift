@@ -535,9 +535,10 @@ struct SpaceView: View {
         VStack(spacing: 2) {
             let currentTabs = tabs
             let split = splitManager
+            let windowId = windowState.id
             
-            if split.isSplit,
-               let leftId = split.leftTabId, let rightId = split.rightTabId,
+            if split.isSplit(for: windowId),
+               let leftId = split.leftTabId(for: windowId), let rightId = split.rightTabId(for: windowId),
                let leftIdx = currentTabs.firstIndex(where: { $0.id == leftId }),
                let rightIdx = currentTabs.firstIndex(where: { $0.id == rightId }),
                leftIdx >= 0, rightIdx >= 0,
