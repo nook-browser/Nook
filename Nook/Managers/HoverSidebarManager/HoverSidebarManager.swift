@@ -21,7 +21,7 @@ final class HoverSidebarManager: ObservableObject {
     /// Horizontal slack to the left of the window to catch slight overshoot.
     var overshootSlack: CGFloat = 12
     /// Extra horizontal margin past the overlay to keep it open while interacting.
-    var keepOpenHysteresis: CGFloat = 16
+    var keepOpenHysteresis: CGFloat = 52
     /// Vertical slack to allow small overshoot above/below the window frame.
     var verticalSlack: CGFloat = 24
 
@@ -113,18 +113,26 @@ final class HoverSidebarManager: ObservableObject {
         // Edge zone calculation
         var inTriggerZone = false
         var inKeepOpenZone = false
+        var inSidebarContentZone = false
 
         // Right Side Calculations (if flag is true)
         if nookSettings?.sidebarPosition == .left {
             inTriggerZone = (mouse.x >= frame.minX - overshootSlack) && (mouse.x <= frame.minX + triggerWidth)
+            // Keep-open zone: extends past the sidebar to allow moving cursor slightly into browser page
             inKeepOpenZone = (mouse.x >= frame.minX) && (mouse.x <= frame.minX + overlayWidth + keepOpenHysteresis)
+            // Sidebar content zone: cursor is actually over the sidebar itself
+            inSidebarContentZone = (mouse.x >= frame.minX) && (mouse.x <= frame.minX + overlayWidth)
         } else {
             let rightEdge = frame.maxX
             inTriggerZone = (mouse.x >= rightEdge - triggerWidth - overshootSlack) && (mouse.x <= rightEdge + overshootSlack)
+            // Keep-open zone: extends past the sidebar to allow moving cursor slightly into browser page
             inKeepOpenZone = (mouse.x >= rightEdge - overlayWidth - keepOpenHysteresis) && (mouse.x <= rightEdge)
+            // Sidebar content zone: cursor is actually over the sidebar itself
+            inSidebarContentZone = (mouse.x >= rightEdge - overlayWidth) && (mouse.x <= rightEdge)
         }
         
-        let shouldShow = inTriggerZone || (isOverlayVisible && inKeepOpenZone)
+        // Show sidebar if: in trigger zone, OR (sidebar visible AND (in keep-open zone OR over sidebar content))
+        let shouldShow = inTriggerZone || (isOverlayVisible && (inKeepOpenZone || inSidebarContentZone))
         if shouldShow != isOverlayVisible {
             withAnimation(.easeInOut(duration: 0.15)) {
                 isOverlayVisible = shouldShow
