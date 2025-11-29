@@ -71,19 +71,22 @@ private struct SettingsContent: View {
             }
             .tag(SettingsTabs.shortcuts)
 
-            if #available(macOS 15.5, *), nookSettings.experimentalExtensions {
-                SettingsPane {
-                    ExtensionsSettingsView()
-                }
-                .tabItem {
-                    Label(
-                        SettingsTabs.extensions.name,
-                        systemImage: SettingsTabs.extensions.icon
-                    )
-                }
-                .tag(SettingsTabs.extensions)
-            }
+            // DISABLED: Extensions feature temporarily disabled
+            // if #available(macOS 15.5, *), nookSettings.experimentalExtensions {
+            //     SettingsPane {
+            //         ExtensionsSettingsView()
+            //     }
+            //     .tabItem {
+            //         Label(
+            //             SettingsTabs.extensions.name,
+            //             systemImage: SettingsTabs.extensions.icon
+            //         )
+            //     }
+            //     .tag(SettingsTabs.extensions)
+            // }
 
+
+            #if DEBUG
             SettingsPane {
                 AdvancedSettingsView()
             }
@@ -94,23 +97,25 @@ private struct SettingsContent: View {
                 )
             }
             .tag(SettingsTabs.advanced)
+            #endif
 
         }
-        .onChange(of: nookSettings.experimentalExtensions) { _, experimentalEnabled in
-            // If extensions are disabled and the current tab is extensions, switch to a valid tab
-            if !experimentalEnabled && nookSettings.currentSettingsTab == .extensions {
-                nookSettings.currentSettingsTab = .advanced
-            }
-
-            // Handle extension state when experimental flag changes
-            if experimentalEnabled {
-                // Re-enable extensions that were previously enabled
-                browserManager.extensionManager?.enableAllExtensions()
-            } else {
-                // Disable all extensions when experimental support is turned off
-                browserManager.extensionManager?.disableAllExtensions()
-            }
-        }
+        // DISABLED: Extensions feature temporarily disabled
+        // .onChange(of: nookSettings.experimentalExtensions) { _, experimentalEnabled in
+        //     // If extensions are disabled and the current tab is extensions, switch to a valid tab
+        //     if !experimentalEnabled && nookSettings.currentSettingsTab == .extensions {
+        //         nookSettings.currentSettingsTab = .advanced
+        //     }
+        //
+        //     // Handle extension state when experimental flag changes
+        //     if experimentalEnabled {
+        //         // Re-enable extensions that were previously enabled
+        //         browserManager.extensionManager?.enableAllExtensions()
+        //     } else {
+        //         // Disable all extensions when experimental support is turned off
+        //         browserManager.extensionManager?.disableAllExtensions()
+        //     }
+        // }
     }
 }
 
@@ -1428,25 +1433,26 @@ struct AdvancedSettingsView: View {
         @Bindable var settings = nookSettings
         return
         VStack(alignment: .leading, spacing: 16) {
-            if #available(macOS 15.5, *) {
-                SettingsSectionCard(
-                    title: "Experimental Features",
-                    subtitle: "Features in development"
-                ) {
-                    Toggle(
-                        isOn: $settings.experimentalExtensions
-                    ) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("EXPERIMENTAL: Enable Extension Support")
-                            Text(
-                                "Enable browser extension support. Extensions are experimental and may cause instability or security issues."
-                            )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
+            // DISABLED: Extensions feature temporarily disabled
+            // if #available(macOS 15.5, *) {
+            //     SettingsSectionCard(
+            //         title: "Experimental Features",
+            //         subtitle: "Features in development"
+            //     ) {
+            //         Toggle(
+            //             isOn: $settings.experimentalExtensions
+            //         ) {
+            //             VStack(alignment: .leading, spacing: 2) {
+            //                 Text("EXPERIMENTAL: Enable Extension Support")
+            //                 Text(
+            //                     "Enable browser extension support. Extensions are experimental and may cause instability or security issues."
+            //                 )
+            //                 .font(.caption)
+            //                 .foregroundStyle(.secondary)
+            //             }
+            //         }
+            //     }
+            // }
 
             #if DEBUG
             SettingsSectionCard(

@@ -14,7 +14,7 @@ struct PeekWebView: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator {
         let coordinator = Coordinator(session: session, peekManager: peekManager)
-        // Store coordinator reference for WebView extraction
+        // Store coordinator reference for WebView extraction immediately
         peekManager?.webViewCoordinator = coordinator
         return coordinator
     }
