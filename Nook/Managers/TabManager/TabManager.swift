@@ -947,6 +947,9 @@ class TabManager: ObservableObject {
     }
 
     func removeTab(_ id: UUID) {
+        // Notify SplitViewManager about tab closure to prevent zombie state
+        browserManager?.splitManager.handleTabClosure(id)
+        
         let wasCurrent = (currentTab?.id == id)
         var removed: Tab?
         var removedSpaceId: UUID?
@@ -2131,6 +2134,9 @@ class TabManager: ObservableObject {
             }
             // If we assigned default profile to legacy pinned tabs, persist to capture migrations
             if __didAssignDefaultProfile { persistSnapshot() }
+            
+            // Notify that initial data load is complete so window states can be updated
+            NotificationCenter.default.post(name: .tabManagerDidLoadInitialData, object: nil)
         } catch {
             print("SwiftData load error: \(error)")
         }

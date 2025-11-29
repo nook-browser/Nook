@@ -414,7 +414,12 @@ class BrowserManager: ObservableObject {
 
     // TEMPORARY: Will be removed when cross-window coordination is eliminated
     weak var webViewCoordinator: WebViewCoordinator?
-    weak var windowRegistry: WindowRegistry?
+    weak var windowRegistry: WindowRegistry? {
+        didSet {
+            // Update PeekManager's windowRegistry reference when this changes
+            peekManager.windowRegistry = windowRegistry
+        }
+    }
 
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
@@ -559,7 +564,6 @@ class BrowserManager: ObservableObject {
 
         self.externalMiniWindowManager.attach(browserManager: self)
         self.peekManager.attach(browserManager: self)
-        self.peekManager.windowRegistry = self.windowRegistry
         bindPeekManagerUpdates()
         self.authenticationManager.attach(browserManager: self)
         // Migrate legacy history entries (with nil profile) to default profile to avoid cross-profile leakage
@@ -582,6 +586,17 @@ class BrowserManager: ObservableObject {
                 self?.trackingProtectionManager.setEnabled(enabled)
             }
         }
+        
+        // Listen for TabManager initial data load completion to update window states
+        NotificationCenter.default.addObserver(
+            forName: .tabManagerDidLoadInitialData,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.handleTabManagerDataLoaded()
+            }
+        }
     }
 
     private func bindTabManagerUpdates() {
@@ -598,6 +613,39 @@ class BrowserManager: ObservableObject {
                 self?.objectWillChange.send()
             }
             .store(in: &cancellables)
+    }
+    
+    /// Called when TabManager finishes loading initial data from persistence
+    private func handleTabManagerDataLoaded() {
+        print("🔄 [BrowserManager] TabManager data loaded, updating window states")
+        
+        // Update all window states with the loaded data
+        guard let windowRegistry = windowRegistry else { return }
+        
+        for (_, windowState) in windowRegistry.windows {
+            // Set current tab and space from TabManager
+            windowState.currentTabId = tabManager.currentTab?.id
+            windowState.currentSpaceId = tabManager.currentSpace?.id
+            
+            // Set gradient from current space
+            if let spaceId = windowState.currentSpaceId,
+                let space = tabManager.spaces.first(where: { $0.id == spaceId })
+            {
+                windowState.currentProfileId = space.profileId ?? currentProfile?.id
+                // Only animate for the active window
+                let isActiveWindow = windowRegistry.activeWindow?.id == windowState.id
+                if isActiveWindow {
+                    gradientColorManager.transition(to: space.gradient, duration: 0.3)
+                } else {
+                    gradientColorManager.setImmediate(space.gradient)
+                }
+            }
+            
+            // Refresh compositor to show the current tab
+            windowState.refreshCompositor()
+        }
+        
+        print("✅ [BrowserManager] Window states updated with loaded data")
     }
 
     // MARK: - OAuth Assist Controls
@@ -1853,16 +1901,23 @@ class BrowserManager: ObservableObject {
         windowState.urlBarFrame = urlBarFrame
         windowState.currentProfileId = currentProfile?.id
 
-        // Set initial tab and space
-        windowState.currentTabId = tabManager.currentTab?.id
+        // Set initial space and tab
         windowState.currentSpaceId = tabManager.currentSpace?.id
+        windowState.currentTabId = tabManager.currentTab?.id
+        
+        // Set gradient from current space immediately to avoid showing default blue
         if let spaceId = windowState.currentSpaceId,
             let space = tabManager.spaces.first(where: { $0.id == spaceId })
         {
             windowState.currentProfileId = space.profileId ?? currentProfile?.id
+            // Set gradient immediately without animation
+            gradientColorManager.setImmediate(space.gradient)
+        } else {
+            // Fallback to default gradient if no space exists
+            gradientColorManager.setImmediate(.default)
         }
 
-        print("🪟 [BrowserManager] Setup window state: \(windowState.id)")
+        print("🪟 [BrowserManager] Setup window state: \(windowState.id), currentTab: \(windowState.currentTabId?.uuidString ?? "none"), currentSpace: \(windowState.currentSpaceId?.uuidString ?? "none")")
     }
 
 

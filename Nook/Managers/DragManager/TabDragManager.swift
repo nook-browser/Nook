@@ -249,7 +249,8 @@ class TabDragManager: ObservableObject {
 }
 
 extension Notification.Name {
-    static let tabDragDidEnd = Notification.Name("TabDragDidEndNotification")
+    static let tabDragDidEnd = Notification.Name("tabDragDidEnd")
+    static let tabManagerDidLoadInitialData = Notification.Name("tabManagerDidLoadInitialData")
 }
 
 // MARK: - Drag Operation Result

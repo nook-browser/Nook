@@ -47,7 +47,9 @@ final class SplitViewManager: ObservableObject {
     }
     
     /// Set split state for a specific window
+    /// Set split state for a specific window
     func setSplitState(_ state: WindowSplitState, for windowId: UUID) {
+        objectWillChange.send()
         windowSplitStates[windowId] = state
         syncPublishedStateIfNeeded(for: windowId)
     }
@@ -177,6 +179,22 @@ final class SplitViewManager: ObservableObject {
             updatePublishedState(from: WindowSplitState())
         }
         print("🪟 [SplitViewManager] Cleaned up split state for window \(windowId)")
+    }
+    
+    /// Handle tab closure to prevent "zombie split" state
+    func handleTabClosure(_ tabId: UUID) {
+        // Check all windows for split state involving this tab
+        for (windowId, state) in windowSplitStates {
+            if state.isSplit {
+                if state.leftTabId == tabId {
+                    print("🪟 [SplitViewManager] Closing left pane for window \(windowId) due to tab closure")
+                    exitSplit(keep: .right, for: windowId)
+                } else if state.rightTabId == tabId {
+                    print("🪟 [SplitViewManager] Closing right pane for window \(windowId) due to tab closure")
+                    exitSplit(keep: .left, for: windowId)
+                }
+            }
+        }
     }
 
     func setDividerFraction(_ value: CGFloat) {

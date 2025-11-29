@@ -69,20 +69,29 @@ final class PeekManager: ObservableObject {
     func moveToSplitView() {
         guard let session = currentSession,
               let browserManager,
-              let coordinator = webViewCoordinator else { return }
+              let windowState = windowRegistry?.activeWindow else { return }
 
-        // Extract the WebView from the Peek coordinator for transfer
-        let extractedWebView = coordinator.webView
+        // Try to get the WebView from coordinator, fall back to creating new WebView if not ready
+        let extractedWebView = webViewCoordinator?.webView
 
-        // Create a new tab with the existing WebView
-        let newTab = browserManager.tabManager.createNewTabWithWebView(
-            url: session.currentURL.absoluteString,
-            in: browserManager.tabManager.currentSpace,
-            existingWebView: extractedWebView
-        )
+        // Create a new tab with the existing WebView (or create new one if coordinator not ready)
+        let newTab: Tab
+        if let webView = extractedWebView {
+            newTab = browserManager.tabManager.createNewTabWithWebView(
+                url: session.currentURL.absoluteString,
+                in: browserManager.tabManager.currentSpace,
+                existingWebView: webView
+            )
+        } else {
+            // Fallback: create new tab with fresh WebView if coordinator not available yet
+            newTab = browserManager.tabManager.createNewTab(
+                url: session.currentURL.absoluteString,
+                in: browserManager.tabManager.currentSpace
+            )
+        }
 
-        // Enter split view with the new tab
-        browserManager.splitManager.enterSplit(with: newTab, placeOn: .right)
+        // Enter split view with the new tab using current active window state
+        browserManager.splitManager.enterSplit(with: newTab, placeOn: .right, in: windowState)
 
         // Activate the new tab using BrowserManager to update window UI state
         browserManager.selectTab(newTab)

@@ -308,6 +308,7 @@ struct SpacesSideBarView: View {
             )
             .environmentObject(browserManager)
             .environment(windowState)
+            .environment(commandPalette)
             .environmentObject(browserManager.splitManager)
             .id(space.id.uuidString + "-w\(Int(windowState.sidebarContentWidth))")
             Spacer()
