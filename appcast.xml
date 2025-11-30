@@ -10,6 +10,17 @@
   <language>en</language>
 
   <item>
+    <title>Version 1.0.5</title>
+    <sparkle:releaseNotesLink>https://github.com/nook-browser/Nook/releases/tag/v1.0.5</sparkle:releaseNotesLink>
+    <pubDate>Thu, 16 Oct 2025 17:00:00 +0000</pubDate>
+    <enclosure
+      url="https://github.com/nook-browser/Nook/releases/download/v1.0.4/Nook-v1.0.5.dmg"
+      sparkle:version="105"
+      sparkle:shortVersionString="1.0.5"
+      type="application/octet-stream"/>
+  </item>
+    
+  <item>
     <title>Version 1.0.4</title>
     <sparkle:releaseNotesLink>https://github.com/nook-browser/Nook/releases/tag/v1.0.4</sparkle:releaseNotesLink>
     <pubDate>Thu, 16 Oct 2025 17:00:00 +0000</pubDate>
