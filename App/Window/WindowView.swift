@@ -111,6 +111,7 @@ struct WindowView: View {
         .environmentObject(browserManager.gradientColorManager)
         .environmentObject(browserManager.splitManager)
         .environmentObject(hoverSidebarManager)
+        .preferredColorScheme(windowState.gradient.primaryColor.isPerceivedDark ? .dark : .light)
     }
 
     // MARK: - Layout Components
@@ -118,12 +119,16 @@ struct WindowView: View {
     @ViewBuilder
     private func WindowBackground() -> some View {
         ZStack {
+            
+            BlurEffectView(material: nookSettings.currentMaterial, state: .followsWindowActiveState)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             SpaceGradientBackgroundView()
 
-            Rectangle()
-                .fill(Color.clear)
-                .universalGlassEffect(.regular.tint(Color(.windowBackgroundColor).opacity(0.35)), in: .rect(cornerRadius: 0))
-                .clipped()
+
+//            Rectangle()
+//                .fill(Color.clear)
+////                .universalGlassEffect(.regular.tint(Color(.windowBackgroundColor).opacity(0.35)), in: .rect(cornerRadius: 0))
+//                .clipped()
         }
         .backgroundDraggable()
         .environment(windowState)
@@ -168,6 +173,8 @@ struct WindowView: View {
                 }
                 .environmentObject(browserManager)
                 .environment(windowState)
+                .environment(commandPalette)
+                .environmentObject(browserManager.gradientColorManager)
         }
     }
 
@@ -175,9 +182,9 @@ struct WindowView: View {
     private func WebContent() -> some View {
         let cornerRadius: CGFloat = {
             if #available(macOS 26.0, *) {
-                return 12
+                return 8
             } else {
-                return 6
+                return 8
             }
         }()
         
