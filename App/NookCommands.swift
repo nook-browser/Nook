@@ -25,12 +25,28 @@ struct NookCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .newItem) {}
         CommandGroup(replacing: .windowList) {}
-        // Use the native Settings menu (no replacement of .appSettings)
 
         // App Menu Section (under Nook)
         CommandGroup(after: .appInfo) {
+            Divider()
             Button("Make Nook Default Browser") {
                 browserManager.setAsDefaultBrowser()
+            }
+            
+            Button("Check for Updates...") {
+                appDelegate.updaterController.checkForUpdates(nil)
+            }
+        }
+        
+        CommandGroup(after: .appSettings) {
+            Button("Import from another Browser") {
+                browserManager.dialogManager.showDialog(
+                    BrowserImportDialog(
+                        onCancel: {
+                            browserManager.dialogManager.closeDialog()
+                        }
+                    )
+                )
             }
         }
 
@@ -44,23 +60,6 @@ struct NookCommands: Commands {
 
         // File Section
         CommandGroup(after: .newItem) {
-
-            Button("Check for Updates...") {
-                appDelegate.updaterController.checkForUpdates(nil)
-            }
-            .keyboardShortcut("u", modifiers: [.command, .shift])
-
-            Button("Import from another Browser") {
-                browserManager.dialogManager.showDialog(
-                    BrowserImportDialog(
-                        onCancel: {
-                            browserManager.dialogManager.closeDialog()
-                        }
-                    )
-                )
-            }
-            Divider()
-
             Button("New Tab") {
                 windowRegistry.activeWindow?.commandPalette?.open()
             }
@@ -72,7 +71,6 @@ struct NookCommands: Commands {
 
             Button("Close Tab") {
                 if windowRegistry.activeWindow?.isCommandPaletteVisible == true {
-                    // Command palette is open, close it instead
                     windowRegistry.activeWindow?.commandPalette?.close()
                 } else {
                     browserManager.closeCurrentTab()
@@ -80,13 +78,19 @@ struct NookCommands: Commands {
             }
             .keyboardShortcut("w", modifiers: .command)
             .disabled(browserManager.tabManager.tabs.isEmpty)
+            Divider()
+            Button("Open Command Bar") {
+                let currentURL = browserManager.currentTabForActiveWindow()?.url.absoluteString ?? ""
+                windowRegistry.activeWindow?.commandPalette?.open(prefill: currentURL, navigateCurrentTab: true)
+            }
+            .keyboardShortcut("l", modifiers: [.command])
+            .disabled(browserManager.currentTabForActiveWindow() == nil)
 
             Button("Copy Current URL") {
                 browserManager.copyCurrentURL()
             }
             .keyboardShortcut("c", modifiers: [.command, .shift])
             .disabled(browserManager.currentTabForActiveWindow() == nil)
-
         }
 
         // Sidebar commands
@@ -115,10 +119,6 @@ struct NookCommands: Commands {
 
         // View commands
         CommandGroup(after: .windowSize) {
-            Button("New URL / Search") {
-//                browserManager.openCommandPaletteWithCurrentURL()
-            }
-            .keyboardShortcut("l", modifiers: .command)
 
             Button("Find in Page") {
                 browserManager.showFindBar()
@@ -134,7 +134,6 @@ struct NookCommands: Commands {
 
             Divider()
 
-            // Zoom controls
             Button("Zoom In") {
                 browserManager.zoomInCurrentTab()
             }
@@ -187,127 +186,125 @@ struct NookCommands: Commands {
                     || !browserManager.currentTabHasAudioContent())
         }
 
-        // Privacy/Cookie Commands
-        CommandMenu("Privacy") {
-            Menu("Clear Cookies") {
-                Button("Clear Cookies for Current Site") {
-                    browserManager.clearCurrentPageCookies()
-                }
-                .disabled(browserManager.currentTabForActiveWindow()?.url.host == nil)
+        Group {
+            CommandMenu("Privacy") {
+                Menu("Clear Cookies") {
+                    Button("Clear Cookies for Current Site") {
+                        browserManager.clearCurrentPageCookies()
+                    }
+                    .disabled(browserManager.currentTabForActiveWindow()?.url.host == nil)
 
-                Button("Clear Expired Cookies") {
-                    browserManager.clearExpiredCookies()
-                }
+                    Button("Clear Expired Cookies") {
+                        browserManager.clearExpiredCookies()
+                    }
 
-                Divider()
-
-                Button("Clear All Cookies") {
-                    browserManager.clearAllCookies()
-                }
-
-                Divider()
-
-                Button("Clear Third-Party Cookies") {
-                    browserManager.clearThirdPartyCookies()
-                }
-
-                Button("Clear High-Risk Cookies") {
-                    browserManager.clearHighRiskCookies()
-                }
-            }
-
-            Menu("Clear Cache") {
-                Button("Clear Cache for Current Site") {
-                    browserManager.clearCurrentPageCache()
-                }
-                .disabled(browserManager.currentTabForActiveWindow()?.url.host == nil)
-
-                Button("Clear Stale Cache") {
-                    browserManager.clearStaleCache()
-                }
-
-                Button("Clear Disk Cache") {
-                    browserManager.clearDiskCache()
-                }
-
-                Button("Clear Memory Cache") {
-                    browserManager.clearMemoryCache()
-                }
-
-                Divider()
-
-                Button("Clear All Cache") {
-                    browserManager.clearAllCache()
-                }
-
-                Divider()
-
-                Button("Clear Personal Data Cache") {
-                    browserManager.clearPersonalDataCache()
-                }
-
-                Button("Clear Favicon Cache") {
-                    browserManager.clearFaviconCache()
-                }
-            }
-
-            Divider()
-
-            Button("Privacy Cleanup") {
-                browserManager.performPrivacyCleanup()
-            }
-
-            Button("Clear Browsing History") {
-                browserManager.historyManager.clearHistory()
-            }
-
-            Button("Clear All Website Data") {
-                Task {
-                    let dataStore = WKWebsiteDataStore.default()
-                    let dataTypes = WKWebsiteDataStore.allWebsiteDataTypes()
-                    await dataStore.removeData(ofTypes: dataTypes, modifiedSince: Date.distantPast)
-                }
-            }
-        }
-
-        // Extensions Commands
-        if nookSettings.experimentalExtensions {
-            CommandMenu("Extensions") {
-                Button("Install Extension...") {
-                    browserManager.showExtensionInstallDialog()
-                }
-                .keyboardShortcut("e", modifiers: [.command, .shift])
-
-                Button("Manage Extensions...") {
-                    // Open native Settings to Extensions pane
-                    openSettings()
-                    nookSettings.currentSettingsTab = .extensions
-                }
-
-                if #available(macOS 15.5, *) {
                     Divider()
-                    Button("Open Popup Console") {
-                        browserManager.extensionManager?.showPopupConsole()
+
+                    Button("Clear All Cookies") {
+                        browserManager.clearAllCookies()
+                    }
+
+                    Divider()
+
+                    Button("Clear Third-Party Cookies") {
+                        browserManager.clearThirdPartyCookies()
+                    }
+
+                    Button("Clear High-Risk Cookies") {
+                        browserManager.clearHighRiskCookies()
+                    }
+                }
+
+                Menu("Clear Cache") {
+                    Button("Clear Cache for Current Site") {
+                        browserManager.clearCurrentPageCache()
+                    }
+                    .disabled(browserManager.currentTabForActiveWindow()?.url.host == nil)
+
+                    Button("Clear Stale Cache") {
+                        browserManager.clearStaleCache()
+                    }
+
+                    Button("Clear Disk Cache") {
+                        browserManager.clearDiskCache()
+                    }
+
+                    Button("Clear Memory Cache") {
+                        browserManager.clearMemoryCache()
+                    }
+
+                    Divider()
+
+                    Button("Clear All Cache") {
+                        browserManager.clearAllCache()
+                    }
+
+                    Divider()
+
+                    Button("Clear Personal Data Cache") {
+                        browserManager.clearPersonalDataCache()
+                    }
+
+                    Button("Clear Favicon Cache") {
+                        browserManager.clearFaviconCache()
+                    }
+                }
+
+                Divider()
+
+                Button("Privacy Cleanup") {
+                    browserManager.performPrivacyCleanup()
+                }
+
+                Button("Clear Browsing History") {
+                    browserManager.historyManager.clearHistory()
+                }
+
+                Button("Clear All Website Data") {
+                    Task {
+                        let dataStore = WKWebsiteDataStore.default()
+                        let dataTypes = WKWebsiteDataStore.allWebsiteDataTypes()
+                        await dataStore.removeData(ofTypes: dataTypes, modifiedSince: Date.distantPast)
                     }
                 }
             }
-        }
 
-        // Appearance Commands
-        CommandMenu("Appearance") {
-            Button("Customize Space Gradient...") {
-                browserManager.showGradientEditor()
+            if nookSettings.experimentalExtensions {
+                CommandMenu("Extensions") {
+                    Button("Install Extension...") {
+                        browserManager.showExtensionInstallDialog()
+                    }
+                    .keyboardShortcut("e", modifiers: [.command, .shift])
+
+                    Button("Manage Extensions...") {
+                        openSettings()
+                        nookSettings.currentSettingsTab = .extensions
+                    }
+
+                    if #available(macOS 15.5, *) {
+                        Divider()
+                        Button("Open Popup Console") {
+                            browserManager.extensionManager?.showPopupConsole()
+                        }
+                    }
+                }
             }
-            .keyboardShortcut("g", modifiers: [.command, .shift])
-            .disabled(browserManager.tabManager.currentSpace == nil)
 
-            Divider()
+            CommandMenu("Appearance") {
+                Button("Customize Space Gradient...") {
+                    browserManager.showGradientEditor()
+                }
+                .keyboardShortcut("g", modifiers: [.command, .shift])
+                .disabled(browserManager.tabManager.currentSpace == nil)
 
-            Button("Create Boosts") {
-                browserManager.showBoostsDialog()
+                Divider()
+
+                Button("Create Boosts") {
+                    browserManager.showBoostsDialog()
+                }
+                .keyboardShortcut("b", modifiers: [.command, .shift])
+                .disabled(browserManager.currentTabForActiveWindow() == nil)
             }
-            .keyboardShortcut("b", modifiers: [.command, .shift])
-            .disabled(browserManager.currentTabForActiveWindow() == nil)
         }
     }
 }
