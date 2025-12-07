@@ -213,9 +213,7 @@ struct SpacesSideBarView: View {
     private var sidebarContextMenu: some View {
         Group {
             Button {
-                Task { @MainActor in
-                    commandPalette.open()
-                }
+                commandPalette.open()
             } label: {
                 Label("New Tab", systemImage: "plus")
             }
