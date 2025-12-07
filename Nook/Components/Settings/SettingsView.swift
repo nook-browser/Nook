@@ -46,6 +46,16 @@ private struct SettingsContent: View {
                 )
             }
             .tag(SettingsTabs.appearance)
+            SettingsPane {
+                SettingsAITab()
+            }
+            .tabItem {
+                Label(
+                    SettingsTabs.ai.name,
+                    systemImage: SettingsTabs.ai.icon
+                )
+            }
+            .tag(SettingsTabs.ai)
 
             SettingsPane {
                 PrivacySettingsView()
