@@ -9,11 +9,14 @@ import SwiftUI
 
 struct DragEnabledSpacesSideBarView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @Environment(CommandPalette.self) private var commandPalette
     private var dragManager = TabDragManager.shared
     
     var body: some View {
         SpacesSideBarView()
             .environmentObject(browserManager)
+            .environment(commandPalette)
+            .environmentObject(browserManager.gradientColorManager)
             .environmentObject(dragManager)
             .tabDragManager(dragManager)
     }
