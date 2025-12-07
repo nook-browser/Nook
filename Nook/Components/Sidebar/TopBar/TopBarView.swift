@@ -5,85 +5,115 @@
 //  Created by Assistant on 23/09/2025.
 //
 
-import SwiftUI
 import AppKit
+import SwiftUI
 
 enum TopBarMetrics {
-    static let height: CGFloat = 36
-    static let horizontalPadding: CGFloat = 8
-    static let verticalPadding: CGFloat = 20
+    static let height: CGFloat = 40
+    static let horizontalPadding: CGFloat = 6
+    static let verticalPadding: CGFloat = 5
 }
 
 struct TopBarView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(CommandPalette.self) private var commandPalette
+    @Environment(\.nookSettings) var nookSettings
     @StateObject private var tabWrapper = ObservableTabWrapper()
     @State private var isHovering: Bool = false
     @State private var previousTabId: UUID? = nil
-    
+
     var body: some View {
         let cornerRadius: CGFloat = {
             if #available(macOS 26.0, *) {
-                return 12
+                return 8
             } else {
-                return 6
+                return 8
             }
         }()
-        
+
         let currentTab = browserManager.currentTab(for: windowState)
-        let hasPiPControl = currentTab?.hasVideoContent == true || browserManager.currentTabHasPiPActive()
-        
+        let hasPiPControl =
+            currentTab?.hasVideoContent == true
+            || browserManager.currentTabHasPiPActive()
+
         ZStack {
             // Main content
             ZStack {
-                HStack(spacing: 12) {
+                HStack(spacing: 8) {
                     navigationControls
-                    
+
                     if hasPiPControl, let tab = currentTab {
                         pipButton(for: tab)
                     }
-                    
+
+                    urlBar
+
                     Spacer()
+                    
+                    extensionsView
+
+
+                    if browserManager.nookSettings?.showAIAssistant ?? false
+                        && !windowState.isSidebarAIChatVisible
+                    {
+                        ChatButton(navButtonColor: navButtonColor)
+                    }
+
                 }
-                .padding(.vertical, TopBarMetrics.verticalPadding)
-                
-                urlBar
-                    .padding(.vertical, TopBarMetrics.verticalPadding)
+
             }
             .padding(.horizontal, TopBarMetrics.horizontalPadding)
+            .padding(.vertical, TopBarMetrics.verticalPadding)
             .frame(maxWidth: .infinity)
             .frame(height: TopBarMetrics.height)
             .background(topBarBackgroundColor)
-            .animation(shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil, value: topBarBackgroundColor)
-            .clipShape(UnevenRoundedRectangle(
-                topLeadingRadius: cornerRadius,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: cornerRadius,
-                style: .continuous
-            ))
+            .animation(
+                shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil,
+                value: topBarBackgroundColor
+            )
+            .clipShape(
+                UnevenRoundedRectangle(
+                    topLeadingRadius: cornerRadius,
+                    bottomLeadingRadius: 0,
+                    bottomTrailingRadius: 0,
+                    topTrailingRadius: cornerRadius,
+                    style: .continuous
+                )
+            )
             .overlay(alignment: .bottom) {
                 // 1px bottom border - lighter when dark, darker when light
                 Rectangle()
                     .fill(bottomBorderColor)
                     .frame(height: 1)
-                    .animation(shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil, value: bottomBorderColor)
+                    .animation(
+                        shouldAnimateColorChange
+                            ? .easeInOut(duration: 0.3) : nil,
+                        value: bottomBorderColor
+                    )
             }
         }
         .background(
             GeometryReader { geometry in
                 Color.clear
-                    .preference(key: URLBarFramePreferenceKey.self, value: geometry.frame(in: .named("WindowSpace")))
+                    .preference(
+                        key: URLBarFramePreferenceKey.self,
+                        value: geometry.frame(in: .named("WindowSpace"))
+                    )
             }
         )
         .onAppear {
-            tabWrapper.setContext(browserManager: browserManager, windowState: windowState)
+            tabWrapper.setContext(
+                browserManager: browserManager,
+                windowState: windowState
+            )
             updateCurrentTab()
             // Initialize previousTabId to current tab so first color change doesn't animate
             previousTabId = browserManager.currentTab(for: windowState)?.id
         }
-        .onChange(of: browserManager.currentTab(for: windowState)?.id) { oldId, newId in
+        .onChange(of: browserManager.currentTab(for: windowState)?.id) {
+            oldId,
+            newId in
             previousTabId = oldId
             updateCurrentTab()
             // Update previousTabId after a brief delay so next color change within this tab will animate
@@ -91,24 +121,50 @@ struct TopBarView: View {
                 previousTabId = newId
             }
         }
-        .onChange(of: browserManager.currentTab(for: windowState)?.pageBackgroundColor) { _, _ in
+        .onChange(
+            of: browserManager.currentTab(for: windowState)?.pageBackgroundColor
+        ) { _, _ in
             // Color changes will trigger animations automatically via computed properties
         }
-        .onChange(of: browserManager.currentTab(for: windowState)?.topBarBackgroundColor) { _, _ in
+        .onChange(
+            of: browserManager.currentTab(for: windowState)?
+                .topBarBackgroundColor
+        ) { _, _ in
             // Top bar color changes will trigger animations automatically via computed properties
         }
-        .onReceive(Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()) { _ in
+        .onReceive(
+            Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
+        ) { _ in
             updateCurrentTab()
         }
     }
 
+    private var extensionsView: some View {
+        HStack(spacing: 4) {
+            if let extensionManager = browserManager.extensionManager,
+               nookSettings.experimentalExtensions
+            {
+                ExtensionActionView(
+                    extensions: extensionManager.installedExtensions
+                )
+                .environmentObject(browserManager)
+            }
+
+        }
+
+
+    }
+
     private var navigationControls: some View {
-        HStack(spacing: 12) {
-            Button("Go Back", systemImage: "arrow.backward", action: goBack)
+        HStack(spacing: 4) {
+            Button("Go Back", systemImage: "chevron.backward", action: goBack)
                 .labelStyle(.iconOnly)
                 .buttonStyle(NavButtonStyle())
                 .foregroundStyle(navButtonColor)
-                .animation(shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil, value: navButtonColor)
+                .animation(
+                    shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil,
+                    value: navButtonColor
+                )
                 .disabled(!tabWrapper.canGoBack)
                 .opacity(tabWrapper.canGoBack ? 1.0 : 0.4)
                 .contextMenu {
@@ -117,65 +173,64 @@ struct TopBarView: View {
                         windowState: windowState
                     )
                 }
-            
-            Button("Go Forward", systemImage: "arrow.forward", action: goForward)
-                .labelStyle(.iconOnly)
-                .buttonStyle(NavButtonStyle())
-                .foregroundStyle(navButtonColor)
-                .animation(shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil, value: navButtonColor)
-                .disabled(!tabWrapper.canGoForward)
-                .opacity(tabWrapper.canGoForward ? 1.0 : 0.4)
-                .contextMenu {
-                    NavigationHistoryContextMenu(
-                        historyType: .forward,
-                        windowState: windowState
-                    )
-                }
-            
-            Button("Reload", systemImage: "arrow.clockwise", action: refreshCurrentTab)
-                .labelStyle(.iconOnly)
-                .buttonStyle(NavButtonStyle())
-                .foregroundStyle(navButtonColor)
-                .animation(shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil, value: navButtonColor)
+
+            Button(
+                "Go Forward",
+                systemImage: "chevron.right",
+                action: goForward
+            )
+            .labelStyle(.iconOnly)
+            .buttonStyle(NavButtonStyle())
+            .foregroundStyle(navButtonColor)
+            .animation(
+                shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil,
+                value: navButtonColor
+            )
+            .disabled(!tabWrapper.canGoForward)
+            .opacity(tabWrapper.canGoForward ? 1.0 : 0.4)
+            .contextMenu {
+                NavigationHistoryContextMenu(
+                    historyType: .forward,
+                    windowState: windowState
+                )
+            }
+
+            Button(
+                "Reload",
+                systemImage: "arrow.clockwise",
+                action: refreshCurrentTab
+            )
+            .labelStyle(.iconOnly)
+            .buttonStyle(NavButtonStyle())
+            .foregroundStyle(navButtonColor)
+            .animation(
+                shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil,
+                value: navButtonColor
+            )
         }
     }
 
     private var urlBar: some View {
         HStack(spacing: 8) {
             if browserManager.currentTab(for: windowState) != nil {
-                Button(action: {
-                    browserManager.copyCurrentURL()
-                }) {
-                    Image(systemName: "link")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(urlBarTextColor)
-                        .animation(shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil, value: urlBarTextColor)
-                }
-                .buttonStyle(.plain)
-                .help("Copy URL")
-                
                 Text(displayURL)
-                    .font(.system(size: 12, weight: .medium, design: .default))
+                    .font(.system(size: 13, weight: .medium, design: .default))
                     .foregroundStyle(urlBarTextColor)
-                    .animation(shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil, value: urlBarTextColor)
+                    .tracking(-0.1)
                     .lineLimit(1)
                     .truncationMode(.tail)
+                Spacer()
             } else {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 12))
-                    .foregroundStyle(urlBarTextColor)
-                    .animation(shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil, value: urlBarTextColor)
-                Text("Search or Enter URL...")
-                    .font(.system(size: 12, weight: .medium, design: .default))
-                    .foregroundStyle(urlBarTextColor)
-                    .animation(shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil, value: urlBarTextColor)
+                EmptyView()
             }
         }
-        .fixedSize(horizontal: true, vertical: false)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 2)
+        .frame(maxWidth: .infinity)
+        .padding(6)
         .background(urlBarBackgroundColor)
-        .animation(shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil, value: urlBarBackgroundColor)
+        .animation(
+            shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil,
+            value: urlBarBackgroundColor
+        )
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .onTapGesture {
             if let currentTab = browserManager.currentTab(for: windowState) {
@@ -190,193 +245,330 @@ struct TopBarView: View {
             }
         }
     }
-    
+
     private func updateCurrentTab() {
         tabWrapper.updateTab(browserManager.currentTab(for: windowState))
     }
-    
+
     private func goBack() {
         if let tab = tabWrapper.tab,
-           let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
+            let webView = browserManager.getWebView(
+                for: tab.id,
+                in: windowState.id
+            )
+        {
             webView.goBack()
         } else {
             tabWrapper.tab?.goBack()
         }
     }
-    
+
     private func goForward() {
         if let tab = tabWrapper.tab,
-           let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
+            let webView = browserManager.getWebView(
+                for: tab.id,
+                in: windowState.id
+            )
+        {
             webView.goForward()
         } else {
             tabWrapper.tab?.goForward()
         }
     }
-    
+
     private func refreshCurrentTab() {
         tabWrapper.tab?.refresh()
     }
-    
+
     // Determine if we should animate color changes (within same tab) or snap (tab switch)
     private var shouldAnimateColorChange: Bool {
         let currentTabId = browserManager.currentTab(for: windowState)?.id
         return currentTabId == previousTabId
     }
-    
+
     // Top bar background color - matches top-right pixel of webview
     private var topBarBackgroundColor: Color {
         if let currentTab = browserManager.currentTab(for: windowState),
-           let topBarColor = currentTab.topBarBackgroundColor {
+            let topBarColor = currentTab.topBarBackgroundColor
+        {
             return Color(nsColor: topBarColor)
         }
         // Fallback to page background color if top bar color not available yet
         if let currentTab = browserManager.currentTab(for: windowState),
-           let pageColor = currentTab.pageBackgroundColor {
+            let pageColor = currentTab.pageBackgroundColor
+        {
             return Color(nsColor: pageColor)
         }
         // Fallback to system theme colors when no tab or color available
         // This ensures the top bar has a proper background even before page loads
         return Color(nsColor: .windowBackgroundColor)
     }
-    
+
     // Nav button color - light on dark backgrounds, dark on light backgrounds
     private var navButtonColor: Color {
         if let currentTab = browserManager.currentTab(for: windowState),
-           let topBarColor = currentTab.topBarBackgroundColor {
-            return topBarColor.isPerceivedDark ? 
-                Color.white.opacity(0.9) : 
-                Color.black.opacity(0.8)
+            let topBarColor = currentTab.topBarBackgroundColor
+        {
+            return topBarColor.isPerceivedDark
+                ? Color.white.opacity(0.9) : Color.black.opacity(0.8)
         }
         // Fallback to page background color
         if let currentTab = browserManager.currentTab(for: windowState),
-           let pageColor = currentTab.pageBackgroundColor {
-            return pageColor.isPerceivedDark ? 
-                Color.white.opacity(0.9) : 
-                Color.black.opacity(0.8)
+            let pageColor = currentTab.pageBackgroundColor
+        {
+            return pageColor.isPerceivedDark
+                ? Color.white.opacity(0.9) : Color.black.opacity(0.8)
         }
-        
+
         // Fallback
-        return browserManager.gradientColorManager.isDark ? 
-            Color.white.opacity(0.9) : 
-            Color.black.opacity(0.8)
+        return browserManager.gradientColorManager.isDark
+            ? Color.white.opacity(0.9) : Color.black.opacity(0.8)
     }
-    
+
     // URL bar background color - slightly adjusted for visual distinction
     private var urlBarBackgroundColor: Color {
         if let currentTab = browserManager.currentTab(for: windowState),
-           let topBarColor = currentTab.topBarBackgroundColor {
+            let topBarColor = currentTab.topBarBackgroundColor
+        {
             let baseColor = Color(nsColor: topBarColor)
             if isHovering {
                 // Slightly lighter/darker on hover
-                return adjustColorBrightness(baseColor, factor: topBarColor.isPerceivedDark ? 1.15 : 0.95)
+                return adjustColorBrightness(
+                    baseColor,
+                    factor: topBarColor.isPerceivedDark ? 1.15 : 0.95
+                )
             } else {
                 // Slightly darker/lighter for subtle distinction from top bar
-                return adjustColorBrightness(baseColor, factor: topBarColor.isPerceivedDark ? 1.1 : 0.98)
+                //                return adjustColorBrightness(baseColor, factor: topBarColor.isPerceivedDark ? 1.1 : 0.98)
+                return .clear
             }
         }
         // Fallback to page background color
         if let currentTab = browserManager.currentTab(for: windowState),
-           let pageColor = currentTab.pageBackgroundColor {
+            let pageColor = currentTab.pageBackgroundColor
+        {
             let baseColor = Color(nsColor: pageColor)
             if isHovering {
                 // Slightly lighter/darker on hover
-                return adjustColorBrightness(baseColor, factor: pageColor.isPerceivedDark ? 1.15 : 0.95)
+                return adjustColorBrightness(
+                    baseColor,
+                    factor: pageColor.isPerceivedDark ? 1.15 : 0.95
+                )
             } else {
                 // Slightly darker/lighter for subtle distinction from top bar
-                return adjustColorBrightness(baseColor, factor: pageColor.isPerceivedDark ? 1.1 : 0.98)
+                return adjustColorBrightness(
+                    baseColor,
+                    factor: pageColor.isPerceivedDark ? 1.1 : 0.98
+                )
             }
         }
         // Fallback to original AppColors when no webview color available
         if isHovering {
-            return browserManager.gradientColorManager.isDark ? AppColors.pinnedTabHoverDark : AppColors.pinnedTabHoverLight
+            return browserManager.gradientColorManager.isDark
+                ? AppColors.pinnedTabHoverDark : AppColors.pinnedTabHoverLight
         } else {
-            return browserManager.gradientColorManager.isDark ? AppColors.pinnedTabIdleDark : AppColors.pinnedTabIdleLight
+            return browserManager.gradientColorManager.isDark
+                ? AppColors.pinnedTabIdleDark : AppColors.pinnedTabIdleLight
         }
     }
-    
+
     // Text color for URL bar - ensures proper contrast
     private var urlBarTextColor: Color {
         if let currentTab = browserManager.currentTab(for: windowState),
-           let topBarColor = currentTab.topBarBackgroundColor {
-            return topBarColor.isPerceivedDark ? 
-                Color.white.opacity(0.9) : 
-                Color.black.opacity(0.8)
+            let topBarColor = currentTab.topBarBackgroundColor
+        {
+            return topBarColor.isPerceivedDark
+                ? Color.white.opacity(0.55) : Color.black.opacity(0.8)
         }
         // Fallback to page background color
         if let currentTab = browserManager.currentTab(for: windowState),
-           let pageColor = currentTab.pageBackgroundColor {
-            return pageColor.isPerceivedDark ? 
-                Color.white.opacity(0.9) : 
-                Color.black.opacity(0.8)
+            let pageColor = currentTab.pageBackgroundColor
+        {
+            return pageColor.isPerceivedDark
+                ? Color.white.opacity(0.55) : Color.black.opacity(0.8)
         }
         // Fallback to original text color logic
-        return browserManager.gradientColorManager.isDark ? AppColors.spaceTabTextDark : AppColors.spaceTabTextLight
+        return browserManager.gradientColorManager.isDark
+            ? AppColors.spaceTabTextDark : AppColors.spaceTabTextLight
     }
-    
+
     // Bottom border color - lighter when dark, darker when light
     private var bottomBorderColor: Color {
         if let currentTab = browserManager.currentTab(for: windowState),
-           let topBarColor = currentTab.topBarBackgroundColor {
+            let topBarColor = currentTab.topBarBackgroundColor
+        {
             let baseColor = Color(nsColor: topBarColor)
             // Make lighter if dark, darker if light
-            return adjustColorBrightness(baseColor, factor: topBarColor.isPerceivedDark ? 1.2 : 0.85)
+            return adjustColorBrightness(
+                baseColor,
+                factor: topBarColor.isPerceivedDark ? 1.2 : 0.85
+            )
         }
         // Fallback to page background color
         if let currentTab = browserManager.currentTab(for: windowState),
-           let pageColor = currentTab.pageBackgroundColor {
+            let pageColor = currentTab.pageBackgroundColor
+        {
             let baseColor = Color(nsColor: pageColor)
-            return adjustColorBrightness(baseColor, factor: pageColor.isPerceivedDark ? 1.2 : 0.85)
+            return adjustColorBrightness(
+                baseColor,
+                factor: pageColor.isPerceivedDark ? 1.2 : 0.85
+            )
         }
         // Fallback to system separator color
         return Color(nsColor: .separatorColor)
     }
-    
+
     // Helper to adjust color brightness
-    private func adjustColorBrightness(_ color: Color, factor: CGFloat) -> Color {
+    private func adjustColorBrightness(_ color: Color, factor: CGFloat) -> Color
+    {
         #if canImport(AppKit)
-        guard let nsColor = NSColor(color).usingColorSpace(.sRGB) else { return color }
-        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        nsColor.getRed(&r, green: &g, blue: &b, alpha: &a)
-        
-        // Clamp values between 0 and 1
-        r = min(1.0, max(0.0, r * factor))
-        g = min(1.0, max(0.0, g * factor))
-        b = min(1.0, max(0.0, b * factor))
-        
-        return Color(nsColor: NSColor(srgbRed: r, green: g, blue: b, alpha: a))
+            guard let nsColor = NSColor(color).usingColorSpace(.sRGB) else {
+                return color
+            }
+            var r: CGFloat = 0
+            var g: CGFloat = 0
+            var b: CGFloat = 0
+            var a: CGFloat = 0
+            nsColor.getRed(&r, green: &g, blue: &b, alpha: &a)
+
+            // Clamp values between 0 and 1
+            r = min(1.0, max(0.0, r * factor))
+            g = min(1.0, max(0.0, g * factor))
+            b = min(1.0, max(0.0, b * factor))
+
+            return Color(
+                nsColor: NSColor(srgbRed: r, green: g, blue: b, alpha: a)
+            )
         #else
-        return color
+            return color
         #endif
     }
-    
-    private var displayURL: String {
-        guard let currentTab = browserManager.currentTab(for: windowState) else {
+
+    private var displayURL: AttributedString {
+        guard let currentTab = browserManager.currentTab(for: windowState)
+        else {
             return ""
         }
-        return formatURL(currentTab.url)
+
+        return formatURL(
+            currentTab.url,
+            title: currentTab.name,
+            isHovering: isHovering
+        )
     }
-    
-    private func formatURL(_ url: URL) -> String {
-        guard let host = url.host else {
-            return url.absoluteString
+
+    private func formatURL(_ url: URL, title: String?, isHovering: Bool)
+        -> AttributedString
+    {
+        if isHovering {
+            guard let host = url.host else {
+                return AttributedString(url.absoluteString)
+            }
+
+            let cleanHost =
+                host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+
+            let hostString = AttributedString(cleanHost)
+
+            var pathString = AttributedString()
+
+            if !url.path.isEmpty {
+                pathString += AttributedString(url.path)
+            }
+
+            if let query = url.query {
+                pathString += AttributedString("?" + query)
+            }
+
+            pathString.foregroundColor = urlBarTextColor.opacity(0.35)
+
+            return hostString + pathString
         }
-        
-        let cleanHost = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
-        
-        return cleanHost
+
+        guard let host = url.host else {
+            return AttributedString(url.absoluteString)
+        }
+
+        let cleanHost =
+            host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+
+        if url.path.isEmpty || url.path == "/" {
+            return AttributedString(cleanHost)
+        } else {
+            let displayTitle = title ?? cleanHost
+            var result = AttributedString(cleanHost)
+            var titlePart = AttributedString(" / " + displayTitle)
+            titlePart.foregroundColor = urlBarTextColor.opacity(0.35)
+            result.append(titlePart)
+            return result
+        }
     }
-    
+
     private func pipButton(for tab: Tab) -> some View {
         Button(action: {
             tab.requestPictureInPicture()
         }) {
-            Image(systemName: browserManager.currentTabHasPiPActive() ? "pip.exit" : "pip.enter")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(urlBarTextColor)
-                .animation(shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil, value: urlBarTextColor)
-                .frame(width: 16, height: 16)
-                .contentShape(RoundedRectangle(cornerRadius: 3))
+            Image(
+                systemName: browserManager.currentTabHasPiPActive()
+                    ? "pip.exit" : "pip.enter"
+            )
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(urlBarTextColor)
+            .animation(
+                shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil,
+                value: urlBarTextColor
+            )
+            .frame(width: 16, height: 16)
+            .contentShape(RoundedRectangle(cornerRadius: 3))
         }
         .buttonStyle(PlainButtonStyle())
     }
+}
+
+struct ChatButton: View {
+    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserWindowState.self) private var windowState
+    @State private var isHovered: Bool = false
+
+    var navButtonColor: Color
+    
+    
+
+
+    var body: some View {
+        Button {
+            browserManager.toggleAISidebar(for: windowState)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "message.fill")
+                Text("Chat")
+            }
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(navButtonColor)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(backgroundColor)
+            .clipShape(
+                RoundedRectangle(cornerRadius: 6)
+            )
+            .contentShape(
+                RoundedRectangle(cornerRadius: 6)
+            )
+        }
+        .buttonStyle(.plain)
+        .onHover { state in
+            isHovered = state
+        }
+
+    }
+    
+    private var backgroundColor: Color {
+        let isDark = browserManager.tabManager.currentTab?.topBarBackgroundColor?.isPerceivedDark == true
+        if isHovered {
+            return isDark ? .white.opacity(0.15) : .black.opacity(0.1)
+        } else {
+            return isDark ? .white.opacity(0.1) : .black.opacity(0.05)
+        }
+    }
+
 }

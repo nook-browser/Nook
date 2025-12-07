@@ -156,6 +156,7 @@ struct SpacesSideBarView: View {
             if let targetIndex = spaces.firstIndex(where: { $0.id == windowState.currentSpaceId }) {
                 activeSpaceIndex = targetIndex
             }
+            browserManager.setActiveSpace(spaces[0], in: windowState)
         }
         .onChange(of: activeSpaceIndex) { _, newIndex in
             handleSpaceIndexChange(newIndex, spaces: spaces)
@@ -309,6 +310,7 @@ struct SpacesSideBarView: View {
             .environmentObject(browserManager)
             .environment(windowState)
             .environment(commandPalette)
+            .environmentObject(browserManager.gradientColorManager)
             .environmentObject(browserManager.splitManager)
             .id(space.id.uuidString + "-w\(Int(windowState.sidebarContentWidth))")
             Spacer()

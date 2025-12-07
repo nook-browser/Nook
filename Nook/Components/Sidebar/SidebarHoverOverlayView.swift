@@ -13,6 +13,7 @@ struct SidebarHoverOverlayView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var hoverManager: HoverSidebarManager
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(CommandPalette.self) private var commandPalette
     @Environment(\.nookSettings) var nookSettings
 
     private let cornerRadius: CGFloat = 12
@@ -41,6 +42,8 @@ struct SidebarHoverOverlayView: View {
                         .frame(width: windowState.sidebarWidth)
                         .environmentObject(browserManager)
                         .environment(windowState)
+                        .environment(commandPalette)
+                        .environmentObject(browserManager.gradientColorManager)
                         .frame(maxHeight: .infinity)
                         .background{
                             
