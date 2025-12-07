@@ -71,7 +71,7 @@ class MacButtonsViewModel {
         if buttonState != .idle {
             return (macFillColor(buttonType: buttonType), macStrokeColor(buttonType: buttonType))
         }
-        return (isDark ? AppColors.pinnedTabHoverDark : AppColors.pinnedTabHoverLight, Color.clear)
+        return (isDark ? AppColors.pinnedTabHoverLight : AppColors.pinnedTabHoverDark, Color.clear)
     }
 
     func macFillColor(buttonType: ButtonType) -> Color {
@@ -159,24 +159,25 @@ struct MacButtonsView: View {
 // MARK: - MacButtonView
 
 struct MacButtonView: View {
-    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(\.colorScheme) var colorScheme
     var viewModel: MacButtonsViewModel
     var buttonType: MacButtonsViewModel.ButtonType
 
     var body: some View {
+        let isDark = colorScheme == .dark
         Button(action: viewModel.getButtonAction(buttonType: buttonType)) {
             if viewModel.buttonState == .idle {
                 Circle()
-                    .fill(viewModel.getButtonColor(buttonType: buttonType, isDark: browserManager.gradientColorManager.isDark).0)
+                    .fill(viewModel.getButtonColor(buttonType: buttonType, isDark: isDark).0)
                     .frame(width: 12.5, height: 12.5)
             } else {
                 ZStack {
                     Circle()
-                        .fill(viewModel.getButtonColor(buttonType: buttonType, isDark: browserManager.gradientColorManager.isDark).1)
+                        .fill(viewModel.getButtonColor(buttonType: buttonType, isDark: isDark).1)
                         .overlay(
                             Circle()
                                 .inset(by: 0.5)
-                                .fill(viewModel.getButtonColor(buttonType: buttonType, isDark: browserManager.gradientColorManager.isDark).0)
+                                .fill(viewModel.getButtonColor(buttonType: buttonType, isDark: isDark).0)
                         )
                     if viewModel.buttonState == .hover {}
                 }.frame(width: 12.5, height: 12.5)

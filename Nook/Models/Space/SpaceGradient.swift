@@ -28,10 +28,10 @@ struct SpaceGradient: Codable, Hashable {
     }
 
     static var `default`: SpaceGradient {
-        let hex = SpaceGradient.accentHex()
+        let hex = "#000000"
         let n1 = GradientNode(colorHex: hex, location: 0.0)
         let n2 = GradientNode(colorHex: hex, location: 1.0)
-        return SpaceGradient(angle: 45.0, nodes: [n1, n2], grain: 0.05, opacity: 1.0)
+        return SpaceGradient(angle: 45.0, nodes: [n1, n2], grain: 0.05, opacity: 0.6)
     }
 
     var encoded: Data? {

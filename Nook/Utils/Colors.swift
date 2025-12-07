@@ -88,15 +88,30 @@ extension Color {
         )
     }
     
-    #if canImport(AppKit)
     func toHexString(includeAlpha: Bool = false) -> String? {
         let ns = NSColor(self)
         return ns.toHexString(includeAlpha: includeAlpha)
     }
-    #endif
+    
+    var perceivedBrightness: CGFloat {
+            guard let nsColor = NSColor(self).usingColorSpace(.sRGB) else { return 0.5 }
+            var r: CGFloat = 0
+            var g: CGFloat = 0
+            var b: CGFloat = 0
+            var a: CGFloat = 0
+            nsColor.getRed(&r, green: &g, blue: &b, alpha: &a)
+
+            if a <= 0.01 { return 1.0 }
+
+            let brightness = (0.299 * r + 0.587 * g + 0.114 * b)
+            return brightness * a + (1 - a)
+        }
+
+        var isPerceivedDark: Bool {
+            perceivedBrightness < 0.6
+        }
 }
 
-#if canImport(AppKit)
 extension NSColor {
     func toHexString(includeAlpha: Bool = false) -> String? {
         guard let rgb = usingColorSpace(.sRGB) else { return nil }
@@ -175,5 +190,4 @@ extension NSImage {
         return NSColor(red: red, green: green, blue: blue, alpha: alpha)
     }
 }
-#endif
 
