@@ -947,6 +947,9 @@ class TabManager: ObservableObject {
     }
 
     func removeTab(_ id: UUID) {
+        // Notify SplitViewManager about tab closure to prevent zombie state
+        browserManager?.splitManager.handleTabClosure(id)
+        
         let wasCurrent = (currentTab?.id == id)
         var removed: Tab?
         var removedSpaceId: UUID?
@@ -1179,6 +1182,58 @@ class TabManager: ObservableObject {
             spaceId: sid,
             index: 0, // New tabs get index 0 to appear at top
             browserManager: browserManager
+        )
+        addTab(newTab)
+        setActiveTab(newTab)
+        return newTab
+    }
+
+    // Create a new tab with an existing WebView (used for Peek transfers)
+    @discardableResult
+    func createNewTabWithWebView(
+        url: String = "https://www.google.com",
+        in space: Space? = nil,
+        existingWebView: WKWebView? = nil
+    ) -> Tab {
+        let engine = nookSettings?.searchEngine ?? .google
+        let normalizedUrl = normalizeURL(url, provider: engine)
+        guard let validURL = URL(string: normalizedUrl)
+        else {
+            print("Invalid URL: \(url). Falling back to default.")
+            return createNewTab(in: space)
+        }
+
+        let targetSpace: Space? = space ?? currentSpace ?? ensureDefaultSpaceIfNeeded()
+        // Ensure the target space has a profile assignment; backfill from currentProfile if missing
+        if let ts = targetSpace, ts.profileId == nil {
+            let defaultProfileId = browserManager?.currentProfile?.id ?? browserManager?.profileManager.profiles.first?.id
+            if let pid = defaultProfileId {
+                ts.profileId = pid
+                persistSnapshot()
+            }
+        }
+        let sid = targetSpace?.id
+
+        // Get existing tabs and increment their indices to make room for new tab at top
+        let existingTabs = sid.flatMap { tabsBySpace[$0] } ?? []
+        let incrementedTabs = existingTabs.map { tab in
+            tab.index += 1
+            return tab
+        }
+
+        // Update the tabs array with incremented indices
+        if let sid = sid {
+            setTabs(incrementedTabs, for: sid)
+        }
+
+        let newTab = Tab(
+            url: validURL,
+            name: "New Tab",
+            favicon: "globe",
+            spaceId: sid,
+            index: 0, // New tabs get index 0 to appear at top
+            browserManager: browserManager,
+            existingWebView: existingWebView
         )
         addTab(newTab)
         setActiveTab(newTab)
@@ -2079,6 +2134,9 @@ class TabManager: ObservableObject {
             }
             // If we assigned default profile to legacy pinned tabs, persist to capture migrations
             if __didAssignDefaultProfile { persistSnapshot() }
+            
+            // Notify that initial data load is complete so window states can be updated
+            NotificationCenter.default.post(name: .tabManagerDidLoadInitialData, object: nil)
         } catch {
             print("SwiftData load error: \(error)")
         }

@@ -13,7 +13,10 @@ struct PeekWebView: NSViewRepresentable {
     weak var peekManager: PeekManager?
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(session: session, peekManager: peekManager)
+        let coordinator = Coordinator(session: session, peekManager: peekManager)
+        // Store coordinator reference for WebView extraction immediately
+        peekManager?.webViewCoordinator = coordinator
+        return coordinator
     }
 
     func makeNSView(context: Context) -> WKWebView {
@@ -38,6 +41,9 @@ struct PeekWebView: NSViewRepresentable {
             webView.isInspectable = true
         }
 
+        // Store reference in coordinator for transfer to tabs
+        context.coordinator.webView = webView
+
         context.coordinator.installProgressObservation(on: webView)
         context.coordinator.installThemeColorExtraction(on: webView)
         context.coordinator.loadInitialURLIfNeeded(on: webView)
@@ -49,6 +55,9 @@ struct PeekWebView: NSViewRepresentable {
         context.coordinator.session = session
         context.coordinator.peekManager = peekManager
         context.coordinator.loadInitialURLIfNeeded(on: nsView)
+
+        // Update reference in coordinator
+        context.coordinator.webView = nsView
     }
 
     // MARK: - Coordinator
@@ -59,6 +68,7 @@ struct PeekWebView: NSViewRepresentable {
         weak var peekManager: PeekManager?
         private var progressObservation: NSKeyValueObservation?
         private var didLoadInitialURL = false
+        var webView: WKWebView? // Store reference for transfer to tabs
 
         init(session: PeekSession, peekManager: PeekManager?) {
             self.session = session

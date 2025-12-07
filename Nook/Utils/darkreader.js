@@ -13,7 +13,7 @@
     : typeof define === "function" && define.amd
       ? define(["exports"], factory)
       : ((global =
-          typeof globalThis !== "undefined" ? globalThis : global || self),
+        typeof globalThis !== "undefined" ? globalThis : global || self),
         factory((global.DarkReader = {})));
 })(this, function (exports) {
   "use strict";
@@ -101,8 +101,8 @@
   const userAgent = isNavigatorDefined
     ? navigator.userAgentData && Array.isArray(navigator.userAgentData.brands)
       ? navigator.userAgentData.brands
-          .map((brand) => `${brand.brand.toLowerCase()} ${brand.version}`)
-          .join(" ")
+        .map((brand) => `${brand.brand.toLowerCase()} ${brand.version}`)
+        .join(" ")
       : navigator.userAgent.toLowerCase()
     : "some useragent";
   const platform = isNavigatorDefined
@@ -1510,9 +1510,9 @@
     return duration;
   }
 
-  function logInfo(...args) {}
-  function logWarn(...args) {}
-  function logAssert(...args) {}
+  function logInfo(...args) { }
+  function logWarn(...args) { }
+  function logAssert(...args) { }
   function ASSERT(description, condition) {
     if (!condition) {
       logAssert(description);
@@ -1871,9 +1871,9 @@
   ];
   const shorthandVarDepPropRegexps = isSafari
     ? shorthandVarDependantProperties.map((prop) => {
-        const regexp = new RegExp(`${prop}:\\s*(.*?)\\s*;`);
-        return [prop, regexp];
-      })
+      const regexp = new RegExp(`${prop}:\\s*(.*?)\\s*;`);
+      return [prop, regexp];
+    })
     : null;
   function iterateCSSDeclarations(style, iterate) {
     forEach(style, (property) => {
@@ -2190,7 +2190,9 @@
     if (!tintRGB) {
       return hsl;
     }
-    const strength = Math.min(100, Math.max(0, tintStrength)) / 100;
+    // Scale strength by the saturation of the tint color
+    // If the color is close to center (low saturation), the effect will be weaker
+    const strength = (Math.min(100, Math.max(0, tintStrength)) / 100) * tintRGB.s;
     let hueDiff = tintRGB.h - hsl.h;
     if (hueDiff > 180) {
       hueDiff -= 360;
@@ -2205,6 +2207,47 @@
     const lightnessDiff = tintRGB.l - hsl.l;
     const newLightness = hsl.l + lightnessDiff * strength * 0.2;
     const finalLightness = Math.min(1, Math.max(0, newLightness));
+    return {
+      h: finalHue,
+      s: finalSaturation,
+      l: finalLightness,
+      a: hsl.a,
+    };
+  }
+  function applyTintOnly(hsl, tintColor, tintStrength) {
+    if (!tintColor || tintStrength <= 0) {
+      return hsl;
+    }
+    const tintRGB = parseToHSLWithCache(tintColor);
+    if (!tintRGB) {
+      return hsl;
+    }
+    // Scale strength by the saturation of the tint color
+    const strength = (Math.min(100, Math.max(0, tintStrength)) / 100) * tintRGB.s;
+
+    // Hue
+    let hueDiff = tintRGB.h - hsl.h;
+    if (hueDiff > 180) hueDiff -= 360;
+    else if (hueDiff < -180) hueDiff += 360;
+    const newHue = (hsl.h + hueDiff * strength) % 360;
+    const finalHue = newHue < 0 ? newHue + 360 : newHue;
+
+    // Saturation - STRONGER
+    const saturationDiff = tintRGB.s - hsl.s;
+    const newSaturation = hsl.s + saturationDiff * strength * 1.0;
+    const finalSaturation = Math.min(1, Math.max(0, newSaturation));
+
+    // Lightness - STRONGER
+    let finalLightness = hsl.l;
+    if (hsl.l > 0.5) {
+      const lightnessDiff = tintRGB.l - hsl.l;
+      finalLightness = hsl.l + lightnessDiff * strength * 0.8;
+    } else {
+      const lightnessDiff = tintRGB.l - hsl.l;
+      finalLightness = hsl.l + lightnessDiff * strength * 0.3;
+    }
+    finalLightness = Math.min(1, Math.max(0, finalLightness));
+
     return {
       h: finalHue,
       s: finalSaturation,
@@ -2236,7 +2279,11 @@
       anotherPoleColor == null ? null : parseToHSLWithCache(anotherPoleColor);
     let modified = modifyHSL(hsl, pole, anotherPole);
     if (theme.tintColor && theme.tintStrength > 0) {
-      modified = applyTint(modified, theme.tintColor, theme.tintStrength);
+      if (theme.mode === 2) {
+        modified = applyTintOnly(modified, theme.tintColor, theme.tintStrength);
+      } else {
+        modified = applyTint(modified, theme.tintColor, theme.tintStrength);
+      }
     }
     const { r, g, b, a } = hslToRGB(modified);
     const matrix = createFilterMatrix({ ...theme, mode: 0 });
@@ -2319,9 +2366,16 @@
     }
     return { h: hx, s, l: lx, a };
   }
+  function modifyTintHSL({ h, s, l, a }, poleFg, poleBg) {
+    return { h, s, l, a };
+  }
   function _modifyBackgroundColor(rgb, theme) {
     if (theme.mode === 0) {
       return modifyLightSchemeColor(rgb, theme);
+    }
+    if (theme.mode === 2) {
+      const pole = getBgPole(theme);
+      return modifyColorWithCache(rgb, theme, modifyTintHSL, pole);
     }
     const pole = getBgPole(theme);
     return modifyColorWithCache(rgb, theme, modifyBgHSL, pole);
@@ -2348,39 +2402,26 @@
   function modifyFgHSL({ h, s, l, a }, pole) {
     const isLight = l > 0.5;
     const isNeutral = l < 0.2 || s < 0.24;
-    const isBlue = !isNeutral && h > 205 && h < 245;
-    if (isLight) {
-      const lx = scale(l, 0.5, 1, MIN_FG_LIGHTNESS, pole.l);
-      if (isNeutral) {
-        const hx = pole.h;
-        const sx = pole.s;
-        return { h: hx, s: sx, l: lx, a };
-      }
-      let hx = h;
-      if (isBlue) {
-        hx = modifyBlueFgHue(h);
-      }
-      return { h: hx, s, l: lx, a };
-    }
-    if (isNeutral) {
-      const hx = pole.h;
-      const sx = pole.s;
-      const lx = scale(l, 0, 0.5, pole.l, MIN_FG_LIGHTNESS);
-      return { h: hx, s: sx, l: lx, a };
-    }
     let hx = h;
-    let lx;
-    if (isBlue) {
-      hx = modifyBlueFgHue(h);
-      lx = scale(l, 0, 0.5, pole.l, Math.min(1, MIN_FG_LIGHTNESS + 0.05));
+    let sx = s;
+    let lx = l;
+    if (isLight && isNeutral) {
+      if (s > 0.05) {
+        sx = 0.05;
+      }
+      lx = scale(l, 0.5, 1, MIN_FG_LIGHTNESS, pole.l);
     } else {
-      lx = scale(l, 0, 0.5, pole.l, MIN_FG_LIGHTNESS);
+      lx = scale(l, 0, 1, MIN_FG_LIGHTNESS, pole.l);
     }
-    return { h: hx, s, l: lx, a };
+    return { h: hx, s: sx, l: lx, a };
   }
   function _modifyForegroundColor(rgb, theme) {
     if (theme.mode === 0) {
       return modifyLightSchemeColor(rgb, theme);
+    }
+    if (theme.mode === 2) {
+      const pole = getFgPole(theme);
+      return modifyColorWithCache(rgb, theme, modifyTintHSL, pole);
     }
     const pole = getFgPole(theme);
     return modifyColorWithCache(rgb, theme, modifyFgHSL, pole);
@@ -2415,6 +2456,11 @@
   function _modifyBorderColor(rgb, theme) {
     if (theme.mode === 0) {
       return modifyLightSchemeColor(rgb, theme);
+    }
+    if (theme.mode === 2) {
+      const poleFg = getFgPole(theme);
+      const poleBg = getBgPole(theme);
+      return modifyColorWithCache(rgb, theme, modifyTintHSL, poleFg, poleBg);
     }
     const poleFg = getFgPole(theme);
     const poleBg = getBgPole(theme);
@@ -2510,7 +2556,7 @@
             json,
           );
           cachedImageUrls.push(url);
-        } catch (err) {}
+        } catch (err) { }
       }
     });
     imageDetailsCacheQueue.clear();
@@ -2543,19 +2589,19 @@
           targetMap.set(url, details);
         }
       });
-    } catch (err) {}
+    } catch (err) { }
   }
   function writeCSSFetchCache(url, cssText) {
     const key = `${STORAGE_KEY_CSS_FETCH_PREFIX}${url}`;
     try {
       sessionStorage.setItem(key, cssText);
-    } catch (err) {}
+    } catch (err) { }
   }
   function readCSSFetchCache(url) {
     const key = `${STORAGE_KEY_CSS_FETCH_PREFIX}${url}`;
     try {
       return sessionStorage.getItem(key) ?? null;
-    } catch (err) {}
+    } catch (err) { }
     return null;
   }
 
@@ -4003,8 +4049,8 @@
       this.definedVars.add(varName);
       const isColor = Boolean(
         value.match(rawRGBSpaceRegex) ||
-          value.match(rawRGBCommaRegex) ||
-          parseColorWithCache(value),
+        value.match(rawRGBCommaRegex) ||
+        parseColorWithCache(value),
       );
       if (isColor) {
         this.unknownColorVars.add(varName);
@@ -4076,8 +4122,8 @@
                 this.isVarType(
                   ref,
                   VAR_TYPE_BG_COLOR |
-                    VAR_TYPE_TEXT_COLOR |
-                    VAR_TYPE_BORDER_COLOR,
+                  VAR_TYPE_TEXT_COLOR |
+                  VAR_TYPE_BORDER_COLOR,
                 )
               );
             }) != null;
@@ -5347,8 +5393,8 @@
     }
     const shouldAnalyze = Boolean(
       svg &&
-        (svg.getAttribute("class")?.includes("logo") ||
-          svg.parentElement?.getAttribute("class")?.includes("logo")),
+      (svg.getAttribute("class")?.includes("logo") ||
+        svg.parentElement?.getAttribute("class")?.includes("logo")),
     );
     svgAnalysisConditionCache.set(svg, shouldAnalyze);
     return shouldAnalyze;
@@ -6025,7 +6071,7 @@
               fullCSSText,
               inMode === "next"
                 ? (cc) =>
-                    element.parentNode.insertBefore(cc, element.nextSibling)
+                  element.parentNode.insertBefore(cc, element.nextSibling)
                 : injectStyleAway,
             );
             if (corsCopy) {

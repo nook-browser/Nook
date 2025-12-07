@@ -127,7 +127,7 @@ class MacButtonsViewModel {
 
 struct MacButtonsView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    let viewModel = MacButtonsViewModel()
+    @State private var viewModel = MacButtonsViewModel()
 
     var body: some View {
         GeometryReader { geometry in
