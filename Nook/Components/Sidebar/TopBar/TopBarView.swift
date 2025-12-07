@@ -564,7 +564,7 @@ struct ChatButton: View {
     
     private var backgroundColor: Color {
         let isDark = browserManager.tabManager.currentTab?.topBarBackgroundColor?.isPerceivedDark == true
-        if(isHovered) {
+        if isHovered {
             return isDark ? .white.opacity(0.15) : .black.opacity(0.1)
         } else {
             return isDark ? .white.opacity(0.1) : .black.opacity(0.05)
