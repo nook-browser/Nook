@@ -147,7 +147,7 @@ struct SpaceTab: View {
         .contextMenu {
             Options()
         }
-        .shadow(color: isActive ? shadowColor : Color.clear, radius: isActive ? 1 : 0, y: 2)
+        .shadow(color: isActive ? shadowColor : Color.clear, radius: isActive ? 2 : 0, y: 1.5)
     }
     
     @ViewBuilder
