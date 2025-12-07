@@ -60,7 +60,7 @@ class DialogManager {
                                 radius: 0.5,
                                 y: 1
                             )
-                        Text("Are you sure your want to quit Nook?")
+                        Text("Are you sure you want to quit Nook?")
                             .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(.white)
                         Text("You may lose unsaved work in your tabs.")
