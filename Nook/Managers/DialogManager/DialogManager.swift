@@ -5,8 +5,8 @@
 //  Created by Maciek Bagiński on 04/08/2025.
 //
 
-import SwiftUI
 import Observation
+import SwiftUI
 import UniversalGlass
 
 @MainActor
@@ -40,18 +40,34 @@ class DialogManager {
 
     // MARK: - Convenience Dialogs
 
-    func showQuitDialog(onAlwaysQuit: @escaping () -> Void, onQuit: @escaping () -> Void) {
+    func showQuitDialog(
+        onAlwaysQuit: @escaping () -> Void,
+        onQuit: @escaping () -> Void
+    ) {
         showDialog {
             StandardDialog(
                 header: {
-                    DialogHeader(
-                        icon: "xmark.circle",
-                        title: "Are you sure you want to quit Nook?",
-                        subtitle: "You may lose unsaved work in your tabs."
-                    )
+                    EmptyView()
                 },
                 content: {
-                    EmptyView()
+                    VStack(alignment: .leading, spacing: 20) {
+                        Image("nook-logo-1024")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 26, height: 26)
+                            .shadow(
+                                color: .white.opacity(0.3),
+                                radius: 0.5,
+                                y: 1
+                            )
+                        Text("Are you sure your want to quit Nook?")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(.white)
+                        Text("You may lose unsaved work in your tabs.")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.8))
+                    }
+                    .padding(10)
                 },
                 footer: {
                     DialogFooter(
@@ -68,10 +84,10 @@ class DialogManager {
                             ),
                             DialogButton(
                                 text: "Quit",
-                                iconName: "arrowshape.turn.up.left.fill",
+                                iconName: "return",
                                 variant: .primary,
                                 action: onQuit
-                            )
+                            ),
                         ]
                     )
                 }
@@ -86,12 +102,20 @@ protocol DialogPresentable: View {
     @ViewBuilder func dialogHeader() -> DialogHeader
     @ViewBuilder func dialogContent() -> DialogContent
     @ViewBuilder func dialogFooter() -> DialogFooter
-    @ViewBuilder func dialogChrome(header: DialogHeader, content: DialogContent, footer: DialogFooter) -> AnyView
+    @ViewBuilder func dialogChrome(
+        header: DialogHeader,
+        content: DialogContent,
+        footer: DialogFooter
+    ) -> AnyView
 }
 
 extension DialogPresentable {
     @ViewBuilder
-    func dialogChrome(header: DialogHeader, content: DialogContent, footer: DialogFooter) -> AnyView {
+    func dialogChrome(
+        header: DialogHeader,
+        content: DialogContent,
+        footer: DialogFooter
+    ) -> AnyView {
         AnyView(
             StandardDialog(
                 header: { header },
@@ -122,9 +146,13 @@ struct DialogCard<Content: View>: View {
         content
             .padding(16)
             .frame(maxWidth: 500, alignment: .leading)
-            .background(Color(.windowBackgroundColor).opacity(0.35), in: .rect(cornerRadius: 26))
-            .universalGlassEffect(.regular.tint(Color(.windowBackgroundColor).opacity(0.35)), in: .rect(cornerRadius: 26))
-            .alwaysArrowCursor()
+            .background(BlurEffectView(material: .headerView, state: .active))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(.white.opacity(0.25), lineWidth: 1)
+            }
+            .shadow(color: .black, radius: 1, y: 0)
     }
 }
 
@@ -152,19 +180,19 @@ struct StandardDialog<Header: View, Content: View, Footer: View>: View {
         DialogCard {
             VStack(alignment: .leading, spacing: 25) {
                 if let header {
-                    
+
                     header
                 }
-                
+
                 content
-                
+
                 if let footer {
                     VStack(alignment: .leading, spacing: 15) {
-//                        Divider()
+                        //                        Divider()
                         footer
                     }
                 }
-                
+
             }
         }
     }
@@ -187,12 +215,19 @@ struct DialogHeader: View {
             ZStack {
                 Circle()
                     .fill(gradientColorManager.primaryColor.opacity(0.1))
-                    .universalGlassEffect(.clear.tint(gradientColorManager.primaryColor.opacity(0.2)))
+                    .universalGlassEffect(
+                        .clear.tint(
+                            gradientColorManager.primaryColor.opacity(0.2)
+                        )
+                    )
                     .frame(width: 48, height: 48)
 
                 Image(systemName: icon)
                     .font(.system(size: 25, weight: .semibold))
-                    .foregroundStyle(gradientColorManager.primaryColor).frame(width: 48, height: 48)
+                    .foregroundStyle(gradientColorManager.primaryColor).frame(
+                        width: 48,
+                        height: 48
+                    )
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -227,30 +262,60 @@ struct DialogFooter: View {
         HStack {
             if let leftButton = leftButton {
                 if let iconName = leftButton.iconName {
-                    Button(leftButton.text, systemImage: iconName, action: leftButton.action)
+                    Button(leftButton.text, action: leftButton.action)
                         .buttonStyle(
-                            .universalGlass()
+                            DialogButtonStyle(
+                                variant: leftButton.variant,
+                                icon: leftButton.iconName.map {
+                                    AnyView(Image(systemName: $0))
+                                },
+                                iconPosition: .trailing
+                            )
                         )
-                        .conditionally(if: OSVersion.supportsGlassEffect){ View in
+                        .conditionally(if: OSVersion.supportsGlassEffect) {
+                            View in
                             View
-                                .tint(Color("plainBackgroundColor").opacity(colorScheme == .light ? 0.8 : 0.4))
+                                .tint(
+                                    Color("plainBackgroundColor").opacity(
+                                        colorScheme == .light ? 0.8 : 0.4
+                                    )
+                                )
                         }
                         .controlSize(.extraLarge)
-                    
+
                         .disabled(!leftButton.isEnabled)
-                        .modifier(OptionalKeyboardShortcut(shortcut: leftButton.keyboardShortcut))
+                        .modifier(
+                            OptionalKeyboardShortcut(
+                                shortcut: leftButton.keyboardShortcut
+                            )
+                        )
                 } else {
                     Button(leftButton.text, action: leftButton.action)
                         .buttonStyle(
-                            .universalGlass()
+                            DialogButtonStyle(
+                                variant: leftButton.variant,
+                                icon: leftButton.iconName.map {
+                                    AnyView(Image(systemName: $0))
+                                },
+                                iconPosition: .trailing
+                            )
                         )
-                        .conditionally(if: OSVersion.supportsGlassEffect){ View in
+                        .conditionally(if: OSVersion.supportsGlassEffect) {
+                            View in
                             View
-                                .tint(Color("plainBackgroundColor").opacity(colorScheme == .light ? 0.8 : 0.4))
+                                .tint(
+                                    Color("plainBackgroundColor").opacity(
+                                        colorScheme == .light ? 0.8 : 0.4
+                                    )
+                                )
                         }
                         .controlSize(.extraLarge)
                         .disabled(!leftButton.isEnabled)
-                        .modifier(OptionalKeyboardShortcut(shortcut: leftButton.keyboardShortcut))
+                        .modifier(
+                            OptionalKeyboardShortcut(
+                                shortcut: leftButton.keyboardShortcut
+                            )
+                        )
                 }
             }
 
@@ -260,28 +325,23 @@ struct DialogFooter: View {
                 ForEach(Array(rightButtons.indices), id: \.self) { index in
                     let button = rightButtons[index]
 
-                    if let iconName = button.iconName {
-                        Button(button.text, systemImage: iconName, action: button.action)
-                            .buttonStyle(
-                                .universalGlassProminent()
+                    Button(button.text, action: button.action)
+                        .buttonStyle(
+                            DialogButtonStyle(
+                                variant: button.variant,
+                                icon: button.iconName.map {
+                                    AnyView(Image(systemName: $0))
+                                },
+                                iconPosition: .trailing
                             )
-                            .tint(gradientColorManager.primaryColor)
-                            .controlSize(.extraLarge)
-                            .disabled(!button.isEnabled)
-                            .modifier(OptionalKeyboardShortcut(shortcut: button.keyboardShortcut))
-                    } else {
-                        Button(button.text, action: button.action)
-                            .buttonStyle(
-                                .universalGlass()
+                        )
+                        .controlSize(.extraLarge)
+                        .disabled(!button.isEnabled)
+                        .modifier(
+                            OptionalKeyboardShortcut(
+                                shortcut: button.keyboardShortcut
                             )
-                            .conditionally(if: OSVersion.supportsGlassEffect){ View in
-                                View
-                                    .tint(Color("plainBackgroundColor").opacity(colorScheme == .light ? 0.8 : 0.4))
-                            }
-                            .controlSize(.extraLarge)
-                            .disabled(!button.isEnabled)
-                            .modifier(OptionalKeyboardShortcut(shortcut: button.keyboardShortcut))
-                    }
+                        )
                 }
             }
         }
@@ -291,7 +351,7 @@ struct DialogFooter: View {
 struct DialogButton {
     let text: String
     let iconName: String?
-    let variant: NookButtonStyle.Variant
+    let variant: DialogButtonStyleVariant
     let action: () -> Void
     let keyboardShortcut: KeyEquivalent?
     let shadowStyle: NookButtonStyle.ShadowStyle
@@ -300,7 +360,7 @@ struct DialogButton {
     init(
         text: String,
         iconName: String? = nil,
-        variant: NookButtonStyle.Variant = .primary,
+        variant: DialogButtonStyleVariant = .secondary,
         keyboardShortcut: KeyEquivalent? = nil,
         shadowStyle: NookButtonStyle.ShadowStyle = .subtle,
         isEnabled: Bool = true,
@@ -328,63 +388,64 @@ struct OptionalKeyboardShortcut: ViewModifier {
     }
 }
 
+enum DialogButtonStyleVariant {
+    case primary
+    case secondary
+    case danger
+}
 
-#if DEBUG
-struct DialogManagerPreviewSurface: View {
+struct DialogButtonStyle: ButtonStyle {
+    var variant: DialogButtonStyleVariant = .primary
+    var icon: AnyView?
+    var iconPosition: IconPosition = .trailing
 
-    var body: some View {
-        StandardDialog(
-            header: {
-                DialogHeader(
-                    icon: "sparkles",
-                    title: "Sample Dialog",
-                    subtitle: "Use this preview to adjust spacing, typography, and surfaces"
-                )
-            },
-            content: {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("This is placeholder body copy to demonstrate wrapping, spacing, and text styles in the dialog. Replace this with your own content.")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.horizontal, 4)
-            },
-            footer: {
-                DialogFooter(
-                    leftButton: DialogButton(
-                        text: "Learn More",
-                        iconName: "book",
-                        variant: .secondary,
-                        action: {}
-                    ),
-                    rightButtons: [
-                        DialogButton(
-                            text: "Close",
-                            variant: .secondary,
-                            action: {}
-                        ),
-                        DialogButton(
-                            text: "OK",
-                            iconName: "checkmark",
-                            variant: .primary,
-                            action: {}
-                        )
-                    ]
-                )
+    enum IconPosition {
+        case leading, trailing
+    }
+
+    private let padding = EdgeInsets(
+        top: 10,
+        leading: 16,
+        bottom: 10,
+        trailing: 16
+    )
+    private let cornerRadius: CGFloat = 10
+
+    private var backgroundColor: Color {
+        switch variant {
+        case .primary: return Color(hex: "DDDDDD")
+        case .secondary: return .white.opacity(0.07)
+        case .danger: return Color(hex: "F60000")
+        }
+    }
+
+    private var foregroundColor: Color {
+        switch variant {
+        case .primary: return .black
+        case .secondary: return .white
+        case .danger: return .white
+        }
+    }
+
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 8) {
+            if iconPosition == .leading, let icon = icon {
+                icon
             }
-        )
-        .padding(32)
-        .background(
-            Image("tulips").resizable().scaledToFill()
-            .ignoresSafeArea()
-        )
+
+            configuration.label
+                .font(.system(size: 13, weight: .medium))
+
+            if iconPosition == .trailing, let icon = icon {
+                icon
+            }
+        }
+        .padding(padding)
+        .background(backgroundColor)
+        .foregroundColor(foregroundColor)
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+        .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+        .opacity(configuration.isPressed ? 0.8 : 1.0)
+        .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
     }
 }
-
-#Preview("Dialog Example") {
-    DialogManagerPreviewSurface()
-        .environmentObject(GradientColorManager())
-}
-#endif
-
