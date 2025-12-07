@@ -6,8 +6,11 @@ final class GradientColorManager: ObservableObject {
     @Published var displayGradient: SpaceGradient = .default
     @Published private(set) var isEditing: Bool = false
     @Published var isAnimating: Bool = false
-    @Published var isDark: Bool = false
     private var animationToken: UUID?
+    
+    var isDark: Bool {
+        !displayGradient.primaryColor.isPerceivedDark
+    }
 
     // Animation state management
     @Published var preferBarycentricDuringAnimation: Bool = false

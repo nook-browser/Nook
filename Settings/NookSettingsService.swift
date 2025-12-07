@@ -35,6 +35,8 @@ class NookSettingsService {
     private let webSearchMaxResultsKey = "settings.webSearchMaxResults"
     private let webSearchContextSizeKey = "settings.webSearchContextSize"
     private let showLinkStatusBarKey = "settings.showLinkStatusBar"
+    private let pinnedTabsLookKey = "settings.pinnedTabsLook"
+    
     var currentSettingsTab: SettingsTabs = .general
 
     var currentMaterialRaw: Int {
@@ -179,6 +181,12 @@ class NookSettingsService {
             userDefaults.set(showLinkStatusBar, forKey: showLinkStatusBarKey)
         }
     }
+    
+    var pinnedTabsLook: PinnedTabsConfiguration {
+        didSet {
+            userDefaults.set(pinnedTabsLook, forKey: pinnedTabsLookKey)
+        }
+    }
 
     init() {
         // Register default values
@@ -205,7 +213,9 @@ class NookSettingsService {
             webSearchEngineKey: "auto",
             webSearchMaxResultsKey: 5,
             webSearchContextSizeKey: "medium",
-            showLinkStatusBarKey: true
+            showLinkStatusBarKey: true,
+            pinnedTabsLookKey: "large",
+            
         ])
 
         // Initialize properties from UserDefaults
@@ -246,7 +256,7 @@ class NookSettingsService {
         self.webSearchMaxResults = userDefaults.integer(forKey: webSearchMaxResultsKey)
         self.webSearchContextSize = userDefaults.string(forKey: webSearchContextSizeKey) ?? "medium"
         self.showLinkStatusBar = userDefaults.bool(forKey: showLinkStatusBarKey)
-    }
+        self.pinnedTabsLook = PinnedTabsConfiguration(rawValue: userDefaults.string(forKey: pinnedTabsLookKey) ?? "large") ?? .large }
 }
 
 // MARK: - AI Provider

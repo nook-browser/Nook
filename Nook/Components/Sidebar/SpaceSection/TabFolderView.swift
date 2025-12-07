@@ -127,16 +127,6 @@ struct TabFolderView: View {
 
                 Spacer()
 
-                // Tab count badge
-                if !tabsInFolder.isEmpty {
-                    Text("\(tabsInFolder.count)")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white)
-                        .frame(width: 18, height: 18)
-                        .background(Color(space.gradient.primaryColor).opacity(0.8))
-                        .clipShape(Circle())
-                }
-
                 // Context menu button
                 if isHovering && !isRenaming {
                     Menu {
@@ -264,7 +254,7 @@ struct TabFolderView: View {
             onClose: { browserManager.tabManager.removeTab(tab.id) },
             onMute: { tab.toggleMute() }
         )
-        .padding(.leading, 20)
+        .padding(.leading, 12)
         .transition(.move(edge: .top).combined(with: .opacity))
         .contextMenu {
             folderTabContextMenu(tab)

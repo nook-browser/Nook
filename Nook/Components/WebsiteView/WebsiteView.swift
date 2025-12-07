@@ -23,12 +23,12 @@ struct LinkStatusBar: View {
         // Show the view if we have a link to display (current or last shown)
         if let link = displayedLink, !link.isEmpty {
             Text(displayText(for: link))
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundColor(textColor)
                 .lineLimit(1)
                 .padding(.horizontal, 7)
-                .padding(.vertical, 5)
-                .background(backgroundColor)
+                .padding(.vertical, 4)
+                .background(.ultraThickMaterial)
                 .clipShape(RoundedRectangle(cornerRadius: 999))
                 .overlay(
                     RoundedRectangle(cornerRadius: 999)
@@ -36,7 +36,7 @@ struct LinkStatusBar: View {
                 )
                 .opacity(shouldShow ? 1 : 0)
                 .animation(.easeOut(duration: 0.25), value: shouldShow)
-                .onChange(of: hoveredLink) { newLink in
+                .onChange(of: hoveredLink) {_,  newLink in
                     handleHoverChange(newLink: newLink)
                 }
                 .onAppear {
@@ -50,7 +50,7 @@ struct LinkStatusBar: View {
                 }
         } else {
             Color.clear
-                .onChange(of: hoveredLink) { newLink in
+                .onChange(of: hoveredLink) {_,  newLink in
                     handleHoverChange(newLink: newLink)
                 }
         }
@@ -174,9 +174,9 @@ struct WebsiteView: View {
 
     private var cornerRadius: CGFloat {
         if #available(macOS 26.0, *) {
-            return 12
+            return 8
         } else {
-            return 6
+            return 8
         }
     }
     

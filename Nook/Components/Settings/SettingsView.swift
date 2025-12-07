@@ -27,7 +27,7 @@ private struct SettingsContent: View {
     var body: some View {
         TabView(selection: $nookSettings.currentSettingsTab) {
             SettingsPane {
-                GeneralSettingsView()
+                SettingsGeneralTab()
             }
             .tabItem {
                 Label(
@@ -36,6 +36,16 @@ private struct SettingsContent: View {
                 )
             }
             .tag(SettingsTabs.general)
+            SettingsPane {
+                SettingsAppearanceTab()
+            }
+            .tabItem {
+                Label(
+                    SettingsTabs.appearance.name,
+                    systemImage: SettingsTabs.appearance.icon
+                )
+            }
+            .tag(SettingsTabs.appearance)
 
             SettingsPane {
                 PrivacySettingsView()
@@ -125,8 +135,8 @@ private struct SettingsPane<Content: View>: View {
     init(@ViewBuilder content: () -> Content) {
         self.content = content()
     }
-    private let fixedHeight: CGFloat = 620
-    private let minWidth: CGFloat = 760
+    private let fixedHeight: CGFloat = 500
+    private let minWidth: CGFloat = 500
 
     var body: some View {
         ScrollView {
@@ -137,7 +147,7 @@ private struct SettingsPane<Content: View>: View {
             .padding(20)
         }
         .scrollIndicators(.automatic)
-        .frame(minWidth: minWidth)
+        .frame(minWidth: minWidth, maxWidth: 675)
         .frame(
             minHeight: fixedHeight,
             idealHeight: fixedHeight,
@@ -180,24 +190,41 @@ struct GeneralSettingsView: View {
                         title: "Appearance",
                         subtitle: "Window materials and visual style"
                     ) {
-                        HStack(alignment: .firstTextBaseline) {
-                            Text("Background Material")
-                            Spacer()
-                            Picker(
-                                "Background Material",
-                                selection: $settings
-                                    .currentMaterialRaw
-                            ) {
-                                ForEach(materials, id: \.value.rawValue) {
-                                    material in
-                                    Text(material.name).tag(
-                                        material.value.rawValue
-                                    )
+                        VStack{
+                            HStack(alignment: .firstTextBaseline) {
+                                Text("Background Material")
+                                Spacer()
+                                Picker(
+                                    "Background Material",
+                                    selection: $settings
+                                        .currentMaterialRaw
+                                ) {
+                                    ForEach(materials, id: \.value.rawValue) {
+                                        material in
+                                        Text(material.name).tag(
+                                            material.value.rawValue
+                                        )
+                                    }
                                 }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .frame(width: 220)
                             }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-                            .frame(width: 220)
+                            HStack(alignment: .firstTextBaseline) {
+                                Text("Pinned Tabs Look")
+                                Spacer()
+                                Picker(
+                                    "pinned tabs",
+                                    selection: $settings.pinnedTabsLook
+                                ) {
+                                    ForEach(PinnedTabsConfiguration.allCases) { config in
+                                        Text(config.name).tag(config)
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .frame(width: 220)
+                            }
                         }
 
                         Divider().opacity(0.4)

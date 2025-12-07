@@ -39,13 +39,14 @@ struct SpacesListItem: View {
 
     var body: some View {
         Button {
-            withAnimation(.easeOut(duration: 0.2)) {
+            withAnimation(.easeOut(duration: 0.1)) {
                 browserManager.setActiveSpace(space, in: windowState)
             }
         } label: {
             spaceIcon
                 .opacity(isActive ? 1.0 : 0.7)
                 .frame(maxWidth: .infinity)
+
         }
         .labelStyle(.iconOnly)
         .buttonStyle(SpaceListItemButtonStyle())
@@ -75,11 +76,15 @@ struct SpacesListItem: View {
             // Normal mode: show icon or emoji
             if isEmoji(space.icon) {
                 Text(space.icon)
+                    .conditionally(if: !isActive, apply: { view in
+                        view.colorMultiply(.gray).blendMode(.luminosity)
+                    })
                     .background(EmojiPickerAnchor(manager: emojiManager))
                     .onChange(of: emojiManager.selectedEmoji) { _, newValue in
                         space.icon = newValue
                         browserManager.tabManager.persistSnapshot()
                     }
+
             } else {
                 Image(systemName: space.icon)
                     .foregroundStyle(iconColor)

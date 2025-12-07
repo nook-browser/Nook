@@ -21,6 +21,7 @@
 		360021442EC6EC7F0016A41E /* Motion in Frameworks */ = {isa = PBXBuildFile; productRef = 360021432EC6EC7F0016A41E /* Motion */; };
 		564997D82E9B24CC00D89F78 /* Garnish in Frameworks */ = {isa = PBXBuildFile; productRef = 564997D72E9B24CC00D89F78 /* Garnish */; };
 		7FAFC5DA2E3ADDCD009D7DC4 /* FaviconFinder in Frameworks */ = {isa = PBXBuildFile; productRef = 7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */; };
+		7FE9E0EB2EE59D3500584E16 /* ColorfulX in Frameworks */ = {isa = PBXBuildFile; productRef = 7FE9E0EA2EE59D3500584E16 /* ColorfulX */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -117,6 +118,7 @@
 				564997D82E9B24CC00D89F78 /* Garnish in Frameworks */,
 				7FAFC5DA2E3ADDCD009D7DC4 /* FaviconFinder in Frameworks */,
 				360021302EC6EADB0016A41E /* RealModule in Frameworks */,
+				7FE9E0EB2EE59D3500584E16 /* ColorfulX in Frameworks */,
 				360021392EC6EC2F0016A41E /* Fuzi in Frameworks */,
 				2C16A0262E87430B0070894B /* Sparkle in Frameworks */,
 				360021362EC6EC150016A41E /* Highlightr in Frameworks */,
@@ -189,6 +191,7 @@
 				360021412EC6EC7F0016A41E /* Graphing */,
 				360021432EC6EC7F0016A41E /* Motion */,
 				2D0822D72EC8A61800C302AC /* UniversalGlass */,
+				7FE9E0EA2EE59D3500584E16 /* ColorfulX */,
 			);
 			productName = Pulse;
 			productReference = 7F8340FC2E37F39400674A5D /* Nook.app */;
@@ -230,6 +233,7 @@
 				3600213D2EC6EC710016A41E /* XCRemoteSwiftPackageReference "LRUCache" */,
 				360021402EC6EC7F0016A41E /* XCRemoteSwiftPackageReference "Motion" */,
 				2D0822D62EC8A61800C302AC /* XCRemoteSwiftPackageReference "universalglass" */,
+				7FE9E0E92EE59D3500584E16 /* XCRemoteSwiftPackageReference "ColorfulX" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7F8340FD2E37F39400674A5D /* Products */;
@@ -587,6 +591,14 @@
 				minimumVersion = 5.1.4;
 			};
 		};
+		7FE9E0E92EE59D3500584E16 /* XCRemoteSwiftPackageReference "ColorfulX" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Lakr233/ColorfulX.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.0.2;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -659,6 +671,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 7FAFC5D82E3ADDCD009D7DC4 /* XCRemoteSwiftPackageReference "FaviconFinder" */;
 			productName = FaviconFinder;
+		};
+		7FE9E0EA2EE59D3500584E16 /* ColorfulX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7FE9E0E92EE59D3500584E16 /* XCRemoteSwiftPackageReference "ColorfulX" */;
+			productName = ColorfulX;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
