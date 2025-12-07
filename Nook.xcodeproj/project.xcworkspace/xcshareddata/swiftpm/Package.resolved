@@ -1,6 +1,24 @@
 {
-  "originHash" : "ee6ba56fa92d8209bf89f941deadc8e113e950a5b9ba50f02b45c8dc9c9db736",
+  "originHash" : "6e4ae14e14eebaea684ee514acfeb7133a6f49e54ce087d811d35060ce492e16",
   "pins" : [
+    {
+      "identity" : "colorfulx",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Lakr233/ColorfulX.git",
+      "state" : {
+        "revision" : "2f008fcffc7f23811b2ba70eda77c57223815bc3",
+        "version" : "6.0.2"
+      }
+    },
+    {
+      "identity" : "colorvector",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Lakr233/ColorVector.git",
+      "state" : {
+        "revision" : "6da8726bf38d68eb943d0f2139ac2a1fac70e65b",
+        "version" : "1.0.4"
+      }
+    },
     {
       "identity" : "faviconfinder",
       "kind" : "remoteSourceControl",
@@ -56,6 +74,15 @@
       }
     },
     {
+      "identity" : "msdisplaylink",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Lakr233/MSDisplayLink.git",
+      "state" : {
+        "revision" : "ebf5823cb5fc1326639d9a05bc06d16bbe82989f",
+        "version" : "2.0.8"
+      }
+    },
+    {
       "identity" : "reeeed",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/nate-parrott/reeeed",
@@ -71,6 +98,15 @@
       "state" : {
         "revision" : "9a1d2a19d3595fcf8d9c447173f9a1687b3dcadb",
         "version" : "2.8.0"
+      }
+    },
+    {
+      "identity" : "springinterpolation",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Lakr233/SpringInterpolation.git",
+      "state" : {
+        "revision" : "cdb556516daa9b43c16aae9436dd39e19ff930fd",
+        "version" : "1.4.0"
       }
     },
     {
