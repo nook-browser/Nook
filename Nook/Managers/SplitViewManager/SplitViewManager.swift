@@ -1,9 +1,9 @@
 import SwiftUI
 
+
 @MainActor
 final class SplitViewManager: ObservableObject {
     enum Side { case left, right }
-
     // MARK: - State
     @Published var isSplit: Bool = false
     @Published var leftTabId: UUID? = nil
@@ -14,6 +14,7 @@ final class SplitViewManager: ObservableObject {
     // Preview state during drag-over of the web content
     @Published var isPreviewActive: Bool = false
     @Published var previewSide: Side? = nil
+    @Published var dragLocation: CGPoint? = nil // Track drag location for magnetic cards
 
     // Limits for divider movement
     let minFraction: CGFloat = 0.2
@@ -33,6 +34,7 @@ final class SplitViewManager: ObservableObject {
         var isPreviewActive: Bool = false
         var previewSide: Side? = nil
         var activeSide: Side? = nil
+        var dragLocation: CGPoint? = nil // Track drag location per window
     }
 
     init(browserManager: BrowserManager? = nil) {
@@ -46,7 +48,6 @@ final class SplitViewManager: ObservableObject {
         return windowSplitStates[windowId] ?? WindowSplitState()
     }
     
-    /// Set split state for a specific window
     /// Set split state for a specific window
     func setSplitState(_ state: WindowSplitState, for windowId: UUID) {
         objectWillChange.send()
@@ -98,6 +99,7 @@ final class SplitViewManager: ObservableObject {
         isPreviewActive = state.isPreviewActive
         previewSide = state.previewSide
         activeSide = state.activeSide
+        dragLocation = state.dragLocation
     }
 
     func refreshPublishedState(for windowId: UUID) {
@@ -398,37 +400,51 @@ final class SplitViewManager: ObservableObject {
         endPreview(cancel: cancel, for: windowState.id)
     }
 
-    func beginPreview(side: Side, for windowId: UUID) {
+    func beginPreview(side: Side?, for windowId: UUID) {
         var state = getSplitState(for: windowId)
         state.previewSide = side
-        if !state.isSplit, let bm = browserManager, let windowState = bm.windowRegistry?.windows[windowId], let current = bm.currentTab(for: windowState) {
-            if side == .right {
-                state.leftTabId = current.id
-            } else {
-                state.rightTabId = current.id
-            }
-            state.isSplit = true
-        }
+
         state.isPreviewActive = true
         setSplitState(state, for: windowId)
-        withAnimation(.spring(response: 0.28, dampingFraction: 0.9)) {
-            setDividerFraction(0.5, for: windowId)
-        }
         if let windowState = browserManager?.windowRegistry?.windows[windowId] {
             browserManager?.refreshCompositor(for: windowState)
         }
+    }
+    
+    /// Update preview side when drag moves
+    func updatePreviewSide(_ side: Side?, for windowId: UUID) {
+        var state = getSplitState(for: windowId)
+        guard state.isPreviewActive else { return }
+        state.previewSide = side
+        setSplitState(state, for: windowId)
+    }
+    
+    /// Update drag location for magnetic card effect
+    func updateDragLocation(_ location: CGPoint?, for windowId: UUID) {
+        var state = getSplitState(for: windowId)
+        state.dragLocation = location
+        setSplitState(state, for: windowId)
+        // Also update published property if this is the active window
+        if windowRegistry?.activeWindow?.id == windowId {
+            dragLocation = location
+        }
+    }
+    
+    /// Get drag location for a specific window
+    func dragLocation(for windowId: UUID) -> CGPoint? {
+        return getSplitState(for: windowId).dragLocation
     }
 
     func endPreview(cancel: Bool, for windowId: UUID) {
         var state = getSplitState(for: windowId)
         state.isPreviewActive = false
         state.previewSide = nil
-        if cancel {
-            if state.leftTabId == nil || state.rightTabId == nil {
-                state.isSplit = false
-            }
-        }
+        state.dragLocation = nil // Clear drag location
         setSplitState(state, for: windowId)
+        // Clear published property if this is the active window
+        if windowRegistry?.activeWindow?.id == windowId {
+            dragLocation = nil
+        }
         if let windowState = browserManager?.windowRegistry?.windows[windowId] {
             browserManager?.refreshCompositor(for: windowState)
         }
