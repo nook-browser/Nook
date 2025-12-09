@@ -21,8 +21,8 @@ struct PinnedTabView: View {
     @State private var isHovered: Bool = false
 
     // Stroke overlay tunables
-    private let faviconScale: CGFloat = 10.0      // favicon scale to fit the ring
-    private let faviconBlur: CGFloat = 80.0      // blur applied to favicon
+    private let faviconScale: CGFloat = 6.0      // favicon scale to fit the ring
+    private let faviconBlur: CGFloat = 30.0      // blur applied to favicon
 
     var body: some View {
         let pinnedTabsConfiguration: PinnedTabsConfiguration = nookSettings.pinnedTabsLook
