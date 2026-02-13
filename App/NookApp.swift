@@ -41,7 +41,11 @@ struct NookApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .commands {
-            NookCommands(browserManager: browserManager, windowRegistry: windowRegistry)
+            NookCommands(
+                browserManager: browserManager,
+                windowRegistry: windowRegistry,
+                shortcutManager: keyboardShortcutManager
+            )
         }
 
         // Native macOS Settings window

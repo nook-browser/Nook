@@ -15,84 +15,73 @@ class KeyboardShortcutManager {
     private let userDefaults = UserDefaults.standard
     private let shortcutsKey = "keyboard.shortcuts"
     private let shortcutsVersionKey = "keyboard.shortcuts.version"
-    private let currentVersion = 3 // Increment when adding new shortcuts
+    private let currentVersion = 5 // Increment when adding new shortcuts
 
+    /// Hash-based storage for O(1) lookup: ["cmd+t": KeyboardShortcut]
+    private var shortcutMap: [String: KeyboardShortcut] = [:]
 
-    var shortcuts: [KeyboardShortcut] = []
+    /// All shortcuts for UI display (sorted by display name)
+    var shortcuts: [KeyboardShortcut] {
+        Array(shortcutMap.values).sorted { $0.action.displayName < $1.action.displayName }
+    }
+
     weak var browserManager: BrowserManager?
     weak var windowRegistry: WindowRegistry?
 
     init() {
-        print("🔧 [KeyboardShortcutManager] NEW INSTANCE CREATED: \(ObjectIdentifier(self))")
         loadShortcuts()
         setupGlobalMonitor()
     }
 
     func setBrowserManager(_ manager: BrowserManager) {
-        print("🔧 [KeyboardShortcutManager] setBrowserManager called")
         self.browserManager = manager
         self.windowRegistry = manager.windowRegistry
-        print("🔧 [KeyboardShortcutManager] browserManager set to: \(ObjectIdentifier(manager))")
-        print("🔧 [KeyboardShortcutManager] windowRegistry set to: \(String(describing: self.windowRegistry))")
     }
 
     // MARK: - Persistence
 
     private func loadShortcuts() {
         let savedVersion = userDefaults.integer(forKey: shortcutsVersionKey)
-        
+
         // Load from UserDefaults or use defaults
         if let data = userDefaults.data(forKey: shortcutsKey),
            let decoded = try? JSONDecoder().decode([KeyboardShortcut].self, from: data) {
-            self.shortcuts = decoded
-            print("🔧 [KeyboardShortcutManager] Loaded \(shortcuts.count) shortcuts from UserDefaults")
-            
+            // Populate hash map from loaded shortcuts
+            for shortcut in decoded {
+                shortcutMap[shortcut.lookupKey] = shortcut
+            }
+
             // Check if we need to merge new shortcuts
             if savedVersion < currentVersion {
-                print("🔧 [KeyboardShortcutManager] Version mismatch, merging defaults")
                 mergeWithDefaults()
                 userDefaults.set(currentVersion, forKey: shortcutsVersionKey)
             }
         } else {
-            print("🔧 [KeyboardShortcutManager] No saved shortcuts, using defaults")
-            self.shortcuts = KeyboardShortcut.defaultShortcuts
+            // Use defaults and populate hash map
+            let defaults = KeyboardShortcut.defaultShortcuts
+            for shortcut in defaults {
+                shortcutMap[shortcut.lookupKey] = shortcut
+            }
             userDefaults.set(currentVersion, forKey: shortcutsVersionKey)
             saveShortcuts()
         }
-        
-        // Print all loaded shortcuts for debugging
-        for shortcut in shortcuts {
-            if shortcut.action == .duplicateTab {
-                print("🔧 [KeyboardShortcutManager] Found duplicateTab shortcut: \(shortcut.keyCombination.displayString) - Enabled: \(shortcut.isEnabled)")
-            }
-        }
     }
-    
+
     private func mergeWithDefaults() {
         let defaultShortcuts = KeyboardShortcut.defaultShortcuts
         var needsUpdate = false
-        
-        // Force add duplicateTab shortcut if it doesn't exist
-        if let duplicateTabShortcut = defaultShortcuts.first(where: { $0.action == .duplicateTab }) {
-            if !shortcuts.contains(where: { $0.action == .duplicateTab }) {
-                shortcuts.append(duplicateTabShortcut)
-                needsUpdate = true
-                print("🔧 [KeyboardShortcutManager] Force added duplicateTab shortcut")
-            }
-        }
-        
+
         for defaultShortcut in defaultShortcuts {
-            // Check if this shortcut already exists
-            if !shortcuts.contains(where: { $0.action == defaultShortcut.action }) {
+            // Check if this shortcut already exists (by action)
+            if !shortcutMap.values.contains(where: { $0.action == defaultShortcut.action }) {
                 // Add missing shortcut
-                shortcuts.append(defaultShortcut)
+                shortcutMap[defaultShortcut.lookupKey] = defaultShortcut
                 needsUpdate = true
             }
         }
-        
+
         if needsUpdate {
             saveShortcuts()
-            print("🔧 [KeyboardShortcutManager] Updated shortcuts with new additions")
         }
     }
 
@@ -104,36 +93,58 @@ class KeyboardShortcutManager {
 
     // MARK: - Public Interface
 
+    /// O(1) lookup of shortcut by key combination
+    func shortcut(for keyCombination: KeyCombination) -> KeyboardShortcut? {
+        shortcutMap[keyCombination.lookupKey]
+    }
+
+    /// O(n) lookup of shortcut by action (for specific action queries)
     func shortcut(for action: ShortcutAction) -> KeyboardShortcut? {
-        return shortcuts.first { $0.action == action && $0.isEnabled }
+        shortcutMap.values.first { $0.action == action && $0.isEnabled }
     }
 
     func updateShortcut(action: ShortcutAction, keyCombination: KeyCombination) {
-        if let index = shortcuts.firstIndex(where: { $0.action == action }) {
-            shortcuts[index].keyCombination = keyCombination
+        // Remove old entry if exists
+        if let existing = shortcutMap.values.first(where: { $0.action == action }) {
+            shortcutMap.removeValue(forKey: existing.lookupKey)
+        }
+
+        // Create updated shortcut and add to map
+        if var shortcut = shortcutMap.values.first(where: { $0.action == action }) {
+            shortcut.keyCombination = keyCombination
+            shortcutMap[keyCombination.lookupKey] = shortcut
             saveShortcuts()
         }
     }
 
     func toggleShortcut(action: ShortcutAction, isEnabled: Bool) {
-        if let index = shortcuts.firstIndex(where: { $0.action == action }) {
-            shortcuts[index].isEnabled = isEnabled
+        if let key = shortcutMap.first(where: { $0.value.action == action })?.key,
+           var shortcut = shortcutMap[key] {
+            shortcut.isEnabled = isEnabled
+            shortcutMap[key] = shortcut
             saveShortcuts()
         }
     }
 
     func resetToDefaults() {
-        shortcuts = KeyboardShortcut.defaultShortcuts
+        shortcutMap.removeAll()
+        let defaults = KeyboardShortcut.defaultShortcuts
+        for shortcut in defaults {
+            shortcutMap[shortcut.lookupKey] = shortcut
+        }
         saveShortcuts()
     }
 
     // MARK: - Conflict Detection
 
     func hasConflict(keyCombination: KeyCombination, excludingAction: ShortcutAction? = nil) -> ShortcutAction? {
-        for shortcut in shortcuts where shortcut.isEnabled {
-            if shortcut.action != excludingAction && shortcut.keyCombination == keyCombination {
-                return shortcut.action
-            }
+        guard let shortcut = shortcutMap[keyCombination.lookupKey],
+              shortcut.isEnabled else {
+            return nil
+        }
+
+        if shortcut.action != excludingAction {
+            return shortcut.action
         }
         return nil
     }
@@ -157,34 +168,23 @@ class KeyboardShortcutManager {
     // MARK: - Shortcut Execution
 
     func executeShortcut(_ event: NSEvent) -> Bool {
-        let key = event.charactersIgnoringModifiers?.lowercased() ?? ""
-        let modifiers = event.modifierFlags
-        print("🔧 [KeyboardShortcutManager] Key pressed: '\(key)' with modifiers: \(modifiers)")
-        
-        for shortcut in shortcuts where shortcut.isEnabled {
-            print("🔧 [KeyboardShortcutManager] Checking shortcut: \(shortcut.action.displayName) - \(shortcut.keyCombination.displayString)")
-            if shortcut.keyCombination.matches(event) {
-                print("🔧 [KeyboardShortcutManager] Match found! Executing: \(shortcut.action.displayName)")
-                executeAction(shortcut.action)
-                return true
-            }
+        guard let keyCombination = KeyCombination(from: event) else { return false }
+
+        guard let shortcut = shortcutMap[keyCombination.lookupKey],
+              shortcut.isEnabled else {
+            return false
         }
-        return false
+
+        executeAction(shortcut.action)
+        return true
     }
 
     private func executeAction(_ action: ShortcutAction) {
-        print("🔧 [KeyboardShortcutManager] executeAction called with: \(action.rawValue)")
-        guard let browserManager = browserManager else {
-            print("🔧 [KeyboardShortcutManager] browserManager is nil!")
-            return
-        }
+        guard let browserManager = browserManager else { return }
 
         DispatchQueue.main.async { [weak self] in
-            guard let self else {
-                print("🔧 [KeyboardShortcutManager] self is nil in async!")
-                return
-            }
-            print("🔧 [KeyboardShortcutManager] About to switch on action: \(action.rawValue)")
+            guard let self else { return }
+
             switch action {
             // Navigation
             case .goBack:
@@ -199,7 +199,6 @@ class KeyboardShortcutManager {
 
             // Tab Management
             case .newTab:
-                print("⌨️ [KeyboardShortcutManager] .newTab triggered - activeWindow: \(String(describing: self.windowRegistry?.activeWindow?.id)), commandPalette: \(String(describing: self.windowRegistry?.activeWindow?.commandPalette))")
                 self.windowRegistry?.activeWindow?.commandPalette?.open()
             case .closeTab:
                 browserManager.closeCurrentTab()
@@ -215,7 +214,6 @@ class KeyboardShortcutManager {
             case .goToLastTab:
                 browserManager.selectLastTabInActiveWindow()
             case .duplicateTab:
-                print("🔧 [KeyboardShortcutManager] Executing duplicateTab")
                 browserManager.duplicateCurrentTab()
             case .toggleTopBarAddressView:
                 browserManager.toggleTopBarAddressView()
@@ -249,8 +247,39 @@ class KeyboardShortcutManager {
                 browserManager.copyCurrentURL()
             case .expandAllFolders:
                 browserManager.expandAllFoldersInSidebar()
-            case .toggleTopBarAddressView:
-                browserManager.toggleTopBarAddressView()
+
+            // NEW: Missing actions that were only in NookCommands
+            case .focusAddressBar:
+                let currentURL = browserManager.currentTabForActiveWindow()?.url.absoluteString ?? ""
+                self.windowRegistry?.activeWindow?.commandPalette?.open(prefill: currentURL, navigateCurrentTab: true)
+            case .findInPage:
+                browserManager.showFindBar()
+            case .zoomIn:
+                browserManager.zoomInCurrentTab()
+            case .zoomOut:
+                browserManager.zoomOutCurrentTab()
+            case .actualSize:
+                browserManager.resetZoomCurrentTab()
+
+            // NEW: Menu actions that were missing ShortcutAction definitions
+            case .toggleSidebar:
+                browserManager.toggleSidebar()
+            case .toggleAIAssistant:
+                browserManager.toggleAISidebar()
+            case .togglePictureInPicture:
+                browserManager.requestPiPForCurrentTabInActiveWindow()
+            case .copyCurrentURL:
+                browserManager.copyCurrentURL()
+            case .hardReload:
+                browserManager.hardReloadCurrentPage()
+            case .muteUnmuteAudio:
+                browserManager.toggleMuteCurrentTabInActiveWindow()
+            case .installExtension:
+                browserManager.showExtensionInstallDialog()
+            case .customizeSpaceGradient:
+                browserManager.showGradientEditor()
+            case .createBoost:
+                browserManager.showBoostsDialog()
             }
 
             NotificationCenter.default.post(
@@ -267,21 +296,14 @@ class KeyboardShortcutManager {
 
     private func setupGlobalMonitor() {
         let monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
-            if let self = self {
-                // Check if this is cmd+z for undo close tab
-                if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers?.lowercased() == "z" {
-                    if let shortcut = self.shortcut(for: .undoCloseTab), shortcut.isEnabled {
-                        self.executeAction(.undoCloseTab)
-                        return nil // Consume the event to prevent system sound
-                    }
-                }
+            guard let self = self else { return event }
 
-                // Check all other shortcuts
-                if self.executeShortcut(event) {
-                    return nil // Consume the event
-                }
+            // Try to execute shortcut - if handled, consume event
+            if self.executeShortcut(event) {
+                return nil // Consume the event
             }
-            return event
+
+            return event // Pass through
         }
         self.eventMonitor = monitor
     }
