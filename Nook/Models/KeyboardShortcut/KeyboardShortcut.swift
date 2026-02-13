@@ -23,6 +23,11 @@ struct KeyboardShortcut: Identifiable, Hashable, Codable {
         self.isEnabled = isEnabled
         self.isCustomizable = isCustomizable
     }
+
+    /// Unique hash for O(1) lookup: "cmd+shift+t"
+    var lookupKey: String {
+        keyCombination.lookupKey
+    }
 }
 
 // MARK: - Shortcut Actions
@@ -69,6 +74,24 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
     case copyLink = "copy_link"
     case expandAllFolders = "expand_all_folders"
 
+    // Missing actions that exist in NookCommands but not here
+    case focusAddressBar = "focus_address_bar"  // Cmd+L
+    case findInPage = "find_in_page"            // Cmd+F
+    case zoomIn = "zoom_in"                     // Cmd++
+    case zoomOut = "zoom_out"                   // Cmd+-
+    case actualSize = "actual_size"             // Cmd+0
+
+    // NEW: Menu items in NookCommands that were missing ShortcutAction definitions
+    case toggleSidebar = "toggle_sidebar"                      // Cmd+S
+    case toggleAIAssistant = "toggle_ai_assistant"             // Cmd+Shift+A
+    case togglePictureInPicture = "toggle_pip"                 // Cmd+Shift+P
+    case copyCurrentURL = "copy_current_url"                   // Cmd+Shift+C
+    case hardReload = "hard_reload"                            // Cmd+Shift+R
+    case muteUnmuteAudio = "mute_unmute_audio"                 // Cmd+M
+    case installExtension = "install_extension"                // Cmd+Shift+E
+    case customizeSpaceGradient = "customize_space_gradient"   // Cmd+Shift+G
+    case createBoost = "create_boost"                          // Cmd+Shift+B
+
     var displayName: String {
         switch self {
         case .goBack: return "Go Back"
@@ -103,6 +126,20 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
         case .viewHistory: return "View History"
         case .copyLink: return "Copy Link"
         case .expandAllFolders: return "Expand All Folders"
+        case .focusAddressBar: return "Focus Address Bar"
+        case .findInPage: return "Find in Page"
+        case .zoomIn: return "Zoom In"
+        case .zoomOut: return "Zoom Out"
+        case .actualSize: return "Actual Size"
+        case .toggleSidebar: return "Toggle Sidebar"
+        case .toggleAIAssistant: return "Toggle AI Assistant"
+        case .togglePictureInPicture: return "Toggle Picture in Picture"
+        case .copyCurrentURL: return "Copy Current URL"
+        case .hardReload: return "Hard Reload"
+        case .muteUnmuteAudio: return "Mute/Unmute Audio"
+        case .installExtension: return "Install Extension"
+        case .customizeSpaceGradient: return "Customize Space Gradient"
+        case .createBoost: return "Create Boost"
         }
     }
 
@@ -117,6 +154,28 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
         case .newWindow, .closeWindow, .closeBrowser, .toggleFullScreen:
             return .window
         case .openCommandPalette, .openDevTools, .viewDownloads, .viewHistory, .copyLink, .expandAllFolders:
+            return .tools
+        case .focusAddressBar, .findInPage:
+            return .navigation
+        case .zoomIn, .zoomOut, .actualSize:
+            return .tools
+        case .toggleSidebar:
+            return .window
+        case .toggleAIAssistant:
+            return .tools
+        case .togglePictureInPicture:
+            return .tools
+        case .copyCurrentURL:
+            return .tools
+        case .hardReload:
+            return .navigation
+        case .muteUnmuteAudio:
+            return .tools
+        case .installExtension:
+            return .tools
+        case .customizeSpaceGradient:
+            return .spaces
+        case .createBoost:
             return .tools
         }
     }
@@ -180,6 +239,31 @@ struct KeyCombination: Hashable, Codable {
             (modifiers.contains(.shift) == (event.modifierFlags.contains(.shift)))
 
         return keyMatches && modifierMatches
+    }
+
+    /// Unique hash for O(1) lookup: "cmd+shift+t"
+    var lookupKey: String {
+        var parts: [String] = []
+        if modifiers.contains(.command) { parts.append("cmd") }
+        if modifiers.contains(.option) { parts.append("opt") }
+        if modifiers.contains(.control) { parts.append("ctrl") }
+        if modifiers.contains(.shift) { parts.append("shift") }
+        parts.append(key.lowercased())
+        return parts.joined(separator: "+")
+    }
+
+    /// Initialize from NSEvent
+    init?(from event: NSEvent) {
+        guard let key = event.charactersIgnoringModifiers?.lowercased(), !key.isEmpty else { return nil }
+
+        var modifiers: Modifiers = []
+        if event.modifierFlags.contains(.command) { modifiers.insert(.command) }
+        if event.modifierFlags.contains(.option) { modifiers.insert(.option) }
+        if event.modifierFlags.contains(.control) { modifiers.insert(.control) }
+        if event.modifierFlags.contains(.shift) { modifiers.insert(.shift) }
+
+        self.key = key
+        self.modifiers = modifiers
     }
 }
 
@@ -246,7 +330,25 @@ extension KeyboardShortcut {
             KeyboardShortcut(action: .viewDownloads, keyCombination: KeyCombination(key: "j", modifiers: [.command, .shift])),
             KeyboardShortcut(action: .viewHistory, keyCombination: KeyCombination(key: "y", modifiers: [.command])),
             KeyboardShortcut(action: .copyLink, keyCombination: KeyCombination(key: "c", modifiers: [.command, .option])),
-            KeyboardShortcut(action: .expandAllFolders, keyCombination: KeyCombination(key: "e", modifiers: [.command, .shift]))
+            KeyboardShortcut(action: .expandAllFolders, keyCombination: KeyCombination(key: "e", modifiers: [.command, .shift])),
+
+            // Missing shortcuts that exist in NookCommands
+            KeyboardShortcut(action: .focusAddressBar, keyCombination: KeyCombination(key: "l", modifiers: [.command])),
+            KeyboardShortcut(action: .findInPage, keyCombination: KeyCombination(key: "f", modifiers: [.command])),
+            KeyboardShortcut(action: .zoomIn, keyCombination: KeyCombination(key: "+", modifiers: [.command])),
+            KeyboardShortcut(action: .zoomOut, keyCombination: KeyCombination(key: "-", modifiers: [.command])),
+            KeyboardShortcut(action: .actualSize, keyCombination: KeyCombination(key: "0", modifiers: [.command])),
+
+            // NEW: Menu shortcuts that were missing from ShortcutAction
+            KeyboardShortcut(action: .toggleSidebar, keyCombination: KeyCombination(key: "s", modifiers: [.command])),
+            KeyboardShortcut(action: .toggleAIAssistant, keyCombination: KeyCombination(key: "a", modifiers: [.command, .shift])),
+            KeyboardShortcut(action: .togglePictureInPicture, keyCombination: KeyCombination(key: "p", modifiers: [.command, .shift])),
+            KeyboardShortcut(action: .copyCurrentURL, keyCombination: KeyCombination(key: "c", modifiers: [.command, .shift])),
+            KeyboardShortcut(action: .hardReload, keyCombination: KeyCombination(key: "r", modifiers: [.command, .shift])),
+            KeyboardShortcut(action: .muteUnmuteAudio, keyCombination: KeyCombination(key: "m", modifiers: [.command])),
+            KeyboardShortcut(action: .installExtension, keyCombination: KeyCombination(key: "e", modifiers: [.command, .shift])),
+            KeyboardShortcut(action: .customizeSpaceGradient, keyCombination: KeyCombination(key: "g", modifiers: [.command, .shift])),
+            KeyboardShortcut(action: .createBoost, keyCombination: KeyCombination(key: "b", modifiers: [.command, .shift]))
         ]
     }
 }

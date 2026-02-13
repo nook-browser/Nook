@@ -12,14 +12,68 @@ import WebKit
 struct NookCommands: Commands {
     let browserManager: BrowserManager
     let windowRegistry: WindowRegistry
+    let shortcutManager: KeyboardShortcutManager
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
     @Environment(\.nookSettings) var nookSettings
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
-    init(browserManager: BrowserManager, windowRegistry: WindowRegistry) {
+    init(browserManager: BrowserManager, windowRegistry: WindowRegistry, shortcutManager: KeyboardShortcutManager) {
         self.browserManager = browserManager
         self.windowRegistry = windowRegistry
+        self.shortcutManager = shortcutManager
+    }
+
+    // MARK: - Dynamic Keyboard Shortcuts
+
+    /// Returns the key equivalent for a given action, or nil if disabled
+    private func keyEquivalent(for action: ShortcutAction) -> KeyEquivalent? {
+        guard let shortcut = shortcutManager.shortcut(for: action),
+              shortcut.isEnabled else { return nil }
+        // Handle special keys
+        switch shortcut.keyCombination.key.lowercased() {
+        case "return", "enter": return .return
+        case "escape", "esc": return .escape
+        case "delete", "backspace": return .delete
+        case "tab": return .tab
+        case "space": return .space
+        case "up", "uparrow": return .upArrow
+        case "down", "downarrow": return .downArrow
+        case "left", "leftarrow": return .leftArrow
+        case "right", "rightarrow": return .rightArrow
+        case "home": return .home
+        case "end": return .end
+        case "pageup": return .pageUp
+        case "pagedown": return .pageDown
+        case "clear": return .clear
+        default:
+            // Handle single character keys
+            if shortcut.keyCombination.key.count == 1,
+               let char = shortcut.keyCombination.key.first {
+                return KeyEquivalent(char)
+            }
+            return nil
+        }
+    }
+
+    /// Returns the event modifiers for a given action
+    private func eventModifiers(for action: ShortcutAction) -> EventModifiers {
+        guard let shortcut = shortcutManager.shortcut(for: action),
+              shortcut.isEnabled else { return [] }
+        var modifiers: EventModifiers = []
+        if shortcut.keyCombination.modifiers.contains(.command) { modifiers.insert(.command) }
+        if shortcut.keyCombination.modifiers.contains(.shift) { modifiers.insert(.shift) }
+        if shortcut.keyCombination.modifiers.contains(.option) { modifiers.insert(.option) }
+        if shortcut.keyCombination.modifiers.contains(.control) { modifiers.insert(.control) }
+        return modifiers
+    }
+
+    /// View extension to apply dynamic keyboard shortcut if enabled
+    private func dynamicShortcut(_ action: ShortcutAction) -> some ViewModifier {
+        DynamicShortcutModifier(
+            keyEquivalent: keyEquivalent(for: action),
+            modifiers: eventModifiers(for: action)
+        )
     }
 
     var body: some Commands {
@@ -55,7 +109,7 @@ struct NookCommands: Commands {
             Button("Undo Close Tab") {
                 browserManager.undoCloseTab()
             }
-            .keyboardShortcut("z", modifiers: .command)
+            .modifier(dynamicShortcut(.undoCloseTab))
         }
 
         // File Section
@@ -63,11 +117,11 @@ struct NookCommands: Commands {
             Button("New Tab") {
                 windowRegistry.activeWindow?.commandPalette?.open()
             }
-            .keyboardShortcut("t", modifiers: .command)
+            .modifier(dynamicShortcut(.newTab))
             Button("New Window") {
                 browserManager.createNewWindow()
             }
-            .keyboardShortcut("n", modifiers: .command)
+            .modifier(dynamicShortcut(.newWindow))
 
             Button("Close Tab") {
                 if windowRegistry.activeWindow?.isCommandPaletteVisible == true {
@@ -76,20 +130,20 @@ struct NookCommands: Commands {
                     browserManager.closeCurrentTab()
                 }
             }
-            .keyboardShortcut("w", modifiers: .command)
+            .modifier(dynamicShortcut(.closeTab))
             .disabled(browserManager.tabManager.tabs.isEmpty)
             Divider()
             Button("Open Command Bar") {
                 let currentURL = browserManager.currentTabForActiveWindow()?.url.absoluteString ?? ""
                 windowRegistry.activeWindow?.commandPalette?.open(prefill: currentURL, navigateCurrentTab: true)
             }
-            .keyboardShortcut("l", modifiers: [.command])
+            .modifier(dynamicShortcut(.focusAddressBar))
             .disabled(browserManager.currentTabForActiveWindow() == nil)
 
             Button("Copy Current URL") {
                 browserManager.copyCurrentURL()
             }
-            .keyboardShortcut("c", modifiers: [.command, .shift])
+            .modifier(dynamicShortcut(.copyCurrentURL))
             .disabled(browserManager.currentTabForActiveWindow() == nil)
         }
 
@@ -98,18 +152,18 @@ struct NookCommands: Commands {
             Button("Toggle Sidebar") {
                 browserManager.toggleSidebar()
             }
-            .keyboardShortcut("s", modifiers: .command)
+            .modifier(dynamicShortcut(.toggleSidebar))
 
             Button("Toggle AI Assistant") {
                 browserManager.toggleAISidebar()
             }
-            .keyboardShortcut("a", modifiers: [.command, .shift])
+            .modifier(dynamicShortcut(.toggleAIAssistant))
             .disabled(!nookSettings.showAIAssistant)
 
             Button("Toggle Picture in Picture") {
                 browserManager.requestPiPForCurrentTabInActiveWindow()
             }
-            .keyboardShortcut("p", modifiers: [.command, .shift])
+            .modifier(dynamicShortcut(.togglePictureInPicture))
             .disabled(
                 browserManager.currentTabForActiveWindow() == nil
                     || !(browserManager.currentTabHasVideoContent()
@@ -123,13 +177,13 @@ struct NookCommands: Commands {
             Button("Find in Page") {
                 browserManager.showFindBar()
             }
-            .keyboardShortcut("f", modifiers: .command)
+            .modifier(dynamicShortcut(.findInPage))
             .disabled(browserManager.currentTabForActiveWindow() == nil)
 
             Button("Reload Page") {
                 browserManager.refreshCurrentTabInActiveWindow()
             }
-            .keyboardShortcut("r", modifiers: .command)
+            .modifier(dynamicShortcut(.refresh))
             .disabled(browserManager.currentTabForActiveWindow() == nil)
 
             Divider()
@@ -137,19 +191,19 @@ struct NookCommands: Commands {
             Button("Zoom In") {
                 browserManager.zoomInCurrentTab()
             }
-            .keyboardShortcut("+", modifiers: .command)
+            .modifier(dynamicShortcut(.zoomIn))
             .disabled(browserManager.currentTabForActiveWindow() == nil)
 
             Button("Zoom Out") {
                 browserManager.zoomOutCurrentTab()
             }
-            .keyboardShortcut("-", modifiers: .command)
+            .modifier(dynamicShortcut(.zoomOut))
             .disabled(browserManager.currentTabForActiveWindow() == nil)
 
             Button("Actual Size") {
                 browserManager.resetZoomCurrentTab()
             }
-            .keyboardShortcut("0", modifiers: .command)
+            .modifier(dynamicShortcut(.actualSize))
             .disabled(browserManager.currentTabForActiveWindow() == nil)
 
             Divider()
@@ -157,7 +211,7 @@ struct NookCommands: Commands {
             Button("Hard Reload (Ignore Cache)") {
                 browserManager.hardReloadCurrentPage()
             }
-            .keyboardShortcut("R", modifiers: [.command, .shift])
+            .modifier(dynamicShortcut(.hardReload))
             .disabled(browserManager.currentTabForActiveWindow() == nil)
 
             Divider()
@@ -165,7 +219,7 @@ struct NookCommands: Commands {
             Button("Web Inspector") {
                 browserManager.openWebInspector()
             }
-            .keyboardShortcut("i", modifiers: [.command, .option])
+            .modifier(dynamicShortcut(.openDevTools))
             .disabled(browserManager.currentTabForActiveWindow() == nil)
 
             Divider()
@@ -173,14 +227,14 @@ struct NookCommands: Commands {
             Button("Force Quit App") {
                 browserManager.showQuitDialog()
             }
-            .keyboardShortcut("q", modifiers: .command)
+            .modifier(dynamicShortcut(.closeBrowser))
 
             Divider()
 
             Button(browserManager.currentTabIsMuted() ? "Unmute Audio" : "Mute Audio") {
                 browserManager.toggleMuteCurrentTabInActiveWindow()
             }
-            .keyboardShortcut("m", modifiers: .command)
+            .modifier(dynamicShortcut(.muteUnmuteAudio))
             .disabled(
                 browserManager.currentTabForActiveWindow() == nil
                     || !browserManager.currentTabHasAudioContent())
@@ -274,7 +328,7 @@ struct NookCommands: Commands {
                     Button("Install Extension...") {
                         browserManager.showExtensionInstallDialog()
                     }
-                    .keyboardShortcut("e", modifiers: [.command, .shift])
+                    .modifier(dynamicShortcut(.installExtension))
 
                     Button("Manage Extensions...") {
                         openSettings()
@@ -294,7 +348,7 @@ struct NookCommands: Commands {
                 Button("Customize Space Gradient...") {
                     browserManager.showGradientEditor()
                 }
-                .keyboardShortcut("g", modifiers: [.command, .shift])
+                .modifier(dynamicShortcut(.customizeSpaceGradient))
                 .disabled(browserManager.tabManager.currentSpace == nil)
 
                 Divider()
@@ -302,9 +356,25 @@ struct NookCommands: Commands {
                 Button("Create Boosts") {
                     browserManager.showBoostsDialog()
                 }
-                .keyboardShortcut("b", modifiers: [.command, .shift])
+                .modifier(dynamicShortcut(.createBoost))
                 .disabled(browserManager.currentTabForActiveWindow() == nil)
             }
+        }
+    }
+}
+
+// MARK: - Dynamic Shortcut Modifier
+
+/// View modifier that conditionally applies a keyboard shortcut based on user preferences
+struct DynamicShortcutModifier: ViewModifier {
+    let keyEquivalent: KeyEquivalent?
+    let modifiers: EventModifiers
+
+    func body(content: Content) -> some View {
+        if let keyEquivalent = keyEquivalent {
+            content.keyboardShortcut(keyEquivalent, modifiers: modifiers)
+        } else {
+            content
         }
     }
 }
