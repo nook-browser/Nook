@@ -12,8 +12,18 @@ import AppKit
 struct ContentView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(WindowRegistry.self) private var windowRegistry
-    @State private var windowState = BrowserWindowState()
+    @State private var defaultWindowState = BrowserWindowState()
     @State private var commandPalette = CommandPalette()
+    
+    private let providedWindowState: BrowserWindowState?
+    
+    init(windowState: BrowserWindowState? = nil) {
+        self.providedWindowState = windowState
+    }
+    
+    private var windowState: BrowserWindowState {
+        providedWindowState ?? defaultWindowState
+    }
 
     var body: some View {
         WindowView()

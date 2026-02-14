@@ -33,7 +33,10 @@ class HistoryManager {
     
     // MARK: - Public Methods
     
-    func addVisit(url: URL, title: String, timestamp: Date = Date(), tabId: UUID?, profileId: UUID? = nil) {
+    func addVisit(url: URL, title: String, timestamp: Date = Date(), tabId: UUID?, profileId: UUID? = nil, isEphemeral: Bool = false) {
+        // Skip recording history for ephemeral/incognito profiles
+        guard !isEphemeral else { return }
+        
         // Skip non-web URLs
         guard url.scheme == "http" || url.scheme == "https" else { return }
         

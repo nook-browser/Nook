@@ -20,12 +20,18 @@ struct SidebarBottomBar: View {
         HStack(alignment: .bottom, spacing: 10) {
             menuButton
             
-            SpacesList()
-                .frame(maxWidth: .infinity)
-                .environmentObject(browserManager)
-                .environment(windowState)
+            // Hide spaces list in incognito windows (only one ephemeral space)
+            if !windowState.isIncognito {
+                SpacesList()
+                    .frame(maxWidth: .infinity)
+                    .environmentObject(browserManager)
+                    .environment(windowState)
+            }
             
-            newSpaceButton
+            // Hide new space button in incognito windows
+            if !windowState.isIncognito {
+                newSpaceButton
+            }
         }.fixedSize(horizontal: false, vertical: true)
         .padding(.horizontal, 8)
     }

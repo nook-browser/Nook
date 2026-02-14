@@ -34,6 +34,12 @@ struct SpaceGradient: Codable, Hashable {
         return SpaceGradient(angle: 45.0, nodes: [n1, n2], grain: 0.05, opacity: 0.6)
     }
 
+    static var incognito: SpaceGradient {
+        let n1 = GradientNode(colorHex: "#1C1C1E", location: 0.0)
+        let n2 = GradientNode(colorHex: "#2C2C2E", location: 1.0)
+        return SpaceGradient(angle: 180.0, nodes: [n1, n2], grain: 0.0, opacity: 1.0)
+    }
+
     var encoded: Data? {
         let encoder = JSONEncoder()
         do {

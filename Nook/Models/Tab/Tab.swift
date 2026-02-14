@@ -33,6 +33,12 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     var isPinned: Bool = false  // Global pinned (essentials)
     var isSpacePinned: Bool = false  // Space-level pinned
     var folderId: UUID?  // Folder membership for tabs within spacepinned area
+    
+    // MARK: - Ephemeral State
+    /// Whether this tab belongs to an ephemeral/incognito session
+    var isEphemeral: Bool {
+        return resolveProfile()?.isEphemeral ?? false
+    }
 
     // MARK: - Favicon Cache
     // Global favicon cache shared across profiles by design to increase hit rate
@@ -650,6 +656,22 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     // Resolve the Profile for this tab via its space association, or fall back to currentProfile, then default profile
     func resolveProfile() -> Profile? {
+        // First, check if we have a direct profileId assignment (including ephemeral tabs)
+        if let pid = profileId {
+            // Check ephemeral profiles first
+            if let windowState = browserManager?.windowRegistry?.windows.values.first(where: { window in
+                window.ephemeralTabs.contains(where: { $0.id == self.id })
+            }),
+               let ephemeralProfile = windowState.ephemeralProfile,
+               ephemeralProfile.id == pid {
+                return ephemeralProfile
+            }
+            // Check regular profiles
+            if let profile = browserManager?.profileManager.profiles.first(where: { $0.id == pid }) {
+                return profile
+            }
+        }
+        
         // Attempt to resolve via associated space
         if let sid = spaceId,
             let space = browserManager?.tabManager.spaces.first(where: { $0.id == sid })
@@ -1645,7 +1667,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
 
     /// MEMORY LEAK FIX: Comprehensive cleanup for the main tab WebView
-    private func performComprehensiveWebViewCleanup() {
+    public func performComprehensiveWebViewCleanup() {
         guard let webView = _webView else { return }
 
         print("🧹 [Tab] Performing comprehensive cleanup for main WebView: \(name)")
@@ -2387,14 +2409,16 @@ extension Tab: WKNavigationDelegate {
 
                     // Add to profile-aware history after title is updated
                     if let currentURL = webView.url {
-                        let profileId =
-                            self?.resolveProfile()?.id ?? self?.browserManager?.currentProfile?.id
+                        let profile = self?.resolveProfile()
+                        let profileId = profile?.id ?? self?.browserManager?.currentProfile?.id
+                        let isEphemeral = profile?.isEphemeral ?? false
                         self?.browserManager?.historyManager.addVisit(
                             url: currentURL,
                             title: title,
                             timestamp: Date(),
                             tabId: self?.id,
-                            profileId: profileId
+                            profileId: profileId,
+                            isEphemeral: isEphemeral
                         )
                     }
 
@@ -3559,9 +3583,13 @@ extension Tab {
 
 extension Tab {
     func deliverContextMenuPayload(_ payload: WebContextMenuPayload?) {
+        print("🔽 [Tab] deliverContextMenuPayload called, payload exists: \(payload != nil)")
         pendingContextMenuPayload = payload
         if let webView = _webView as? FocusableWKWebView {
+            print("🔽 [Tab] Calling webView.contextMenuPayloadDidUpdate")
             webView.contextMenuPayloadDidUpdate(payload)
+        } else {
+            print("🔽 [Tab] WARNING: _webView is nil or not FocusableWKWebView")
         }
     }
 }

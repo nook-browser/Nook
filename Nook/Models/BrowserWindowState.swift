@@ -80,16 +80,41 @@ class BrowserWindowState {
     /// Reference to this window's CommandPalette for global shortcuts
     weak var commandPalette: CommandPalette?
 
+    // MARK: - Incognito/Ephemeral State
+    
+    /// Whether this window is an incognito/private browsing window
+    var isIncognito: Bool = false
+    
+    /// The ephemeral profile associated with this incognito window
+    /// Only set when isIncognito is true
+    var ephemeralProfile: Profile?
+    
+    /// Ephemeral spaces created in this incognito session
+    var ephemeralSpaces: [Space] = []
+    
+    /// Ephemeral tabs created in this incognito session
+    var ephemeralTabs: [Tab] = []
+    
+    /// Whether the download warning has been shown in this incognito session
+    var hasShownDownloadWarning: Bool = false
+    
     /// Computed property: the actual Space object for this window's current space
     var currentSpace: Space? {
-        guard let tabManager = tabManager,
-              let spaceId = currentSpaceId else { return nil }
-        return tabManager.spaces.first(where: { $0.id == spaceId })
+        guard let spaceId = currentSpaceId else { return nil }
+        // Check ephemeral spaces first for incognito windows
+        if isIncognito {
+            return ephemeralSpaces.first { $0.id == spaceId }
+        }
+        guard let tabManager = tabManager else { return nil }
+        return tabManager.spaces.first { $0.id == spaceId }
     }
 
-    /// Computed property: gradient for the current space
+    /// Computed property: gradient for the current space (dark for incognito)
     var gradient: SpaceGradient {
-        currentSpace?.gradient ?? .default
+        if isIncognito {
+            return SpaceGradient.incognito
+        }
+        return currentSpace?.gradient ?? .default
     }
 
     init(id: UUID = UUID()) {

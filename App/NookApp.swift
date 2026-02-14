@@ -106,6 +106,12 @@ struct NookApp: App {
             if let browserManager = browserManager {
                 webViewCoordinator.cleanupWindow(windowId, tabManager: browserManager.tabManager)
                 browserManager.splitManager.cleanupWindow(windowId)
+                
+                // Clean up incognito window if applicable
+                if let windowState = browserManager.windowRegistry?.windows[windowId],
+                   windowState.isIncognito {
+                    browserManager.closeIncognitoWindow(windowState)
+                }
             } else {
                 // BrowserManager was deallocated - perform minimal cleanup
                 // Remove compositor container view to prevent leaks
