@@ -232,18 +232,17 @@ struct WebsiteView: View {
             VStack {
                 HStack {
                     Spacer()
-                    if browserManager.didCopyURL {
-                        WebsitePopup()
-                            .animation(.spring(response: 0.5, dampingFraction: 0.8), value: browserManager.didCopyURL)
-                            .padding(10)
+                    Group {
+                        if let assist = browserManager.oauthAssist,
+                           browserManager.currentTab(for: windowState)?.id == assist.tabId {
+                            OAuthAssistBanner(host: assist.host)
+                                .environmentObject(browserManager)
+                                .environment(windowState)
+                                .padding(10)
+                        }
                     }
-                    if let assist = browserManager.oauthAssist,
-                       browserManager.currentTab(for: windowState)?.id == assist.tabId {
-                        OAuthAssistBanner(host: assist.host)
-                            .environmentObject(browserManager)
-                            .animation(.spring(response: 0.5, dampingFraction: 0.8), value: browserManager.oauthAssist)
-                            .padding(10)
-                    }
+                    // Animate toast insertions/removals
+                    .animation(.smooth(duration: 0.25), value: browserManager.oauthAssist != nil)
                 }
                 Spacer()
                 if nookSettings.showLinkStatusBar {
