@@ -169,6 +169,23 @@ class KeyboardShortcutManager {
     // MARK: - Shortcut Execution
 
     func executeShortcut(_ event: NSEvent) -> Bool {
+        // Arrow keys and other navigation keys should pass through to the WebView
+        // They have no charactersIgnoringModifiers, so KeyCombination would fail anyway
+        let keyCode = event.keyCode
+        let navigationKeyCodes: Set<UInt16> = [
+            123, // left arrow
+            124, // right arrow
+            125, // down arrow
+            126, // up arrow
+            115, // home
+            119, // end
+            116, // page up
+            121, // page down
+        ]
+        if navigationKeyCodes.contains(keyCode) {
+            return false // Always pass through
+        }
+        
         guard let keyCombination = KeyCombination(from: event) else { return false }
 
         guard let shortcut = shortcutMap[keyCombination.lookupKey],
