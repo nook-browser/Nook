@@ -6,6 +6,10 @@ sessions-config.json
 Nook/.claude
 .crush
 /sessions
+CLAUDE.md
+.xcodebuildmcp/
+package.json
+package-lock.json
 
 ## User settings
 xcuserdata/
@@ -43,6 +47,8 @@ DerivedData/
 ## Playgrounds
 'timeline.xctimeline'
 playground.xcworkspace
+*.playground
+UIPlayground/
 
 # Swift Package Manager
 #

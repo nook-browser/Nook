@@ -40,14 +40,10 @@ struct WindowView: View {
 
             // Peek overlay for external link previews
             PeekOverlayView()
-        }
-        // Find bar overlay - centered at top
-        .overlay(alignment: .top) {
-            if browserManager.findManager.isFindBarVisible {
-                FindBarView(findManager: browserManager.findManager)
-                    .frame(maxWidth: 500)
-                    .padding(.top, 20)
-            }
+
+            // Find bar - always rendered (24/7), visibility controlled via opacity
+            FindBarView(findManager: browserManager.findManager)
+                .zIndex(10000)
         }
         // System notification toasts - top trailing corner
         .overlay(alignment: .topTrailing) {

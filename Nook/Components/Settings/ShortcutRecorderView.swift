@@ -145,6 +145,8 @@ struct ShortcutRecorderView: View {
             return
         }
 
+        // Use charactersIgnoringModifiers for consistent handling of bracket keys
+        // This ensures Cmd+[ works correctly on US keyboards where [ requires Shift
         if let key = event.charactersIgnoringModifiers?.lowercased() {
             recordingKey = key
             finishRecording()
