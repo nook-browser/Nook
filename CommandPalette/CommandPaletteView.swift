@@ -189,10 +189,6 @@ struct CommandPaletteView: View {
                 searchManager.clearSuggestions()
             }
         }
-        .onKeyPress(.escape) {
-            commandPalette.close()
-            return .handled
-        }
         .onChange(of: searchManager.suggestions.count) { _, newCount in
             if newCount == 0 {
                 selectedSuggestionIndex = -1

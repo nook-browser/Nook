@@ -149,4 +149,38 @@ final class Profile: NSObject, Identifiable {
         }
         await refreshDataStoreStats()
     }
+    
+    /// Destroys the ephemeral data store by clearing all data.
+    /// This should be called before releasing an ephemeral profile to ensure
+    /// all incognito data is wiped and the store can be properly deallocated.
+    /// - Parameter completion: Optional completion handler called when destruction is complete
+    func destroyEphemeralDataStore(completion: (() -> Void)? = nil) {
+        guard isEphemeral else {
+            print("⚠️ [Profile] Cannot destroy data store: profile is not ephemeral")
+            completion?()
+            return
+        }
+        
+        print("🔒 [Profile] Destroying ephemeral data store for profile: \(id)")
+        
+        let allTypes = WKWebsiteDataStore.allWebsiteDataTypes()
+        
+        // Clear all data from the store
+        dataStore.removeData(ofTypes: allTypes, modifiedSince: .distantPast) { [weak self] in
+            guard let self = self else {
+                completion?()
+                return
+            }
+            
+            // Also clear cookies specifically
+            self.dataStore.httpCookieStore.getAllCookies { cookies in
+                for cookie in cookies {
+                    self.dataStore.httpCookieStore.delete(cookie)
+                }
+                
+                print("🔒 [Profile] Ephemeral data store destroyed for profile: \(self.id)")
+                completion?()
+            }
+        }
+    }
 }

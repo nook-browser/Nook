@@ -15,6 +15,7 @@ struct ShortcutRecorderView: View {
     @State private var recordingModifiers: Modifiers = []
     @State private var hasConflict = false
     @State private var conflictAction: ShortcutAction? = nil
+    @State private var eventMonitor: Any?
 
     let action: ShortcutAction
     let shortcutManager: KeyboardShortcutManager
@@ -61,14 +62,14 @@ struct ShortcutRecorderView: View {
             .foregroundColor(.secondary)
             .disabled(keyCombination.key.isEmpty && keyCombination.modifiers.isEmpty)
         }
-        .onAppear {
-            setupKeyMonitor()
-        }
         .onChange(of: recordingKey) {
             checkForConflicts()
         }
         .onChange(of: recordingModifiers) {
             checkForConflicts()
+        }
+        .onDisappear {
+            removeKeyMonitor()
         }
     }
 
@@ -84,10 +85,12 @@ struct ShortcutRecorderView: View {
         isRecording = true
         recordingKey = ""
         recordingModifiers = []
+        setupKeyMonitor()
     }
 
     private func finishRecording() {
         isRecording = false
+        removeKeyMonitor()
         if !recordingKey.isEmpty || !recordingModifiers.isEmpty {
             let newCombination = KeyCombination(key: recordingKey, modifiers: recordingModifiers)
             if shortcutManager.isValidKeyCombination(newCombination) {
@@ -99,6 +102,7 @@ struct ShortcutRecorderView: View {
 
     private func clearShortcut() {
         keyCombination = KeyCombination(key: "", modifiers: [])
+        removeKeyMonitor()
         onRecordingComplete()
     }
 
@@ -120,19 +124,29 @@ struct ShortcutRecorderView: View {
     }
 
     private func setupKeyMonitor() {
-        NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp, .flagsChanged]) { event in
+        // Remove any existing monitor first
+        removeKeyMonitor()
+        
+        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp, .flagsChanged]) { event in
             guard isRecording else { return event }
 
             switch event.type {
             case .keyDown:
                 handleKeyDown(event)
-                return nil // Consume the event
+                return nil
             case .flagsChanged:
                 handleFlagsChanged(event)
-                return nil // Consume the event
+                return nil
             default:
                 return event
             }
+        }
+    }
+    
+    private func removeKeyMonitor() {
+        if let monitor = eventMonitor {
+            NSEvent.removeMonitor(monitor)
+            eventMonitor = nil
         }
     }
 
