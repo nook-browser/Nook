@@ -122,16 +122,12 @@ struct NookCommands: Commands {
                 browserManager.createNewWindow()
             }
             .modifier(dynamicShortcut(.newWindow))
-
-            Button("Close Tab") {
-                if windowRegistry.activeWindow?.isCommandPaletteVisible == true {
-                    windowRegistry.activeWindow?.commandPalette?.close()
-                } else {
-                    browserManager.closeCurrentTab()
-                }
+            
+            Button("New Incognito Window") {
+                browserManager.createIncognitoWindow()
             }
-            .modifier(dynamicShortcut(.closeTab))
-            .disabled(browserManager.tabManager.tabs.isEmpty)
+            .keyboardShortcut("n", modifiers: [.command, .shift])
+            
             Divider()
             Button("Open Command Bar") {
                 let currentURL = browserManager.currentTabForActiveWindow()?.url.absoluteString ?? ""

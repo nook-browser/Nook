@@ -447,6 +447,8 @@ class BrowserManager: ObservableObject {
     private func updateGradient(
         for windowState: BrowserWindowState, to newGradient: SpaceGradient, animate: Bool
     ) {
+        // Skip gradient updates for incognito windows - they use their own dark gradient
+        guard !windowState.isIncognito else { return }
         // Only animate if this is the active window (to avoid animating all windows simultaneously)
         let isActiveWindow = windowRegistry?.activeWindow?.id == windowState.id
         if animate && isActiveWindow {
@@ -461,8 +463,10 @@ class BrowserManager: ObservableObject {
         guard let windowRegistry = windowRegistry else { return }
         let activeWindowId = windowRegistry.activeWindow?.id
         
-        // Update gradients for all windows using this space
+        // Update gradients for all windows using this space (skip incognito)
         for (_, windowState) in windowRegistry.windows {
+            // Skip incognito windows
+            guard !windowState.isIncognito else { continue }
             if windowState.currentSpaceId == space.id {
                 let isActiveWindow = windowState.id == activeWindowId
                 if animate && isActiveWindow {
@@ -903,6 +907,21 @@ class BrowserManager: ObservableObject {
 
     /// Create a new tab and set it as active in the specified window
     func createNewTab(in windowState: BrowserWindowState) {
+        // Handle incognito windows - create ephemeral tabs
+        if windowState.isIncognito, let profile = windowState.ephemeralProfile {
+            let engine = nookSettings?.searchEngine ?? .google
+            let normalizedURL = normalizeURL("https://www.google.com", provider: engine)
+            guard let url = URL(string: normalizedURL) else { return }
+            
+            let newTab = tabManager.createEphemeralTab(
+                url: url,
+                in: windowState,
+                profile: profile
+            )
+            selectTab(newTab, in: windowState)
+            return
+        }
+        
         let targetSpace =
             windowState.currentSpaceId.flatMap { id in
                 tabManager.spaces.first(where: { $0.id == id })
@@ -972,7 +991,33 @@ class BrowserManager: ObservableObject {
         if let activeWindow = windowRegistry?.activeWindow,
             let currentTab = currentTab(for: activeWindow)
         {
-            tabManager.removeTab(currentTab.id)
+            // Handle ephemeral tabs in incognito windows
+            if activeWindow.isIncognito {
+                // Clean up WebView
+                currentTab.performComprehensiveWebViewCleanup()
+                
+                // Remove from ephemeral tabs
+                if let index = activeWindow.ephemeralTabs.firstIndex(where: { $0.id == currentTab.id }) {
+                    activeWindow.ephemeralTabs.remove(at: index)
+                    
+                    // Select another tab or create new one
+                    if let nextTab = activeWindow.ephemeralTabs.first {
+                        selectTab(nextTab, in: activeWindow)
+                    } else {
+                        // All tabs closed - create a new ephemeral tab
+                        if let profile = activeWindow.ephemeralProfile {
+                            let engine = nookSettings?.searchEngine ?? .google
+                            let normalizedURL = normalizeURL("https://www.google.com", provider: engine)
+                            if let url = URL(string: normalizedURL) {
+                                let newTab = tabManager.createEphemeralTab(url: url, in: activeWindow, profile: profile)
+                                selectTab(newTab, in: activeWindow)
+                            }
+                        }
+                    }
+                }
+            } else {
+                tabManager.removeTab(currentTab.id)
+            }
         } else {
             // Fallback to global current tab for backward compatibility
             tabManager.closeActiveTab()
@@ -1904,25 +1949,27 @@ class BrowserManager: ObservableObject {
         sidebarContentWidth = windowState.sidebarContentWidth
         isSidebarVisible = windowState.isSidebarVisible
         urlBarFrame = windowState.urlBarFrame
-        gradientColorManager.setImmediate(windowState.gradient)
+        // Skip gradient sync for incognito windows - they use their own dark gradient
+        if !windowState.isIncognito {
+            gradientColorManager.setImmediate(windowState.gradient)
+        }
         splitManager.refreshPublishedState(for: windowState.id)
         isCommandPaletteVisible = windowState.isCommandPaletteVisible
         if windowState.currentProfileId == nil {
             windowState.currentProfileId = currentProfile?.id
         }
         adoptProfileIfNeeded(for: windowState, context: .windowActivation)
-        // DISABLED: Exclusive audio enforcement - use standard browser behavior instead
-        // if let currentId = windowState.currentTabId,
-        //     let tab = tabManager.allTabs().first(where: { $0.id == currentId })
-        // {
-        //     enforceExclusiveAudio(for: tab, activeWindowId: windowState.id)
-        // }
     }
 
     // MARK: - Window-Aware Tab Operations
 
     /// Get the current tab for a specific window
     func currentTab(for windowState: BrowserWindowState) -> Tab? {
+        // Check ephemeral tabs first for incognito windows
+        if windowState.isIncognito {
+            return windowState.ephemeralTabs.first { $0.id == windowState.currentTabId }
+        }
+        
         guard let tabId = windowState.currentTabId else { return nil }
         return tabManager.allTabs().first { $0.id == tabId }
     }
@@ -1999,6 +2046,11 @@ class BrowserManager: ObservableObject {
 
     /// Get tabs that should be displayed in a specific window
     func tabsForDisplay(in windowState: BrowserWindowState) -> [Tab] {
+        // For incognito windows, return ephemeral tabs directly
+        if windowState.isIncognito {
+            return windowState.ephemeralTabs
+        }
+        
         print("🔍 tabsForDisplay called for window \(windowState.id.uuidString.prefix(8))...")
 
         // Get tabs for the window's current space
@@ -2045,13 +2097,26 @@ class BrowserManager: ObservableObject {
         windowState.refreshCompositor()
     }
 
-    /// DEPRECATED: Use WebViewCoordinator.getWebView() directly via environment
+/// DEPRECATED: Use WebViewCoordinator.getWebView() directly via environment
     func getWebView(for tabId: UUID, in windowId: UUID) -> WKWebView? {
+        // Check ephemeral tabs first for incognito windows
+        if let windowState = windowRegistry?.windows[windowId],
+           windowState.isIncognito {
+            return webViewCoordinator?.getWebView(for: tabId, in: windowId)
+        }
         return webViewCoordinator?.getWebView(for: tabId, in: windowId)
     }
 
     /// DEPRECATED: Use WebViewCoordinator directly
     func createWebView(for tabId: UUID, in windowId: UUID) -> WKWebView {
+        // Check ephemeral tabs first for incognito windows
+        if let windowState = windowRegistry?.windows[windowId],
+           windowState.isIncognito,
+           let tab = windowState.ephemeralTabs.first(where: { $0.id == tabId }),
+           let coordinator = webViewCoordinator {
+            return coordinator.createWebView(for: tab, in: windowId)
+        }
+        
         guard let tab = tabManager.allTabs().first(where: { $0.id == tabId }),
               let coordinator = webViewCoordinator else {
             fatalError("Tab or WebViewCoordinator not found")
@@ -2347,6 +2412,117 @@ class BrowserManager: ObservableObject {
         newWindow.contentMinSize = NSSize(width: 470, height: 382)
         newWindow.center()
         newWindow.makeKeyAndOrderFront(nil)
+    }
+
+    // MARK: - Incognito Window
+    
+    /// Active incognito window IDs
+    @Published private var incognitoWindows: Set<UUID> = []
+    
+    /// Create a new incognito/private browsing window
+    func createIncognitoWindow() {
+        guard let windowRegistry = windowRegistry,
+              let webViewCoordinator = webViewCoordinator else {
+            print("⚠️ [BrowserManager] Cannot create incognito window - missing WindowRegistry or WebViewCoordinator")
+            return
+        }
+
+        let windowState = BrowserWindowState()
+        windowState.isIncognito = true
+        
+        // Create ephemeral profile for this window
+        let ephemeralProfile = profileManager.createEphemeralProfile(for: windowState.id)
+        windowState.ephemeralProfile = ephemeralProfile
+        windowState.currentProfileId = ephemeralProfile.id
+        
+        // Create default ephemeral space
+        let ephemeralSpace = Space(
+            id: UUID(),
+            name: "Incognito",
+            icon: "eye.slash",
+            profileId: ephemeralProfile.id
+        )
+        ephemeralSpace.isEphemeral = true
+        windowState.ephemeralSpaces.append(ephemeralSpace)
+        windowState.currentSpaceId = ephemeralSpace.id
+        
+        // Track as incognito window
+        incognitoWindows.insert(windowState.id)
+        
+        // Create the NSWindow (similar to createNewWindow but with incognito title)
+        let newWindow = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+
+        let contentView = ContentView(windowState: windowState)
+            .background(BackgroundWindowModifier())
+            .ignoresSafeArea(.all)
+            .environmentObject(self)
+            .environment(windowRegistry)
+            .environment(webViewCoordinator)
+            .environmentObject(gradientColorManager)
+
+        newWindow.contentView = NSHostingView(rootView: contentView)
+        newWindow.title = "Incognito - Nook"
+        newWindow.minSize = NSSize(width: 470, height: 382)
+        newWindow.contentMinSize = NSSize(width: 470, height: 382)
+        newWindow.center()
+        
+        windowState.window = newWindow
+        
+        // Register the window
+        windowRegistry.register(windowState)
+        windowRegistry.setActive(windowState)
+        
+        // Set tabManager reference only (don't call full setupWindowState - it would overwrite ephemeral state)
+        windowState.tabManager = tabManager
+        
+        // Create initial ephemeral tab
+        createNewTab(in: windowState)
+        
+        newWindow.makeKeyAndOrderFront(nil)
+        
+        print("🔒 [BrowserManager] Created incognito window: \(windowState.id)")
+    }
+    
+    /// Close an incognito window and clean up all ephemeral data
+    func closeIncognitoWindow(_ windowState: BrowserWindowState) {
+        guard windowState.isIncognito else { return }
+        
+        print("🔒 [BrowserManager] Closing incognito window: \(windowState.id)")
+        
+        // Clean up all ephemeral tabs (WebView cleanup)
+        for tab in windowState.ephemeralTabs {
+            tab.performComprehensiveWebViewCleanup()
+        }
+        
+        // Remove ephemeral profile (triggers data store cleanup)
+        profileManager.removeEphemeralProfile(for: windowState.id)
+        
+        // Stop tracking
+        incognitoWindows.remove(windowState.id)
+        
+        // Clear references
+        windowState.ephemeralTabs.removeAll()
+        windowState.ephemeralSpaces.removeAll()
+        windowState.ephemeralProfile = nil
+    }
+    
+    /// Check if a tab can be dragged to a target window (block cross-window for incognito)
+    func canDragTab(_ tab: Tab, toWindow targetWindow: BrowserWindowState) -> Bool {
+        let sourceIsIncognito = tab.isEphemeral
+        let targetIsIncognito = targetWindow.isIncognito
+        
+        // Block dragging between incognito and normal windows
+        return sourceIsIncognito == targetIsIncognito
+    }
+    
+    /// Check if a window is an incognito window
+    func isIncognitoWindow(_ windowId: UUID) -> Bool {
+        return incognitoWindows.contains(windowId)
     }
 
     /// Close the active window

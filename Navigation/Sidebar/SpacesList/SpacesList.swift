@@ -17,13 +17,19 @@ struct SpacesList: View {
     @State private var isHoveringList: Bool = false
 
     private var layoutMode: SpacesListLayoutMode {
-        SpacesListLayoutMode.determine(
-            spacesCount: browserManager.tabManager.spaces.count,
+        let spaces = windowState.isIncognito
+            ? windowState.ephemeralSpaces
+            : browserManager.tabManager.spaces
+        return SpacesListLayoutMode.determine(
+            spacesCount: spaces.count,
             availableWidth: availableWidth
         )
     }
 
     private var visibleSpaces: [Space] {
+        if windowState.isIncognito {
+            return windowState.ephemeralSpaces
+        }
         return browserManager.tabManager.spaces
     }
 
@@ -45,12 +51,8 @@ struct SpacesList: View {
                                 onHoverChange: { isHovering in
                                     if isHovering {
                                         hoveredSpaceId = space.id
-                                        // If preview is already showing, update immediately
-                                        // Otherwise, show after delay
                                         if showPreview {
-                                            // Already showing, just swap the space
                                         } else {
-                                            // First time showing, add delay
                                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
                                                 if hoveredSpaceId == space.id && isHoveringList {
                                                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -87,11 +89,10 @@ struct SpacesList: View {
                         }
                     }
                     .overlay(alignment: .top) {
-                        // Preview text positioned above the icons
                         if showPreview,
                            let hoveredId = hoveredSpaceId,
                            hoveredId != windowState.currentSpaceId,
-                           let hoveredSpace = browserManager.tabManager.spaces.first(where: { $0.id == hoveredId }) {
+                           let hoveredSpace = visibleSpaces.first(where: { $0.id == hoveredId }) {
                             Text(hoveredSpace.name)
                                 .font(.caption)
                                 .foregroundStyle(previewTextColor)
@@ -106,8 +107,6 @@ struct SpacesList: View {
             .animation(.easeInOut(duration: 0.3), value: visibleSpaces.count)
             .animation(.easeInOut(duration: 0.3), value: visibleSpaces.map(\.id))
     }
-
-    // MARK: - Colors
 
     private var previewTextColor: Color {
         browserManager.gradientColorManager.isDark
