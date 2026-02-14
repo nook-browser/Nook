@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import UniversalGlass
 
 /// Main window view that orchestrates the browser UI layout
 struct WindowView: View {
@@ -53,37 +54,27 @@ struct WindowView: View {
                    let toast = windowState.profileSwitchToast
                 {
                     ProfileSwitchToastView(toast: toast)
-                        .transition(.scale(scale: 0.0, anchor: .top))
-                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: windowState.isShowingProfileSwitchToast)
-                        .onTapGesture {
-                            browserManager.hideProfileSwitchToast(for: windowState)
-                        }
+                        .environment(windowState)
+                        .environmentObject(browserManager)
                 }
 
                 // Tab closure toast
                 if browserManager.showTabClosureToast && browserManager.tabClosureToastCount > 0 {
                     TabClosureToast()
                         .environmentObject(browserManager)
-                        .environment(windowState)
-                        .transition(.scale(scale: 0.0, anchor: .top))
-                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: browserManager.showTabClosureToast)
-                        .onTapGesture {
-                            browserManager.hideTabClosureToast()
-                        }
                 }
-                
+
                 // Copy URL toast
                 if windowState.isShowingCopyURLToast {
                     CopyURLToast()
                         .environment(windowState)
-                        .transition(.scale(scale: 0.0, anchor: .top))
-                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: windowState.isShowingCopyURLToast)
-                        .onTapGesture {
-                            windowState.isShowingCopyURLToast = false
-                        }
                 }
             }
             .padding(10)
+            // Animate toast insertions/removals
+            .animation(.smooth(duration: 0.25), value: windowState.isShowingProfileSwitchToast)
+            .animation(.smooth(duration: 0.25), value: browserManager.showTabClosureToast)
+            .animation(.smooth(duration: 0.25), value: windowState.isShowingCopyURLToast)
         }
         // Zoom control popup - separate from system toasts
         .overlay(alignment: .topTrailing) {
@@ -281,31 +272,37 @@ struct WindowView: View {
 // MARK: - Profile Switch Toast View
 private struct ProfileSwitchToastView: View {
     let toast: BrowserManager.ProfileSwitchToast
-    
+    @Environment(BrowserWindowState.self) private var windowState
+    @EnvironmentObject var browserManager: BrowserManager
+
     var body: some View {
-        HStack {
-            Text("Switched to \(toast.toProfile.name)")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white)
-            Image(systemName: "person.crop.circle")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white)
-                .frame(width: 14, height: 14)
-                .padding(4)
-                .background(Color.white.opacity(0.2))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(.white.opacity(0.4), lineWidth: 1)
-                }
+        ToastView {
+            HStack {
+                Text("Switched to \(toast.toProfile.name)")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white)
+                Image(systemName: "person.crop.circle")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white)
+                    .frame(width: 14, height: 14)
+                    .padding(4)
+                    .background(Color.white.opacity(0.2))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(.white.opacity(0.4), lineWidth: 1)
+                    }
+            }
         }
-        .padding(12)
-        .background(Color(hex: "3E4D2E"))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(.white.opacity(0.2), lineWidth: 2)
+        .transition(.toast)
+        .onAppear {
+            // Auto-dismiss after 2 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                browserManager.hideProfileSwitchToast(for: windowState)
+            }
         }
-        .transition(.scale(scale: 0.0, anchor: .top))
+        .onTapGesture {
+            browserManager.hideProfileSwitchToast(for: windowState)
+        }
     }
 }
