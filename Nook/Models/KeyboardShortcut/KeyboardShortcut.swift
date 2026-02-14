@@ -71,7 +71,6 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
     case openDevTools = "open_dev_tools"
     case viewDownloads = "view_downloads"
     case viewHistory = "view_history"
-    case copyLink = "copy_link"
     case expandAllFolders = "expand_all_folders"
 
     // Missing actions that exist in NookCommands but not here
@@ -124,7 +123,6 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
         case .openDevTools: return "Developer Tools"
         case .viewDownloads: return "View Downloads"
         case .viewHistory: return "View History"
-        case .copyLink: return "Copy Link"
         case .expandAllFolders: return "Expand All Folders"
         case .focusAddressBar: return "Focus Address Bar"
         case .findInPage: return "Find in Page"
@@ -153,7 +151,7 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
             return .spaces
         case .newWindow, .closeWindow, .closeBrowser, .toggleFullScreen:
             return .window
-        case .openCommandPalette, .openDevTools, .viewDownloads, .viewHistory, .copyLink, .expandAllFolders:
+        case .openCommandPalette, .openDevTools, .viewDownloads, .viewHistory, .expandAllFolders:
             return .tools
         case .focusAddressBar, .findInPage:
             return .navigation
@@ -230,7 +228,13 @@ struct KeyCombination: Hashable, Codable {
     func matches(_ event: NSEvent) -> Bool {
         guard event.type == .keyDown || event.type == .keyUp else { return false }
 
-        let keyMatches = event.charactersIgnoringModifiers?.lowercased() == key
+        // Try charactersIgnoringModifiers first (for bracket keys like [ ] { })
+        // Fall back to characters for regular keys
+        let keyWithoutModifiers = event.charactersIgnoringModifiers?.lowercased() ?? ""
+        let keyWithModifiers = event.characters?.lowercased() ?? ""
+
+        // Match if either form matches (handles bracket keys on different layouts)
+        let keyMatches = (keyWithoutModifiers == key) || (keyWithModifiers == key)
 
         let modifierMatches =
             (modifiers.contains(.command) == (event.modifierFlags.contains(.command))) &&
@@ -254,6 +258,8 @@ struct KeyCombination: Hashable, Codable {
 
     /// Initialize from NSEvent
     init?(from event: NSEvent) {
+        // Use charactersIgnoringModifiers for consistent handling of bracket keys
+        // This ensures Cmd+[ works correctly on US keyboards where [ requires Shift
         guard let key = event.charactersIgnoringModifiers?.lowercased(), !key.isEmpty else { return nil }
 
         var modifiers: Modifiers = []
@@ -329,7 +335,6 @@ extension KeyboardShortcut {
             KeyboardShortcut(action: .openDevTools, keyCombination: KeyCombination(key: "i", modifiers: [.command, .option])),
             KeyboardShortcut(action: .viewDownloads, keyCombination: KeyCombination(key: "j", modifiers: [.command, .shift])),
             KeyboardShortcut(action: .viewHistory, keyCombination: KeyCombination(key: "y", modifiers: [.command])),
-            KeyboardShortcut(action: .copyLink, keyCombination: KeyCombination(key: "c", modifiers: [.command, .option])),
             KeyboardShortcut(action: .expandAllFolders, keyCombination: KeyCombination(key: "e", modifiers: [.command, .shift])),
 
             // Missing shortcuts that exist in NookCommands

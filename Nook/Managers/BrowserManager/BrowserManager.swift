@@ -1467,58 +1467,34 @@ class BrowserManager: ObservableObject {
 
     // MARK: - Web Inspector
     func openWebInspector() {
-        guard let currentTab = currentTabForActiveWindow(),
-            let activeWindowId = windowRegistry?.activeWindow?.id
-        else {
+        guard let currentTab = currentTabForActiveWindow() else {
             print("No current tab to inspect")
             return
         }
 
         if #available(macOS 13.3, *) {
-            // Use the WebView that's actually visible in the current window
-            let webView: WKWebView
-            if let windowWebView = getWebView(for: currentTab.id, in: activeWindowId) {
-                webView = windowWebView
-            } else {
-                webView = currentTab.activeWebView
+            let webView = currentTab.activeWebView
+
+            // Ensure the webview is inspectable (macOS 16+)
+            if #available(macOS 16.0, *) {
+                webView.isInspectable = true
             }
 
-            if webView.isInspectable {
-                DispatchQueue.main.async {
-                    // Focus the webview and trigger context menu programmatically
-                    self.presentInspectorContextMenu(for: webView)
-                }
-            } else {
-                print("Web inspector not available for this tab")
-            }
+            // There is no public API to programmatically open the Web Inspector
+            // Show an alert instructing the user how to open it manually
+            showWebInspectorAlert()
         } else {
             print("Web inspector requires macOS 13.3 or later")
         }
     }
 
-    private func presentInspectorContextMenu(for webView: WKWebView) {
-        // Focus the webview first
-        webView.window?.makeFirstResponder(webView)
-
-        // Create a right-click event at the center of the webview
-        let bounds = webView.bounds
-        let center = NSPoint(x: bounds.midX, y: bounds.midY)
-
-        let rightClickEvent = NSEvent.mouseEvent(
-            with: .rightMouseDown,
-            location: center,
-            modifierFlags: [],
-            timestamp: ProcessInfo.processInfo.systemUptime,
-            windowNumber: webView.window?.windowNumber ?? 0,
-            context: nil,
-            eventNumber: 0,
-            clickCount: 1,
-            pressure: 1.0
-        )
-
-        if let event = rightClickEvent {
-            webView.rightMouseDown(with: event)
-        }
+    private func showWebInspectorAlert() {
+        let alert = NSAlert()
+        alert.messageText = "Open Web Inspector"
+        alert.informativeText = "To open the Web Inspector:\n\n1. Right-click on the page and select 'Inspect Element'\n\nOr enable the Develop menu in Safari Settings → Advanced, then use Develop → [Your App]"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     // MARK: - Profile Switch Toast

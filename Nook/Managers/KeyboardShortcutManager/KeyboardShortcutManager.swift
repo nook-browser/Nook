@@ -104,17 +104,18 @@ class KeyboardShortcutManager {
     }
 
     func updateShortcut(action: ShortcutAction, keyCombination: KeyCombination) {
-        // Remove old entry if exists
-        if let existing = shortcutMap.values.first(where: { $0.action == action }) {
-            shortcutMap.removeValue(forKey: existing.lookupKey)
+        // Find the existing shortcut first
+        guard var shortcut = shortcutMap.values.first(where: { $0.action == action }) else {
+            return
         }
 
-        // Create updated shortcut and add to map
-        if var shortcut = shortcutMap.values.first(where: { $0.action == action }) {
-            shortcut.keyCombination = keyCombination
-            shortcutMap[keyCombination.lookupKey] = shortcut
-            saveShortcuts()
-        }
+        // Remove old entry
+        shortcutMap.removeValue(forKey: shortcut.lookupKey)
+
+        // Update and add back
+        shortcut.keyCombination = keyCombination
+        shortcutMap[keyCombination.lookupKey] = shortcut
+        saveShortcuts()
     }
 
     func toggleShortcut(action: ShortcutAction, isEnabled: Bool) {
@@ -188,9 +189,23 @@ class KeyboardShortcutManager {
             switch action {
             // Navigation
             case .goBack:
-                browserManager.currentTabForActiveWindow()?.goBack()
+                // Use window-specific webview like the UI buttons do
+                if let tab = browserManager.currentTabForActiveWindow(),
+                   let windowId = self.windowRegistry?.activeWindow?.id,
+                   let webView = browserManager.getWebView(for: tab.id, in: windowId) {
+                    if webView.canGoBack {
+                        webView.goBack()
+                    }
+                }
             case .goForward:
-                browserManager.currentTabForActiveWindow()?.goForward()
+                // Use window-specific webview like the UI buttons do
+                if let tab = browserManager.currentTabForActiveWindow(),
+                   let windowId = self.windowRegistry?.activeWindow?.id,
+                   let webView = browserManager.getWebView(for: tab.id, in: windowId) {
+                    if webView.canGoForward {
+                        webView.goForward()
+                    }
+                }
             case .refresh:
                 browserManager.refreshCurrentTabInActiveWindow()
             case .clearCookiesAndRefresh:
@@ -243,8 +258,6 @@ class KeyboardShortcutManager {
                 browserManager.showDownloads()
             case .viewHistory:
                 browserManager.showHistory()
-            case .copyLink:
-                browserManager.copyCurrentURL()
             case .expandAllFolders:
                 browserManager.expandAllFoldersInSidebar()
 

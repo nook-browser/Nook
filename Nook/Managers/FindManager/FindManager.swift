@@ -26,18 +26,21 @@ class FindManager: ObservableObject {
         matchCount = 0
         currentMatchIndex = 0
     }
-    
+
     func hideFindBar() {
         // Clear highlights from current tab before hiding
         if let tab = currentTab {
             tab.clearFindInPage()
         }
-        
+
         isFindBarVisible = false
-        searchText = ""
-        matchCount = 0
-        currentMatchIndex = 0
-        currentTab = nil
+        // Delay clearing text until animation completes (0.25s)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            self?.searchText = ""
+            self?.matchCount = 0
+            self?.currentMatchIndex = 0
+            self?.currentTab = nil
+        }
     }
     
     func search(for text: String, in tab: Tab?) {

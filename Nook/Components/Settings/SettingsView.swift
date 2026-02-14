@@ -1250,6 +1250,9 @@ private struct ShortcutRowView: View {
         .padding(12)
         .background(Color(.controlBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .onChange(of: shortcut) { _, newShortcut in
+            localKeyCombination = newShortcut.keyCombination
+        }
     }
 
     private func updateShortcut() {

@@ -147,6 +147,9 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     // Web Store integration
     private var webStoreHandler: WebStoreScriptHandler?
 
+    // Debounce task for SPA navigation persistence
+    private var spaPersistDebounceTask: Task<Void, Never>?
+
     // MARK: - Tab State
     var isUnloaded: Bool {
         return _webView == nil
@@ -2690,6 +2693,14 @@ extension Tab: WKScriptMessageHandler {
                     if self.url.absoluteString != url.absoluteString {
                         self.url = url
                         self.browserManager?.syncTabAcrossWindows(self.id)
+
+                        // Debounce persistence for SPA navigation to avoid excessive writes
+                        self.spaPersistDebounceTask?.cancel()
+                        self.spaPersistDebounceTask = Task { [weak self] in
+                            try? await Task.sleep(nanoseconds: 200_000_000) // 200ms
+                            guard !Task.isCancelled else { return }
+                            self?.browserManager?.tabManager.persistSnapshot()
+                        }
                     }
                 }
             }
