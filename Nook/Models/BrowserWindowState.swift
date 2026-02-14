@@ -52,9 +52,6 @@ class BrowserWindowState {
     /// Whether the command palette is visible in this window
     var isCommandPaletteVisible: Bool = false
 
-    /// Whether the URL was recently copied (for toast feedback)
-    var didCopyURL: Bool = false
-
     /// Frame of the URL bar within this window
     var urlBarFrame: CGRect = .zero
 

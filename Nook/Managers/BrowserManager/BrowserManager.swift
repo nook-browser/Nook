@@ -365,7 +365,6 @@ class BrowserManager: ObservableObject {
     @Published var sidebarContentWidth: CGFloat = 234
     @Published var isSidebarVisible: Bool = true
     @Published var isCommandPaletteVisible: Bool = false
-    @Published var didCopyURL: Bool = false
     // Frame of the URL bar within the window; used to anchor the mini palette precisely
     @Published var urlBarFrame: CGRect = .zero
     @Published var shouldShowZoomPopup: Bool = false
@@ -1451,13 +1450,12 @@ class BrowserManager: ObservableObject {
                 print("Clipboard operation success: \(success)")
             }
 
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                self.didCopyURL = true
-            }
+            // Show toast on active window
+            if let windowState = windowRegistry?.activeWindow {
+                windowState.isShowingCopyURLToast = true
 
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                    self.didCopyURL = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    windowState.isShowingCopyURLToast = false
                 }
             }
         } else {
@@ -1864,7 +1862,6 @@ class BrowserManager: ObservableObject {
         windowState.isSidebarVisible = isSidebarVisible
         windowState.savedSidebarWidth = savedSidebarWidth
         windowState.isCommandPaletteVisible = false
-        windowState.didCopyURL = false
 
         // Set the NSWindow reference for keyboard shortcuts
         if let window = NSApplication.shared.windows.first(where: {
