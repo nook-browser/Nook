@@ -419,8 +419,8 @@ class TabManager: ObservableObject {
     private let context: ModelContext
     private let persistence: PersistenceActor
 
-    // Tab closure undo tracking
-    private var recentlyClosedTabs: [(tab: Tab, spaceId: UUID?, timestamp: Date)] = []
+    // Tab closure undo tracking - stores snapshot of tab state at closure time
+    private var recentlyClosedTabs: [(tab: Tab, spaceId: UUID?, currentURL: URL?, canGoBack: Bool, canGoForward: Bool, timestamp: Date)] = []
     private let undoDuration: TimeInterval = 20.0 // 20 seconds
     private var undoTimer: Timer?
 
@@ -2460,12 +2460,26 @@ extension TabManager {
         // Update last tab closure time
         lastTabClosureTime = now
 
+        // Capture the ACTUAL current state at closure time
+        // This ensures undo restores to the same page as browser restart would
+        let canGoBack = tab.canGoBack
+        let canGoForward = tab.canGoForward
+
+        // Use tab.url which is reliably updated via didCommit/didFinish navigation delegates
+        // Note: tab.webView?.url can be stale/incorrect, especially after SPA navigation
+        let urlToRestore = tab.url
+        let currentURL = tab.url  // For consistency in storage tuple
+
+        // Capture current title for restoration (favicon will be re-fetched)
+        let titleToRestore = tab.name
+
+
         // Create a deep copy of the tab for restoration
         let tabCopy = Tab(
             id: UUID(), // New ID for the restored tab
-            url: tab.url,
-            name: tab.name,
-            favicon: "globe", // Default icon, will be updated when tab loads
+            url: urlToRestore,
+            name: titleToRestore,
+            favicon: "globe", // Default favicon, will be updated when tab loads
             spaceId: spaceId,
             index: tab.index
         )
@@ -2476,7 +2490,15 @@ extension TabManager {
         tabCopy.isSpacePinned = tab.isSpacePinned
         tabCopy.folderId = tab.folderId
 
-        recentlyClosedTabs.append((tab: tabCopy, spaceId: spaceId, timestamp: now))
+        // Store snapshot with navigation state for accurate restoration
+        recentlyClosedTabs.append((
+            tab: tabCopy,
+            spaceId: spaceId,
+            currentURL: currentURL,
+            canGoBack: canGoBack,
+            canGoForward: canGoForward,
+            timestamp: now
+        ))
 
         // Schedule cleanup of expired tabs
         scheduleUndoTimerCleanup()
@@ -2493,13 +2515,25 @@ extension TabManager {
         // Update last tab closure time for cooldown
         lastTabClosureTime = now
 
-        // Create deep copies of all tabs for restoration
+        // Create deep copies of all tabs for restoration with current state snapshot
         for (tab, spaceId) in tabs {
+            // Capture the ACTUAL current state at closure time
+            let canGoBack = tab.canGoBack
+            let canGoForward = tab.canGoForward
+
+            // Use tab.url which is reliably updated via didCommit/didFinish navigation delegates
+            // Note: tab.webView?.url can be stale/incorrect, especially after SPA navigation
+            let urlToRestore = tab.url
+            let currentURL = tab.url  // For consistency in storage tuple
+
+            // Capture current title for restoration (favicon will be re-fetched)
+            let titleToRestore = tab.name
+
             let tabCopy = Tab(
                 id: UUID(), // New ID for the restored tab
-                url: tab.url,
-                name: tab.name,
-                favicon: "globe", // Default icon, will be updated when tab loads
+                url: urlToRestore,
+                name: titleToRestore,
+                favicon: "globe", // Default favicon, will be updated when tab loads
                 spaceId: spaceId,
                 index: tab.index
             )
@@ -2510,7 +2544,15 @@ extension TabManager {
             tabCopy.isSpacePinned = tab.isSpacePinned
             tabCopy.folderId = tab.folderId
 
-            recentlyClosedTabs.append((tab: tabCopy, spaceId: spaceId, timestamp: now))
+            // Store snapshot with navigation state for accurate restoration
+            recentlyClosedTabs.append((
+                tab: tabCopy,
+                spaceId: spaceId,
+                currentURL: currentURL,
+                canGoBack: canGoBack,
+                canGoForward: canGoForward,
+                timestamp: now
+            ))
         }
 
         // Schedule cleanup of expired tabs
@@ -2535,8 +2577,13 @@ extension TabManager {
 
         let mostRecent = recentlyClosedTabs.removeLast()
 
-        // Restore the tab
+        // Apply navigation state BEFORE addTab to ensure it's available when webView is created
+        mostRecent.tab.restoredCanGoBack = mostRecent.canGoBack
+        mostRecent.tab.restoredCanGoForward = mostRecent.canGoForward
+
+        // Restore the tab with its navigation state from when it was closed
         addTab(mostRecent.tab)
+
         setActiveTab(mostRecent.tab)
 
         // Clear the timer if no more tabs to undo
@@ -2553,6 +2600,11 @@ extension TabManager {
             guard !recentlyClosedTabs.isEmpty else { break }
             let tabInfo = recentlyClosedTabs.removeLast()
             restoredTabs.append(tabInfo.tab)
+
+            // Apply navigation state to match what the user saw when tab was closed
+            tabInfo.tab.restoredCanGoBack = tabInfo.canGoBack
+            tabInfo.tab.restoredCanGoForward = tabInfo.canGoForward
+
             addTab(tabInfo.tab)
         }
 
