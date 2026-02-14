@@ -107,6 +107,10 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     @Published var canGoBack: Bool = false
     @Published var canGoForward: Bool = false
 
+    // Restored navigation state from undo/session restoration (applied when web view is created)
+    var restoredCanGoBack: Bool?
+    var restoredCanGoForward: Bool?
+
     // MARK: - Video State
     @Published var hasPlayingVideo: Bool = false
     @Published var hasVideoContent: Bool = false  // Track if tab has any video content
@@ -169,7 +173,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     var activeWebView: WKWebView {
         if _webView == nil {
-            print("🔧 [Tab] First webView access, calling setupWebView() for: \(url.absoluteString)")
             setupWebView()
         }
         return _webView!
@@ -294,6 +297,23 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             // Notify TabManager to persist navigation state
             browserManager?.tabManager.updateTabNavigationState(self)
         }
+    }
+
+    /// Applies restored navigation state from undo/session restoration.
+    /// Call this after setting up navigation observers to ensure proper initial state.
+    private func applyRestoredNavigationState() {
+        guard let back = restoredCanGoBack else { return }
+        // Only apply restored state if webView hasn't already set different values
+        // This preserves actual webView state when it differs from restored state
+        if back != canGoBack {
+            canGoBack = back
+        }
+        if let forward = restoredCanGoForward, forward != canGoForward {
+            canGoForward = forward
+        }
+        // Clear restored state after applying
+        restoredCanGoBack = nil
+        restoredCanGoForward = nil
     }
 
     /// Enhanced navigation state update with aggressive timing for same-domain navigation
@@ -531,6 +551,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         if let webView = _webView {
             setupThemeColorObserver(for: webView)
             setupNavigationStateObservers(for: webView)
+            applyRestoredNavigationState()
         }
 
         // Only set up script handlers and user agent for new WebViews
@@ -1524,6 +1545,10 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
                 self, forKeyPath: "canGoBack", options: [.new, .initial], context: nil)
             webView.addObserver(
                 self, forKeyPath: "canGoForward", options: [.new, .initial], context: nil)
+            webView.addObserver(
+                self, forKeyPath: "title", options: [.new], context: nil)
+            // NOTE: URL observer removed - it was firing during setup and overwriting
+            // restored URLs. URL updates are handled by didCommit/didFinish delegates.
             navigationStateObservedWebViews.add(webView)
             print("🔍 [Tab] Set up navigation state observers for \(name)")
         }
@@ -1534,6 +1559,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         if navigationStateObservedWebViews.contains(webView) {
             webView.removeObserver(self, forKeyPath: "canGoBack")
             webView.removeObserver(self, forKeyPath: "canGoForward")
+            webView.removeObserver(self, forKeyPath: "title")
+            // NOTE: URL observer removed - see setupNavigationStateObservers
             navigationStateObservedWebViews.remove(webView)
             print("🔍 [Tab] Removed navigation state observers for \(name)")
         }
@@ -1647,6 +1674,15 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
                 "🔄 [Tab] KVO navigation state change for \(name): \(observedKeyPath) = \(webView.canGoBack), \(webView.canGoForward)"
             )
             updateNavigationState()
+        } else if keyPath == "title", let webView = object as? WKWebView {
+            // Real-time title updates from KVO (especially for SPAs)
+            if let newTitle = webView.title, !newTitle.isEmpty, newTitle != self.name {
+                print("📄 [Tab] KVO title change for \(name): '\(newTitle)'")
+                updateTitle(newTitle)
+            }
+        } else if keyPath == "URL", let webView = object as? WKWebView {
+            // URL observer disabled - was causing restored URLs to be overwritten
+            // URL updates are handled by didCommit/didFinish navigation delegates
         } else {
             super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
         }
@@ -2097,7 +2133,10 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
 
     func updateTitle(_ title: String) {
-        self.name = title.isEmpty ? url.host ?? "New Tab" : title
+        let newName = title.isEmpty ? url.host ?? "New Tab" : title
+        // Only update if title actually changed to prevent redundant redraws
+        guard newName != self.name else { return }
+        self.name = newName
         if #available(macOS 15.5, *) {
             ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.title])
         }
