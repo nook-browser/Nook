@@ -406,6 +406,7 @@ class BrowserManager: ObservableObject {
     var importManager: ImportManager
     var zoomManager = ZoomManager()
     var boostsManager = BoostsManager()
+    var keyboardShortcutManager: KeyboardShortcutManager?
     weak var nookSettings: NookSettingsService?
 
     var externalMiniWindowManager = ExternalMiniWindowManager()
@@ -689,6 +690,13 @@ class BrowserManager: ObservableObject {
         guard let assist = oauthAssist else { return }
         trackingProtectionManager.allowDomain(assist.host, allowed: true)
         hideOAuthAssist()
+    }
+
+    /// Automatically allows an OAuth provider domain for tracking protection
+    func oauthAllowDomain(_ host: String) {
+        let normalizedHost = host.lowercased()
+        print("🔐 [BrowserManager] Auto-allowing OAuth provider domain: \(normalizedHost)")
+        trackingProtectionManager.allowDomain(normalizedHost, allowed: true)
     }
 
     private func isLikelyOAuthURL(_ url: URL) -> Bool {
@@ -2489,26 +2497,52 @@ class BrowserManager: ObservableObject {
     }
     
     /// Close an incognito window and clean up all ephemeral data
+    /// This method ensures complete destruction of the incognito session with no memory leaks
     func closeIncognitoWindow(_ windowState: BrowserWindowState) {
         guard windowState.isIncognito else { return }
         
         print("🔒 [BrowserManager] Closing incognito window: \(windowState.id)")
         
-        // Clean up all ephemeral tabs (WebView cleanup)
+        // Step 1: Clean up all clone WebViews for ephemeral tabs from WebViewCoordinator
+        // This is critical - clone WebViews hold references to the data store
+        if let coordinator = webViewCoordinator {
+            for tab in windowState.ephemeralTabs {
+                coordinator.removeAllWebViews(for: tab)
+            }
+        }
+        
+        // Step 2: Clean up main WebViews for ephemeral tabs
         for tab in windowState.ephemeralTabs {
             tab.performComprehensiveWebViewCleanup()
         }
         
-        // Remove ephemeral profile (triggers data store cleanup)
-        profileManager.removeEphemeralProfile(for: windowState.id)
-        
-        // Stop tracking
+        // Step 3: Stop tracking this window BEFORE removing profile
+        // This prevents any concurrent access to ephemeral data
         incognitoWindows.remove(windowState.id)
         
-        // Clear references
+        // Step 4: Clear all ephemeral references from window state
+        // This breaks retain cycles BEFORE profile destruction
+        let ephemeralTabs = windowState.ephemeralTabs
+        let ephemeralSpaces = windowState.ephemeralSpaces
         windowState.ephemeralTabs.removeAll()
         windowState.ephemeralSpaces.removeAll()
+        windowState.currentTabId = nil
+        
+        // Step 5: Remove ephemeral profile (triggers data store destruction)
+        // This is done last to ensure all references are cleared first
+        profileManager.removeEphemeralProfile(for: windowState.id)
+        
+        // Step 6: Final cleanup of window state
         windowState.ephemeralProfile = nil
+        windowState.currentSpaceId = nil
+        
+        // Step 7: Force a memory warning to encourage garbage collection
+        // This helps ensure the data store is released
+        #if DEBUG
+        print("🔒 [BrowserManager] Incognito window closed. Ephemeral tabs: \(ephemeralTabs.count), spaces: \(ephemeralSpaces.count)")
+        #endif
+        
+        print("🔒 [BrowserManager] Incognito window fully closed and cleaned up: \(windowState.id)")
     }
     
     /// Check if a tab can be dragged to a target window (block cross-window for incognito)

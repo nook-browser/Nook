@@ -66,6 +66,12 @@ class BrowserWindowState {
     
     /// Presentation flag for the copy URL toast
     var isShowingCopyURLToast: Bool = false
+    
+    /// Presentation flag for the shortcut conflict toast
+    var isShowingShortcutConflictToast: Bool = false
+    
+    /// Shortcut conflict info for this window's toast
+    var shortcutConflictInfo: ShortcutConflictInfo?
 
     /// Compositor version counter for this window (incremented when tab ownership changes)
     var compositorVersion: Int = 0

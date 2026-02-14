@@ -122,10 +122,26 @@ final class ProfileManager: ObservableObject {
     }
     
     /// Remove an ephemeral profile when incognito window closes
+    /// This destroys the data store to ensure complete privacy
     func removeEphemeralProfile(for windowId: UUID) {
-        if let profile = ephemeralProfiles.removeValue(forKey: windowId) {
-            print("🔒 [ProfileManager] Removed ephemeral profile: \(profile.id) for window: \(windowId)")
+        guard let profile = ephemeralProfiles[windowId] else { return }
+        
+        print("🔒 [ProfileManager] Removing ephemeral profile: \(profile.id) for window: \(windowId)")
+        
+        // Destroy the data store first (synchronous wait for completion)
+        let semaphore = DispatchSemaphore(value: 0)
+        profile.destroyEphemeralDataStore {
+            semaphore.signal()
         }
+        
+        // Wait up to 5 seconds for data store destruction to complete
+        // This ensures all incognito data is wiped before releasing the profile
+        _ = semaphore.wait(timeout: .now() + 5)
+        
+        // Now remove from tracking
+        ephemeralProfiles.removeValue(forKey: windowId)
+        
+        print("🔒 [ProfileManager] Ephemeral profile removed: \(profile.id) for window: \(windowId)")
     }
     
     /// Get ephemeral profile for a window

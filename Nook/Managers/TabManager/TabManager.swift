@@ -1077,6 +1077,10 @@ class TabManager: ObservableObject {
         print("🔄 Setting currentTab from \(previous?.name ?? "nil") to \(tab.name)")
         currentTab = tab
         print("✅ currentTab set successfully to: \(currentTab?.name ?? "nil")")
+        
+        // Update website shortcut detector with the new tab's URL
+        browserManager?.keyboardShortcutManager?.websiteShortcutDetector.updateCurrentURL(tab.url)
+        
         // Do not auto-exit split when leaving split panes; preserve split state
 
         // Update active side in split view for all windows that contain this tab
