@@ -1077,6 +1077,10 @@ class TabManager: ObservableObject {
         print("🔄 Setting currentTab from \(previous?.name ?? "nil") to \(tab.name)")
         currentTab = tab
         print("✅ currentTab set successfully to: \(currentTab?.name ?? "nil")")
+        
+        // Update website shortcut detector with the new tab's URL
+        browserManager?.keyboardShortcutManager?.websiteShortcutDetector.updateCurrentURL(tab.url)
+        
         // Do not auto-exit split when leaving split panes; preserve split state
 
         // Update active side in split view for all windows that contain this tab
@@ -1185,6 +1189,35 @@ class TabManager: ObservableObject {
         )
         addTab(newTab)
         setActiveTab(newTab)
+        return newTab
+    }
+    
+    // MARK: - Ephemeral Tab Creation (Incognito)
+    
+    /// Create a new ephemeral tab in an incognito window
+    /// These tabs are NOT persisted and are stored in window state
+    @discardableResult
+    func createEphemeralTab(
+        url: URL,
+        in windowState: BrowserWindowState,
+        profile: Profile
+    ) -> Tab {
+        let newTab = Tab(
+            url: url,
+            name: url.host ?? "New Tab",
+            favicon: "globe",
+            spaceId: nil,
+            index: 0,
+            browserManager: browserManager
+        )
+        newTab.profileId = profile.id
+        
+        // Add to window's ephemeral tabs (NOT to persistent tabs)
+        windowState.ephemeralTabs.append(newTab)
+        windowState.currentTabId = newTab.id
+        
+        print("🔒 [TabManager] Created ephemeral tab: \(newTab.id) in window: \(windowState.id)")
+        
         return newTab
     }
 

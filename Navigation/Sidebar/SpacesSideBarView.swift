@@ -66,15 +66,17 @@ struct SpacesSideBarView: View {
                 .environmentObject(browserManager)
                 .environment(windowState)
 
-            // Pinned tabs grid
-            PinnedGrid(
-                width: windowState.sidebarContentWidth,
-                profileId: effectiveProfileId
-            )
-            .environmentObject(browserManager)
-            .environment(windowState)
-            .padding(.horizontal, 8)
-            .modifier(FallbackDropBelowEssentialsModifier())
+            // Pinned tabs grid (hidden in incognito)
+            if !windowState.isIncognito {
+                PinnedGrid(
+                    width: windowState.sidebarContentWidth,
+                    profileId: effectiveProfileId
+                )
+                .environmentObject(browserManager)
+                .environment(windowState)
+                .padding(.horizontal, 8)
+                .modifier(FallbackDropBelowEssentialsModifier())
+            }
 
             // Spaces page view with draggable spacer
             ZStack {
@@ -128,7 +130,9 @@ struct SpacesSideBarView: View {
     // MARK: - Spaces Page View
 
     private var spacesPageView: some View {
-        let spaces = browserManager.tabManager.spaces
+        let spaces = windowState.isIncognito
+            ? windowState.ephemeralSpaces
+            : browserManager.tabManager.spaces
 
         return Group {
             if spaces.isEmpty {
@@ -392,6 +396,14 @@ struct SpacesSideBarView: View {
     }
 
     private func resolveCurrentSpace() -> Space? {
+        // For incognito windows, use ephemeral spaces
+        if windowState.isIncognito {
+            if let currentId = windowState.currentSpaceId {
+                return windowState.ephemeralSpaces.first { $0.id == currentId }
+            }
+            return windowState.ephemeralSpaces.first
+        }
+        
         if let current = browserManager.tabManager.currentSpace {
             return current
         }

@@ -55,23 +55,36 @@ final class FocusableWKWebView: WKWebView {
     private var contextMenuFallbackWorkItem: DispatchWorkItem?
 
     override func menu(for event: NSEvent) -> NSMenu? {
-        guard let menu = super.menu(for: event) else { return nil }
+        print("🔽 [FocusableWKWebView] menu(for:) called - START")
+        guard let menu = super.menu(for: event) else {
+            print("🔽 [FocusableWKWebView] menu(for:) - super.menu returned nil")
+            return nil
+        }
+        print("🔽 [FocusableWKWebView] menu(for:) - got menu with \(menu.items.count) items")
         prepareMenu(menu)
+        print("🔽 [FocusableWKWebView] menu(for:) - returning menu with \(menu.items.count) items")
         return menu
     }
 
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
+        print("🔽 [FocusableWKWebView] willOpenMenu called - START, menu items: \(menu.items.count), menu address: \(ObjectIdentifier(menu))")
         super.willOpenMenu(menu, with: event)
         prepareMenu(menu)
+        print("🔽 [FocusableWKWebView] willOpenMenu - AFTER prepareMenu, menu items: \(menu.items.count)")
     }
 
     private func prepareMenu(_ menu: NSMenu) {
+        print("🔽 [FocusableWKWebView] prepareMenu called, pendingPayload exists: \(pendingPayload != nil), owningTab?.pendingContextMenuPayload exists: \(owningTab?.pendingContextMenuPayload != nil)")
         pendingMenu = menu
         pendingPayload = owningTab?.pendingContextMenuPayload
 
         contextMenuFallbackWorkItem?.cancel()
         let fallback = DispatchWorkItem { [weak self, weak menu] in
-            guard let self, let menu, self.pendingMenu === menu else { return }
+            guard let self, let menu, self.pendingMenu === menu else {
+                print("🔽 [FocusableWKWebView] FALLBACK TIMER: Guard failed - self exists: \(self != nil), menu exists: \(menu != nil), pendingMenu === menu: \(self?.pendingMenu === menu)")
+                return
+            }
+            print("🔽 [FocusableWKWebView] FALLBACK TIMER EXECUTING - sanitizing default menu")
             self.sanitizeDefaultMenu(menu)
             self.pendingMenu = nil
             self.pendingPayload = nil
@@ -81,7 +94,8 @@ final class FocusableWKWebView: WKWebView {
         contextMenuFallbackWorkItem = fallback
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: fallback)
 
-        _ = applyPendingContextMenuIfPossible()
+        let applied = applyPendingContextMenuIfPossible()
+        print("🔽 [FocusableWKWebView] prepareMenu: applyPendingContextMenuIfPossible returned \(applied)")
     }
     
     func handleImageDownload(identifier: String, promptForLocation: Bool = false) {
@@ -384,18 +398,30 @@ final class FocusableWKWebView: WKWebView {
     }
 
     func contextMenuPayloadDidUpdate(_ payload: WebContextMenuPayload?) {
+        print("🔽 [FocusableWKWebView] contextMenuPayloadDidUpdate called, payload exists: \(payload != nil), payload type: \(payload != nil ? String(describing: payload!) : "nil")")
         pendingPayload = payload
-        _ = applyPendingContextMenuIfPossible()
+        let applied = applyPendingContextMenuIfPossible()
+        print("🔽 [FocusableWKWebView] contextMenuPayloadDidUpdate: applyPendingContextMenuIfPossible returned \(applied)")
     }
 
     private func applyPendingContextMenuIfPossible() -> Bool {
+        print("🔽 [FocusableWKWebView] applyPendingContextMenuIfPossible: pendingPayload exists: \(pendingPayload != nil), pendingMenu exists: \(pendingMenu != nil)")
         guard let payload = pendingPayload,
               payload.shouldProvideCustomMenu,
-              let menu = pendingMenu else { return false }
+              let menu = pendingMenu else {
+            print("🔽 [FocusableWKWebView] applyPendingContextMenuIfPossible: GUARD FAILED")
+            return false
+        }
 
+        print("🔽 [FocusableWKWebView] applyPendingContextMenuIfPossible: Building menu items for payload")
         let items = WebContextMenuItem.buildMenuItems(for: payload, on: self, baseMenu: menu)
-        guard !items.isEmpty else { return false }
+        print("🔽 [FocusableWKWebView] applyPendingContextMenuIfPossible: Built \(items.count) items")
+        guard !items.isEmpty else {
+            print("🔽 [FocusableWKWebView] applyPendingContextMenuIfPossible: NO ITEMS BUILT")
+            return false
+        }
 
+        print("🔽 [FocusableWKWebView] applyPendingContextMenuIfPossible: APPLYING CUSTOM MENU with \(items.count) items")
         menu.items = items
         pendingMenu = nil
         pendingPayload = nil

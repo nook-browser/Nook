@@ -38,7 +38,7 @@ struct SpaceTab: View {
                     tab.favicon
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 14, height: 14)
+                        .frame(width: 18, height: 18)
                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         .opacity(tab.isUnloaded ? 0.5 : 1.0)
                     

@@ -19,9 +19,9 @@ enum PinnedTabsConfiguration: String, CaseIterable, Identifiable {
     var faviconHeight: CGFloat {
         switch self {
         case .large:
-            return 16
+            return 20
         case .small:
-            return 16
+            return 18
         }
     }
     

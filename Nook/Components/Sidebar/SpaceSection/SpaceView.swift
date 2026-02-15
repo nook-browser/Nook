@@ -82,15 +82,24 @@ struct SpaceView: View {
     }
     
     private var tabs: [Tab] {
-        browserManager.tabManager.tabs(in: space)
+        if windowState.isIncognito {
+            return windowState.ephemeralTabs.sorted { $0.index < $1.index }
+        }
+        return browserManager.tabManager.tabs(in: space)
     }
 
     private var spacePinnedTabs: [Tab] {
-        browserManager.tabManager.spacePinnedTabs(for: space.id)
+        if windowState.isIncognito {
+            return []
+        }
+        return browserManager.tabManager.spacePinnedTabs(for: space.id)
     }
 
     private var folders: [TabFolder] {
-        browserManager.tabManager.folders(for: space.id)
+        if windowState.isIncognito {
+            return []
+        }
+        return browserManager.tabManager.folders(for: space.id)
     }
 
     private var hasSpacePinnedContent: Bool {

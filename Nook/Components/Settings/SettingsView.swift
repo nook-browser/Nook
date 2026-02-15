@@ -1117,6 +1117,29 @@ struct ShortcutsSettingsView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
             }
+            
+            // Website shortcut detection toggle
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Detect Website Shortcuts")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    Text("When a website uses the same shortcut, press once for website, twice for Nook")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                Toggle("", isOn: Binding(
+                    get: { WebsiteShortcutProfile.isFeatureEnabled },
+                    set: { WebsiteShortcutProfile.isFeatureEnabled = $0 }
+                ))
+                .toggleStyle(.switch)
+                .controlSize(.small)
+            }
+            .padding(12)
+            .background(Color(.controlBackgroundColor).opacity(0.5))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
 
             Divider().opacity(0.4)
 

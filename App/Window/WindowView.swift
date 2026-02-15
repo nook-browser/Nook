@@ -69,12 +69,21 @@ struct WindowView: View {
                     CopyURLToast()
                         .environment(windowState)
                 }
+                
+                // Shortcut conflict toast
+                if windowState.isShowingShortcutConflictToast,
+                   let conflictInfo = windowState.shortcutConflictInfo
+                {
+                    ShortcutConflictToast(conflictInfo: conflictInfo)
+                        .environment(windowState)
+                }
             }
             .padding(10)
             // Animate toast insertions/removals
             .animation(.smooth(duration: 0.25), value: windowState.isShowingProfileSwitchToast)
             .animation(.smooth(duration: 0.25), value: browserManager.showTabClosureToast)
             .animation(.smooth(duration: 0.25), value: windowState.isShowingCopyURLToast)
+            .animation(.smooth(duration: 0.25), value: windowState.isShowingShortcutConflictToast)
         }
         // Zoom control popup - separate from system toasts
         .overlay(alignment: .topTrailing) {
@@ -104,6 +113,28 @@ struct WindowView: View {
         }
         .onDisappear {
             hoverSidebarManager.stop()
+        }
+        // Handle shortcut conflict notifications
+        .onReceive(NotificationCenter.default.publisher(for: .shortcutConflictDetected)) { notification in
+            if let conflictInfo = notification.userInfo?["conflictInfo"] as? ShortcutConflictInfo,
+               conflictInfo.windowId == windowState.id {
+                windowState.shortcutConflictInfo = conflictInfo
+                windowState.isShowingShortcutConflictToast = true
+                
+                // Auto-dismiss after 1.5 seconds (slightly longer than the 1s timeout)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    if windowState.shortcutConflictInfo?.timestamp == conflictInfo.timestamp {
+                        windowState.isShowingShortcutConflictToast = false
+                    }
+                }
+            }
+        }
+        // Handle shortcut conflict dismissal
+        .onReceive(NotificationCenter.default.publisher(for: .shortcutConflictDismissed)) { notification in
+            if let windowId = notification.userInfo?["windowId"] as? UUID,
+               windowId == windowState.id {
+                windowState.isShowingShortcutConflictToast = false
+            }
         }
         .environmentObject(browserManager)
         .environmentObject(browserManager.gradientColorManager)

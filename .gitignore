@@ -7,9 +7,11 @@ Nook/.claude
 .crush
 /sessions
 CLAUDE.md
+AGENTS.md
 .xcodebuildmcp/
 package.json
 package-lock.json
+.opencode/
 
 ## User settings
 xcuserdata/

@@ -23,6 +23,9 @@ final class Profile: NSObject, Identifiable {
     var lastUsed: Date = Date()
     var isDefault: Bool { name.lowercased() == "default" }
     
+    /// Whether this is an ephemeral/incognito profile (no disk persistence)
+    var isEphemeral: Bool = false
+    
     // Cached stats
     private(set) var cachedCookieCount: Int = 0
     private(set) var cachedRecordCount: Int = 0
@@ -42,6 +45,34 @@ final class Profile: NSObject, Identifiable {
         // Falls back to the default store if unavailable for any reason.
         self.dataStore = Profile.createDataStore(for: id)
         super.init()
+    }
+
+    /// Initialize with a custom data store (used for ephemeral profiles)
+    init(
+        id: UUID = UUID(),
+        name: String,
+        icon: String,
+        dataStore: WKWebsiteDataStore
+    ) {
+        self.id = id
+        self.name = name
+        self.icon = icon
+        self.dataStore = dataStore
+        super.init()
+    }
+
+    // MARK: - Ephemeral Profile Factory
+    /// Create a new ephemeral/incognito profile with non-persistent data store
+    static func createEphemeral() -> Profile {
+        let profile = Profile(
+            id: UUID(),
+            name: "Incognito",
+            icon: "eye.slash",
+            dataStore: .nonPersistent()
+        )
+        profile.isEphemeral = true
+        print("🔒 [Profile] Created ephemeral incognito profile: \(profile.id)")
+        return profile
     }
 
     // MARK: - Data Store Creation
@@ -117,5 +148,39 @@ final class Profile: NSObject, Identifiable {
             }
         }
         await refreshDataStoreStats()
+    }
+    
+    /// Destroys the ephemeral data store by clearing all data.
+    /// This should be called before releasing an ephemeral profile to ensure
+    /// all incognito data is wiped and the store can be properly deallocated.
+    /// - Parameter completion: Optional completion handler called when destruction is complete
+    func destroyEphemeralDataStore(completion: (() -> Void)? = nil) {
+        guard isEphemeral else {
+            print("⚠️ [Profile] Cannot destroy data store: profile is not ephemeral")
+            completion?()
+            return
+        }
+        
+        print("🔒 [Profile] Destroying ephemeral data store for profile: \(id)")
+        
+        let allTypes = WKWebsiteDataStore.allWebsiteDataTypes()
+        
+        // Clear all data from the store
+        dataStore.removeData(ofTypes: allTypes, modifiedSince: .distantPast) { [weak self] in
+            guard let self = self else {
+                completion?()
+                return
+            }
+            
+            // Also clear cookies specifically
+            self.dataStore.httpCookieStore.getAllCookies { cookies in
+                for cookie in cookies {
+                    self.dataStore.httpCookieStore.delete(cookie)
+                }
+                
+                print("🔒 [Profile] Ephemeral data store destroyed for profile: \(self.id)")
+                completion?()
+            }
+        }
     }
 }

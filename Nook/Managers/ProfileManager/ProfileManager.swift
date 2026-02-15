@@ -13,7 +13,11 @@ import SwiftData
 final class ProfileManager: ObservableObject {
     let context: ModelContext
     @Published var profiles: [Profile] = []
-
+    
+    // MARK: - Ephemeral Profiles (Incognito)
+    /// Active ephemeral profiles (one per incognito window)
+    private var ephemeralProfiles: [UUID: Profile] = [:]  // windowId -> profile
+    
     init(context: ModelContext) {
         self.context = context
         loadProfiles()
@@ -105,5 +109,48 @@ final class ProfileManager: ObservableObject {
         if profiles.isEmpty {
             _ = createProfile(name: "Default", icon: "person.crop.circle")
         }
+    }
+    
+    // MARK: - Ephemeral Profile Management
+    
+    /// Create a new ephemeral profile for an incognito window
+    func createEphemeralProfile(for windowId: UUID) -> Profile {
+        let profile = Profile.createEphemeral()
+        ephemeralProfiles[windowId] = profile
+        print("🔒 [ProfileManager] Created ephemeral profile for window: \(windowId)")
+        return profile
+    }
+    
+    /// Remove an ephemeral profile when incognito window closes
+    /// This destroys the data store to ensure complete privacy
+    func removeEphemeralProfile(for windowId: UUID) {
+        guard let profile = ephemeralProfiles[windowId] else { return }
+        
+        print("🔒 [ProfileManager] Removing ephemeral profile: \(profile.id) for window: \(windowId)")
+        
+        // Destroy the data store first (synchronous wait for completion)
+        let semaphore = DispatchSemaphore(value: 0)
+        profile.destroyEphemeralDataStore {
+            semaphore.signal()
+        }
+        
+        // Wait up to 5 seconds for data store destruction to complete
+        // This ensures all incognito data is wiped before releasing the profile
+        _ = semaphore.wait(timeout: .now() + 5)
+        
+        // Now remove from tracking
+        ephemeralProfiles.removeValue(forKey: windowId)
+        
+        print("🔒 [ProfileManager] Ephemeral profile removed: \(profile.id) for window: \(windowId)")
+    }
+    
+    /// Get ephemeral profile for a window
+    func ephemeralProfile(for windowId: UUID) -> Profile? {
+        return ephemeralProfiles[windowId]
+    }
+    
+    /// Check if a profile ID is an ephemeral profile
+    func isEphemeralProfile(_ profileId: UUID) -> Bool {
+        return ephemeralProfiles.values.contains { $0.id == profileId }
     }
 }

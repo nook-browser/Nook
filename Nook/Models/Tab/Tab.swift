@@ -29,10 +29,26 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     // Track Option key state for Peek functionality
     var isOptionKeyDown: Bool = false
 
+    // MARK: - OAuth Flow State
+    /// Whether this tab is hosting an OAuth/sign-in flow popup
+    var isOAuthFlow: Bool = false
+    /// Reference to the parent tab that initiated this OAuth flow
+    var oauthParentTabId: UUID?
+    /// The OAuth provider host (e.g., "accounts.google.com") for tracking protection exemption
+    var oauthProviderHost: String?
+    /// The URL pattern that indicates OAuth completion (redirect back to original domain)
+    var oauthCompletionURLPattern: String?
+
     // MARK: - Pin State
     var isPinned: Bool = false  // Global pinned (essentials)
     var isSpacePinned: Bool = false  // Space-level pinned
     var folderId: UUID?  // Folder membership for tabs within spacepinned area
+    
+    // MARK: - Ephemeral State
+    /// Whether this tab belongs to an ephemeral/incognito session
+    var isEphemeral: Bool {
+        return resolveProfile()?.isEphemeral ?? false
+    }
 
     // MARK: - Favicon Cache
     // Global favicon cache shared across profiles by design to increase hit rate
@@ -576,6 +592,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
                 forName: "NookIdentity")
             _webView?.configuration.userContentController.removeScriptMessageHandler(
                 forName: "nookWebStore")
+            _webView?.configuration.userContentController.removeScriptMessageHandler(
+                forName: "nookShortcutDetect")
 
             // Add handlers
             _webView?.configuration.userContentController.add(self, name: "linkHover")
@@ -588,6 +606,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
                 self, name: "backgroundColor_\(id.uuidString)")
             _webView?.configuration.userContentController.add(self, name: "historyStateDidChange")
             _webView?.configuration.userContentController.add(self, name: "NookIdentity")
+            _webView?.configuration.userContentController.add(self, name: "nookShortcutDetect")
 
             // Add Web Store integration handler (only if experimental extensions are enabled)
             if let browserManager = browserManager,
@@ -650,6 +669,22 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     // Resolve the Profile for this tab via its space association, or fall back to currentProfile, then default profile
     func resolveProfile() -> Profile? {
+        // First, check if we have a direct profileId assignment (including ephemeral tabs)
+        if let pid = profileId {
+            // Check ephemeral profiles first
+            if let windowState = browserManager?.windowRegistry?.windows.values.first(where: { window in
+                window.ephemeralTabs.contains(where: { $0.id == self.id })
+            }),
+               let ephemeralProfile = windowState.ephemeralProfile,
+               ephemeralProfile.id == pid {
+                return ephemeralProfile
+            }
+            // Check regular profiles
+            if let profile = browserManager?.profileManager.profiles.first(where: { $0.id == pid }) {
+                return profile
+            }
+        }
+        
         // Attempt to resolve via associated space
         if let sid = spaceId,
             let space = browserManager?.tabManager.spaces.first(where: { $0.id == sid })
@@ -1645,7 +1680,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
 
     /// MEMORY LEAK FIX: Comprehensive cleanup for the main tab WebView
-    private func performComprehensiveWebViewCleanup() {
+    public func performComprehensiveWebViewCleanup() {
         guard let webView = _webView else { return }
 
         print("🧹 [Tab] Performing comprehensive cleanup for main WebView: \(name)")
@@ -2114,6 +2149,19 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             }
         }
     }
+    
+    private func injectShortcutDetection(to webView: WKWebView) {
+        // Inject the JS script from WebsiteShortcutDetector for runtime shortcut detection
+        let script = WebsiteShortcutDetector.jsDetectionScript
+        
+        webView.evaluateJavaScript(script) { _, error in
+            if let error = error {
+                print("⚠️ [Tab] Error injecting shortcut detection: \(error.localizedDescription)")
+            } else {
+                print("⌨️ [Tab] Shortcut detection script injected")
+            }
+        }
+    }
 
     func activate() {
         browserManager?.tabManager.setActiveTab(self)
@@ -2340,6 +2388,8 @@ extension Tab: WKNavigationDelegate {
         if let newURL = webView.url {
             self.url = newURL
             browserManager?.syncTabAcrossWindows(self.id)
+            // Update website shortcut detector with new URL
+            browserManager?.keyboardShortcutManager?.websiteShortcutDetector.updateCurrentURL(newURL)
             if #available(macOS 15.5, *) {
                 ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
             }
@@ -2387,14 +2437,16 @@ extension Tab: WKNavigationDelegate {
 
                     // Add to profile-aware history after title is updated
                     if let currentURL = webView.url {
-                        let profileId =
-                            self?.resolveProfile()?.id ?? self?.browserManager?.currentProfile?.id
+                        let profile = self?.resolveProfile()
+                        let profileId = profile?.id ?? self?.browserManager?.currentProfile?.id
+                        let isEphemeral = profile?.isEphemeral ?? false
                         self?.browserManager?.historyManager.addVisit(
                             url: currentURL,
                             title: title,
                             timestamp: Date(),
                             tabId: self?.id,
-                            profileId: profileId
+                            profileId: profileId,
+                            isEphemeral: isEphemeral
                         )
                     }
 
@@ -2421,6 +2473,7 @@ extension Tab: WKNavigationDelegate {
         injectPiPStateListener(to: webView)
         injectMediaDetection(to: webView)
         injectHistoryStateObserver(into: webView)
+        injectShortcutDetection(to: webView)
         updateNavigationStateEnhanced(source: "didCommit")
 
         // Trigger background color extraction after page fully loads
@@ -2438,6 +2491,11 @@ extension Tab: WKNavigationDelegate {
         // Apply mute state using MuteableWKWebView if the tab was previously muted
         if isAudioMuted {
             setMuted(true)
+        }
+        
+        // Check for OAuth completion and auto-close if needed
+        if isOAuthFlow, let currentURL = webView.url {
+            checkOAuthCompletion(url: currentURL)
         }
     }
 
@@ -2746,10 +2804,28 @@ extension Tab: WKScriptMessageHandler {
 
         case "NookIdentity":
             handleOAuthRequest(message: message)
+            
+        case "nookShortcutDetect":
+            handleShortcutDetection(message: message)
 
         default:
             break
         }
+    }
+    
+    private func handleShortcutDetection(message: WKScriptMessage) {
+        // Handle detected shortcuts from JS injection
+        guard let shortcutsString = message.body as? String,
+              let currentURL = _webView?.url?.absoluteString else { return }
+        
+        // Parse the comma-separated shortcuts
+        let shortcuts = Set(shortcutsString.split(separator: ",").map { String($0) })
+        
+        // Update the detector with detected shortcuts for this URL
+        browserManager?.keyboardShortcutManager?.websiteShortcutDetector.updateJSDetectedShortcuts(
+            for: currentURL,
+            shortcuts: shortcuts
+        )
     }
 
     private func handleCommandClick(url: URL) {
@@ -2921,17 +2997,40 @@ extension Tab: WKUIDelegate {
     ) -> WKWebView? {
         guard let bm = browserManager else { return nil }
 
-        // OAuth and signin flows should ALWAYS open in a new tab in the same profile/data store
-        // Miniwindows use separate data stores which breaks OAuth flows
+        // OAuth and signin flows should open in a miniwindow for better UX
+        // The miniwindow handles OAuth completion detection and notifies the parent tab
         if let url = navigationAction.request.url,
             isLikelyOAuthOrExternalWindow(url: url, windowFeatures: windowFeatures)
         {
-            print("🔐 [Tab] OAuth/signin popup detected, opening in new tab: \(url.absoluteString)")
-            // Create a new tab in the same space with the same profile/data store
-            let newTab = bm.tabManager.createNewTab(
-                url: url.absoluteString, in: bm.tabManager.currentSpace)
-            bm.tabManager.setActiveTab(newTab)
-            return nil  // Don't create a WebView, we created a tab instead
+            print("🔐 [Tab] OAuth/signin popup detected, opening in miniwindow: \(url.absoluteString)")
+            
+            // Auto-allow the OAuth provider domain for tracking protection
+            if let providerHost = url.host?.lowercased() {
+                bm.oauthAllowDomain(providerHost)
+            }
+            
+            // Store reference to parent tab for completion callback
+            let parentTabId = self.id
+            
+            // Open OAuth flow in miniwindow
+            bm.externalMiniWindowManager.present(url: url) { [weak bm] success, finalURL in
+                print("🔐 [Tab] Miniwindow OAuth flow completed: success=\(success), url=\(finalURL?.absoluteString ?? "nil")")
+                
+                guard let bm = bm else { return }
+                
+                // Find the parent tab and reload it
+                if let parentTab = bm.tabManager.allTabs().first(where: { $0.id == parentTabId }) {
+                    DispatchQueue.main.async {
+                        if success {
+                            bm.tabManager.setActiveTab(parentTab)
+                            parentTab.activeWebView.reload()
+                            print("🔐 [Tab] Parent tab reloaded after successful OAuth")
+                        }
+                    }
+                }
+            }
+            
+            return nil  // Don't create a WebView, miniwindow handles it
         }
 
         // For regular popups, check if this should be redirected to Peek
@@ -3014,6 +3113,105 @@ extension Tab: WKUIDelegate {
         }
 
         return newWebView
+    }
+
+    // MARK: - OAuth Tab Helpers
+    
+    /// Sets up message handlers for an OAuth popup tab
+    private func setupOAuthTabMessageHandlers(for tab: Tab, webView: WKWebView) {
+        let userContentController = webView.configuration.userContentController
+        
+        // Remove any existing handlers first
+        let handlerNames = ["linkHover", "commandHover", "commandClick", "pipStateChange",
+                           "mediaStateChange_\(tab.id.uuidString)",
+                           "backgroundColor_\(tab.id.uuidString)",
+                           "historyStateDidChange", "NookIdentity"]
+        
+        for handlerName in handlerNames {
+            userContentController.removeScriptMessageHandler(forName: handlerName)
+        }
+        
+        // Add handlers for the OAuth tab
+        userContentController.add(tab, name: "linkHover")
+        userContentController.add(tab, name: "commandHover")
+        userContentController.add(tab, name: "commandClick")
+        userContentController.add(tab, name: "pipStateChange")
+        userContentController.add(tab, name: "mediaStateChange_\(tab.id.uuidString)")
+        userContentController.add(tab, name: "backgroundColor_\(tab.id.uuidString)")
+        userContentController.add(tab, name: "historyStateDidChange")
+        userContentController.add(tab, name: "NookIdentity")
+    }
+    
+    /// Checks if a URL indicates OAuth completion and handles the flow
+    private func checkOAuthCompletion(url: URL) {
+        guard isOAuthFlow, let parentTabId = oauthParentTabId,
+              let bm = browserManager else { return }
+        
+        let urlString = url.absoluteString.lowercased()
+        let host = url.host?.lowercased() ?? ""
+        
+        // Check for OAuth success indicators
+        let successIndicators = ["code=", "access_token=", "id_token=", "oauth_token=",
+                                "oauth_verifier=", "session_state=", "samlresponse="]
+        
+        // Check for OAuth error indicators
+        let errorIndicators = ["error=", "access_denied", "invalid_request", "denied"]
+        
+        let isSuccess = successIndicators.contains { urlString.contains($0) }
+        let isError = errorIndicators.contains { urlString.contains($0) }
+        
+        // Check if this is a redirect back to the original domain (not the OAuth provider)
+        if let providerHost = oauthProviderHost, !host.contains(providerHost),
+           (isSuccess || isError || !isLikelyOAuthURL(url)) {
+            
+            print("🔐 [Tab] OAuth flow completed: success=\(isSuccess), closing OAuth tab")
+            
+            // Find and reload the parent tab
+            if let parentTab = bm.tabManager.allTabs().first(where: { $0.id == parentTabId }) {
+                DispatchQueue.main.async { [weak bm] in
+                    // Switch to parent tab
+                    bm?.tabManager.setActiveTab(parentTab)
+                    // Reload parent tab to pick up authenticated state
+                    parentTab.activeWebView.reload()
+                }
+            }
+            
+            // Close this OAuth tab
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak bm, weak self] in
+                guard let self = self, let bm = bm else { return }
+                print("🔐 [Tab] Auto-closing OAuth tab: \(self.name)")
+                bm.tabManager.removeTab(self.id)
+            }
+        }
+    }
+    
+    /// Determines if a URL is likely an OAuth-related URL
+    private func isLikelyOAuthURL(_ url: URL) -> Bool {
+        let host = (url.host ?? "").lowercased()
+        let path = url.path.lowercased()
+        let query = url.query?.lowercased() ?? ""
+        
+        let oauthHosts = [
+            "accounts.google.com", "login.microsoftonline.com", "login.live.com",
+            "appleid.apple.com", "github.com", "gitlab.com", "bitbucket.org",
+            "auth0.com", "okta.com", "onelogin.com", "pingidentity.com",
+            "slack.com", "zoom.us", "login.cloudflareaccess.com",
+            "oauth", "auth", "login", "signin"
+        ]
+        
+        if oauthHosts.contains(where: { host.contains($0) }) { return true }
+        
+        if path.contains("/oauth") || path.contains("oauth2") || path.contains("/authorize")
+            || path.contains("/signin") || path.contains("/login") || path.contains("/callback") {
+            return true
+        }
+        
+        if query.contains("client_id=") || query.contains("redirect_uri=")
+            || query.contains("response_type=") || query.contains("scope=") {
+            return true
+        }
+        
+        return false
     }
 
     private func handleMiniWindowAuthCompletion(success: Bool, finalURL: URL?) {
@@ -3559,9 +3757,13 @@ extension Tab {
 
 extension Tab {
     func deliverContextMenuPayload(_ payload: WebContextMenuPayload?) {
+        print("🔽 [Tab] deliverContextMenuPayload called, payload exists: \(payload != nil)")
         pendingContextMenuPayload = payload
         if let webView = _webView as? FocusableWKWebView {
+            print("🔽 [Tab] Calling webView.contextMenuPayloadDidUpdate")
             webView.contextMenuPayloadDidUpdate(payload)
+        } else {
+            print("🔽 [Tab] WARNING: _webView is nil or not FocusableWKWebView")
         }
     }
 }

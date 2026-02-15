@@ -21,6 +21,9 @@ public class Space: NSObject, Identifiable {
     var gradient: SpaceGradient
     var activeTabId: UUID?
     var profileId: UUID?
+    
+    /// Whether this space belongs to an ephemeral/incognito profile
+    var isEphemeral: Bool = false
 
     init(
         id: UUID = UUID(),
