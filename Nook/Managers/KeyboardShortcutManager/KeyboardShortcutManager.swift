@@ -183,7 +183,7 @@ class KeyboardShortcutManager {
         }
         
         // Arrow keys and other navigation keys should pass through to the WebView
-        // They have no charactersIgnoringModifiers, so KeyCombination would fail anyway
+        // UNLESS they have modifiers (cmd, option, etc.) - those might be Nook shortcuts
         let keyCode = event.keyCode
         let navigationKeyCodes: Set<UInt16> = [
             123, // left arrow
@@ -196,7 +196,16 @@ class KeyboardShortcutManager {
             121, // page down
         ]
         if navigationKeyCodes.contains(keyCode) {
-            return false // Always pass through
+            // If arrow keys have modifiers, don't pass through - let them be checked as shortcuts
+            // This prevents the "bonk" sound when using combo shortcuts like cmd+option+arrow
+            let hasModifiers = event.modifierFlags.contains(.command) ||
+                              event.modifierFlags.contains(.option) ||
+                              event.modifierFlags.contains(.control) ||
+                              event.modifierFlags.contains(.shift)
+            if !hasModifiers {
+                return false // Pass through for pure navigation (no modifiers)
+            }
+            // Has modifiers - continue to check if it's a Nook shortcut
         }
         
         guard let keyCombination = KeyCombination(from: event) else { 

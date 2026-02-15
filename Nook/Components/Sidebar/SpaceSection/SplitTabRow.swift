@@ -63,7 +63,7 @@ private struct SplitHalfTab: View {
                     tab.favicon
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 16, height: 16)
+                        .frame(width: 18, height: 18)
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                     Text(tab.name)
                         .font(.system(size: 13, weight: .medium))
