@@ -34,6 +34,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     // Window registry for accessing active window state
     weak var windowRegistry: WindowRegistry?
 
+    // MCP Manager reference for cleanup on termination
+    var mcpManager: MCPManager?
+
     private let urlEventClass = AEEventClass(kInternetEventClass)
     private let urlEventID = AEEventID(kAEGetURL)
     private var mouseEventMonitor: Any?
@@ -212,6 +215,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         // Keep minimal to avoid MainActor deadlocks; main work happens in applicationShouldTerminate
         AppDelegate.log.info("applicationWillTerminate called")
+
+        // Stop MCP child processes
+        mcpManager?.stopAll()
     }
 
     // MARK: - External URL Handling
