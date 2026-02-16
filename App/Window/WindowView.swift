@@ -15,6 +15,7 @@ struct WindowView: View {
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(CommandPalette.self) private var commandPalette
     @Environment(WindowRegistry.self) private var windowRegistry
+    @Environment(AIService.self) private var aiService
     @Environment(\.nookSettings) var nookSettings
     @StateObject private var hoverSidebarManager = HoverSidebarManager()
     @Environment(\.colorScheme) var colorScheme
@@ -45,6 +46,7 @@ struct WindowView: View {
             // Find bar - always rendered (24/7), visibility controlled via opacity
             FindBarView(findManager: browserManager.findManager)
                 .zIndex(10000)
+
         }
         // System notification toasts - top trailing corner
         .overlay(alignment: .topTrailing) {
@@ -258,6 +260,13 @@ struct WindowView: View {
                 .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 0)
                 .allowsHitTesting(false)
                 .zIndex(-1)
+            }
+        }
+        .overlay {
+            if aiService.isExecutingTools {
+                ToolExecutionGlowView()
+                    .transition(.opacity.animation(.easeInOut(duration: 0.3)))
+                    .allowsHitTesting(false)
             }
         }
         .padding(.bottom, 8)
