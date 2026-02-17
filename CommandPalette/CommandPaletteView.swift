@@ -97,11 +97,15 @@ struct CommandPaletteView: View {
                                         navigateSuggestions(direction: 1)
                                         return .handled
                                     }
+                                    .onKeyPress(.escape) {
+                                        commandPalette.close()
+                                        return .handled
+                                    }
                                     .onChange(of: text) { _, newValue in
-                                        selectedSuggestionIndex = -1
                                         searchManager.searchSuggestions(
                                             for: newValue
                                         )
+                                        selectedSuggestionIndex = searchManager.suggestions.isEmpty ? -1 : 0
                                     }
                             }
                             .padding(.vertical, 8)
@@ -192,8 +196,8 @@ struct CommandPaletteView: View {
         .onChange(of: searchManager.suggestions.count) { _, newCount in
             if newCount == 0 {
                 selectedSuggestionIndex = -1
-            } else if selectedSuggestionIndex >= newCount {
-                selectedSuggestionIndex = -1
+            } else if selectedSuggestionIndex < 0 || selectedSuggestionIndex >= newCount {
+                selectedSuggestionIndex = 0
             }
         }
         .animation(.easeInOut(duration: 0.15), value: selectedSuggestionIndex)
