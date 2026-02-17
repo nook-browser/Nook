@@ -1113,6 +1113,19 @@ final class ExtensionManager: NSObject, ObservableObject,
 
         Self.logger.debug("Granted permissions: \(extensionContext.currentPermissions.map { String(describing: $0) }.joined(separator: ", "), privacy: .public)")
 
+        // Ensure background service worker is alive before showing the popup.
+        // MV3 workers auto-terminate after ~5 min of inactivity; if the popup
+        // tries chrome.runtime.sendMessage and the worker is dead, it hangs forever.
+        if extensionContext.webExtension.hasBackgroundContent {
+            extensionContext.loadBackgroundContent { error in
+                if let error {
+                    Self.logger.error("Failed to wake background worker for '\(extName, privacy: .public)': \(error.localizedDescription, privacy: .public)")
+                } else {
+                    Self.logger.debug("Background worker alive for '\(extName, privacy: .public)'")
+                }
+            }
+        }
+
         guard let popover = action.popupPopover else {
             Self.logger.error("No popover available on action")
             completionHandler(
