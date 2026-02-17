@@ -3008,7 +3008,11 @@ extension Tab: WKUIDelegate {
 
         // OAuth and signin flows should open in a miniwindow for better UX
         // The miniwindow handles OAuth completion detection and notifies the parent tab
-        if let url = navigationAction.request.url,
+        // Skip this for extension-originated navigations — extensions manage their own auth flows
+        let sourceScheme = navigationAction.sourceFrame.request.url?.scheme?.lowercased() ?? ""
+        let isFromExtension = sourceScheme == "webkit-extension" || sourceScheme == "safari-web-extension"
+        if !isFromExtension,
+            let url = navigationAction.request.url,
             isLikelyOAuthOrExternalWindow(url: url, windowFeatures: windowFeatures)
         {
             print("🔐 [Tab] OAuth/signin popup detected, opening in miniwindow: \(url.absoluteString)")
@@ -3043,7 +3047,9 @@ extension Tab: WKUIDelegate {
         }
 
         // For regular popups, check if this should be redirected to Peek
-        if let url = navigationAction.request.url,
+        // Skip Peek for extension-originated navigations
+        if !isFromExtension,
+            let url = navigationAction.request.url,
             shouldRedirectToPeek(url: url)
         {
 
