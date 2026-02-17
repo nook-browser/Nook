@@ -68,48 +68,10 @@ class BrowserConfiguration {
     }()
 
     // MARK: - Cache-Optimized Configuration
-    // Returns a fresh configuration each call to avoid cross-tab state sharing
+    // Derives from shared config to preserve process pool + extension controller
     func cacheOptimizedWebViewConfiguration() -> WKWebViewConfiguration {
-        let config = WKWebViewConfiguration()
-
-        // Default data store for non-profile-specific usage
-        config.websiteDataStore = WKWebsiteDataStore.default()
-
-        // Configure JavaScript preferences for extension support
-        let preferences = WKWebpagePreferences()
-        preferences.allowsContentJavaScript = true
-        config.defaultWebpagePreferences = preferences
-
-        // Core WebKit preferences for extensions
-        config.preferences.javaScriptCanOpenWindowsAutomatically = true
-
-        // Media settings
-        config.mediaTypesRequiringUserActionForPlayback = []
-
-        // Enable Picture-in-Picture for web media
-        config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
-        
-        // Enable full-screen API support
-        config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
-        config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
-        
-        // CRITICAL: Enable HTML5 Fullscreen API
-        config.preferences.isElementFullscreenEnabled = true
-        
-        
-
-        // Enable background media playback
-        config.allowsAirPlayForMediaPlayback = true
-
-        // User agent for better compatibility with Client Hints support (mirror default config)
-        config.applicationNameForUserAgent = "Version/26.0.1 Safari/605.1.15"
-
-        // Cache/perf optimizations mirroring profile-scoped variant
-        config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
-        config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
-        
-        config.preferences.setValue(true, forKey: "developerExtrasEnabled")
-
+        let config = webViewConfiguration.copy() as! WKWebViewConfiguration
+        config.userContentController = WKUserContentController()
         return config
     }
 
