@@ -21,9 +21,11 @@ final class PiPManager: NSObject {
     // MARK: - Web Video PiP
     
     func requestPiP(for tab: Tab, webView: WKWebView? = nil) {
-        let targetWebView = webView ?? tab.webView
+        // Use assignedWebView to avoid triggering lazy initialization
+        // PiP only works on tabs that are currently displayed
+        let targetWebView = webView ?? tab.assignedWebView
         guard let webView = targetWebView else {
-            print("[PiP] No webView available")
+            print("[PiP] No webView available (tab not displayed)")
             return
         }
         
@@ -82,7 +84,8 @@ final class PiPManager: NSObject {
     }
     
     func stopPiP(for tab: Tab, webView: WKWebView? = nil) {
-        let targetWebView = webView ?? tab.webView
+        // Use assignedWebView to avoid triggering lazy initialization
+        let targetWebView = webView ?? tab.assignedWebView
         guard let webView = targetWebView else { 
             print("[PiP] No webView available for stopping PiP")
             tab.hasPiPActive = false

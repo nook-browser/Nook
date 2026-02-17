@@ -180,9 +180,30 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     private var _existingWebView: WKWebView?
     var pendingContextMenuPayload: WebContextMenuPayload?
     var didNotifyOpenToExtensions: Bool = false
+    
+    // MARK: - WebView Ownership Tracking (Memory Optimization)
+    /// The window ID that currently "owns" the primary WebView for this tab
+    /// If nil, no window is displaying this tab yet
+    var primaryWindowId: UUID?
+    
+    /// Returns true if this tab has an assigned primary WebView (displayed in any window)
+    var hasAssignedPrimaryWebView: Bool {
+        return primaryWindowId != nil && _webView != nil
+    }
+    
+    /// Returns the WebView IF it has been assigned to a window, nil otherwise
+    /// This prevents creating "orphan" WebViews that are never displayed
+    var assignedWebView: WKWebView? {
+        // Only return WebView if it's been assigned to a window
+        // This prevents the old behavior of creating a WebView on first access
+        return primaryWindowId != nil ? _webView : nil
+    }
+    
     var webView: WKWebView? {
         if _webView == nil {
-            print("🔧 [Tab] First webView access, calling setupWebView() for: \(url.absoluteString)")
+            let stackSymbols = Thread.callStackSymbols.prefix(8).joined(separator: "\n  ")
+            print("🔍 [MEMDEBUG] Tab.webView LAZY ACCESS - Tab: \(id.uuidString.prefix(8)), URL: \(url.absoluteString)")
+            print("🔍 [MEMDEBUG] Stack trace:\n  \(stackSymbols)")
             setupWebView()
         }
         return _webView
@@ -193,6 +214,28 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             setupWebView()
         }
         return _webView!
+    }
+
+    /// Returns the existing WebView without triggering lazy initialization
+    var existingWebView: WKWebView? {
+        return _webView
+    }
+    
+    /// Assigns the WebView to a specific window as its "primary" display
+    /// Call this when a window first displays this tab
+    func assignWebViewToWindow(_ webView: WKWebView, windowId: UUID) {
+        print("🔍 [MEMDEBUG] Tab.assignWebViewToWindow() - Tab: \(id.uuidString.prefix(8)), Window: \(windowId.uuidString.prefix(8)), WebView: \(Unmanaged.passUnretained(webView).toOpaque())")
+        
+        // If we already have a WebView assigned to a different window, this is an error
+        // (should have been caught by WebViewCoordinator)
+        if let existingWindow = primaryWindowId, existingWindow != windowId {
+            print("⚠️ [MEMDEBUG] WARNING: Reassigning WebView from window \(existingWindow.uuidString.prefix(8)) to \(windowId.uuidString.prefix(8))")
+        }
+        
+        _webView = webView
+        primaryWindowId = windowId
+        
+        print("🔍 [MEMDEBUG]   -> Primary window assigned: \(windowId.uuidString.prefix(8))")
     }
 
     weak var browserManager: BrowserManager?
@@ -485,6 +528,9 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     // MARK: - WebView Setup
 
     private func setupWebView() {
+        print("🔍 [MEMDEBUG] Tab.setupWebView() START - Tab: \(id.uuidString.prefix(8)), Name: \(name), URL: \(url.absoluteString)")
+        print("🔍 [MEMDEBUG]   _webView exists: \(_webView != nil), _existingWebView exists: \(_existingWebView != nil)")
+        
         let resolvedProfile = resolveProfile()
         let configuration: WKWebViewConfiguration
         if let profile = resolvedProfile {
@@ -546,7 +592,9 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         if let existingWebView = _existingWebView {
             _webView = existingWebView
         } else {
-            _webView = FocusableWKWebView(frame: .zero, configuration: configuration)
+            let newWebView = FocusableWKWebView(frame: .zero, configuration: configuration)
+            _webView = newWebView
+            print("🔍 [MEMDEBUG] Tab CREATED NEW PRIMARY WebView - Tab: \(id.uuidString.prefix(8)), WebView: \(Unmanaged.passUnretained(newWebView).toOpaque()), ConfigStore: \(configuration.websiteDataStore.identifier?.uuidString.prefix(8) ?? "default")")
             if let fv = _webView as? FocusableWKWebView {
                 fv.owningTab = self
                 fv.contextMenuBridge = WebContextMenuBridge(tab: self, configuration: configuration)
@@ -638,6 +686,12 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             // No ad-hoc page script injection here; rely on WKWebExtension
         }
 
+        // For existing WebViews, ensure the delegates are updated to point to this tab
+        if _existingWebView != nil {
+            print("🔍 [MEMDEBUG] Tab setup COMPLETE (existing WebView) - Tab: \(id.uuidString.prefix(8))")
+        } else {
+            print("🔍 [MEMDEBUG] Tab setup COMPLETE (new WebView) - Tab: \(id.uuidString.prefix(8)), WebView: \(Unmanaged.passUnretained(_webView!).toOpaque())")
+        }
 
         // Inform extensions that this tab's view is now open/available BEFORE loading,
         // so content scripts and messaging can resolve this tab during early document phases
