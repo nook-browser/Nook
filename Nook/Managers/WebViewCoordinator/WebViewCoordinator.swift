@@ -165,38 +165,22 @@ class WebViewCoordinator {
     private func createWebViewInternal(for tab: Tab, in windowId: UUID, isPrimary: Bool, copyFrom: WKWebView? = nil) -> WKWebView {
         let tabId = tab.id
         
-        // Create configuration
-        let configuration = WKWebViewConfiguration()
-        
-        // Use the source WebView's configuration if available, otherwise tab's config
+        // Derive config from shared config or existing webview to preserve
+        // process pool + extension controller (fresh configs break content script injection)
+        let configuration: WKWebViewConfiguration
         if let sourceWebView = copyFrom ?? tab.existingWebView {
-            configuration.websiteDataStore = sourceWebView.configuration.websiteDataStore
-            configuration.preferences = sourceWebView.configuration.preferences
-            configuration.defaultWebpagePreferences = sourceWebView.configuration.defaultWebpagePreferences
-            configuration.mediaTypesRequiringUserActionForPlayback = sourceWebView.configuration.mediaTypesRequiringUserActionForPlayback
-            configuration.allowsAirPlayForMediaPlayback = sourceWebView.configuration.allowsAirPlayForMediaPlayback
-            configuration.applicationNameForUserAgent = sourceWebView.configuration.applicationNameForUserAgent
-            if #available(macOS 15.5, *) {
-                configuration.webExtensionController = sourceWebView.configuration.webExtensionController
-            }
+            // .configuration returns a copy — preserves process pool, extension controller, etc.
+            configuration = sourceWebView.configuration
         } else {
             let resolvedProfile = tab.resolveProfile()
-            configuration.websiteDataStore = resolvedProfile?.dataStore ?? WKWebsiteDataStore.default()
-            
-            let preferences = WKWebpagePreferences()
-            preferences.allowsContentJavaScript = true
-            configuration.defaultWebpagePreferences = preferences
-            
-            configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
-            configuration.mediaTypesRequiringUserActionForPlayback = []
-            configuration.allowsAirPlayForMediaPlayback = true
-            configuration.applicationNameForUserAgent = "Version/17.4.1 Safari/605.1.15"
-            configuration.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
-            configuration.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
-            configuration.preferences.setValue(true, forKey: "mediaDevicesEnabled")
-            configuration.preferences.isElementFullscreenEnabled = true
-            configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
+            if let profile = resolvedProfile {
+                configuration = BrowserConfiguration.shared.cacheOptimizedWebViewConfiguration(for: profile)
+            } else {
+                configuration = BrowserConfiguration.shared.webViewConfiguration.copy() as! WKWebViewConfiguration
+            }
         }
+        // Fresh user content controller per webview to avoid cross-tab handler conflicts
+        configuration.userContentController = WKUserContentController()
         
         let newWebView = FocusableWKWebView(frame: .zero, configuration: configuration)
         newWebView.navigationDelegate = tab
@@ -336,37 +320,20 @@ class WebViewCoordinator {
             print("🔍 [MEMDEBUG]   Tab's existingWebView: \(Unmanaged.passUnretained(tabWebView).toOpaque())")
         }
 
-        // Create configuration
-        let configuration = WKWebViewConfiguration()
-
+        // Derive config from shared config or existing webview to preserve
+        // process pool + extension controller (fresh configs break content script injection)
+        let configuration: WKWebViewConfiguration
         if let originalWebView = tab.existingWebView {
-            configuration.websiteDataStore = originalWebView.configuration.websiteDataStore
-            configuration.preferences = originalWebView.configuration.preferences
-            configuration.defaultWebpagePreferences = originalWebView.configuration.defaultWebpagePreferences
-            configuration.mediaTypesRequiringUserActionForPlayback = originalWebView.configuration.mediaTypesRequiringUserActionForPlayback
-            configuration.allowsAirPlayForMediaPlayback = originalWebView.configuration.allowsAirPlayForMediaPlayback
-            configuration.applicationNameForUserAgent = originalWebView.configuration.applicationNameForUserAgent
-            if #available(macOS 15.5, *) {
-                configuration.webExtensionController = originalWebView.configuration.webExtensionController
-            }
+            configuration = originalWebView.configuration
         } else {
             let resolvedProfile = tab.resolveProfile()
-            configuration.websiteDataStore = resolvedProfile?.dataStore ?? WKWebsiteDataStore.default()
-
-            let preferences = WKWebpagePreferences()
-            preferences.allowsContentJavaScript = true
-            configuration.defaultWebpagePreferences = preferences
-
-            configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
-            configuration.mediaTypesRequiringUserActionForPlayback = []
-            configuration.allowsAirPlayForMediaPlayback = true
-            configuration.applicationNameForUserAgent = "Version/17.4.1 Safari/605.1.15"
-            configuration.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
-            configuration.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
-            configuration.preferences.setValue(true, forKey: "mediaDevicesEnabled")
-            configuration.preferences.isElementFullscreenEnabled = true
-            configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
+            if let profile = resolvedProfile {
+                configuration = BrowserConfiguration.shared.cacheOptimizedWebViewConfiguration(for: profile)
+            } else {
+                configuration = BrowserConfiguration.shared.webViewConfiguration.copy() as! WKWebViewConfiguration
+            }
         }
+        configuration.userContentController = WKUserContentController()
 
         let newWebView = FocusableWKWebView(frame: .zero, configuration: configuration)
         newWebView.navigationDelegate = tab
