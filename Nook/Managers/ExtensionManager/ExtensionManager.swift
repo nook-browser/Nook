@@ -829,62 +829,85 @@ final class ExtensionManager: NSObject, ObservableObject,
             return
         }
 
-        // Load enabled extensions asynchronously, then signal ready
+        // Load enabled extensions — parse manifests in parallel, then register sequentially
         Task { @MainActor in
-            for (entity, _) in enabledEntities {
-                let resourceURL = URL(fileURLWithPath: entity.packagePath)
-                do {
-                    let webExtension = try await WKWebExtension(resourceBaseURL: resourceURL)
-                    let extensionContext = WKWebExtensionContext(for: webExtension)
-
-                    Self.logger.info("Loading '\(webExtension.displayName ?? entity.name, privacy: .public)' MV\(webExtension.manifestVersion) hasBackground=\(webExtension.hasBackgroundContent)")
-
-                    // Grant all permissions
-                    for p in webExtension.requestedPermissions {
-                        extensionContext.setPermissionStatus(.grantedExplicitly, for: p)
-                    }
-                    for p in webExtension.optionalPermissions {
-                        extensionContext.setPermissionStatus(.grantedExplicitly, for: p)
-                    }
-                    for m in webExtension.allRequestedMatchPatterns {
-                        extensionContext.setPermissionStatus(.grantedExplicitly, for: m)
-                    }
-                    for m in webExtension.optionalPermissionMatchPatterns {
-                        extensionContext.setPermissionStatus(.grantedExplicitly, for: m)
-                    }
-
-                    extensionContext.isInspectable = true
-
-                    let correctExtensionId = extensionContext.uniqueIdentifier
-
-                    // Update DB if ID changed
-                    if entity.id != correctExtensionId {
-                        let oldId = entity.id
-                        entity.id = correctExtensionId
-                        try? self.context.save()
-                        if let index = self.installedExtensions.firstIndex(where: { $0.id == oldId }) {
-                            self.installedExtensions[index] = InstalledExtension(from: entity, manifest: self.installedExtensions[index].manifest)
+            // Phase 1: Parse all extensions in parallel (I/O-bound)
+            let parsed: [(ExtensionEntity, WKWebExtension)] = await withTaskGroup(
+                of: (ExtensionEntity, WKWebExtension)?.self
+            ) { group in
+                for (entity, _) in enabledEntities {
+                    group.addTask {
+                        let resourceURL = URL(fileURLWithPath: entity.packagePath)
+                        do {
+                            let ext = try await WKWebExtension(resourceBaseURL: resourceURL)
+                            return (entity, ext)
+                        } catch {
+                            Self.logger.error("Failed to load extension '\(entity.name, privacy: .public)': \(error.localizedDescription, privacy: .public)")
+                            return nil
                         }
                     }
-
-                    self.extensionContexts[correctExtensionId] = extensionContext
-                    try self.extensionController?.load(extensionContext)
-
-                    // Start background service worker if the extension has one
-                    if webExtension.hasBackgroundContent {
-                        extensionContext.loadBackgroundContent(completionHandler: { error in
-                            if let error {
-                                Self.logger.error("Background content failed for '\(entity.name, privacy: .public)': \(error.localizedDescription, privacy: .public)")
-                            } else {
-                                Self.logger.info("Background content started for '\(entity.name, privacy: .public)'")
-                            }
-                        })
-                    }
-
-                    Self.logger.info("Loaded '\(entity.name, privacy: .public)' — contexts: \(self.extensionController?.extensionContexts.count ?? 0, privacy: .public)")
-                } catch {
-                    Self.logger.error("Failed to load extension '\(entity.name, privacy: .public)': \(error.localizedDescription, privacy: .public)")
                 }
+                var results: [(ExtensionEntity, WKWebExtension)] = []
+                for await result in group {
+                    if let r = result { results.append(r) }
+                }
+                return results
+            }
+
+            // Phase 2: Register contexts sequentially (must be on MainActor)
+            for (entity, webExtension) in parsed {
+                let extensionContext = WKWebExtensionContext(for: webExtension)
+
+                Self.logger.info("Loading '\(webExtension.displayName ?? entity.name, privacy: .public)' MV\(webExtension.manifestVersion) hasBackground=\(webExtension.hasBackgroundContent)")
+
+                // Grant all permissions
+                for p in webExtension.requestedPermissions {
+                    extensionContext.setPermissionStatus(.grantedExplicitly, for: p)
+                }
+                for p in webExtension.optionalPermissions {
+                    extensionContext.setPermissionStatus(.grantedExplicitly, for: p)
+                }
+                for m in webExtension.allRequestedMatchPatterns {
+                    extensionContext.setPermissionStatus(.grantedExplicitly, for: m)
+                }
+                for m in webExtension.optionalPermissionMatchPatterns {
+                    extensionContext.setPermissionStatus(.grantedExplicitly, for: m)
+                }
+
+                extensionContext.isInspectable = true
+
+                let correctExtensionId = extensionContext.uniqueIdentifier
+
+                // Update DB if ID changed
+                if entity.id != correctExtensionId {
+                    let oldId = entity.id
+                    entity.id = correctExtensionId
+                    try? self.context.save()
+                    if let index = self.installedExtensions.firstIndex(where: { $0.id == oldId }) {
+                        self.installedExtensions[index] = InstalledExtension(from: entity, manifest: self.installedExtensions[index].manifest)
+                    }
+                }
+
+                self.extensionContexts[correctExtensionId] = extensionContext
+                do {
+                    try self.extensionController?.load(extensionContext)
+                } catch {
+                    Self.logger.error("Failed to register extension '\(entity.name, privacy: .public)': \(error.localizedDescription, privacy: .public)")
+                    continue
+                }
+
+                // Start background service worker if the extension has one
+                if webExtension.hasBackgroundContent {
+                    extensionContext.loadBackgroundContent(completionHandler: { error in
+                        if let error {
+                            Self.logger.error("Background content failed for '\(entity.name, privacy: .public)': \(error.localizedDescription, privacy: .public)")
+                        } else {
+                            Self.logger.info("Background content started for '\(entity.name, privacy: .public)'")
+                        }
+                    })
+                }
+
+                Self.logger.info("Loaded '\(entity.name, privacy: .public)' — contexts: \(self.extensionController?.extensionContexts.count ?? 0, privacy: .public)")
             }
 
             Self.logger.info("All extensions loaded — signaling ready")

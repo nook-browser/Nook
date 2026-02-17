@@ -558,23 +558,9 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         }
 
 
-        // Wait for extensions to finish loading so content scripts inject with the webview
-        if #available(macOS 15.4, *) {
-            let extManager = ExtensionManager.shared
-            if extManager.isExtensionSupportAvailable && !extManager.extensionsLoaded {
-                if extensionAwaitCancellable == nil {
-                    extensionAwaitCancellable = extManager.$extensionsLoaded
-                        .receive(on: RunLoop.main)
-                        .sink { [weak self] loaded in
-                            guard let self = self, loaded, self._webView == nil else { return }
-                            self.extensionAwaitCancellable?.cancel()
-                            self.extensionAwaitCancellable = nil
-                            self.setupWebView()
-                        }
-                }
-                return
-            }
-        }
+        // No need to block on extensionsLoaded — the shared config already has the
+        // extension controller set (from setupExtensionController). Content scripts will
+        // inject once individual extension contexts finish loading asynchronously.
 
         // Ensure the configuration has the extension controller so content scripts can inject
         if #available(macOS 15.5, *) {
