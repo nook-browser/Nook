@@ -184,7 +184,9 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
     }
 
     func webView(for extensionContext: WKWebExtensionContext) -> WKWebView? {
-        return tab.webView
+        // Use assignedWebView to avoid triggering lazy initialization
+        // Extensions can only interact with tabs that are currently displayed
+        return tab.assignedWebView
     }
 
     func activate(for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {

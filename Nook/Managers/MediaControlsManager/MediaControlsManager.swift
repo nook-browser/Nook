@@ -80,7 +80,9 @@ final class MediaControlsManager {
             }
         }
 
-        if webViews.isEmpty, let fallback = tab.webView {
+        // Use assignedWebView as fallback to avoid triggering lazy initialization
+        // Media controls only work on tabs that are currently displayed
+        if webViews.isEmpty, let fallback = tab.assignedWebView {
             webViews.append(fallback)
         }
 

@@ -82,7 +82,8 @@ struct NavigationHistoryContextMenu: View {
 
     private func loadHistoryItemsFresh() -> [NavigationHistoryContextMenuItem] {
         guard let tab = browserManager.currentTab(for: windowState),
-              let webView = browserManager.getWebView(for: tab.id, in: windowState.id) ?? tab.webView else {
+              // Use assignedWebView as fallback to avoid triggering lazy initialization
+              let webView = browserManager.getWebView(for: tab.id, in: windowState.id) ?? tab.assignedWebView else {
             return []
         }
 
@@ -114,7 +115,8 @@ struct NavigationHistoryContextMenu: View {
 
     private func navigateToHistoryItem(_ item: NavigationHistoryContextMenuItem) {
         guard let tab = browserManager.currentTab(for: windowState),
-              let webView = browserManager.getWebView(for: tab.id, in: windowState.id) ?? tab.webView else { return }
+              // Use assignedWebView as fallback to avoid triggering lazy initialization
+              let webView = browserManager.getWebView(for: tab.id, in: windowState.id) ?? tab.assignedWebView else { return }
 
         // Use WebKit's proper navigation history API to jump to the specific item
         // This preserves the back/forward state correctly

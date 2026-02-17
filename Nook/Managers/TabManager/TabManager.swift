@@ -2155,7 +2155,10 @@ class TabManager: ObservableObject {
                 self.currentTab = defaultTab
             }
 
-            if let ct = self.currentTab { _ = ct.webView }
+            // REMOVED: Forcing lazy webView creation here caused duplicate WebViews
+            // The WebView should only be created when the window actually displays the tab
+            // if let ct = self.currentTab { _ = ct.webView }
+            
             print(
                 "Current Space: \(currentSpace?.name ?? "None"), Tab: \(currentTab?.name ?? "None")"
             )
@@ -2338,7 +2341,10 @@ extension TabManager {
                 self.currentTab = match
             }
         }
-        if let ct = self.currentTab { _ = ct.webView }
+        // REMOVED: Forcing lazy webView creation here caused duplicate WebViews
+        // The WebView should only be created when the window actually displays the tab
+        // if let ct = self.currentTab { _ = ct.webView }
+        
         // Inform the extension controller about existing tabs and the active tab
         if #available(macOS 15.5, *) {
             for t in (self.pinnedTabs + spacePinned + self.tabs) where t.didNotifyOpenToExtensions == false {
