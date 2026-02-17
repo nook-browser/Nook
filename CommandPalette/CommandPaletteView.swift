@@ -95,7 +95,7 @@ struct CommandPaletteView: View {
                                         .padding(.horizontal, 10)
                                         .padding(.vertical, 4)
                                         .background(site.color)
-                                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                                        .clipShape(Capsule())
                                         .transition(
                                             .blur(intensity: 8, scale: 0.6)
                                             .animation(.spring(response: 0.35, dampingFraction: 0.75))
@@ -155,6 +155,15 @@ struct CommandPaletteView: View {
                                         }
                                         return .ignored
                                     }
+                                    .onKeyPress(characters: CharacterSet(charactersIn: "\u{7F}")) { _ in
+                                        if activeSiteSearch != nil && text.isEmpty {
+                                            withAnimation(.smooth(duration: 0.25)) {
+                                                activeSiteSearch = nil
+                                            }
+                                            return .handled
+                                        }
+                                        return .ignored
+                                    }
                                     .onChange(of: text) { _, newValue in
                                         searchManager.searchSuggestions(
                                             for: newValue
@@ -194,7 +203,14 @@ struct CommandPaletteView: View {
                             .padding(.vertical, 8)
                             .padding(.horizontal, 8)
 
-                            if !searchManager.suggestions.isEmpty {
+                            let filteredSuggestions = activeSiteSearch != nil
+                                ? searchManager.suggestions.filter {
+                                    if case .search = $0.type { return true }
+                                    return false
+                                }
+                                : searchManager.suggestions
+
+                            if !filteredSuggestions.isEmpty {
                                 RoundedRectangle(cornerRadius: 100)
                                     .fill(
                                         isDark
@@ -203,13 +219,11 @@ struct CommandPaletteView: View {
                                     )
                                     .frame(height: 0.5)
                                     .frame(maxWidth: .infinity)
-
                             }
 
-                            if !searchManager.suggestions.isEmpty {
-                                let suggestions = searchManager.suggestions
+                            if !filteredSuggestions.isEmpty {
                                 CommandPaletteSuggestionsListView(
-                                    suggestions: suggestions,
+                                    suggestions: filteredSuggestions,
                                     selectedIndex: $selectedSuggestionIndex,
                                     hoveredIndex: $hoveredSuggestionIndex,
                                     onSelect: { suggestion in
@@ -377,7 +391,17 @@ struct CommandPaletteView: View {
 
     private func handleReturn() {
         if let site = activeSiteSearch {
-            guard !text.isEmpty, let url = site.searchURL(for: text) else { return }
+            let filteredSuggestions = searchManager.suggestions.filter {
+                if case .search = $0.type { return true }
+                return false
+            }
+            let query: String
+            if selectedSuggestionIndex >= 0 && selectedSuggestionIndex < filteredSuggestions.count {
+                query = filteredSuggestions[selectedSuggestionIndex].text
+            } else {
+                query = text
+            }
+            guard !query.isEmpty, let url = site.searchURL(for: query) else { return }
             if commandPalette.shouldNavigateCurrentTab
                 && browserManager.currentTab(for: windowState) != nil
             {
