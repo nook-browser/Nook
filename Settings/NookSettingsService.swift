@@ -36,7 +36,8 @@ class NookSettingsService {
     private let webSearchContextSizeKey = "settings.webSearchContextSize"
     private let showLinkStatusBarKey = "settings.showLinkStatusBar"
     private let pinnedTabsLookKey = "settings.pinnedTabsLook"
-    
+    private let siteSearchEntriesKey = "settings.siteSearchEntries"
+
     var currentSettingsTab: SettingsTabs = .general
 
     var currentMaterialRaw: Int {
@@ -183,6 +184,14 @@ class NookSettingsService {
         }
     }
 
+    var siteSearchEntries: [SiteSearchEntry] {
+        didSet {
+            if let data = try? JSONEncoder().encode(siteSearchEntries) {
+                userDefaults.set(data, forKey: siteSearchEntriesKey)
+            }
+        }
+    }
+
     init() {
         // Register default values
         userDefaults.register(defaults: [
@@ -246,7 +255,15 @@ class NookSettingsService {
         self.webSearchMaxResults = userDefaults.integer(forKey: webSearchMaxResultsKey)
         self.webSearchContextSize = userDefaults.string(forKey: webSearchContextSizeKey) ?? "medium"
         self.showLinkStatusBar = userDefaults.bool(forKey: showLinkStatusBarKey)
-        self.pinnedTabsLook = PinnedTabsConfiguration(rawValue: userDefaults.string(forKey: pinnedTabsLookKey) ?? "large") ?? .large }
+        self.pinnedTabsLook = PinnedTabsConfiguration(rawValue: userDefaults.string(forKey: pinnedTabsLookKey) ?? "large") ?? .large
+
+        if let data = userDefaults.data(forKey: siteSearchEntriesKey),
+           let decoded = try? JSONDecoder().decode([SiteSearchEntry].self, from: data) {
+            self.siteSearchEntries = decoded
+        } else {
+            self.siteSearchEntries = SiteSearchEntry.defaultSites
+        }
+    }
 }
 
 // MARK: - AI Provider

@@ -1623,6 +1623,150 @@ struct SettingsPlaceholderView: View {
     }
 }
 
+// MARK: - Site Search Settings
+
+struct SiteSearchSettingsCard: View {
+    @Environment(\.nookSettings) var nookSettings
+    @State private var showingAddSheet = false
+    @State private var editingEntry: SiteSearchEntry? = nil
+
+    var body: some View {
+        @Bindable var settings = nookSettings
+        SettingsSectionCard(
+            title: "Site Search",
+            subtitle: "Tab-to-Search shortcuts for quick site searches"
+        ) {
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(nookSettings.siteSearchEntries) { entry in
+                    HStack(spacing: 10) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(entry.color)
+                            .frame(width: 14, height: 14)
+
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(entry.name)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            Text(entry.domain)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+
+                        Button {
+                            editingEntry = entry
+                        } label: {
+                            Image(systemName: "pencil")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+
+                        Button {
+                            nookSettings.siteSearchEntries.removeAll { $0.id == entry.id }
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                    .padding(8)
+                    .background(Color(.controlBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+
+                HStack(spacing: 8) {
+                    Button {
+                        showingAddSheet = true
+                    } label: {
+                        Label("Add Site", systemImage: "plus")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+
+                    Spacer()
+
+                    Button("Reset to Defaults") {
+                        nookSettings.siteSearchEntries = SiteSearchEntry.defaultSites
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+            }
+        }
+        .sheet(isPresented: $showingAddSheet) {
+            SiteSearchEntryEditor(entry: nil) { newEntry in
+                nookSettings.siteSearchEntries.append(newEntry)
+            }
+        }
+        .sheet(item: $editingEntry) { entry in
+            SiteSearchEntryEditor(entry: entry) { updated in
+                if let idx = nookSettings.siteSearchEntries.firstIndex(where: { $0.id == updated.id }) {
+                    nookSettings.siteSearchEntries[idx] = updated
+                }
+            }
+        }
+    }
+}
+
+struct SiteSearchEntryEditor: View {
+    let entry: SiteSearchEntry?
+    let onSave: (SiteSearchEntry) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var name: String = ""
+    @State private var domain: String = ""
+    @State private var searchURLTemplate: String = ""
+    @State private var colorHex: String = "#666666"
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(entry == nil ? "Add Site Search" : "Edit Site Search")
+                .font(.headline)
+
+            Form {
+                TextField("Name", text: $name)
+                TextField("Domain (e.g. youtube.com)", text: $domain)
+                TextField("Search URL (use {query})", text: $searchURLTemplate)
+                TextField("Color Hex (e.g. #E62617)", text: $colorHex)
+            }
+            .formStyle(.grouped)
+
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                    .buttonStyle(.bordered)
+                Button("Save") {
+                    let saved = SiteSearchEntry(
+                        id: entry?.id ?? UUID(),
+                        name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+                        domain: domain.trimmingCharacters(in: .whitespacesAndNewlines),
+                        searchURLTemplate: searchURLTemplate.trimmingCharacters(in: .whitespacesAndNewlines),
+                        colorHex: colorHex.trimmingCharacters(in: .whitespacesAndNewlines)
+                    )
+                    onSave(saved)
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(name.isEmpty || domain.isEmpty || searchURLTemplate.isEmpty)
+            }
+        }
+        .padding(20)
+        .frame(width: 450)
+        .onAppear {
+            if let entry {
+                name = entry.name
+                domain = entry.domain
+                searchURLTemplate = entry.searchURLTemplate
+                colorHex = entry.colorHex
+            }
+        }
+    }
+}
+
 private func formatTimeout(_ seconds: TimeInterval) -> String {
     if seconds < 3600 {  // under 1 hour
         let minutes = Int(seconds / 60)
