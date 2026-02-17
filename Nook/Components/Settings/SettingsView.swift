@@ -1727,7 +1727,7 @@ struct SiteSearchSettingsCard: View {
     }
 }
 
-private struct SiteSearchEntryEditor: View {
+struct SiteSearchEntryEditor: View {
     let entry: SiteSearchEntry?
     let onSave: (SiteSearchEntry) -> Void
     @Environment(\.dismiss) private var dismiss

@@ -30,7 +30,11 @@ struct SiteSearchEntry: Codable, Identifiable, Equatable {
         guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
             return nil
         }
-        let urlString = searchURLTemplate.replacingOccurrences(of: "{query}", with: encoded)
+        var template = searchURLTemplate
+        if !template.hasPrefix("http://") && !template.hasPrefix("https://") {
+            template = "https://" + template
+        }
+        let urlString = template.replacingOccurrences(of: "{query}", with: encoded)
         return URL(string: urlString)
     }
 
