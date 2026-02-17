@@ -8,6 +8,7 @@
 import SwiftUI
 import WebKit
 import AppKit
+import os
 
 @available(macOS 15.5, *)
 struct ExtensionActionView: View {
@@ -62,24 +63,20 @@ struct ExtensionActionButton: View {
         }
     }
     
+    private static let logger = Logger(subsystem: "com.nook.browser", category: "ExtensionAction")
+
     private func showExtensionPopup() {
-        print("🎯 Performing action for extension: \(ext.name)")
-        
+        Self.logger.info("Action tapped for '\(self.ext.name, privacy: .public)' id=\(self.ext.id, privacy: .public)")
+
         guard let extensionContext = ExtensionManager.shared.getExtensionContext(for: ext.id) else {
-            print("❌ No extension context found")
+            Self.logger.error("No extension context for id=\(self.ext.id, privacy: .public). Available: \(ExtensionManager.shared.loadedContextIDs.joined(separator: ", "), privacy: .public)")
             return
         }
-        
-        print("✅ Calling performAction() - this should trigger the delegate")
-        if let current = browserManager.currentTab(for: windowState) {
-            if let adapter = ExtensionManager.shared.stableAdapter(for: current) {
-                extensionContext.performAction(for: adapter)
-            } else {
-                extensionContext.performAction(for: nil)
-            }
-        } else {
-            extensionContext.performAction(for: nil)
-        }
+
+        let tab = browserManager.currentTab(for: windowState)
+        let adapter: ExtensionTabAdapter? = tab.flatMap { ExtensionManager.shared.stableAdapter(for: $0) }
+        Self.logger.info("Calling performAction (tab=\(tab?.name ?? "nil", privacy: .public), adapter=\(adapter != nil ? "yes" : "nil", privacy: .public))")
+        extensionContext.performAction(for: adapter)
     }
 }
 
