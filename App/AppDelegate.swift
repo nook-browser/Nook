@@ -216,8 +216,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         // Keep minimal to avoid MainActor deadlocks; main work happens in applicationShouldTerminate
         AppDelegate.log.info("applicationWillTerminate called")
 
-        // Stop MCP child processes
-        mcpManager?.stopAll()
+        // Stop MCP child processes synchronously (blocking up to 5 seconds)
+        mcpManager?.stopAllSync()
     }
 
     // MARK: - External URL Handling

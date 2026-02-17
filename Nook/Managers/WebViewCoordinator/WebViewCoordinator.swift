@@ -393,6 +393,7 @@ class WebViewCoordinator {
             "backgroundColor_\(tabId.uuidString)",
             "historyStateDidChange",
             "NookIdentity",
+            "nookShortcutDetect",
         ]
 
         for handlerName in allMessageHandlers {
