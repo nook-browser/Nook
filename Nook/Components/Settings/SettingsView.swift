@@ -91,19 +91,19 @@ private struct SettingsContent: View {
             }
             .tag(SettingsTabs.shortcuts)
 
-            // DISABLED: Extensions feature temporarily disabled
-            // if #available(macOS 15.5, *), nookSettings.experimentalExtensions {
-            //     SettingsPane {
-            //         ExtensionsSettingsView()
-            //     }
-            //     .tabItem {
-            //         Label(
-            //             SettingsTabs.extensions.name,
-            //             systemImage: SettingsTabs.extensions.icon
-            //         )
-            //     }
-            //     .tag(SettingsTabs.extensions)
-            // }
+            if #available(macOS 15.5, *),
+               let extensionManager = browserManager.extensionManager {
+                SettingsPane {
+                    ExtensionsSettingsView(extensionManager: extensionManager)
+                }
+                .tabItem {
+                    Label(
+                        SettingsTabs.extensions.name,
+                        systemImage: SettingsTabs.extensions.icon
+                    )
+                }
+                .tag(SettingsTabs.extensions)
+            }
 
 
             #if DEBUG
@@ -120,22 +120,6 @@ private struct SettingsContent: View {
             #endif
 
         }
-        // DISABLED: Extensions feature temporarily disabled
-        // .onChange(of: nookSettings.experimentalExtensions) { _, experimentalEnabled in
-        //     // If extensions are disabled and the current tab is extensions, switch to a valid tab
-        //     if !experimentalEnabled && nookSettings.currentSettingsTab == .extensions {
-        //         nookSettings.currentSettingsTab = .advanced
-        //     }
-        //
-        //     // Handle extension state when experimental flag changes
-        //     if experimentalEnabled {
-        //         // Re-enable extensions that were previously enabled
-        //         browserManager.extensionManager?.enableAllExtensions()
-        //     } else {
-        //         // Disable all extensions when experimental support is turned off
-        //         browserManager.extensionManager?.disableAllExtensions()
-        //     }
-        // }
     }
 }
 
@@ -1315,66 +1299,53 @@ private struct CategoryFilterChip: View {
 
 struct ExtensionsSettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @ObservedObject var extensionManager: ExtensionManager
     @State private var showingInstallDialog = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             if #available(macOS 15.5, *) {
-                if let extensionManager = browserManager.extensionManager {
-                    // Extension management UI
-                    HStack {
-                        Text("Installed Extensions")
-                            .font(.headline)
-                        Spacer()
-                        Button("Install Extension...") {
-                            browserManager.showExtensionInstallDialog()
-                        }
-                        .buttonStyle(.borderedProminent)
+                // Extension management UI
+                HStack {
+                    Text("Installed Extensions")
+                        .font(.headline)
+                    Spacer()
+                    Button("Install Extension...") {
+                        browserManager.showExtensionInstallDialog()
                     }
+                    .buttonStyle(.borderedProminent)
+                }
 
-                    Divider()
+                Divider()
 
-                    if extensionManager.installedExtensions.isEmpty {
-                        VStack(spacing: 12) {
-                            Image(systemName: "puzzlepiece.extension")
-                                .font(.system(size: 48))
-                                .foregroundColor(.secondary)
-                            Text("No Extensions Installed")
-                                .font(.title2)
-                                .fontWeight(.medium)
-                            Text(
-                                "Install browser extensions to enhance your browsing experience"
-                            )
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else {
-                        ScrollView {
-                            LazyVStack(spacing: 12) {
-                                ForEach(
-                                    extensionManager.installedExtensions,
-                                    id: \.id
-                                ) { ext in
-                                    ExtensionRowView(extension: ext)
-                                        .environmentObject(browserManager)
-                                }
-                            }
-                            .padding(.vertical)
-                        }
-                    }
-                } else {
+                if extensionManager.installedExtensions.isEmpty {
                     VStack(spacing: 12) {
-                        Image(systemName: "exclamationmark.triangle")
+                        Image(systemName: "puzzlepiece.extension")
                             .font(.system(size: 48))
-                            .foregroundColor(.orange)
-                        Text("Extension Manager Unavailable")
+                            .foregroundColor(.secondary)
+                        Text("No Extensions Installed")
                             .font(.title2)
                             .fontWeight(.medium)
-                        Text("Extension support is not properly initialized")
-                            .foregroundColor(.secondary)
+                        Text(
+                            "Install browser extensions to enhance your browsing experience"
+                        )
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            ForEach(
+                                extensionManager.installedExtensions,
+                                id: \.id
+                            ) { ext in
+                                ExtensionRowView(extension: ext)
+                                    .environmentObject(browserManager)
+                            }
+                        }
+                        .padding(.vertical)
+                    }
                 }
             } else {
                 // Unsupported OS version
@@ -1481,27 +1452,6 @@ struct AdvancedSettingsView: View {
         @Bindable var settings = nookSettings
         return
         VStack(alignment: .leading, spacing: 16) {
-            // DISABLED: Extensions feature temporarily disabled
-            // if #available(macOS 15.5, *) {
-            //     SettingsSectionCard(
-            //         title: "Experimental Features",
-            //         subtitle: "Features in development"
-            //     ) {
-            //         Toggle(
-            //             isOn: $settings.experimentalExtensions
-            //         ) {
-            //             VStack(alignment: .leading, spacing: 2) {
-            //                 Text("EXPERIMENTAL: Enable Extension Support")
-            //                 Text(
-            //                     "Enable browser extension support. Extensions are experimental and may cause instability or security issues."
-            //                 )
-            //                 .font(.caption)
-            //                 .foregroundStyle(.secondary)
-            //             }
-            //         }
-            //     }
-            // }
-
             #if DEBUG
             SettingsSectionCard(
                 title: "Debug Options",

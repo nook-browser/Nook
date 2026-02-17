@@ -66,13 +66,10 @@ struct URLBarView: View {
                     }
                     
                     // Extension action buttons
-                    if isSidebarHovered || browserManager.isExtensionPopupActive {
-                        if #available(macOS 15.5, *),
-                           let extensionManager = browserManager.extensionManager,
-                           nookSettings.experimentalExtensions {
-                            ExtensionActionView(extensions: extensionManager.installedExtensions)
-                                .environmentObject(browserManager)
-                        }
+                    if #available(macOS 15.5, *),
+                       let extensionManager = browserManager.extensionManager {
+                        ExtensionActionView(extensions: extensionManager.installedExtensions)
+                            .environmentObject(browserManager)
                     }
                 }
                 .padding(.leading, 12)

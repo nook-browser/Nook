@@ -12,60 +12,45 @@ import WebKit
 @available(macOS 15.4, *)
 final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
     private unowned let browserManager: BrowserManager
-    private var isProcessingTabsRequest = false
 
     init(browserManager: BrowserManager) {
         self.browserManager = browserManager
         super.init()
     }
-    
+
     // MARK: - Window Identity
-    
+
     override func isEqual(_ object: Any?) -> Bool {
         guard let other = object as? ExtensionWindowAdapter else { return false }
         return other.browserManager === self.browserManager
     }
-    
+
     override var hash: Int {
         return ObjectIdentifier(browserManager).hashValue
     }
 
-    private var lastActiveTabCall: Date = Date.distantPast
-    
     func activeTab(for extensionContext: WKWebExtensionContext) -> (any WKWebExtensionTab)? {
-        let now = Date()
-        if now.timeIntervalSince(lastActiveTabCall) > 2.0 {
-            print("[ExtensionWindowAdapter] activeTab() called")
-            lastActiveTabCall = now
-        }
-        
         if let t = browserManager.currentTabForActiveWindow(),
            let a = ExtensionManager.shared.stableAdapter(for: t) {
+            print("[EXT-BRIDGE] activeTab → '\(t.name)' webView=\(a.tab.isUnloaded ? "nil" : "yes")")
             return a
         }
-        
+
         if let first = browserManager.tabManager.pinnedTabs.first ?? browserManager.tabManager.tabs.first,
            let a = ExtensionManager.shared.stableAdapter(for: first) {
+            print("[EXT-BRIDGE] activeTab fallback → '\(first.name)'")
             return a
         }
-        
+
+        print("[EXT-BRIDGE] activeTab → nil")
         return nil
     }
 
-    private var lastTabsCall: Date = Date.distantPast
-    
     func tabs(for extensionContext: WKWebExtensionContext) -> [any WKWebExtensionTab] {
-        let now = Date()
-        let shouldLog = now.timeIntervalSince(lastTabsCall) > 2.0
-        if shouldLog {
-            let currentTabName = browserManager.currentTabForActiveWindow()?.name ?? "nil"
-            print("[ExtensionWindowAdapter] tabs() called - Current tab: '\(currentTabName)'")
-            lastTabsCall = now
-        }
-        
         let all = browserManager.tabManager.pinnedTabs + browserManager.tabManager.tabs
         let adapters = all.compactMap { ExtensionManager.shared.stableAdapter(for: $0) }
-        
+        let withWebViews = adapters.filter { !$0.tab.isUnloaded }
+        print("[EXT-BRIDGE] tabs → \(adapters.count) total, \(withWebViews.count) with webviews")
         return adapters
     }
 
@@ -91,6 +76,9 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
     }
 
     func isPrivate(for extensionContext: WKWebExtensionContext) -> Bool {
+        if let currentTab = browserManager.currentTabForActiveWindow() {
+            return currentTab.isEphemeral
+        }
         return false
     }
 
@@ -99,6 +87,13 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
     }
 
     func windowState(for extensionContext: WKWebExtensionContext) -> WKWebExtension.WindowState {
+        guard let window = NSApp.mainWindow else { return .normal }
+        if window.isMiniaturized {
+            return .minimized
+        }
+        if window.styleMask.contains(.fullScreen) {
+            return .fullscreen
+        }
         return .normal
     }
 
@@ -136,14 +131,18 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
         super.init()
     }
 
-    private var lastMethodCall: Date = Date.distantPast
-    
+    // MARK: - Identity (consistent across lookups)
+
+    override func isEqual(_ object: Any?) -> Bool {
+        guard let other = object as? ExtensionTabAdapter else { return false }
+        return other.tab.id == self.tab.id
+    }
+
+    override var hash: Int {
+        return tab.id.hashValue
+    }
+
     func url(for extensionContext: WKWebExtensionContext) -> URL? {
-        let now = Date()
-        if now.timeIntervalSince(lastMethodCall) > 5.0 {
-            print("[ExtensionTabAdapter] Methods called for tab: '\(tab.name)'")
-            lastMethodCall = now
-        }
         return tab.url
     }
 
@@ -152,8 +151,7 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
     }
 
     func isSelected(for extensionContext: WKWebExtensionContext) -> Bool {
-        let isActive = browserManager.currentTabForActiveWindow()?.id == tab.id
-        return isActive
+        return browserManager.currentTabForActiveWindow()?.id == tab.id
     }
 
     func indexInWindow(for extensionContext: WKWebExtensionContext) -> Int {
@@ -172,11 +170,11 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
     }
 
     func isMuted(for extensionContext: WKWebExtensionContext) -> Bool {
-        return false
+        return tab.isAudioMuted
     }
 
     func isPlayingAudio(for extensionContext: WKWebExtensionContext) -> Bool {
-        return false
+        return tab.hasPlayingAudio
     }
 
     func isReaderModeActive(for extensionContext: WKWebExtensionContext) -> Bool {
@@ -198,9 +196,43 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
         browserManager.tabManager.removeTab(tab.id)
         completionHandler(nil)
     }
-    
-    // MARK: - Critical Missing Method
-    
+
+    func reload(fromOrigin: Bool, for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
+        guard let webView = tab.webView else {
+            completionHandler(NSError(domain: "ExtensionTabAdapter", code: 1, userInfo: [NSLocalizedDescriptionKey: "No webview"]))
+            return
+        }
+        if fromOrigin {
+            webView.reloadFromOrigin()
+        } else {
+            webView.reload()
+        }
+        completionHandler(nil)
+    }
+
+    func loadURL(_ url: URL, for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
+        tab.loadURL(url.absoluteString)
+        completionHandler(nil)
+    }
+
+    func setMuted(_ muted: Bool, for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
+        tab.isAudioMuted = muted
+        completionHandler(nil)
+    }
+
+    func setZoomFactor(_ zoomFactor: Double, for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
+        tab.webView?.pageZoom = zoomFactor
+        completionHandler(nil)
+    }
+
+    func zoomFactor(for extensionContext: WKWebExtensionContext) -> Double {
+        return Double(tab.webView?.pageZoom ?? 1.0)
+    }
+
+    func shouldGrantPermissionsOnUserGesture(for extensionContext: WKWebExtensionContext) -> Bool {
+        return true
+    }
+
     func window(for extensionContext: WKWebExtensionContext) -> (any WKWebExtensionWindow)? {
         let manager = ExtensionManager.shared
         if manager.windowAdapter == nil {

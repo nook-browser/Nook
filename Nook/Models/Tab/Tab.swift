@@ -163,6 +163,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     private var audioMonitoringTimer: Timer?
     private var hasAddedCoreAudioListener = false
     private var profileAwaitCancellable: AnyCancellable?
+    private var extensionAwaitCancellable: AnyCancellable?
 
     // Web Store integration
     private var webStoreHandler: WebStoreScriptHandler?
@@ -394,11 +395,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     /// Inject Web Store script after navigation completes
     private func injectWebStoreScriptIfNeeded(for url: URL, in webView: WKWebView) {
-        // Only inject if experimental extensions are enabled
-        guard let browserManager = browserManager,
-            let nookSettings = nookSettings,
-            nookSettings.experimentalExtensions
-        else {
+        guard let browserManager = browserManager else {
             return
         }
 
@@ -560,43 +557,26 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             return
         }
 
-        // Debug: Check what data store this WebView will use
-        let profileInfo = resolvedProfile.map { "\($0.name) [\($0.id.uuidString)]" } ?? "nil"
-        print("[Tab] Resolved profile: \(profileInfo)")
-        let storeIdString: String =
-            configuration.websiteDataStore.identifier?.uuidString ?? "default"
-        print("[Tab] Creating WebView with data store ID: \(storeIdString)")
-        print("[Tab] Data store is persistent: \(configuration.websiteDataStore.isPersistent)")
 
-        // CRITICAL: Ensure the configuration has access to extension controller for ALL URLs
-        // Extensions may load additional resources that also need access
+        // No need to block on extensionsLoaded — the shared config already has the
+        // extension controller set (from setupExtensionController). Content scripts will
+        // inject once individual extension contexts finish loading asynchronously.
+
+        // Ensure the configuration has the extension controller so content scripts can inject
         if #available(macOS 15.5, *) {
-            print("🔍 [Tab] Checking extension controller setup...")
-            print("   Configuration has controller: \(configuration.webExtensionController != nil)")
-            print(
-                "   ExtensionManager has controller: \(ExtensionManager.shared.nativeController != nil)"
-            )
-
-            if configuration.webExtensionController == nil {
-                if let controller = ExtensionManager.shared.nativeController {
-                    configuration.webExtensionController = controller
-                    print("🔧 [Tab] Added extension controller to configuration for resource access")
-                    print("   Controller contexts: \(controller.extensionContexts.count)")
-                } else {
-                    print("❌ [Tab] No extension controller available from ExtensionManager")
-                }
-            } else {
-                print("✅ [Tab] Configuration already has extension controller")
-                if let controller = configuration.webExtensionController {
-                    print("   Controller contexts: \(controller.extensionContexts.count)")
-                }
+            if configuration.webExtensionController == nil,
+               let controller = ExtensionManager.shared.nativeController {
+                configuration.webExtensionController = controller
             }
+            let ctrl = configuration.webExtensionController
+            let ctxs = ctrl?.extensionContexts.count ?? -1
+            let samePool = configuration.processPool === BrowserConfiguration.shared.webViewConfiguration.processPool
+            print("[EXT-CFG] '\(name)' controller=\(ctrl != nil), contexts=\(ctxs), sameProcessPool=\(samePool), existing=\(_existingWebView != nil)")
         }
 
         // Check if we have an existing WebView to inject
         if let existingWebView = _existingWebView {
             _webView = existingWebView
-            print("🔍 [MEMDEBUG] Tab using EXISTING WebView - Tab: \(id.uuidString.prefix(8)), WebView: \(Unmanaged.passUnretained(existingWebView).toOpaque())")
         } else {
             let newWebView = FocusableWKWebView(frame: .zero, configuration: configuration)
             _webView = newWebView
@@ -656,11 +636,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             _webView?.configuration.userContentController.add(self, name: "NookIdentity")
             _webView?.configuration.userContentController.add(self, name: "nookShortcutDetect")
 
-            // Add Web Store integration handler (only if experimental extensions are enabled)
-            if let browserManager = browserManager,
-                let nookSettings = nookSettings,
-                nookSettings.experimentalExtensions
-            {
+            // Add Web Store integration handler for Chrome Web Store extension installs
+            if let browserManager = browserManager {
                 webStoreHandler = WebStoreScriptHandler(browserManager: browserManager)
                 _webView?.configuration.userContentController.add(
                     webStoreHandler!, name: "nookWebStore")
@@ -676,7 +653,10 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             _webView?.customUserAgent =
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0.1 Safari/605.1.15"
 
-            _webView?.setValue(false, forKey: "drawsBackground")
+            // Let the web content control its own background so extension styles
+            // (like Dark Reader) can paint dark backgrounds. The app's themed
+            // background is only visible while the page is loading.
+            _webView?.setValue(true, forKey: "drawsBackground")
         }
 
         if let webView = _webView {
@@ -703,6 +683,11 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         // so content scripts and messaging can resolve this tab during early document phases
         if #available(macOS 15.5, *), didNotifyOpenToExtensions == false {
             ExtensionManager.shared.notifyTabOpened(self)
+            // Also activate this tab if it's the current one, so the controller
+            // can route chrome.runtime messages correctly
+            if browserManager?.currentTabForActiveWindow()?.id == self.id {
+                ExtensionManager.shared.notifyTabActivated(newTab: self, previous: nil)
+            }
             didNotifyOpenToExtensions = true
         }
         // For popup-hosting tabs, don't trigger an initial navigation. WebKit will
@@ -710,8 +695,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         // Also don't reload if we're using an existing WebView (from Peek)
         if !isPopupHost && _existingWebView == nil {
             loadURL(url)
-        } else if _existingWebView != nil {
-            print("🔄 [Tab] Skipping URL load for existing WebView in tab: \(name)")
         }
     }
 
@@ -797,9 +780,11 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         // 15. REMOVE FROM TAB MANAGER
         browserManager?.tabManager.removeTab(self.id)
 
-        // Cancel any pending profile observation
+        // Cancel any pending observations
         profileAwaitCancellable?.cancel()
         profileAwaitCancellable = nil
+        extensionAwaitCancellable?.cancel()
+        extensionAwaitCancellable = nil
 
         print("Tab killed: \(name)")
     }
@@ -809,9 +794,11 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         // Note: We can't access main actor-isolated properties in deinit,
         // but we can still clean up non-actor properties
 
-        // Cancel any pending profile observation
+        // Cancel any pending observations
         profileAwaitCancellable?.cancel()
         profileAwaitCancellable = nil
+        extensionAwaitCancellable?.cancel()
+        extensionAwaitCancellable = nil
 
         // Clear theme color observers
         themeColorObservedWebViews.removeAllObjects()
@@ -825,6 +812,11 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     func loadURL(_ newURL: URL) {
         self.url = newURL
         loadingState = .didStartProvisionalNavigation
+
+        // Grant extension access before loading so content scripts inject at document_start
+        if #available(macOS 15.4, *) {
+            ExtensionManager.shared.grantExtensionAccessToURL(newURL)
+        }
 
         // Reset audio tracking for new page but preserve mute state
         hasAudioContent = false
@@ -2460,6 +2452,9 @@ extension Tab: WKNavigationDelegate {
             self.url = newURL
             if #available(macOS 15.5, *) {
                 ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
+
+                // Extension diagnostics: check content scripts, background worker, and messaging
+                ExtensionManager.shared.diagnoseExtensionState(for: webView, url: newURL)
             }
             browserManager?.syncTabAcrossWindows(self.id)
 
@@ -2609,7 +2604,13 @@ extension Tab: WKNavigationDelegate {
             navigationAction.targetFrame?.isMainFrame == true
         {
             browserManager?.maybeShowOAuthAssist(for: url, in: self)
-            
+
+            // Grant extension access to this URL BEFORE navigation starts
+            // so content scripts can inject at document_start
+            if #available(macOS 15.4, *) {
+                ExtensionManager.shared.grantExtensionAccessToURL(url)
+            }
+
             // Setup boost user script before navigation starts
             setupBoostUserScript(for: url, in: webView)
         }
@@ -3047,7 +3048,11 @@ extension Tab: WKUIDelegate {
 
         // OAuth and signin flows should open in a miniwindow for better UX
         // The miniwindow handles OAuth completion detection and notifies the parent tab
-        if let url = navigationAction.request.url,
+        // Skip this for extension-originated navigations — extensions manage their own auth flows
+        let sourceScheme = navigationAction.sourceFrame.request.url?.scheme?.lowercased() ?? ""
+        let isFromExtension = sourceScheme == "webkit-extension" || sourceScheme == "safari-web-extension"
+        if !isFromExtension,
+            let url = navigationAction.request.url,
             isLikelyOAuthOrExternalWindow(url: url, windowFeatures: windowFeatures)
         {
             print("🔐 [Tab] OAuth/signin popup detected, opening in miniwindow: \(url.absoluteString)")
@@ -3082,7 +3087,9 @@ extension Tab: WKUIDelegate {
         }
 
         // For regular popups, check if this should be redirected to Peek
-        if let url = navigationAction.request.url,
+        // Skip Peek for extension-originated navigations
+        if !isFromExtension,
+            let url = navigationAction.request.url,
             shouldRedirectToPeek(url: url)
         {
 
