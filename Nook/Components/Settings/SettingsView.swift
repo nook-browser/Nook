@@ -1135,6 +1135,7 @@ struct ShortcutsSettingsView: View {
                 ))
                 .toggleStyle(.switch)
                 .controlSize(.small)
+                .accessibilityLabel("Detect Website Shortcuts")
             }
             .padding(12)
             .background(Color(.controlBackgroundColor).opacity(0.5))

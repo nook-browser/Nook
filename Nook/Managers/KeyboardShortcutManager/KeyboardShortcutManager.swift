@@ -293,6 +293,7 @@ class KeyboardShortcutManager {
         if modifiers.contains(.control) { jsModifiers.append("ctrlKey: true") }
         if modifiers.contains(.option) { jsModifiers.append("altKey: true") }
         let modifierStr = jsModifiers.joined(separator: ", ")
+        let modifierSuffix = modifierStr.isEmpty ? "" : ", \(modifierStr)"
         
         // Escape the key for JavaScript
         let escapedKey = key
@@ -312,32 +313,30 @@ class KeyboardShortcutManager {
                 key: '\(escapedKey)',
                 code: '\(jsKeyCode)',
                 keyCode: \(keyCode),
-                which: \(keyCode),
-                \(modifierStr),
+                which: \(keyCode)\(modifierSuffix),
                 bubbles: true,
                 cancelable: true,
                 composed: true
             });
-            
+
             var dispatched = document.activeElement.dispatchEvent(keyEvent);
             if (!dispatched) {
                 // Try dispatching to document if activeElement didn't handle it
                 document.dispatchEvent(keyEvent);
             }
-            
+
             // Also dispatch keyup
             var keyUpEvent = new KeyboardEvent('keyup', {
                 key: '\(escapedKey)',
                 code: '\(jsKeyCode)',
                 keyCode: \(keyCode),
-                which: \(keyCode),
-                \(modifierStr),
+                which: \(keyCode)\(modifierSuffix),
                 bubbles: true,
                 cancelable: true,
                 composed: true
             });
             document.activeElement.dispatchEvent(keyUpEvent);
-            
+
             return dispatched;
         })();
         """

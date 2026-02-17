@@ -385,6 +385,24 @@ extension MiniWindowWebView.Coordinator: WKUIDelegate {
         completionHandler(true, nil)
     }
 
+    // MARK: - WebAuthn / Passkey Support
+
+    /// Handle requests for media capture authorization (including WebAuthn/passkey requests)
+    @available(macOS 13.0, *)
+    func webView(
+        _ webView: WKWebView,
+        requestMediaCaptureAuthorization type: WKMediaCaptureType,
+        for origin: WKSecurityOrigin,
+        initiatedByFrame frame: WKFrameInfo,
+        decisionHandler: @escaping (WKPermissionDecision) -> Void
+    ) {
+        print("🔐 [MiniWindow] Media capture authorization requested for type: \(type.rawValue) from origin: \(origin)")
+
+        // For passkeys/WebAuthn, we want to grant permission
+        // The system will handle the actual Touch ID/Face ID prompt
+        decisionHandler(.grant)
+    }
+
     // MARK: - File Upload Support
     func webView(
         _ webView: WKWebView,
