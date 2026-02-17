@@ -141,7 +141,9 @@ struct NookApp: App {
                 // Clean up incognito window if applicable
                 if let windowState = browserManager.windowRegistry?.windows[windowId],
                    windowState.isIncognito {
-                    browserManager.closeIncognitoWindow(windowState)
+                    Task {
+                        await browserManager.closeIncognitoWindow(windowState)
+                    }
                 }
             } else {
                 // BrowserManager was deallocated - perform minimal cleanup

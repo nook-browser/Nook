@@ -85,13 +85,20 @@ final class StdioTransport: MCPTransportProtocol, @unchecked Sendable {
             message.append(UInt8(ascii: "\n"))
         }
 
-        stdinPipe.fileHandleForWriting.write(message)
+        do {
+            try stdinPipe.fileHandleForWriting.write(contentsOf: message)
+        } catch {
+            throw MCPTransportError.sendFailed
+        }
     }
+
+    // Track the receive task for cancellation
+    private var receiveTask: Task<Void, Never>?
 
     func receive() -> AsyncStream<Data> {
         let pipe = getStdoutPipe()
 
-        return AsyncStream { continuation in
+        return AsyncStream { [weak self] continuation in
             guard let stdoutPipe = pipe else {
                 continuation.finish()
                 return
@@ -99,10 +106,16 @@ final class StdioTransport: MCPTransportProtocol, @unchecked Sendable {
 
             let handle = stdoutPipe.fileHandleForReading
 
-            Task.detached {
+            self?.receiveTask = Task.detached { [weak self] in
                 var buffer = Data()
 
                 while true {
+                    // Check for cancellation
+                    guard let self = self, !(self.receiveTask?.isCancelled ?? true) else {
+                        continuation.finish()
+                        break
+                    }
+
                     let chunk = handle.availableData
                     if chunk.isEmpty {
                         continuation.finish()
@@ -136,6 +149,10 @@ final class StdioTransport: MCPTransportProtocol, @unchecked Sendable {
     }
 
     func close() async {
+        // Cancel the receive task first
+        receiveTask?.cancel()
+        receiveTask = nil
+
         let (proc, pipe) = clearProcessState()
         pipe?.fileHandleForWriting.closeFile()
         proc?.terminate()
@@ -153,6 +170,10 @@ final class SSETransport: MCPTransportProtocol, @unchecked Sendable {
     private var task: URLSessionDataTask?
     private var postEndpoint: String?
     private let lock = NSLock()
+
+    // Track the receive task for cancellation
+    private var receiveTask: Task<Void, Never>?
+
 
     init(url: String) {
         self.url = url
@@ -192,13 +213,13 @@ final class SSETransport: MCPTransportProtocol, @unchecked Sendable {
     func receive() -> AsyncStream<Data> {
         let sseURL = URL(string: url)
 
-        return AsyncStream { continuation in
+        return AsyncStream { [weak self] continuation in
             guard let sseURL = sseURL else {
                 continuation.finish()
                 return
             }
 
-            Task.detached {
+            self?.receiveTask = Task.detached { [weak self] in
                 do {
                     var request = URLRequest(url: sseURL)
                     request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
@@ -206,6 +227,12 @@ final class SSETransport: MCPTransportProtocol, @unchecked Sendable {
                     let (bytes, _) = try await URLSession.shared.bytes(for: request)
 
                     for try await line in bytes.lines {
+                        // Check for cancellation
+                        guard let self = self, !(self.receiveTask?.isCancelled ?? true) else {
+                            continuation.finish()
+                            break
+                        }
+
                         if line.hasPrefix("data: ") {
                             let dataStr = String(line.dropFirst(6))
                             if let data = dataStr.data(using: .utf8) {
@@ -230,6 +257,10 @@ final class SSETransport: MCPTransportProtocol, @unchecked Sendable {
     }
 
     func close() async {
+        // Cancel the receive task first
+        receiveTask?.cancel()
+        receiveTask = nil
+
         let t = clearTask()
         t?.cancel()
         Self.log.info("Closed SSE connection: \(self.url)")

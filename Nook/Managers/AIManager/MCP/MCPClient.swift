@@ -165,6 +165,9 @@ actor MCPClient {
         return textParts.joined(separator: "\n")
     }
 
+    // Default timeout for MCP requests (30 seconds)
+    private let requestTimeout: TimeInterval = 30
+
     // MARK: - JSON-RPC Communication
 
     private func sendRequest(method: String, params: [String: MCPAnyCodable]? = nil) async throws -> JSONRPCResponse {
@@ -177,18 +180,41 @@ actor MCPClient {
         let request = JSONRPCRequest(id: id, method: method, params: params)
         let data = try JSONEncoder().encode(request)
 
-        return try await withCheckedThrowingContinuation { continuation in
-            pendingRequests[id] = continuation
+        return try await withTimeout(seconds: requestTimeout) { [self] in
+            try await withCheckedThrowingContinuation { continuation in
+                self.pendingRequests[id] = continuation
 
-            Task {
-                do {
-                    try await transport.send(data)
-                } catch {
-                    if let cont = pendingRequests.removeValue(forKey: id) {
-                        cont.resume(throwing: error)
+                Task {
+                    do {
+                        try await transport.send(data)
+                    } catch {
+                        if let cont = self.pendingRequests.removeValue(forKey: id) {
+                            cont.resume(throwing: error)
+                        }
                     }
                 }
             }
+        }
+    }
+
+    /// Wraps an async operation with a timeout
+    private func withTimeout<T>(seconds: TimeInterval, operation: @escaping () async throws -> T) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            // Add the main operation
+            group.addTask {
+                try await operation()
+            }
+
+            // Add the timeout task
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                throw MCPClientError.timeout
+            }
+
+            // Return the first completed result and cancel the other
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
         }
     }
 

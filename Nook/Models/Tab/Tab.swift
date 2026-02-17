@@ -1391,6 +1391,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             "backgroundColor_\(id.uuidString)",
             "historyStateDidChange",
             "NookIdentity",
+            "nookShortcutDetect",
         ]
 
         for handlerName in allMessageHandlers {
@@ -1696,6 +1697,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             "backgroundColor_\(id.uuidString)",
             "historyStateDidChange",
             "NookIdentity",
+            "nookShortcutDetect",
         ]
 
         for handlerName in allMessageHandlers {

@@ -2506,7 +2506,7 @@ class BrowserManager: ObservableObject {
     
     /// Close an incognito window and clean up all ephemeral data
     /// This method ensures complete destruction of the incognito session with no memory leaks
-    func closeIncognitoWindow(_ windowState: BrowserWindowState) {
+    func closeIncognitoWindow(_ windowState: BrowserWindowState) async {
         guard windowState.isIncognito else { return }
         
         print("🔒 [BrowserManager] Closing incognito window: \(windowState.id)")
@@ -2538,7 +2538,7 @@ class BrowserManager: ObservableObject {
         
         // Step 5: Remove ephemeral profile (triggers data store destruction)
         // This is done last to ensure all references are cleared first
-        profileManager.removeEphemeralProfile(for: windowState.id)
+        await profileManager.removeEphemeralProfile(for: windowState.id)
         
         // Step 6: Final cleanup of window state
         windowState.ephemeralProfile = nil
