@@ -2415,7 +2415,7 @@ class BrowserManager: ObservableObject {
             .environment(windowRegistry)
             .environment(webViewCoordinator)
             .environmentObject(gradientColorManager)
-            .environment(\.nookSettings, nookSettings)
+            .environment(\.nookSettings, nookSettings ?? NookSettingsService())
             .environment(aiService)
             .environment(aiConfigService)
 
@@ -2477,7 +2477,7 @@ class BrowserManager: ObservableObject {
             .environment(windowRegistry)
             .environment(webViewCoordinator)
             .environmentObject(gradientColorManager)
-            .environment(\.nookSettings, nookSettings)
+            .environment(\.nookSettings, nookSettings ?? NookSettingsService())
             .environment(aiService)
             .environment(aiConfigService)
 
