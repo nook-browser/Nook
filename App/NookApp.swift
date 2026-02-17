@@ -116,6 +116,8 @@ struct NookApp: App {
         browserManager.windowRegistry = windowRegistry
         browserManager.nookSettings = settingsManager
         browserManager.tabManager.nookSettings = settingsManager
+        browserManager.aiService = aiService
+        browserManager.aiConfigService = aiConfigService
 
         // Configure managers that depend on settings
         browserManager.compositorManager.setUnloadTimeout(settingsManager.tabUnloadTimeout)
