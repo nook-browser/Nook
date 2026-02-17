@@ -73,6 +73,16 @@ struct ExtensionActionButton: View {
             return
         }
 
+        // Wake background worker before triggering the action so the popup
+        // doesn't hang waiting for a dead service worker to respond.
+        if extensionContext.webExtension.hasBackgroundContent {
+            extensionContext.loadBackgroundContent { error in
+                if let error {
+                    Self.logger.error("Background wake failed: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+        }
+
         let tab = browserManager.currentTab(for: windowState)
         let adapter: ExtensionTabAdapter? = tab.flatMap { ExtensionManager.shared.stableAdapter(for: $0) }
         Self.logger.info("Calling performAction (tab=\(tab?.name ?? "nil", privacy: .public), adapter=\(adapter != nil ? "yes" : "nil", privacy: .public))")
