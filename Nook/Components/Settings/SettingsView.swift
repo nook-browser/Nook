@@ -312,8 +312,6 @@ struct GeneralSettingsView: View {
                         }
                     }
                     
-                    SiteSearchSettingsCard()
-
                     SettingsSectionCard(
                         title: "AI Assistant",
                         subtitle: "Configure AI chat powered by Gemini"
