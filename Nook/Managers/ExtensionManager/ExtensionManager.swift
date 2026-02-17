@@ -310,7 +310,9 @@ final class ExtensionManager: NSObject, ObservableObject,
         var updatedCount = 0
 
         for tab in allTabs {
-            guard let webView = tab.webView else { continue }
+            // Use assignedWebView to avoid triggering lazy initialization
+            // Only update WebViews that have been assigned to a window
+            guard let webView = tab.assignedWebView else { continue }
 
             if webView.configuration.webExtensionController !== controller {
                 print("  📝 Updating WebView for tab: \(tab.name)")
