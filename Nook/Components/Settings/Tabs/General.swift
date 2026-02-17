@@ -33,6 +33,28 @@ struct SettingsGeneralTab: View {
                         }
                     }
                 }
+
+                Section(header: Text("Site Search")) {
+                    ForEach(nookSettings.siteSearchEntries) { entry in
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(entry.color)
+                                .frame(width: 10, height: 10)
+                            Text(entry.name)
+                            Spacer()
+                            Text(entry.domain)
+                                .foregroundStyle(.secondary)
+                                .font(.caption)
+                        }
+                    }
+                    .onDelete { indexSet in
+                        nookSettings.siteSearchEntries.remove(atOffsets: indexSet)
+                    }
+
+                    Button("Reset to Defaults") {
+                        nookSettings.siteSearchEntries = SiteSearchEntry.defaultSites
+                    }
+                }
             }
             .formStyle(.grouped)
         }
