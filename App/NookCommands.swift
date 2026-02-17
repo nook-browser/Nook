@@ -319,7 +319,7 @@ struct NookCommands: Commands {
                 }
             }
 
-            if nookSettings.experimentalExtensions {
+            if #available(macOS 15.5, *) {
                 CommandMenu("Extensions") {
                     Button("Install Extension...") {
                         browserManager.showExtensionInstallDialog()
@@ -331,12 +331,12 @@ struct NookCommands: Commands {
                         nookSettings.currentSettingsTab = .extensions
                     }
 
-                    if #available(macOS 15.5, *) {
-                        Divider()
-                        Button("Open Popup Console") {
-                            browserManager.extensionManager?.showPopupConsole()
-                        }
+                    #if DEBUG
+                    Divider()
+                    Button("Open Popup Console") {
+                        browserManager.extensionManager?.showPopupConsole()
                     }
+                    #endif
                 }
             }
 

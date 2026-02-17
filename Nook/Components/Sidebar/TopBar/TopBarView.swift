@@ -141,9 +141,7 @@ struct TopBarView: View {
 
     private var extensionsView: some View {
         HStack(spacing: 4) {
-            if let extensionManager = browserManager.extensionManager,
-               nookSettings.experimentalExtensions
-            {
+            if let extensionManager = browserManager.extensionManager {
                 ExtensionActionView(
                     extensions: extensionManager.installedExtensions
                 )

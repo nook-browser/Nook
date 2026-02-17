@@ -207,7 +207,7 @@ class WebViewCoordinator {
         newWebView.uiDelegate = tab
         newWebView.allowsBackForwardNavigationGestures = true
         newWebView.allowsMagnification = true
-        newWebView.setValue(false, forKey: "drawsBackground")
+        newWebView.setValue(true, forKey: "drawsBackground")
         newWebView.owningTab = tab
         newWebView.contextMenuBridge = WebContextMenuBridge(tab: tab, configuration: configuration)
 

@@ -21,7 +21,7 @@ class NookSettingsService {
     private let askBeforeQuitKey = "settings.askBeforeQuit"
     private let sidebarPositionKey = "settings.sidebarPosition"
     private let topBarAddressViewKey = "settings.topBarAddressView"
-    private let experimentalExtensionsKey = "settings.experimentalExtensions"
+
     private let geminiApiKeyKey = "settings.geminiApiKey"
     private let geminiModelKey = "settings.geminiModel"
     private let showAIAssistantKey = "settings.showAIAssistant"
@@ -98,11 +98,6 @@ class NookSettingsService {
         }
     }
 
-    var experimentalExtensions: Bool {
-        didSet {
-            userDefaults.set(experimentalExtensions, forKey: experimentalExtensionsKey)
-        }
-    }
 
     var geminiApiKey: String {
         didSet {
@@ -200,7 +195,7 @@ class NookSettingsService {
             askBeforeQuitKey: true,
             sidebarPositionKey: SidebarPosition.left.rawValue,
             topBarAddressViewKey: false,
-            experimentalExtensionsKey: false,
+
             geminiApiKeyKey: "",
             geminiModelKey: GeminiModel.flash.rawValue,
             showAIAssistantKey: true,
@@ -238,11 +233,6 @@ class NookSettingsService {
         self.askBeforeQuit = userDefaults.bool(forKey: askBeforeQuitKey)
         self.sidebarPosition = SidebarPosition(rawValue: userDefaults.string(forKey: sidebarPositionKey) ?? "left") ?? SidebarPosition.left
         self.topBarAddressView = userDefaults.bool(forKey: topBarAddressViewKey)
-        // DISABLED: Force disable experimental extensions (feature temporarily disabled)
-        // Override any stored value to prevent issues for users who had it enabled
-        self.experimentalExtensions = false
-        // Clear the stored value to prevent confusion
-        userDefaults.set(false, forKey: experimentalExtensionsKey)
         self.geminiApiKey = userDefaults.string(forKey: geminiApiKeyKey) ?? ""
         self.geminiModel = GeminiModel(rawValue: userDefaults.string(forKey: geminiModelKey) ?? GeminiModel.flash.rawValue) ?? .flash
         self.showAIAssistant = userDefaults.bool(forKey: showAIAssistantKey)
