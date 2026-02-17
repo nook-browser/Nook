@@ -30,6 +30,16 @@ struct CommandPaletteView: View {
         return SiteSearchEntry.match(for: text, in: nookSettings.siteSearchEntries)
     }
 
+    private var visibleSuggestions: [SearchManager.SearchSuggestion] {
+        if activeSiteSearch != nil {
+            return searchManager.suggestions.filter {
+                if case .search = $0.type { return true }
+                return false
+            }
+        }
+        return searchManager.suggestions
+    }
+
     let commandPaletteWidth: CGFloat = 765
     let commandPaletteHorizontalPadding: CGFloat = 10
     
@@ -168,7 +178,7 @@ struct CommandPaletteView: View {
                                         searchManager.searchSuggestions(
                                             for: newValue
                                         )
-                                        selectedSuggestionIndex = searchManager.suggestions.isEmpty ? -1 : 0
+                                        selectedSuggestionIndex = visibleSuggestions.isEmpty ? -1 : 0
                                     }
 
                                     if activeSiteSearch == nil, let match = siteSearchMatch {
@@ -203,14 +213,7 @@ struct CommandPaletteView: View {
                             .padding(.vertical, 8)
                             .padding(.horizontal, 8)
 
-                            let filteredSuggestions = activeSiteSearch != nil
-                                ? searchManager.suggestions.filter {
-                                    if case .search = $0.type { return true }
-                                    return false
-                                }
-                                : searchManager.suggestions
-
-                            if !filteredSuggestions.isEmpty {
+                            if !visibleSuggestions.isEmpty {
                                 RoundedRectangle(cornerRadius: 100)
                                     .fill(
                                         isDark
@@ -221,9 +224,9 @@ struct CommandPaletteView: View {
                                     .frame(maxWidth: .infinity)
                             }
 
-                            if !filteredSuggestions.isEmpty {
+                            if !visibleSuggestions.isEmpty {
                                 CommandPaletteSuggestionsListView(
-                                    suggestions: filteredSuggestions,
+                                    suggestions: visibleSuggestions,
                                     selectedIndex: $selectedSuggestionIndex,
                                     hoveredIndex: $hoveredSuggestionIndex,
                                     onSelect: { suggestion in
@@ -291,10 +294,11 @@ struct CommandPaletteView: View {
                 searchManager.clearSuggestions()
             }
         }
-        .onChange(of: searchManager.suggestions.count) { _, newCount in
-            if newCount == 0 {
+        .onChange(of: searchManager.suggestions.count) { _, _ in
+            let count = visibleSuggestions.count
+            if count == 0 {
                 selectedSuggestionIndex = -1
-            } else if selectedSuggestionIndex < 0 || selectedSuggestionIndex >= newCount {
+            } else if selectedSuggestionIndex < 0 || selectedSuggestionIndex >= count {
                 selectedSuggestionIndex = 0
             }
         }
@@ -391,24 +395,27 @@ struct CommandPaletteView: View {
 
     private func handleReturn() {
         if let site = activeSiteSearch {
-            let filteredSuggestions = searchManager.suggestions.filter {
-                if case .search = $0.type { return true }
-                return false
-            }
             let query: String
-            if selectedSuggestionIndex >= 0 && selectedSuggestionIndex < filteredSuggestions.count {
-                query = filteredSuggestions[selectedSuggestionIndex].text
+            if selectedSuggestionIndex >= 0 && selectedSuggestionIndex < visibleSuggestions.count {
+                query = visibleSuggestions[selectedSuggestionIndex].text
             } else {
                 query = text
             }
-            guard !query.isEmpty, let url = site.searchURL(for: query) else { return }
+            guard !query.isEmpty else { return }
+            let navigateURL: String
+            if let url = site.searchURL(for: query) {
+                navigateURL = url.absoluteString
+            } else {
+                // Fallback: search on the site's domain directly
+                navigateURL = "https://\(site.domain)/search?q=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query)"
+            }
             if commandPalette.shouldNavigateCurrentTab
                 && browserManager.currentTab(for: windowState) != nil
             {
-                browserManager.currentTab(for: windowState)?.loadURL(url)
+                browserManager.currentTab(for: windowState)?.loadURL(navigateURL)
             } else {
                 browserManager.createNewTab(in: windowState)
-                browserManager.currentTab(for: windowState)?.loadURL(url)
+                browserManager.currentTab(for: windowState)?.loadURL(navigateURL)
             }
             text = ""
             activeSiteSearch = nil
@@ -418,9 +425,9 @@ struct CommandPaletteView: View {
         }
 
         if selectedSuggestionIndex >= 0
-            && selectedSuggestionIndex < searchManager.suggestions.count
+            && selectedSuggestionIndex < visibleSuggestions.count
         {
-            let suggestion = searchManager.suggestions[selectedSuggestionIndex]
+            let suggestion = visibleSuggestions[selectedSuggestionIndex]
             selectSuggestion(suggestion)
         } else {
             let newSuggestion = SearchManager.SearchSuggestion(
@@ -480,7 +487,7 @@ struct CommandPaletteView: View {
     }
 
     private func navigateSuggestions(direction: Int) {
-        let maxIndex = searchManager.suggestions.count - 1
+        let maxIndex = visibleSuggestions.count - 1
 
         if direction > 0 {
             selectedSuggestionIndex = min(selectedSuggestionIndex + 1, maxIndex)
