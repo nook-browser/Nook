@@ -17,12 +17,19 @@ struct CommandPaletteView: View {
     @EnvironmentObject var gradientColorManager: GradientColorManager
     @State private var searchManager = SearchManager()
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.nookSettings) var nookSettings
 
     @FocusState private var isSearchFocused: Bool
     @State private var text: String = ""
     @State private var selectedSuggestionIndex: Int = -1
     @State private var hoveredSuggestionIndex: Int? = nil
-    
+    @State private var activeSiteSearch: SiteSearchEntry? = nil
+
+    private var siteSearchMatch: SiteSearchEntry? {
+        guard activeSiteSearch == nil else { return nil }
+        return SiteSearchEntry.match(for: text, in: nookSettings.siteSearchEntries)
+    }
+
     let commandPaletteWidth: CGFloat = 765
     let commandPaletteHorizontalPadding: CGFloat = 10
     
@@ -70,21 +77,53 @@ struct CommandPaletteView: View {
                         VStack(alignment: .center,spacing: 6) {
                             HStack(spacing: 15) {
                                 Image(
-                                    systemName: isLikelyURL(text)
-                                        ? "globe" : "magnifyingglass"
+                                    systemName: activeSiteSearch != nil
+                                        ? "magnifyingglass"
+                                        : isLikelyURL(text)
+                                            ? "globe" : "magnifyingglass"
                                 )
-                                .id(isLikelyURL(text) ? "globe" : "magnifyingglass")
+                                .id(activeSiteSearch != nil ? "magnifyingglass" : isLikelyURL(text) ? "globe" : "magnifyingglass")
                                 .transition(.blur(intensity: 2, scale: 0.6).animation(.smooth(duration: 0.3)))
                                 .font(.system(size: 14, weight: .regular))
                                 .foregroundStyle(isDark ? .white : .black)
                                 .frame(width: 15)
 
-                                TextField("Search or enter URL...", text: $text)
+                                if let site = activeSiteSearch {
+                                    Text(site.name)
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 4)
+                                        .background(site.color)
+                                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                                        .transition(
+                                            .blur(intensity: 8, scale: 0.6)
+                                            .animation(.spring(response: 0.35, dampingFraction: 0.75))
+                                        )
+                                }
+
+                                ZStack(alignment: .trailing) {
+                                    TextField(
+                                        activeSiteSearch != nil
+                                            ? "Search \(activeSiteSearch!.name)..."
+                                            : "Search or enter URL...",
+                                        text: $text
+                                    )
                                     .textFieldStyle(.plain)
                                     .font(.system(size: 18, weight: .medium))
                                     .foregroundColor(textFieldColor)
                                     .tint(gradientColorManager.primaryColor)
                                     .focused($isSearchFocused)
+                                    .onKeyPress(.tab) {
+                                        if let match = siteSearchMatch, activeSiteSearch == nil {
+                                            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                                activeSiteSearch = match
+                                            }
+                                            text = ""
+                                            return .handled
+                                        }
+                                        return .ignored
+                                    }
                                     .onKeyPress(.return) {
                                         handleReturn()
                                         return .handled
@@ -98,8 +137,23 @@ struct CommandPaletteView: View {
                                         return .handled
                                     }
                                     .onKeyPress(.escape) {
+                                        if activeSiteSearch != nil {
+                                            withAnimation(.smooth(duration: 0.25)) {
+                                                activeSiteSearch = nil
+                                            }
+                                            return .handled
+                                        }
                                         commandPalette.close()
                                         return .handled
+                                    }
+                                    .onKeyPress(.delete) {
+                                        if activeSiteSearch != nil && text.isEmpty {
+                                            withAnimation(.smooth(duration: 0.25)) {
+                                                activeSiteSearch = nil
+                                            }
+                                            return .handled
+                                        }
+                                        return .ignored
                                     }
                                     .onChange(of: text) { _, newValue in
                                         searchManager.searchSuggestions(
@@ -107,7 +161,36 @@ struct CommandPaletteView: View {
                                         )
                                         selectedSuggestionIndex = searchManager.suggestions.isEmpty ? -1 : 0
                                     }
+
+                                    if activeSiteSearch == nil, let match = siteSearchMatch {
+                                        HStack(spacing: 6) {
+                                            Text("Search \(match.name)")
+                                                .font(.system(size: 14, weight: .medium))
+                                                .foregroundStyle(isDark ? .white.opacity(0.3) : .black.opacity(0.3))
+
+                                            Text("Tab")
+                                                .font(.system(size: 11, weight: .medium))
+                                                .foregroundStyle(isDark ? .white.opacity(0.4) : .black.opacity(0.4))
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .background(
+                                                    RoundedRectangle(cornerRadius: 4)
+                                                        .fill(isDark ? .white.opacity(0.1) : .black.opacity(0.08))
+                                                )
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 4)
+                                                        .stroke(isDark ? .white.opacity(0.15) : .black.opacity(0.12), lineWidth: 0.5)
+                                                )
+                                        }
+                                        .allowsHitTesting(false)
+                                        .transition(
+                                            .blur(intensity: 4, scale: 0.92)
+                                            .animation(.smooth(duration: 0.3))
+                                        )
+                                    }
+                                }
                             }
+                            .animation(.spring(response: 0.35, dampingFraction: 0.75), value: activeSiteSearch != nil)
                             .padding(.vertical, 8)
                             .padding(.horizontal, 8)
 
@@ -184,6 +267,7 @@ struct CommandPaletteView: View {
                 isSearchFocused = false
                 searchManager.clearSuggestions()
                 text = ""
+                activeSiteSearch = nil
                 selectedSuggestionIndex = -1
             }
         }
@@ -292,6 +376,23 @@ struct CommandPaletteView: View {
     }
 
     private func handleReturn() {
+        if let site = activeSiteSearch {
+            guard !text.isEmpty, let url = site.searchURL(for: text) else { return }
+            if commandPalette.shouldNavigateCurrentTab
+                && browserManager.currentTab(for: windowState) != nil
+            {
+                browserManager.currentTab(for: windowState)?.loadURL(url)
+            } else {
+                browserManager.createNewTab(in: windowState)
+                browserManager.currentTab(for: windowState)?.loadURL(url)
+            }
+            text = ""
+            activeSiteSearch = nil
+            selectedSuggestionIndex = -1
+            commandPalette.close()
+            return
+        }
+
         if selectedSuggestionIndex >= 0
             && selectedSuggestionIndex < searchManager.suggestions.count
         {
@@ -349,6 +450,7 @@ struct CommandPaletteView: View {
         }
 
         text = ""
+        activeSiteSearch = nil
         selectedSuggestionIndex = -1
         commandPalette.close()
     }
