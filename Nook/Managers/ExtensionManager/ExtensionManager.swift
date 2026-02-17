@@ -561,7 +561,7 @@ final class ExtensionManager: NSObject, ObservableObject,
         // Create extension entity for persistence
         let entity = ExtensionEntity(
             id: extensionId,
-            name: manifest["name"] as? String ?? "Unknown Extension",
+            name: getLocaleText(key: "name") ?? manifest["name"] as? String ?? "Unknown Extension",
             version: manifest["version"] as? String ?? "1.0",
             manifestVersion: manifest["manifest_version"] as? Int ?? 3,
             extensionDescription: getLocaleText(key: "description") ?? "",
