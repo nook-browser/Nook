@@ -4,6 +4,8 @@
 <dict>
 	<key>com.apple.developer.aps-environment</key>
 	<string>development</string>
+	<key>com.apple.developer.web-browser</key>
+	<true/>
 	<key>com.apple.developer.authentication-services.autofill-credential-provider</key>
 	<true/>
 	<key>com.apple.developer.web-browser.public-key-credential</key>
