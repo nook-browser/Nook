@@ -188,13 +188,21 @@ actor MCPClient {
                     do {
                         try await transport.send(data)
                     } catch {
-                        if let cont = self.pendingRequests.removeValue(forKey: id) {
-                            cont.resume(throwing: error)
-                        }
+                        await self.removePendingRequest(id: id, error: error)
                     }
                 }
             }
         }
+    }
+
+    private func removePendingRequest(id: Int, error: Error) {
+        if let cont = pendingRequests.removeValue(forKey: id) {
+            cont.resume(throwing: error)
+        }
+    }
+
+    private func cancelPendingRequest(id: Int) {
+        pendingRequests.removeValue(forKey: id)
     }
 
     /// Wraps an async operation with a timeout

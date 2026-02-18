@@ -131,10 +131,26 @@ final class ProfileManager: ObservableObject {
         // Remove from tracking immediately to stop tracking
         ephemeralProfiles.removeValue(forKey: windowId)
         
-        // Destroy the data store asynchronously without blocking main thread
-        await withCheckedContinuation { continuation in
-            profile.destroyEphemeralDataStore {
+        // Destroy the data store with timeout protection
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            var resumed = false
+            let resumeSafely: () -> Void = {
+                guard !resumed else { return }
+                resumed = true
                 continuation.resume()
+            }
+            
+            // Timeout after 5 seconds
+            Task {
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                if !resumed {
+                    print("⚠️ [ProfileManager] Timeout destroying ephemeral data store for: \(profile.id)")
+                    resumeSafely()
+                }
+            }
+            
+            profile.destroyEphemeralDataStore {
+                resumeSafely()
             }
         }
         

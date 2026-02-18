@@ -36,14 +36,18 @@ class MCPManager {
 
     /// Synchronous version for app termination when async is not available
     func stopAllSync() {
-        // Use a semaphore to wait for async cleanup
         let semaphore = DispatchSemaphore(value: 0)
         Task {
             await stopAll()
             semaphore.signal()
         }
-        // Wait up to 5 seconds for cleanup
-        _ = semaphore.wait(timeout: .now() + 5)
+        let deadline = Date().addingTimeInterval(5)
+        while Date() < deadline {
+            if semaphore.wait(timeout: .now()) == .success {
+                return
+            }
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.01))
+        }
     }
 
     // MARK: - Server Management

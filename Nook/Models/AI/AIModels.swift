@@ -169,7 +169,10 @@ final class AIKeychainStorage: @unchecked Sendable {
             kSecAttrAccount as String: providerId
         ]
 
-        let attributes: [String: Any] = [kSecValueData as String: data]
+        let attributes: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
+        ]
 
         let status: OSStatus
         if SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess {
@@ -177,6 +180,7 @@ final class AIKeychainStorage: @unchecked Sendable {
         } else {
             var insert = query
             insert[kSecValueData as String] = data
+            insert[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
             status = SecItemAdd(insert as CFDictionary, nil)
         }
 
