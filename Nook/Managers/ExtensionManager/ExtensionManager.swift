@@ -10,6 +10,7 @@ import Foundation
 import os
 import SwiftData
 import SwiftUI
+import UniformTypeIdentifiers
 import WebKit
 
 @available(macOS 15.4, *)
@@ -39,6 +40,8 @@ final class ExtensionManager: NSObject, ObservableObject,
     // Whether to auto-resize extension action popovers to content. Disabled per UX preference.
     // UI delegate for popup context menus
     private var popupUIDelegate: PopupUIDelegate?
+    // Track whether externally_connectable bridge scripts have been added to shared config
+    private var externallyConnectableBridgeInstalled = false
 
     // No preference for action popups-as-tabs; keep native popovers per Apple docs
 
@@ -170,6 +173,121 @@ final class ExtensionManager: NSObject, ObservableObject,
         }
 
         Self.logger.info("Native WKWebExtensionController initialized and configured")
+    }
+
+    // MARK: - Externally Connectable Bridge
+
+    /// Set up the externally_connectable bridge for an extension.
+    ///
+    /// Problem: Web pages (like account.proton.me) call browser.runtime.sendMessage(SAFARI_EXT_ID, msg)
+    /// to communicate with the extension. The Safari extension ID doesn't match our WKWebExtension
+    /// uniqueIdentifier, so the call fails and the page shows an error.
+    ///
+    /// Fix: Inject a user script into matching pages that wraps browser.runtime.sendMessage.
+    /// When called with an external extensionId, it strips the ID and forwards as a regular
+    /// content-script-to-background message (which the background handles — this is the same
+    /// path Firefox uses via its postMessage fallback).
+    @available(macOS 15.4, *)
+    private func setupExternallyConnectableBridge(
+        for extensionContext: WKWebExtensionContext,
+        extensionId: String,
+        packagePath: String
+    ) {
+        let manifestURL = URL(fileURLWithPath: packagePath).appendingPathComponent("manifest.json")
+        guard let data = try? Data(contentsOf: manifestURL),
+              let manifest = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let ec = manifest["externally_connectable"] as? [String: Any],
+              let matchPatterns = ec["matches"] as? [String], !matchPatterns.isEmpty
+        else { return }
+
+        guard !externallyConnectableBridgeInstalled else { return }
+        externallyConnectableBridgeInstalled = true
+
+        // Extract hostnames from match patterns
+        var hostnames: [String] = []
+        for pattern in matchPatterns {
+            guard let schemeEnd = pattern.range(of: "://") else { continue }
+            let afterScheme = pattern[schemeEnd.upperBound...]
+            guard let slashIndex = afterScheme.firstIndex(of: "/") else { continue }
+            let host = String(afterScheme[afterScheme.startIndex..<slashIndex])
+            if host != "*" {
+                hostnames.append(host.replacingOccurrences(of: "*.", with: ""))
+            }
+        }
+        guard !hostnames.isEmpty else { return }
+
+        Self.logger.info("Installing page-world externally_connectable polyfill for: \(hostnames.joined(separator: ", "), privacy: .public)")
+
+        let hostnamesJSON = hostnames.map { "\"\($0)\"" }.joined(separator: ",")
+
+        // PAGE-world polyfill: makes browser.runtime.sendMessage available to web pages.
+        // Uses window.postMessage to bridge to nook_bridge.js (extension content script
+        // in ISOLATED world with real browser.runtime access).
+        let polyfillJS = """
+        (function() {
+            var _hosts = [\(hostnamesJSON)];
+            var h = location.hostname;
+            if (!_hosts.some(function(p) { return h === p || h.endsWith('.' + p); })) return;
+
+            console.log('[NOOK-EC] Installing externally_connectable polyfill on ' + location.href);
+
+            function sendMessagePolyfill(extensionId, message) {
+                return new Promise(function(resolve, reject) {
+                    var callbackId = 'nook_ec_' + Math.random().toString(36).substr(2, 9);
+
+                    function handler(event) {
+                        if (event.source !== window) return;
+                        if (!event.data || event.data.type !== 'nook_ec_response') return;
+                        if (event.data.callbackId !== callbackId) return;
+                        window.removeEventListener('message', handler);
+                        if (event.data.error) {
+                            reject(new Error(event.data.error));
+                        } else {
+                            resolve(event.data.response);
+                        }
+                    }
+                    window.addEventListener('message', handler);
+
+                    window.postMessage({
+                        type: 'nook_ec_request',
+                        extensionId: extensionId,
+                        message: message,
+                        callbackId: callbackId
+                    }, '*');
+
+                    setTimeout(function() {
+                        window.removeEventListener('message', handler);
+                        reject(new Error('Extension communication timeout'));
+                    }, 30000);
+                });
+            }
+
+            // Polyfill browser.runtime.sendMessage for matching web pages
+            if (!window.browser) window.browser = {};
+            if (!window.browser.runtime) window.browser.runtime = {};
+            if (typeof window.browser.runtime.sendMessage !== 'function') {
+                window.browser.runtime.sendMessage = sendMessagePolyfill;
+            }
+
+            // Also polyfill chrome.runtime.sendMessage
+            if (!window.chrome) window.chrome = {};
+            if (!window.chrome.runtime) window.chrome.runtime = {};
+            if (typeof window.chrome.runtime.sendMessage !== 'function') {
+                window.chrome.runtime.sendMessage = sendMessagePolyfill;
+            }
+
+            console.log('[NOOK-EC] Polyfill ready — browser.runtime.sendMessage available');
+        })();
+        """
+
+        let sharedConfig = BrowserConfiguration.shared.webViewConfiguration
+        let pageScript = WKUserScript(
+            source: polyfillJS,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true,
+            in: .page
+        )
+        sharedConfig.userContentController.addUserScript(pageScript)
     }
 
     /// Verify extension storage is working properly
@@ -325,6 +443,123 @@ final class ExtensionManager: NSObject, ObservableObject,
         }
     }
 
+    /// Patch manifest.json so domain-specific content scripts run in MAIN world.
+    ///
+    /// In Chrome MV3, content script fetch() uses the page's origin. In WebKit's
+    /// ISOLATED world, fetch() uses the extension's origin (webkit-extension://)
+    /// which causes CORS failures and prevents cookies from being sent. This
+    /// particularly breaks SSO/auth flows like Proton Pass's fork session handoff
+    /// where a content script needs to make authenticated requests to the page's API.
+    ///
+    /// The fix: content scripts that target a small set of specific domains (not
+    /// wildcard all-sites patterns) and don't already specify a world are patched
+    /// to run in MAIN world, where fetch() uses the page's origin and cookies.
+    private func patchManifestForWebKit(at manifestURL: URL) {
+        guard let data = try? Data(contentsOf: manifestURL),
+              var manifest = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return }
+
+        var changed = false
+
+        // --- Revert any previous MAIN-world patches on domain-specific content scripts ---
+        // (Earlier code incorrectly patched domain-specific scripts to MAIN world,
+        // but MAIN world content scripts lose browser.runtime access in WKWebExtension.)
+        if var contentScripts = manifest["content_scripts"] as? [[String: Any]] {
+            for i in contentScripts.indices {
+                guard let world = contentScripts[i]["world"] as? String, world == "MAIN" else { continue }
+                guard let matches = contentScripts[i]["matches"] as? [String] else { continue }
+                let jsFiles = contentScripts[i]["js"] as? [String] ?? []
+
+                // Don't touch our own bridge entry
+                if jsFiles.contains("nook_bridge.js") { continue }
+
+                // If ALL matches are domain-specific (no wildcard hosts), this was likely our patch
+                let allDomainSpecific = matches.allSatisfy { pattern in
+                    guard let schemeEnd = pattern.range(of: "://") else { return false }
+                    let afterScheme = pattern[schemeEnd.upperBound...]
+                    guard let slashIndex = afterScheme.firstIndex(of: "/") else { return false }
+                    let host = String(afterScheme[afterScheme.startIndex..<slashIndex])
+                    return host != "*" && !host.hasPrefix("*.")
+                }
+
+                if allDomainSpecific {
+                    contentScripts[i].removeValue(forKey: "world")
+                    Self.logger.info("Reverted MAIN world on [\(jsFiles.joined(separator: ", "), privacy: .public)] — restoring to ISOLATED")
+                    changed = true
+                }
+            }
+            manifest["content_scripts"] = contentScripts
+        }
+
+        // --- Add externally_connectable bridge content script ---
+        if let ec = manifest["externally_connectable"] as? [String: Any],
+           let matchPatterns = ec["matches"] as? [String], !matchPatterns.isEmpty {
+
+            var contentScripts = manifest["content_scripts"] as? [[String: Any]] ?? []
+
+            let alreadyHasBridge = contentScripts.contains { entry in
+                (entry["js"] as? [String])?.contains("nook_bridge.js") == true
+            }
+
+            if !alreadyHasBridge {
+                // Add bridge content script entry — runs in ISOLATED world (has browser.runtime)
+                let bridgeEntry: [String: Any] = [
+                    "all_frames": false,
+                    "js": ["nook_bridge.js"],
+                    "matches": matchPatterns,
+                    "run_at": "document_start"
+                ]
+                contentScripts.append(bridgeEntry)
+                manifest["content_scripts"] = contentScripts
+
+                // Create the nook_bridge.js relay file
+                let bridgeDir = manifestURL.deletingLastPathComponent()
+                let bridgeFileURL = bridgeDir.appendingPathComponent("nook_bridge.js")
+                let bridgeJS = """
+                // Nook: externally_connectable bridge relay
+                // Runs as extension content script (ISOLATED world) with browser.runtime access.
+                // Listens for postMessage from page-world polyfill and forwards to background.
+                (function() {
+                    window.addEventListener('message', function(event) {
+                        if (event.source !== window) return;
+                        if (!event.data || event.data.type !== 'nook_ec_request') return;
+
+                        var callbackId = event.data.callbackId;
+                        var message = event.data.message;
+
+                        if (message && typeof message === 'object') {
+                            message = Object.assign({}, message, { sender: 'contentscript' });
+                        }
+
+                        browser.runtime.sendMessage(message).then(function(response) {
+                            window.postMessage({
+                                type: 'nook_ec_response',
+                                callbackId: callbackId,
+                                response: response
+                            }, '*');
+                        }).catch(function(error) {
+                            window.postMessage({
+                                type: 'nook_ec_response',
+                                callbackId: callbackId,
+                                error: error.message || String(error)
+                            }, '*');
+                        });
+                    });
+                })();
+                """
+                try? bridgeJS.write(to: bridgeFileURL, atomically: true, encoding: .utf8)
+                Self.logger.info("Created nook_bridge.js and registered in manifest for externally_connectable bridge")
+                changed = true
+            }
+        }
+
+        if changed {
+            if let updatedData = try? JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys]) {
+                try? updatedData.write(to: manifestURL)
+            }
+        }
+    }
+
     /// Configure MV3-specific extension features
     private func configureMV3Extension(
         webExtension: WKWebExtension,
@@ -399,9 +634,13 @@ final class ExtensionManager: NSObject, ObservableObject,
         let tempId = UUID().uuidString
         let tempDir = extensionsDir.appendingPathComponent("temp_\(tempId)")
 
-        // Handle ZIP files and directories
-        if sourceURL.pathExtension.lowercased() == "zip" {
+        let ext = sourceURL.pathExtension.lowercased()
+        if ext == "zip" {
             try await extractZip(from: sourceURL, to: tempDir)
+        } else if ext == "appex" || ext == "app" {
+            // Safari Web Extension bundle — resolve and copy web resources
+            let resourcesDir = try resolveSafariExtensionResources(at: sourceURL)
+            try FileManager.default.copyItem(at: resourcesDir, to: tempDir)
         } else {
             try FileManager.default.copyItem(at: sourceURL, to: tempDir)
         }
@@ -420,6 +659,9 @@ final class ExtensionManager: NSObject, ObservableObject,
                 )
             }
         }
+
+        // Patch domain-specific content scripts to MAIN world for WebKit fetch compatibility
+        patchManifestForWebKit(at: manifestURL)
 
         // STEP 2: Create a temporary WKWebExtension just to get the uniqueIdentifier
         Self.logger.debug("Initializing WKWebExtension from \(tempDir.path, privacy: .public)")
@@ -461,15 +703,24 @@ final class ExtensionManager: NSObject, ObservableObject,
 
         // Store context and load into controller
         extensionContexts[extensionId] = extensionContext
+
+        // Set up externally_connectable bridge BEFORE loading background
+        setupExternallyConnectableBridge(
+            for: extensionContext,
+            extensionId: extensionId,
+            packagePath: finalDestinationDir.path
+        )
+
         try extensionController?.load(extensionContext)
 
         // Start the background service worker so it can handle
         // messages from popup and content scripts.
-        extensionContext.loadBackgroundContent { error in
+        extensionContext.loadBackgroundContent { [weak self] error in
             if let error {
                 Self.logger.error("Background load failed for new extension: \(error.localizedDescription, privacy: .public)")
             } else {
                 Self.logger.info("Background content loaded for new extension")
+                self?.probeBackgroundHealth(for: extensionContext, name: "new extension")
             }
         }
 
@@ -497,10 +748,26 @@ final class ExtensionManager: NSObject, ObservableObject,
                         at: localesDirectory,
                         includingPropertiesForKeys: nil
                     )
-                    for item in items {
-                        // TODO: Get user locale
-                        if item.lastPathComponent.hasPrefix("en") {
-                            pathToDirectory = item
+
+                    // Build a priority list from the user's current locale
+                    var localeCandidates: [String] = []
+                    let current = Locale.current
+                    if let langCode = current.language.languageCode?.identifier {
+                        if let regionCode = current.language.region?.identifier {
+                            // Full locale with underscore and hyphen variants (e.g. pt_BR, pt-BR)
+                            localeCandidates.append("\(langCode)_\(regionCode)")
+                            localeCandidates.append("\(langCode)-\(regionCode)")
+                        }
+                        // Language-only (e.g. pt)
+                        localeCandidates.append(langCode)
+                    }
+                    // Always fall back to English
+                    localeCandidates.append("en")
+
+                    // Case-insensitive matching against available locale directories
+                    for candidate in localeCandidates {
+                        if let match = items.first(where: { $0.lastPathComponent.caseInsensitiveCompare(candidate) == .orderedSame }) {
+                            pathToDirectory = match
                             break
                         }
                     }
@@ -603,6 +870,47 @@ final class ExtensionManager: NSObject, ObservableObject,
                 "Failed to extract ZIP file"
             )
         }
+    }
+
+    /// Resolve the web extension resources directory from a Safari .appex or .app bundle.
+    /// - .appex: look for `Contents/Resources/manifest.json`
+    /// - .app: find the first `.appex` inside `Contents/PlugIns/` that contains web extension resources
+    private func resolveSafariExtensionResources(at bundleURL: URL) throws -> URL {
+        let ext = bundleURL.pathExtension.lowercased()
+
+        if ext == "appex" {
+            let resourcesDir = bundleURL.appendingPathComponent("Contents/Resources")
+            let manifest = resourcesDir.appendingPathComponent("manifest.json")
+            if FileManager.default.fileExists(atPath: manifest.path) {
+                Self.logger.info("Found Safari extension resources at \(resourcesDir.path, privacy: .public)")
+                return resourcesDir
+            }
+            throw ExtensionError.installationFailed(
+                "No manifest.json found in .appex bundle at Contents/Resources"
+            )
+        }
+
+        if ext == "app" {
+            // Search PlugIns directory for .appex bundles containing web extension resources
+            let plugInsDir = bundleURL.appendingPathComponent("Contents/PlugIns")
+            if let items = try? FileManager.default.contentsOfDirectory(
+                at: plugInsDir, includingPropertiesForKeys: nil
+            ) {
+                for item in items where item.pathExtension.lowercased() == "appex" {
+                    let resourcesDir = item.appendingPathComponent("Contents/Resources")
+                    let manifest = resourcesDir.appendingPathComponent("manifest.json")
+                    if FileManager.default.fileExists(atPath: manifest.path) {
+                        Self.logger.info("Found Safari extension in \(item.lastPathComponent): \(resourcesDir.path, privacy: .public)")
+                        return resourcesDir
+                    }
+                }
+            }
+            throw ExtensionError.installationFailed(
+                "No Safari Web Extension found in app bundle. Check Contents/PlugIns/ for .appex with manifest.json"
+            )
+        }
+
+        throw ExtensionError.installationFailed("Unsupported bundle format: .\(ext)")
     }
 
     private func findExtensionIcon(in directory: URL, manifest: [String: Any])
@@ -758,16 +1066,111 @@ final class ExtensionManager: NSObject, ObservableObject,
         }
     }
 
+    // MARK: - Safari Extension Discovery
+
+    /// A Safari Web Extension found on the system
+    struct SafariExtensionInfo: Identifiable {
+        let id: String           // bundle identifier
+        let name: String         // display name
+        let appPath: URL         // path to the parent .app
+        let appexPath: URL       // path to the .appex bundle
+        let resourcesPath: URL   // path to Contents/Resources with manifest.json
+    }
+
+    /// Discover Safari Web Extensions installed on this Mac by scanning application
+    /// bundles for .appex plugins that contain a manifest.json (web extension resources).
+    func discoverSafariExtensions() async -> [SafariExtensionInfo] {
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                var results: [SafariExtensionInfo] = []
+                let fm = FileManager.default
+
+                // Scan both system and user Applications directories
+                let searchDirs: [URL] = [
+                    URL(fileURLWithPath: "/Applications"),
+                    fm.homeDirectoryForCurrentUser.appendingPathComponent("Applications"),
+                ]
+
+                for searchDir in searchDirs {
+                    guard let apps = try? fm.contentsOfDirectory(
+                        at: searchDir,
+                        includingPropertiesForKeys: nil,
+                        options: [.skipsHiddenFiles]
+                    ) else { continue }
+
+                    for appURL in apps where appURL.pathExtension == "app" {
+                        let plugInsDir = appURL.appendingPathComponent("Contents/PlugIns")
+                        guard let plugins = try? fm.contentsOfDirectory(
+                            at: plugInsDir,
+                            includingPropertiesForKeys: nil
+                        ) else { continue }
+
+                        for pluginURL in plugins where pluginURL.pathExtension == "appex" {
+                            // Check if this appex is a Safari web extension by looking for
+                            // both the extension point identifier and a manifest.json
+                            let infoPlist = pluginURL.appendingPathComponent("Contents/Info.plist")
+                            if let plistData = try? Data(contentsOf: infoPlist),
+                               let plist = try? PropertyListSerialization.propertyList(from: plistData, format: nil) as? [String: Any],
+                               let nsExt = plist["NSExtension"] as? [String: Any],
+                               let pointId = nsExt["NSExtensionPointIdentifier"] as? String,
+                               pointId == "com.apple.Safari.web-extension" {
+                                // Confirmed Safari web extension — check for manifest.json
+                            } else {
+                                continue
+                            }
+
+                            let resourcesDir = pluginURL.appendingPathComponent("Contents/Resources")
+                            let manifestPath = resourcesDir.appendingPathComponent("manifest.json")
+                            guard fm.fileExists(atPath: manifestPath.path) else { continue }
+
+                            // Read extension name from manifest
+                            var extName = appURL.deletingPathExtension().lastPathComponent
+                            if let data = try? Data(contentsOf: manifestPath),
+                               let manifest = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                               let name = manifest["name"] as? String,
+                               !name.hasPrefix("__MSG_") {
+                                extName = name
+                            }
+
+                            // Get bundle identifier from Info.plist
+                            let bundleId = Bundle(url: pluginURL)?.bundleIdentifier ?? pluginURL.lastPathComponent
+
+                            results.append(SafariExtensionInfo(
+                                id: bundleId,
+                                name: extName,
+                                appPath: appURL,
+                                appexPath: pluginURL,
+                                resourcesPath: resourcesDir
+                            ))
+                        }
+                    }
+                }
+
+                continuation.resume(returning: results)
+            }
+        }
+    }
+
+    /// Install a discovered Safari extension by its resources path
+    func installSafariExtension(_ info: SafariExtensionInfo, completionHandler: @escaping (Result<InstalledExtension, ExtensionError>) -> Void) {
+        installExtension(from: info.appexPath, completionHandler: completionHandler)
+    }
+
     // MARK: - File Picker
 
     func showExtensionInstallDialog() {
         let openPanel = NSOpenPanel()
         openPanel.title = "Install Extension"
-        openPanel.message = "Select an extension folder or ZIP file to install"
+        openPanel.message = "Select an extension folder, ZIP file, or Safari extension (.app/.appex)"
         openPanel.canChooseFiles = true
         openPanel.canChooseDirectories = true
         openPanel.allowsMultipleSelection = false
-        openPanel.allowedContentTypes = [.zip, .directory]
+        openPanel.allowedContentTypes = [
+            .zip,
+            .directory,
+            .application,
+            .applicationExtension,
+        ]
 
         if openPanel.runModal() == .OK, let url = openPanel.url {
             installExtension(from: url) { result in
@@ -810,6 +1213,9 @@ final class ExtensionManager: NSObject, ObservableObject,
             let manifestURL = URL(fileURLWithPath: entity.packagePath)
                 .appendingPathComponent("manifest.json")
             do {
+                // Patch domain-specific content scripts to MAIN world on each load
+                // (idempotent — skips entries that already have a world set)
+                patchManifestForWebKit(at: manifestURL)
                 let manifest = try ExtensionUtils.validateManifest(at: manifestURL)
                 loadedExtensions.append(InstalledExtension(from: entity, manifest: manifest))
                 if entity.isEnabled {
@@ -889,6 +1295,14 @@ final class ExtensionManager: NSObject, ObservableObject,
                 }
 
                 self.extensionContexts[correctExtensionId] = extensionContext
+
+                // Set up externally_connectable bridge BEFORE loading background
+                self.setupExternallyConnectableBridge(
+                    for: extensionContext,
+                    extensionId: correctExtensionId,
+                    packagePath: entity.packagePath
+                )
+
                 do {
                     try self.extensionController?.load(extensionContext)
                 } catch {
@@ -898,11 +1312,13 @@ final class ExtensionManager: NSObject, ObservableObject,
 
                 // Start background service worker if the extension has one
                 if webExtension.hasBackgroundContent {
-                    extensionContext.loadBackgroundContent(completionHandler: { error in
+                    extensionContext.loadBackgroundContent(completionHandler: { [weak self] error in
                         if let error {
                             Self.logger.error("Background content failed for '\(entity.name, privacy: .public)': \(error.localizedDescription, privacy: .public)")
                         } else {
                             Self.logger.info("Background content started for '\(entity.name, privacy: .public)'")
+                            // Probe background webview for JS errors after a short delay
+                            self?.probeBackgroundHealth(for: extensionContext, name: entity.name)
                         }
                     })
                 }
@@ -1733,7 +2149,6 @@ final class ExtensionManager: NSObject, ObservableObject,
             windowAdapter = ExtensionWindowAdapter(browserManager: bm)
         }
         Self.logger.info("Created new window (space): \(newSpace.name)")
-        Self.logger.info("Created new window (space): \(newSpace.name)")
         completionHandler(windowAdapter, nil)
     }
 
@@ -2075,6 +2490,8 @@ final class ExtensionManager: NSObject, ObservableObject,
     }
 
     // URL-specific access prompts (used for cross-origin network requests from extension contexts)
+    // Auto-grant URLs that fall within the extension's already-granted host permissions.
+    // Only prompt for URLs the extension has no declared permission for.
     @available(macOS 15.5, *)
     func webExtensionController(
         _ controller: WKWebExtensionController,
@@ -2083,10 +2500,63 @@ final class ExtensionManager: NSObject, ObservableObject,
         for extensionContext: WKWebExtensionContext,
         completionHandler: @escaping (Set<URL>, Date?) -> Void
     ) {
-        // Grant all requested URLs so extension popups and background scripts can
-        // reach their own API servers (e.g. AdGuard filter lists, Bitwarden vault).
-        // TODO: Replace with a user-facing per-site prompt for untrusted domains.
-        completionHandler(urls, nil)
+        // Check each URL against the extension's granted permissions
+        var granted = Set<URL>()
+        var needsPrompt = Set<URL>()
+
+        for url in urls {
+            let status = extensionContext.permissionStatus(for: url)
+            if status == .grantedExplicitly || status == .grantedImplicitly {
+                granted.insert(url)
+            } else {
+                needsPrompt.insert(url)
+            }
+        }
+
+        // If all URLs are already covered by granted permissions, auto-approve
+        if needsPrompt.isEmpty {
+            completionHandler(granted, nil)
+            return
+        }
+
+        // Prompt only for URLs not covered by existing permissions
+        let displayName =
+            extensionContext.webExtension.displayName ?? "Extension"
+
+        guard let bm = browserManagerRef else {
+            // No UI available — grant what we can, deny the rest
+            completionHandler(granted, nil)
+            return
+        }
+
+        let urlStrings = needsPrompt.map { $0.absoluteString }.sorted()
+
+        bm.showDialog {
+            StandardDialog(
+                header: { EmptyView() },
+                content: {
+                    ExtensionPermissionView(
+                        extensionName: displayName,
+                        requestedPermissions: [],
+                        optionalPermissions: [],
+                        requestedHostPermissions: urlStrings,
+                        optionalHostPermissions: [],
+                        onGrant: {
+                            bm.closeDialog()
+                            completionHandler(urls, nil)
+                        },
+                        onDeny: {
+                            bm.closeDialog()
+                            completionHandler(granted, nil)
+                        },
+                        extensionLogo: extensionContext.webExtension.icon(
+                            for: .init(width: 64, height: 64)
+                        ) ?? NSImage()
+                    )
+                },
+                footer: { EmptyView() }
+            )
+        }
     }
 
     // MARK: - URL Conversion Helpers
@@ -2136,11 +2606,72 @@ final class ExtensionManager: NSObject, ObservableObject,
 
     // MARK: - Extension Diagnostics
 
+    /// Probe the background webview after load to check for JS-level errors.
+    /// Output goes to Xcode debug console via NSLog for easy visibility.
+    @available(macOS 15.4, *)
+    private func probeBackgroundHealth(for context: WKWebExtensionContext, name: String) {
+        // First probe at 3s, second at 8s (gives boot saga time to complete/fail)
+        for delay in [3.0, 8.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                guard let bgWV = (context as AnyObject).value(forKey: "_backgroundWebView") as? WKWebView else {
+                    NSLog("[EXT-HEALTH] [\(name)] +\(Int(delay))s: No background webview found")
+                    return
+                }
+
+                bgWV.evaluateJavaScript("""
+                    (function() {
+                        var b = typeof browser !== 'undefined' ? browser : (typeof chrome !== 'undefined' ? chrome : null);
+                        if (!b) return JSON.stringify({error: 'No browser/chrome API available'});
+
+                        var result = {
+                            url: location.href,
+                            apiNamespace: typeof browser !== 'undefined' ? 'browser' : 'chrome',
+                            runtime: !!b.runtime,
+                            runtimeId: b.runtime ? b.runtime.id : null,
+                            alarms: !!b.alarms,
+                            storage: !!b.storage,
+                            storageLocal: !!(b.storage && b.storage.local),
+                            storageSession: !!(b.storage && b.storage.session),
+                            storageSync: !!(b.storage && b.storage.sync),
+                            tabs: !!b.tabs,
+                            scripting: !!b.scripting,
+                            webNavigation: !!b.webNavigation,
+                            permissions: !!b.permissions,
+                            action: !!b.action,
+                            notifications: !!b.notifications,
+                            webRequest: !!b.webRequest,
+                            declarativeNetRequest: !!b.declarativeNetRequest,
+                            contextMenus: !!b.contextMenus,
+                            commands: !!b.commands,
+                            i18n: !!b.i18n,
+                            windows: !!b.windows,
+                        };
+
+                        // Try to detect if there were uncaught errors
+                        try {
+                            if (b.runtime && b.runtime.lastError) {
+                                result.lastError = b.runtime.lastError.message || String(b.runtime.lastError);
+                            }
+                        } catch(e) {}
+
+                        return JSON.stringify(result, null, 2);
+                    })()
+                """) { result, error in
+                    if let json = result as? String {
+                        NSLog("[EXT-HEALTH] [\(name)] +\(Int(delay))s background APIs:\\n\(json)")
+                    } else if let error = error {
+                        NSLog("[EXT-HEALTH] [\(name)] +\(Int(delay))s probe FAILED: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+    }
+
     /// Comprehensive diagnostic for extension content script + messaging state
     @available(macOS 15.5, *)
     func diagnoseExtensionState(for webView: WKWebView, url: URL) {
         guard let controller = extensionController else {
-            print("[EXT-DIAG] No extension controller")
+            Self.logger.debug("No extension controller")
             return
         }
 
@@ -2149,7 +2680,7 @@ final class ExtensionManager: NSObject, ObservableObject,
         let configCtrl = webView.configuration.webExtensionController
         let sameCtrl = configCtrl === controller
 
-        print("[EXT-DIAG] \(host): contexts=\(ctxCount), webviewHasCtrl=\(configCtrl != nil), sameCtrl=\(sameCtrl)")
+        Self.logger.debug("\(host): contexts=\(ctxCount), webviewHasCtrl=\(configCtrl != nil), sameCtrl=\(sameCtrl)")
 
         for (extId, ctx) in extensionContexts {
             let name = ctx.webExtension.displayName ?? extId
@@ -2160,13 +2691,13 @@ final class ExtensionManager: NSObject, ObservableObject,
             let matchPatterns = ctx.grantedPermissionMatchPatterns.map { String(describing: $0) }.joined(separator: ", ")
             let urlAccess = ctx.permissionStatus(for: url)
 
-            print("[EXT-DIAG] '\(name)': hasBackground=\(hasBackground), hasInjected=\(hasInjected), baseURL=\(baseURL), urlAccess=\(urlAccess.rawValue)")
-            print("[EXT-DIAG] '\(name)' perms: \(perms)")
-            print("[EXT-DIAG] '\(name)' matchPatterns: \(matchPatterns)")
+            Self.logger.debug("'\(name)': hasBackground=\(hasBackground), hasInjected=\(hasInjected), baseURL=\(baseURL), urlAccess=\(urlAccess.rawValue)")
+            Self.logger.debug("'\(name)' perms: \(perms)")
+            Self.logger.debug("'\(name)' matchPatterns: \(matchPatterns)")
 
             // Try to reach background webview via KVC
             let bgWV = (ctx as AnyObject).value(forKey: "_backgroundWebView") as? WKWebView
-            print("[EXT-DIAG] '\(name)' bgWebView via KVC: \(bgWV != nil ? bgWV!.url?.absoluteString ?? "no-url" : "nil")")
+            Self.logger.debug("'\(name)' bgWebView via KVC: \(bgWV != nil ? bgWV!.url?.absoluteString ?? "no-url" : "nil")")
 
             if let bgWV = bgWV {
                 bgWV.evaluateJavaScript("""
@@ -2180,10 +2711,11 @@ final class ExtensionManager: NSObject, ObservableObject,
                         }
                     })
                 """) { result, error in
+                    let logger = Logger(subsystem: "com.nook.browser", category: "Extensions")
                     if let json = result as? String {
-                        print("[EXT-DIAG] '\(name)' background: \(json)")
+                        logger.debug("'\(name)' background: \(json)")
                     } else if let error = error {
-                        print("[EXT-DIAG] '\(name)' background eval error: \(error.localizedDescription)")
+                        logger.debug("'\(name)' background eval error: \(error.localizedDescription)")
                     }
                 }
             }
@@ -2197,8 +2729,9 @@ final class ExtensionManager: NSObject, ObservableObject,
                 scripts: document.querySelectorAll('script').length
             })
         """) { result, _ in
+            let logger = Logger(subsystem: "com.nook.browser", category: "Extensions")
             if let json = result as? String {
-                print("[EXT-DIAG] \(host) page: \(json)")
+                logger.debug("\(host) page: \(json)")
             }
         }
 
@@ -2207,7 +2740,8 @@ final class ExtensionManager: NSObject, ObservableObject,
             webView.evaluateJavaScript(
                 "'drCount=' + document.querySelectorAll('style[class*=\"darkreader\"]').length"
             ) { result, _ in
-                print("[EXT-DIAG] \(host) +3s: \(result ?? "nil")")
+                let logger = Logger(subsystem: "com.nook.browser", category: "Extensions")
+                logger.debug("\(host) +3s: \(String(describing: result ?? "nil"))")
             }
         }
     }
@@ -2354,6 +2888,7 @@ class NativeMessagingHandler: NSObject {
     private var outputPipe: Pipe?
     private var errorPipe: Pipe?
     private weak var port: WKWebExtension.MessagePort?
+    private var outputBuffer = Data()
     
     init(applicationId: String) {
         self.applicationId = applicationId
@@ -2361,20 +2896,61 @@ class NativeMessagingHandler: NSObject {
     }
     
     func sendMessage(_ message: Any, completion: @escaping (Any?, Error?) -> Void) {
-        // Single-shot message: Launch, write, read, exit
+        // Single-shot message: Launch, write, read response, terminate
         launchProcess { [weak self] success in
             guard success, let self = self else {
                 completion(nil, NSError(domain: "NativeMessaging", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to launch host"]))
                 return
             }
-            
+
             do {
+                // Disable the readabilityHandler to avoid conflict with long-lived port mode
+                self.outputPipe?.fileHandleForReading.readabilityHandler = nil
+
                 try self.writeMessage(message)
-                // Read response (implementation simplified for single-shot)
-                // In reality, we'd need to wait for stdout
-                // For now, we'll just acknowledge receipt as many hosts don't reply immediately to single messages
-                completion(["status": "sent"], nil) 
+
+                // Read the response synchronously with a 5-second timeout
+                let readHandle = self.outputPipe?.fileHandleForReading
+                var responseData: Any?
+                var readError: Error?
+                let semaphore = DispatchSemaphore(value: 0)
+
+                DispatchQueue.global(qos: .userInitiated).async {
+                    defer { semaphore.signal() }
+                    guard let handle = readHandle else {
+                        readError = NSError(domain: "NativeMessaging", code: 3, userInfo: [NSLocalizedDescriptionKey: "No output pipe"])
+                        return
+                    }
+
+                    // Read 4-byte length prefix
+                    let lengthData = handle.readData(ofLength: 4)
+                    guard lengthData.count == 4 else {
+                        readError = NSError(domain: "NativeMessaging", code: 4, userInfo: [NSLocalizedDescriptionKey: "Host closed without response"])
+                        return
+                    }
+
+                    let length: UInt32 = lengthData.withUnsafeBytes { $0.load(as: UInt32.self) }
+                    let jsonData = handle.readData(ofLength: Int(length))
+
+                    if let json = try? JSONSerialization.jsonObject(with: jsonData) {
+                        responseData = json
+                    } else {
+                        readError = NSError(domain: "NativeMessaging", code: 5, userInfo: [NSLocalizedDescriptionKey: "Failed to parse host response"])
+                    }
+                }
+
+                let result = semaphore.wait(timeout: .now() + 5)
+                self.terminateProcess()
+
+                if result == .timedOut {
+                    completion(nil, NSError(domain: "NativeMessaging", code: 6, userInfo: [NSLocalizedDescriptionKey: "Host response timed out"]))
+                } else if let error = readError {
+                    completion(nil, error)
+                } else {
+                    completion(responseData, nil)
+                }
             } catch {
+                self.terminateProcess()
                 completion(nil, error)
             }
         }
@@ -2436,12 +3012,29 @@ class NativeMessagingHandler: NSObject {
         // Let's try to look in standard paths.
         
         DispatchQueue.global(qos: .userInitiated).async {
-            let paths = [
-                FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Google/Chrome/NativeMessagingHosts/\(self.applicationId).json"),
-                URL(fileURLWithPath: "/Library/Application Support/Google/Chrome/NativeMessagingHosts/\(self.applicationId).json"),
-                FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Mozilla/NativeMessagingHosts/\(self.applicationId).json"),
-                URL(fileURLWithPath: "/Library/Application Support/Mozilla/NativeMessagingHosts/\(self.applicationId).json")
+            let home = FileManager.default.homeDirectoryForCurrentUser
+            let manifestName = "\(self.applicationId).json"
+            let browserDirs = [
+                // Nook-specific (highest priority)
+                "Library/Application Support/Nook/NativeMessagingHosts",
+                // Chrome
+                "Library/Application Support/Google/Chrome/NativeMessagingHosts",
+                // Chromium
+                "Library/Application Support/Chromium/NativeMessagingHosts",
+                // Microsoft Edge
+                "Library/Application Support/Microsoft Edge/NativeMessagingHosts",
+                // Brave
+                "Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts",
+                // Firefox / Mozilla
+                "Library/Application Support/Mozilla/NativeMessagingHosts",
             ]
+            var paths: [URL] = []
+            for dir in browserDirs {
+                // User-level
+                paths.append(home.appendingPathComponent(dir).appendingPathComponent(manifestName))
+                // System-level
+                paths.append(URL(fileURLWithPath: "/\(dir)").appendingPathComponent(manifestName))
+            }
             
             for path in paths {
                 if let data = try? Data(contentsOf: path),
@@ -2500,7 +3093,9 @@ class NativeMessagingHandler: NSObject {
     }
     
     private func writeMessage(_ message: Any) throws {
-        guard let input = inputPipe else { return }
+        guard let input = inputPipe else {
+            throw NSError(domain: "NativeMessaging", code: 2, userInfo: [NSLocalizedDescriptionKey: "No input pipe available — host process not running"])
+        }
         
         let jsonData = try JSONSerialization.data(withJSONObject: message, options: [])
         var length = UInt32(jsonData.count)
@@ -2513,18 +3108,27 @@ class NativeMessagingHandler: NSObject {
     }
     
     private func handleOutput(_ data: Data) {
-        // Parse length-prefixed JSON
-        // This is a stream, so we might get partial data. 
-        // For simplicity in this MVP, we assume we get complete messages or handle basic buffering.
-        // (Real implementation needs a buffer)
-        
-        // Skip length (4 bytes) and parse JSON
-        if data.count > 4 {
-            let jsonRange = 4..<data.count
-            let jsonData = data.subdata(in: jsonRange)
+        outputBuffer.append(data)
+
+        // Process all complete messages in the buffer
+        while outputBuffer.count >= 4 {
+            // Read 4-byte length prefix (native byte order)
+            let length: UInt32 = outputBuffer.withUnsafeBytes { $0.load(as: UInt32.self) }
+            let totalNeeded = 4 + Int(length)
+
+            guard outputBuffer.count >= totalNeeded else {
+                // Wait for more data
+                break
+            }
+
+            let jsonData = outputBuffer.subdata(in: 4..<totalNeeded)
+            outputBuffer.removeSubrange(0..<totalNeeded)
+
             if let json = try? JSONSerialization.jsonObject(with: jsonData) {
                 Self.logger.debug("Received from host: \(String(describing: json))")
                 port?.sendMessage(json) { _ in }
+            } else {
+                Self.logger.error("Failed to parse JSON from host (\(jsonData.count) bytes)")
             }
         }
     }
