@@ -40,9 +40,6 @@ final class ExtensionManager: NSObject, ObservableObject,
     // Whether to auto-resize extension action popovers to content. Disabled per UX preference.
     // UI delegate for popup context menus
     private var popupUIDelegate: PopupUIDelegate?
-    // Track whether externally_connectable bridge scripts have been added to shared config
-    private var externallyConnectableBridgeInstalled = false
-
     // No preference for action popups-as-tabs; keep native popovers per Apple docs
 
     let context: ModelContext
@@ -200,31 +197,36 @@ final class ExtensionManager: NSObject, ObservableObject,
               let matchPatterns = ec["matches"] as? [String], !matchPatterns.isEmpty
         else { return }
 
-        guard !externallyConnectableBridgeInstalled else { return }
-        externallyConnectableBridgeInstalled = true
-
         // Extract hostnames from match patterns
-        var hostnames: [String] = []
+        var hostnames = Set<String>()
         for pattern in matchPatterns {
             guard let schemeEnd = pattern.range(of: "://") else { continue }
             let afterScheme = pattern[schemeEnd.upperBound...]
             guard let slashIndex = afterScheme.firstIndex(of: "/") else { continue }
             let host = String(afterScheme[afterScheme.startIndex..<slashIndex])
             if host != "*" {
-                hostnames.append(host.replacingOccurrences(of: "*.", with: ""))
+                hostnames.insert(host.replacingOccurrences(of: "*.", with: ""))
             }
         }
-        guard !hostnames.isEmpty else { return }
+        let sortedHostnames = hostnames.sorted()
+        guard !sortedHostnames.isEmpty else { return }
 
-        Self.logger.info("Installing page-world externally_connectable polyfill for: \(hostnames.joined(separator: ", "), privacy: .public)")
+        Self.logger.info("Installing page-world externally_connectable polyfill for extension \(extensionId, privacy: .public): \(sortedHostnames.joined(separator: ", "), privacy: .public)")
 
-        let hostnamesJSON = hostnames.map { "\"\($0)\"" }.joined(separator: ",")
+        let hostnamesJSON = sortedHostnames.map { "\"\($0)\"" }.joined(separator: ",")
+        let escapedTargetRuntimeId = extensionId
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
 
         // PAGE-world polyfill: wraps browser/chrome runtime APIs used by externally_connectable
         // pages and relays extension traffic via window.postMessage to nook_bridge.js (ISOLATED world).
         let polyfillJS = """
         (function() {
             var _hosts = [\(hostnamesJSON)];
+            var _configuredRuntimeId = "\(escapedTargetRuntimeId)";
+            var _activeRuntimeId = _configuredRuntimeId;
+            var _pendingBridgeRuntimeId = null;
+            var _bridgeRuntimeRetargetTimer = null;
             var h = location.hostname;
             if (!_hosts.some(function(p) { return h === p || h.endsWith('.' + p); })) return;
             if (window.__nookEcShimInstalled) return;
@@ -235,6 +237,7 @@ final class ExtensionManager: NSObject, ObservableObject,
             var bridgeReady = false;
             var bridgeWaiters = [];
             var bridgePorts = Object.create(null);
+            var bridgeRequestDedup = Object.create(null);
 
             function makeEvent() {
                 var listeners = [];
@@ -271,6 +274,43 @@ final class ExtensionManager: NSObject, ObservableObject,
                 while (bridgeWaiters.length) {
                     try { bridgeWaiters.shift()(); } catch (_) {}
                 }
+            }
+
+            function activeRuntimeId() {
+                return _activeRuntimeId || _configuredRuntimeId;
+            }
+
+            function matchesActiveRuntimeId(runtimeId) {
+                if (!runtimeId || typeof runtimeId !== 'string') return true;
+                return runtimeId === activeRuntimeId();
+            }
+
+            function adoptBridgeRuntime(runtimeId) {
+                if (!runtimeId || typeof runtimeId !== 'string') {
+                    markBridgeReady();
+                    return;
+                }
+
+                if (runtimeId === _configuredRuntimeId || runtimeId === _activeRuntimeId) {
+                    _activeRuntimeId = runtimeId;
+                    markBridgeReady();
+                    return;
+                }
+
+                if (_activeRuntimeId !== _configuredRuntimeId) {
+                    return;
+                }
+
+                _pendingBridgeRuntimeId = runtimeId;
+                if (_bridgeRuntimeRetargetTimer !== null) return;
+
+                _bridgeRuntimeRetargetTimer = setTimeout(function() {
+                    _bridgeRuntimeRetargetTimer = null;
+                    if (bridgeReady || !_pendingBridgeRuntimeId) return;
+                    _activeRuntimeId = _pendingBridgeRuntimeId;
+                    console.warn('[NOOK-EC] Bridge runtime mismatch; retargeting to ' + _activeRuntimeId + ' (configured ' + _configuredRuntimeId + ')');
+                    markBridgeReady();
+                }, 250);
             }
 
             function waitForBridgeReady(timeoutMs) {
@@ -385,6 +425,22 @@ final class ExtensionManager: NSObject, ObservableObject,
                         : typeof parsed.message
                 );
 
+                function dedupKeyForRequest() {
+                    if (normalizedType !== 'fork') return null;
+                    var selector = parsed && parsed.message && parsed.message.payload && parsed.message.payload.selector;
+                    if (!selector || typeof selector !== 'string') return null;
+                    return 'fork:' + selector;
+                }
+
+                var dedupKey = dedupKeyForRequest();
+                if (dedupKey) {
+                    var inFlight = bridgeRequestDedup[dedupKey];
+                    if (inFlight && typeof inFlight.then === 'function') {
+                        console.log('[NOOK-EC] Reusing in-flight request key=' + dedupKey);
+                        return inFlight;
+                    }
+                }
+
                 var promise = waitForBridgeReady(3000).then(function() {
                     return new Promise(function(resolve, reject) {
                         var callbackId = 'nook_ec_' + Math.random().toString(36).slice(2, 11);
@@ -400,6 +456,9 @@ final class ExtensionManager: NSObject, ObservableObject,
                             if (settled) return;
                             settled = true;
                             cleanup();
+                            if (normalizedType === 'fork' && response && typeof response === 'object') {
+                                console.log('[NOOK-EC] fork response ok=' + String(response.ok) + ' ext=' + (parsed.extensionId || '(none)'));
+                            }
                             resolve(response);
                         }
 
@@ -413,6 +472,7 @@ final class ExtensionManager: NSObject, ObservableObject,
                         function handler(event) {
                             if (event.source !== window) return;
                             if (!event.data || event.data.type !== 'nook_ec_response') return;
+                            if (!matchesActiveRuntimeId(event.data.targetRuntimeId)) return;
                             if (event.data.callbackId !== callbackId) return;
 
                             if (event.data.error) {
@@ -433,6 +493,7 @@ final class ExtensionManager: NSObject, ObservableObject,
                         console.log('[NOOK-EC] Forwarding request type=' + normalizedType + ' ext=' + (parsed.extensionId || '(none)'));
                         window.postMessage({
                             type: 'nook_ec_request',
+                            targetRuntimeId: activeRuntimeId(),
                             extensionId: parsed.extensionId,
                             message: parsed.message,
                             options: parsed.options,
@@ -440,6 +501,16 @@ final class ExtensionManager: NSObject, ObservableObject,
                         }, '*');
                     });
                 });
+
+                if (dedupKey) {
+                    bridgeRequestDedup[dedupKey] = promise;
+                    var clearInFlight = function() {
+                        if (bridgeRequestDedup[dedupKey] === promise) {
+                            delete bridgeRequestDedup[dedupKey];
+                        }
+                    };
+                    promise.then(clearInFlight).catch(clearInFlight);
+                }
 
                 return promise;
             }
@@ -481,6 +552,7 @@ final class ExtensionManager: NSObject, ObservableObject,
                         if (entry.disconnected) throw new Error('Port is disconnected');
                         window.postMessage({
                             type: 'nook_ec_connect_post',
+                            targetRuntimeId: activeRuntimeId(),
                             portId: portId,
                             message: message
                         }, '*');
@@ -489,6 +561,7 @@ final class ExtensionManager: NSObject, ObservableObject,
                         if (entry.disconnected) return;
                         window.postMessage({
                             type: 'nook_ec_connect_close',
+                            targetRuntimeId: activeRuntimeId(),
                             portId: portId
                         }, '*');
                         closeBridgePort(portId, null);
@@ -503,6 +576,7 @@ final class ExtensionManager: NSObject, ObservableObject,
                     console.log('[NOOK-EC] Opening bridge port id=' + portId + ' name=' + port.name + ' ext=' + (parsed.extensionId || '(none)'));
                     window.postMessage({
                         type: 'nook_ec_connect_open',
+                        targetRuntimeId: activeRuntimeId(),
                         extensionId: parsed.extensionId,
                         connectInfo: connectInfo,
                         portId: portId
@@ -619,16 +693,18 @@ final class ExtensionManager: NSObject, ObservableObject,
                 if (event.source !== window) return;
                 if (!event.data || typeof event.data.type !== 'string') return;
                 if (event.data.type === 'nook_ec_bridge_ready') {
-                    markBridgeReady();
+                    adoptBridgeRuntime(event.data.targetRuntimeId);
                     return;
                 }
                 if (event.data.type === 'nook_ec_connect_message') {
+                    if (!matchesActiveRuntimeId(event.data.targetRuntimeId)) return;
                     var messageEntry = bridgePorts[event.data.portId];
                     if (!messageEntry || messageEntry.disconnected) return;
                     messageEntry.onMessage.dispatch(event.data.message, messageEntry.port);
                     return;
                 }
                 if (event.data.type === 'nook_ec_connect_disconnect') {
+                    if (!matchesActiveRuntimeId(event.data.targetRuntimeId)) return;
                     closeBridgePort(event.data.portId, event.data.error || null);
                     return;
                 }
@@ -648,7 +724,7 @@ final class ExtensionManager: NSObject, ObservableObject,
                 if (shimAttempts >= 60) clearInterval(shimTimer);
             }, 500);
 
-            console.log('[NOOK-EC] Polyfill ready — runtime sendMessage/connect wrapped');
+            console.log('[NOOK-EC] Polyfill ready — runtime sendMessage/connect wrapped (configured=' + _configuredRuntimeId + ')');
         })();
         """
 
@@ -705,6 +781,28 @@ final class ExtensionManager: NSObject, ObservableObject,
         Self.logger.info("Switched controller data store to profile=\(profileId.uuidString, privacy: .public)")
         // Verify storage on the new profile
         verifyExtensionStorage(profileId)
+    }
+
+    // MARK: - Extension Context Identity
+
+    /// Keep a deterministic extension origin across app relaunches.
+    /// This prevents extension local storage/session state from moving
+    /// to a fresh namespace when WebKit generates a new default context ID.
+    private func configureContextIdentity(
+        _ extensionContext: WKWebExtensionContext,
+        extensionId: String
+    ) {
+        extensionContext.uniqueIdentifier = extensionId
+
+        // Use a host-safe, deterministic base URL derived from the persisted ID.
+        // Keep the built-in `webkit-extension` scheme to avoid custom-scheme assertions.
+        let host = "ext-" + extensionId.utf8.map { String(format: "%02x", $0) }.joined()
+        if let baseURL = URL(string: "webkit-extension://\(host)") {
+            extensionContext.baseURL = baseURL
+            Self.logger.debug("Configured context identity id=\(extensionId, privacy: .public), baseURL=\(baseURL.absoluteString, privacy: .public)")
+        } else {
+            Self.logger.error("Failed to configure base URL for extension id=\(extensionId, privacy: .public)")
+        }
     }
 
     func clearExtensionData(for profileId: UUID) {
@@ -926,8 +1024,27 @@ final class ExtensionManager: NSObject, ObservableObject,
                 } catch (_) {}
                 var bridgePorts = Object.create(null);
 
+                function currentRuntimeId() {
+                    try {
+                        return runtimeAPI && runtimeAPI.id ? runtimeAPI.id : null;
+                    } catch (_) {
+                        return null;
+                    }
+                }
+
+                function isTargetedMessage(data) {
+                    if (!data || typeof data !== 'object') return false;
+                    var targetRuntimeId = data.targetRuntimeId;
+                    if (!targetRuntimeId || typeof targetRuntimeId !== 'string') return false;
+                    var runtimeId = currentRuntimeId();
+                    return !!runtimeId && targetRuntimeId === runtimeId;
+                }
+
                 function announceReady() {
-                    window.postMessage({ type: 'nook_ec_bridge_ready' }, '*');
+                    window.postMessage({
+                        type: 'nook_ec_bridge_ready',
+                        targetRuntimeId: currentRuntimeId()
+                    }, '*');
                 }
 
                 announceReady();
@@ -949,6 +1066,7 @@ final class ExtensionManager: NSObject, ObservableObject,
                         window.postMessage({
                             type: 'nook_ec_response',
                             callbackId: data.callbackId,
+                            targetRuntimeId: currentRuntimeId(),
                             error: 'runtime.sendMessage unavailable'
                         }, '*');
                         return;
@@ -999,6 +1117,7 @@ final class ExtensionManager: NSObject, ObservableObject,
                         window.postMessage({
                             type: 'nook_ec_response',
                             callbackId: callbackId,
+                            targetRuntimeId: currentRuntimeId(),
                             response: response
                         }, '*');
                     }).catch(function(error) {
@@ -1006,6 +1125,7 @@ final class ExtensionManager: NSObject, ObservableObject,
                         window.postMessage({
                             type: 'nook_ec_response',
                             callbackId: callbackId,
+                            targetRuntimeId: currentRuntimeId(),
                             error: (error && error.message) ? error.message : String(error)
                         }, '*');
                     });
@@ -1019,6 +1139,7 @@ final class ExtensionManager: NSObject, ObservableObject,
                         window.postMessage({
                             type: 'nook_ec_connect_disconnect',
                             portId: portId,
+                            targetRuntimeId: currentRuntimeId(),
                             error: 'runtime.connect unavailable'
                         }, '*');
                         return;
@@ -1039,6 +1160,7 @@ final class ExtensionManager: NSObject, ObservableObject,
                         window.postMessage({
                             type: 'nook_ec_connect_disconnect',
                             portId: portId,
+                            targetRuntimeId: currentRuntimeId(),
                             error: (error && error.message) ? error.message : String(error)
                         }, '*');
                         return;
@@ -1049,6 +1171,7 @@ final class ExtensionManager: NSObject, ObservableObject,
                         window.postMessage({
                             type: 'nook_ec_connect_message',
                             portId: portId,
+                            targetRuntimeId: currentRuntimeId(),
                             message: message
                         }, '*');
                     });
@@ -1059,13 +1182,15 @@ final class ExtensionManager: NSObject, ObservableObject,
                         window.postMessage({
                             type: 'nook_ec_connect_disconnect',
                             portId: portId,
+                            targetRuntimeId: currentRuntimeId(),
                             error: error
                         }, '*');
                     });
 
                     window.postMessage({
                         type: 'nook_ec_connect_opened',
-                        portId: portId
+                        portId: portId,
+                        targetRuntimeId: currentRuntimeId()
                     }, '*');
                 }
 
@@ -1079,6 +1204,7 @@ final class ExtensionManager: NSObject, ObservableObject,
                         window.postMessage({
                             type: 'nook_ec_connect_disconnect',
                             portId: data.portId,
+                            targetRuntimeId: currentRuntimeId(),
                             error: (error && error.message) ? error.message : String(error)
                         }, '*');
                     }
@@ -1095,6 +1221,7 @@ final class ExtensionManager: NSObject, ObservableObject,
                     window.postMessage({
                         type: 'nook_ec_connect_disconnect',
                         portId: portId,
+                        targetRuntimeId: currentRuntimeId(),
                         error: null
                     }, '*');
                 }
@@ -1103,18 +1230,22 @@ final class ExtensionManager: NSObject, ObservableObject,
                     if (event.source !== window) return;
                     if (!event.data || typeof event.data.type !== 'string') return;
                     if (event.data.type === 'nook_ec_request') {
+                        if (!isTargetedMessage(event.data)) return;
                         relaySendMessage(event.data);
                         return;
                     }
                     if (event.data.type === 'nook_ec_connect_open') {
+                        if (!isTargetedMessage(event.data)) return;
                         relayConnectOpen(event.data);
                         return;
                     }
                     if (event.data.type === 'nook_ec_connect_post') {
+                        if (!isTargetedMessage(event.data)) return;
                         relayConnectPost(event.data);
                         return;
                     }
                     if (event.data.type === 'nook_ec_connect_close') {
+                        if (!isTargetedMessage(event.data)) return;
                         relayConnectClose(event.data);
                         return;
                     }
@@ -1266,6 +1397,7 @@ final class ExtensionManager: NSObject, ObservableObject,
         // loaded from this path at runtime.
         let webExtension = try await WKWebExtension(resourceBaseURL: finalDestinationDir)
         let extensionContext = WKWebExtensionContext(for: webExtension)
+        configureContextIdentity(extensionContext, extensionId: extensionId)
 
         Self.logger.info("WKWebExtension created from final path: \(finalDestinationDir.path, privacy: .public)")
         Self.logger.debug("Requested permissions: \(webExtension.requestedPermissions.map { String(describing: $0) }.joined(separator: ", "), privacy: .public)")
@@ -1844,6 +1976,11 @@ final class ExtensionManager: NSObject, ObservableObject,
             // Phase 2: Register contexts sequentially (must be on MainActor)
             for (entity, webExtension) in parsed {
                 let extensionContext = WKWebExtensionContext(for: webExtension)
+                let extensionId = entity.id
+                self.configureContextIdentity(
+                    extensionContext,
+                    extensionId: extensionId
+                )
 
                 Self.logger.info("Loading '\(webExtension.displayName ?? entity.name, privacy: .public)' MV\(webExtension.manifestVersion) hasBackground=\(webExtension.hasBackgroundContent)")
 
@@ -1863,24 +2000,12 @@ final class ExtensionManager: NSObject, ObservableObject,
 
                 extensionContext.isInspectable = true
 
-                let correctExtensionId = extensionContext.uniqueIdentifier
-
-                // Update DB if ID changed
-                if entity.id != correctExtensionId {
-                    let oldId = entity.id
-                    entity.id = correctExtensionId
-                    try? self.context.save()
-                    if let index = self.installedExtensions.firstIndex(where: { $0.id == oldId }) {
-                        self.installedExtensions[index] = InstalledExtension(from: entity, manifest: self.installedExtensions[index].manifest)
-                    }
-                }
-
-                self.extensionContexts[correctExtensionId] = extensionContext
+                self.extensionContexts[extensionId] = extensionContext
 
                 // Set up externally_connectable bridge BEFORE loading background
                 self.setupExternallyConnectableBridge(
                     for: extensionContext,
-                    extensionId: correctExtensionId,
+                    extensionId: extensionId,
                     packagePath: entity.packagePath
                 )
 
