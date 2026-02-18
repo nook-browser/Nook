@@ -181,16 +181,20 @@ actor MCPClient {
         let data = try JSONEncoder().encode(request)
 
         return try await withTimeout(seconds: requestTimeout) { [self] in
-            try await withCheckedThrowingContinuation { continuation in
-                self.pendingRequests[id] = continuation
+            try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation { continuation in
+                    self.pendingRequests[id] = continuation
 
-                Task {
-                    do {
-                        try await transport.send(data)
-                    } catch {
-                        await self.removePendingRequest(id: id, error: error)
+                    Task {
+                        do {
+                            try await transport.send(data)
+                        } catch {
+                            await self.removePendingRequest(id: id, error: error)
+                        }
                     }
                 }
+            } onCancel: {
+                Task { await self.cancelPendingRequest(id: id) }
             }
         }
     }
