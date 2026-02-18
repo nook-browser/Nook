@@ -7,10 +7,12 @@
 
 import AppKit
 import Foundation
+import os
 import WebKit
 
 @available(macOS 15.4, *)
 final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
+    private static let logger = Logger(subsystem: "com.nook.browser", category: "ExtensionBridge")
     private unowned let browserManager: BrowserManager
 
     init(browserManager: BrowserManager) {
@@ -32,17 +34,17 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
     func activeTab(for extensionContext: WKWebExtensionContext) -> (any WKWebExtensionTab)? {
         if let t = browserManager.currentTabForActiveWindow(),
            let a = ExtensionManager.shared.stableAdapter(for: t) {
-            print("[EXT-BRIDGE] activeTab → '\(t.name)' webView=\(a.tab.isUnloaded ? "nil" : "yes")")
+            Self.logger.debug("activeTab → '\(t.name)' webView=\(a.tab.isUnloaded ? "nil" : "yes")")
             return a
         }
 
         if let first = browserManager.tabManager.pinnedTabs.first ?? browserManager.tabManager.tabs.first,
            let a = ExtensionManager.shared.stableAdapter(for: first) {
-            print("[EXT-BRIDGE] activeTab fallback → '\(first.name)'")
+            Self.logger.debug("activeTab fallback → '\(first.name)'")
             return a
         }
 
-        print("[EXT-BRIDGE] activeTab → nil")
+        Self.logger.debug("activeTab → nil")
         return nil
     }
 
@@ -50,7 +52,7 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
         let all = browserManager.tabManager.pinnedTabs + browserManager.tabManager.tabs
         let adapters = all.compactMap { ExtensionManager.shared.stableAdapter(for: $0) }
         let withWebViews = adapters.filter { !$0.tab.isUnloaded }
-        print("[EXT-BRIDGE] tabs → \(adapters.count) total, \(withWebViews.count) with webviews")
+        Self.logger.debug("tabs → \(adapters.count) total, \(withWebViews.count) with webviews")
         return adapters
     }
 
@@ -98,6 +100,33 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
     }
 
     func setWindowState(_ windowState: WKWebExtension.WindowState, for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
+        guard let window = NSApp.mainWindow else {
+            completionHandler(NSError(domain: "ExtensionWindowAdapter", code: 4, userInfo: [NSLocalizedDescriptionKey: "No window available"]))
+            return
+        }
+
+        switch windowState {
+        case .minimized:
+            window.miniaturize(nil)
+        case .maximized:
+            if window.isMiniaturized {
+                window.deminiaturize(nil)
+            }
+            window.zoom(nil)
+        case .fullscreen:
+            if !window.styleMask.contains(.fullScreen) {
+                window.toggleFullScreen(nil)
+            }
+        case .normal:
+            if window.isMiniaturized {
+                window.deminiaturize(nil)
+            } else if window.styleMask.contains(.fullScreen) {
+                window.toggleFullScreen(nil)
+            }
+        @unknown default:
+            break
+        }
+
         completionHandler(nil)
     }
 
