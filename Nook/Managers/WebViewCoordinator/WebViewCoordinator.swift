@@ -180,8 +180,9 @@ class WebViewCoordinator {
             }
         }
         // Fresh user content controller per webview to avoid cross-tab handler conflicts
-        configuration.userContentController = WKUserContentController()
-        
+        // (preserves shared scripts like extension bridge polyfills)
+        configuration.userContentController = BrowserConfiguration.shared.freshUserContentController()
+
         let newWebView = FocusableWKWebView(frame: .zero, configuration: configuration)
         newWebView.navigationDelegate = tab
         newWebView.uiDelegate = tab
@@ -334,7 +335,7 @@ class WebViewCoordinator {
                 configuration = BrowserConfiguration.shared.webViewConfiguration.copy() as! WKWebViewConfiguration
             }
         }
-        configuration.userContentController = WKUserContentController()
+        configuration.userContentController = BrowserConfiguration.shared.freshUserContentController()
 
         let newWebView = FocusableWKWebView(frame: .zero, configuration: configuration)
         newWebView.navigationDelegate = tab

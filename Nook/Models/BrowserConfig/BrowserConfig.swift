@@ -67,11 +67,23 @@ class BrowserConfiguration {
         return config
     }()
 
+    // MARK: - Fresh User Content Controller
+    // Creates a fresh WKUserContentController but preserves shared user scripts
+    // (e.g., extension bridge scripts). This avoids cross-tab handler conflicts
+    // while keeping scripts that must be present on every tab.
+    func freshUserContentController() -> WKUserContentController {
+        let controller = WKUserContentController()
+        for script in webViewConfiguration.userContentController.userScripts {
+            controller.addUserScript(script)
+        }
+        return controller
+    }
+
     // MARK: - Cache-Optimized Configuration
     // Derives from shared config to preserve process pool + extension controller
     func cacheOptimizedWebViewConfiguration() -> WKWebViewConfiguration {
         let config = webViewConfiguration.copy() as! WKWebViewConfiguration
-        config.userContentController = WKUserContentController()
+        config.userContentController = freshUserContentController()
         return config
     }
 
@@ -80,8 +92,8 @@ class BrowserConfiguration {
     func webViewConfiguration(for profile: Profile) -> WKWebViewConfiguration {
         let config = webViewConfiguration.copy() as! WKWebViewConfiguration
 
-        // Fresh UCC per tab to avoid cross-tab handler conflicts
-        config.userContentController = WKUserContentController()
+        // Fresh UCC per tab to avoid cross-tab handler conflicts (preserves shared scripts)
+        config.userContentController = freshUserContentController()
 
         // Use the profile's website data store for isolation
         config.websiteDataStore = profile.dataStore
