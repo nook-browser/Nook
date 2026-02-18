@@ -1696,7 +1696,7 @@ final class ExtensionManager: NSObject, ObservableObject,
         // OAuth flows from extensions should open in tabs to share the same data store
         // Miniwindows use separate data stores which breaks OAuth flows
         if let firstURL = configuration.tabURLs.first,
-            isLikelyOAuthURL(firstURL)
+            OAuthDetector.isLikelyOAuthPopupURL(firstURL)
         {
             Self.logger.debug(
                 "🔐 [DELEGATE] Extension OAuth window detected, opening in new tab: \(firstURL.absoluteString)"
@@ -1775,42 +1775,6 @@ final class ExtensionManager: NSObject, ObservableObject,
         // (Note: In a production app, we might need to manage these references in a set)
     }
 
-    private func isLikelyOAuthURL(_ url: URL) -> Bool {
-        let host = (url.host ?? "").lowercased()
-        let path = url.path.lowercased()
-        let query = url.query?.lowercased() ?? ""
-
-        // Check for OAuth-related URLs
-        let oauthHosts = [
-            "accounts.google.com", "login.microsoftonline.com",
-            "login.live.com",
-            "appleid.apple.com", "github.com", "gitlab.com", "bitbucket.org",
-            "auth0.com", "okta.com", "onelogin.com", "pingidentity.com",
-            "slack.com", "zoom.us", "login.cloudflareaccess.com",
-            "oauth", "auth", "login", "signin",
-        ]
-
-        // Check if host contains OAuth-related terms
-        if oauthHosts.contains(where: { host.contains($0) }) {
-            return true
-        }
-
-        // Check for OAuth paths and query parameters
-        if path.contains("/oauth") || path.contains("oauth2")
-            || path.contains("/authorize") || path.contains("/signin")
-            || path.contains("/login") || path.contains("/callback")
-        {
-            return true
-        }
-
-        if query.contains("client_id=") || query.contains("redirect_uri=")
-            || query.contains("response_type=") || query.contains("scope=")
-        {
-            return true
-        }
-
-        return false
-    }
 
     // Open the extension's options page (inside a browser tab)
     @available(macOS 15.5, *)

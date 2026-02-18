@@ -666,7 +666,7 @@ class BrowserManager: ObservableObject {
         // Respect per-domain allow list
         guard !trackingProtectionManager.isDomainAllowed(host) else { return }
         // Simple heuristic for OAuth endpoints
-        if isLikelyOAuthURL(url) {
+        if OAuthDetector.isLikelyOAuthURL(url) {
             let now = Date()
             if let coolUntil = oauthAssistCooldown[host], coolUntil > now { return }
             oauthAssist = OAuthAssist(host: host, url: url, tabId: tab.id, timestamp: now)
@@ -699,32 +699,6 @@ class BrowserManager: ObservableObject {
         let normalizedHost = host.lowercased()
         print("🔐 [BrowserManager] Auto-allowing OAuth provider domain: \(normalizedHost)")
         trackingProtectionManager.allowDomain(normalizedHost, allowed: true)
-    }
-
-    private func isLikelyOAuthURL(_ url: URL) -> Bool {
-        let host = (url.host ?? "").lowercased()
-        let path = url.path.lowercased()
-        let query = url.query?.lowercased() ?? ""
-        // Common IdP hosts
-        let hostHints = [
-            "accounts.google.com", "login.microsoftonline.com", "login.live.com",
-            "appleid.apple.com", "github.com", "gitlab.com", "bitbucket.org",
-            "auth0.com", "okta.com", "onelogin.com", "pingidentity.com",
-            "slack.com", "zoom.us", "login.cloudflareaccess.com",
-        ]
-        if hostHints.contains(where: { host.contains($0) }) { return true }
-        // Common OAuth paths and signals
-        if path.contains("/oauth") || path.contains("oauth2") || path.contains("/authorize")
-            || path.contains("/signin") || path.contains("/login") || path.contains("/callback")
-        {
-            return true
-        }
-        if query.contains("client_id=") || query.contains("redirect_uri=")
-            || query.contains("response_type=")
-        {
-            return true
-        }
-        return false
     }
 
     // MARK: - Profile Switching

@@ -2973,47 +2973,14 @@ extension Tab: WKScriptMessageHandler {
     }
 
     private func isLikelyOAuthOrExternalWindow(url: URL, windowFeatures: WKWindowFeatures) -> Bool {
-        let host = (url.host ?? "").lowercased()
-        let path = url.path.lowercased()
-        let query = url.query?.lowercased() ?? ""
+        if OAuthDetector.isLikelyOAuthPopupURL(url) { return true }
 
-        // Check for OAuth-related URLs
-        let oauthHosts = [
-            "accounts.google.com", "login.microsoftonline.com", "login.live.com",
-            "appleid.apple.com", "github.com", "gitlab.com", "bitbucket.org",
-            "auth0.com", "okta.com", "onelogin.com", "pingidentity.com",
-            "slack.com", "zoom.us", "login.cloudflareaccess.com",
-            "oauth", "auth", "login", "signin",
-        ]
-
-        // Check if host contains OAuth-related terms
-        if oauthHosts.contains(where: { host.contains($0) }) {
-            return true
-        }
-
-        // Check for OAuth paths and query parameters
-        if path.contains("/oauth") || path.contains("oauth2") || path.contains("/authorize")
-            || path.contains("/signin") || path.contains("/login") || path.contains("/callback")
-        {
-            return true
-        }
-
-        if query.contains("client_id=") || query.contains("redirect_uri=")
-            || query.contains("response_type=") || query.contains("scope=")
-        {
-            return true
-        }
-
-        // Check window features that suggest external/popup behavior
+        // If the popup has explicit dimensions it's almost certainly a modal sign-in window
         if let width = windowFeatures.width, let height = windowFeatures.height,
             width.doubleValue > 0 && height.doubleValue > 0
         {
-            // If specific dimensions are set, it's likely a popup
             return true
         }
-
-        // Note: WKWindowFeatures visibility properties are NSNumber? and don't directly map to enum values
-        // We'll rely on URL patterns and dimensions for popup detection
 
         return false
     }
@@ -3222,7 +3189,7 @@ extension Tab: WKUIDelegate {
         
         // Check if this is a redirect back to the original domain (not the OAuth provider)
         if let providerHost = oauthProviderHost, !host.contains(providerHost),
-           (isSuccess || isError || !isLikelyOAuthURL(url)) {
+           (isSuccess || isError || !OAuthDetector.isLikelyOAuthURL(url)) {
             
             print("🔐 [Tab] OAuth flow completed: success=\(isSuccess), closing OAuth tab")
             
@@ -3245,35 +3212,6 @@ extension Tab: WKUIDelegate {
         }
     }
     
-    /// Determines if a URL is likely an OAuth-related URL
-    private func isLikelyOAuthURL(_ url: URL) -> Bool {
-        let host = (url.host ?? "").lowercased()
-        let path = url.path.lowercased()
-        let query = url.query?.lowercased() ?? ""
-        
-        let oauthHosts = [
-            "accounts.google.com", "login.microsoftonline.com", "login.live.com",
-            "appleid.apple.com", "github.com", "gitlab.com", "bitbucket.org",
-            "auth0.com", "okta.com", "onelogin.com", "pingidentity.com",
-            "slack.com", "zoom.us", "login.cloudflareaccess.com",
-            "oauth", "auth", "login", "signin"
-        ]
-        
-        if oauthHosts.contains(where: { host.contains($0) }) { return true }
-        
-        if path.contains("/oauth") || path.contains("oauth2") || path.contains("/authorize")
-            || path.contains("/signin") || path.contains("/login") || path.contains("/callback") {
-            return true
-        }
-        
-        if query.contains("client_id=") || query.contains("redirect_uri=")
-            || query.contains("response_type=") || query.contains("scope=") {
-            return true
-        }
-        
-        return false
-    }
-
     private func handleMiniWindowAuthCompletion(success: Bool, finalURL: URL?) {
         print(
             "🪟 [Tab] Popup OAuth flow completed: success=\(success), finalURL=\(finalURL?.absoluteString ?? "nil")"
