@@ -429,7 +429,9 @@ final class ExtensionManager: NSObject, ObservableObject,
                     if (normalizedType !== 'fork') return null;
                     var selector = parsed && parsed.message && parsed.message.payload && parsed.message.payload.selector;
                     if (!selector || typeof selector !== 'string') return null;
-                    return 'fork:' + selector;
+                    var runtimeKey = activeRuntimeId();
+                    if (!runtimeKey || typeof runtimeKey !== 'string') runtimeKey = '(runtime)';
+                    return 'fork:' + runtimeKey + ':' + selector;
                 }
 
                 var dedupKey = dedupKeyForRequest();
@@ -729,13 +731,28 @@ final class ExtensionManager: NSObject, ObservableObject,
         """
 
         let sharedConfig = BrowserConfiguration.shared.webViewConfiguration
+        let hostsSignature = "var _hosts = [\(hostnamesJSON)];"
+        let sharedUserContentController = sharedConfig.userContentController
+        let retainedScripts = sharedUserContentController.userScripts.filter { script in
+            let source = script.source
+            guard source.contains("[NOOK-EC] Installing externally_connectable polyfill on ") else {
+                return true
+            }
+            return !source.contains(hostsSignature)
+        }
+        if retainedScripts.count != sharedUserContentController.userScripts.count {
+            sharedUserContentController.removeAllUserScripts()
+            retainedScripts.forEach { sharedUserContentController.addUserScript($0) }
+            Self.logger.info("Removed stale page-world externally_connectable shim for hosts: \(sortedHostnames.joined(separator: ", "), privacy: .public)")
+        }
+
         let pageScript = WKUserScript(
             source: polyfillJS,
             injectionTime: .atDocumentStart,
             forMainFrameOnly: false,
             in: .page
         )
-        sharedConfig.userContentController.addUserScript(pageScript)
+        sharedUserContentController.addUserScript(pageScript)
     }
 
     /// Verify extension storage is working properly
