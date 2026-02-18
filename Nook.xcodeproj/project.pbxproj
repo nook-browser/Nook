@@ -49,6 +49,7 @@
 				"CommandPalette Accessories/TabSuggestionItem.swift",
 				CommandPalette.swift,
 				CommandPaletteView.swift,
+				SiteSearch.swift,
 			);
 			target = 7F8340FB2E37F39400674A5D /* Nook */;
 		};
@@ -579,8 +580,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/Aeastr/Garnish";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.0.4;
+				branch = main;
+				kind = branch;
 			};
 		};
 		56C82BA72E9C2DB500DDD0D6 /* XCRemoteSwiftPackageReference "UniversalGlass" */ = {

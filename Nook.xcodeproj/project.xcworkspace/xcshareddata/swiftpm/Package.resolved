@@ -1,6 +1,15 @@
 {
-  "originHash" : "6e4ae14e14eebaea684ee514acfeb7133a6f49e54ce087d811d35060ce492e16",
+  "originHash" : "024e9cf92580ba5340e36406aec14f45a64d57882cc9409c8ce964fe2e583383",
   "pins" : [
+    {
+      "identity" : "chronicle",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Aeastr/Chronicle.git",
+      "state" : {
+        "revision" : "78f4d0d634c4834f13f7ab1bcca79c150c4c172a",
+        "version" : "3.0.2"
+      }
+    },
     {
       "identity" : "colorfulx",
       "kind" : "remoteSourceControl",
@@ -24,8 +33,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/will-lumley/FaviconFinder",
       "state" : {
-        "revision" : "9279f4371f4877ca302ba3bf1015f3f58ae4a56c",
-        "version" : "5.1.4"
+        "revision" : "11c2b27fbdc5fdfe0bf3addac01d27c40299a819",
+        "version" : "5.1.5"
       }
     },
     {
@@ -42,8 +51,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Aeastr/Garnish",
       "state" : {
-        "revision" : "4c49a3f163473fcb1a90f6730999cbd2e3931a18",
-        "version" : "0.0.4"
+        "branch" : "main",
+        "revision" : "ffbd0091ed25eb3e250ca47b5ccc8c4f9a6a3420"
       }
     },
     {
@@ -60,8 +69,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/nicklockwood/LRUCache.git",
       "state" : {
-        "revision" : "0d91406ecd4d6c1c56275866f00508d9aeacc92a",
-        "version" : "1.2.0"
+        "revision" : "cb5b2bd0da83ad29c0bec762d39f41c8ad0eaf3e",
+        "version" : "1.2.1"
       }
     },
     {
@@ -96,8 +105,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/sparkle-project/Sparkle",
       "state" : {
-        "revision" : "9a1d2a19d3595fcf8d9c447173f9a1687b3dcadb",
-        "version" : "2.8.0"
+        "revision" : "5581748cef2bae787496fe6d61139aebe0a451f6",
+        "version" : "2.8.1"
       }
     },
     {
@@ -119,6 +128,15 @@
       }
     },
     {
+      "identity" : "swift-log",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-log.git",
+      "state" : {
+        "revision" : "bbd81b6725ae874c69e9b8c8804d462356b55523",
+        "version" : "1.10.1"
+      }
+    },
+    {
       "identity" : "swift-numerics",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-numerics.git",
@@ -132,17 +150,17 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/scinfu/SwiftSoup.git",
       "state" : {
-        "revision" : "a81b1a5ac933dee8c6cfccf05d5ffcc5eb8c7ec4",
-        "version" : "2.10.0"
+        "revision" : "d86f244ed497d48012782e2f59c985a55e77b3f5",
+        "version" : "2.11.3"
       }
     },
     {
       "identity" : "universalglass",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/Aeastr/UniversalGlass",
+      "location" : "https://github.com/aeastr/universalglass.git",
       "state" : {
-        "revision" : "bb27ffe16a33c9e48d65111331ce4cfb519e0e92",
-        "version" : "1.0.0"
+        "revision" : "9c084472801ac2c1b4c753668b275094c635b8a2",
+        "version" : "1.1.0"
       }
     }
   ],
