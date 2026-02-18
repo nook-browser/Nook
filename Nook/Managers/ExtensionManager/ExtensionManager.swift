@@ -40,9 +40,6 @@ final class ExtensionManager: NSObject, ObservableObject,
     // Whether to auto-resize extension action popovers to content. Disabled per UX preference.
     // UI delegate for popup context menus
     private var popupUIDelegate: PopupUIDelegate?
-    // Track whether externally_connectable bridge scripts have been added to shared config
-    private var externallyConnectableBridgeInstalled = false
-
     // No preference for action popups-as-tabs; keep native popovers per Apple docs
 
     let context: ModelContext
@@ -200,94 +197,562 @@ final class ExtensionManager: NSObject, ObservableObject,
               let matchPatterns = ec["matches"] as? [String], !matchPatterns.isEmpty
         else { return }
 
-        guard !externallyConnectableBridgeInstalled else { return }
-        externallyConnectableBridgeInstalled = true
-
         // Extract hostnames from match patterns
-        var hostnames: [String] = []
+        var hostnames = Set<String>()
         for pattern in matchPatterns {
             guard let schemeEnd = pattern.range(of: "://") else { continue }
             let afterScheme = pattern[schemeEnd.upperBound...]
             guard let slashIndex = afterScheme.firstIndex(of: "/") else { continue }
             let host = String(afterScheme[afterScheme.startIndex..<slashIndex])
             if host != "*" {
-                hostnames.append(host.replacingOccurrences(of: "*.", with: ""))
+                hostnames.insert(host.replacingOccurrences(of: "*.", with: ""))
             }
         }
-        guard !hostnames.isEmpty else { return }
+        let sortedHostnames = hostnames.sorted()
+        guard !sortedHostnames.isEmpty else { return }
 
-        Self.logger.info("Installing page-world externally_connectable polyfill for: \(hostnames.joined(separator: ", "), privacy: .public)")
+        Self.logger.info("Installing page-world externally_connectable polyfill for extension \(extensionId, privacy: .public): \(sortedHostnames.joined(separator: ", "), privacy: .public)")
 
-        let hostnamesJSON = hostnames.map { "\"\($0)\"" }.joined(separator: ",")
+        let hostnamesJSON = sortedHostnames.map { "\"\($0)\"" }.joined(separator: ",")
+        let escapedTargetRuntimeId = extensionId
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
 
-        // PAGE-world polyfill: makes browser.runtime.sendMessage available to web pages.
-        // Uses window.postMessage to bridge to nook_bridge.js (extension content script
-        // in ISOLATED world with real browser.runtime access).
+        // PAGE-world polyfill: wraps browser/chrome runtime APIs used by externally_connectable
+        // pages and relays extension traffic via window.postMessage to nook_bridge.js (ISOLATED world).
         let polyfillJS = """
         (function() {
             var _hosts = [\(hostnamesJSON)];
+            var _configuredRuntimeId = "\(escapedTargetRuntimeId)";
+            var _activeRuntimeId = _configuredRuntimeId;
+            var _pendingBridgeRuntimeId = null;
+            var _bridgeRuntimeRetargetTimer = null;
             var h = location.hostname;
             if (!_hosts.some(function(p) { return h === p || h.endsWith('.' + p); })) return;
+            if (window.__nookEcShimInstalled) return;
+            window.__nookEcShimInstalled = true;
 
             console.log('[NOOK-EC] Installing externally_connectable polyfill on ' + location.href);
 
-            function sendMessagePolyfill(extensionId, message) {
-                return new Promise(function(resolve, reject) {
-                    var callbackId = 'nook_ec_' + Math.random().toString(36).substr(2, 9);
+            var bridgeReady = false;
+            var bridgeWaiters = [];
+            var bridgePorts = Object.create(null);
+            var bridgeRequestDedup = Object.create(null);
 
-                    function handler(event) {
-                        if (event.source !== window) return;
-                        if (!event.data || event.data.type !== 'nook_ec_response') return;
-                        if (event.data.callbackId !== callbackId) return;
-                        window.removeEventListener('message', handler);
-                        if (event.data.error) {
-                            reject(new Error(event.data.error));
-                        } else {
-                            resolve(event.data.response);
+            function makeEvent() {
+                var listeners = [];
+                return {
+                    addListener: function(fn) {
+                        if (typeof fn !== 'function') return;
+                        if (listeners.indexOf(fn) >= 0) return;
+                        listeners.push(fn);
+                    },
+                    removeListener: function(fn) {
+                        var idx = listeners.indexOf(fn);
+                        if (idx >= 0) listeners.splice(idx, 1);
+                    },
+                    hasListener: function(fn) {
+                        return listeners.indexOf(fn) >= 0;
+                    },
+                    dispatch: function() {
+                        var args = Array.prototype.slice.call(arguments);
+                        var snapshot = listeners.slice();
+                        for (var i = 0; i < snapshot.length; i += 1) {
+                            try {
+                                snapshot[i].apply(null, args);
+                            } catch (error) {
+                                console.error('[NOOK-EC] Listener error:', error);
+                            }
                         }
                     }
-                    window.addEventListener('message', handler);
+                };
+            }
 
-                    window.postMessage({
-                        type: 'nook_ec_request',
-                        extensionId: extensionId,
-                        message: message,
-                        callbackId: callbackId
-                    }, '*');
+            function markBridgeReady() {
+                if (bridgeReady) return;
+                bridgeReady = true;
+                while (bridgeWaiters.length) {
+                    try { bridgeWaiters.shift()(); } catch (_) {}
+                }
+            }
 
-                    setTimeout(function() {
-                        window.removeEventListener('message', handler);
-                        reject(new Error('Extension communication timeout'));
-                    }, 30000);
+            function activeRuntimeId() {
+                return _activeRuntimeId || _configuredRuntimeId;
+            }
+
+            function matchesActiveRuntimeId(runtimeId) {
+                if (!runtimeId || typeof runtimeId !== 'string') return true;
+                return runtimeId === activeRuntimeId();
+            }
+
+            function adoptBridgeRuntime(runtimeId) {
+                if (!runtimeId || typeof runtimeId !== 'string') {
+                    markBridgeReady();
+                    return;
+                }
+
+                if (runtimeId === _configuredRuntimeId || runtimeId === _activeRuntimeId) {
+                    _activeRuntimeId = runtimeId;
+                    markBridgeReady();
+                    return;
+                }
+
+                if (_activeRuntimeId !== _configuredRuntimeId) {
+                    return;
+                }
+
+                _pendingBridgeRuntimeId = runtimeId;
+                if (_bridgeRuntimeRetargetTimer !== null) return;
+
+                _bridgeRuntimeRetargetTimer = setTimeout(function() {
+                    _bridgeRuntimeRetargetTimer = null;
+                    if (bridgeReady || !_pendingBridgeRuntimeId) return;
+                    _activeRuntimeId = _pendingBridgeRuntimeId;
+                    console.warn('[NOOK-EC] Bridge runtime mismatch; retargeting to ' + _activeRuntimeId + ' (configured ' + _configuredRuntimeId + ')');
+                    markBridgeReady();
+                }, 250);
+            }
+
+            function waitForBridgeReady(timeoutMs) {
+                if (bridgeReady) return Promise.resolve();
+                return new Promise(function(resolve, reject) {
+                    var settled = false;
+                    var timer = null;
+
+                    var waiter = function() {
+                        if (settled) return;
+                        settled = true;
+                        if (timer !== null) clearTimeout(timer);
+                        resolve();
+                    };
+
+                    bridgeWaiters.push(waiter);
+
+                    timer = setTimeout(function() {
+                        if (settled) return;
+                        settled = true;
+                        var idx = bridgeWaiters.indexOf(waiter);
+                        if (idx >= 0) bridgeWaiters.splice(idx, 1);
+                        reject(new Error('Extension bridge unavailable'));
+                    }, timeoutMs);
                 });
             }
 
-            // Polyfill browser.runtime.sendMessage for matching web pages
-            if (!window.browser) window.browser = {};
-            if (!window.browser.runtime) window.browser.runtime = {};
-            if (typeof window.browser.runtime.sendMessage !== 'function') {
-                window.browser.runtime.sendMessage = sendMessagePolyfill;
+            function normalizeSendMessageArgs(argsLike) {
+                var args = Array.prototype.slice.call(argsLike);
+                var callback = null;
+
+                if (args.length && typeof args[args.length - 1] === 'function') {
+                    callback = args.pop();
+                }
+
+                var extensionId = null;
+                var message = undefined;
+                var options = undefined;
+
+                if (args.length === 1) {
+                    message = args[0];
+                } else if (args.length === 2) {
+                    if (typeof args[0] === 'string') {
+                        extensionId = args[0];
+                        message = args[1];
+                    } else {
+                        message = args[0];
+                        options = args[1];
+                    }
+                } else if (args.length >= 3) {
+                    extensionId = args[0];
+                    message = args[1];
+                    options = args[2];
+                }
+
+                return {
+                    extensionId: extensionId,
+                    message: message,
+                    options: options,
+                    callback: callback
+                };
             }
 
-            // Also polyfill chrome.runtime.sendMessage
-            if (!window.chrome) window.chrome = {};
-            if (!window.chrome.runtime) window.chrome.runtime = {};
-            if (typeof window.chrome.runtime.sendMessage !== 'function') {
-                window.chrome.runtime.sendMessage = sendMessagePolyfill;
+            function normalizeConnectArgs(argsLike) {
+                var args = Array.prototype.slice.call(argsLike);
+                var extensionId = null;
+                var connectInfo = {};
+
+                if (args.length === 1) {
+                    if (typeof args[0] === 'string') {
+                        extensionId = args[0];
+                    } else {
+                        connectInfo = args[0];
+                    }
+                } else if (args.length >= 2) {
+                    extensionId = args[0];
+                    connectInfo = args[1];
+                }
+
+                if (!connectInfo || typeof connectInfo !== 'object') {
+                    connectInfo = {};
+                }
+
+                return {
+                    extensionId: extensionId,
+                    connectInfo: connectInfo
+                };
             }
 
-            console.log('[NOOK-EC] Polyfill ready — browser.runtime.sendMessage available');
+            function setChromeLastError(error) {
+                if (!window.chrome) window.chrome = {};
+                if (!window.chrome.runtime) window.chrome.runtime = {};
+                if (error) {
+                    window.chrome.runtime.lastError = { message: error.message || String(error) };
+                } else if (window.chrome.runtime.lastError) {
+                    try {
+                        delete window.chrome.runtime.lastError;
+                    } catch (_) {
+                        window.chrome.runtime.lastError = undefined;
+                    }
+                }
+            }
+
+            function clearChromeLastErrorAsync() {
+                setTimeout(function() { setChromeLastError(null); }, 0);
+            }
+
+            function requestViaBridge(parsed, requestType) {
+                var normalizedType = requestType || (
+                    (parsed.message && typeof parsed.message === 'object' && parsed.message.type)
+                        ? parsed.message.type
+                        : typeof parsed.message
+                );
+
+                function dedupKeyForRequest() {
+                    if (normalizedType !== 'fork') return null;
+                    var selector = parsed && parsed.message && parsed.message.payload && parsed.message.payload.selector;
+                    if (!selector || typeof selector !== 'string') return null;
+                    var runtimeKey = activeRuntimeId();
+                    if (!runtimeKey || typeof runtimeKey !== 'string') runtimeKey = '(runtime)';
+                    return 'fork:' + runtimeKey + ':' + selector;
+                }
+
+                var dedupKey = dedupKeyForRequest();
+                if (dedupKey) {
+                    var inFlight = bridgeRequestDedup[dedupKey];
+                    if (inFlight && typeof inFlight.then === 'function') {
+                        console.log('[NOOK-EC] Reusing in-flight request key=' + dedupKey);
+                        return inFlight;
+                    }
+                }
+
+                var promise = waitForBridgeReady(3000).then(function() {
+                    return new Promise(function(resolve, reject) {
+                        var callbackId = 'nook_ec_' + Math.random().toString(36).slice(2, 11);
+                        var timeoutId = null;
+                        var settled = false;
+
+                        function cleanup() {
+                            window.removeEventListener('message', handler);
+                            if (timeoutId !== null) clearTimeout(timeoutId);
+                        }
+
+                        function settleSuccess(response) {
+                            if (settled) return;
+                            settled = true;
+                            cleanup();
+                            if (normalizedType === 'fork' && response && typeof response === 'object') {
+                                console.log('[NOOK-EC] fork response ok=' + String(response.ok) + ' ext=' + (parsed.extensionId || '(none)'));
+                            }
+                            resolve(response);
+                        }
+
+                        function settleError(error) {
+                            if (settled) return;
+                            settled = true;
+                            cleanup();
+                            reject(error);
+                        }
+
+                        function handler(event) {
+                            if (event.source !== window) return;
+                            if (!event.data || event.data.type !== 'nook_ec_response') return;
+                            if (!matchesActiveRuntimeId(event.data.targetRuntimeId)) return;
+                            if (event.data.callbackId !== callbackId) return;
+
+                            if (event.data.error) {
+                                console.warn('[NOOK-EC] Response error for type=' + normalizedType + ': ' + event.data.error);
+                                settleError(new Error(event.data.error));
+                            } else {
+                                console.log('[NOOK-EC] Response success for type=' + normalizedType);
+                                settleSuccess(event.data.response);
+                            }
+                        }
+
+                        window.addEventListener('message', handler);
+                        timeoutId = setTimeout(function() {
+                            console.warn('[NOOK-EC] Timeout waiting for response type=' + normalizedType);
+                            settleError(new Error('Extension communication timeout'));
+                        }, 30000);
+
+                        console.log('[NOOK-EC] Forwarding request type=' + normalizedType + ' ext=' + (parsed.extensionId || '(none)'));
+                        window.postMessage({
+                            type: 'nook_ec_request',
+                            targetRuntimeId: activeRuntimeId(),
+                            extensionId: parsed.extensionId,
+                            message: parsed.message,
+                            options: parsed.options,
+                            callbackId: callbackId
+                        }, '*');
+                    });
+                });
+
+                if (dedupKey) {
+                    bridgeRequestDedup[dedupKey] = promise;
+                    var clearInFlight = function() {
+                        if (bridgeRequestDedup[dedupKey] === promise) {
+                            delete bridgeRequestDedup[dedupKey];
+                        }
+                    };
+                    promise.then(clearInFlight).catch(clearInFlight);
+                }
+
+                return promise;
+            }
+
+            function closeBridgePort(portId, errorMessage) {
+                var entry = bridgePorts[portId];
+                if (!entry || entry.disconnected) return;
+                entry.disconnected = true;
+                delete bridgePorts[portId];
+
+                if (errorMessage) {
+                    setChromeLastError(new Error(errorMessage));
+                    try {
+                        entry.onDisconnect.dispatch(entry.port);
+                    } finally {
+                        clearChromeLastErrorAsync();
+                    }
+                    return;
+                }
+                entry.onDisconnect.dispatch(entry.port);
+            }
+
+            function createBridgePort(parsed) {
+                var portId = 'nook_ec_port_' + Math.random().toString(36).slice(2, 11);
+                var connectInfo = parsed.connectInfo || {};
+                var onMessage = makeEvent();
+                var onDisconnect = makeEvent();
+
+                var entry = {
+                    disconnected: false,
+                    onMessage: onMessage,
+                    onDisconnect: onDisconnect,
+                    port: null
+                };
+
+                var port = {
+                    name: typeof connectInfo.name === 'string' ? connectInfo.name : '',
+                    postMessage: function(message) {
+                        if (entry.disconnected) throw new Error('Port is disconnected');
+                        window.postMessage({
+                            type: 'nook_ec_connect_post',
+                            targetRuntimeId: activeRuntimeId(),
+                            portId: portId,
+                            message: message
+                        }, '*');
+                    },
+                    disconnect: function() {
+                        if (entry.disconnected) return;
+                        window.postMessage({
+                            type: 'nook_ec_connect_close',
+                            targetRuntimeId: activeRuntimeId(),
+                            portId: portId
+                        }, '*');
+                        closeBridgePort(portId, null);
+                    },
+                    onMessage: onMessage,
+                    onDisconnect: onDisconnect
+                };
+                entry.port = port;
+                bridgePorts[portId] = entry;
+
+                waitForBridgeReady(3000).then(function() {
+                    console.log('[NOOK-EC] Opening bridge port id=' + portId + ' name=' + port.name + ' ext=' + (parsed.extensionId || '(none)'));
+                    window.postMessage({
+                        type: 'nook_ec_connect_open',
+                        targetRuntimeId: activeRuntimeId(),
+                        extensionId: parsed.extensionId,
+                        connectInfo: connectInfo,
+                        portId: portId
+                    }, '*');
+                }).catch(function(error) {
+                    var message = (error && error.message) ? error.message : String(error);
+                    console.warn('[NOOK-EC] Bridge port open failed id=' + portId + ': ' + message);
+                    closeBridgePort(portId, message);
+                });
+
+                return port;
+            }
+
+            function makeSendMessageWrapper(originalSendMessage, runtimeKind, runtimeObject) {
+                return function() {
+                    var parsed = normalizeSendMessageArgs(arguments);
+                    var requestType = (
+                        parsed.message && typeof parsed.message === 'object' && parsed.message.type
+                    ) ? parsed.message.type : typeof parsed.message;
+
+                    var shouldBridge = parsed.extensionId !== null || typeof originalSendMessage !== 'function';
+                    console.log('[NOOK-EC] sendMessage called via ' + runtimeKind + ' type=' + requestType + ' ext=' + (parsed.extensionId || '(none)') + ' mode=' + (shouldBridge ? 'bridge' : 'native'));
+
+                    var promise;
+                    if (shouldBridge) {
+                        promise = requestViaBridge(parsed, requestType);
+                    } else {
+                        try {
+                            promise = Promise.resolve(originalSendMessage.apply(runtimeObject, arguments));
+                        } catch (error) {
+                            promise = Promise.reject(error);
+                        }
+                        promise = promise.catch(function(error) {
+                            var message = (error && error.message) ? error.message : String(error);
+                            console.warn('[NOOK-EC] Native sendMessage failed via ' + runtimeKind + ', falling back to bridge: ' + message);
+                            return requestViaBridge(parsed, requestType);
+                        });
+                    }
+
+                    if (parsed.callback) {
+                        promise.then(function(response) {
+                            setChromeLastError(null);
+                            parsed.callback(response);
+                        }).catch(function(error) {
+                            setChromeLastError(error);
+                            try {
+                                parsed.callback();
+                            } finally {
+                                clearChromeLastErrorAsync();
+                            }
+                        });
+                        return;
+                    }
+
+                    return promise;
+                };
+            }
+
+            function makeConnectWrapper(originalConnect, runtimeKind, runtimeObject) {
+                return function() {
+                    var parsed = normalizeConnectArgs(arguments);
+                    var shouldBridge = parsed.extensionId !== null || typeof originalConnect !== 'function';
+                    console.log('[NOOK-EC] connect called via ' + runtimeKind + ' ext=' + (parsed.extensionId || '(none)') + ' mode=' + (shouldBridge ? 'bridge' : 'native'));
+
+                    if (shouldBridge) {
+                        return createBridgePort(parsed);
+                    }
+
+                    try {
+                        return originalConnect.apply(runtimeObject, arguments);
+                    } catch (error) {
+                        var message = (error && error.message) ? error.message : String(error);
+                        console.warn('[NOOK-EC] Native connect failed via ' + runtimeKind + ', falling back to bridge: ' + message);
+                        return createBridgePort(parsed);
+                    }
+                };
+            }
+
+            function installRuntimeShim(runtimeObject, runtimeKind) {
+                if (!runtimeObject || typeof runtimeObject !== 'object') return;
+
+                var currentSendMessage = typeof runtimeObject.sendMessage === 'function'
+                    ? runtimeObject.sendMessage
+                    : null;
+                if (runtimeObject.sendMessage !== runtimeObject.__nookEcWrappedSendMessage) {
+                    runtimeObject.__nookEcWrappedSendMessage = makeSendMessageWrapper(
+                        currentSendMessage,
+                        runtimeKind,
+                        runtimeObject
+                    );
+                    runtimeObject.sendMessage = runtimeObject.__nookEcWrappedSendMessage;
+                }
+
+                var currentConnect = typeof runtimeObject.connect === 'function'
+                    ? runtimeObject.connect
+                    : null;
+                if (runtimeObject.connect !== runtimeObject.__nookEcWrappedConnect) {
+                    runtimeObject.__nookEcWrappedConnect = makeConnectWrapper(
+                        currentConnect,
+                        runtimeKind,
+                        runtimeObject
+                    );
+                    runtimeObject.connect = runtimeObject.__nookEcWrappedConnect;
+                }
+            }
+
+            function ensureRuntimeObject(rootName) {
+                if (!window[rootName]) window[rootName] = {};
+                if (!window[rootName].runtime) window[rootName].runtime = {};
+                return window[rootName].runtime;
+            }
+
+            window.addEventListener('message', function(event) {
+                if (event.source !== window) return;
+                if (!event.data || typeof event.data.type !== 'string') return;
+                if (event.data.type === 'nook_ec_bridge_ready') {
+                    adoptBridgeRuntime(event.data.targetRuntimeId);
+                    return;
+                }
+                if (event.data.type === 'nook_ec_connect_message') {
+                    if (!matchesActiveRuntimeId(event.data.targetRuntimeId)) return;
+                    var messageEntry = bridgePorts[event.data.portId];
+                    if (!messageEntry || messageEntry.disconnected) return;
+                    messageEntry.onMessage.dispatch(event.data.message, messageEntry.port);
+                    return;
+                }
+                if (event.data.type === 'nook_ec_connect_disconnect') {
+                    if (!matchesActiveRuntimeId(event.data.targetRuntimeId)) return;
+                    closeBridgePort(event.data.portId, event.data.error || null);
+                    return;
+                }
+            });
+
+            var browserRuntime = ensureRuntimeObject('browser');
+            var chromeRuntime = ensureRuntimeObject('chrome');
+            installRuntimeShim(browserRuntime, 'browser.runtime');
+            installRuntimeShim(chromeRuntime, 'chrome.runtime');
+
+            // Some apps patch runtime methods after page load; re-apply wrappers briefly.
+            var shimAttempts = 0;
+            var shimTimer = setInterval(function() {
+                shimAttempts += 1;
+                installRuntimeShim(browserRuntime, 'browser.runtime');
+                installRuntimeShim(chromeRuntime, 'chrome.runtime');
+                if (shimAttempts >= 60) clearInterval(shimTimer);
+            }, 500);
+
+            console.log('[NOOK-EC] Polyfill ready — runtime sendMessage/connect wrapped (configured=' + _configuredRuntimeId + ')');
         })();
         """
 
         let sharedConfig = BrowserConfiguration.shared.webViewConfiguration
+        let hostsSignature = "var _hosts = [\(hostnamesJSON)];"
+        let sharedUserContentController = sharedConfig.userContentController
+        let retainedScripts = sharedUserContentController.userScripts.filter { script in
+            let source = script.source
+            guard source.contains("[NOOK-EC] Installing externally_connectable polyfill on ") else {
+                return true
+            }
+            return !source.contains(hostsSignature)
+        }
+        if retainedScripts.count != sharedUserContentController.userScripts.count {
+            sharedUserContentController.removeAllUserScripts()
+            retainedScripts.forEach { sharedUserContentController.addUserScript($0) }
+            Self.logger.info("Removed stale page-world externally_connectable shim for hosts: \(sortedHostnames.joined(separator: ", "), privacy: .public)")
+        }
+
         let pageScript = WKUserScript(
             source: polyfillJS,
             injectionTime: .atDocumentStart,
-            forMainFrameOnly: true,
+            forMainFrameOnly: false,
             in: .page
         )
-        sharedConfig.userContentController.addUserScript(pageScript)
+        sharedUserContentController.addUserScript(pageScript)
     }
 
     /// Verify extension storage is working properly
@@ -333,6 +798,28 @@ final class ExtensionManager: NSObject, ObservableObject,
         Self.logger.info("Switched controller data store to profile=\(profileId.uuidString, privacy: .public)")
         // Verify storage on the new profile
         verifyExtensionStorage(profileId)
+    }
+
+    // MARK: - Extension Context Identity
+
+    /// Keep a deterministic extension origin across app relaunches.
+    /// This prevents extension local storage/session state from moving
+    /// to a fresh namespace when WebKit generates a new default context ID.
+    private func configureContextIdentity(
+        _ extensionContext: WKWebExtensionContext,
+        extensionId: String
+    ) {
+        extensionContext.uniqueIdentifier = extensionId
+
+        // Use a host-safe, deterministic base URL derived from the persisted ID.
+        // Keep the built-in `webkit-extension` scheme to avoid custom-scheme assertions.
+        let host = "ext-" + extensionId.utf8.map { String(format: "%02x", $0) }.joined()
+        if let baseURL = URL(string: "webkit-extension://\(host)") {
+            extensionContext.baseURL = baseURL
+            Self.logger.debug("Configured context identity id=\(extensionId, privacy: .public), baseURL=\(baseURL.absoluteString, privacy: .public)")
+        } else {
+            Self.logger.error("Failed to configure base URL for extension id=\(extensionId, privacy: .public)")
+        }
     }
 
     func clearExtensionData(for profileId: UUID) {
@@ -497,59 +984,301 @@ final class ExtensionManager: NSObject, ObservableObject,
 
             var contentScripts = manifest["content_scripts"] as? [[String: Any]] ?? []
 
-            let alreadyHasBridge = contentScripts.contains { entry in
+            let existingBridgeIndex = contentScripts.firstIndex { entry in
                 (entry["js"] as? [String])?.contains("nook_bridge.js") == true
             }
 
-            if !alreadyHasBridge {
+            if let bridgeIndex = existingBridgeIndex {
+                var bridgeEntry = contentScripts[bridgeIndex]
+                let currentAllFrames = bridgeEntry["all_frames"] as? Bool ?? false
+                let currentRunAt = bridgeEntry["run_at"] as? String
+                let currentMatches = bridgeEntry["matches"] as? [String] ?? []
+
+                if currentAllFrames != true || currentRunAt != "document_start" || currentMatches != matchPatterns {
+                    bridgeEntry["all_frames"] = true
+                    bridgeEntry["run_at"] = "document_start"
+                    bridgeEntry["matches"] = matchPatterns
+                    contentScripts[bridgeIndex] = bridgeEntry
+                    manifest["content_scripts"] = contentScripts
+                    changed = true
+                    Self.logger.info("Updated existing nook_bridge.js content script entry for all-frames document_start coverage")
+                }
+            } else {
                 // Add bridge content script entry — runs in ISOLATED world (has browser.runtime)
                 let bridgeEntry: [String: Any] = [
-                    "all_frames": false,
+                    "all_frames": true,
                     "js": ["nook_bridge.js"],
                     "matches": matchPatterns,
                     "run_at": "document_start"
                 ]
                 contentScripts.append(bridgeEntry)
                 manifest["content_scripts"] = contentScripts
-
-                // Create the nook_bridge.js relay file
-                let bridgeDir = manifestURL.deletingLastPathComponent()
-                let bridgeFileURL = bridgeDir.appendingPathComponent("nook_bridge.js")
-                let bridgeJS = """
-                // Nook: externally_connectable bridge relay
-                // Runs as extension content script (ISOLATED world) with browser.runtime access.
-                // Listens for postMessage from page-world polyfill and forwards to background.
-                (function() {
-                    window.addEventListener('message', function(event) {
-                        if (event.source !== window) return;
-                        if (!event.data || event.data.type !== 'nook_ec_request') return;
-
-                        var callbackId = event.data.callbackId;
-                        var message = event.data.message;
-
-                        if (message && typeof message === 'object') {
-                            message = Object.assign({}, message, { sender: 'contentscript' });
-                        }
-
-                        browser.runtime.sendMessage(message).then(function(response) {
-                            window.postMessage({
-                                type: 'nook_ec_response',
-                                callbackId: callbackId,
-                                response: response
-                            }, '*');
-                        }).catch(function(error) {
-                            window.postMessage({
-                                type: 'nook_ec_response',
-                                callbackId: callbackId,
-                                error: error.message || String(error)
-                            }, '*');
-                        });
-                    });
-                })();
-                """
-                try? bridgeJS.write(to: bridgeFileURL, atomically: true, encoding: .utf8)
-                Self.logger.info("Created nook_bridge.js and registered in manifest for externally_connectable bridge")
                 changed = true
+            }
+
+            // Always refresh bridge file to keep compatibility fixes for already-installed extensions.
+            let bridgeDir = manifestURL.deletingLastPathComponent()
+            let bridgeFileURL = bridgeDir.appendingPathComponent("nook_bridge.js")
+            let bridgeJS = """
+            // Nook: externally_connectable bridge relay
+            // Runs as extension content script (ISOLATED world) with browser.runtime access.
+            // Listens for postMessage from page-world polyfill and forwards to background.
+            (function() {
+                var runtimeAPI = null;
+                try {
+                    if (typeof browser !== 'undefined' && browser.runtime) {
+                        runtimeAPI = browser.runtime;
+                    } else if (typeof chrome !== 'undefined' && chrome.runtime) {
+                        runtimeAPI = chrome.runtime;
+                    }
+                } catch (_) {}
+
+                var runtimeVersion = null;
+                try {
+                    if (runtimeAPI && runtimeAPI.getManifest) {
+                        runtimeVersion = runtimeAPI.getManifest().version || null;
+                    }
+                } catch (_) {}
+                var bridgePorts = Object.create(null);
+
+                function currentRuntimeId() {
+                    try {
+                        return runtimeAPI && runtimeAPI.id ? runtimeAPI.id : null;
+                    } catch (_) {
+                        return null;
+                    }
+                }
+
+                function isTargetedMessage(data) {
+                    if (!data || typeof data !== 'object') return false;
+                    var targetRuntimeId = data.targetRuntimeId;
+                    if (!targetRuntimeId || typeof targetRuntimeId !== 'string') return false;
+                    var runtimeId = currentRuntimeId();
+                    return !!runtimeId && targetRuntimeId === runtimeId;
+                }
+
+                function announceReady() {
+                    window.postMessage({
+                        type: 'nook_ec_bridge_ready',
+                        targetRuntimeId: currentRuntimeId()
+                    }, '*');
+                }
+
+                announceReady();
+                setTimeout(announceReady, 0);
+                setTimeout(announceReady, 100);
+                setTimeout(announceReady, 500);
+
+                function lastErrorMessage() {
+                    try {
+                        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.lastError && chrome.runtime.lastError.message) {
+                            return chrome.runtime.lastError.message;
+                        }
+                    } catch (_) {}
+                    return null;
+                }
+
+                function relaySendMessage(data) {
+                    if (!runtimeAPI || typeof runtimeAPI.sendMessage !== 'function') {
+                        window.postMessage({
+                            type: 'nook_ec_response',
+                            callbackId: data.callbackId,
+                            targetRuntimeId: currentRuntimeId(),
+                            error: 'runtime.sendMessage unavailable'
+                        }, '*');
+                        return;
+                    }
+
+                    var callbackId = data.callbackId;
+                    var message = data.message;
+                    var options = data.options;
+                    var outgoingMessage = message;
+
+                    if (outgoingMessage && typeof outgoingMessage === 'object') {
+                        // Preserve sender when provided by the page; default to page semantics.
+                        outgoingMessage = Object.assign({ sender: 'page' }, outgoingMessage);
+                        // Proton's broker enforces a version field for internal messages.
+                        if (runtimeVersion && typeof outgoingMessage.version === 'undefined') {
+                            outgoingMessage.version = runtimeVersion;
+                        }
+                    }
+
+                    var outgoingType = (
+                        outgoingMessage && typeof outgoingMessage === 'object' && outgoingMessage.type
+                    ) ? outgoingMessage.type : typeof outgoingMessage;
+                    console.log('[NOOK-EC] Relay send type=' + outgoingType + ' version=' + (
+                        outgoingMessage && typeof outgoingMessage === 'object' ? (outgoingMessage.version || '(none)') : '(n/a)'
+                    ));
+
+                    var sendPromise = new Promise(function(resolve, reject) {
+                        var result;
+                        try {
+                            if (typeof options !== 'undefined') {
+                                result = runtimeAPI.sendMessage(outgoingMessage, options);
+                            } else {
+                                result = runtimeAPI.sendMessage(outgoingMessage);
+                            }
+                        } catch (error) {
+                            reject(error);
+                            return;
+                        }
+                        if (result && typeof result.then === 'function') {
+                            result.then(resolve).catch(reject);
+                        } else {
+                            resolve(result);
+                        }
+                    });
+
+                    Promise.resolve(sendPromise).then(function(response) {
+                        console.log('[NOOK-EC] Relay success type=' + outgoingType);
+                        window.postMessage({
+                            type: 'nook_ec_response',
+                            callbackId: callbackId,
+                            targetRuntimeId: currentRuntimeId(),
+                            response: response
+                        }, '*');
+                    }).catch(function(error) {
+                        console.warn('[NOOK-EC] Relay error type=' + outgoingType + ': ' + ((error && error.message) ? error.message : String(error)));
+                        window.postMessage({
+                            type: 'nook_ec_response',
+                            callbackId: callbackId,
+                            targetRuntimeId: currentRuntimeId(),
+                            error: (error && error.message) ? error.message : String(error)
+                        }, '*');
+                    });
+                }
+
+                function relayConnectOpen(data) {
+                    var portId = data.portId;
+                    if (!portId) return;
+
+                    if (!runtimeAPI || typeof runtimeAPI.connect !== 'function') {
+                        window.postMessage({
+                            type: 'nook_ec_connect_disconnect',
+                            portId: portId,
+                            targetRuntimeId: currentRuntimeId(),
+                            error: 'runtime.connect unavailable'
+                        }, '*');
+                        return;
+                    }
+
+                    var connectInfo = data.connectInfo;
+                    if (!connectInfo || typeof connectInfo !== 'object') {
+                        connectInfo = {};
+                    }
+
+                    console.log('[NOOK-EC] Relay connect open id=' + portId + ' name=' + (connectInfo.name || '') + ' ext=' + (data.extensionId || '(none)'));
+
+                    var port;
+                    try {
+                        // Intentionally ignore external extensionId and connect internally.
+                        port = runtimeAPI.connect(connectInfo);
+                    } catch (error) {
+                        window.postMessage({
+                            type: 'nook_ec_connect_disconnect',
+                            portId: portId,
+                            targetRuntimeId: currentRuntimeId(),
+                            error: (error && error.message) ? error.message : String(error)
+                        }, '*');
+                        return;
+                    }
+
+                    bridgePorts[portId] = port;
+                    port.onMessage.addListener(function(message) {
+                        window.postMessage({
+                            type: 'nook_ec_connect_message',
+                            portId: portId,
+                            targetRuntimeId: currentRuntimeId(),
+                            message: message
+                        }, '*');
+                    });
+                    port.onDisconnect.addListener(function() {
+                        var error = lastErrorMessage();
+                        delete bridgePorts[portId];
+                        console.log('[NOOK-EC] Relay connect disconnect id=' + portId + (error ? (' error=' + error) : ''));
+                        window.postMessage({
+                            type: 'nook_ec_connect_disconnect',
+                            portId: portId,
+                            targetRuntimeId: currentRuntimeId(),
+                            error: error
+                        }, '*');
+                    });
+
+                    window.postMessage({
+                        type: 'nook_ec_connect_opened',
+                        portId: portId,
+                        targetRuntimeId: currentRuntimeId()
+                    }, '*');
+                }
+
+                function relayConnectPost(data) {
+                    var port = bridgePorts[data.portId];
+                    if (!port) return;
+                    try {
+                        port.postMessage(data.message);
+                    } catch (error) {
+                        delete bridgePorts[data.portId];
+                        window.postMessage({
+                            type: 'nook_ec_connect_disconnect',
+                            portId: data.portId,
+                            targetRuntimeId: currentRuntimeId(),
+                            error: (error && error.message) ? error.message : String(error)
+                        }, '*');
+                    }
+                }
+
+                function relayConnectClose(data) {
+                    var portId = data.portId;
+                    var port = bridgePorts[portId];
+                    if (!port) return;
+                    delete bridgePorts[portId];
+                    try {
+                        port.disconnect();
+                    } catch (_) {}
+                    window.postMessage({
+                        type: 'nook_ec_connect_disconnect',
+                        portId: portId,
+                        targetRuntimeId: currentRuntimeId(),
+                        error: null
+                    }, '*');
+                }
+
+                window.addEventListener('message', function(event) {
+                    if (event.source !== window) return;
+                    if (!event.data || typeof event.data.type !== 'string') return;
+                    if (event.data.type === 'nook_ec_request') {
+                        if (!isTargetedMessage(event.data)) return;
+                        relaySendMessage(event.data);
+                        return;
+                    }
+                    if (event.data.type === 'nook_ec_connect_open') {
+                        if (!isTargetedMessage(event.data)) return;
+                        relayConnectOpen(event.data);
+                        return;
+                    }
+                    if (event.data.type === 'nook_ec_connect_post') {
+                        if (!isTargetedMessage(event.data)) return;
+                        relayConnectPost(event.data);
+                        return;
+                    }
+                    if (event.data.type === 'nook_ec_connect_close') {
+                        if (!isTargetedMessage(event.data)) return;
+                        relayConnectClose(event.data);
+                        return;
+                    }
+                });
+            })();
+            """
+
+            let existingBridgeJS = try? String(contentsOf: bridgeFileURL, encoding: .utf8)
+            if existingBridgeJS != bridgeJS {
+                try? bridgeJS.write(to: bridgeFileURL, atomically: true, encoding: .utf8)
+                Self.logger.info("Updated nook_bridge.js for externally_connectable bridge compatibility")
+                changed = true
+            }
+
+            if existingBridgeIndex == nil {
+                Self.logger.info("Created nook_bridge.js and registered in manifest for externally_connectable bridge")
             }
         }
 
@@ -685,6 +1414,7 @@ final class ExtensionManager: NSObject, ObservableObject,
         // loaded from this path at runtime.
         let webExtension = try await WKWebExtension(resourceBaseURL: finalDestinationDir)
         let extensionContext = WKWebExtensionContext(for: webExtension)
+        configureContextIdentity(extensionContext, extensionId: extensionId)
 
         Self.logger.info("WKWebExtension created from final path: \(finalDestinationDir.path, privacy: .public)")
         Self.logger.debug("Requested permissions: \(webExtension.requestedPermissions.map { String(describing: $0) }.joined(separator: ", "), privacy: .public)")
@@ -1263,6 +1993,11 @@ final class ExtensionManager: NSObject, ObservableObject,
             // Phase 2: Register contexts sequentially (must be on MainActor)
             for (entity, webExtension) in parsed {
                 let extensionContext = WKWebExtensionContext(for: webExtension)
+                let extensionId = entity.id
+                self.configureContextIdentity(
+                    extensionContext,
+                    extensionId: extensionId
+                )
 
                 Self.logger.info("Loading '\(webExtension.displayName ?? entity.name, privacy: .public)' MV\(webExtension.manifestVersion) hasBackground=\(webExtension.hasBackgroundContent)")
 
@@ -1282,24 +2017,12 @@ final class ExtensionManager: NSObject, ObservableObject,
 
                 extensionContext.isInspectable = true
 
-                let correctExtensionId = extensionContext.uniqueIdentifier
-
-                // Update DB if ID changed
-                if entity.id != correctExtensionId {
-                    let oldId = entity.id
-                    entity.id = correctExtensionId
-                    try? self.context.save()
-                    if let index = self.installedExtensions.firstIndex(where: { $0.id == oldId }) {
-                        self.installedExtensions[index] = InstalledExtension(from: entity, manifest: self.installedExtensions[index].manifest)
-                    }
-                }
-
-                self.extensionContexts[correctExtensionId] = extensionContext
+                self.extensionContexts[extensionId] = extensionContext
 
                 // Set up externally_connectable bridge BEFORE loading background
                 self.setupExternallyConnectableBridge(
                     for: extensionContext,
-                    extensionId: correctExtensionId,
+                    extensionId: extensionId,
                     packagePath: entity.packagePath
                 )
 
