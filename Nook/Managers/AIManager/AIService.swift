@@ -237,7 +237,7 @@ class AIService {
             do {
                 return try await browserToolExecutor.execute(toolCall)
             } catch {
-                return AIToolResult(toolCallId: toolCall.id, content: "Error: \(error.localizedDescription)", isError: true)
+                return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: "Error: \(error.localizedDescription)", isError: true)
             }
         }
 
@@ -250,14 +250,14 @@ class AIService {
                 let toolName = String(parts[1])
                 do {
                     let result = try await mcpManager.callTool(serverId: serverId, name: toolName, arguments: toolCall.arguments)
-                    return AIToolResult(toolCallId: toolCall.id, content: result)
+                    return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: result)
                 } catch {
-                    return AIToolResult(toolCallId: toolCall.id, content: "MCP Error: \(error.localizedDescription)", isError: true)
+                    return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: "MCP Error: \(error.localizedDescription)", isError: true)
                 }
             }
         }
 
-        return AIToolResult(toolCallId: toolCall.id, content: "Unknown tool: \(toolCall.name)", isError: true)
+        return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: "Unknown tool: \(toolCall.name)", isError: true)
     }
 
     // MARK: - Page Context Extraction

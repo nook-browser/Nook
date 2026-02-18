@@ -82,7 +82,8 @@ struct GeminiProvider: AIProviderProtocol {
                         "role": "function",
                         "parts": [[
                             "functionResponse": [
-                                "name": result.toolCallId,
+                                "id": result.toolCallId,
+                                "name": result.toolName,
                                 "response": ["content": result.content]
                             ]
                         ]]
@@ -158,7 +159,9 @@ struct GeminiProvider: AIProviderProtocol {
             if let functionCall = part["functionCall"] as? [String: Any],
                let name = functionCall["name"] as? String {
                 let args = functionCall["args"] as? [String: Any] ?? [:]
-                toolCalls.append(AIToolCall(name: name, arguments: args))
+                // Extract Gemini's unique call ID for proper FunctionResponse correlation
+                let callId = functionCall["id"] as? String ?? UUID().uuidString
+                toolCalls.append(AIToolCall(id: callId, name: name, arguments: args))
             }
         }
 

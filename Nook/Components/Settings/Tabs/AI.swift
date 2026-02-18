@@ -449,9 +449,8 @@ struct SettingsAITab: View {
                     SecureField("API Key", text: Binding(
                         get: { provider.apiKey },
                         set: { newValue in
-                            var updated = provider
-                            updated.apiKey = newValue
-                            configService.updateProvider(updated)
+                            // Update provider config and API key separately
+                            configService.updateProvider(provider, apiKey: newValue)
                         }
                     ))
                     .textFieldStyle(.roundedBorder)

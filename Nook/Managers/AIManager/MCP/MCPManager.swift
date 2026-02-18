@@ -25,14 +25,28 @@ class MCPManager {
         }
     }
 
-    func stopAll() {
+    func stopAll() async {
+        for (_, client) in clients {
+            await client.disconnect()
+        }
+        clients.removeAll()
+        connectionStates.removeAll()
+        allTools.removeAll()
+    }
+
+    /// Synchronous version for app termination when async is not available
+    func stopAllSync() {
+        let semaphore = DispatchSemaphore(value: 0)
         Task {
-            for (_, client) in clients {
-                await client.disconnect()
+            await stopAll()
+            semaphore.signal()
+        }
+        let deadline = Date().addingTimeInterval(5)
+        while Date() < deadline {
+            if semaphore.wait(timeout: .now()) == .success {
+                return
             }
-            clients.removeAll()
-            connectionStates.removeAll()
-            allTools.removeAll()
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.01))
         }
     }
 
@@ -68,12 +82,21 @@ class MCPManager {
     }
 
     func reconnectServer(_ config: MCPServerConfig) {
-        disconnectServer(config.id)
-        // Brief delay before reconnecting
         Task {
+            await disconnectServerAsync(config.id)
+            // Brief delay before reconnecting
             try? await Task.sleep(nanoseconds: 500_000_000)
             connectServer(config)
         }
+    }
+
+    /// Async version of disconnectServer that waits for completion
+    func disconnectServerAsync(_ serverId: String) async {
+        guard let client = clients[serverId] else { return }
+        await client.disconnect()
+        clients.removeValue(forKey: serverId)
+        connectionStates[serverId] = .disconnected
+        refreshTools()
     }
 
     // MARK: - Tool Calling

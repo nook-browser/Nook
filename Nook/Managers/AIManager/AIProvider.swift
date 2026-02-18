@@ -99,11 +99,13 @@ struct AIToolCall: Identifiable, Equatable {
 
 struct AIToolResult: Equatable {
     let toolCallId: String
+    let toolName: String
     let content: String
     let isError: Bool
 
-    init(toolCallId: String, content: String, isError: Bool = false) {
+    init(toolCallId: String, toolName: String = "", content: String, isError: Bool = false) {
         self.toolCallId = toolCallId
+        self.toolName = toolName
         self.content = content
         self.isError = isError
     }

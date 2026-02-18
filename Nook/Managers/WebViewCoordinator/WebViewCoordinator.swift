@@ -199,6 +199,7 @@ class WebViewCoordinator {
         newWebView.configuration.userContentController.add(tab, name: "backgroundColor_\(tabId.uuidString)")
         newWebView.configuration.userContentController.add(tab, name: "historyStateDidChange")
         newWebView.configuration.userContentController.add(tab, name: "NookIdentity")
+        newWebView.configuration.userContentController.add(tab, name: "nookShortcutDetect")
         
         tab.setupThemeColorObserver(for: newWebView)
         
@@ -393,6 +394,7 @@ class WebViewCoordinator {
             "backgroundColor_\(tabId.uuidString)",
             "historyStateDidChange",
             "NookIdentity",
+            "nookShortcutDetect",
         ]
 
         for handlerName in allMessageHandlers {

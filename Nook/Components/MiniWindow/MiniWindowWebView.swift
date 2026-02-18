@@ -385,6 +385,28 @@ extension MiniWindowWebView.Coordinator: WKUIDelegate {
         completionHandler(true, nil)
     }
 
+    // MARK: - Media Capture Permission
+
+    /// Handle requests for media capture authorization (camera/microphone).
+    /// This is used for OAuth providers that may require getUserMedia during auth flows.
+    @available(macOS 13.0, *)
+    func webView(
+        _ webView: WKWebView,
+        requestMediaCaptureAuthorization type: WKMediaCaptureType,
+        for origin: WKSecurityOrigin,
+        initiatedByFrame frame: WKFrameInfo,
+        decisionHandler: @escaping (WKPermissionDecision) -> Void
+    ) {
+        print("🔐 [MiniWindow] Media capture authorization requested for type: \(type.rawValue) from origin: \(origin)")
+
+        let knownOAuthDomains = [
+            "accounts.google.com", "login.microsoftonline.com", "github.com",
+            "appleid.apple.com", "auth0.com", "okta.com", "auth.cloudflare.com"
+        ]
+        let isKnownOAuth = knownOAuthDomains.contains { origin.host.contains($0) }
+        decisionHandler(isKnownOAuth ? .grant : .deny)
+    }
+
     // MARK: - File Upload Support
     func webView(
         _ webView: WKWebView,

@@ -32,7 +32,7 @@ class BrowserToolExecutor {
     func execute(_ toolCall: AIToolCall) async throws -> AIToolResult {
         guard let browserManager = browserManager,
               let windowState = windowState else {
-            return AIToolResult(toolCallId: toolCall.id, content: "Browser not available", isError: true)
+            return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: "Browser not available", isError: true)
         }
 
         let result: String
@@ -63,10 +63,10 @@ class BrowserToolExecutor {
         case "executeJavaScript":
             result = try await executeJavaScript(toolCall.arguments, browserManager: browserManager, windowState: windowState)
         default:
-            return AIToolResult(toolCallId: toolCall.id, content: "Unknown tool: \(toolCall.name)", isError: true)
+            return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: "Unknown tool: \(toolCall.name)", isError: true)
         }
 
-        return AIToolResult(toolCallId: toolCall.id, content: result)
+        return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: result)
     }
 
     // MARK: - Tool Implementations

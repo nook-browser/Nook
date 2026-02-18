@@ -108,7 +108,12 @@ class AIConfigService {
         save()
     }
 
-    func updateProvider(_ provider: AIProviderConfig) {
+    func updateProvider(_ provider: AIProviderConfig, apiKey: String? = nil) {
+        // Save API key to Keychain if provided
+        if let apiKey = apiKey {
+            AIKeychainStorage.shared.saveAPIKey(apiKey, for: provider.id)
+        }
+
         if let index = config.providers.firstIndex(where: { $0.id == provider.id }) {
             config.providers[index] = provider
         } else {
@@ -124,7 +129,14 @@ class AIConfigService {
             config.activeProviderId = config.providers.first?.id
             config.activeModelId = nil
         }
+        // Delete API key from Keychain
+        AIKeychainStorage.shared.deleteAPIKey(for: providerId)
         save()
+    }
+
+    /// Update only the API key for a provider (stored in Keychain)
+    func updateProviderAPIKey(_ providerId: String, apiKey: String) {
+        AIKeychainStorage.shared.saveAPIKey(apiKey, for: providerId)
     }
 
     func addCustomProvider(name: String, baseURL: String, apiKey: String = "") {
@@ -258,7 +270,10 @@ class AIConfigService {
         guard let provider = config.providers.first(where: { $0.providerType == .ollama }) else { return }
 
         do {
-            let url = URL(string: "\(provider.baseURL)/api/tags")!
+            guard let url = URL(string: "\(provider.baseURL)/api/tags") else {
+                ollamaModels = []
+                return
+            }
             var request = URLRequest(url: url)
             request.httpMethod = "GET"
             request.timeoutInterval = 5.0
@@ -336,16 +351,16 @@ class AIConfigService {
         let migrationKey = "ai_config_migrated_v1"
         guard !defaults.bool(forKey: migrationKey) else { return }
 
-        // Migrate API keys
+        // Migrate API keys to Keychain and remove plaintext entries
         if let geminiKey = defaults.string(forKey: "settings.geminiApiKey"), !geminiKey.isEmpty {
-            if let idx = config.providers.firstIndex(where: { $0.id == "gemini" }) {
-                config.providers[idx].apiKey = geminiKey
+            if AIKeychainStorage.shared.saveAPIKey(geminiKey, for: "gemini") {
+                defaults.removeObject(forKey: "settings.geminiApiKey")
             }
         }
 
         if let openRouterKey = defaults.string(forKey: "settings.openRouterApiKey"), !openRouterKey.isEmpty {
-            if let idx = config.providers.firstIndex(where: { $0.id == "openrouter" }) {
-                config.providers[idx].apiKey = openRouterKey
+            if AIKeychainStorage.shared.saveAPIKey(openRouterKey, for: "openrouter") {
+                defaults.removeObject(forKey: "settings.openRouterApiKey")
             }
         }
 

@@ -18,10 +18,10 @@ final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
         self.userContentController = controller
         super.init()
 
-        print("🔽 [WebContextMenuBridge] Initializing bridge for tab: \(tab.id)")
+        debugLog("🔽 [WebContextMenuBridge] Initializing bridge for tab: \(tab.id)")
         controller.add(self, name: Self.handlerName)
         controller.addUserScript(Self.script)
-        print("🔽 [WebContextMenuBridge] Added message handler and user script")
+        debugLog("🔽 [WebContextMenuBridge] Added message handler and user script")
     }
 
     func detach() {
@@ -31,16 +31,23 @@ final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.name == Self.handlerName else { return }
-        print("🔽 [WebContextMenuBridge] Received message from JavaScript")
+        debugLog("🔽 [WebContextMenuBridge] Received message from JavaScript")
         guard let dictionary = message.body as? [String: Any] else {
-            print("🔽 [WebContextMenuBridge] Failed to cast message.body as dictionary")
+            debugLog("🔽 [WebContextMenuBridge] Failed to cast message.body as dictionary")
             tab?.deliverContextMenuPayload(nil)
             return
         }
-        print("🔽 [WebContextMenuBridge] Dictionary: \(dictionary)")
+        debugLog("🔽 [WebContextMenuBridge] Dictionary: \(dictionary)")
         let payload = WebContextMenuPayload(dictionary: dictionary)
-        print("🔽 [WebContextMenuBridge] Created payload: \(String(describing: payload))")
+        debugLog("🔽 [WebContextMenuBridge] Created payload: \(String(describing: payload))")
         tab?.deliverContextMenuPayload(payload)
+    }
+
+    /// Logs debug messages only in DEBUG builds
+    private func debugLog(_ message: String) {
+        #if DEBUG
+        print(message)
+        #endif
     }
 
     private static let handlerName = "contextMenuPayload"

@@ -7,6 +7,10 @@
 
 import Foundation
 
+#if canImport(Security)
+import Security
+#endif
+
 // MARK: - Provider Configuration
 
 enum AIProviderType: String, Codable, CaseIterable, Identifiable {
@@ -47,10 +51,14 @@ struct AIProviderConfig: Codable, Identifiable, Equatable {
     let id: String
     var displayName: String
     var providerType: AIProviderType
-    var apiKey: String
     var baseURL: String
     var isEnabled: Bool
     var customHeaders: [String: String]
+
+    // API key is stored in Keychain, not in JSON
+    var apiKey: String {
+        AIKeychainStorage.shared.apiKey(for: id) ?? ""
+    }
 
     init(
         id: String = UUID().uuidString,
@@ -64,10 +72,142 @@ struct AIProviderConfig: Codable, Identifiable, Equatable {
         self.id = id
         self.displayName = displayName
         self.providerType = providerType
-        self.apiKey = apiKey
         self.baseURL = baseURL ?? providerType.defaultBaseURL ?? ""
         self.isEnabled = isEnabled
         self.customHeaders = customHeaders
+        // Store API key in Keychain, not in the struct
+        if !apiKey.isEmpty {
+            AIKeychainStorage.shared.saveAPIKey(apiKey, for: id)
+        }
+    }
+
+    // Custom CodingKeys to exclude apiKey from JSON encoding/decoding
+    enum CodingKeys: String, CodingKey {
+        case id
+        case displayName
+        case providerType
+        case baseURL
+        case isEnabled
+        case customHeaders
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.displayName = try container.decode(String.self, forKey: .displayName)
+        self.providerType = try container.decode(AIProviderType.self, forKey: .providerType)
+        self.baseURL = try container.decode(String.self, forKey: .baseURL)
+        self.isEnabled = try container.decode(Bool.self, forKey: .isEnabled)
+        self.customHeaders = try container.decode([String: String].self, forKey: .customHeaders)
+        // apiKey is loaded from Keychain via computed property
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(displayName, forKey: .displayName)
+        try container.encode(providerType, forKey: .providerType)
+        try container.encode(baseURL, forKey: .baseURL)
+        try container.encode(isEnabled, forKey: .isEnabled)
+        try container.encode(customHeaders, forKey: .customHeaders)
+        // apiKey is NOT encoded - it's stored in Keychain
+    }
+}
+
+// MARK: - Keychain Storage for API Keys
+
+/// Non-isolated Keychain storage for AI provider API keys
+/// Uses internal synchronization for thread safety
+final class AIKeychainStorage: @unchecked Sendable {
+    static let shared = AIKeychainStorage()
+
+    private let service = "com.nook.aiProvider"
+    private let lock = NSLock()
+
+    private init() {}
+
+    func apiKey(for providerId: String) -> String? {
+        guard !providerId.isEmpty else { return nil }
+
+        lock.lock()
+        defer { lock.unlock() }
+
+        #if canImport(Security)
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: providerId,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+
+        guard status == errSecSuccess else { return nil }
+        guard let data = item as? Data else { return nil }
+
+        return String(data: data, encoding: .utf8)
+        #else
+        return nil
+        #endif
+    }
+
+    @discardableResult
+    func saveAPIKey(_ apiKey: String, for providerId: String) -> Bool {
+        guard !providerId.isEmpty else { return false }
+
+        lock.lock()
+        defer { lock.unlock() }
+
+        #if canImport(Security)
+        guard let data = apiKey.data(using: .utf8) else { return false }
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: providerId
+        ]
+
+        let attributes: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
+        ]
+
+        let status: OSStatus
+        if SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess {
+            status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        } else {
+            var insert = query
+            insert[kSecValueData as String] = data
+            insert[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
+            status = SecItemAdd(insert as CFDictionary, nil)
+        }
+
+        return status == errSecSuccess
+        #else
+        return false
+        #endif
+    }
+
+    @discardableResult
+    func deleteAPIKey(for providerId: String) -> Bool {
+        guard !providerId.isEmpty else { return false }
+
+        lock.lock()
+        defer { lock.unlock() }
+
+        #if canImport(Security)
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: providerId
+        ]
+        let status = SecItemDelete(query as CFDictionary)
+        return status == errSecSuccess || status == errSecItemNotFound
+        #else
+        return false
+        #endif
     }
 }
 
