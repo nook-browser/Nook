@@ -106,12 +106,11 @@ final class StdioTransport: MCPTransportProtocol, @unchecked Sendable {
 
             let handle = stdoutPipe.fileHandleForReading
 
-            self?.receiveTask = Task.detached { [weak self] in
+            let task = Task.detached {
                 var buffer = Data()
 
                 while true {
-                    // Check for cancellation
-                    guard let self = self, !(self.receiveTask?.isCancelled ?? true) else {
+                    guard !Task.isCancelled else {
                         continuation.finish()
                         break
                     }
@@ -134,6 +133,7 @@ final class StdioTransport: MCPTransportProtocol, @unchecked Sendable {
                     }
                 }
             }
+            self?.receiveTask = task
         }
     }
 
@@ -219,7 +219,7 @@ final class SSETransport: MCPTransportProtocol, @unchecked Sendable {
                 return
             }
 
-            self?.receiveTask = Task.detached { [weak self] in
+            let task = Task.detached {
                 do {
                     var request = URLRequest(url: sseURL)
                     request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
@@ -227,8 +227,7 @@ final class SSETransport: MCPTransportProtocol, @unchecked Sendable {
                     let (bytes, _) = try await URLSession.shared.bytes(for: request)
 
                     for try await line in bytes.lines {
-                        // Check for cancellation
-                        guard let self = self, !(self.receiveTask?.isCancelled ?? true) else {
+                        guard !Task.isCancelled else {
                             continuation.finish()
                             break
                         }
@@ -245,6 +244,7 @@ final class SSETransport: MCPTransportProtocol, @unchecked Sendable {
                 }
                 continuation.finish()
             }
+            self?.receiveTask = task
         }
     }
 

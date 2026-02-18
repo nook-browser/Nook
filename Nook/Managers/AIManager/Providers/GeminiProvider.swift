@@ -82,7 +82,8 @@ struct GeminiProvider: AIProviderProtocol {
                         "role": "function",
                         "parts": [[
                             "functionResponse": [
-                                "name": result.toolCallId,
+                                "id": result.toolCallId,
+                                "name": result.toolName,
                                 "response": ["content": result.content]
                             ]
                         ]]

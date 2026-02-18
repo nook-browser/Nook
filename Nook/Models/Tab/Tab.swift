@@ -2866,15 +2866,18 @@ extension Tab: WKScriptMessageHandler {
     
     private func handleShortcutDetection(message: WKScriptMessage) {
         // Handle detected shortcuts from JS injection
-        guard let shortcutsString = message.body as? String,
-              let currentURL = _webView?.url?.absoluteString else { return }
+        guard let shortcutsString = message.body as? String else { return }
+        
+        // Use the frame's webView URL for correct attribution, fallback to _webView
+        let currentURL = message.frameInfo.webView?.url?.absoluteString ?? _webView?.url?.absoluteString
+        guard let url = currentURL else { return }
         
         // Parse the comma-separated shortcuts
         let shortcuts = Set(shortcutsString.split(separator: ",").map { String($0) })
         
         // Update the detector with detected shortcuts for this URL
         browserManager?.keyboardShortcutManager?.websiteShortcutDetector.updateJSDetectedShortcuts(
-            for: currentURL,
+            for: url,
             shortcuts: shortcuts
         )
     }

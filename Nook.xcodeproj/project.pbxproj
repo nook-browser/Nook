@@ -49,7 +49,6 @@
 				"CommandPalette Accessories/TabSuggestionItem.swift",
 				CommandPalette.swift,
 				CommandPaletteView.swift,
-				SiteSearch.swift,
 			);
 			target = 7F8340FB2E37F39400674A5D /* Nook */;
 		};

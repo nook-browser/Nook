@@ -351,13 +351,17 @@ class AIConfigService {
         let migrationKey = "ai_config_migrated_v1"
         guard !defaults.bool(forKey: migrationKey) else { return }
 
-        // Migrate API keys to Keychain
+        // Migrate API keys to Keychain and remove plaintext entries
         if let geminiKey = defaults.string(forKey: "settings.geminiApiKey"), !geminiKey.isEmpty {
-            AIKeychainStorage.shared.saveAPIKey(geminiKey, for: "gemini")
+            if AIKeychainStorage.shared.saveAPIKey(geminiKey, for: "gemini") {
+                defaults.removeObject(forKey: "settings.geminiApiKey")
+            }
         }
 
         if let openRouterKey = defaults.string(forKey: "settings.openRouterApiKey"), !openRouterKey.isEmpty {
-            AIKeychainStorage.shared.saveAPIKey(openRouterKey, for: "openrouter")
+            if AIKeychainStorage.shared.saveAPIKey(openRouterKey, for: "openrouter") {
+                defaults.removeObject(forKey: "settings.openRouterApiKey")
+            }
         }
 
         if let ollamaEndpoint = defaults.string(forKey: "settings.ollamaEndpoint"), !ollamaEndpoint.isEmpty {
