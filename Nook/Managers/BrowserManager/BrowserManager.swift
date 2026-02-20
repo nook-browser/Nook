@@ -890,22 +890,22 @@ class BrowserManager: ObservableObject {
     }
 
     /// Create a new tab and set it as active in the specified window
-    func createNewTab(in windowState: BrowserWindowState) {
+    func createNewTab(in windowState: BrowserWindowState, url: String = "https://www.google.com") {
         // Handle incognito windows - create ephemeral tabs
         if windowState.isIncognito, let profile = windowState.ephemeralProfile {
-            let engine = nookSettings?.searchEngine ?? .google
-            let normalizedURL = normalizeURL("https://www.google.com", provider: engine)
-            guard let url = URL(string: normalizedURL) else { return }
-            
+            let template = nookSettings?.resolvedSearchEngineTemplate ?? SearchProvider.google.queryTemplate
+            let normalizedURL = normalizeURL(url, queryTemplate: template)
+            guard let resolvedUrl = URL(string: normalizedURL) else { return }
+
             let newTab = tabManager.createEphemeralTab(
-                url: url,
+                url: resolvedUrl,
                 in: windowState,
                 profile: profile
             )
             selectTab(newTab, in: windowState)
             return
         }
-        
+
         let targetSpace =
             windowState.currentSpaceId.flatMap { id in
                 tabManager.spaces.first(where: { $0.id == id })
@@ -913,7 +913,7 @@ class BrowserManager: ObservableObject {
             ?? windowState.currentProfileId.flatMap { pid in
                 tabManager.spaces.first(where: { $0.profileId == pid })
             }
-        let newTab = tabManager.createNewTab(in: targetSpace)
+        let newTab = tabManager.createNewTab(url: url, in: targetSpace)
         selectTab(newTab, in: windowState)
     }
 
@@ -990,8 +990,8 @@ class BrowserManager: ObservableObject {
                     } else {
                         // All tabs closed - create a new ephemeral tab
                         if let profile = activeWindow.ephemeralProfile {
-                            let engine = nookSettings?.searchEngine ?? .google
-                            let normalizedURL = normalizeURL("https://www.google.com", provider: engine)
+                            let template = nookSettings?.resolvedSearchEngineTemplate ?? SearchProvider.google.queryTemplate
+                            let normalizedURL = normalizeURL("https://www.google.com", queryTemplate: template)
                             if let url = URL(string: normalizedURL) {
                                 let newTab = tabManager.createEphemeralTab(url: url, in: activeWindow, profile: profile)
                                 selectTab(newTab, in: activeWindow)

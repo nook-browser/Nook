@@ -7,6 +7,7 @@
 
 import AppKit
 import FaviconFinder
+import Garnish
 import SwiftUI
 
 struct HistorySection: Identifiable {
@@ -33,6 +34,7 @@ enum TimeRange: String, CaseIterable {
 
 struct SidebarMenuHistoryTab: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var gradientColorManager: GradientColorManager
     @State private var isHovering: Bool = false
     @State private var text: String = ""
     @FocusState private var isSearchFocused: Bool
@@ -49,18 +51,30 @@ struct SidebarMenuHistoryTab: View {
     private let pageSize: Int = 50
     private let maxResults: Int = 1000
 
+    private var contrastText: Color {
+        Garnish.contrastingShade(of: gradientColorManager.primaryColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
+    }
+
+    private var contrastTextSecondary: Color {
+        contrastText.opacity(0.7)
+    }
+
+    private var contrastTextTertiary: Color {
+        contrastText.opacity(0.5)
+    }
+
     var body: some View {
         VStack(spacing: 10) {
             HStack(spacing: 3) {
                 HStack {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.3))
+                        .foregroundStyle(contrastTextTertiary)
                         .frame(width: 16, height: 16)
                     TextField("Search history...", text: $text)
                         .textFieldStyle(.plain)
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.3))
+                        .foregroundColor(contrastTextTertiary)
                         .focused($isSearchFocused)
                         .onChange(of: text) { _, _ in
                             searchHistory()
@@ -83,7 +97,7 @@ struct SidebarMenuHistoryTab: View {
                 .frame(height: 38)
                 .frame(maxWidth: .infinity)
                 .background(
-                    isHovering ? .white.opacity(0.08) : .white.opacity(0.05)
+                    isHovering ? contrastText.opacity(0.08) : contrastText.opacity(0.05)
                 )
                 .animation(.easeInOut(duration: 0.1), value: isHovering)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -102,19 +116,19 @@ struct SidebarMenuHistoryTab: View {
                             .font(.system(size: 16, weight: .regular))
                             .foregroundStyle(
                                 isShowingFilters
-                                    ? Color(hex: "1E1E1E") : .white.opacity(0.6)
+                                    ? Color(hex: "1E1E1E") : contrastTextSecondary
                             )
                         Text("Filters")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(
                                 isShowingFilters
-                                    ? Color(hex: "1E1E1E") : .white.opacity(0.6)
+                                    ? Color(hex: "1E1E1E") : contrastTextSecondary
                             )
                     }
                     .padding(10)
                     .background(
                         isShowingFilters
-                            ? .white.opacity(0.6) : .white.opacity(0.05)
+                            ? contrastText.opacity(0.6) : contrastText.opacity(0.05)
                     )
                     .animation(
                         .easeInOut(duration: 0.1),
@@ -441,10 +455,15 @@ struct HistoryRowView: View {
     let onTap: () -> Void
     let onDelete: () -> Void
 
+    @EnvironmentObject var gradientColorManager: GradientColorManager
     @State private var isHovered: Bool = false
     @State private var isTrashIconHovered: Bool = false
     @State private var isArrowIconHovered: Bool = false
     @State private var favicon: SwiftUI.Image = Image(systemName: "globe")
+
+    private var contrastText: Color {
+        Garnish.contrastingShade(of: gradientColorManager.primaryColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
+    }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -458,20 +477,20 @@ struct HistoryRowView: View {
                         .antialiased(true)
                         .scaledToFit()
                         .frame(width: 12, height: 12)
-                        .foregroundColor(.white)
+                        .foregroundColor(contrastText)
                 )
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(entry.displayTitle)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(contrastText.opacity(0.7))
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .minimumScaleFactor(0.85)
 
                 Text(entry.url.host ?? "")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.55))
+                    .foregroundColor(contrastText.opacity(0.55))
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .minimumScaleFactor(0.8)
@@ -484,12 +503,12 @@ struct HistoryRowView: View {
                     Button(action: onDelete) {
                         Image(systemName: "trash")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(contrastText.opacity(0.6))
                             .frame(width: 16, height: 16)
                     }
                     .padding(8)
                     .background(
-                        isTrashIconHovered ? .white.opacity(0.1) : .clear
+                        isTrashIconHovered ? contrastText.opacity(0.1) : .clear
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .buttonStyle(PlainButtonStyle())
@@ -502,12 +521,12 @@ struct HistoryRowView: View {
                     Button(action: onDelete) {
                         Image(systemName: "arrow.uturn.backward")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(contrastText.opacity(0.6))
                             .frame(width: 16, height: 16)
                     }
                     .padding(8)
                     .background(
-                        isArrowIconHovered ? .white.opacity(0.1) : .clear
+                        isArrowIconHovered ? contrastText.opacity(0.1) : .clear
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .buttonStyle(PlainButtonStyle())
@@ -523,7 +542,7 @@ struct HistoryRowView: View {
         .padding(.vertical, 14)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(isHovered ? .white.opacity(0.1) : .clear)
+                .fill(isHovered ? contrastText.opacity(0.1) : .clear)
         )
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .contentShape(RoundedRectangle(cornerRadius: 12))
@@ -600,13 +619,18 @@ struct HistoryRowView: View {
 
 struct FiltersSelectView: View {
     @Binding var selectedTimeRange: TimeRange
+    @EnvironmentObject var gradientColorManager: GradientColorManager
+
+    private var contrastText: Color {
+        Garnish.contrastingShade(of: gradientColorManager.primaryColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("When was the tab closed?")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(contrastText.opacity(0.6))
                 Spacer()
             }
 
@@ -653,7 +677,12 @@ struct FiltersSelectButton: View {
     var isActive: Bool
     var action: () -> Void
 
+    @EnvironmentObject var gradientColorManager: GradientColorManager
     @State private var isHovering: Bool = false
+
+    private var contrastText: Color {
+        Garnish.contrastingShade(of: gradientColorManager.primaryColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
+    }
 
     var body: some View {
         Button {
@@ -662,16 +691,16 @@ struct FiltersSelectButton: View {
             Text(text)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(
-                    isActive ? Color(hex: "1E1E1E") : .white.opacity(0.5)
+                    isActive ? Color(hex: "1E1E1E") : contrastText.opacity(0.5)
                 )
                 .lineLimit(1)
                 .padding(.vertical, 10)
                 .padding(.horizontal, 12)
                 .background(
                     isActive
-                        ? .white.opacity(0.6)
+                        ? contrastText.opacity(0.6)
                         : isHovering
-                        ? .white.opacity(0.08) : .white.opacity(0.05)
+                        ? contrastText.opacity(0.08) : contrastText.opacity(0.05)
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 12))
         }

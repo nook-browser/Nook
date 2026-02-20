@@ -25,7 +25,7 @@ public func isValidURL(_ string: String) -> Bool {
   }
 }
 
-public func normalizeURL(_ input: String, provider: SearchProvider) -> String {
+public func normalizeURL(_ input: String, queryTemplate: String) -> String {
   let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
 
   if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") ||
@@ -41,7 +41,7 @@ public func normalizeURL(_ input: String, provider: SearchProvider) -> String {
   }
 
   let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? trimmed
-  let urlString = String(format: provider.queryTemplate, encoded)
+  let urlString = String(format: queryTemplate, encoded)
   return urlString
 }
 

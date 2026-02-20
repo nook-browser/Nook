@@ -7,6 +7,22 @@
 
 import SwiftUI
 
+// MARK: - Custom Search Engine
+
+struct CustomSearchEngine: Codable, Identifiable, Equatable, Sendable {
+    var id: UUID
+    var name: String
+    var urlTemplate: String   // uses %@ placeholder like SearchProvider.queryTemplate
+
+    init(id: UUID = UUID(), name: String, urlTemplate: String) {
+        self.id = id
+        self.name = name
+        self.urlTemplate = urlTemplate
+    }
+}
+
+// MARK: - Site Search Entry
+
 struct SiteSearchEntry: Codable, Identifiable, Equatable {
     var id: UUID
     var name: String
@@ -90,6 +106,31 @@ struct SiteSearchEntry: Codable, Identifiable, Equatable {
             name: "Stack Overflow", domain: "stackoverflow.com",
             searchURLTemplate: "https://stackoverflow.com/search?q={query}",
             colorHex: "#F28C0D"
+        ),
+        SiteSearchEntry(
+            name: "Perplexity", domain: "perplexity.ai",
+            searchURLTemplate: "https://www.perplexity.ai/search?q={query}",
+            colorHex: "#20B8CD"
+        ),
+        SiteSearchEntry(
+            name: "ChatGPT", domain: "chatgpt.com",
+            searchURLTemplate: "https://chatgpt.com/?q={query}",
+            colorHex: "#10A37F"
+        ),
+        SiteSearchEntry(
+            name: "Claude", domain: "claude.ai",
+            searchURLTemplate: "https://claude.ai/new?q={query}",
+            colorHex: "#D97757"
+        ),
+        SiteSearchEntry(
+            name: "Gemini", domain: "gemini.google.com",
+            searchURLTemplate: "https://gemini.google.com/app?q={query}",
+            colorHex: "#8E75B2"
+        ),
+        SiteSearchEntry(
+            name: "Grok", domain: "grok.com",
+            searchURLTemplate: "https://grok.com/?q={query}",
+            colorHex: "#000000"
         ),
     ]
 

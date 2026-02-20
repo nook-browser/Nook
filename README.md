@@ -124,6 +124,24 @@ Nook follows a manager-based architecture where:
 - **BrowserManager** acts as the central coordinator, connecting all managers together
 
 
+---
+
+<div align="center">
+
+## Star History
+
+<a href="https://www.star-history.com/#nook-browser/nook&type=date&legend=bottom-right">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nook-browser/nook&type=date&theme=dark&legend=bottom-right" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nook-browser/nook&type=date&legend=bottom-right" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=nook-browser/nook&type=date&legend=bottom-right" width="600" />
+ </picture>
+</a>
+
+</div>
+
+---
+
 ### LICENSES
 With the exception of third-party libraries in Nook/ThirdParty, all code is under the GPL 3.0 License. The relevant third-party code is licensed per-folder under a variety of free, open-source software licenses.
 

@@ -168,6 +168,7 @@ struct SettingsTabItem: View {
 struct GeneralSettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(\.nookSettings) var nookSettings
+    @State private var showingAddEngine = false
 
     var body: some View {
         @Bindable var settings = nookSettings
@@ -300,15 +301,47 @@ struct GeneralSettingsView: View {
                             Picker(
                                 "Search Engine",
                                 selection: $settings
-                                    .searchEngine
+                                    .searchEngineId
                             ) {
                                 ForEach(SearchProvider.allCases) { provider in
-                                    Text(provider.displayName).tag(provider)
+                                    Text(provider.displayName).tag(provider.rawValue)
+                                }
+                                ForEach(nookSettings.customSearchEngines) { engine in
+                                    Text(engine.name).tag(engine.id.uuidString)
                                 }
                             }
                             .labelsHidden()
                             .pickerStyle(.menu)
                             .frame(width: 220)
+
+                            Button {
+                                showingAddEngine = true
+                            } label: {
+                                Image(systemName: "plus")
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        }
+
+                        if let selected = nookSettings.customSearchEngines.first(where: { $0.id.uuidString == nookSettings.searchEngineId }) {
+                            HStack {
+                                Text(selected.name)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Button("Remove") {
+                                    nookSettings.customSearchEngines.removeAll { $0.id == selected.id }
+                                    nookSettings.searchEngineId = SearchProvider.google.rawValue
+                                }
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .sheet(isPresented: $showingAddEngine) {
+                        CustomSearchEngineEditor { newEngine in
+                            nookSettings.customSearchEngines.append(newEngine)
                         }
                     }
                     
