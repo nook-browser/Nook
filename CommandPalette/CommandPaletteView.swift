@@ -101,7 +101,7 @@ struct CommandPaletteView: View {
                                 if let site = activeSiteSearch {
                                     Text(site.name)
                                         .font(.system(size: 13, weight: .semibold))
-                                        .foregroundStyle(.white)
+                                        .foregroundStyle(Garnish.contrastingShade(of: site.color, targetRatio: 4.5, blendStyle: .strong) ?? .white)
                                         .padding(.horizontal, 10)
                                         .padding(.vertical, 4)
                                         .background(site.color)

@@ -56,16 +56,16 @@ class DialogManager {
                             .scaledToFit()
                             .frame(width: 26, height: 26)
                             .shadow(
-                                color: .white.opacity(0.3),
+                                color: AppColors.textPrimary.opacity(0.3),
                                 radius: 0.5,
                                 y: 1
                             )
                         Text("Are you sure you want to quit Nook?")
                             .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(AppColors.textPrimary)
                         Text("You may lose unsaved work in your tabs.")
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.8))
+                            .foregroundStyle(AppColors.textSecondary)
                     }
                     .padding(10)
                 },
@@ -422,7 +422,7 @@ struct DialogButtonStyle: ButtonStyle {
     private var foregroundColor: Color {
         switch variant {
         case .primary: return .black
-        case .secondary: return .white
+        case .secondary: return AppColors.textPrimary
         case .danger: return .white
         }
     }

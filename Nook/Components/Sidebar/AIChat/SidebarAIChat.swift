@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AppKit
+import Garnish
 
 struct ChatMessage: Identifiable, Equatable {
     let id = UUID()
@@ -46,6 +47,7 @@ struct URLCitation: Identifiable, Equatable, Codable {
 struct SidebarAIChat: View {
     @Environment(BrowserWindowState.self) private var windowState
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var gradientColorManager: GradientColorManager
     @Environment(\.nookSettings) var nookSettings
     @Environment(AIService.self) var aiService
     @Environment(AIConfigService.self) var configService
@@ -54,6 +56,10 @@ struct SidebarAIChat: View {
     @State private var showAddModelPopover: Bool = false
     @State private var newModelId: String = ""
     @FocusState private var isTextFieldFocused: Bool
+
+    private var contrastText: Color {
+        Garnish.contrastingShade(of: gradientColorManager.primaryColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -136,7 +142,7 @@ struct SidebarAIChat: View {
             if !aiService.messages.isEmpty {
                 Text("Ask Nook")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.9))
+                    .foregroundStyle(contrastText.opacity(0.9))
                     .transition(.blur.animation(.smooth))
             }
 
@@ -167,7 +173,7 @@ struct SidebarAIChat: View {
             TextField("Ask about this page...", text: $messageText, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.white.opacity(0.9))
+                .foregroundColor(contrastText.opacity(0.9))
                 .lineLimit(1...4)
                 .focused($isTextFieldFocused)
                 .onSubmit { sendMessage() }
@@ -187,7 +193,7 @@ struct SidebarAIChat: View {
                 Button(action: sendMessage) {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.system(size: 24))
-                        .foregroundStyle(messageText.isEmpty ? .white.opacity(0.3) : .white.opacity(0.9))
+                        .foregroundStyle(messageText.isEmpty ? contrastText.opacity(0.3) : contrastText.opacity(0.9))
                 }
                 .buttonStyle(.plain)
                 .disabled(messageText.isEmpty || aiService.isLoading || !aiService.hasApiKey)
@@ -288,11 +294,11 @@ struct SidebarAIChat: View {
         }) {
             Image(systemName: configService.generationConfig.webSearchEnabled ? "globe.americas.fill" : "globe")
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(configService.generationConfig.webSearchEnabled ? .green : .white.opacity(0.5))
+                .foregroundStyle(configService.generationConfig.webSearchEnabled ? .green : contrastText.opacity(0.5))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(configService.generationConfig.webSearchEnabled ? .green.opacity(0.15) : .white.opacity(0.08))
+                        .fill(configService.generationConfig.webSearchEnabled ? .green.opacity(0.15) : contrastText.opacity(0.08))
                 )
         }
         .buttonStyle(.plain)
@@ -306,15 +312,15 @@ struct SidebarAIChat: View {
         VStack(spacing: 12) {
             Image(systemName: "key.fill")
                 .font(.system(size: 32))
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(contrastText.opacity(0.3))
 
             Text("API Key Required")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.8))
+                .foregroundStyle(contrastText.opacity(0.8))
 
             Text("Add your API key to start chatting")
                 .font(.system(size: 12))
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(contrastText.opacity(0.6))
                 .multilineTextAlignment(.center)
 
             Button(action: { showSettingsDialog() }) {
@@ -339,17 +345,17 @@ struct SidebarAIChat: View {
 
             Image(systemName: webSearchEnabled && supportsWebSearch ? "globe" : "sparkle")
                 .font(.system(size: 32))
-                .foregroundStyle(webSearchEnabled && supportsWebSearch ? .green.opacity(0.6) : .white.opacity(0.3))
+                .foregroundStyle(webSearchEnabled && supportsWebSearch ? .green.opacity(0.6) : contrastText.opacity(0.3))
 
             Text("Ask Nook")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.8))
+                .foregroundStyle(contrastText.opacity(0.8))
 
             if webSearchEnabled && supportsWebSearch {
                 VStack(spacing: 6) {
                     Text("Questions about this page, or just curious? I'm here.")
                         .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(contrastText.opacity(0.6))
                         .multilineTextAlignment(.center)
 
                     HStack(spacing: 4) {
@@ -368,7 +374,7 @@ struct SidebarAIChat: View {
             } else {
                 Text("Questions about this page, or just curious? I'm here.")
                     .font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(contrastText.opacity(0.6))
                     .multilineTextAlignment(.center)
             }
         }
@@ -388,12 +394,12 @@ struct SidebarAIChat: View {
                 } else {
                     Text("Thinking...")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(contrastText.opacity(0.5))
                 }
                 if configService.generationConfig.webSearchEnabled && !aiService.isExecutingTools {
                     Text("Searching the web...")
                         .font(.system(size: 10))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(contrastText.opacity(0.4))
                 }
             }
         }
@@ -463,10 +469,15 @@ struct SidebarAIChat: View {
 
 struct MessageBubble: View {
     let message: ChatMessage
+    @EnvironmentObject var gradientColorManager: GradientColorManager
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.openURL) var openURL
     @State private var isHovered: Bool = false
     @State private var showCopied: Bool = false
+
+    private var contrastText: Color {
+        Garnish.contrastingShade(of: gradientColorManager.primaryColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -488,7 +499,7 @@ struct MessageBubble: View {
                                         .font(.system(size: 9, weight: .regular))
                                 }
                             }
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(contrastText.opacity(0.5))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(.green.opacity(0.15))
@@ -516,7 +527,7 @@ struct MessageBubble: View {
 
                                 Text("Sources")
                                     .font(.system(size: 10, weight: .semibold))
-                                    .foregroundStyle(.white.opacity(0.5))
+                                    .foregroundStyle(contrastText.opacity(0.5))
                                     .padding(.horizontal, 12)
 
                                 VStack(spacing: 4) {
@@ -531,7 +542,7 @@ struct MessageBubble: View {
                     }
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(.white.opacity(0.12))
+                            .fill(contrastText.opacity(0.12))
                     )
                     .overlay(alignment: .topTrailing) {
                         if isHovered {
@@ -545,7 +556,7 @@ struct MessageBubble: View {
                             }) {
                                 Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
                                     .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.8))
+                                    .foregroundStyle(contrastText.opacity(0.8))
                                     .frame(width: 28, height: 28)
                                     .background(
                                         RoundedRectangle(cornerRadius: 8)
@@ -553,7 +564,7 @@ struct MessageBubble: View {
                                     )
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 8)
-                                            .stroke(.white.opacity(0.15), lineWidth: 1)
+                                            .stroke(contrastText.opacity(0.15), lineWidth: 1)
                                     )
                             }
                             .buttonStyle(.plain)
@@ -645,7 +656,7 @@ struct MessageBubble: View {
 
         return Text(parseInlineMarkdown(text))
             .font(.system(size: fontSize, weight: weight))
-            .foregroundStyle(.white.opacity(0.95))
+            .foregroundStyle(contrastText.opacity(0.95))
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 2)
     }
@@ -654,7 +665,7 @@ struct MessageBubble: View {
         Text(parseInlineMarkdown(text))
             .font(.system(size: 13, weight: .regular))
             .lineSpacing(4)
-            .foregroundStyle(.white.opacity(0.9))
+            .foregroundStyle(contrastText.opacity(0.9))
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -662,12 +673,12 @@ struct MessageBubble: View {
         HStack(alignment: .top, spacing: 6) {
             Text("•")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(contrastText.opacity(0.7))
                 .padding(.top, 1)
             Text(parseInlineMarkdown(text))
                 .font(.system(size: 13, weight: .regular))
                 .lineSpacing(4)
-                .foregroundStyle(.white.opacity(0.9))
+                .foregroundStyle(contrastText.opacity(0.9))
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -676,12 +687,12 @@ struct MessageBubble: View {
         HStack(alignment: .top, spacing: 6) {
             Text("•")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(contrastText.opacity(0.7))
                 .padding(.top, 1)
             Text(parseInlineMarkdown(text))
                 .font(.system(size: 13, weight: .regular))
                 .lineSpacing(4)
-                .foregroundStyle(.white.opacity(0.9))
+                .foregroundStyle(contrastText.opacity(0.9))
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -691,15 +702,15 @@ struct MessageBubble: View {
             if !language.isEmpty {
                 Text(language)
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(contrastText.opacity(0.5))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 2)
-                    .background(.white.opacity(0.08))
+                    .background(contrastText.opacity(0.08))
                     .clipShape(RoundedRectangle(cornerRadius: 4))
             }
             Text(code)
                 .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.9))
+                .foregroundStyle(contrastText.opacity(0.9))
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(.black.opacity(0.3))
@@ -710,7 +721,7 @@ struct MessageBubble: View {
     private func parseInlineMarkdown(_ text: String) -> AttributedString {
         do {
             var attributed = try AttributedString(markdown: text, options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace))
-            attributed.foregroundColor = .white.opacity(0.9)
+            attributed.foregroundColor = contrastText.opacity(0.9)
             return attributed
         } catch {
             return AttributedString(text)
@@ -722,8 +733,13 @@ struct MessageBubble: View {
 
 struct CitationView: View {
     let citation: URLCitation
+    @EnvironmentObject var gradientColorManager: GradientColorManager
     @Environment(\.openURL) var openURL
     @State private var isHovered = false
+
+    private var contrastText: Color {
+        Garnish.contrastingShade(of: gradientColorManager.primaryColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
+    }
 
     var body: some View {
         Button(action: {
@@ -734,18 +750,18 @@ struct CitationView: View {
             HStack(spacing: 6) {
                 Image(systemName: "link")
                     .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(contrastText.opacity(0.4))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(citation.domain)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(isHovered ? 0.9 : 0.7))
+                        .foregroundStyle(contrastText.opacity(isHovered ? 0.9 : 0.7))
                         .lineLimit(1)
 
                     if let title = citation.title, !title.isEmpty {
                         Text(title)
                             .font(.system(size: 10, weight: .regular))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(contrastText.opacity(0.5))
                             .lineLimit(1)
                     }
                 }
@@ -754,17 +770,17 @@ struct CitationView: View {
 
                 Image(systemName: "arrow.up.forward")
                     .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(.white.opacity(isHovered ? 0.6 : 0.4))
+                    .foregroundStyle(contrastText.opacity(isHovered ? 0.6 : 0.4))
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(.white.opacity(isHovered ? 0.12 : 0.08))
+                    .fill(contrastText.opacity(isHovered ? 0.12 : 0.08))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 6)
-                    .stroke(.white.opacity(isHovered ? 0.2 : 0.0), lineWidth: 1)
+                    .stroke(contrastText.opacity(isHovered ? 0.2 : 0.0), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
