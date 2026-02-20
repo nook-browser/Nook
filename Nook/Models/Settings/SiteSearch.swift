@@ -7,6 +7,22 @@
 
 import SwiftUI
 
+// MARK: - Custom Search Engine
+
+struct CustomSearchEngine: Codable, Identifiable, Equatable, Sendable {
+    var id: UUID
+    var name: String
+    var urlTemplate: String   // uses %@ placeholder like SearchProvider.queryTemplate
+
+    init(id: UUID = UUID(), name: String, urlTemplate: String) {
+        self.id = id
+        self.name = name
+        self.urlTemplate = urlTemplate
+    }
+}
+
+// MARK: - Site Search Entry
+
 struct SiteSearchEntry: Codable, Identifiable, Equatable {
     var id: UUID
     var name: String

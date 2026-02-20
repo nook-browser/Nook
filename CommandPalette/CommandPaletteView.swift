@@ -414,8 +414,7 @@ struct CommandPaletteView: View {
             {
                 browserManager.currentTab(for: windowState)?.loadURL(navigateURL)
             } else {
-                browserManager.createNewTab(in: windowState)
-                browserManager.currentTab(for: windowState)?.loadURL(navigateURL)
+                browserManager.createNewTab(in: windowState, url: navigateURL)
             }
             text = ""
             activeSiteSearch = nil
@@ -455,10 +454,7 @@ struct CommandPaletteView: View {
                     "Navigated current tab to history URL: \(historyEntry.url)"
                 )
             } else {
-                browserManager.createNewTab(in: windowState)
-                browserManager.currentTab(for: windowState)?.loadURL(
-                    historyEntry.url.absoluteString
-                )
+                browserManager.createNewTab(in: windowState, url: historyEntry.url.absoluteString)
                 print(
                     "Created new tab from history in window \(windowState.id)"
                 )
@@ -472,10 +468,11 @@ struct CommandPaletteView: View {
                 )
                 print("Navigated current tab to: \(suggestion.text)")
             } else {
-                browserManager.createNewTab(in: windowState)
-                browserManager.currentTab(for: windowState)?.navigateToURL(
-                    suggestion.text
-                )
+                // Normalize the URL/search query first, then create the tab with
+                // the correct URL so the webview loads it directly without a race.
+                let template = browserManager.nookSettings?.resolvedSearchEngineTemplate ?? SearchProvider.google.queryTemplate
+                let resolved = normalizeURL(suggestion.text, queryTemplate: template)
+                browserManager.createNewTab(in: windowState, url: resolved)
                 print("Created new tab in window \(windowState.id)")
             }
         }
