@@ -182,9 +182,19 @@ class KeyboardShortcutManager {
             return false
         }
         
+        let keyCode = event.keyCode
+        if keyCode == 36 || keyCode == 76 { // 36 = Return, 76 = Enter (numpad)
+            let hasModifiers = event.modifierFlags.contains(.command) ||
+                              event.modifierFlags.contains(.option) ||
+                              event.modifierFlags.contains(.control) ||
+                              event.modifierFlags.contains(.shift)
+            if !hasModifiers {
+                return false
+            }
+        }
+
         // Arrow keys and other navigation keys should pass through to the WebView
         // UNLESS they have modifiers (cmd, option, etc.) - those might be Nook shortcuts
-        let keyCode = event.keyCode
         let navigationKeyCodes: Set<UInt16> = [
             123, // left arrow
             124, // right arrow

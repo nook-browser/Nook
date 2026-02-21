@@ -447,11 +447,12 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             
             // Re-add only non-boost scripts (those not in our tracked list)
             let boostScriptSources = Set(currentBoostScripts.map { $0.source })
-            for script in allScripts {
-                if !boostScriptSources.contains(script.source) {
-                    userContentController.addUserScript(script)
-                }
-            }
+//            for script in allScripts {
+//                if !boostScriptSources.contains(script.source) {
+//                    userContentController.addUserScript(script)
+//                }
+//            }
+// MARK: This causes the browser to crash when loading boosted pages
             
             currentBoostScripts.removeAll()
         } else {
