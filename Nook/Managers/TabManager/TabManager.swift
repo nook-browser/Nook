@@ -1148,14 +1148,15 @@ class TabManager: ObservableObject {
         url: String = "https://www.google.com",
         in space: Space? = nil
     ) -> Tab {
-        let engine = nookSettings?.searchEngine ?? .google
-        let normalizedUrl = normalizeURL(url, provider: engine)
+        let settings = nookSettings ?? browserManager?.nookSettings
+        let template = settings?.resolvedSearchEngineTemplate ?? SearchProvider.google.queryTemplate
+        let normalizedUrl = normalizeURL(url, queryTemplate: template)
         guard let validURL = URL(string: normalizedUrl)
         else {
             print("Invalid URL: \(url). Falling back to default.")
             return createNewTab(in: space)
         }
-        
+
         let targetSpace: Space? = space ?? currentSpace ?? ensureDefaultSpaceIfNeeded()
         // Ensure the target space has a profile assignment; backfill from currentProfile if missing
         if let ts = targetSpace, ts.profileId == nil {
@@ -1166,7 +1167,7 @@ class TabManager: ObservableObject {
             }
         }
         let sid = targetSpace?.id
-        
+
         // Get existing tabs and increment their indices to make room for new tab at top
         let existingTabs = sid.flatMap { tabsBySpace[$0] } ?? []
         let incrementedTabs = existingTabs.map { tab in
@@ -1228,8 +1229,9 @@ class TabManager: ObservableObject {
         in space: Space? = nil,
         existingWebView: WKWebView? = nil
     ) -> Tab {
-        let engine = nookSettings?.searchEngine ?? .google
-        let normalizedUrl = normalizeURL(url, provider: engine)
+        let settings = nookSettings ?? browserManager?.nookSettings
+        let template = settings?.resolvedSearchEngineTemplate ?? SearchProvider.google.queryTemplate
+        let normalizedUrl = normalizeURL(url, queryTemplate: template)
         guard let validURL = URL(string: normalizedUrl)
         else {
             print("Invalid URL: \(url). Falling back to default.")

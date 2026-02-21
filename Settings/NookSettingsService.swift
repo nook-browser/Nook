@@ -40,6 +40,7 @@ class NookSettingsService {
     private let siteSearchEntriesKey = "settings.siteSearchEntries"
     private let didFinishOnboardingKey = "settings.didFinishOnboarding"
     private let tabLayoutKey = "settings.tabLayout"
+    private let customSearchEnginesKey = "settings.customSearchEngines"
 
     var currentSettingsTab: SettingsTabs = .general
 
@@ -57,10 +58,30 @@ class NookSettingsService {
         set { currentMaterialRaw = newValue.rawValue }
     }
 
-    var searchEngine: SearchProvider {
+    var searchEngineId: String {
         didSet {
-            userDefaults.set(searchEngine.rawValue, forKey: searchEngineKey)
+            userDefaults.set(searchEngineId, forKey: searchEngineKey)
         }
+    }
+
+    var customSearchEngines: [CustomSearchEngine] {
+        didSet {
+            if let data = try? JSONEncoder().encode(customSearchEngines) {
+                userDefaults.set(data, forKey: customSearchEnginesKey)
+            }
+        }
+    }
+
+    /// Resolves the current `searchEngineId` to a query template string.
+    /// Checks built-in `SearchProvider` cases first, then custom engines.
+    var resolvedSearchEngineTemplate: String {
+        if let provider = SearchProvider(rawValue: searchEngineId) {
+            return provider.queryTemplate
+        }
+        if let custom = customSearchEngines.first(where: { $0.id.uuidString == searchEngineId }) {
+            return custom.urlTemplate
+        }
+        return SearchProvider.google.queryTemplate
     }
     
     var tabUnloadTimeout: TimeInterval {
@@ -246,13 +267,14 @@ class NookSettingsService {
         // This will use the registered defaults if no value is set
         self.currentMaterialRaw = userDefaults.integer(forKey: materialKey)
 
-        if let rawEngine = userDefaults.string(forKey: searchEngineKey),
-           let provider = SearchProvider(rawValue: rawEngine)
-        {
-            self.searchEngine = provider
+        // searchEngineId: backward compatible — existing "google" string still works
+        self.searchEngineId = userDefaults.string(forKey: searchEngineKey) ?? SearchProvider.google.rawValue
+
+        if let ceData = userDefaults.data(forKey: customSearchEnginesKey),
+           let decoded = try? JSONDecoder().decode([CustomSearchEngine].self, from: ceData) {
+            self.customSearchEngines = decoded
         } else {
-            // Fallback to google if the stored value is somehow invalid
-            self.searchEngine = .google
+            self.customSearchEngines = []
         }
         
         // Initialize tab unload timeout
