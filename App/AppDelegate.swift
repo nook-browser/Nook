@@ -40,6 +40,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     private let urlEventClass = AEEventClass(kInternetEventClass)
     private let urlEventID = AEEventID(kAEGetURL)
     private var mouseEventMonitor: Any?
+    private let userDefaults = UserDefaults.standard
+    
+
 
     // MARK: - Sparkle Updates
 
@@ -54,6 +57,24 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupURLEventHandling()
         setupMouseButtonHandling()
+        let didFinishOnboarding = userDefaults.bool(forKey: "settings.didFinishOnboarding")
+
+        if let window = NSApplication.shared.windows.first {
+            // Always hide titlebar immediately to prevent flash during transitions
+            window.titlebarAppearsTransparent = true
+            window.titleVisibility = .hidden
+            window.toolbar?.isVisible = false
+            window.standardWindowButton(.closeButton)?.isHidden = true
+            window.standardWindowButton(.zoomButton)?.isHidden = true
+            window.standardWindowButton(.miniaturizeButton)?.isHidden = true
+
+            if !didFinishOnboarding {
+                window.setContentSize(NSSize(width: 1200, height: 720))
+                window.center()
+                NSApp.activate(ignoringOtherApps: true)
+                NSApp.hideOtherApplications(nil)
+            }
+        }
     }
 
     /// Registers handler for external URL events (e.g., clicking links from other apps)

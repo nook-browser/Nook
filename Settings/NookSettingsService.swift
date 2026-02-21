@@ -9,6 +9,7 @@
 import AppKit
 import SwiftUI
 
+
 @MainActor
 @Observable
 class NookSettingsService {
@@ -37,6 +38,8 @@ class NookSettingsService {
     private let showLinkStatusBarKey = "settings.showLinkStatusBar"
     private let pinnedTabsLookKey = "settings.pinnedTabsLook"
     private let siteSearchEntriesKey = "settings.siteSearchEntries"
+    private let didFinishOnboardingKey = "settings.didFinishOnboarding"
+    private let tabLayoutKey = "settings.tabLayout"
     private let customSearchEnginesKey = "settings.customSearchEngines"
 
     var currentSettingsTab: SettingsTabs = .general
@@ -212,6 +215,22 @@ class NookSettingsService {
             }
         }
     }
+    
+    var tabLayout: TabLayout {
+        didSet {
+            userDefaults.set(tabLayout.rawValue, forKey: tabLayoutKey)
+            // When tabs are on top, URL bar can't be in the sidebar
+            if tabLayout == .topOfWindow && !topBarAddressView {
+                topBarAddressView = true
+            }
+        }
+    }
+
+    var didFinishOnboarding: Bool {
+        didSet {
+            userDefaults.set(didFinishOnboarding, forKey: didFinishOnboardingKey)
+        }
+    }
 
     init() {
         // Register default values
@@ -240,7 +259,8 @@ class NookSettingsService {
             webSearchContextSizeKey: "medium",
             showLinkStatusBarKey: true,
             pinnedTabsLookKey: "large",
-            
+            didFinishOnboardingKey: false,
+            tabLayoutKey: TabLayout.sidebar.rawValue,
         ])
 
         // Initialize properties from UserDefaults
@@ -278,6 +298,8 @@ class NookSettingsService {
         self.webSearchContextSize = userDefaults.string(forKey: webSearchContextSizeKey) ?? "medium"
         self.showLinkStatusBar = userDefaults.bool(forKey: showLinkStatusBarKey)
         self.pinnedTabsLook = PinnedTabsConfiguration(rawValue: userDefaults.string(forKey: pinnedTabsLookKey) ?? "large") ?? .large
+        self.tabLayout = TabLayout(rawValue: userDefaults.string(forKey: tabLayoutKey) ?? TabLayout.sidebar.rawValue) ?? .sidebar
+        self.didFinishOnboarding = userDefaults.bool(forKey: didFinishOnboardingKey)
 
         if let data = userDefaults.data(forKey: siteSearchEntriesKey),
            let decoded = try? JSONDecoder().decode([SiteSearchEntry].self, from: data) {
@@ -419,4 +441,20 @@ public let materials: [(name: String, value: NSVisualEffectView.Material)] = [
 public func nameForMaterial(_ material: NSVisualEffectView.Material) -> String {
     materials.first(where: { $0.value == material })?.name
         ?? "raw(\(material.rawValue))"
+}
+
+// MARK: - Tab Layout
+
+public enum TabLayout: String, CaseIterable, Identifiable {
+    case sidebar
+    case topOfWindow
+
+    public var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .sidebar: return "Sidebar"
+        case .topOfWindow: return "Top of Window"
+        }
+    }
 }
