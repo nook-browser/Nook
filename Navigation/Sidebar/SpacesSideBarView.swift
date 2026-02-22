@@ -129,7 +129,7 @@ struct SpacesSideBarView: View {
                     .onAppear {
                         updateSidebarScreenFrame(geo)
                     }
-                    .onChange(of: geo.size) { _, _ in
+                    .onChange(of: geo.frame(in: .global)) { _, _ in
                         updateSidebarScreenFrame(geo)
                     }
             }
@@ -142,12 +142,8 @@ struct SpacesSideBarView: View {
 
     private func updateSidebarScreenFrame(_ geo: GeometryProxy) {
         let frame = geo.frame(in: .global)
-        // SwiftUI .global gives window-level flipped coordinates (top-left origin)
-        // Convert to screen coordinates for comparison with cursor screen position
-        guard let window = NSApp.mainWindow ?? NSApp.windows.first(where: { $0.isVisible }),
+        guard let window = windowState.window ?? NSApp.windows.first(where: { $0.isVisible }),
               let contentView = window.contentView else { return }
-        // SwiftUI global Y is top-down from window content top
-        // AppKit window Y is bottom-up from window content bottom
         let appKitY = contentView.bounds.height - frame.maxY
         let bottomLeft = NSPoint(x: frame.origin.x, y: appKitY)
         let screenBottomLeft = window.convertPoint(toScreen: bottomLeft)

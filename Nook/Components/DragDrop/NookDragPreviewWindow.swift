@@ -10,6 +10,8 @@ import Combine
 // MARK: - NookDragPreviewWindow
 
 class NookDragPreviewWindow: NSWindow {
+    static let previewSize = NSSize(width: 320, height: 160)
+
     private var hostingView: NSHostingView<AnyView>?
     private var cancellables = Set<AnyCancellable>()
     private weak var manager: NookDragSessionManager?
@@ -19,7 +21,7 @@ class NookDragPreviewWindow: NSWindow {
         self.manager = manager
 
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 320, height: 160),
+            contentRect: NSRect(origin: .zero, size: Self.previewSize),
             styleMask: [.borderless],
             backing: .buffered,
             defer: true
@@ -69,7 +71,7 @@ class NookDragPreviewWindow: NSWindow {
     private func updatePosition(screenPoint: NSPoint) {
         guard let manager = manager, manager.isDragging else { return }
 
-        let windowSize = NSSize(width: 320, height: 160)
+        let windowSize = Self.previewSize
 
         if manager.isSidebarReorder && manager.isCursorInSidebar {
             let sidebarFrame = manager.sidebarScreenFrame
@@ -128,7 +130,7 @@ private struct NookDragPreviewContent: View {
                 .animation(morphSpring, value: currentStyle)
             }
         }
-        .frame(width: 320, height: 160)
+        .frame(width: NookDragPreviewWindow.previewSize.width, height: NookDragPreviewWindow.previewSize.height)
     }
 
     private var currentStyle: NookPreviewStyle {

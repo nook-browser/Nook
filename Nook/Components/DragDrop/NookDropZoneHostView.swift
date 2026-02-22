@@ -2,9 +2,6 @@
 //  NookDropZoneHostView.swift
 //  Nook
 //
-//  Pure SwiftUI wrapper that registers an invisible NSView as NSDraggingDestination.
-//  Content renders natively in SwiftUI layout, preserving flexible sizing.
-//
 
 import SwiftUI
 import AppKit
@@ -48,8 +45,6 @@ class NookDropZoneNSView: NSView {
         }
     }
 
-    // MARK: - NSDraggingDestination
-
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
         guard let coordinator = coordinator else { return [] }
         Task { @MainActor in
@@ -76,7 +71,7 @@ class NookDropZoneNSView: NSView {
         let zoneID = coordinator.zoneID
         let mgr = coordinator.manager
 
-        Task { @MainActor in
+        MainActor.assumeIsolated {
             let targetIndex = mgr.insertionIndex[zoneID] ?? (mgr.itemCounts[zoneID] ?? 0)
 
             if mgr.sourceZone == zoneID {
@@ -89,8 +84,6 @@ class NookDropZoneNSView: NSView {
     }
 
     override func concludeDragOperation(_ sender: (any NSDraggingInfo)?) {}
-
-    // MARK: - Helpers
 
     private func updateInsertionIndex(_ sender: NSDraggingInfo) {
         guard let coordinator = coordinator else { return }
@@ -130,10 +123,8 @@ private struct DropZoneAnchor: NSViewRepresentable {
     }
 }
 
-// MARK: - NookDropZoneHostView (Pure SwiftUI)
+// MARK: - NookDropZoneHostView
 
-/// Wraps content with a transparent drop zone anchor. Content renders natively in SwiftUI,
-/// preserving flexible sizing, grids, stacks, and all layout behaviour.
 struct NookDropZoneHostView<Content: View>: View {
     let zoneID: DropZoneID
     let isVertical: Bool

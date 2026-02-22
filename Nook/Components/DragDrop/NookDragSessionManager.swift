@@ -31,47 +31,39 @@ struct PendingReorder: Equatable {
 final class NookDragSessionManager: ObservableObject {
     static let shared = NookDragSessionManager()
 
-    // --- Active drag state ---
     @Published var draggedItem: NookDragItem?
     @Published var draggedTab: Tab?
     @Published var sourceZone: DropZoneID?
     @Published var sourceIndex: Int?
 
-    // --- Cursor tracking ---
     @Published var activeZone: DropZoneID?
     @Published var isOutsideWindow: Bool = false
     @Published var cursorLocation: CGPoint = .zero // window-flipped coords (top-left origin)
     @Published var cursorScreenLocation: NSPoint = .zero // raw screen coords for preview window
 
-    // --- Insertion index per zone ---
     @Published var insertionIndex: [DropZoneID: Int] = [:]
 
-    // --- Drop payloads ---
     @Published var pendingDrop: PendingDrop?
     @Published var pendingReorder: PendingReorder?
 
-    // --- Geometry caches (set by zone views) ---
     var zoneFrames: [DropZoneID: CGRect] = [:]
     var itemCellSize: [DropZoneID: CGFloat] = [:]
     var itemCellSpacing: [DropZoneID: CGFloat] = [:]
     var itemCounts: [DropZoneID: Int] = [:]
-    var gridColumnCount: [DropZoneID: Int] = [:]  // For grid zones (essentials)
+    var gridColumnCount: [DropZoneID: Int] = [:]
 
-    // --- Sidebar geometry (set by sidebar view, screen coordinates) ---
     @Published var sidebarScreenFrame: CGRect = .zero
 
     @Published var pinnedTabsConfig: PinnedTabsConfiguration = .large
 
     var isDragging: Bool { draggedItem != nil }
 
-    /// Whether the cursor is within the sidebar bounds (horizontally).
     var isCursorInSidebar: Bool {
         guard sidebarScreenFrame.width > 0 else { return false }
         return cursorScreenLocation.x >= sidebarScreenFrame.minX &&
                cursorScreenLocation.x <= sidebarScreenFrame.maxX
     }
 
-    /// Whether this is a same-zone sidebar reorder (not essentials grid).
     var isSidebarReorder: Bool {
         guard isDragging, let source = sourceZone, activeZone == source else { return false }
         switch source {
@@ -82,7 +74,6 @@ final class NookDragSessionManager: ObservableObject {
         }
     }
 
-    // --- Preview window ---
     private var previewWindow: NookDragPreviewWindow?
 
     private func ensurePreviewWindow() {
@@ -90,7 +81,6 @@ final class NookDragSessionManager: ObservableObject {
         previewWindow = NookDragPreviewWindow(manager: self)
     }
 
-    // --- Centralized drag source tracking ---
     private struct WeakDragSource {
         weak var view: NookDragSourceNSView?
     }
@@ -131,12 +121,7 @@ final class NookDragSessionManager: ObservableObject {
         }
     }
 
-    /// Returns nil to consume the event, or the event to pass it through.
     nonisolated private func handleMonitoredEvent(_ event: NSEvent) -> NSEvent? {
-        // All work must happen on MainActor since we access @MainActor state
-        // But event monitors are synchronous — we need to check state inline.
-        // Since NookDragSessionManager is @MainActor and this is called from the main thread
-        // event monitor (which runs on main thread), we can use MainActor.assumeIsolated.
         return MainActor.assumeIsolated {
             handleMonitoredEventOnMain(event)
         }
@@ -199,7 +184,9 @@ final class NookDragSessionManager: ObservableObject {
     // MARK: - Drag Lifecycle
 
     func beginDrag(item: NookDragItem, tab: Tab, from zone: DropZoneID, at index: Int) {
+        #if DEBUG
         print("🚀 [DragSession] beginDrag: \(item.title) from \(zone) at \(index)")
+        #endif
         ensurePreviewWindow()
         draggedItem = item
         draggedTab = tab
@@ -213,7 +200,6 @@ final class NookDragSessionManager: ObservableObject {
         hapticFeedback(.alignment)
     }
 
-    /// Called continuously by the drag source's draggingSession(_:movedTo:).
     nonisolated func updateCursorScreenPosition(_ screenPoint: NSPoint) {
         Task { @MainActor in
             self._updateCursorScreenPosition(screenPoint)
@@ -226,9 +212,7 @@ final class NookDragSessionManager: ObservableObject {
         guard let window = NSApp.mainWindow ?? NSApp.windows.first(where: { $0.isVisible && !($0 is NookDragPreviewWindow) }),
               let contentView = window.contentView else { return }
 
-        // Screen -> window
         let windowPoint = window.convertPoint(fromScreen: screenPoint)
-        // Window (bottom-left origin) -> flipped (top-left origin, matching SwiftUI)
         let flipped = CGPoint(x: windowPoint.x, y: contentView.bounds.height - windowPoint.y)
         cursorLocation = flipped
 
@@ -243,7 +227,6 @@ final class NookDragSessionManager: ObservableObject {
         }
     }
 
-    /// Called by drop zone delegates on draggingEntered.
     func cursorEnteredZone(_ zone: DropZoneID) {
         guard isDragging else { return }
         if activeZone != zone {
@@ -253,14 +236,12 @@ final class NookDragSessionManager: ObservableObject {
         }
     }
 
-    /// Called by drop zone delegates on draggingExited.
     func cursorExitedZone(_ zone: DropZoneID) {
         guard isDragging, activeZone == zone else { return }
         activeZone = nil
         insertionIndex[zone] = nil
     }
 
-    /// Called by drop zone delegates on draggingUpdated.
     func updateInsertionIndex(for zone: DropZoneID, localPoint: CGPoint, isVertical: Bool) {
         guard isDragging else { return }
 
@@ -308,11 +289,11 @@ final class NookDragSessionManager: ObservableObject {
 
     func completeDrop(targetZone: DropZoneID, targetIndex: Int) {
         guard let item = draggedItem, let source = sourceZone else {
+            #if DEBUG
             print("🔴 [DragSession] completeDrop: no draggedItem or sourceZone")
+            #endif
             return
         }
-
-        print("🟢 [DragSession] completeDrop: source=\(source) target=\(targetZone) index=\(targetIndex)")
 
         if source != targetZone {
             pendingDrop = PendingDrop(
@@ -322,25 +303,18 @@ final class NookDragSessionManager: ObservableObject {
                 targetZone: targetZone,
                 targetIndex: targetIndex
             )
-            print("🟢 [DragSession] pendingDrop SET: \(pendingDrop!)")
-        } else {
-            print("🟡 [DragSession] completeDrop: same zone, ignoring (should be reorder)")
         }
         hapticFeedback(.generic)
         clearDrag()
     }
 
     func completeReorder() {
-        print("🟡 [DragSession] completeReorder: zone=\(String(describing: sourceZone)) from=\(String(describing: sourceIndex)) to=\(String(describing: sourceZone.flatMap { insertionIndex[$0] }))")
         if let item = draggedItem,
            let zone = sourceZone,
            let from = sourceIndex,
            let to = insertionIndex[zone],
            from != to {
             pendingReorder = PendingReorder(item: item, zone: zone, fromIndex: from, toIndex: to)
-            print("🟢 [DragSession] pendingReorder SET: from=\(from) to=\(to)")
-        } else {
-            print("🟡 [DragSession] completeReorder: no change or missing data")
         }
         hapticFeedback(.generic)
         clearDrag()
@@ -369,9 +343,7 @@ final class NookDragSessionManager: ObservableObject {
 
     // MARK: - Live Reorder Offsets
 
-    /// Returns the Y-offset (vertical zones) or X-offset (horizontal zones) for a tab at `index` during same-zone reorder.
     func reorderOffset(for zone: DropZoneID, at index: Int) -> CGFloat {
-        // Only shift when same-zone reorder is happening
         guard isDragging, sourceZone == zone, activeZone == zone else { return 0 }
         guard let from = sourceIndex, let to = insertionIndex[zone] else { return 0 }
         guard from != to else { return 0 }
@@ -398,7 +370,6 @@ final class NookDragSessionManager: ObservableObject {
 
     // MARK: - Bridge to TabManager
 
-    /// Convert a PendingDrop into a DragOperation for TabManager
     func makeDragOperation(from drop: PendingDrop, tab: Tab) -> DragOperation {
         DragOperation(
             tab: tab,
@@ -410,7 +381,6 @@ final class NookDragSessionManager: ObservableObject {
         )
     }
 
-    /// Convert a PendingReorder into a DragOperation for TabManager
     func makeDragOperation(from reorder: PendingReorder, tab: Tab) -> DragOperation {
         DragOperation(
             tab: tab,

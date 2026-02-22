@@ -238,6 +238,12 @@ struct TabFolderView: View {
             dragSession.itemCellSpacing[zone] = 2
             dragSession.itemCounts[zone] = tabs.count
         }
+        .onDisappear {
+            let zone = DropZoneID.folder(folder.id)
+            dragSession.itemCellSize[zone] = nil
+            dragSession.itemCellSpacing[zone] = nil
+            dragSession.itemCounts[zone] = nil
+        }
         .onChange(of: tabs.count) { _, newCount in
             dragSession.itemCounts[.folder(folder.id)] = newCount
         }

@@ -17,6 +17,7 @@ struct SplitTabRow: View {
             SplitHalfTab(
                 tab: left,
                 side: .left,
+                spaceId: spaceId,
                 onActivate: { onActivate(left) },
                 onClose: { onClose(left) }
             )
@@ -27,6 +28,7 @@ struct SplitTabRow: View {
             SplitHalfTab(
                 tab: right,
                 side: .right,
+                spaceId: spaceId,
                 onActivate: { onActivate(right) },
                 onClose: { onClose(right) }
             )
@@ -39,6 +41,7 @@ struct SplitTabRow: View {
 private struct SplitHalfTab: View {
     @ObservedObject var tab: Tab
     let side: SplitViewManager.Side
+    let spaceId: UUID
     let onActivate: () -> Void
     let onClose: () -> Void
 
@@ -54,7 +57,7 @@ private struct SplitHalfTab: View {
         NookDragSourceView(
             item: NookDragItem(tabId: tab.id, title: tab.name, urlString: tab.url.absoluteString),
             tab: tab,
-            zoneID: .spaceRegular(tab.spaceId ?? UUID()),
+            zoneID: .spaceRegular(tab.spaceId ?? spaceId),
             index: tab.index,
             manager: dragSession
         ) {

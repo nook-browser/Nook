@@ -2,20 +2,14 @@
 //  NookDragItem.swift
 //  Nook
 //
-//  Custom pasteboard type and drag data model for AppKit-based tab dragging.
-//
 
 import Foundation
 import AppKit
 import UniformTypeIdentifiers
 
-// MARK: - Custom UTType
-
 extension UTType {
     static let nookTabItem = UTType(exportedAs: "com.nook.tab-drag-item")
 }
-
-// MARK: - NSPasteboard.PasteboardType
 
 extension NSPasteboard.PasteboardType {
     static let nookTabItem = NSPasteboard.PasteboardType("com.nook.tab-drag-item")
@@ -29,7 +23,6 @@ enum DropZoneID: Hashable {
     case spaceRegular(UUID)
     case folder(UUID)
 
-    /// Convert to the existing DragContainer used by TabManager.handleDragOperation
     var asDragContainer: TabDragManager.DragContainer {
         switch self {
         case .essentials: return .essentials
@@ -63,15 +56,15 @@ struct NookDragItem: Codable, Equatable {
     }
 }
 
-// MARK: - Pasteboard Support
-
 extension NookDragItem {
     func writeToPasteboard(_ pasteboard: NSPasteboard) {
         pasteboard.declareTypes([.nookTabItem, .string], owner: nil)
-        if let data = try? JSONEncoder().encode(self) {
+        do {
+            let data = try JSONEncoder().encode(self)
             pasteboard.setData(data, forType: .nookTabItem)
+        } catch {
+            NSLog("NookDragItem encoding failed: %@", String(describing: error))
         }
-        // Also write tab ID as string for backward compatibility
         pasteboard.setString(tabId.uuidString, forType: .string)
     }
 

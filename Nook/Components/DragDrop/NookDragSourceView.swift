@@ -2,11 +2,6 @@
 //  NookDragSourceView.swift
 //  Nook
 //
-//  Pure SwiftUI wrapper that registers an invisible NSView anchor for drag initiation.
-//  Content renders natively in SwiftUI layout (no NSHostingView wrapping), preserving
-//  flexible sizing in grids, stacks, etc.
-//  Drag detection is handled by the centralized event monitor in NookDragSessionManager.
-//
 
 import SwiftUI
 import AppKit
@@ -48,8 +43,6 @@ final class NookDragSourceCoordinator: NSObject, NSDraggingSource {
 
 // MARK: - DragSourceNSView
 
-/// A transparent NSView that exists solely as an anchor for `beginDraggingSession`.
-/// It does NOT host SwiftUI content — the content renders natively above/below this view.
 final class NookDragSourceNSView: NSView {
     var coordinator: NookDragSourceCoordinator?
     private(set) var registrationId: UUID?
@@ -67,27 +60,22 @@ final class NookDragSourceNSView: NSView {
         registrationId = nil
     }
 
-    /// Called by the centralized event monitor when a drag is detected on this view.
     func initiateDrag(with event: NSEvent) {
-        guard let coordinator = coordinator else { return }
+        guard let coordinator = coordinator, let tab = coordinator.tab else { return }
 
-        // Notify manager
         coordinator.manager.beginDrag(
             item: coordinator.item,
-            tab: coordinator.tab!,
+            tab: tab,
             from: coordinator.zoneID,
             at: coordinator.index
         )
 
-        // Write item to pasteboard
         let pasteboardItem = NSPasteboardItem()
         if let data = try? JSONEncoder().encode(coordinator.item) {
             pasteboardItem.setData(data, forType: .nookTabItem)
         }
-        // Also write tab ID as string for compatibility (e.g. SplitDropCaptureView)
         pasteboardItem.setString(coordinator.item.tabId.uuidString, forType: .string)
 
-        // 1x1 transparent drag image — the real preview is a floating NSWindow
         let transparentImage = NSImage(size: NSSize(width: 1, height: 1))
 
         let draggingItem = NSDraggingItem(pasteboardWriter: pasteboardItem)
@@ -102,8 +90,6 @@ final class NookDragSourceNSView: NSView {
 
 // MARK: - Invisible Anchor (NSViewRepresentable)
 
-/// Transparent NSView placed as a `.background` — provides the AppKit view needed
-/// for `beginDraggingSession` without affecting SwiftUI layout.
 private struct DragSourceAnchor: NSViewRepresentable {
     let item: NookDragItem
     let tab: Tab?
@@ -134,10 +120,8 @@ private struct DragSourceAnchor: NSViewRepresentable {
     }
 }
 
-// MARK: - NookDragSourceView (Pure SwiftUI)
+// MARK: - NookDragSourceView
 
-/// Wraps content with a transparent drag anchor. Content renders natively in SwiftUI,
-/// preserving flexible sizing, grids, stacks, and all layout behaviour.
 struct NookDragSourceView<Content: View>: View {
     let item: NookDragItem
     let tab: Tab?

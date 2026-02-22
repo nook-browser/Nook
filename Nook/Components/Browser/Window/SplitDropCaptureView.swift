@@ -81,6 +81,7 @@ final class SplitDropCaptureView: NSView {
         guard let tab = all.first(where: { $0.id == id }) else {
             sm.updateDragLocation(nil, for: windowId)
             sm.endPreview(cancel: false, for: windowId)
+            NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
             return false
         }
         
