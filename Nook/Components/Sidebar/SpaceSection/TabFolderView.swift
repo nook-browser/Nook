@@ -9,12 +9,6 @@ import SwiftUI
 import UniformTypeIdentifiers
 import AppKit
 
-// MARK: - Helpers
-
-private func haptic(_ pattern: NSHapticFeedbackManager.FeedbackPattern = .alignment) {
-    NSHapticFeedbackManager.defaultPerformer.perform(pattern, performanceTime: .now)
-}
-
 struct TabFolderView: View {
     @ObservedObject var folder: TabFolder
     let space: Space
@@ -24,23 +18,20 @@ struct TabFolderView: View {
 
     @State private var isHovering: Bool = false
     @State private var isFolderIconAnimating: Bool = false
-    @State private var draggedItem: UUID? = nil
     @State private var isDropTargeted: Bool = false
-    @State private var dropPreviewIndex: Int? = nil
     @State private var isRenaming: Bool = false
     @State private var draftName: String = ""
     @FocusState private var nameFieldFocused: Bool
 
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
-  
+    @ObservedObject private var dragSession = NookDragSessionManager.shared
 
     // Get tabs in this folder
     private var tabsInFolder: [Tab] {
         let tabs = browserManager.tabManager.spacePinnedTabs(for: space.id)
             .filter { $0.folderId == folder.id }
             .sorted { $0.index < $1.index }
-        print("📁 Folder '\(folder.name)' contains \(tabs.count) tabs: \(tabs.map { $0.name })")
         return tabs
     }
 
@@ -58,33 +49,41 @@ struct TabFolderView: View {
                     ))
             }
         }
-        .onDrop(
-            of: [.text],
-            delegate: SidebarSectionDropDelegateSimple(
-                itemsCount: { tabsInFolder.count },
-                draggedItem: $draggedItem,
-                targetSection: .folder(folder.id),
-                tabManager: browserManager.tabManager,
-                targetIndex: { folderInsertionIndex(before: tabsInFolder.count, tabs: tabsInFolder) },
-                onDropEntered: {
-                    if !folder.isOpen {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            folder.isOpen = true
-                        }
-                    }
-                    isDropTargeted = true
-                },
-                onDropCompleted: {
-                    dropPreviewIndex = nil
-                    isDropTargeted = false
-                    triggerFolderAnimation()
-                },
-                onDropExited: {
-                    dropPreviewIndex = nil
-                    isDropTargeted = false
-                }
-            )
-        )
+        .onChange(of: dragSession.pendingDrop) { _, drop in
+            handleFolderDrop(drop)
+        }
+        .onChange(of: dragSession.pendingReorder) { _, reorder in
+            handleFolderReorder(reorder)
+        }
+    }
+
+    // MARK: - Drop Handling
+
+    private func handleFolderDrop(_ drop: PendingDrop?) {
+        guard let drop = drop, case .folder(let folderId) = drop.targetZone, folderId == folder.id else { return }
+        let allTabs = browserManager.tabManager.allTabs()
+        guard let tab = allTabs.first(where: { $0.id == drop.item.tabId }) else { return }
+        let op = dragSession.makeDragOperation(from: drop, tab: tab)
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            browserManager.tabManager.handleDragOperation(op)
+        }
+        triggerFolderAnimation()
+        dragSession.pendingDrop = nil
+    }
+
+    private func handleFolderReorder(_ reorder: PendingReorder?) {
+        guard let reorder = reorder, case .folder(let folderId) = reorder.zone, folderId == folder.id else { return }
+        let tabs = tabsInFolder
+        guard reorder.fromIndex < tabs.count else {
+            dragSession.pendingReorder = nil
+            return
+        }
+        let tab = tabs[reorder.fromIndex]
+        let op = dragSession.makeDragOperation(from: reorder, tab: tab)
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            browserManager.tabManager.handleDragOperation(op)
+        }
+        dragSession.pendingReorder = nil
     }
 
     private var folderHeader: some View {
@@ -177,16 +176,6 @@ struct TabFolderView: View {
         .contextMenu {
             folderContextMenu
         }
-        .onTabDrag(folder.id, draggedItem: $draggedItem)
-        .opacity(draggedItem == folder.id ? 0.0 : 1.0)
-        .onChange(of: draggedItem) { _, newValue in
-            // Close folder immediately when drag starts on this folder
-            if newValue == folder.id && folder.isOpen {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    folder.isOpen = false
-                }
-            }
-        }
         .onChange(of: nameFieldFocused) { _, focused in
             // When losing focus during rename, commit
             if isRenaming && !focused {
@@ -216,24 +205,26 @@ struct TabFolderView: View {
     private var folderContent: some View {
         let tabs = tabsInFolder
 
-        return VStack(spacing: 0) {
-            ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
-                folderDropSpacer(before: index, tabs: tabs)
-
-                folderTabView(tab)
-                    .transition(
-                        .asymmetric(
-                            insertion: .move(edge: .top)
-                                .combined(with: .opacity)
-                                .animation(.spring(response: 0.3, dampingFraction: 0.8).delay(Double(index) * 0.03)),
-                            removal: .move(edge: .top)
-                                .combined(with: .opacity)
-                                .animation(.spring(response: 0.2, dampingFraction: 0.7).delay(Double(tabs.count - index - 1) * 0.02))
+        return NookDropZoneHostView(
+            zoneID: .folder(folder.id),
+            isVertical: true,
+            manager: dragSession
+        ) {
+            VStack(spacing: 0) {
+                ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
+                    folderTabView(tab, index: index)
+                        .transition(
+                            .asymmetric(
+                                insertion: .move(edge: .top)
+                                    .combined(with: .opacity)
+                                    .animation(.spring(response: 0.3, dampingFraction: 0.8).delay(Double(index) * 0.03)),
+                                removal: .move(edge: .top)
+                                    .combined(with: .opacity)
+                                    .animation(.spring(response: 0.2, dampingFraction: 0.7).delay(Double(tabs.count - index - 1) * 0.02))
+                            )
                         )
-                    )
+                }
             }
-
-            folderDropSpacer(before: tabs.count, tabs: tabs)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
@@ -241,35 +232,42 @@ struct TabFolderView: View {
             RoundedRectangle(cornerRadius: 10)
                 .fill(isDropTargeted ? AppColors.controlBackgroundActive.opacity(0.18) : Color.clear)
         )
+        .onAppear {
+            let zone = DropZoneID.folder(folder.id)
+            dragSession.itemCellSize[zone] = 36
+            dragSession.itemCellSpacing[zone] = 2
+            dragSession.itemCounts[zone] = tabs.count
+        }
+        .onChange(of: tabs.count) { _, newCount in
+            dragSession.itemCounts[.folder(folder.id)] = newCount
+        }
     }
 
-    private func folderTabView(_ tab: Tab) -> some View {
-        print("👀 Rendering folder tab: \(tab.name)")
-        return SpaceTab(
+    private func folderTabView(_ tab: Tab, index: Int) -> some View {
+        NookDragSourceView(
+            item: NookDragItem(tabId: tab.id, title: tab.name, urlString: tab.url.absoluteString),
             tab: tab,
-            action: {
-                print("🖱️ Folder tab clicked: \(tab.name)")
-                onActivateTab(tab)
-            },
-            onClose: { browserManager.tabManager.removeTab(tab.id) },
-            onMute: { tab.toggleMute() }
-        )
-        .padding(.leading, 12)
+            zoneID: .folder(folder.id),
+            index: index,
+            manager: dragSession
+        ) {
+            SpaceTab(
+                tab: tab,
+                action: {
+                    onActivateTab(tab)
+                },
+                onClose: { browserManager.tabManager.removeTab(tab.id) },
+                onMute: { tab.toggleMute() }
+            )
+            .padding(.leading, 12)
+        }
+        .opacity(dragSession.draggedItem?.tabId == tab.id ? 0.0 : 1.0)
+        .offset(y: dragSession.reorderOffset(for: .folder(folder.id), at: index))
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: dragSession.insertionIndex[.folder(folder.id)])
         .transition(.move(edge: .top).combined(with: .opacity))
         .contextMenu {
             folderTabContextMenu(tab)
         }
-        .onTabDrag(tab.id, draggedItem: $draggedItem)
-        .opacity(draggedItem == tab.id ? 0.0 : 1.0)
-        .onDrop(
-            of: [.text],
-            delegate: SidebarTabDropDelegateSimple(
-                item: tab,
-                draggedItem: $draggedItem,
-                targetSection: .folder(folder.id),
-                tabManager: browserManager.tabManager
-            )
-        )
     }
 
     private var folderContextMenu: some View {
@@ -298,10 +296,10 @@ struct TabFolderView: View {
             label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
             Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) }
             label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
-            
+
             Button { browserManager.duplicateCurrentTab() }
             label: { Label("Duplicate Tab", systemImage: "doc.on.doc") }
-            
+
             Divider()
             // Mute/Unmute option (show if tab has audio content OR is muted)
             if tab.hasAudioContent || tab.isAudioMuted {
@@ -350,73 +348,6 @@ struct TabFolderView: View {
             }
             browserManager.tabManager.persistSnapshot()
         }
-    }
-
-    @ViewBuilder
-    private func folderDropSpacer(before displayIndex: Int, tabs: [Tab]) -> some View {
-        let isActive = dropPreviewIndex == displayIndex
-
-        Color.clear
-            .frame(height: 2)
-            .contentShape(Rectangle())
-            .overlay(alignment: .center) {
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(AppColors.controlBackgroundHover)
-                    .frame(height: isActive ? 4 : 0)
-                    .padding(.leading, 26)
-                    .padding(.trailing, 8)
-                    .opacity(isActive ? 1 : 0)
-                    .animation(.easeInOut(duration: 0.12), value: isActive)
-            }
-            .onDrop(
-                of: [.text],
-                delegate: SidebarSectionDropDelegateSimple(
-                    itemsCount: { tabs.count },
-                    draggedItem: $draggedItem,
-                    targetSection: .folder(folder.id),
-                    tabManager: browserManager.tabManager,
-                    targetIndex: { folderInsertionIndex(before: displayIndex, tabs: tabs) },
-                    onDropEntered: {
-                        dropPreviewIndex = displayIndex
-                        isDropTargeted = true
-                    },
-                    onDropCompleted: {
-                        dropPreviewIndex = nil
-                        isDropTargeted = false
-                        triggerFolderAnimation()
-                    },
-                    onDropExited: {
-                        if dropPreviewIndex == displayIndex {
-                            dropPreviewIndex = nil
-                        }
-                        isDropTargeted = false
-                    }
-                )
-            )
-    }
-
-    private func folderInsertionIndex(before displayIndex: Int, tabs: [Tab]) -> Int {
-        let all = browserManager.tabManager.spacePinnedTabs(for: space.id)
-
-        guard !tabs.isEmpty else {
-            return folderFallbackInsertionIndex(within: all)
-        }
-
-        if displayIndex <= 0 {
-            return tabs.first?.index ?? 0
-        }
-
-        if displayIndex >= tabs.count {
-            let lastIndex = tabs.last?.index ?? (all.count - 1)
-            return min(lastIndex + 1, all.count)
-        }
-
-        return tabs[displayIndex].index
-    }
-
-    private func folderFallbackInsertionIndex(within all: [Tab]) -> Int {
-        let clampedIndex = max(0, min(folder.index, all.count))
-        return clampedIndex
     }
 
     // MARK: - Rename Actions

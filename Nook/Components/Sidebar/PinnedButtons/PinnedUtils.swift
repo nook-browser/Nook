@@ -21,7 +21,7 @@ enum PinnedTabsConfiguration: String, CaseIterable, Identifiable {
         case .large:
             return 20
         case .small:
-            return 18
+            return 16
         }
     }
     
@@ -75,7 +75,7 @@ enum PinnedTabsConfiguration: String, CaseIterable, Identifiable {
         case .large:
             return 7
         case .small:
-            return 8
+            return 7
         }
     }
     

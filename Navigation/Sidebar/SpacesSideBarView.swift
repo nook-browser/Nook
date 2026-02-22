@@ -55,6 +55,8 @@ struct SpacesSideBarView: View {
         }
     }
 
+    @ObservedObject private var dragSession = NookDragSessionManager.shared
+
     private var mainSidebarContent: some View {
         let effectiveProfileId = windowState.currentProfileId ?? browserManager.currentProfile?.id
         let essentialsCount = effectiveProfileId.map { browserManager.tabManager.essentialTabs(for: $0).count } ?? 0
@@ -121,9 +123,39 @@ struct SpacesSideBarView: View {
         }
         .padding(.top, 8)
         .padding(.bottom, 8)
+        .background(
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear {
+                        updateSidebarScreenFrame(geo)
+                    }
+                    .onChange(of: geo.size) { _, _ in
+                        updateSidebarScreenFrame(geo)
+                    }
+            }
+        )
         .animation(
             shouldAnimate ? .easeInOut(duration: 0.18) : nil,
             value: essentialsCount
+        )
+    }
+
+    private func updateSidebarScreenFrame(_ geo: GeometryProxy) {
+        let frame = geo.frame(in: .global)
+        // SwiftUI .global gives window-level flipped coordinates (top-left origin)
+        // Convert to screen coordinates for comparison with cursor screen position
+        guard let window = NSApp.mainWindow ?? NSApp.windows.first(where: { $0.isVisible }),
+              let contentView = window.contentView else { return }
+        // SwiftUI global Y is top-down from window content top
+        // AppKit window Y is bottom-up from window content bottom
+        let appKitY = contentView.bounds.height - frame.maxY
+        let bottomLeft = NSPoint(x: frame.origin.x, y: appKitY)
+        let screenBottomLeft = window.convertPoint(toScreen: bottomLeft)
+        dragSession.sidebarScreenFrame = CGRect(
+            x: screenBottomLeft.x,
+            y: screenBottomLeft.y,
+            width: frame.width,
+            height: frame.height
         )
     }
 
