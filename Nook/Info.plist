@@ -70,6 +70,16 @@
 				</array>
 			</dict>
 		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Nook Tab Drag Item</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.nook.tab-drag-item</string>
+		</dict>
 	</array>
 </dict>
 </plist>
