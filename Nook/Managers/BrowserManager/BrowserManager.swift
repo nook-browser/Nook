@@ -774,8 +774,8 @@ class BrowserManager: ObservableObject {
             }
 
             if animateTransition {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                    self.isTransitioningProfile = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+                    self?.isTransitioningProfile = false
                 }
             }
         }
@@ -2742,10 +2742,10 @@ extension BrowserManager {
         zoomPopupHideTimer?.invalidate()
 
         // Schedule new hide timer
-        zoomPopupHideTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { _ in
+        zoomPopupHideTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
             DispatchQueue.main.async {
-                self.shouldShowZoomPopup = false
-                self.zoomPopupHideTimer = nil
+                self?.shouldShowZoomPopup = false
+                self?.zoomPopupHideTimer = nil
             }
         }
     }
@@ -2769,10 +2769,10 @@ extension BrowserManager {
         zoomPopupHideTimer?.invalidate()
 
         // Schedule new hide timer
-        zoomPopupHideTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { _ in
+        zoomPopupHideTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
             DispatchQueue.main.async {
-                self.shouldShowZoomPopup = false
-                self.zoomPopupHideTimer = nil
+                self?.shouldShowZoomPopup = false
+                self?.zoomPopupHideTimer = nil
             }
         }
     }
@@ -2796,10 +2796,10 @@ extension BrowserManager {
         zoomPopupHideTimer?.invalidate()
 
         // Schedule new hide timer
-        zoomPopupHideTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { _ in
+        zoomPopupHideTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
             DispatchQueue.main.async {
-                self.shouldShowZoomPopup = false
-                self.zoomPopupHideTimer = nil
+                self?.shouldShowZoomPopup = false
+                self?.zoomPopupHideTimer = nil
             }
         }
     }

@@ -54,6 +54,9 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     // Global favicon cache shared across profiles by design to increase hit rate
     // and reduce duplicate downloads. Favicons are cached persistently to survive app restarts.
     private static var faviconCache: [String: SwiftUI.Image] = [:]
+    /// MEMORY LEAK FIX: Track insertion order for proper LRU eviction
+    private static var faviconCacheOrder: [String] = []
+    private static let faviconCacheMaxSize = 200
     private static let faviconCacheQueue = DispatchQueue(
         label: "favicon.cache", attributes: .concurrent)
     private static let faviconCacheLock = NSLock()
@@ -1706,15 +1709,22 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             controller.removeScriptMessageHandler(forName: handlerName)
         }
 
-        // 4. Remove theme color and navigation state observers
+        // 4. MEMORY LEAK FIX: Detach contextMenuBridge before clearing delegates
+        // This breaks the retain cycle: WKWebView → contextMenuBridge → userContentController → WKWebView
+        if let focusableWebView = webView as? FocusableWKWebView {
+            focusableWebView.contextMenuBridge?.detach()
+            focusableWebView.contextMenuBridge = nil
+        }
+
+        // 5. Remove theme color and navigation state observers
         removeThemeColorObserver(from: webView)
         removeNavigationStateObservers(from: webView)
 
-        // 5. Clear all delegates
+        // 6. Clear all delegates
         webView.navigationDelegate = nil
         webView.uiDelegate = nil
 
-        // 6. Remove from view hierarchy
+        // 7. Remove from view hierarchy
         webView.removeFromSuperview()
 
         // 7. Force remove from compositor
@@ -2318,14 +2328,19 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
         faviconCache[key] = favicon
 
-        // Limit cache size to prevent memory issues
-        if faviconCache.count > 100 {
-            // Remove oldest entries (simple FIFO)
-            let keysToRemove = Array(faviconCache.keys.prefix(20))
+        // MEMORY LEAK FIX: Maintain insertion order for proper LRU eviction
+        faviconCacheOrder.removeAll { $0 == key }
+        faviconCacheOrder.append(key)
+
+        // Evict oldest entries when cache exceeds max size
+        if faviconCache.count > faviconCacheMaxSize {
+            let evictCount = faviconCache.count - faviconCacheMaxSize + 20
+            let keysToRemove = Array(faviconCacheOrder.prefix(evictCount))
             for keyToRemove in keysToRemove {
                 faviconCache.removeValue(forKey: keyToRemove)
                 removeFaviconFromDisk(for: keyToRemove)
             }
+            faviconCacheOrder.removeFirst(min(evictCount, faviconCacheOrder.count))
         }
     }
 
@@ -3238,8 +3253,13 @@ extension Tab: WKUIDelegate {
         alert.messageText = "JavaScript Alert"
         alert.informativeText = message
         alert.addButton(withTitle: "OK")
-        alert.runModal()
-        completionHandler()
+        if let window = webView.window {
+            alert.beginSheetModal(for: window) { _ in
+                completionHandler()
+            }
+        } else {
+            completionHandler()
+        }
     }
 
     public func webView(
@@ -3253,8 +3273,13 @@ extension Tab: WKUIDelegate {
         alert.informativeText = message
         alert.addButton(withTitle: "OK")
         alert.addButton(withTitle: "Cancel")
-        let result = alert.runModal()
-        completionHandler(result == .alertFirstButtonReturn)
+        if let window = webView.window {
+            alert.beginSheetModal(for: window) { result in
+                completionHandler(result == .alertFirstButtonReturn)
+            }
+        } else {
+            completionHandler(false)
+        }
     }
 
     public func webView(
@@ -3274,9 +3299,10 @@ extension Tab: WKUIDelegate {
         textField.stringValue = defaultText ?? ""
         alert.accessoryView = textField
 
-        let result = alert.runModal()
-        if result == .alertFirstButtonReturn {
-            completionHandler(textField.stringValue)
+        if let window = webView.window {
+            alert.beginSheetModal(for: window) { result in
+                completionHandler(result == .alertFirstButtonReturn ? textField.stringValue : nil)
+            }
         } else {
             completionHandler(nil)
         }

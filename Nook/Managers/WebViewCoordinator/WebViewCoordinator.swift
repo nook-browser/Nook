@@ -402,6 +402,12 @@ class WebViewCoordinator {
             controller.removeScriptMessageHandler(forName: handlerName)
         }
 
+        // MEMORY LEAK FIX: Detach contextMenuBridge
+        if let focusableWebView = webView as? FocusableWKWebView {
+            focusableWebView.contextMenuBridge?.detach()
+            focusableWebView.contextMenuBridge = nil
+        }
+
         // Clear delegates
         webView.navigationDelegate = nil
         webView.uiDelegate = nil

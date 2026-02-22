@@ -31,6 +31,8 @@ final class ExtensionManager: NSObject, ObservableObject,
     private var extensionController: WKWebExtensionController?
     private var extensionContexts: [String: WKWebExtensionContext] = [:]
     private var actionAnchors: [String: [WeakAnchor]] = [:]
+    /// MEMORY LEAK FIX: Store observer tokens so they can be removed when anchors change
+    private var anchorObserverTokens: [String: [Any]] = [:]
     // Keep options windows alive per extension id
     private var optionsWindows: [String: NSWindow] = [:]
     // Stable adapters for tabs/windows used when notifying controller events
@@ -70,6 +72,14 @@ final class ExtensionManager: NSObject, ObservableObject,
         // MEMORY LEAK FIX: Clean up all extension contexts and break circular references
         tabAdapters.removeAll()
         actionAnchors.removeAll()
+
+        // MEMORY LEAK FIX: Remove all stored notification observer tokens
+        for (_, tokens) in anchorObserverTokens {
+            for token in tokens {
+                NotificationCenter.default.removeObserver(token)
+            }
+        }
+        anchorObserverTokens.removeAll()
 
         // Close all options windows
         for (_, window) in optionsWindows {
@@ -147,7 +157,7 @@ final class ExtensionManager: NSObject, ObservableObject,
         Self.logger.debug("Controller configured with storage ID: \(config.identifier?.uuidString ?? "none", privacy: .public), persistent: \(extensionDataStore.isPersistent)")
 
         // Handle macOS 15.4+ ViewBridge issues with delayed delegate assignment
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             controller.delegate = self
         }
 
@@ -165,7 +175,8 @@ final class ExtensionManager: NSObject, ObservableObject,
         }
 
         // Verify storage is working after setup
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+            guard let self else { return }
             self.verifyExtensionStorage(self.currentProfileId)
         }
 
@@ -1282,6 +1293,109 @@ final class ExtensionManager: NSObject, ObservableObject,
             }
         }
 
+        // --- Ensure MV2 extensions have "scripting" permission ---
+        // WKWebExtension exposes chrome.scripting for MV2 extensions. Some MV2 extensions
+        // (like Bitwarden) detect chrome.scripting availability and prefer it over the older
+        // chrome.tabs.executeScript() API. If the manifest lacks "scripting", the calls fail
+        // silently and dynamic script injection (e.g. inline autofill overlay) never runs.
+        let manifestVersion = manifest["manifest_version"] as? Int ?? 3
+        if manifestVersion == 2 {
+            var permissions = manifest["permissions"] as? [String] ?? []
+            if !permissions.contains("scripting") {
+                permissions.append("scripting")
+                manifest["permissions"] = permissions
+                changed = true
+                Self.logger.info("patchManifestForWebKit: added 'scripting' permission for MV2 extension")
+            }
+        }
+
+        // --- Add Bitwarden iframe message bridge for inline menu height ---
+        // Bitwarden's inline autofill menu uses an iframe that sends height updates via
+        // parent.postMessage(). In WKWebExtension, content scripts run in an isolated world
+        // and don't receive these messages. We inject a MAIN-world script that forwards
+        // iframe messages to the isolated content script.
+        let extensionId = manifestURL.deletingLastPathComponent().lastPathComponent
+        let isBitwarden = (manifest["name"] as? String)?.contains("Bitwarden") == true ||
+                          extensionId == "9c120cf8-9b3a-468c-9f1f-a37f29bd519c"
+        if isBitwarden {
+            var contentScripts = manifest["content_scripts"] as? [[String: Any]] ?? []
+            let bridgeExists = contentScripts.contains { entry in
+                (entry["js"] as? [String])?.contains("nook_iframe_bridge.js") == true
+            }
+            if !bridgeExists {
+                let iframeBridgeEntry: [String: Any] = [
+                    "all_frames": true,
+                    "js": ["nook_iframe_bridge.js"],
+                    "matches": ["<all_urls>"],
+                    "run_at": "document_start",
+                    "world": "MAIN"
+                ]
+                contentScripts.append(iframeBridgeEntry)
+                manifest["content_scripts"] = contentScripts
+                changed = true
+                Self.logger.info("patchManifestForWebKit: added nook_iframe_bridge.js for Bitwarden iframe message forwarding")
+            }
+
+            // Write the bridge file
+            let bridgeDir = manifestURL.deletingLastPathComponent()
+            let bridgeFileURL = bridgeDir.appendingPathComponent("nook_iframe_bridge.js")
+            let bridgeJS = """
+            // Nook: Bitwarden iframe message bridge
+            // Runs in MAIN world to receive iframe postMessages and update iframe styles directly.
+            (function() {
+                // Find Bitwarden's autofill inline menu iframe and update its height
+                function findBitwardenIframe() {
+                    // The iframe is injected into a shadow DOM by Bitwarden's content script
+                    // Look for iframes with webkit-extension:// src containing "overlay/menu"
+                    var iframes = document.querySelectorAll('iframe');
+                    for (var i = 0; i < iframes.length; i++) {
+                        var iframe = iframes[i];
+                        if (iframe.src && iframe.src.includes('overlay/menu') && iframe.src.includes('webkit-extension')) {
+                            return iframe;
+                        }
+                    }
+                    // Also check shadow DOM elements
+                    var allElements = document.querySelectorAll('*');
+                    for (var j = 0; j < allElements.length; j++) {
+                        var el = allElements[j];
+                        if (el.shadowRoot) {
+                            var shadowIframes = el.shadowRoot.querySelectorAll('iframe');
+                            for (var k = 0; k < shadowIframes.length; k++) {
+                                var sIframe = shadowIframes[k];
+                                if (sIframe.src && sIframe.src.includes('overlay/menu') && sIframe.src.includes('webkit-extension')) {
+                                    return sIframe;
+                                }
+                            }
+                        }
+                    }
+                    return null;
+                }
+
+                window.addEventListener('message', function(event) {
+                    var data = event.data;
+                    if (!data || typeof data !== 'object') return;
+                    if (!data.command) return;
+
+                    // Handle height update from iframe
+                    if (data.command === 'updateAutofillInlineMenuListHeight' && data.styles && data.styles.height) {
+                        var iframe = findBitwardenIframe();
+                        if (iframe) {
+                            iframe.style.height = data.styles.height;
+                            iframe.style.opacity = '1';
+                            iframe.style.display = 'block';
+                        }
+                    }
+                });
+            })();
+            """
+            let existingBridgeJS = try? String(contentsOf: bridgeFileURL, encoding: .utf8)
+            if existingBridgeJS != bridgeJS {
+                try? bridgeJS.write(to: bridgeFileURL, atomically: true, encoding: .utf8)
+                Self.logger.info("Updated nook_iframe_bridge.js for Bitwarden iframe message forwarding")
+                changed = true
+            }
+        }
+
         if changed {
             if let updatedData = try? JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys]) {
                 try? updatedData.write(to: manifestURL)
@@ -2228,12 +2342,16 @@ final class ExtensionManager: NSObject, ObservableObject,
         }
         Self.logger.debug("Total anchors for extension \(extensionId, privacy: .public): \(self.actionAnchors[extensionId]?.count ?? 0)")
 
+        // MEMORY LEAK FIX: Remove any previous observer for this anchor to prevent accumulation
+        if anchorObserverTokens[extensionId] == nil { anchorObserverTokens[extensionId] = [] }
+
         // Update anchor if view moves to a different window
-        NotificationCenter.default.addObserver(
+        let token = NotificationCenter.default.addObserver(
             forName: NSView.frameDidChangeNotification,
             object: anchorView,
             queue: .main
-        ) { [weak self] _ in
+        ) { [weak self, weak anchorView] _ in
+            guard let anchorView else { return }
             if let idx = self?.actionAnchors[extensionId]?.firstIndex(
                 where: { $0.view === anchorView }
             ) {
@@ -2244,6 +2362,7 @@ final class ExtensionManager: NSObject, ObservableObject,
                 self?.actionAnchors[extensionId]?[idx] = updated
             }
         }
+        anchorObserverTokens[extensionId]?.append(token)
     }
 
     // MARK: - WKWebExtensionControllerDelegate
@@ -2885,7 +3004,20 @@ final class ExtensionManager: NSObject, ObservableObject,
         for extensionContext: WKWebExtensionContext,
         replyHandler: @escaping (Any?, (any Error)?) -> Void
     ) {
-        
+        // Intercept Bitwarden's "showPopover" native message. When isSafariApi=true and
+        // chrome.browserAction.openPopup() is unavailable, Bitwarden sends this message to
+        // "com.bitwarden.desktop" to open its action popup. Route it to performAction instead.
+        if let msg = message as? [String: Any],
+           let command = msg["command"] as? String,
+           command == "showPopover" {
+            Self.logger.info("[NativeMessaging] Intercepting showPopover for '\(extensionContext.webExtension.displayName ?? "?", privacy: .public)'")
+            let tab = browserManagerRef?.currentTabForActiveWindow()
+            let adapter: ExtensionTabAdapter? = tab.flatMap { stableAdapter(for: $0) }
+            extensionContext.performAction(for: adapter)
+            replyHandler(["success": true], nil)
+            return
+        }
+
         // Single-shot message handling
         let handler = NativeMessagingHandler(applicationId: applicationId)
         handler.sendMessage(message) { response, error in

@@ -68,7 +68,9 @@ struct PeekWebView: NSViewRepresentable {
         weak var peekManager: PeekManager?
         private var progressObservation: NSKeyValueObservation?
         private var didLoadInitialURL = false
-        var webView: WKWebView? // Store reference for transfer to tabs
+        /// MEMORY LEAK FIX: Use weak reference to avoid retaining the WKWebView
+        /// when the peek overlay is dismissed. The view hierarchy holds the strong ref.
+        weak var webView: WKWebView?
 
         init(session: PeekSession, peekManager: PeekManager?) {
             self.session = session

@@ -488,15 +488,17 @@ struct TabCompositorWrapper: NSViewRepresentable {
 
         // Observe size changes to recompute pane layout when available width changes
         let coord = context.coordinator
+        // MEMORY LEAK FIX: Capture coord weakly to break potential retain cycle
+        // Coordinator → frameObserver token → closure → Coordinator
         coord.frameObserver = NotificationCenter.default.addObserver(
             forName: NSView.frameDidChangeNotification,
             object: containerView,
             queue: .main
-        ) { [weak containerView] _ in
+        ) { [weak containerView, weak coord] _ in
             guard let cv = containerView else { return }
             // Rebuild compositor to anchor left/right panes to new bounds
             updateCompositor(cv)
-            coord.lastSize = cv.bounds.size
+            coord?.lastSize = cv.bounds.size
         }
 
         // Set up link hover callbacks for current tab
