@@ -13,7 +13,6 @@ struct OnboardingView: View {
 
     @State private var currentStage: Int = 0
     @State private var selectedMaterial: NSVisualEffectView.Material = .hudWindow
-    @State private var selectedTabLayout: TabLayout = .sidebar
     @State private var selectedBrowser: Browsers = .arc
     @State private var aiChatEnabled: Bool = true
     @State private var adBlockerEnabled: Bool = true
@@ -28,7 +27,7 @@ struct OnboardingView: View {
             Color.white.opacity(0.2)
 
             VStack {
-                StageIndicator(stages: 8, activeStage: currentStage)
+                StageIndicator(stages: 7, activeStage: currentStage)
                 Spacer()
                 stageView
                     .transition(.slideAndBlur)
@@ -77,45 +76,29 @@ struct OnboardingView: View {
             switch currentStage {
             case 0: HelloStage()
             case 1: ImportStage(selectedBrowser: $selectedBrowser)
-            case 2: TabLayoutStage(selectedLayout: $selectedTabLayout)
-            case 3: AiChatStage(aiChatEnabled: $aiChatEnabled)
-            case 4: AdBlockerStage(adBlockerEnabled: $adBlockerEnabled)
-            case 5: URLBarStage(topBarAddressView: $topBarAddressView)
-            case 6: BackgroundStage(selectedMaterial: $selectedMaterial)
-            case 7: FinalStage()
+            case 2: AiChatStage(aiChatEnabled: $aiChatEnabled)
+            case 3: AdBlockerStage(adBlockerEnabled: $adBlockerEnabled)
+            case 4: URLBarStage(topBarAddressView: $topBarAddressView)
+            case 5: BackgroundStage(selectedMaterial: $selectedMaterial)
+            case 6: FinalStage()
             default: EmptyView()
             }
         }
     }
 
     private func applySettings() {
-        nookSettings.tabLayout = selectedTabLayout
         nookSettings.showAIAssistant = aiChatEnabled
         nookSettings.blockCrossSiteTracking = adBlockerEnabled
         nookSettings.currentMaterial = selectedMaterial
-
-        // When tabs are on top, URL bar must be top of website
-        if selectedTabLayout == .topOfWindow {
-            nookSettings.topBarAddressView = true
-        } else {
-            nookSettings.topBarAddressView = topBarAddressView
-        }
+        nookSettings.topBarAddressView = topBarAddressView
 
         nookSettings.didFinishOnboarding = true
     }
 
     private func advance() {
-        guard currentStage < 8 else { return }
-        if currentStage == 7 {
+        guard currentStage < 7 else { return }
+        if currentStage == 6 {
             applySettings()
-        }
-
-        // When tab layout is topOfWindow, skip URL bar stage (forced to top of website)
-        if currentStage == 4 && selectedTabLayout == .topOfWindow {
-            withAnimation(.easeInOut(duration: 0.25)) {
-                currentStage = 6
-            }
-            return
         }
 
         if currentStage == 1 && selectedBrowser == .safari {
@@ -157,15 +140,8 @@ struct OnboardingView: View {
 
     private func goBack() {
         guard currentStage > 0 else { return }
-        if currentStage == 6 && selectedTabLayout == .topOfWindow {
-            // Skip back over URL bar stage when tabs are on top
-            withAnimation(.easeInOut(duration: 0.25)) {
-                currentStage = 4
-            }
-        } else {
-            withAnimation(.easeInOut(duration: 0.25)) {
-                currentStage -= 1
-            }
+        withAnimation(.easeInOut(duration: 0.25)) {
+            currentStage -= 1
         }
     }
 
