@@ -919,7 +919,7 @@ class BrowserManager: ObservableObject {
     func createNewTab(in windowState: BrowserWindowState) {
         // Handle incognito windows - create ephemeral tabs
         if windowState.isIncognito, let profile = windowState.ephemeralProfile {
-            let engine = nookSettings?.searchEngine ?? .google
+            let engine = nookSettings?.searchEngine ?? DefaultSearchProvider.google
             let normalizedURL = normalizeURL("https://www.google.com", provider: engine)
             guard let url = URL(string: normalizedURL) else { return }
             
@@ -1016,7 +1016,7 @@ class BrowserManager: ObservableObject {
                     } else {
                         // All tabs closed - create a new ephemeral tab
                         if let profile = activeWindow.ephemeralProfile {
-                            let engine = nookSettings?.searchEngine ?? .google
+                            let engine = nookSettings?.searchEngine ?? DefaultSearchProvider.google
                             let normalizedURL = normalizeURL("https://www.google.com", provider: engine)
                             if let url = URL(string: normalizedURL) {
                                 let newTab = tabManager.createEphemeralTab(url: url, in: activeWindow, profile: profile)

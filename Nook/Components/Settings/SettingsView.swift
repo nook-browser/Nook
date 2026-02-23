@@ -7,6 +7,7 @@
 
 import AppKit
 import SwiftUI
+import FaviconFinder
 
 // MARK: - Settings Root (Native macOS Settings)
 struct SettingsView: View {
@@ -312,18 +313,9 @@ struct GeneralSettingsView: View {
                         HStack(alignment: .firstTextBaseline) {
                             Text("Search Engine")
                             Spacer()
-                            Picker(
-                                "Search Engine",
-                                selection: $settings
-                                    .searchEngine
-                            ) {
-                                ForEach(SearchProvider.allCases) { provider in
-                                    Text(provider.displayName).tag(provider)
-                                }
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-                            .frame(width: 220)
+                            
+                            SearchEnginePicker(selectedSearchEngine: $settings.searchEngine)
+                                .environment(nookSettings)
                         }
                     }
                     
@@ -450,6 +442,125 @@ struct GeneralSettingsView: View {
             }
         }
         .frame(minHeight: 480)
+    }
+}
+
+
+struct SearchEnginePicker: View {
+    @Binding var selectedSearchEngine: any SearchProvider
+    @State var searchEngines: [any SearchProvider]
+    @State private var showingAddSheet = false
+    @State var resolvedFavicons: [String : SwiftUI.Image] = [:]
+
+    @Environment(\.nookSettings) var nookSettings
+    
+    init(selectedSearchEngine: Binding<any SearchProvider>) {
+        _selectedSearchEngine = selectedSearchEngine
+        searchEngines = DefaultSearchProvider.allCases
+    }
+    
+    var body: some View {
+        VStack {
+            searchEnginesList
+            Divider()
+            HStack {
+                Button {
+                    showingAddSheet = true
+                } label: {
+                    Label("Add Site", systemImage: "plus")
+                }
+                .buttonStyle(.plain)
+                .controlSize(.small)
+
+                Spacer()
+            }
+        }.onAppear {
+            searchEngines.append(contentsOf: nookSettings.customSearchEngines)
+        }.sheet(isPresented: $showingAddSheet) {
+            CustomSearchEngineEntryEditor(entry: nil) { newEntry in
+                nookSettings.customSearchEngines.append(newEntry)
+            }
+        }.onChange(of: showingAddSheet) { _, _ in
+           refreshCustomEnginges()
+        }
+    }
+    
+    @ViewBuilder var searchEnginesList: some View {
+        ForEach(searchEngines, id: \.id) { provider in
+            HStack {
+                (resolvedFavicons[provider.id] ?? Image(systemName: "globe"))
+                    .resizable()
+                    .frame(width: 20, height: 20)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+
+                Text(provider.displayName)
+                Spacer()
+                if provider is CustomSearchProvider {
+                    Button(action: {
+                        nookSettings.customSearchEngines.removeAll(where: { $0.id == provider.id })
+                        refreshCustomEnginges()
+                    }) {
+                        Image(systemName: "trash")
+                    }
+                }
+                Image(systemName: selectedSearchEngine.id == provider.id ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 20, height: 20)
+            }.contentShape(Rectangle())
+            .onAppear {
+                guard let url = URL(string: "https://\(provider.host)") else { return }
+                Task {
+                    await fetchFavicon(for: url, with: provider.id)
+                }
+            }.onTapGesture {
+                selectedSearchEngine = provider
+            }
+            
+            if provider.id != searchEngines.last?.id {
+                Divider()
+                    .padding(.bottom, 4)
+            }
+        }
+    }
+    
+    private func refreshCustomEnginges() {
+        var searchEngines = self.searchEngines
+        searchEngines = searchEngines.filter { $0 is DefaultSearchProvider }
+        searchEngines.append(contentsOf: nookSettings.customSearchEngines)
+        self.searchEngines = searchEngines
+    }
+    
+    private func fetchFavicon(for url: URL, with key: String) async {
+        let defaultFavicon = SwiftUI.Image(systemName: "globe")
+        guard url.scheme == "http" || url.scheme == "https", url.host != nil else {
+            await MainActor.run { self.resolvedFavicons[key] = defaultFavicon }
+            return
+        }
+        
+        let cacheKey = url.host ?? url.absoluteString
+        if let cachedFavicon = Tab.getCachedFavicon(for: cacheKey) {
+            await MainActor.run { self.resolvedFavicons[key] = cachedFavicon }
+            return
+        }
+        
+        do {
+            let favicon = try await FaviconFinder(url: url)
+                .fetchFaviconURLs()
+                .download()
+                .largest()
+            if let faviconImage = favicon.image {
+                let nsImage = faviconImage.image
+                let swiftUIImage = SwiftUI.Image(nsImage: nsImage)
+                
+                Tab.cacheFavicon(swiftUIImage, for: cacheKey)
+                
+                await MainActor.run { self.resolvedFavicons[key] = swiftUIImage }
+            } else {
+                await MainActor.run { self.resolvedFavicons[key] = defaultFavicon }
+            }
+        } catch {
+            await MainActor.run { self.resolvedFavicons[key] = defaultFavicon }
+        }
     }
 }
 
@@ -1723,6 +1834,57 @@ struct SiteSearchSettingsCard: View {
                 if let idx = nookSettings.siteSearchEntries.firstIndex(where: { $0.id == updated.id }) {
                     nookSettings.siteSearchEntries[idx] = updated
                 }
+            }
+        }
+    }
+}
+
+struct CustomSearchEngineEntryEditor: View {
+    let entry: CustomSearchProvider?
+    let onSave: (CustomSearchProvider) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var displayName: String = ""
+    @State private var host: String = ""
+    @State private var queryTemplate: String = ""
+    @State private var colorHex: String = "#666666"
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(entry == nil ? "Add Search Engine" : "Edit Search Engine")
+                .font(.headline)
+
+            Form {
+                TextField("Name", text: $displayName)
+                TextField("Host (e.g. google.com)", text: $host)
+                TextField("Search URL (use %@)", text: $queryTemplate)
+            }
+            .formStyle(.grouped)
+
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                    .buttonStyle(.bordered)
+                Button("Save") {
+                    let saved = CustomSearchProvider(
+                        displayName: displayName.trimmingCharacters(in: .whitespacesAndNewlines),
+                        host: host.trimmingCharacters(in: .whitespacesAndNewlines),
+                        queryTemplate: queryTemplate.trimmingCharacters(in: .whitespacesAndNewlines),
+                    )
+                    onSave(saved)
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(displayName.isEmpty || host.isEmpty || queryTemplate.isEmpty || !queryTemplate.contains("%@"))
+            }
+        }
+        .padding(20)
+        .frame(width: 450)
+        .onAppear {
+            if let entry {
+                displayName = entry.displayName
+                host = entry.host
+                queryTemplate = entry.queryTemplate
             }
         }
     }

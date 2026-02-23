@@ -54,7 +54,14 @@ public func isLikelyURL(_ text: String) -> Bool {
       trimmed.contains(".co") || trimmed.contains(".dev"))
 }
 
-public enum SearchProvider: String, CaseIterable, Identifiable, Codable, Sendable {
+public protocol SearchProvider: Codable, Identifiable, Sendable {
+    var displayName: String { get }
+    var host: String { get }
+    var queryTemplate: String { get }
+    var id: String { get }
+}
+
+public enum DefaultSearchProvider: String, CaseIterable, SearchProvider {
   case google
   case duckDuckGo
   case bing
@@ -67,7 +74,7 @@ public enum SearchProvider: String, CaseIterable, Identifiable, Codable, Sendabl
 
   public var id: String { rawValue }
 
-  var displayName: String {
+  public var displayName: String {
     switch self {
     case .google: return "Google"
     case .duckDuckGo: return "DuckDuckGo"
@@ -81,7 +88,7 @@ public enum SearchProvider: String, CaseIterable, Identifiable, Codable, Sendabl
     }
   }
 
-  var host: String {
+  public var host: String {
     switch self {
     case .google: return "www.google.com"
     case .duckDuckGo: return "duckduckgo.com"
@@ -95,7 +102,7 @@ public enum SearchProvider: String, CaseIterable, Identifiable, Codable, Sendabl
     }
   }
 
-  var queryTemplate: String {
+  public var queryTemplate: String {
     switch self {
     case .google:
       return "https://www.google.com/search?q=%@"
@@ -117,4 +124,16 @@ public enum SearchProvider: String, CaseIterable, Identifiable, Codable, Sendabl
       return "https://kagi.com/search?q=%@"
     }
   }
+}
+
+public struct CustomSearchProvider: SearchProvider {
+    public var displayName: String
+    
+    public var host: String
+    
+    public var queryTemplate: String
+    
+    public var id: String {
+        return "\(host)_\(queryTemplate)"
+    }
 }

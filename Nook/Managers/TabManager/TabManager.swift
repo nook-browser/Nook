@@ -1148,7 +1148,7 @@ class TabManager: ObservableObject {
         url: String = "https://www.google.com",
         in space: Space? = nil
     ) -> Tab {
-        let engine = nookSettings?.searchEngine ?? .google
+        let engine = nookSettings?.searchEngine ?? DefaultSearchProvider.google
         let normalizedUrl = normalizeURL(url, provider: engine)
         guard let validURL = URL(string: normalizedUrl)
         else {
@@ -1228,7 +1228,7 @@ class TabManager: ObservableObject {
         in space: Space? = nil,
         existingWebView: WKWebView? = nil
     ) -> Tab {
-        let engine = nookSettings?.searchEngine ?? .google
+        let engine = nookSettings?.searchEngine ?? DefaultSearchProvider.google
         let normalizedUrl = normalizeURL(url, provider: engine)
         guard let validURL = URL(string: normalizedUrl)
         else {

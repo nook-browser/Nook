@@ -23,14 +23,8 @@ struct SettingsGeneralTab: View {
                     .disabled(true)
 
                 Section(header: Text("Search")) {
-                    Picker(
-                        "Default search engine",
-                        selection: $settings.searchEngine
-                    ) {
-                        ForEach(SearchProvider.allCases) { provider in
-                            Text(provider.displayName).tag(provider)
-                        }
-                    }
+                    SearchEnginePicker(selectedSearchEngine: $settings.searchEngine)
+                        .environment(nookSettings)
                 }
 
                 Section {

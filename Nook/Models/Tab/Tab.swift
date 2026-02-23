@@ -801,7 +801,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     /// Navigate to a new URL with proper search engine normalization
     func navigateToURL(_ input: String) {
-        let engine = nookSettings?.searchEngine ?? .google
+        let engine = nookSettings?.searchEngine ?? DefaultSearchProvider.google
         let normalizedUrl = normalizeURL(input, provider: engine)
 
         guard let validURL = URL(string: normalizedUrl) else {
