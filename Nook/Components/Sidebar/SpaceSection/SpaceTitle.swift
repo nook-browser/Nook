@@ -14,8 +14,7 @@ struct SpaceTitle: View {
     @FocusState private var nameFieldFocused: Bool
     @FocusState private var emojiFieldFocused: Bool
     @State private var isEllipsisHovering: Bool = false
-    @State private var isDropHovering: Bool = false
-    @State private var dropDraggedItem: UUID?
+    @ObservedObject private var dragSession = NookDragSessionManager.shared
     
     @StateObject private var emojiManager = EmojiPickerManager()
 
@@ -142,40 +141,16 @@ struct SpaceTitle: View {
 
         }
         // Match tabs' internal left/right padding so text aligns
-        .overlay {
-            if browserManager.tabManager.spacePinnedTabs(for: space.id).isEmpty {
-                Color.clear
-                    .contentShape(RoundedRectangle(cornerRadius: 12))
-                    .onDrop(
-                        of: [.text],
-                        delegate: SidebarSectionDropDelegateSimple(
-                            itemsCount: {
-                                browserManager.tabManager.spacePinnedTabs(for: space.id).count
-                            },
-                            draggedItem: $dropDraggedItem,
-                            targetSection: .spacePinned(space.id),
-                            tabManager: browserManager.tabManager,
-                            targetIndex: nil,
-                            onDropEntered: {
-                                withAnimation(.easeInOut(duration: 0.15)) {
-                                    NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
-                                    isDropHovering = true
-                                }
-                            },
-                            onDropCompleted: {
-                                withAnimation(.easeInOut(duration: 0.15)) {
-                                    isDropHovering = false
-                                }
-                            },
-                            onDropExited: {
-                                withAnimation(.easeInOut(duration: 0.15)) {
-                                    isDropHovering = false
-                                }
-                            }
-                        )
-                    )
-                    .allowsHitTesting(false)
+        .onChange(of: dragSession.pendingDrop) { _, drop in
+            guard let drop = drop, drop.targetZone == .spacePinned(space.id) else { return }
+            guard browserManager.tabManager.spacePinnedTabs(for: space.id).isEmpty else { return }
+            let allTabs = browserManager.tabManager.allTabs()
+            guard let tab = allTabs.first(where: { $0.id == drop.item.tabId }) else { return }
+            let op = dragSession.makeDragOperation(from: drop, tab: tab)
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                browserManager.tabManager.handleDragOperation(op)
             }
+            dragSession.pendingDrop = nil
         }
         .padding(.leading, 10)
         .padding(.trailing, 5)
@@ -228,6 +203,12 @@ struct SpaceTitle: View {
     
     //MARK: - Colors
     
+    private var isDropHovering: Bool {
+        guard dragSession.isDragging else { return false }
+        return dragSession.activeZone == .spacePinned(space.id)
+            && browserManager.tabManager.spacePinnedTabs(for: space.id).isEmpty
+    }
+
     private var hoverColor: Color {
         if isHovering || isDropHovering {
             return colorScheme == .dark ? AppColors.spaceTabHoverLight : AppColors.spaceTabHoverDark

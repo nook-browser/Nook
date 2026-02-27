@@ -54,6 +54,9 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     // Global favicon cache shared across profiles by design to increase hit rate
     // and reduce duplicate downloads. Favicons are cached persistently to survive app restarts.
     private static var faviconCache: [String: SwiftUI.Image] = [:]
+    /// MEMORY LEAK FIX: Track insertion order for proper LRU eviction
+    private static var faviconCacheOrder: [String] = []
+    private static let faviconCacheMaxSize = 200
     private static let faviconCacheQueue = DispatchQueue(
         label: "favicon.cache", attributes: .concurrent)
     private static let faviconCacheLock = NSLock()
@@ -447,11 +450,12 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             
             // Re-add only non-boost scripts (those not in our tracked list)
             let boostScriptSources = Set(currentBoostScripts.map { $0.source })
-            for script in allScripts {
-                if !boostScriptSources.contains(script.source) {
-                    userContentController.addUserScript(script)
-                }
-            }
+//            for script in allScripts {
+//                if !boostScriptSources.contains(script.source) {
+//                    userContentController.addUserScript(script)
+//                }
+//            }
+// MARK: This causes the browser to crash when loading boosted pages
             
             currentBoostScripts.removeAll()
         } else {
@@ -855,8 +859,9 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     /// Navigate to a new URL with proper search engine normalization
     func navigateToURL(_ input: String) {
-        let engine = nookSettings?.searchEngine ?? .google
-        let normalizedUrl = normalizeURL(input, provider: engine)
+        let settings = nookSettings ?? browserManager?.nookSettings
+        let template = settings?.resolvedSearchEngineTemplate ?? SearchProvider.google.queryTemplate
+        let normalizedUrl = normalizeURL(input, queryTemplate: template)
 
         guard let validURL = URL(string: normalizedUrl) else {
             print("Invalid URL after normalization: \(input) -> \(normalizedUrl)")
@@ -1704,15 +1709,22 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             controller.removeScriptMessageHandler(forName: handlerName)
         }
 
-        // 4. Remove theme color and navigation state observers
+        // 4. MEMORY LEAK FIX: Detach contextMenuBridge before clearing delegates
+        // This breaks the retain cycle: WKWebView → contextMenuBridge → userContentController → WKWebView
+        if let focusableWebView = webView as? FocusableWKWebView {
+            focusableWebView.contextMenuBridge?.detach()
+            focusableWebView.contextMenuBridge = nil
+        }
+
+        // 5. Remove theme color and navigation state observers
         removeThemeColorObserver(from: webView)
         removeNavigationStateObservers(from: webView)
 
-        // 5. Clear all delegates
+        // 6. Clear all delegates
         webView.navigationDelegate = nil
         webView.uiDelegate = nil
 
-        // 6. Remove from view hierarchy
+        // 7. Remove from view hierarchy
         webView.removeFromSuperview()
 
         // 7. Force remove from compositor
@@ -2316,14 +2328,19 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
         faviconCache[key] = favicon
 
-        // Limit cache size to prevent memory issues
-        if faviconCache.count > 100 {
-            // Remove oldest entries (simple FIFO)
-            let keysToRemove = Array(faviconCache.keys.prefix(20))
+        // MEMORY LEAK FIX: Maintain insertion order for proper LRU eviction
+        faviconCacheOrder.removeAll { $0 == key }
+        faviconCacheOrder.append(key)
+
+        // Evict oldest entries when cache exceeds max size
+        if faviconCache.count > faviconCacheMaxSize {
+            let evictCount = faviconCache.count - faviconCacheMaxSize + 20
+            let keysToRemove = Array(faviconCacheOrder.prefix(evictCount))
             for keyToRemove in keysToRemove {
                 faviconCache.removeValue(forKey: keyToRemove)
                 removeFaviconFromDisk(for: keyToRemove)
             }
+            faviconCacheOrder.removeFirst(min(evictCount, faviconCacheOrder.count))
         }
     }
 
@@ -2973,47 +2990,14 @@ extension Tab: WKScriptMessageHandler {
     }
 
     private func isLikelyOAuthOrExternalWindow(url: URL, windowFeatures: WKWindowFeatures) -> Bool {
-        let host = (url.host ?? "").lowercased()
-        let path = url.path.lowercased()
-        let query = url.query?.lowercased() ?? ""
+        if OAuthDetector.isLikelyOAuthPopupURL(url) { return true }
 
-        // Check for OAuth-related URLs
-        let oauthHosts = [
-            "accounts.google.com", "login.microsoftonline.com", "login.live.com",
-            "appleid.apple.com", "github.com", "gitlab.com", "bitbucket.org",
-            "auth0.com", "okta.com", "onelogin.com", "pingidentity.com",
-            "slack.com", "zoom.us", "login.cloudflareaccess.com",
-            "oauth", "auth", "login", "signin",
-        ]
-
-        // Check if host contains OAuth-related terms
-        if oauthHosts.contains(where: { host.contains($0) }) {
-            return true
-        }
-
-        // Check for OAuth paths and query parameters
-        if path.contains("/oauth") || path.contains("oauth2") || path.contains("/authorize")
-            || path.contains("/signin") || path.contains("/login") || path.contains("/callback")
-        {
-            return true
-        }
-
-        if query.contains("client_id=") || query.contains("redirect_uri=")
-            || query.contains("response_type=") || query.contains("scope=")
-        {
-            return true
-        }
-
-        // Check window features that suggest external/popup behavior
+        // If the popup has explicit dimensions it's almost certainly a modal sign-in window
         if let width = windowFeatures.width, let height = windowFeatures.height,
             width.doubleValue > 0 && height.doubleValue > 0
         {
-            // If specific dimensions are set, it's likely a popup
             return true
         }
-
-        // Note: WKWindowFeatures visibility properties are NSNumber? and don't directly map to enum values
-        // We'll rely on URL patterns and dimensions for popup detection
 
         return false
     }
@@ -3222,7 +3206,7 @@ extension Tab: WKUIDelegate {
         
         // Check if this is a redirect back to the original domain (not the OAuth provider)
         if let providerHost = oauthProviderHost, !host.contains(providerHost),
-           (isSuccess || isError || !isLikelyOAuthURL(url)) {
+           (isSuccess || isError || !OAuthDetector.isLikelyOAuthURL(url)) {
             
             print("🔐 [Tab] OAuth flow completed: success=\(isSuccess), closing OAuth tab")
             
@@ -3245,35 +3229,6 @@ extension Tab: WKUIDelegate {
         }
     }
     
-    /// Determines if a URL is likely an OAuth-related URL
-    private func isLikelyOAuthURL(_ url: URL) -> Bool {
-        let host = (url.host ?? "").lowercased()
-        let path = url.path.lowercased()
-        let query = url.query?.lowercased() ?? ""
-        
-        let oauthHosts = [
-            "accounts.google.com", "login.microsoftonline.com", "login.live.com",
-            "appleid.apple.com", "github.com", "gitlab.com", "bitbucket.org",
-            "auth0.com", "okta.com", "onelogin.com", "pingidentity.com",
-            "slack.com", "zoom.us", "login.cloudflareaccess.com",
-            "oauth", "auth", "login", "signin"
-        ]
-        
-        if oauthHosts.contains(where: { host.contains($0) }) { return true }
-        
-        if path.contains("/oauth") || path.contains("oauth2") || path.contains("/authorize")
-            || path.contains("/signin") || path.contains("/login") || path.contains("/callback") {
-            return true
-        }
-        
-        if query.contains("client_id=") || query.contains("redirect_uri=")
-            || query.contains("response_type=") || query.contains("scope=") {
-            return true
-        }
-        
-        return false
-    }
-
     private func handleMiniWindowAuthCompletion(success: Bool, finalURL: URL?) {
         print(
             "🪟 [Tab] Popup OAuth flow completed: success=\(success), finalURL=\(finalURL?.absoluteString ?? "nil")"
@@ -3298,8 +3253,13 @@ extension Tab: WKUIDelegate {
         alert.messageText = "JavaScript Alert"
         alert.informativeText = message
         alert.addButton(withTitle: "OK")
-        alert.runModal()
-        completionHandler()
+        if let window = webView.window {
+            alert.beginSheetModal(for: window) { _ in
+                completionHandler()
+            }
+        } else {
+            completionHandler()
+        }
     }
 
     public func webView(
@@ -3313,8 +3273,13 @@ extension Tab: WKUIDelegate {
         alert.informativeText = message
         alert.addButton(withTitle: "OK")
         alert.addButton(withTitle: "Cancel")
-        let result = alert.runModal()
-        completionHandler(result == .alertFirstButtonReturn)
+        if let window = webView.window {
+            alert.beginSheetModal(for: window) { result in
+                completionHandler(result == .alertFirstButtonReturn)
+            }
+        } else {
+            completionHandler(false)
+        }
     }
 
     public func webView(
@@ -3334,9 +3299,10 @@ extension Tab: WKUIDelegate {
         textField.stringValue = defaultText ?? ""
         alert.accessoryView = textField
 
-        let result = alert.runModal()
-        if result == .alertFirstButtonReturn {
-            completionHandler(textField.stringValue)
+        if let window = webView.window {
+            alert.beginSheetModal(for: window) { result in
+                completionHandler(result == .alertFirstButtonReturn ? textField.stringValue : nil)
+            }
         } else {
             completionHandler(nil)
         }

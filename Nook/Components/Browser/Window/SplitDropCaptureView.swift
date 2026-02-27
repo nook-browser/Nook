@@ -21,7 +21,7 @@ final class SplitDropCaptureView: NSView {
         wantsLayer = true
         layer?.backgroundColor = NSColor.clear.cgColor
         // Accept plain text drags (UUID string for a Tab)
-        registerForDraggedTypes([.string])
+        registerForDraggedTypes([.nookTabItem, .string])
         // Transparent to normal mouse events; only DnD uses these callbacks
         isHidden = false
     }
@@ -64,7 +64,13 @@ final class SplitDropCaptureView: NSView {
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         guard let bm = browserManager, let sm = splitManager, let windowId else { return false }
         let pb = sender.draggingPasteboard
-        guard let idString = pb.string(forType: .string), let id = UUID(uuidString: idString) else {
+        // Try to read NookDragItem first, fall back to plain string UUID
+        let tabId: UUID? = {
+            if let item = NookDragItem.fromPasteboard(pb) { return item.tabId }
+            if let idString = pb.string(forType: .string) { return UUID(uuidString: idString) }
+            return nil
+        }()
+        guard let id = tabId else {
             // Invalid payload; clear any lingering drag UI state
             sm.updateDragLocation(nil, for: windowId)
             sm.endPreview(cancel: false, for: windowId)
@@ -75,6 +81,7 @@ final class SplitDropCaptureView: NSView {
         guard let tab = all.first(where: { $0.id == id }) else {
             sm.updateDragLocation(nil, for: windowId)
             sm.endPreview(cancel: false, for: windowId)
+            NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
             return false
         }
         
@@ -101,7 +108,7 @@ final class SplitDropCaptureView: NSView {
         }
         // Cancel any in-progress sidebar/tab drag to prevent unintended reorder/removal
         DispatchQueue.main.async {
-            TabDragManager.shared.cancelDrag()
+            NookDragSessionManager.shared.cancelDrag()
         }
         isDragActive = false
         return true

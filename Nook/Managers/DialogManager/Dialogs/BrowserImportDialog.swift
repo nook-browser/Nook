@@ -52,7 +52,6 @@ struct BrowserImportDialog: DialogPresentable {
     }
 
     private func handleCreate() {
-        browserManager.importArcData()
         onCancel()
     }
 }

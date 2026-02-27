@@ -666,7 +666,7 @@ class BrowserManager: ObservableObject {
         // Respect per-domain allow list
         guard !trackingProtectionManager.isDomainAllowed(host) else { return }
         // Simple heuristic for OAuth endpoints
-        if isLikelyOAuthURL(url) {
+        if OAuthDetector.isLikelyOAuthURL(url) {
             let now = Date()
             if let coolUntil = oauthAssistCooldown[host], coolUntil > now { return }
             oauthAssist = OAuthAssist(host: host, url: url, tabId: tab.id, timestamp: now)
@@ -699,32 +699,6 @@ class BrowserManager: ObservableObject {
         let normalizedHost = host.lowercased()
         print("🔐 [BrowserManager] Auto-allowing OAuth provider domain: \(normalizedHost)")
         trackingProtectionManager.allowDomain(normalizedHost, allowed: true)
-    }
-
-    private func isLikelyOAuthURL(_ url: URL) -> Bool {
-        let host = (url.host ?? "").lowercased()
-        let path = url.path.lowercased()
-        let query = url.query?.lowercased() ?? ""
-        // Common IdP hosts
-        let hostHints = [
-            "accounts.google.com", "login.microsoftonline.com", "login.live.com",
-            "appleid.apple.com", "github.com", "gitlab.com", "bitbucket.org",
-            "auth0.com", "okta.com", "onelogin.com", "pingidentity.com",
-            "slack.com", "zoom.us", "login.cloudflareaccess.com",
-        ]
-        if hostHints.contains(where: { host.contains($0) }) { return true }
-        // Common OAuth paths and signals
-        if path.contains("/oauth") || path.contains("oauth2") || path.contains("/authorize")
-            || path.contains("/signin") || path.contains("/login") || path.contains("/callback")
-        {
-            return true
-        }
-        if query.contains("client_id=") || query.contains("redirect_uri=")
-            || query.contains("response_type=")
-        {
-            return true
-        }
-        return false
     }
 
     // MARK: - Profile Switching
@@ -800,8 +774,8 @@ class BrowserManager: ObservableObject {
             }
 
             if animateTransition {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                    self.isTransitioningProfile = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+                    self?.isTransitioningProfile = false
                 }
             }
         }
@@ -916,22 +890,22 @@ class BrowserManager: ObservableObject {
     }
 
     /// Create a new tab and set it as active in the specified window
-    func createNewTab(in windowState: BrowserWindowState) {
+    func createNewTab(in windowState: BrowserWindowState, url: String = "https://www.google.com") {
         // Handle incognito windows - create ephemeral tabs
         if windowState.isIncognito, let profile = windowState.ephemeralProfile {
-            let engine = nookSettings?.searchEngine ?? .google
-            let normalizedURL = normalizeURL("https://www.google.com", provider: engine)
-            guard let url = URL(string: normalizedURL) else { return }
-            
+            let template = nookSettings?.resolvedSearchEngineTemplate ?? SearchProvider.google.queryTemplate
+            let normalizedURL = normalizeURL(url, queryTemplate: template)
+            guard let resolvedUrl = URL(string: normalizedURL) else { return }
+
             let newTab = tabManager.createEphemeralTab(
-                url: url,
+                url: resolvedUrl,
                 in: windowState,
                 profile: profile
             )
             selectTab(newTab, in: windowState)
             return
         }
-        
+
         let targetSpace =
             windowState.currentSpaceId.flatMap { id in
                 tabManager.spaces.first(where: { $0.id == id })
@@ -939,7 +913,7 @@ class BrowserManager: ObservableObject {
             ?? windowState.currentProfileId.flatMap { pid in
                 tabManager.spaces.first(where: { $0.profileId == pid })
             }
-        let newTab = tabManager.createNewTab(in: targetSpace)
+        let newTab = tabManager.createNewTab(url: url, in: targetSpace)
         selectTab(newTab, in: windowState)
     }
 
@@ -1016,8 +990,8 @@ class BrowserManager: ObservableObject {
                     } else {
                         // All tabs closed - create a new ephemeral tab
                         if let profile = activeWindow.ephemeralProfile {
-                            let engine = nookSettings?.searchEngine ?? .google
-                            let normalizedURL = normalizeURL("https://www.google.com", provider: engine)
+                            let template = nookSettings?.resolvedSearchEngineTemplate ?? SearchProvider.google.queryTemplate
+                            let normalizedURL = normalizeURL("https://www.google.com", queryTemplate: template)
                             if let url = URL(string: normalizedURL) {
                                 let newTab = tabManager.createEphemeralTab(url: url, in: activeWindow, profile: profile)
                                 selectTab(newTab, in: activeWindow)
@@ -2271,48 +2245,119 @@ class BrowserManager: ObservableObject {
     }
 
     /// Import Data from arc
-    func importArcData() {
-        Task {
-            let result = await importManager.importArcSidebarData()
+    func importArcData() async {
+        let result = await importManager.importArcSidebarData()
 
-            for space in result.spaces {
-                print("========== \(space.title)")
-                self.tabManager.createSpace(name: space.title, icon: space.emoji ?? "person.fill")
+        for space in result.spaces {
+            print("========== \(space.title)")
+            self.tabManager.createSpace(name: space.title, icon: space.emoji ?? "person.fill")
 
-                guard
-                    let createdSpace = self.tabManager.spaces.first(where: {
-                        $0.name == space.title
-                    })
-                else {
-                    continue
-                }
+            guard
+                let createdSpace = self.tabManager.spaces.first(where: {
+                    $0.name == space.title
+                })
+            else {
+                continue
+            }
 
-                for tab in space.unpinnedTabs {
-                    print("Unpinned tab - \(tab.title)")
-                    self.tabManager.createNewTab(url: tab.url, in: createdSpace)
-                }
+            for tab in space.unpinnedTabs {
+                print("Unpinned tab - \(tab.title)")
+                self.tabManager.createNewTab(url: tab.url, in: createdSpace)
+            }
 
-                for tab in space.pinnedTabs {
-                    print("Pinned tab - \(tab.title)")
+            for tab in space.pinnedTabs {
+                print("Pinned tab - \(tab.title)")
+                let newtab = self.tabManager.createNewTab(url: tab.url, in: createdSpace)
+                self.tabManager.pinTabToSpace(newtab, spaceId: createdSpace.id)
+            }
+            for folder in space.folders {
+                print("Folder - \(folder.title)")
+                let newFolder = self.tabManager.createFolder(
+                    for: createdSpace.id, name: folder.title)
+
+                for tab in folder.tabs {
                     let newtab = self.tabManager.createNewTab(url: tab.url, in: createdSpace)
-                    self.tabManager.pinTabToSpace(newtab, spaceId: createdSpace.id)
-                }
-                for folder in space.folders {
-                    print("Folder - \(folder.title)")
-                    let newFolder = self.tabManager.createFolder(
-                        for: createdSpace.id, name: folder.title)
-
-                    for tab in folder.tabs {
-                        let newtab = self.tabManager.createNewTab(url: tab.url, in: createdSpace)
-                        self.tabManager.moveTabToFolder(tab: newtab, folderId: newFolder.id)
-                    }
+                    self.tabManager.moveTabToFolder(tab: newtab, folderId: newFolder.id)
                 }
             }
-            for topTab in result.topTabs {
-                print("TopTab - \(topTab.title)")
-                let tab = self.tabManager.createNewTab(
-                    url: topTab.url, in: self.tabManager.spaces.first!)
+        }
+        for topTab in result.topTabs {
+            print("TopTab - \(topTab.title)")
+            let tab = self.tabManager.createNewTab(
+                url: topTab.url, in: self.tabManager.spaces.first!)
+            self.tabManager.addToEssentials(tab)
+        }
+    }
+
+    func importDiaData() async {
+        let result = await importManager.importDiaData()
+
+        guard let defaultSpace = self.tabManager.spaces.first else { return }
+
+        for tab in result.favoriteTabs {
+            print("Dia Favorite - \(tab.title)")
+            let newTab = self.tabManager.createNewTab(url: tab.url, in: defaultSpace)
+            self.tabManager.addToEssentials(newTab)
+        }
+
+        for tab in result.windowTabs {
+            print("Dia Tab - \(tab.title)")
+            self.tabManager.createNewTab(url: tab.url, in: defaultSpace)
+        }
+    }
+
+    func importSafariData(from directoryURL: URL, importBookmarks: Bool, importHistory: Bool) async {
+        let result = await importManager.importSafariData(
+            from: directoryURL,
+            importBookmarks: importBookmarks,
+            importHistory: importHistory
+        )
+
+        guard let defaultSpace = self.tabManager.spaces.first else { return }
+
+        if !result.bookmarks.isEmpty {
+            let favoritesBookmarks = result.bookmarks.filter { $0.folder == "Favorites" }
+            let otherBookmarks = result.bookmarks.filter { $0.folder != "Favorites" }
+
+            for bookmark in favoritesBookmarks {
+                let tab = self.tabManager.createNewTab(url: bookmark.url, in: defaultSpace)
                 self.tabManager.addToEssentials(tab)
+            }
+
+            var folderGroups: [String: [SafariBookmark]] = [:]
+            var unfolderedBookmarks: [SafariBookmark] = []
+
+            for bookmark in otherBookmarks {
+                if let folder = bookmark.folder, !folder.isEmpty {
+                    folderGroups[folder, default: []].append(bookmark)
+                } else {
+                    unfolderedBookmarks.append(bookmark)
+                }
+            }
+
+            for (folderName, bookmarks) in folderGroups {
+                let newFolder = self.tabManager.createFolder(for: defaultSpace.id, name: folderName)
+                for bookmark in bookmarks {
+                    let tab = self.tabManager.createNewTab(url: bookmark.url, in: defaultSpace)
+                    self.tabManager.moveTabToFolder(tab: tab, folderId: newFolder.id)
+                }
+            }
+
+            for bookmark in unfolderedBookmarks {
+                self.tabManager.createNewTab(url: bookmark.url, in: defaultSpace)
+            }
+        }
+
+        if !result.history.isEmpty {
+            for entry in result.history {
+                guard let url = URL(string: entry.url) else { continue }
+                historyManager.addVisit(
+                    url: url,
+                    title: entry.title,
+                    timestamp: entry.visitDate,
+                    tabId: nil,
+                    profileId: nil
+                )
             }
         }
     }
@@ -2697,10 +2742,10 @@ extension BrowserManager {
         zoomPopupHideTimer?.invalidate()
 
         // Schedule new hide timer
-        zoomPopupHideTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { _ in
+        zoomPopupHideTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
             DispatchQueue.main.async {
-                self.shouldShowZoomPopup = false
-                self.zoomPopupHideTimer = nil
+                self?.shouldShowZoomPopup = false
+                self?.zoomPopupHideTimer = nil
             }
         }
     }
@@ -2724,10 +2769,10 @@ extension BrowserManager {
         zoomPopupHideTimer?.invalidate()
 
         // Schedule new hide timer
-        zoomPopupHideTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { _ in
+        zoomPopupHideTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
             DispatchQueue.main.async {
-                self.shouldShowZoomPopup = false
-                self.zoomPopupHideTimer = nil
+                self?.shouldShowZoomPopup = false
+                self?.zoomPopupHideTimer = nil
             }
         }
     }
@@ -2751,10 +2796,10 @@ extension BrowserManager {
         zoomPopupHideTimer?.invalidate()
 
         // Schedule new hide timer
-        zoomPopupHideTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { _ in
+        zoomPopupHideTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
             DispatchQueue.main.async {
-                self.shouldShowZoomPopup = false
-                self.zoomPopupHideTimer = nil
+                self?.shouldShowZoomPopup = false
+                self?.zoomPopupHideTimer = nil
             }
         }
     }

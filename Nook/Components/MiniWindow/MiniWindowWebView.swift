@@ -49,8 +49,22 @@ struct MiniWindowWebView: NSViewRepresentable {
         private var progressObservation: NSKeyValueObservation?
         private var didLoadInitialURL = false
 
+        /// Weak reference to the webView so we can clean up message handlers in deinit
+        private weak var installedWebView: WKWebView?
+
         init(session: MiniWindowSession) {
             self.session = session
+        }
+
+        deinit {
+            // MEMORY LEAK FIX: Remove the script message handler that holds a strong
+            // reference to this Coordinator. Without this, the WKUserContentController
+            // retains the Coordinator forever.
+            let webView = installedWebView
+            Task { @MainActor in
+                webView?.configuration.userContentController
+                    .removeScriptMessageHandler(forName: "authCompletion")
+            }
         }
 
         func installProgressObservation(on webView: WKWebView) {
@@ -129,6 +143,7 @@ struct MiniWindowWebView: NSViewRepresentable {
 
         func installAuthDetectionScript(on webView: WKWebView) {
             // Add message handler for authentication completion
+            installedWebView = webView
             webView.configuration.userContentController.add(self, name: "authCompletion")
             
             // Inject a simpler, less intrusive JavaScript to detect authentication completion

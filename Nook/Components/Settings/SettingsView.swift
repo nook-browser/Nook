@@ -168,6 +168,7 @@ struct SettingsTabItem: View {
 struct GeneralSettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(\.nookSettings) var nookSettings
+    @State private var showingAddEngine = false
 
     var body: some View {
         @Bindable var settings = nookSettings
@@ -300,15 +301,47 @@ struct GeneralSettingsView: View {
                             Picker(
                                 "Search Engine",
                                 selection: $settings
-                                    .searchEngine
+                                    .searchEngineId
                             ) {
                                 ForEach(SearchProvider.allCases) { provider in
-                                    Text(provider.displayName).tag(provider)
+                                    Text(provider.displayName).tag(provider.rawValue)
+                                }
+                                ForEach(nookSettings.customSearchEngines) { engine in
+                                    Text(engine.name).tag(engine.id.uuidString)
                                 }
                             }
                             .labelsHidden()
                             .pickerStyle(.menu)
                             .frame(width: 220)
+
+                            Button {
+                                showingAddEngine = true
+                            } label: {
+                                Image(systemName: "plus")
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        }
+
+                        if let selected = nookSettings.customSearchEngines.first(where: { $0.id.uuidString == nookSettings.searchEngineId }) {
+                            HStack {
+                                Text(selected.name)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Button("Remove") {
+                                    nookSettings.customSearchEngines.removeAll { $0.id == selected.id }
+                                    nookSettings.searchEngineId = SearchProvider.google.rawValue
+                                }
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .sheet(isPresented: $showingAddEngine) {
+                        CustomSearchEngineEditor { newEngine in
+                            nookSettings.customSearchEngines.append(newEngine)
                         }
                     }
                     
@@ -1302,6 +1335,9 @@ struct ExtensionsSettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @ObservedObject var extensionManager: ExtensionManager
     @State private var showingInstallDialog = false
+    @State private var safariExtensions: [ExtensionManager.SafariExtensionInfo] = []
+    @State private var isScanningSafari = false
+    @State private var showSafariSection = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -1319,7 +1355,7 @@ struct ExtensionsSettingsView: View {
 
                 Divider()
 
-                if extensionManager.installedExtensions.isEmpty {
+                if extensionManager.installedExtensions.isEmpty && !showSafariSection {
                     VStack(spacing: 12) {
                         Image(systemName: "puzzlepiece.extension")
                             .font(.system(size: 48))
@@ -1348,6 +1384,45 @@ struct ExtensionsSettingsView: View {
                         .padding(.vertical)
                     }
                 }
+
+                // Safari Extensions Discovery
+                Divider()
+
+                HStack {
+                    Text("Safari Extensions")
+                        .font(.headline)
+                    Spacer()
+                    if isScanningSafari {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Button("Scan for Safari Extensions") {
+                            scanForSafariExtensions()
+                        }
+                    }
+                }
+
+                if showSafariSection {
+                    if safariExtensions.isEmpty {
+                        Text("No Safari Web Extensions found on this Mac.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        LazyVStack(spacing: 8) {
+                            ForEach(safariExtensions) { ext in
+                                SafariExtensionRowView(
+                                    info: ext,
+                                    isAlreadyInstalled: extensionManager.installedExtensions.contains(where: {
+                                        $0.name == ext.name
+                                    }),
+                                    onInstall: {
+                                        installSafariExtension(ext)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
             } else {
                 // Unsupported OS version
                 VStack(spacing: 12) {
@@ -1365,6 +1440,79 @@ struct ExtensionsSettingsView: View {
         }
         .padding()
         .frame(minWidth: 520, minHeight: 360)
+    }
+
+    private func scanForSafariExtensions() {
+        isScanningSafari = true
+        showSafariSection = true
+        Task {
+            let found = await extensionManager.discoverSafariExtensions()
+            await MainActor.run {
+                safariExtensions = found
+                isScanningSafari = false
+            }
+        }
+    }
+
+    private func installSafariExtension(_ info: ExtensionManager.SafariExtensionInfo) {
+        extensionManager.installSafariExtension(info) { result in
+            switch result {
+            case .success(let ext):
+                // Remove from available list since it's now installed
+                safariExtensions.removeAll { $0.id == info.id }
+                _ = ext // suppress unused warning
+            case .failure(let error):
+                let alert = NSAlert()
+                alert.messageText = "Failed to Install Safari Extension"
+                alert.informativeText = error.localizedDescription
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "OK")
+                alert.runModal()
+            }
+        }
+    }
+}
+
+@available(macOS 15.5, *)
+struct SafariExtensionRowView: View {
+    let info: ExtensionManager.SafariExtensionInfo
+    let isAlreadyInstalled: Bool
+    let onInstall: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "safari")
+                .font(.system(size: 20))
+                .foregroundColor(.blue)
+                .frame(width: 32, height: 32)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(info.name)
+                    .font(.headline)
+                    .lineLimit(1)
+                Text(info.appPath.lastPathComponent)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            if isAlreadyInstalled {
+                Text("Installed")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            } else {
+                Button("Install") {
+                    onInstall()
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color(.controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 

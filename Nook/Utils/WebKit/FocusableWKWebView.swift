@@ -13,11 +13,15 @@ final class FocusableWKWebView: WKWebView {
     ]
 
     deinit {
+        // MEMORY LEAK FIX: Detach bridge deterministically. The primary cleanup now
+        // happens in Tab.cleanupCloneWebView(), but this is a safety net.
         if let bridge = contextMenuBridge {
+            let bridge = bridge
             Task { @MainActor in
                 bridge.detach()
             }
         }
+        contextMenuBridge = nil
     }
 
     override func mouseDown(with event: NSEvent) {
