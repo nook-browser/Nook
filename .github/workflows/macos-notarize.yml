@@ -3,6 +3,7 @@ name: macOS Build, Sign, Notarize & Release
 on:
   release:
     types: [published]
+  workflow_dispatch:
 
 jobs:
   build-sign-notarize:
