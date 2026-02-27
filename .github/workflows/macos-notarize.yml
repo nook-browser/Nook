@@ -58,6 +58,7 @@ jobs:
         run: |
           set -e
           mkdir -p build
+          ENTITLEMENTS="$(pwd)/Nook/Nook.entitlements"
           echo "Attempting universal build (arm64 + x86_64)..."
           if ! xcodebuild -scheme Nook -configuration Release \
             -arch arm64 -arch x86_64 \
@@ -65,7 +66,7 @@ jobs:
             CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            CODE_SIGN_ENTITLEMENTS="Nook/Nook.entitlements" \
+            CODE_SIGN_ENTITLEMENTS="$ENTITLEMENTS" \
             PROVISIONING_PROFILE_SPECIFIER=""; then
             echo "Universal build failed, retrying Apple Silicon only..."
             xcodebuild -scheme Nook -configuration Release \
@@ -74,7 +75,7 @@ jobs:
               CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
               CODE_SIGN_STYLE=Manual \
               DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-              CODE_SIGN_ENTITLEMENTS="Nook/Nook.entitlements" \
+              CODE_SIGN_ENTITLEMENTS="$ENTITLEMENTS" \
               PROVISIONING_PROFILE_SPECIFIER=""
           fi
           cp -R "build/Build/Products/Release/Nook.app" ./Nook.app
