@@ -124,16 +124,19 @@ jobs:
           git fetch origin gh-pages
           git checkout gh-pages
 
-          ENTRY="  <item>
-    <title>Version ${SHORT_VERSION}</title>
-    <sparkle:releaseNotesLink>https://github.com/${{ github.repository }}/releases/tag/${VERSION}</sparkle:releaseNotesLink>
-    <pubDate>${DATE}</pubDate>
-    <enclosure
-      url=\"${DMG_URL}\"
-      sparkle:version=\"${BUILD_NUMBER}\"
-      sparkle:shortVersionString=\"${SHORT_VERSION}\"
-      type=\"application/octet-stream\"/>
-  </item>"
+          ENTRY=$(cat << XMLEOF
+            <item>
+              <title>Version ${SHORT_VERSION}</title>
+              <sparkle:releaseNotesLink>https://github.com/${{ github.repository }}/releases/tag/${VERSION}</sparkle:releaseNotesLink>
+              <pubDate>${DATE}</pubDate>
+              <enclosure
+                url="${DMG_URL}"
+                sparkle:version="${BUILD_NUMBER}"
+                sparkle:shortVersionString="${SHORT_VERSION}"
+                type="application/octet-stream"/>
+            </item>
+          XMLEOF
+          )
 
           python3 -c "
 import sys
