@@ -138,13 +138,7 @@ jobs:
           XMLEOF
           )
 
-          python3 -c "
-import sys
-content = open('appcast.xml').read()
-entry = sys.argv[1]
-content = content.replace('</channel>', entry + '\n</channel>', 1)
-open('appcast.xml', 'w').write(content)
-" "$ENTRY"
+          python3 -c "import sys; content = open('appcast.xml').read(); entry = sys.argv[1]; content = content.replace('</channel>', entry + '\n</channel>', 1); open('appcast.xml', 'w').write(content)" "$ENTRY"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
