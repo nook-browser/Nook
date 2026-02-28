@@ -92,9 +92,17 @@ jobs:
             --password "$APPLE_APP_SPECIFIC_PASSWORD"
 
           zip -r Nook.zip "Nook.app"
-          xcrun notarytool submit "Nook.zip" \
+          SUBMIT_OUTPUT=$(xcrun notarytool submit "Nook.zip" \
             --keychain-profile "nook-notary" \
-            --wait
+            --wait 2>&1)
+          echo "$SUBMIT_OUTPUT"
+          SUBMISSION_ID=$(echo "$SUBMIT_OUTPUT" | grep "^  id:" | head -1 | awk '{print $2}')
+          STATUS=$(echo "$SUBMIT_OUTPUT" | grep "^  status:" | awk '{print $2}')
+          if [ "$STATUS" != "Accepted" ]; then
+            echo "Notarization rejected. Fetching log..."
+            xcrun notarytool log "$SUBMISSION_ID" --keychain-profile "nook-notary"
+            exit 1
+          fi
 
       - name: Staple notarization ticket
         run: xcrun stapler staple "Nook.app"
