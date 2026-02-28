@@ -80,6 +80,42 @@ jobs:
           fi
           cp -R "build/Build/Products/Release/Nook.app" ./Nook.app
 
+      - name: Re-sign for notarization
+        run: |
+          # Notarization requires all binaries to be signed with our Developer ID,
+          # a secure timestamp, and hardened runtime. Sparkle ships pre-signed with
+          # its own cert, so we must re-sign the entire bundle from inside out.
+          SPARKLE="Nook.app/Contents/Frameworks/Sparkle.framework/Versions/B"
+
+          # Sign innermost binaries first
+          codesign --force --sign "$SIGNING_IDENTITY" --timestamp --options runtime \
+            "$SPARKLE/XPCServices/Downloader.xpc/Contents/MacOS/Downloader"
+          codesign --force --sign "$SIGNING_IDENTITY" --timestamp --options runtime \
+            "$SPARKLE/XPCServices/Installer.xpc/Contents/MacOS/Installer"
+          codesign --force --sign "$SIGNING_IDENTITY" --timestamp --options runtime \
+            "$SPARKLE/Updater.app/Contents/MacOS/Updater"
+          codesign --force --sign "$SIGNING_IDENTITY" --timestamp --options runtime \
+            "$SPARKLE/Autoupdate"
+
+          # Sign bundles
+          codesign --force --sign "$SIGNING_IDENTITY" --timestamp --options runtime \
+            "$SPARKLE/XPCServices/Downloader.xpc"
+          codesign --force --sign "$SIGNING_IDENTITY" --timestamp --options runtime \
+            "$SPARKLE/XPCServices/Installer.xpc"
+          codesign --force --sign "$SIGNING_IDENTITY" --timestamp --options runtime \
+            "$SPARKLE/Updater.app"
+
+          # Sign the framework version and top-level
+          codesign --force --sign "$SIGNING_IDENTITY" --timestamp "$SPARKLE"
+          codesign --force --sign "$SIGNING_IDENTITY" --timestamp \
+            "Nook.app/Contents/Frameworks/Sparkle.framework"
+
+          # Re-sign the main app with entitlements and hardened runtime
+          codesign --force --sign "$SIGNING_IDENTITY" --timestamp \
+            --options runtime \
+            --entitlements "$(pwd)/Nook/Nook.entitlements" \
+            "Nook.app"
+
       - name: Notarize app
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
