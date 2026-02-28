@@ -64,5 +64,15 @@
       sparkle:shortVersionString="1.0.1"
       type="application/octet-stream"/>
   </item>
+  <item>
+    <title>Version 1.0.6</title>
+    <sparkle:releaseNotesLink>https://github.com/nook-browser/Nook/releases/tag/v1.0.6</sparkle:releaseNotesLink>
+    <pubDate>Sat, 28 Feb 2026 02:12:53 +0000</pubDate>
+    <enclosure
+      url="https://github.com/nook-browser/Nook/releases/download/v1.0.6/Nook-v1.0.6.dmg"
+      sparkle:version="106"
+      sparkle:shortVersionString="1.0.6"
+      type="application/octet-stream"/>
+  </item>
 </channel>
 </rss>
