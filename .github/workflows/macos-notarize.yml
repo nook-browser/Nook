@@ -105,10 +105,10 @@ jobs:
           codesign --force --sign "$SIGNING_IDENTITY" --timestamp --options runtime \
             "$SPARKLE/Updater.app"
 
-          # Sign the framework version and top-level
+          # Sign the framework version (Versions/B) — do NOT also sign the
+          # top-level Sparkle.framework symlink; it resolves to the same Versions/B
+          # directory and double-signing invalidates the signature.
           codesign --force --sign "$SIGNING_IDENTITY" --timestamp "$SPARKLE"
-          codesign --force --sign "$SIGNING_IDENTITY" --timestamp \
-            "Nook.app/Contents/Frameworks/Sparkle.framework"
 
           # Re-sign the main app with entitlements and hardened runtime
           codesign --force --sign "$SIGNING_IDENTITY" --timestamp \
