@@ -1,0 +1,21 @@
+[submodule "Fuzi"]
+	path = Fuzi
+	url = https://github.com/cezheng/Fuzi.git
+[submodule "Highlightr"]
+	path = Highlightr
+	url = https://github.com/raspu/Highlightr.git
+[submodule "LRUCache"]
+	path = LRUCache
+	url = https://github.com/nicklockwood/LRUCache.git
+[submodule "Motion"]
+	path = Motion
+	url = https://github.com/b3ll/Motion.git
+[submodule "reeeed"]
+	path = reeeed
+	url = https://github.com/nate-parrott/reeeed.git
+[submodule "swift-atomics"]
+	path = swift-atomics
+	url = https://github.com/apple/swift-atomics.git
+[submodule "swift-numerics"]
+	path = swift-numerics
+	url = https://github.com/apple/swift-numerics.git
