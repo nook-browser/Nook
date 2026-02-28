@@ -112,7 +112,7 @@ jobs:
           # Sign the framework version (Versions/B) — do NOT also sign the
           # top-level Sparkle.framework symlink; it resolves to the same Versions/B
           # directory and double-signing would invalidate the signature.
-          codesign --force --sign "$SIGNING_IDENTITY" --timestamp "$SPARKLE"
+          codesign --force --sign "$SIGNING_IDENTITY" --timestamp --options runtime "$SPARKLE"
 
           # Re-sign the main app with entitlements and hardened runtime
           codesign --force --sign "$SIGNING_IDENTITY" --timestamp \
@@ -134,7 +134,10 @@ jobs:
             --team-id "$APPLE_TEAM_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD"
 
-          zip -r Nook.zip "Nook.app"
+          # ditto preserves macOS symlinks and extended attributes; zip -r does not.
+          # Broken symlinks in the archive cause "invalid signature" errors because
+          # the bundle seal references symlink targets, not file copies.
+          ditto -c -k --keepParent "Nook.app" Nook.zip
           SUBMIT_OUTPUT=$(xcrun notarytool submit "Nook.zip" \
             --keychain-profile "nook-notary" \
             --wait 2>&1)
