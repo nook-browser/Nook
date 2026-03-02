@@ -16,7 +16,7 @@ package-lock.json
 xcuserdata/
 
 # Xcode nonsense
-# *.pbxproj
+ *.pbxproj
 # macOS garbage
 .DS_Store
 
