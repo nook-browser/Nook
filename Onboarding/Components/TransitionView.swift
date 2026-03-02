@@ -52,7 +52,6 @@ struct TransitionView<A: View, B: View>: View {
                     .frame(width: geo.size.width, height: geo.size.height)
                     .opacity(renderedShowB ? 1 : 0)
                     .allowsHitTesting(renderedShowB)
-                    .alwaysArrowCursor()
 
                 if let cg = snapshot {
                     Image(cg, scale: 1, label: Text(""))

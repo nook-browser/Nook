@@ -46,7 +46,7 @@ final class FocusableWKWebView: WKWebView {
         }
         super.rightMouseDown(with: event)
     }
-    
+
     override var acceptsFirstResponder: Bool { true }
 
     override func mouseUp(with event: NSEvent) {
@@ -101,7 +101,7 @@ final class FocusableWKWebView: WKWebView {
         let applied = applyPendingContextMenuIfPossible()
         print("🔽 [FocusableWKWebView] prepareMenu: applyPendingContextMenuIfPossible returned \(applied)")
     }
-    
+
     func handleImageDownload(identifier: String, promptForLocation: Bool = false) {
         let destinationPreference: Download.DestinationPreference = promptForLocation ? .askUser : .automaticDownloadsFolder
 
@@ -121,7 +121,7 @@ final class FocusableWKWebView: WKWebView {
             }
         }
     }
-    
+
     private func showSaveDialog(
         for localURL: URL,
         suggestedFilename: String,
@@ -129,19 +129,19 @@ final class FocusableWKWebView: WKWebView {
     ) {
         let savePanel = NSSavePanel()
         savePanel.nameFieldStringValue = suggestedFilename
-        
+
         // Set the default directory to Downloads
         if let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first {
             savePanel.directoryURL = downloads
         }
-        
+
         // Set allowed file types for images
         savePanel.allowedContentTypes = allowedContentTypes
-        
+
         // Set the title and message
         savePanel.title = "Save Image"
         savePanel.message = "Choose where to save the image"
-        
+
         // Show the save dialog
         savePanel.begin { [weak self] result in
             if result == .OK, let destinationURL = savePanel.url {
@@ -149,7 +149,7 @@ final class FocusableWKWebView: WKWebView {
                     // Move the downloaded file to the chosen location
                     try FileManager.default.moveItem(at: localURL, to: destinationURL)
                     print("🔽 [FocusableWKWebView] Image saved to: \(destinationURL.path)")
-                    
+
                     // Show a success notification
                     self?.showSaveSuccessNotification(for: destinationURL)
                 } catch {
@@ -162,7 +162,7 @@ final class FocusableWKWebView: WKWebView {
             }
         }
     }
-    
+
     private func showSaveSuccessNotification(for url: URL) {
         postUserNotification(
             title: "Image Saved",
@@ -238,9 +238,9 @@ final class FocusableWKWebView: WKWebView {
         originalURL: URL,
         destinationPreference: Download.DestinationPreference
     ) {
-        guard let tab = owningTab else { 
+        guard let tab = owningTab else {
             print("🔽 [FocusableWKWebView] No owning tab for download")
-            return 
+            return
         }
 
         var enrichedRequest = request

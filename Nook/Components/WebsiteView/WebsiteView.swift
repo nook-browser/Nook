@@ -221,7 +221,6 @@ struct WebsiteView: View {
                         // Critical: Use allowsHitTesting to prevent SwiftUI from intercepting mouse events
                         // This allows right-clicks to pass through to the underlying NSView (WKWebView)
                         .allowsHitTesting(true)
-                        .contentShape(Rectangle())
                     }
                     // Removed SwiftUI contextMenu - it intercepts ALL right-clicks
                     // WKWebView's willOpenMenu will handle context menus for images
@@ -524,6 +523,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
             context.coordinator.lastVersion != compositorVersion
 
         if needsRebuild {
+            let previousCurrentId = context.coordinator.lastCurrentId
             updateCompositor(nsView)
             context.coordinator.lastIsSplit = isSplit
             context.coordinator.lastLeftId = leftId
@@ -532,6 +532,27 @@ struct TabCompositorWrapper: NSViewRepresentable {
             context.coordinator.lastFraction = splitFraction
             context.coordinator.lastSize = size
             context.coordinator.lastVersion = compositorVersion
+
+            // Restore focus when tab changed (webview is now in hierarchy)
+            if previousCurrentId != currentId {
+                DispatchQueue.main.async {
+                    guard let window = nsView.window else { return }
+                    for subview in nsView.subviews.reversed() {
+                        if subview is SplitDropCaptureView { continue }
+                        if let webView = subview as? WKWebView, !webView.isHidden {
+                            window.makeFirstResponder(webView)
+                            return
+                        }
+                        // Check pane containers (split view)
+                        for child in subview.subviews {
+                            if let webView = child as? WKWebView, !child.isHidden {
+                                window.makeFirstResponder(webView)
+                                return
+                            }
+                        }
+                    }
+                }
+            }
         }
         
         // Mark current tab as accessed (resets unload timer)
@@ -822,7 +843,13 @@ private extension WebsiteView {
 private class ContainerView: NSView {
     // Don't intercept events - let them pass through to webviews
     override var acceptsFirstResponder: Bool { false }
-    
+
+    override func resetCursorRects() {
+        // Empty: prevents NSHostingView and other ancestors from registering
+        // arrow cursor rects over the webview. WKWebView uses NSCursor.set()
+        // internally, which works correctly when cursor rects don't override it.
+    }
+
     // Forward right-clicks to the webview below so context menus work
     override func rightMouseDown(with event: NSEvent) {
         print("🔽 [ContainerView] rightMouseDown received, forwarding to webview")

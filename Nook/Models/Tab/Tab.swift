@@ -3421,9 +3421,9 @@ extension Tab: WKUIDelegate {
         completionHandler(true, nil)
     }
 
-    // MARK: - WebAuthn / Passkey Support
+    // MARK: - Media Capture Authorization
 
-    /// Handle requests for media capture authorization (including WebAuthn/passkey requests)
+    /// Handle requests for camera/microphone capture authorization
     @available(macOS 13.0, *)
     public func webView(
         _ webView: WKWebView,
@@ -3436,8 +3436,6 @@ extension Tab: WKUIDelegate {
             "🔐 [Tab] Media capture authorization requested for type: \(type.rawValue) from origin: \(origin)"
         )
 
-        // For passkeys/WebAuthn, we want to grant permission
-        // The system will handle the actual Touch ID/Face ID prompt
         decisionHandler(.grant)
     }
 }
