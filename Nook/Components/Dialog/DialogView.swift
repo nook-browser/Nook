@@ -28,8 +28,7 @@ struct DialogView: View {
         .onChange(of: browserManager.dialogManager.isVisible) { _, isVisible in
             if isVisible {
                 // Resign WebView first responder so keyboard events reach the dialog
-                if let window = NSApp.keyWindow,
-                   window.firstResponder is WKWebView {
+                if let window = NSApp.keyWindow {
                     window.makeFirstResponder(nil)
                 }
             }

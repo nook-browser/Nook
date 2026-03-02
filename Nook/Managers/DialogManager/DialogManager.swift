@@ -15,7 +15,7 @@ class DialogManager {
     var isVisible: Bool = false
     var activeDialog: AnyView?
 
-    private nonisolated(unsafe) var tabKeyMonitor: Any?
+    private var tabKeyMonitor: Any?
 
     // MARK: - Presentation
 
