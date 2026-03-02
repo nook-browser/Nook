@@ -60,7 +60,7 @@ struct PeekOverlayView: View {
             }
         }
         .zIndex(9999) // Put it at the very top
-        .allowsHitTesting(true) // Always allow hit testing
+        .allowsHitTesting(isActive) // Only intercept events when Peek is active
         .onAppear {
             // Sync initial state when view appears
             if browserManager.peekManager.isActive {

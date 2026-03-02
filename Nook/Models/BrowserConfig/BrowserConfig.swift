@@ -111,22 +111,7 @@ class BrowserConfiguration {
         
         return config
     }
-    
-    // MARK: - User-Agent Client Hints Configuration
-    
-    /// Configure User-Agent Client Hints for enhanced browser capability reporting
-    /// This ensures websites receive proper information about platform capabilities
-    /// including passkey/WebAuthn support
-    private func configureClientHints(_ config: WKWebViewConfiguration) {
-        // User-Agent Client Hints are automatically supported when using a Safari-compatible User-Agent
-        // The applicationNameForUserAgent setting enables this functionality
-        // Additional headers like Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Platform are sent automatically
-        
-        // Enable features that support Client Hints
-        config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
-        config.preferences.setValue(true, forKey: "getUserMediaRequiresFocus")
-    }
-    
+
     // MARK: - Chrome Web Store Integration
     
     /// Get the Web Store injector script
