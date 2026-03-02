@@ -47,10 +47,9 @@ class DialogManager {
     private func installTabKeyMonitor() {
         guard tabKeyMonitor == nil else { return }
         tabKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            // Intercept Tab key while a dialog is visible
-            if event.keyCode == 48 { // 48 = Tab
+            if event.keyCode == 48 {
                 NSSound.beep()
-                return nil // swallow the event
+                return nil
             }
             return event
         }
