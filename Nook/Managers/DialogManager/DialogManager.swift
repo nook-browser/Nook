@@ -15,11 +15,14 @@ class DialogManager {
     var isVisible: Bool = false
     var activeDialog: AnyView?
 
+    private nonisolated(unsafe) var tabKeyMonitor: Any?
+
     // MARK: - Presentation
 
     func showDialog<Content: View>(_ dialog: Content) {
         activeDialog = AnyView(dialog)
         isVisible = true
+        installTabKeyMonitor()
     }
 
     func showDialog<Content: View>(@ViewBuilder builder: () -> Content) {
@@ -33,8 +36,30 @@ class DialogManager {
         }
 
         isVisible = false
+        removeTabKeyMonitor()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
             self?.activeDialog = nil
+        }
+    }
+
+    // MARK: - Tab Key Blocking
+
+    private func installTabKeyMonitor() {
+        guard tabKeyMonitor == nil else { return }
+        tabKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // Intercept Tab key while a dialog is visible
+            if event.keyCode == 48 { // 48 = Tab
+                NSSound.beep()
+                return nil // swallow the event
+            }
+            return event
+        }
+    }
+
+    private func removeTabKeyMonitor() {
+        if let monitor = tabKeyMonitor {
+            NSEvent.removeMonitor(monitor)
+            tabKeyMonitor = nil
         }
     }
 
@@ -54,13 +79,13 @@ class DialogManager {
                         Image("nook-logo-1024")
                             .resizable()
                             .scaledToFit()
-                            .frame(width: 26, height: 26)
+                            .frame(width: 50, height: 50)
                             .shadow(
                                 color: AppColors.textPrimary.opacity(0.3),
                                 radius: 0.5,
                                 y: 1
                             )
-                        Text("Are you sure you want to quit Nook?")
+                        Text("Quit Nook?")
                             .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(AppColors.textPrimary)
                         Text("You may lose unsaved work in your tabs.")
@@ -79,13 +104,16 @@ class DialogManager {
                         rightButtons: [
                             DialogButton(
                                 text: "Cancel",
+                                customIcon: AnyView(KeycapLabel("esc")),
                                 variant: .secondary,
+                                keyboardShortcut: .escape,
                                 action: closeDialog
                             ),
                             DialogButton(
                                 text: "Quit",
                                 iconName: "return",
                                 variant: .primary,
+                                keyboardShortcut: .return,
                                 action: onQuit
                             ),
                         ]
@@ -261,62 +289,30 @@ struct DialogFooter: View {
     var body: some View {
         HStack {
             if let leftButton = leftButton {
-                if let iconName = leftButton.iconName {
-                    Button(leftButton.text, action: leftButton.action)
-                        .buttonStyle(
-                            DialogButtonStyle(
-                                variant: leftButton.variant,
-                                icon: leftButton.iconName.map {
-                                    AnyView(Image(systemName: $0))
-                                },
-                                iconPosition: .trailing
-                            )
+                Button(leftButton.text, action: leftButton.action)
+                    .buttonStyle(
+                        DialogButtonStyle(
+                            variant: leftButton.variant,
+                            icon: leftButton.resolvedIcon,
+                            iconPosition: .trailing
                         )
-                        .conditionally(if: OSVersion.supportsGlassEffect) {
-                            View in
-                            View
-                                .tint(
-                                    Color("plainBackgroundColor").opacity(
-                                        colorScheme == .light ? 0.8 : 0.4
-                                    )
+                    )
+                    .conditionally(if: OSVersion.supportsGlassEffect) {
+                        View in
+                        View
+                            .tint(
+                                Color("plainBackgroundColor").opacity(
+                                    colorScheme == .light ? 0.8 : 0.4
                                 )
-                        }
-                        .controlSize(.extraLarge)
-
-                        .disabled(!leftButton.isEnabled)
-                        .modifier(
-                            OptionalKeyboardShortcut(
-                                shortcut: leftButton.keyboardShortcut
                             )
+                    }
+                    .controlSize(.extraLarge)
+                    .disabled(!leftButton.isEnabled)
+                    .modifier(
+                        OptionalKeyboardShortcut(
+                            shortcut: leftButton.keyboardShortcut
                         )
-                } else {
-                    Button(leftButton.text, action: leftButton.action)
-                        .buttonStyle(
-                            DialogButtonStyle(
-                                variant: leftButton.variant,
-                                icon: leftButton.iconName.map {
-                                    AnyView(Image(systemName: $0))
-                                },
-                                iconPosition: .trailing
-                            )
-                        )
-                        .conditionally(if: OSVersion.supportsGlassEffect) {
-                            View in
-                            View
-                                .tint(
-                                    Color("plainBackgroundColor").opacity(
-                                        colorScheme == .light ? 0.8 : 0.4
-                                    )
-                                )
-                        }
-                        .controlSize(.extraLarge)
-                        .disabled(!leftButton.isEnabled)
-                        .modifier(
-                            OptionalKeyboardShortcut(
-                                shortcut: leftButton.keyboardShortcut
-                            )
-                        )
-                }
+                    )
             }
 
             Spacer()
@@ -329,9 +325,7 @@ struct DialogFooter: View {
                         .buttonStyle(
                             DialogButtonStyle(
                                 variant: button.variant,
-                                icon: button.iconName.map {
-                                    AnyView(Image(systemName: $0))
-                                },
+                                icon: button.resolvedIcon,
                                 iconPosition: .trailing
                             )
                         )
@@ -351,15 +345,23 @@ struct DialogFooter: View {
 struct DialogButton {
     let text: String
     let iconName: String?
+    let customIcon: AnyView?
     let variant: DialogButtonStyleVariant
     let action: () -> Void
     let keyboardShortcut: KeyEquivalent?
     let shadowStyle: NookButtonStyle.ShadowStyle
     let isEnabled: Bool
 
+    /// The resolved icon view: customIcon takes priority, then iconName as SF Symbol
+    var resolvedIcon: AnyView? {
+        if let customIcon { return customIcon }
+        return iconName.map { AnyView(Image(systemName: $0)) }
+    }
+
     init(
         text: String,
         iconName: String? = nil,
+        customIcon: AnyView? = nil,
         variant: DialogButtonStyleVariant = .secondary,
         keyboardShortcut: KeyEquivalent? = nil,
         shadowStyle: NookButtonStyle.ShadowStyle = .subtle,
@@ -368,6 +370,7 @@ struct DialogButton {
     ) {
         self.text = text
         self.iconName = iconName
+        self.customIcon = customIcon
         self.variant = variant
         self.action = action
         self.keyboardShortcut = keyboardShortcut
@@ -447,5 +450,23 @@ struct DialogButtonStyle: ButtonStyle {
         .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
         .opacity(configuration.isPressed ? 0.8 : 1.0)
         .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
+    }
+}
+
+/// A small rounded badge for displaying keyboard shortcut hints (e.g. "esc", "tab")
+struct KeycapLabel: View {
+    let text: String
+
+    init(_ text: String) {
+        self.text = text
+    }
+
+    var body: some View {
+        Text(text.uppercased())
+            .font(.system(size: 10, weight: .semibold, design: .rounded))
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(.white.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 }

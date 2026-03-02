@@ -220,7 +220,9 @@ struct WebsiteView: View {
                         .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 0)
                         // Critical: Use allowsHitTesting to prevent SwiftUI from intercepting mouse events
                         // This allows right-clicks to pass through to the underlying NSView (WKWebView)
-                        .allowsHitTesting(true)
+                        // Disable hit testing when a dialog is visible so clicks can't reach the WebView
+                        .allowsHitTesting(!browserManager.dialogManager.isVisible)
+                        .contentShape(Rectangle())
                     }
                     // Removed SwiftUI contextMenu - it intercepts ALL right-clicks
                     // WKWebView's willOpenMenu will handle context menus for images

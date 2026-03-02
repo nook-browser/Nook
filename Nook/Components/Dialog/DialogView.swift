@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import WebKit
 
 struct DialogView: View {
     @EnvironmentObject var browserManager: BrowserManager
@@ -24,6 +25,16 @@ struct DialogView: View {
             }
         }
         .animation(.bouncy(duration: 0.2, extraBounce: -0.1), value: browserManager.dialogManager.isVisible)
+        .onChange(of: browserManager.dialogManager.isVisible) { _, isVisible in
+            if isVisible {
+                // Resign the WebView as first responder so keyboard events
+                // (Enter, Escape, Tab) go to the dialog buttons instead
+                if let window = NSApp.keyWindow,
+                   window.firstResponder is WKWebView {
+                    window.makeFirstResponder(nil)
+                }
+            }
+        }
     }
 
     @ViewBuilder
