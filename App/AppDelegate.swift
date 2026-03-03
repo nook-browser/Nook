@@ -149,17 +149,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     ///
     /// - Returns: Always returns `.terminateLater` to handle termination asynchronously
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        let reason = NSAppleEventManager.shared()
-            .currentAppleEvent?
-            .attributeDescriptor(forKeyword: kAEQuitReason)
-
-        switch reason?.enumCodeValue {
-        case nil:
-            handleTermination(sender: sender, shouldTerminate: true)
-        default:
-            handleTermination(sender: sender, shouldTerminate: true)
+        // When "warn before quitting" is disabled, terminate(nil) is called directly
+        // from the SwiftUI CommandGroup button action. Returning .terminateLater in that
+        // context deadlocks because the async Task can't execute during the termination
+        // run loop mode. Since the user opted out of the warning, just quit immediately.
+        let askBeforeQuit = userDefaults.bool(forKey: "settings.askBeforeQuit")
+        if !askBeforeQuit {
+            return .terminateNow
         }
 
+        handleTermination(sender: sender, shouldTerminate: true)
         return .terminateLater
     }
 

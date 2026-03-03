@@ -80,6 +80,15 @@ struct NookCommands: Commands {
         CommandGroup(replacing: .newItem) {}
         CommandGroup(replacing: .windowList) {}
 
+        // Replace the standard Quit menu item to route through showQuitDialog(),
+        // which respects the "warn before quitting" setting
+        CommandGroup(replacing: .appTermination) {
+            Button("Quit Nook") {
+                browserManager.showQuitDialog()
+            }
+            .keyboardShortcut("q", modifiers: .command)
+        }
+
         // App Menu Section (under Nook)
         CommandGroup(after: .appInfo) {
             Divider()
@@ -217,13 +226,6 @@ struct NookCommands: Commands {
             }
             .modifier(dynamicShortcut(.openDevTools))
             .disabled(browserManager.currentTabForActiveWindow() == nil)
-
-            Divider()
-
-            Button("Force Quit App") {
-                browserManager.showQuitDialog()
-            }
-            .modifier(dynamicShortcut(.closeBrowser))
 
             Divider()
 
