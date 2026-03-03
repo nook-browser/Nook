@@ -40,9 +40,7 @@ struct SidebarMenu: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
-            if nookSettings.sidebarPosition == .left{
-                tabs
-            }
+            tabs
             VStack {
                 switch selectedTab {
                 case .history:
@@ -52,10 +50,8 @@ struct SidebarMenu: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            if nookSettings.sidebarPosition == .right{
-                tabs
-            }
         }
+        .environment(\.layoutDirection, nookSettings.sidebarPosition == .left ? .leftToRight : .rightToLeft)
         .frame(maxWidth: .infinity)
         .ignoresSafeArea()
     }
