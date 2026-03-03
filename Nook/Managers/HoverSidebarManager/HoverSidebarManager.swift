@@ -82,7 +82,9 @@ final class HoverSidebarManager: ObservableObject {
         // Never show overlay while the real sidebar is visible
         if activeState.isSidebarVisible {
             if isOverlayVisible {
-                isOverlayVisible = false
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    isOverlayVisible = false
+                }
             }
             return
         }

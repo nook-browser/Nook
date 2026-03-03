@@ -32,11 +32,6 @@ struct WindowView: View {
 
             SidebarWebViewStack()
 
-            // Hover-reveal Sidebar overlay (slides in over web content)
-            SidebarHoverOverlayView()
-                .environmentObject(hoverSidebarManager)
-                .environment(windowState)
-
             CommandPaletteView()
             DialogView()
 
@@ -172,10 +167,10 @@ struct WindowView: View {
         let sidebarVisible = windowState.isSidebarVisible
         let sidebarOnRight = nookSettings.sidebarPosition == .right
         let sidebarOnLeft = nookSettings.sidebarPosition == .left
-        
+
         HStack(spacing: 0) {
             if aiAppearsOnTrailingEdge {
-                SpacesSidebar()
+                SidebarLayoutSpacer()
                 WebContent()
                 if aiVisible {
                     AISidebar()
@@ -185,33 +180,106 @@ struct WindowView: View {
                     AISidebar()
                 }
                 WebContent()
-                SpacesSidebar()
+                SidebarLayoutSpacer()
             }
         }
         // Apply padding similar to regular sidebar: remove padding when sidebar/AI is visible on that side
         // When sidebar is on left, AI appears on right (trailing); when sidebar is on right, AI appears on left (leading)
         .padding(.trailing, (sidebarVisible && sidebarOnRight) || (aiVisible && sidebarOnLeft) ? 0 : 8)
         .padding(.leading, (sidebarVisible && sidebarOnLeft) || (aiVisible && sidebarOnRight) ? 0 : 8)
+        .overlay(alignment: nookSettings.sidebarPosition == .left ? .leading : .trailing) {
+            UnifiedSidebar()
+        }
     }
 
+    /// Invisible spacer that pushes web content aside when the sidebar is pinned.
     @ViewBuilder
-    private func SpacesSidebar() -> some View {
-        if windowState.isSidebarVisible {
-            SpacesSideBarView()
-                .frame(width: windowState.sidebarWidth)
-                .overlay(alignment: nookSettings.sidebarPosition == .left ? .trailing : .leading) {
-                    SidebarResizeView()
-                        .frame(maxHeight: .infinity)
-                        .environmentObject(browserManager)
-                        .environment(windowState)
-                        .zIndex(2000)
-                        .environment(windowState)
-                }
-                .environmentObject(browserManager)
-                .environment(windowState)
-                .environment(commandPalette)
-                .environmentObject(browserManager.gradientColorManager)
+    private func SidebarLayoutSpacer() -> some View {
+        Color.clear
+            .frame(width: windowState.isSidebarVisible ? windowState.sidebarWidth : 0)
+    }
+
+    /// Single sidebar instance rendered as an overlay — always the same view identity.
+    /// When floating, uses offset to slide in/out (preserving view identity without removal).
+    @ViewBuilder
+    private func UnifiedSidebar() -> some View {
+        let isPinned = windowState.isSidebarVisible
+        let isFloatingVisible = hoverSidebarManager.isOverlayVisible && !isPinned
+        let shouldShow = isPinned || isFloatingVisible
+        let onLeft = nookSettings.sidebarPosition == .left
+        // Slide offset: push sidebar fully off-screen in the appropriate direction
+        let slideOffset: CGFloat = {
+            if isPinned || isFloatingVisible { return 0 }
+            // Slide out to the left or right edge
+            return onLeft ? -(windowState.sidebarWidth + 14) : (windowState.sidebarWidth + 14)
+        }()
+
+        ZStack(alignment: onLeft ? .leading : .trailing) {
+            // Edge hover trigger zone — always present when sidebar is unpinned
+            if !isPinned {
+                Color.clear
+                    .frame(width: hoverSidebarManager.triggerWidth)
+                    .contentShape(Rectangle())
+                    .onHover { isIn in
+                        if isIn && !windowState.isSidebarVisible {
+                            withAnimation(.easeInOut(duration: 0.12)) {
+                                hoverSidebarManager.isOverlayVisible = true
+                            }
+                        }
+                        NSCursor.arrow.set()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity,
+                           alignment: onLeft ? .leading : .trailing)
+            }
+
+            // The single sidebar panel — slides in/out when floating, always visible when pinned
+            sidebarPanel(isPinned: isPinned)
+                .offset(x: isPinned ? 0 : slideOffset)
+                .allowsHitTesting(shouldShow)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity,
+               alignment: onLeft ? .leading : .trailing)
+        .animation(.easeInOut(duration: 0.15), value: isFloatingVisible)
+    }
+
+    /// Wraps `SpacesSideBarView` with mode-dependent styling.
+    @ViewBuilder
+    private func sidebarPanel(isPinned: Bool) -> some View {
+        let cornerRadius: CGFloat = isPinned ? 0 : 12
+        let inset: CGFloat = isPinned ? 0 : 7
+        let resizeHandleAlignment: Alignment = nookSettings.sidebarPosition == .left ? .trailing : .leading
+
+        SpacesSideBarView()
+            .frame(width: windowState.sidebarWidth)
+            .frame(maxHeight: .infinity)
+            .overlay(alignment: resizeHandleAlignment) {
+                SidebarResizeView()
+                    .frame(maxHeight: .infinity)
+                    .environmentObject(browserManager)
+                    .environment(windowState)
+                    .zIndex(2000)
+                    .opacity(isPinned ? 1 : 0)
+                    .allowsHitTesting(isPinned)
+            }
+            .background {
+                if !isPinned {
+                    SpaceGradientBackgroundView()
+                        .environmentObject(browserManager)
+                        .environmentObject(browserManager.gradientColorManager)
+                        .environment(windowState)
+                        .clipShape(.rect(cornerRadius: cornerRadius))
+
+                    Rectangle()
+                        .fill(Color.clear)
+                        .universalGlassEffect(.regular.tint(Color(.windowBackgroundColor).opacity(0.35)), in: .rect(cornerRadius: cornerRadius))
+                }
+            }
+            .padding(nookSettings.sidebarPosition == .left ? .leading : .trailing, inset)
+            .padding(.vertical, inset)
+            .environmentObject(browserManager)
+            .environment(windowState)
+            .environment(commandPalette)
+            .environmentObject(browserManager.gradientColorManager)
     }
 
     @ViewBuilder
