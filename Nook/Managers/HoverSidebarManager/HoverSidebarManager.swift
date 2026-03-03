@@ -30,6 +30,33 @@ final class HoverSidebarManager: ObservableObject {
     weak var windowRegistry: WindowRegistry?
     weak var nookSettings: NookSettingsService?
 
+    /// Whether the mouse is currently inside the sidebar content area.
+    /// Updated on every mouse move; used to avoid dismissing the peek overlay while the user hovers.
+    @Published var isMouseInsideSidebar: Bool = false
+
+    /// When set, the mouse monitor won't auto-hide the overlay until this time has passed.
+    /// Used to keep the sidebar visible briefly after a position swap.
+    var peekUntil: Date?
+
+    /// Show the floating sidebar and keep it visible for `duration` seconds,
+    /// regardless of mouse position. After the duration, normal mouse tracking resumes.
+    func peekOverlay(for duration: TimeInterval = 2.0) {
+        let deadline = Date().addingTimeInterval(duration)
+        peekUntil = deadline
+        withAnimation(.easeInOut(duration: 0.15)) {
+            isOverlayVisible = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
+            guard let self else { return }
+            // Only expire if this is still the same peek (not a newer one)
+            if self.peekUntil == deadline {
+                self.peekUntil = nil
+                // Let the next mouse move naturally evaluate whether to hide
+                self.scheduleHandleMouseMovement()
+            }
+        }
+    }
+
     // MARK: - Monitors
     private var globalMonitor: Any?
     private var localMonitor: Any?
@@ -133,6 +160,14 @@ final class HoverSidebarManager: ObservableObject {
             inSidebarContentZone = (mouse.x >= rightEdge - overlayWidth) && (mouse.x <= rightEdge)
         }
         
+        isMouseInsideSidebar = inSidebarContentZone && verticalOK
+
+        // During a peek (e.g. after position swap), don't auto-hide
+        if let peekUntil, Date() < peekUntil {
+            // Still update isMouseInsideSidebar but don't change visibility
+            return
+        }
+
         // Show sidebar if: in trigger zone, OR (sidebar visible AND (in keep-open zone OR over sidebar content))
         let shouldShow = inTriggerZone || (isOverlayVisible && (inKeepOpenZone || inSidebarContentZone))
         if shouldShow != isOverlayVisible {

@@ -163,40 +163,60 @@ struct WindowView: View {
     @ViewBuilder
     private func SidebarWebViewStack() -> some View {
         let aiVisible = windowState.isSidebarAIChatVisible
-        let aiAppearsOnTrailingEdge = nookSettings.sidebarPosition == .left
         let sidebarVisible = windowState.isSidebarVisible
-        let sidebarOnRight = nookSettings.sidebarPosition == .right
         let sidebarOnLeft = nookSettings.sidebarPosition == .left
 
-        HStack(spacing: 0) {
-            if aiAppearsOnTrailingEdge {
-                SidebarLayoutSpacer()
-                WebContent()
-                if aiVisible {
-                    AISidebar()
-                }
+        // Fixed-order layout: [LeftSpacer] [WebContent] [RightSpacer]
+        // WebContent always stays in the middle with stable view identity.
+        // Spacer widths push content based on what's on each side.
+        let leftWidth: CGFloat = {
+            if sidebarOnLeft {
+                return sidebarVisible ? windowState.sidebarWidth : 0
             } else {
-                if aiVisible {
-                    AISidebar()
-                }
-                WebContent()
-                SidebarLayoutSpacer()
+                return aiVisible ? windowState.aiSidebarWidth : 0
             }
-        }
-        // Apply padding similar to regular sidebar: remove padding when sidebar/AI is visible on that side
-        // When sidebar is on left, AI appears on right (trailing); when sidebar is on right, AI appears on left (leading)
-        .padding(.trailing, (sidebarVisible && sidebarOnRight) || (aiVisible && sidebarOnLeft) ? 0 : 8)
-        .padding(.leading, (sidebarVisible && sidebarOnLeft) || (aiVisible && sidebarOnRight) ? 0 : 8)
-        .overlay(alignment: nookSettings.sidebarPosition == .left ? .leading : .trailing) {
-            UnifiedSidebar()
-        }
-    }
+        }()
 
-    /// Invisible spacer that pushes web content aside when the sidebar is pinned.
-    @ViewBuilder
-    private func SidebarLayoutSpacer() -> some View {
-        Color.clear
-            .frame(width: windowState.isSidebarVisible ? windowState.sidebarWidth : 0)
+        let rightWidth: CGFloat = {
+            if sidebarOnLeft {
+                return aiVisible ? windowState.aiSidebarWidth : 0
+            } else {
+                return sidebarVisible ? windowState.sidebarWidth : 0
+            }
+        }()
+
+        // Determine edge padding: remove padding when sidebar/AI is visible on that side
+        let hasLeftContent = (sidebarOnLeft && sidebarVisible) || (!sidebarOnLeft && aiVisible)
+        let hasRightContent = (!sidebarOnLeft && sidebarVisible) || (sidebarOnLeft && aiVisible)
+
+        ZStack {
+            // Sidebar sits below web content when pinned (slides under during swap),
+            // but above when floating (hovers over web content from the edge)
+            UnifiedSidebar()
+                .zIndex(windowState.isSidebarVisible ? 0 : 2)
+
+            if aiVisible {
+                AISidebar()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity,
+                           alignment: sidebarOnLeft ? .trailing : .leading)
+                    .zIndex(0)
+            }
+
+            // Web content column renders above sidebars so they slide under it
+            HStack(spacing: 0) {
+                Color.clear
+                    .frame(width: leftWidth)
+                    .allowsHitTesting(false)
+                WebContent()
+                Color.clear
+                    .frame(width: rightWidth)
+                    .allowsHitTesting(false)
+            }
+            .padding(.leading, hasLeftContent ? 0 : 8)
+            .padding(.trailing, hasRightContent ? 0 : 8)
+            .zIndex(1)
+        }
+        .animation(.smooth(duration: 0.3), value: nookSettings.sidebarPosition)
     }
 
     /// Single sidebar instance rendered as an overlay — always the same view identity.
@@ -240,6 +260,12 @@ struct WindowView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity,
                alignment: onLeft ? .leading : .trailing)
         .animation(.easeInOut(duration: 0.15), value: isFloatingVisible)
+        .animation(.smooth(duration: 0.3), value: nookSettings.sidebarPosition)
+        // Briefly flash the floating sidebar on its new side after a position swap
+        .onChange(of: nookSettings.sidebarPosition) { _, _ in
+            guard !isPinned else { return }
+            hoverSidebarManager.peekOverlay(for: 2.0)
+        }
     }
 
     /// Wraps `SpacesSideBarView` with mode-dependent styling.
