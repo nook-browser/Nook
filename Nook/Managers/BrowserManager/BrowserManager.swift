@@ -808,25 +808,23 @@ class BrowserManager: ObservableObject {
 
     func toggleSidebar() {
         if let windowState = windowRegistry?.activeWindow {
-            toggleSidebar(for: windowState)
+            let floatingVisible = windowState.hoverSidebarManager?.isOverlayVisible ?? false
+            toggleSidebar(for: windowState, floatingVisible: floatingVisible)
         } else {
-            let unpinning = isSidebarVisible
-            if unpinning {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isSidebarVisible = false
-                }
-            } else {
-                isSidebarVisible = true
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isSidebarVisible.toggle()
             }
             saveSidebarSettings()
         }
     }
 
-    func toggleSidebar(for windowState: BrowserWindowState) {
+    func toggleSidebar(for windowState: BrowserWindowState, floatingVisible: Bool = false) {
         let unpinning = windowState.isSidebarVisible
-        if unpinning {
+        // Skip animation when pinning while the floating sidebar is already showing
+        let shouldAnimate = unpinning || !floatingVisible
+        if shouldAnimate {
             withAnimation(.easeInOut(duration: 0.2)) {
-                windowState.isSidebarVisible = false
+                windowState.isSidebarVisible = !unpinning
             }
         } else {
             windowState.isSidebarVisible = true

@@ -107,6 +107,7 @@ struct WindowView: View {
             hoverSidebarManager.windowRegistry = windowRegistry
             hoverSidebarManager.nookSettings = nookSettings
             hoverSidebarManager.start()
+            windowState.hoverSidebarManager = hoverSidebarManager
         }
         .onDisappear {
             hoverSidebarManager.stop()
@@ -190,8 +191,8 @@ struct WindowView: View {
         let hasRightContent = (!sidebarOnLeft && sidebarVisible) || (sidebarOnLeft && aiVisible)
 
         ZStack {
-            // Sidebar sits below web content when pinned (slides under during swap),
-            // but above when floating (hovers over web content from the edge)
+            // When pinned: sidebar sits below web content (zIndex 0) so position
+            // swaps slide it under. When floating: above (zIndex 2) so it hovers.
             UnifiedSidebar()
                 .zIndex(windowState.isSidebarVisible ? 0 : 2)
 
@@ -202,7 +203,7 @@ struct WindowView: View {
                     .zIndex(0)
             }
 
-            // Web content column renders above sidebars so they slide under it
+            // Web content column — above pinned sidebars so they slide under it
             HStack(spacing: 0) {
                 Color.clear
                     .frame(width: leftWidth)
