@@ -160,7 +160,10 @@ final class HoverSidebarManager: ObservableObject {
             inSidebarContentZone = (mouse.x >= rightEdge - overlayWidth) && (mouse.x <= rightEdge)
         }
         
-        isMouseInsideSidebar = inSidebarContentZone && verticalOK
+        let newIsInsideSidebar = inSidebarContentZone && verticalOK
+        if isMouseInsideSidebar != newIsInsideSidebar {
+            isMouseInsideSidebar = newIsInsideSidebar
+        }
 
         // During a peek (e.g. after position swap), don't auto-hide
         if let peekUntil, Date() < peekUntil {
