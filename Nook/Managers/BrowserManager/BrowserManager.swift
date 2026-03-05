@@ -811,7 +811,7 @@ class BrowserManager: ObservableObject {
             let floatingVisible = windowState.hoverSidebarManager?.isOverlayVisible ?? false
             toggleSidebar(for: windowState, floatingVisible: floatingVisible)
         } else {
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(.smooth(duration: 0.1)) {
                 isSidebarVisible.toggle()
             }
             saveSidebarSettings()
@@ -823,7 +823,7 @@ class BrowserManager: ObservableObject {
         // Skip animation when pinning while the floating sidebar is already showing
         let shouldAnimate = unpinning || !floatingVisible
         if shouldAnimate {
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(.smooth(duration: 0.1)) {
                 windowState.isSidebarVisible = !unpinning
             }
         } else {
