@@ -214,7 +214,7 @@ struct WebsiteView: View {
                             windowState: windowState
                         )
                         .coordinateSpace(name: dragCoordinateSpace)
-                        .background(shouldShowSplit ? Color.clear : Color(nsColor: .windowBackgroundColor))
+                        .background(shouldShowSplit ? Color.clear : Color(nsColor: browserManager.currentTab(for: windowState)?.pageBackgroundColor ?? .windowBackgroundColor))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .clipShape(webViewClipShape)
                         .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 0)
@@ -645,19 +645,19 @@ struct TabCompositorWrapper: NSViewRepresentable {
                 if let lId = leftId, let leftTab = allKnownTabs.first(where: { $0.id == lId }) {
                     // Force-create/ensure loaded when visible in split
                     let lWeb = webView(for: leftTab, windowId: windowState.id)
-                    let pane = makePaneContainer(frame: leftRect, isActive: (activeSide == .left), accent: accent, side: .left)
+                    let pane = makePaneContainer(frame: leftRect, isActive: (activeSide == .left), accent: accent, side: .left, pageBackground: leftTab.pageBackgroundColor)
                     containerView.addSubview(pane)
                     lWeb.frame = pane.bounds
                     lWeb.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
                     lWeb.isHidden = false
                     pane.addSubview(lWeb)
-                    
+
                 }
 
                 if let rId = rightId, let rightTab = allKnownTabs.first(where: { $0.id == rId }) {
                     // Force-create/ensure loaded when visible in split
                     let rWeb = webView(for: rightTab, windowId: windowState.id)
-                    let pane = makePaneContainer(frame: rightRect, isActive: (activeSide == .right), accent: accent, side: .right)
+                    let pane = makePaneContainer(frame: rightRect, isActive: (activeSide == .right), accent: accent, side: .right, pageBackground: rightTab.pageBackgroundColor)
                     containerView.addSubview(pane)
                     rWeb.frame = pane.bounds
                     rWeb.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
@@ -706,16 +706,16 @@ struct TabCompositorWrapper: NSViewRepresentable {
         print("🔍 [MEMDEBUG] updateCompositor() COMPLETE - Window: \(windowState.id.uuidString.prefix(8)), WebViews in container: \(webViewCount), Total subviews: \(totalSubviews)")
     }
 
-    private func makePaneContainer(frame: NSRect, isActive: Bool, accent: NSColor, side: SplitViewManager.Side) -> NSView {
+    private func makePaneContainer(frame: NSRect, isActive: Bool, accent: NSColor, side: SplitViewManager.Side, pageBackground: NSColor? = nil) -> NSView {
         let cornerRadius: CGFloat = {
             if #available(macOS 26.0, *) { return 8 } else { return 8 }
         }()
-        
+
         let v = NSView(frame: frame)
         v.wantsLayer = true
-        
+
         if let layer = v.layer {
-            layer.backgroundColor = NSColor.windowBackgroundColor.cgColor
+            layer.backgroundColor = (pageBackground ?? .windowBackgroundColor).cgColor
             
             // Create mask layer for uneven rounded corners
             let maskLayer = CAShapeLayer()
