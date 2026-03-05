@@ -40,20 +40,29 @@ struct SidebarMenu: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
-            tabs
-            VStack {
-                switch selectedTab {
-                case .history:
-                    SidebarMenuHistoryTab()
-                case .downloads:
-                    SidebarMenuDownloadsTab()
-                }
+            if nookSettings.sidebarPosition == .left {
+                tabs
+                content
+            } else {
+                content
+                tabs
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .environment(\.layoutDirection, nookSettings.sidebarPosition == .left ? .leftToRight : .rightToLeft)
         .frame(maxWidth: .infinity)
         .ignoresSafeArea()
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        VStack {
+            switch selectedTab {
+            case .history:
+                SidebarMenuHistoryTab()
+            case .downloads:
+                SidebarMenuDownloadsTab()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     var tabs: some View{
