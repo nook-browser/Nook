@@ -260,6 +260,9 @@ struct SpacesSideBarView: View {
 
             Divider()
 
+            // Note: The same .smooth(duration: 0.3) animation is also applied in
+            // Appearance.swift's sidebar position picker — both entry points animate
+            // consistently.
             Menu {
                 ForEach(SidebarPosition.allCases) { position in
                     Toggle(isOn: Binding(

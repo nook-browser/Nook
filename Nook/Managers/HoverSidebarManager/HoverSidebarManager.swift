@@ -11,6 +11,11 @@ import AppKit
 /// Manages reveal/hide of the overlay sidebar when the real sidebar is collapsed.
 /// Uses a global mouse-move monitor to handle edge hover, including slight overshoot
 /// beyond the window's left boundary.
+///
+/// All state reads/writes (isOverlayVisible, peekUntil, isMouseInsideSidebar) happen on
+/// the main actor — either from SwiftUI onChange callbacks or DispatchQueue.main callbacks.
+/// Marking the class @MainActor makes this guarantee compiler-enforced.
+@MainActor
 final class HoverSidebarManager: ObservableObject {
     // MARK: - Published State
     @Published var isOverlayVisible: Bool = false
@@ -46,13 +51,14 @@ final class HoverSidebarManager: ObservableObject {
         withAnimation(.easeInOut(duration: 0.15)) {
             isOverlayVisible = true
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
             guard let self else { return }
             // Only expire if this is still the same peek (not a newer one)
             if self.peekUntil == deadline {
                 self.peekUntil = nil
                 // Let the next mouse move naturally evaluate whether to hide
-                self.scheduleHandleMouseMovement()
+                self.handleMouseMovementOnMain()
             }
         }
     }
@@ -87,20 +93,18 @@ final class HoverSidebarManager: ObservableObject {
         isActive = false
         if let token = localMonitor { NSEvent.removeMonitor(token); localMonitor = nil }
         if let token = globalMonitor { NSEvent.removeMonitor(token); globalMonitor = nil }
-        DispatchQueue.main.async { [weak self] in self?.isOverlayVisible = false }
+        isOverlayVisible = false
     }
 
-    deinit { stop() }
-
     // MARK: - Mouse Logic
-    private func scheduleHandleMouseMovement() {
-        // Ensure main-actor work since we touch NSApp/window and main-actor BrowserManager
+    private nonisolated func scheduleHandleMouseMovement() {
+        // Event monitors fire on the main thread but aren't formally MainActor-isolated,
+        // so dispatch back to MainActor explicitly.
         DispatchQueue.main.async { [weak self] in
             self?.handleMouseMovementOnMain()
         }
     }
 
-    @MainActor
     private func handleMouseMovementOnMain() {
         guard let bm = browserManager,
               let registry = windowRegistry,

@@ -66,4 +66,15 @@ extension View {
     func alwaysArrowCursor() -> some View {
         self.overlay(ForceArrowCursorView().allowsHitTesting(false))
     }
+
+    /// Conditionally ensures the arrow cursor while hovering this view's visual bounds.
+    /// Useful for the floating sidebar where a web view underneath may set a different cursor.
+    @ViewBuilder
+    func alwaysArrowCursor(when condition: Bool) -> some View {
+        if condition {
+            self.overlay(ForceArrowCursorView().allowsHitTesting(false))
+        } else {
+            self
+        }
+    }
 }

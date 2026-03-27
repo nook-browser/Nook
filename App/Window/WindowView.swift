@@ -229,10 +229,12 @@ struct WindowView: View {
         let shouldShow = isPinned || isFloatingVisible
         let onLeft = nookSettings.sidebarPosition == .left
         // Slide offset: push sidebar fully off-screen in the appropriate direction
+        // Total floating inset = 7pt padding × 2 sides (horizontal padding around the floating panel)
+        let floatingInset: CGFloat = 14
         let slideOffset: CGFloat = {
             if isPinned || isFloatingVisible { return 0 }
-            // Slide out to the left or right edge
-            return onLeft ? -(windowState.sidebarWidth + 14) : (windowState.sidebarWidth + 14)
+            // Slide out to the left or right edge (sidebar width + both sides of floating padding)
+            return onLeft ? -(windowState.sidebarWidth + floatingInset) : (windowState.sidebarWidth + floatingInset)
         }()
 
         ZStack(alignment: onLeft ? .leading : .trailing) {
@@ -279,6 +281,7 @@ struct WindowView: View {
         SpacesSideBarView()
             .frame(width: windowState.sidebarWidth)
             .frame(maxHeight: .infinity)
+            .alwaysArrowCursor(when: !isPinned)
             .overlay(alignment: resizeHandleAlignment) {
                 SidebarResizeView()
                     .frame(maxHeight: .infinity)
@@ -311,13 +314,7 @@ struct WindowView: View {
 
     @ViewBuilder
     private func WebContent() -> some View {
-        let cornerRadius: CGFloat = {
-            if #available(macOS 26.0, *) {
-                return 8
-            } else {
-                return 8
-            }
-        }()
+        let cornerRadius: CGFloat = 8
         
         let hasTopBar = nookSettings.topBarAddressView
         
