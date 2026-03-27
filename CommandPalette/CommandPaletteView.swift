@@ -7,7 +7,6 @@
 
 import AppKit
 import SwiftUI
-import UniversalGlass
 import Garnish
 
 struct CommandPaletteView: View {
@@ -23,6 +22,8 @@ struct CommandPaletteView: View {
     @State private var text: String = ""
     @State private var selectedSuggestionIndex: Int = -1
     @State private var hoveredSuggestionIndex: Int? = nil
+    @State private var userTypedText: String = ""
+    @State private var isNavigatingSuggestion: Bool = false
     @State private var activeSiteSearch: SiteSearchEntry? = nil
 
     private var siteSearchMatch: SiteSearchEntry? {
@@ -123,6 +124,14 @@ struct CommandPaletteView: View {
                                     .font(.system(size: 18, weight: .medium))
                                     .foregroundColor(textFieldColor)
                                     .tint(gradientColorManager.primaryColor)
+                                    .overlay(alignment: .leading) {
+                                        if let suffix = inlineCompletionSuffix {
+                                            (Text(text).foregroundColor(.clear) + Text(suffix).foregroundColor(isDark ? .white.opacity(0.25) : .black.opacity(0.25)))
+                                                .font(.system(size: 18, weight: .medium))
+                                                .lineLimit(1)
+                                                .allowsHitTesting(false)
+                                        }
+                                    }
                                     .focused($isSearchFocused)
                                     .onKeyPress(.tab) {
                                         if let match = siteSearchMatch, activeSiteSearch == nil {
@@ -130,6 +139,19 @@ struct CommandPaletteView: View {
                                                 activeSiteSearch = match
                                             }
                                             text = ""
+                                            return .handled
+                                        }
+                                        // Tab accepts the top suggestion when nothing is selected
+                                        if selectedSuggestionIndex < 0 && !visibleSuggestions.isEmpty {
+                                            selectedSuggestionIndex = 0
+                                            isNavigatingSuggestion = true
+                                            text = displayTextForSuggestion(visibleSuggestions[0])
+                                            return .handled
+                                        }
+                                        // Tab with a selected suggestion = accept it (same as Enter)
+                                        if selectedSuggestionIndex >= 0 && selectedSuggestionIndex < visibleSuggestions.count {
+                                            let suggestion = visibleSuggestions[selectedSuggestionIndex]
+                                            selectSuggestion(suggestion)
                                             return .handled
                                         }
                                         return .ignored
@@ -175,10 +197,15 @@ struct CommandPaletteView: View {
                                         return .ignored
                                     }
                                     .onChange(of: text) { _, newValue in
+                                        if isNavigatingSuggestion {
+                                            isNavigatingSuggestion = false
+                                            return
+                                        }
+                                        userTypedText = newValue
                                         searchManager.searchSuggestions(
                                             for: newValue
                                         )
-                                        selectedSuggestionIndex = visibleSuggestions.isEmpty ? -1 : 0
+                                        selectedSuggestionIndex = -1
                                     }
 
                                     if activeSiteSearch == nil, let match = siteSearchMatch {
@@ -240,9 +267,7 @@ struct CommandPaletteView: View {
                         .frame(width: effectiveCommandPaletteWidth)
                         .background(Color(.windowBackgroundColor).opacity(0.35))
                         .clipShape(.rect(cornerRadius: 26))
-                        .universalGlassEffect(
-                            .regular.tint(Color(.windowBackgroundColor).opacity(0.35)),
-                            in: .rect(cornerRadius: 26))
+                        .nookGlassEffect(in: .rect(cornerRadius: 26))
                         .animation(
                             .easeInOut(duration: 0.15),
                             value: searchManager.suggestions.count
@@ -269,6 +294,7 @@ struct CommandPaletteView: View {
                 searchManager.updateProfileContext()
 
                 text = commandPalette.prefilledText
+                userTypedText = commandPalette.prefilledText
 
                 DispatchQueue.main.async {
                     isSearchFocused = true
@@ -284,6 +310,7 @@ struct CommandPaletteView: View {
                 isSearchFocused = false
                 searchManager.clearSuggestions()
                 text = ""
+                userTypedText = ""
                 activeSiteSearch = nil
                 selectedSuggestionIndex = -1
             }
@@ -298,14 +325,15 @@ struct CommandPaletteView: View {
             let count = visibleSuggestions.count
             if count == 0 {
                 selectedSuggestionIndex = -1
-            } else if selectedSuggestionIndex < 0 || selectedSuggestionIndex >= count {
-                selectedSuggestionIndex = 0
+            } else if selectedSuggestionIndex >= count {
+                selectedSuggestionIndex = count - 1
             }
         }
         .animation(.easeInOut(duration: 0.15), value: selectedSuggestionIndex)
         .onChange(of: commandPalette.prefilledText) { _, newValue in
             if isVisible {
                 text = newValue
+                userTypedText = newValue
                 DispatchQueue.main.async {
                     isSearchFocused = true
                 }
@@ -353,7 +381,7 @@ struct CommandPaletteView: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.white)
                         .contentShape(RoundedRectangle(cornerRadius: 6))
-                        .onHover { hovering in
+                        .onHoverTracking { hovering in
                             withAnimation(.easeInOut(duration: 0.12)) {
                                 if hovering {
                                     hoveredIndex = index
@@ -442,7 +470,6 @@ struct CommandPaletteView: View {
         switch suggestion.type {
         case .tab(let existingTab):
             browserManager.selectTab(existingTab, in: windowState)
-            print("Switched to existing tab: \(existingTab.name)")
         case .history(let historyEntry):
             if commandPalette.shouldNavigateCurrentTab
                 && browserManager.currentTab(for: windowState) != nil
@@ -450,14 +477,8 @@ struct CommandPaletteView: View {
                 browserManager.currentTab(for: windowState)?.loadURL(
                     historyEntry.url.absoluteString
                 )
-                print(
-                    "Navigated current tab to history URL: \(historyEntry.url)"
-                )
             } else {
                 browserManager.createNewTab(in: windowState, url: historyEntry.url.absoluteString)
-                print(
-                    "Created new tab from history in window \(windowState.id)"
-                )
             }
         case .url, .search:
             if commandPalette.shouldNavigateCurrentTab
@@ -466,14 +487,12 @@ struct CommandPaletteView: View {
                 browserManager.currentTab(for: windowState)?.navigateToURL(
                     suggestion.text
                 )
-                print("Navigated current tab to: \(suggestion.text)")
             } else {
                 // Normalize the URL/search query first, then create the tab with
                 // the correct URL so the webview loads it directly without a race.
                 let template = browserManager.nookSettings?.resolvedSearchEngineTemplate ?? SearchProvider.google.queryTemplate
                 let resolved = normalizeURL(suggestion.text, queryTemplate: template)
                 browserManager.createNewTab(in: windowState, url: resolved)
-                print("Created new tab in window \(windowState.id)")
             }
         }
 
@@ -491,6 +510,49 @@ struct CommandPaletteView: View {
         } else {
             selectedSuggestionIndex = max(selectedSuggestionIndex - 1, -1)
         }
+
+        // Update text field to show selected suggestion's info
+        isNavigatingSuggestion = true
+        if selectedSuggestionIndex >= 0 && selectedSuggestionIndex < visibleSuggestions.count {
+            text = displayTextForSuggestion(visibleSuggestions[selectedSuggestionIndex])
+        } else {
+            text = userTypedText
+        }
+    }
+
+    private func stripScheme(_ urlString: String) -> String {
+        for prefix in ["https://", "http://"] {
+            if urlString.hasPrefix(prefix) {
+                return String(urlString.dropFirst(prefix.count))
+            }
+        }
+        return urlString
+    }
+
+    private func displayTextForSuggestion(_ suggestion: SearchManager.SearchSuggestion) -> String {
+        switch suggestion.type {
+        case .tab(let tab):
+            return stripScheme(tab.url.absoluteString)
+        case .history(let entry):
+            return stripScheme(entry.url.absoluteString)
+        case .url, .search:
+            return suggestion.text
+        }
+    }
+
+    private var inlineCompletionSuffix: String? {
+        guard text == userTypedText,
+              !text.isEmpty,
+              selectedSuggestionIndex >= 0,
+              selectedSuggestionIndex < visibleSuggestions.count else { return nil }
+
+        let suggestion = visibleSuggestions[selectedSuggestionIndex]
+        let target = suggestion.text
+
+        guard target.lowercased().hasPrefix(text.lowercased()),
+              target.count > text.count else { return nil }
+
+        return String(target.dropFirst(text.count))
     }
 
     private func iconForSuggestion(_ suggestion: SearchManager.SearchSuggestion)

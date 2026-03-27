@@ -2,14 +2,18 @@
 //  EmojiPicker.swift
 //  Nook
 //
-//  Created by Maciek Bagiński on 02/10/2025.
+//  Created by Maciek Baginski on 02/10/2025.
 //
 
 import AppKit
 import Combine
 import SwiftUI
 
-class EmojiButton: NSButton {
+// MARK: - Icon Button
+
+class IconButton: NSButton {
+    /// The value emitted on selection: emoji character or SF Symbol name.
+    var iconValue: String = ""
     var onHover: ((Bool) -> Void)?
     private var trackingArea: NSTrackingArea?
 
@@ -43,14 +47,67 @@ class EmojiButton: NSButton {
     }
 }
 
-class EmojiPickerViewController: NSViewController {
+// MARK: - Icon Picker View Controller
+
+class IconPickerViewController: NSViewController {
+    enum Tab: Int {
+        case symbols = 0
+        case emojis = 1
+    }
+
+    private let segmentedControl = NSSegmentedControl()
     private let searchField = NSSearchField()
     private let scrollView = NSScrollView()
     private let contentView = NSView()
-    var onEmojiSelected: ((String) -> Void)?
-    var currentEmoji: String = ""
+    var onIconSelected: ((String) -> Void)?
+    var currentIcon: String = ""
 
-    private let allEmojis: [String] = {
+    private var currentTab: Tab = .symbols
+    private var buttons: [IconButton] = []
+
+    // MARK: - SF Symbols
+
+    private static let symbolNames: [String] = [
+        // General
+        "square.grid.2x2", "house", "star", "heart", "bookmark",
+        "flag", "tag", "pin", "bolt", "sparkles",
+        // Work & Productivity
+        "briefcase", "building.2", "doc.text", "folder",
+        "tray.full", "calendar", "clock",
+        "paperplane", "envelope", "phone",
+        // Development & Tech
+        "terminal", "chevron.left.forwardslash.chevron.right",
+        "hammer", "wrench.and.screwdriver",
+        "server.rack", "cpu", "globe", "link", "network",
+        // People & Communication
+        "person", "person.2", "bubble.left", "bell",
+        // Media & Entertainment
+        "play.circle", "music.note", "photo", "film", "tv",
+        "headphones", "mic",
+        // Shopping & Finance
+        "cart", "bag", "creditcard", "chart.bar",
+        // Education & Science
+        "book", "graduationcap", "brain", "lightbulb", "atom",
+        // Travel & Nature
+        "airplane", "car", "leaf",
+        "sun.max", "moon", "cloud",
+        // Lifestyle
+        "gamecontroller", "paintbrush", "camera",
+        "gift", "cup.and.saucer", "fork.knife",
+        // Security
+        "lock", "shield", "key", "eye",
+        // Devices
+        "laptopcomputer", "desktopcomputer",
+        "wifi", "map", "location",
+        // Tools
+        "pencil", "scissors", "gearshape",
+        "magnifyingglass", "wand.and.stars",
+        "archivebox", "flame", "drop", "snowflake",
+    ]
+
+    // MARK: - Emojis
+
+    private static let allEmojis: [String] = {
         var result: [String] = []
         let ranges: [ClosedRange<UInt32>] = [
             0x1F600...0x1F64F,
@@ -61,7 +118,6 @@ class EmojiPickerViewController: NSViewController {
             0x2700...0x27BF,
             0x1F1E6...0x1F1FF,
         ]
-
         for range in ranges {
             for scalar in range {
                 if let unicodeScalar = UnicodeScalar(scalar) {
@@ -72,39 +128,59 @@ class EmojiPickerViewController: NSViewController {
         return result
     }()
 
-    private var filteredEmojis: [String] = []
-    private var emojiButtons: [EmojiButton] = []
+    // MARK: - Lifecycle
 
     override func loadView() {
-        view = NSView(frame: NSRect(x: 0, y: 0, width: 320, height: 280))
+        view = NSView(frame: NSRect(x: 0, y: 0, width: 320, height: 316))
     }
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        filteredEmojis = allEmojis
+        currentTab = isEmoji(currentIcon) ? .emojis : .symbols
         setupUI()
-        buildEmojiGrid()
+        rebuildGrid()
     }
+
+    // MARK: - UI Setup
 
     private func setupUI() {
         let padding: CGFloat = 12
 
+        // Segmented control
+        segmentedControl.segmentCount = 2
+        segmentedControl.setLabel("Symbols", forSegment: 0)
+        segmentedControl.setLabel("Emojis", forSegment: 1)
+        segmentedControl.trackingMode = .selectOne
+        segmentedControl.selectedSegment = currentTab.rawValue
+        segmentedControl.target = self
+        segmentedControl.action = #selector(tabChanged)
+        segmentedControl.segmentStyle = .rounded
+        segmentedControl.frame = NSRect(
+            x: padding,
+            y: view.bounds.height - 30,
+            width: view.bounds.width - padding * 2,
+            height: 22
+        )
+        view.addSubview(segmentedControl)
+
+        // Search field
         searchField.frame = NSRect(
             x: padding,
-            y: view.bounds.height - 32,
+            y: view.bounds.height - 62,
             width: view.bounds.width - padding * 2,
             height: 24
         )
-        searchField.placeholderString = "Search emojis..."
+        searchField.placeholderString = "Search..."
         searchField.target = self
         searchField.action = #selector(searchChanged)
         view.addSubview(searchField)
 
+        // Scroll view
         scrollView.frame = NSRect(
             x: padding,
             y: padding,
             width: view.bounds.width - padding * 2,
-            height: view.bounds.height - 32 - padding * 2
+            height: view.bounds.height - 62 - padding * 2
         )
         scrollView.autoresizingMask = [.width, .height]
         scrollView.hasVerticalScroller = true
@@ -115,44 +191,51 @@ class EmojiPickerViewController: NSViewController {
         view.addSubview(scrollView)
     }
 
-    @objc private func searchChanged() {
-        updateVisibility()
+    // MARK: - Actions
+
+    @objc private func tabChanged() {
+        currentTab = Tab(rawValue: segmentedControl.selectedSegment) ?? .symbols
+        searchField.stringValue = ""
+        rebuildGrid()
     }
 
-    private func updateVisibility() {
-        let searchText = searchField.stringValue.lowercased()
+    @objc private func searchChanged() {
+        filterButtons()
+    }
 
-        for button in emojiButtons {
-            if searchText.isEmpty {
-                button.isHidden = false
-            } else {
-                button.isHidden = !button.title.contains(searchText)
-            }
+    // MARK: - Grid Building
+
+    private func rebuildGrid() {
+        contentView.subviews.removeAll()
+        buttons.removeAll()
+
+        switch currentTab {
+        case .symbols:
+            buildSymbolGrid()
+        case .emojis:
+            buildEmojiGrid()
         }
     }
 
-    private func buildEmojiGrid() {
+    private func buildSymbolGrid() {
         let columns = 8
         let buttonSize: CGFloat = 32
         let spacing: CGFloat = 4
-        let rows = (filteredEmojis.count + columns - 1) / columns
-
+        let items = Self.symbolNames
+        let rows = (items.count + columns - 1) / columns
         let totalHeight = CGFloat(rows) * (buttonSize + spacing) + spacing
 
         contentView.frame = NSRect(
-            x: 0,
-            y: 0,
+            x: 0, y: 0,
             width: scrollView.contentSize.width,
             height: max(totalHeight, scrollView.bounds.height)
         )
 
-        emojiButtons.removeAll()
-
-        for (index, emoji) in filteredEmojis.enumerated() {
+        for (index, symbolName) in items.enumerated() {
             let row = index / columns
             let col = index % columns
 
-            let button = EmojiButton(
+            let button = IconButton(
                 frame: NSRect(
                     x: CGFloat(col) * (buttonSize + spacing) + spacing,
                     y: totalHeight - CGFloat(row + 1) * (buttonSize + spacing),
@@ -161,39 +244,141 @@ class EmojiPickerViewController: NSViewController {
                 )
             )
 
-            button.title = emoji
+            button.iconValue = symbolName
             button.bezelStyle = .inline
             button.isBordered = false
-            button.font = NSFont.systemFont(ofSize: 24)
-            button.target = self
-            button.action = #selector(emojiTapped(_:))
+            button.imagePosition = .imageOnly
             button.wantsLayer = true
-            button.layer?.cornerRadius = 4
+            button.layer?.cornerRadius = 6
 
-            if emoji == currentEmoji {
-                button.layer?.backgroundColor =
-                    NSColor.black.withAlphaComponent(0.2).cgColor
+            let config = NSImage.SymbolConfiguration(pointSize: 15, weight: .medium)
+            if let img = NSImage(systemSymbolName: symbolName, accessibilityDescription: symbolName)?
+                .withSymbolConfiguration(config) {
+                button.image = img
+            }
+            button.contentTintColor = .labelColor
+
+            button.target = self
+            button.action = #selector(iconTapped(_:))
+
+            if symbolName == currentIcon {
+                button.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.3).cgColor
             }
 
             button.onHover = { [weak button, weak self] isHovering in
                 guard let button = button, let self = self else { return }
                 if isHovering {
-                    button.layer?.backgroundColor =
-                        NSColor.black.withAlphaComponent(0.3).cgColor
+                    button.layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.15).cgColor
+                } else if button.iconValue == self.currentIcon {
+                    button.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.3).cgColor
                 } else {
-                    if button.title == self.currentEmoji {
-                        button.layer?.backgroundColor =
-                            NSColor.black.withAlphaComponent(0.2).cgColor
-                    } else {
-                        button.layer?.backgroundColor = .clear
-                    }
+                    button.layer?.backgroundColor = .clear
                 }
             }
 
             contentView.addSubview(button)
-            emojiButtons.append(button)
+            buttons.append(button)
         }
 
+        scrollToTop()
+    }
+
+    private func buildEmojiGrid() {
+        let columns = 8
+        let buttonSize: CGFloat = 32
+        let spacing: CGFloat = 4
+        let items = Self.allEmojis
+        let rows = (items.count + columns - 1) / columns
+        let totalHeight = CGFloat(rows) * (buttonSize + spacing) + spacing
+
+        contentView.frame = NSRect(
+            x: 0, y: 0,
+            width: scrollView.contentSize.width,
+            height: max(totalHeight, scrollView.bounds.height)
+        )
+
+        for (index, emoji) in items.enumerated() {
+            let row = index / columns
+            let col = index % columns
+
+            let button = IconButton(
+                frame: NSRect(
+                    x: CGFloat(col) * (buttonSize + spacing) + spacing,
+                    y: totalHeight - CGFloat(row + 1) * (buttonSize + spacing),
+                    width: buttonSize,
+                    height: buttonSize
+                )
+            )
+
+            button.iconValue = emoji
+            button.title = emoji
+            button.bezelStyle = .inline
+            button.isBordered = false
+            button.font = NSFont.systemFont(ofSize: 22)
+            button.wantsLayer = true
+            button.layer?.cornerRadius = 6
+
+            button.target = self
+            button.action = #selector(iconTapped(_:))
+
+            if emoji == currentIcon {
+                button.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.3).cgColor
+            }
+
+            button.onHover = { [weak button, weak self] isHovering in
+                guard let button = button, let self = self else { return }
+                if isHovering {
+                    button.layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.15).cgColor
+                } else if button.iconValue == self.currentIcon {
+                    button.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.3).cgColor
+                } else {
+                    button.layer?.backgroundColor = .clear
+                }
+            }
+
+            contentView.addSubview(button)
+            buttons.append(button)
+        }
+
+        scrollToTop()
+    }
+
+    // MARK: - Filtering
+
+    private func filterButtons() {
+        let searchText = searchField.stringValue.lowercased()
+
+        for button in buttons {
+            if searchText.isEmpty {
+                button.isHidden = false
+            } else {
+                // For symbols, search against the symbol name; for emojis, against the character
+                button.isHidden = !button.iconValue.lowercased().contains(searchText)
+            }
+        }
+    }
+
+    // MARK: - Selection
+
+    @objc private func iconTapped(_ sender: IconButton) {
+        for button in buttons {
+            if button !== sender {
+                if button.iconValue == currentIcon {
+                    button.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.3).cgColor
+                } else {
+                    button.layer?.backgroundColor = .clear
+                }
+            }
+        }
+
+        sender.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.3).cgColor
+        currentIcon = sender.iconValue
+        onIconSelected?(sender.iconValue)
+    }
+
+    // MARK: - Helpers
+
+    private func scrollToTop() {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             self.scrollView.documentView?.scroll(
@@ -202,20 +387,16 @@ class EmojiPickerViewController: NSViewController {
         }
     }
 
-    @objc private func emojiTapped(_ sender: EmojiButton) {
-        for button in emojiButtons {
-            if button.title != sender.title {
-                button.layer?.backgroundColor = .clear
-            }
+    private func isEmoji(_ string: String) -> Bool {
+        string.unicodeScalars.contains { scalar in
+            (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF)
+                || (scalar.value >= 0x2600 && scalar.value <= 0x26FF)
+                || (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
         }
-
-        sender.layer?.backgroundColor =
-            NSColor.black.withAlphaComponent(0.2).cgColor
-
-        currentEmoji = sender.title
-        onEmojiSelected?(sender.title)
     }
 }
+
+// MARK: - Emoji Picker Manager
 
 class EmojiPickerManager: ObservableObject {
     var popover: NSPopover?
@@ -230,10 +411,10 @@ class EmojiPickerManager: ObservableObject {
             return
         }
 
-        let picker = EmojiPickerViewController()
-        picker.currentEmoji = selectedEmoji
-        picker.onEmojiSelected = { [weak self] emoji in
-            self?.selectedEmoji = emoji
+        let picker = IconPickerViewController()
+        picker.currentIcon = selectedEmoji
+        picker.onIconSelected = { [weak self] icon in
+            self?.selectedEmoji = icon
         }
 
         popover = NSPopover()
@@ -277,6 +458,8 @@ class EmojiPickerManager: ObservableObject {
         )
     }
 }
+
+// MARK: - Anchor View
 
 struct EmojiPickerAnchor: NSViewRepresentable {
     let manager: EmojiPickerManager

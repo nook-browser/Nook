@@ -147,6 +147,7 @@ enum AIProviderError: LocalizedError {
     case rateLimited
     case networkError(Error)
     case unsupportedFeature(String)
+    case insecureURL(String)
 
     var errorDescription: String? {
         switch self {
@@ -156,6 +157,7 @@ enum AIProviderError: LocalizedError {
         case .rateLimited: return "Rate limit exceeded. Please try again later."
         case .networkError(let err): return "Network error: \(err.localizedDescription)"
         case .unsupportedFeature(let feature): return "\(feature) is not supported by this provider"
+        case .insecureURL(let url): return "Custom provider URL must use HTTPS for non-local connections: \(url)"
         }
     }
 }

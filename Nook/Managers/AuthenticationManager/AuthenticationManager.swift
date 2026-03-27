@@ -84,7 +84,7 @@ final class AuthenticationManager: NSObject {
             return
         }
 
-        browserManager?.trackingProtectionManager.disableTemporarily(for: tab, duration: 15 * 60)
+        browserManager?.contentBlockerManager.disableTemporarily(for: tab, duration: 15 * 60)
 
         cancelActiveIdentityFlow()
 
@@ -134,6 +134,10 @@ final class AuthenticationManager: NSObject {
                 var error: CFError?
                 if SecTrustEvaluateWithError(trust, &error) {
                     completionHandler(.useCredential, URLCredential(trust: trust))
+                } else if Self.isPrivateHost(challenge.protectionSpace.host) {
+                    // Accept self-signed / untrusted certs for local network hosts
+                    // (routers, NAS devices, IoT, etc.) instead of silently cancelling
+                    completionHandler(.useCredential, URLCredential(trust: trust))
                 } else {
                     completionHandler(.cancelAuthenticationChallenge, nil)
                 }
@@ -146,6 +150,21 @@ final class AuthenticationManager: NSObject {
             return true
         default:
             return false
+        }
+    }
+
+    /// Returns true when the host is a private/local network address (RFC 1918, link-local, loopback).
+    private static func isPrivateHost(_ host: String) -> Bool {
+        if host == "localhost" || host == "::1" { return true }
+        let parts = host.split(separator: ".").compactMap { UInt8($0) }
+        guard parts.count == 4 else { return false }
+        switch parts[0] {
+        case 10: return true                                       // 10.0.0.0/8
+        case 172: return (16...31).contains(parts[1])              // 172.16.0.0/12
+        case 192: return parts[1] == 168                           // 192.168.0.0/16
+        case 169: return parts[1] == 254                           // 169.254.0.0/16 link-local
+        case 127: return true                                      // 127.0.0.0/8
+        default: return false
         }
     }
 

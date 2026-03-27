@@ -20,24 +20,33 @@ struct URLBarView: View {
     var body: some View {
         ZStack {
             HStack(spacing: 8) {
-                    if browserManager.currentTab(for: windowState) != nil {
-                        Text(
-                            displayURL
-                        )
-                        .font(.system(size: 12, weight: .medium, design: .default))
-                        .foregroundStyle(textColor)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    } else {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 12))
-                            .foregroundStyle(textColor)
-                        Text("Search or Enter URL...")
+                    // URL text area — tappable to open command palette
+                    Group {
+                        if browserManager.currentTab(for: windowState) != nil {
+                            Text(
+                                displayURL
+                            )
                             .font(.system(size: 12, weight: .medium, design: .default))
                             .foregroundStyle(textColor)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        } else {
+                            HStack(spacing: 4) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(textColor)
+                                Text("Search or Enter URL...")
+                                    .font(.system(size: 12, weight: .medium, design: .default))
+                                    .foregroundStyle(textColor)
+                            }
+                        }
                     }
-                    
-                    Spacer()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        let currentURL = browserManager.currentTab(for: windowState)?.url.absoluteString ?? ""
+                        windowState.commandPalette?.open(prefill: currentURL, navigateCurrentTab: true)
+                    }
                     
                     // Copy link button (show on hover when tab is selected)
                     if isHovering, let currentTab = browserManager.currentTab(for: windowState) {
@@ -65,11 +74,25 @@ struct URLBarView: View {
                         .help(currentTab.hasPiPActive ? "Exit Picture in Picture" : "Enter Picture in Picture")
                     }
                     
-                    // Extension action buttons
+                    // Pinned extension buttons + library button
                     if #available(macOS 15.5, *),
                        let extensionManager = browserManager.extensionManager {
-                        ExtensionActionView(extensions: extensionManager.installedExtensions)
+                        let pinnedIDs = browserManager.nookSettings?.pinnedExtensionIDs ?? []
+                        let pinnedExtensions = extensionManager.installedExtensions.filter { pinnedIDs.contains($0.id) }
+
+                        if !pinnedExtensions.isEmpty {
+                            ExtensionActionView(extensions: pinnedExtensions)
+                                .environmentObject(browserManager)
+                        }
+
+                        ExtensionLibraryButton()
                             .environmentObject(browserManager)
+                            .onAppear {
+                                let installedIDs = extensionManager.installedExtensions
+                                    .filter { $0.isEnabled }
+                                    .map { $0.id }
+                                browserManager.nookSettings?.migrateExtensionPinStateIfNeeded(installedExtensionIDs: installedIDs)
+                            }
                     }
                 }
                 .padding(.leading, 12)
@@ -79,6 +102,10 @@ struct URLBarView: View {
         .background(
            backgroundColor
         )
+        .overlay(alignment: .bottom) {
+            PageLoadingProgressBar(tab: browserManager.currentTab(for: windowState))
+                .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 12, bottomTrailingRadius: 12))
+        }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         // Report the frame in the window space so we can overlay the mini palette above all content
         .background(
@@ -89,16 +116,10 @@ struct URLBarView: View {
                 )
             }
         )
-        .onHover { hovering in
+        .onHoverTracking { hovering in
             withAnimation(.easeInOut(duration: 0.1)) {
                 isHovering = hovering
             }
-        }
-        // Focus URL bar when tapping anywhere in the bar
-        .contentShape(Rectangle())
-        .onTapGesture {
-            let currentURL = browserManager.currentTab(for: windowState)?.url.absoluteString ?? ""
-            windowState.commandPalette?.open(prefill: currentURL, navigateCurrentTab: true)
         }
         
     }
@@ -181,7 +202,7 @@ struct URLBarButtonStyle: ButtonStyle {
         .scaleEffect(configuration.isPressed && isEnabled ? 0.95 : 1.0)
         .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
         .animation(.easeInOut(duration: 0.15), value: isHovering)
-        .onHover { hovering in
+        .onHoverTracking { hovering in
             isHovering = hovering
         }
     }

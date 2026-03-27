@@ -7,7 +7,6 @@
 
 import Observation
 import SwiftUI
-import UniversalGlass
 
 @MainActor
 @Observable
@@ -242,11 +241,7 @@ struct DialogHeader: View {
             ZStack {
                 Circle()
                     .fill(gradientColorManager.primaryColor.opacity(0.1))
-                    .universalGlassEffect(
-                        .clear.tint(
-                            gradientColorManager.primaryColor.opacity(0.2)
-                        )
-                    )
+                    .nookClearGlassEffect(tint: gradientColorManager.primaryColor.opacity(0.2))
                     .frame(width: 48, height: 48)
 
                 Image(systemName: icon)

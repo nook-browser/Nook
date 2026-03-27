@@ -40,7 +40,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     private let urlEventClass = AEEventClass(kInternetEventClass)
     private let urlEventID = AEEventID(kAEGetURL)
     private var mouseEventMonitor: Any?
+    private var wakeObserver: Any?
     private let userDefaults = UserDefaults.standard
+    private var pendingURLs: [URL] = []
     
 
 
@@ -57,22 +59,51 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupURLEventHandling()
         setupMouseButtonHandling()
+        setupSleepWakeHandling()
         let didFinishOnboarding = userDefaults.bool(forKey: "settings.didFinishOnboarding")
 
         if let window = NSApplication.shared.windows.first {
-            // Always hide titlebar immediately to prevent flash during transitions
+            // Always hide titlebar text immediately to prevent flash during transitions
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
             window.toolbar?.isVisible = false
-            window.standardWindowButton(.closeButton)?.isHidden = true
-            window.standardWindowButton(.zoomButton)?.isHidden = true
-            window.standardWindowButton(.miniaturizeButton)?.isHidden = true
 
             if !didFinishOnboarding {
                 window.setContentSize(NSSize(width: 1200, height: 720))
                 window.center()
                 NSApp.activate(ignoringOtherApps: true)
                 NSApp.hideOtherApplications(nil)
+            }
+        }
+    }
+
+    /// Observes system wake notifications and resets crash counters on all tabs.
+    ///
+    /// When the system wakes from sleep, launchservicesd and other XPC services need
+    /// a few seconds to fully restart. During this window, new WebContent processes crash
+    /// immediately with XPC_ERROR_CONNECTION_INVALID. We reset crash counters on wake so
+    /// the exponential backoff in webViewWebContentProcessDidTerminate starts fresh and
+    /// the delayed reload eventually succeeds once XPC services are stable.
+    private func setupSleepWakeHandling() {
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleSystemWake()
+        }
+    }
+
+    private func handleSystemWake() {
+        AppDelegate.log.info("System woke from sleep — resetting web process crash counters")
+        // Reset crash counters so tabs get fresh backoff windows after wake.
+        // Tabs that were mid-crash-loop before sleep will retry with a clean slate.
+        // Called on the main queue (per NSWorkspace notification delivery), so MainActor access is safe.
+        MainActor.assumeIsolated {
+            guard let manager = browserManager else { return }
+            for tab in manager.tabManager.allTabs() {
+                tab.webProcessCrashCount = 0
+                tab.lastWebProcessCrashDate = .distantPast
             }
         }
     }
@@ -106,7 +137,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             MainActor.assumeIsolated {
                 switch event.buttonNumber {
                 case 2:  // Middle mouse button
-                    registry.activeWindow?.commandPalette?.open()
+                    if let hoveredId = manager.hoveredPinnedTabId,
+                       let tab = manager.tabManager.allTabs().first(where: { $0.id == hoveredId }),
+                       tab.pinnedURL != nil {
+                        tab.resetToPinnedURL()
+                    } else {
+                        registry.activeWindow?.commandPalette?.open()
+                    }
                 case 3:  // Back button
                     guard
                         let windowState = registry.activeWindow,
@@ -251,17 +288,41 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         else {
             return
         }
+
+        // Security: Only allow http/https URLs from external automation
+        guard let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https" else {
+            return
+        }
+
         handleIncoming(url: url)
     }
 
     /// Routes incoming external URLs to the browser manager
+    ///
+    /// If the browser manager isn't ready yet (cold launch via URL click),
+    /// queues the URL and drains it once `browserManager` is set.
     private func handleIncoming(url: URL) {
         guard let manager = browserManager else {
+            AppDelegate.log.info("Queuing URL for deferred open: \(url.absoluteString, privacy: .public)")
+            pendingURLs.append(url)
             return
         }
         Task { @MainActor in
+            // Air Traffic Control — route to designated space if a rule matches
+            if manager.siteRoutingManager.applyRoute(url: url, from: nil) {
+                return
+            }
             manager.presentExternalURL(url)
         }
+    }
+
+    /// Opens any URLs that arrived before browserManager was available
+    func drainPendingURLs() {
+        guard !pendingURLs.isEmpty else { return }
+        let urls = pendingURLs
+        pendingURLs.removeAll()
+        urls.forEach { handleIncoming(url: $0) }
     }
 }
 

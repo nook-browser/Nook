@@ -104,7 +104,7 @@ struct ProfileRowView: View {
             RoundedRectangle(cornerRadius: 8)
                 .fill(isHovering ? Color.primary.opacity(0.04) : Color(.controlBackgroundColor))
         )
-        .onHover { hovering in
+        .onHoverTracking { hovering in
             withAnimation(.easeInOut(duration: 0.15)) { isHovering = hovering }
         }
         .accessibilityElement(children: .combine)

@@ -24,7 +24,7 @@ struct ChatMessage: Identifiable, Equatable {
 }
 
 struct URLCitation: Identifiable, Equatable, Codable {
-    let id = UUID()
+    var id = UUID()
     let url: String
     let title: String?
     let content: String?
@@ -590,7 +590,7 @@ struct MessageBubble: View {
                 Spacer(minLength: 40)
             }
         }
-        .onHover { hovering in
+        .onHoverTracking { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovered = hovering
             }
@@ -784,7 +784,7 @@ struct CitationView: View {
             )
         }
         .buttonStyle(.plain)
-        .onHover { hovering in
+        .onHoverTracking { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovered = hovering
             }

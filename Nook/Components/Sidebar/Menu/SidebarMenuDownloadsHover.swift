@@ -227,7 +227,7 @@ struct SidebarMenuHoverDownloadItem: View {
         .background(isHovering ? .white.opacity(0.2) : .clear)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .animation(.easeInOut(duration: 0.1), value: isHovering)
-        .onHover { state in
+        .onHoverTracking { state in
             isHovering = state
         }
         .onTapGesture {
@@ -256,7 +256,7 @@ struct SidebarMenuHoverDownloadItem: View {
                         forTypeIdentifier: utType.identifier,
                         visibility: .all
                     ) { completion in
-                        completion(fileData, nil)
+                        Task { @MainActor in completion(fileData, nil) }
                         return nil
                     }
                 }

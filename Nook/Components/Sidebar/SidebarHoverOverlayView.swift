@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import UniversalGlass
 import AppKit
 
 struct SidebarHoverOverlayView: View {
@@ -28,7 +27,7 @@ struct SidebarHoverOverlayView: View {
                 Color.clear
                     .frame(width: hoverManager.triggerWidth)
                     .contentShape(Rectangle())
-                    .onHover { isIn in
+                    .onHoverTracking { isIn in
                         if isIn && !windowState.isSidebarVisible {
                             withAnimation(.easeInOut(duration: 0.12)) {
                                 hoverManager.isOverlayVisible = true
@@ -56,7 +55,7 @@ struct SidebarHoverOverlayView: View {
                             
                                 Rectangle()
                                     .fill(Color.clear)
-                                    .universalGlassEffect(.regular.tint(Color(.windowBackgroundColor).opacity(0.35)), in: .rect(cornerRadius: cornerRadius))
+                                    .nookGlassEffect(in: .rect(cornerRadius: cornerRadius))
                         }
                         .alwaysArrowCursor()
                         .padding(nookSettings.sidebarPosition == .left ? .leading : .trailing, horizontalInset)

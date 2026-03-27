@@ -1,5 +1,5 @@
 import AppKit
-import UserNotifications
+@preconcurrency import UserNotifications
 import WebKit
 import UniformTypeIdentifiers
 
@@ -8,7 +8,7 @@ import UniformTypeIdentifiers
 final class FocusableWKWebView: WKWebView {
     weak var owningTab: Tab?
     var contextMenuBridge: WebContextMenuBridge?
-    private static let imageContentTypes: [UTType] = [
+    nonisolated private static let imageContentTypes: [UTType] = [
         .jpeg, .png, .gif, .bmp, .tiff, .webP, .heic, .heif
     ]
 
@@ -37,11 +37,9 @@ final class FocusableWKWebView: WKWebView {
     }
 
     override func rightMouseDown(with event: NSEvent) {
-        print("🔽 [FocusableWKWebView] rightMouseDown called")
         owningTab?.activate()
         // Ensure this webview becomes first responder so willOpenMenu gets called
         if window?.firstResponder != self {
-            print("🔽 [FocusableWKWebView] Making webview first responder")
             window?.makeFirstResponder(self)
         }
         super.rightMouseDown(with: event)
@@ -59,36 +57,27 @@ final class FocusableWKWebView: WKWebView {
     private var contextMenuFallbackWorkItem: DispatchWorkItem?
 
     override func menu(for event: NSEvent) -> NSMenu? {
-        print("🔽 [FocusableWKWebView] menu(for:) called - START")
         guard let menu = super.menu(for: event) else {
-            print("🔽 [FocusableWKWebView] menu(for:) - super.menu returned nil")
             return nil
         }
-        print("🔽 [FocusableWKWebView] menu(for:) - got menu with \(menu.items.count) items")
         prepareMenu(menu)
-        print("🔽 [FocusableWKWebView] menu(for:) - returning menu with \(menu.items.count) items")
         return menu
     }
 
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
-        print("🔽 [FocusableWKWebView] willOpenMenu called - START, menu items: \(menu.items.count), menu address: \(ObjectIdentifier(menu))")
         super.willOpenMenu(menu, with: event)
         prepareMenu(menu)
-        print("🔽 [FocusableWKWebView] willOpenMenu - AFTER prepareMenu, menu items: \(menu.items.count)")
     }
 
     private func prepareMenu(_ menu: NSMenu) {
-        print("🔽 [FocusableWKWebView] prepareMenu called, pendingPayload exists: \(pendingPayload != nil), owningTab?.pendingContextMenuPayload exists: \(owningTab?.pendingContextMenuPayload != nil)")
         pendingMenu = menu
         pendingPayload = owningTab?.pendingContextMenuPayload
 
         contextMenuFallbackWorkItem?.cancel()
         let fallback = DispatchWorkItem { [weak self, weak menu] in
             guard let self, let menu, self.pendingMenu === menu else {
-                print("🔽 [FocusableWKWebView] FALLBACK TIMER: Guard failed - self exists: \(self != nil), menu exists: \(menu != nil), pendingMenu === menu: \(self?.pendingMenu === menu)")
                 return
             }
-            print("🔽 [FocusableWKWebView] FALLBACK TIMER EXECUTING - sanitizing default menu")
             self.sanitizeDefaultMenu(menu)
             self.pendingMenu = nil
             self.pendingPayload = nil
@@ -98,8 +87,7 @@ final class FocusableWKWebView: WKWebView {
         contextMenuFallbackWorkItem = fallback
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: fallback)
 
-        let applied = applyPendingContextMenuIfPossible()
-        print("🔽 [FocusableWKWebView] prepareMenu: applyPendingContextMenuIfPossible returned \(applied)")
+        _ = applyPendingContextMenuIfPossible()
     }
 
     func handleImageDownload(identifier: String, promptForLocation: Bool = false) {
@@ -111,7 +99,6 @@ final class FocusableWKWebView: WKWebView {
         }
 
         guard let url = resolveImageURL(from: identifier) else {
-            print("🔽 [FocusableWKWebView] Unable to resolve image URL from: \(identifier)")
             return
         }
 
@@ -148,12 +135,10 @@ final class FocusableWKWebView: WKWebView {
                 do {
                     // Move the downloaded file to the chosen location
                     try FileManager.default.moveItem(at: localURL, to: destinationURL)
-                    print("🔽 [FocusableWKWebView] Image saved to: \(destinationURL.path)")
 
                     // Show a success notification
                     self?.showSaveSuccessNotification(for: destinationURL)
                 } catch {
-                    print("🔽 [FocusableWKWebView] Failed to save image: \(error.localizedDescription)")
                     self?.showSaveErrorNotification(error: error)
                 }
             } else {
@@ -178,9 +163,10 @@ final class FocusableWKWebView: WKWebView {
     }
 
     private func postUserNotification(title: String, message: String) {
-        let center = UNUserNotificationCenter.current()
-        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
-            guard granted else { return }
+        Task {
+            let center = UNUserNotificationCenter.current()
+            let granted = try? await center.requestAuthorization(options: [.alert, .sound])
+            guard granted == true else { return }
 
             let content = UNMutableNotificationContent()
             content.title = title
@@ -192,7 +178,7 @@ final class FocusableWKWebView: WKWebView {
                 content: content,
                 trigger: UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
             )
-            center.add(request, withCompletionHandler: nil)
+            try? await center.add(request)
         }
     }
 
@@ -239,7 +225,6 @@ final class FocusableWKWebView: WKWebView {
         destinationPreference: Download.DestinationPreference
     ) {
         guard let tab = owningTab else {
-            print("🔽 [FocusableWKWebView] No owning tab for download")
             return
         }
 
@@ -248,11 +233,9 @@ final class FocusableWKWebView: WKWebView {
             enrichedRequest.setValue(tab.url.absoluteString, forHTTPHeaderField: "Referer")
         }
 
-        print("🔽 [FocusableWKWebView] Starting download for: \(originalURL.absoluteString)")
         // Call WKWebView's startDownload method (inherited from WKWebView)
         self.startDownload(using: enrichedRequest) { [weak self] wkDownload in
             guard let self else { return }
-            print("🔽 [FocusableWKWebView] Download started, registering with DownloadManager")
             DispatchQueue.main.async {
                 self.registerDownload(wkDownload, originalURL: originalURL, destinationPreference: destinationPreference)
             }
@@ -307,7 +290,6 @@ final class FocusableWKWebView: WKWebView {
         destinationPreference: Download.DestinationPreference
     ) {
         guard let commaIndex = dataURLString.firstIndex(of: ",") else {
-            print("🔽 [FocusableWKWebView] Malformed data URL")
             return
         }
 
@@ -332,7 +314,6 @@ final class FocusableWKWebView: WKWebView {
         }
 
         guard let data = imageData else {
-            print("🔽 [FocusableWKWebView] Unable to decode data URL contents")
             return
         }
 
@@ -355,13 +336,11 @@ final class FocusableWKWebView: WKWebView {
                 }
             }
         } catch {
-            print("🔽 [FocusableWKWebView] Failed to materialize data URL: \(error.localizedDescription)")
         }
     }
 
     private func saveTempFileToDownloads(_ tempURL: URL, suggestedName: String) {
         guard let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else {
-            print("🔽 [FocusableWKWebView] Unable to resolve Downloads directory for data URL save")
             return
         }
 
@@ -379,7 +358,6 @@ final class FocusableWKWebView: WKWebView {
             try FileManager.default.moveItem(at: tempURL, to: destination)
             showSaveSuccessNotification(for: destination)
         } catch {
-            print("🔽 [FocusableWKWebView] Failed to move data URL temp file: \(error.localizedDescription)")
         }
     }
 
@@ -402,30 +380,22 @@ final class FocusableWKWebView: WKWebView {
     }
 
     func contextMenuPayloadDidUpdate(_ payload: WebContextMenuPayload?) {
-        print("🔽 [FocusableWKWebView] contextMenuPayloadDidUpdate called, payload exists: \(payload != nil), payload type: \(payload != nil ? String(describing: payload!) : "nil")")
         pendingPayload = payload
-        let applied = applyPendingContextMenuIfPossible()
-        print("🔽 [FocusableWKWebView] contextMenuPayloadDidUpdate: applyPendingContextMenuIfPossible returned \(applied)")
+        _ = applyPendingContextMenuIfPossible()
     }
 
     private func applyPendingContextMenuIfPossible() -> Bool {
-        print("🔽 [FocusableWKWebView] applyPendingContextMenuIfPossible: pendingPayload exists: \(pendingPayload != nil), pendingMenu exists: \(pendingMenu != nil)")
         guard let payload = pendingPayload,
               payload.shouldProvideCustomMenu,
               let menu = pendingMenu else {
-            print("🔽 [FocusableWKWebView] applyPendingContextMenuIfPossible: GUARD FAILED")
             return false
         }
 
-        print("🔽 [FocusableWKWebView] applyPendingContextMenuIfPossible: Building menu items for payload")
         let items = WebContextMenuItem.buildMenuItems(for: payload, on: self, baseMenu: menu)
-        print("🔽 [FocusableWKWebView] applyPendingContextMenuIfPossible: Built \(items.count) items")
         guard !items.isEmpty else {
-            print("🔽 [FocusableWKWebView] applyPendingContextMenuIfPossible: NO ITEMS BUILT")
             return false
         }
 
-        print("🔽 [FocusableWKWebView] applyPendingContextMenuIfPossible: APPLYING CUSTOM MENU with \(items.count) items")
         menu.items = items
         pendingMenu = nil
         pendingPayload = nil

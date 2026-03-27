@@ -28,6 +28,17 @@ struct OpenAICompatibleProvider: AIProviderProtocol {
         tools: [AIToolDefinition],
         onStream: @escaping @Sendable (String) -> Void
     ) async throws -> AIResponse {
+        // SECURITY: Require HTTPS for non-local connections to prevent MITM on API keys
+        if let parsedBase = URL(string: baseURL) {
+            let scheme = parsedBase.scheme?.lowercased() ?? ""
+            let host = parsedBase.host?.lowercased() ?? ""
+            let isLocal = host == "localhost" || host == "127.0.0.1" || host == "::1"
+            if scheme != "https" && !isLocal {
+                Self.log.warning("Custom provider requires HTTPS for non-local connections: \(self.baseURL)")
+                throw AIProviderError.insecureURL(baseURL)
+            }
+        }
+
         let url = URL(string: "\(baseURL)/chat/completions")!
 
         var request = URLRequest(url: url)

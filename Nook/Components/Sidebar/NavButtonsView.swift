@@ -5,14 +5,20 @@
 //  Created by Maciek Bagiński on 30/07/2025.
 //
 import SwiftUI
+import Combine
 
-// Wrapper to properly observe Tab object and use active window's WebView
+// Wrapper to properly observe Tab object and use active window's WebView.
+// Uses KVO on WKWebView.canGoBack/canGoForward/isLoading instead of a polling timer.
 @MainActor
 class ObservableTabWrapper: ObservableObject {
     @Published var tab: Tab?
     weak var browserManager: BrowserManager?
     weak var windowState: BrowserWindowState?
-    
+    private var canGoBackObservation: NSKeyValueObservation?
+    private var canGoForwardObservation: NSKeyValueObservation?
+    private var isLoadingObservation: NSKeyValueObservation?
+    private var loadingStateCancellable: AnyCancellable?
+
     var canGoBack: Bool {
         if let tab = tab,
            let browserManager = browserManager,
@@ -22,7 +28,7 @@ class ObservableTabWrapper: ObservableObject {
         }
         return tab?.canGoBack ?? false
     }
-    
+
     var canGoForward: Bool {
         if let tab = tab,
            let browserManager = browserManager,
@@ -32,14 +38,50 @@ class ObservableTabWrapper: ObservableObject {
         }
         return tab?.canGoForward ?? false
     }
-    
+
     func updateTab(_ newTab: Tab?) {
         tab = newTab
+        observeWebView()
+        observeLoadingState()
     }
-    
+
     func setContext(browserManager: BrowserManager, windowState: BrowserWindowState) {
         self.browserManager = browserManager
         self.windowState = windowState
+        observeWebView()
+    }
+
+    private func observeWebView() {
+        // Remove old observations
+        canGoBackObservation = nil
+        canGoForwardObservation = nil
+        isLoadingObservation = nil
+
+        guard let tab = tab,
+              let browserManager = browserManager,
+              let windowState = windowState,
+              let webView = browserManager.getWebView(for: tab.id, in: windowState.id)
+        else { return }
+
+        canGoBackObservation = webView.observe(\.canGoBack, options: [.new]) { [weak self] _, _ in
+            Task { @MainActor in self?.objectWillChange.send() }
+        }
+        canGoForwardObservation = webView.observe(\.canGoForward, options: [.new]) { [weak self] _, _ in
+            Task { @MainActor in self?.objectWillChange.send() }
+        }
+        isLoadingObservation = webView.observe(\.isLoading, options: [.new]) { [weak self] _, _ in
+            Task { @MainActor in self?.objectWillChange.send() }
+        }
+    }
+
+    private func observeLoadingState() {
+        loadingStateCancellable = nil
+        guard let tab = tab else { return }
+        loadingStateCancellable = tab.$loadingState
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
     }
 }
 
@@ -55,22 +97,17 @@ struct NavButtonsView: View {
         let sidebarOnLeft = nookSettings.sidebarPosition == .left
         let sidebarWidthForLayout = effectiveSidebarWidth ?? windowState.sidebarWidth
 
-        // Adjust thresholds based on whether AI button is shown
-        // When AI is disabled, we have more space, so thresholds are lower
-        let navigationCollapseThreshold: CGFloat = nookSettings.showAIAssistant ? 280 : 250
-        let refreshCollapseThreshold: CGFloat = nookSettings.showAIAssistant ? 240 : 210
-        let aiChatCollapseThreshold: CGFloat = 220
+        // Collapse thresholds: at 250pt default width all buttons fit comfortably
+        // (5 buttons × 32pt + spacing ≈ 186pt, leaving ~48pt spacer in 234pt usable)
+        let navigationCollapseThreshold: CGFloat = nookSettings.showAIAssistant ? 215 : 180
+        let refreshCollapseThreshold: CGFloat = nookSettings.showAIAssistant ? 200 : 165
+        let aiChatCollapseThreshold: CGFloat = 195
 
         let shouldCollapseNavigation = sidebarWidthForLayout < navigationCollapseThreshold
         let shouldCollapseRefresh = sidebarWidthForLayout < refreshCollapseThreshold
         let shouldCollapseAIChat = sidebarWidthForLayout < aiChatCollapseThreshold
         
         HStack(spacing: 2) {
-            if sidebarOnLeft {
-                MacButtonsView()
-                    .frame(width: 70)
-            }
-            
             Button("Toggle Sidebar", systemImage: sidebarOnLeft ? "sidebar.left" : "sidebar.right") {
                 browserManager.toggleSidebar(for: windowState)
             }
@@ -133,17 +170,21 @@ struct NavButtonsView: View {
                 }
                 
                 if !shouldCollapseRefresh {
-                    Button("Reload", systemImage: "arrow.clockwise", action: refreshCurrentTab)
-                        .labelStyle(.iconOnly)
-                        .buttonStyle(NavButtonStyle())
-                        .foregroundStyle(Color.primary)
-                        .foregroundStyle(Color.primary)
+                    Button {
+                        if tabWrapper.tab?.isLoading == true {
+                            tabWrapper.tab?.stop()
+                        } else {
+                            refreshCurrentTab()
+                        }
+                    } label: {
+                        Image(systemName: tabWrapper.tab?.isLoading == true ? "xmark" : "arrow.clockwise")
+                            .contentTransition(.symbolEffect(.replace))
+                    }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(NavButtonStyle())
+                    .foregroundStyle(Color.primary)
                 }
                 
-                if !sidebarOnLeft {
-                    MacButtonsView()
-                        .frame(width: 70)
-                }
             }
         }
         .frame(maxWidth: .infinity)
@@ -159,9 +200,6 @@ struct NavButtonsView: View {
             updateCurrentTab()
         }
         .onChange(of: browserManager.currentTab(for: windowState)?.id) { _, _ in
-            updateCurrentTab()
-        }
-        .onReceive(Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()) { _ in
             updateCurrentTab()
         }
     }

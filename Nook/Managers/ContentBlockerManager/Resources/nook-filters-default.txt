@@ -1,0 +1,110 @@
+! Title: Nook Filters
+! Homepage: https://github.com/nook-browser/nook-filters
+! Description: Site-specific ad blocking rules for Nook browser
+! Last modified: 2026-03-22
+! License: GPL-3.0
+
+! === YOUTUBE ===
+
+! --- Primary YouTube ad blocking handled by youtube-ad-blocker.js ---
+! (Dedicated JS + native Swift handler for object traps, fetch/XHR interception,
+!  player state monitoring via WKScriptMessageHandler, and SPA navigation)
+
+! --- Timer acceleration: skip ad wait timers (safety net) ---
+www.youtube.com##+js(nano-stb, [native code], 17000, 0.001)
+www.youtube.com##+js(nano-stb, bAK, *, 0.001)
+
+! --- Network blocking: block ad-related fetch/XHR/beacon requests ---
+youtube.com##+js(no-fetch-if, /pagead|doubleclick|googleadservices|ptracking|api\/stats\/ads|get_midroll_info|youtubei\/v1\/player\/ad_break|adnw_request/)
+youtube.com##+js(no-xhr-if, /pagead|doubleclick|googleadservices|ptracking|api\/stats\/ads|get_midroll_info/)
+youtube.com##+js(no-beacon-if, /pagead|doubleclick|ptracking|api\/stats\/ads/)
+
+! --- Block ad network requests ---
+||googlevideo.com/initplayback?source=youtube&*oad=$xhr,domain=youtube.com
+*_ad_$media,domain=youtube.com,third-party
+
+! --- Cosmetic hiding: hide ad containers in the YouTube UI ---
+youtube.com##ytd-ad-slot-renderer
+youtube.com##ytd-in-feed-ad-layout-renderer
+youtube.com##ytd-banner-promo-renderer
+youtube.com##.ytp-ad-overlay-container
+youtube.com##.ytp-ad-text-overlay
+youtube.com##.video-ads
+youtube.com###player-ads
+youtube.com###masthead-ad
+youtube.com##ytd-promoted-sparkles-web-renderer
+youtube.com##ytd-promoted-video-renderer
+youtube.com##ytd-rich-item-renderer:has(ytd-ad-slot-renderer)
+youtube.com##ytd-rich-section-renderer:has(ytd-ad-slot-renderer)
+youtube.com##tp-yt-paper-dialog:has(ytd-enforcement-dialog-view-model)
+youtube.com##.ytp-ad-skip-button-container
+youtube.com##.ytp-ad-preview-container
+youtube.com##.ytp-ad-progress-list
+youtube.com##.ytp-ad-player-overlay
+youtube.com##ytd-display-ad-renderer
+youtube.com##ytd-statement-banner-renderer
+youtube.com##ytd-compact-promoted-item-renderer
+youtube.com##ytd-promoted-sparkles-text-search-renderer
+youtube.com##.ytd-merch-shelf-renderer
+youtube.com##ytd-action-companion-ad-renderer
+youtube.com##ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-ads"]
+youtube.com##ytd-player-legacy-desktop-watch-ads-renderer
+
+! === FACEBOOK ===
+
+! --- GraphQL response pruning: strip sponsored data from API responses ---
+facebook.com##+js(json-prune-xhr-response, data.viewer.instream_video_ads data.scrubber, , url:/api/graphql)
+facebook.com##+js(json-prune-fetch-response, data.viewer.instream_video_ads data.scrubber, , url:/api/graphql)
+facebook.com##+js(json-prune-xhr-response, data.node.story.sponsored_data, , url:/api/graphql)
+facebook.com##+js(json-prune-fetch-response, data.node.story.sponsored_data, , url:/api/graphql)
+facebook.com##+js(json-prune-xhr-response, data.viewer.news_feed.edges.[-].node.sponsored_data, , url:/api/graphql)
+facebook.com##+js(json-prune-fetch-response, data.viewer.news_feed.edges.[-].node.sponsored_data, , url:/api/graphql)
+facebook.com##+js(json-prune-xhr-response, data.viewer.sideFeedUnit.nodes.[-].new_adverts, , url:/api/graphql)
+facebook.com##+js(json-prune-fetch-response, data.viewer.sideFeedUnit.nodes.[-].new_adverts, , url:/api/graphql)
+
+! --- Set sponsored detection properties ---
+facebook.com##+js(set-constant, __NEXT_DATA__.props.pageProps.ads, undefined)
+
+! --- Sponsored post detection: handled by facebook-sponsored-blocker.js ---
+! (Dedicated JS content script uses Privacy Sandbox attributionsrc detection,
+!  geometric text reconstruction, and MutationObserver for dynamic feed)
+
+! --- Cosmetic hiding: sidebar ads only (feed posts handled by JS to avoid scroll breakage) ---
+facebook.com##div[role="complementary"] a[attributionsrc^="/privacy_sandbox/comet/register/source/"]
+
+! --- Network blocking: block ad-related requests ---
+facebook.com##+js(no-fetch-if, /adnw_request|ads\/dtsg|ad_limits|tr\.facebook\.com|ad_request/)
+facebook.com##+js(no-xhr-if, /adnw_request|ads\/dtsg|ad_limits|tr\.facebook\.com|ad_request/)
+||facebook.com/tr?$image,third-party
+||connect.facebook.net/signals/$script
+||facebook.com/impression.php$image
+
+! === INSTAGRAM ===
+
+instagram.com##article:has(a[href*="/ads/about"])
+instagram.com##div[role="dialog"]:has(a[href*="/ads/about"])
+instagram.com##+js(json-prune-fetch-response, data.xdt_api__v1__feed__timeline__connection.edges.[-].node.ad_id, , url:/api/graphql)
+
+! === TWITTER / X ===
+
+twitter.com##article:has(div[data-testid="placementTracking"])
+x.com##article:has(div[data-testid="placementTracking"])
+twitter.com,x.com##+js(json-prune-fetch-response, data.timeline_by_id.timeline.instructions.[-].entries.[-].content.itemContent.promotedMetadata, , url:/graphql/)
+
+! === REDDIT ===
+
+reddit.com##shreddit-ad-post
+reddit.com##.promotedlink
+reddit.com###ad-slot
+reddit.com##shreddit-comments-page-ad
+reddit.com##div[data-testid="post-container"]:has(a[href*="/r/RedditAdvertising/"])
+
+! === COMMON AD NETWORKS ===
+
+||pagead2.googlesyndication.com^
+||securepubads.g.doubleclick.net^
+||adservice.google.com^
+||static.ads-twitter.com^
+||ads.reddit.com^
+||pixel.facebook.com^
+||analytics.tiktok.com^

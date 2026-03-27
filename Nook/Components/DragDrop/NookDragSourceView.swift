@@ -33,7 +33,7 @@ final class NookDragSourceCoordinator: NSObject, NSDraggingSource {
     }
 
     nonisolated func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
-        Task { @MainActor in
+        MainActor.assumeIsolated {
             if operation == [] {
                 manager.cancelDrag()
             }
@@ -63,11 +63,20 @@ final class NookDragSourceNSView: NSView {
     func initiateDrag(with event: NSEvent) {
         guard let coordinator = coordinator, let tab = coordinator.tab else { return }
 
+        // Capture screen position from the event for preview window positioning
+        let screenPoint: NSPoint
+        if let window = self.window {
+            screenPoint = window.convertPoint(toScreen: event.locationInWindow)
+        } else {
+            screenPoint = NSEvent.mouseLocation
+        }
+
         coordinator.manager.beginDrag(
             item: coordinator.item,
             tab: tab,
             from: coordinator.zoneID,
-            at: coordinator.index
+            at: coordinator.index,
+            cursorScreenPoint: screenPoint
         )
 
         let pasteboardItem = NSPasteboardItem()

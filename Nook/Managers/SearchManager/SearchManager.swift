@@ -61,15 +61,12 @@ class SearchManager {
     @MainActor func updateProfileContext() {
         let pid = tabManager?.browserManager?.currentProfile?.id
         currentProfileId = pid
-        #if DEBUG
-        if let pid { print("🔎 [SearchManager] Profile context updated: \(pid.uuidString)") }
-        #endif
     }
     
     @MainActor func searchSuggestions(for query: String) {
         // Cancel previous request
         searchTask?.cancel()
-        
+
         // Clear suggestions if query is empty
         guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             if !suggestions.isEmpty {
@@ -79,38 +76,39 @@ class SearchManager {
             }
             return
         }
-        
-        // Search tabs first
+
+        // Search tabs (highest priority)
         let tabSuggestions = searchTabs(for: query)
-        
-        // Search history
+        let limitedTabSuggestions = Array(tabSuggestions.prefix(2))
+
+        // Search history (lowest priority — shown after search suggestions)
         let historySuggestions = searchHistory(for: query)
-        
-        // Combine suggestions: tabs first, then history, then web suggestions
-        var allSuggestions: [SearchSuggestion] = []
-        
-        // Add tab suggestions (limit to 2 to leave room for history)
-        let maxTabSuggestions = 2
-        let limitedTabSuggestions = Array(tabSuggestions.prefix(maxTabSuggestions))
-        allSuggestions.append(contentsOf: limitedTabSuggestions)
-        
-        // Add history suggestions (limit to leave room for web suggestions)
-        let maxHistorySuggestions = 2
-        let limitedHistorySuggestions = Array(historySuggestions.prefix(maxHistorySuggestions))
-        allSuggestions.append(contentsOf: limitedHistorySuggestions)
-        
-        // Add URL suggestion if query looks like a URL
-        if isLikelyURL(query) {
-            allSuggestions.append(SearchSuggestion(text: query, type: .url))
+        let limitedHistorySuggestions = Array(historySuggestions.prefix(2))
+
+        // URL suggestion if query looks like a URL
+        let urlSuggestion: SearchSuggestion? = isLikelyURL(query)
+            ? SearchSuggestion(text: query, type: .url)
+            : nil
+
+        // Show immediate suggestions: URL + history + tabs
+        var immediateSuggestions: [SearchSuggestion] = []
+        if let urlSug = urlSuggestion {
+            immediateSuggestions.append(urlSug)
         }
-        
-        // Update suggestions immediately with what we have
-        if !allSuggestions.isEmpty {
-            updateSuggestionsIfNeeded(allSuggestions)
+        immediateSuggestions.append(contentsOf: limitedHistorySuggestions)
+        immediateSuggestions.append(contentsOf: limitedTabSuggestions)
+
+        if !immediateSuggestions.isEmpty {
+            updateSuggestionsIfNeeded(immediateSuggestions)
         }
-        
-        // Fetch web suggestions and combine them, but limit total to 5
-        fetchWebSuggestions(for: query, prependTabSuggestions: allSuggestions)
+
+        // Fetch web suggestions; final order: tabs -> URL -> search -> history
+        fetchWebSuggestions(
+            for: query,
+            tabSuggestions: limitedTabSuggestions,
+            urlSuggestion: urlSuggestion,
+            historySuggestions: limitedHistorySuggestions
+        )
     }
     
     @MainActor private func searchTabs(for query: String) -> [SearchSuggestion] {
@@ -203,53 +201,60 @@ class SearchManager {
         return sortedHistory
     }
     
-    private func fetchWebSuggestions(for query: String, prependTabSuggestions: [SearchSuggestion]) {
+    private func fetchWebSuggestions(
+        for query: String,
+        tabSuggestions: [SearchSuggestion],
+        urlSuggestion: SearchSuggestion?,
+        historySuggestions: [SearchSuggestion]
+    ) {
         isLoading = true
-        
+
         let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
         let urlString = "https://suggestqueries.google.com/complete/search?client=firefox&q=\(encodedQuery)"
-        
+
         guard let url = URL(string: urlString) else {
             isLoading = false
             return
         }
-        
+
         searchTask = session.dataTask(with: url) { [weak self] data, response, error in
             DispatchQueue.main.async {
                 self?.isLoading = false
-                
+
                 guard let data = data,
                       error == nil else {
-                    print("Search suggestions error: \(error?.localizedDescription ?? "Unknown error")")
                     return
                 }
-                
+
                 do {
                     guard let jsonArray = try JSONSerialization.jsonObject(with: data) as? [Any],
                           jsonArray.count >= 2,
                           let suggestionsArray = jsonArray[1] as? [String] else {
-                        print("Invalid JSON response format")
                         return
                     }
-                    
+
                     let webSuggestions = suggestionsArray.prefix(5).map { suggestion in
                         SearchSuggestion(
                             text: suggestion,
                             type: isLikelyURL(suggestion) == true ? .url : .search
                         )
                     }
-                    
-                    // Combine suggestions but limit total to 5
-                    let combinedSuggestions = prependTabSuggestions + Array(webSuggestions)
-                    let limitedSuggestions = Array(combinedSuggestions.prefix(5))
-                    self?.updateSuggestionsIfNeeded(limitedSuggestions)
-                    
+
+                    // Priority order: URL -> search -> history -> tabs
+                    var combined: [SearchSuggestion] = []
+                    if let urlSug = urlSuggestion {
+                        combined.append(urlSug)
+                    }
+                    combined.append(contentsOf: webSuggestions)
+                    combined.append(contentsOf: historySuggestions)
+                    combined.append(contentsOf: tabSuggestions)
+                    self?.updateSuggestionsIfNeeded(Array(combined.prefix(5)))
+
                 } catch {
-                    print("JSON parsing error: \(error.localizedDescription)")
                 }
             }
         }
-        
+
         searchTask?.resume()
     }
     
@@ -287,7 +292,6 @@ class SearchManager {
         // Only animate if less than 60% of suggestions are the same
         return similarityRatio < 0.6
     }
-    
     
     
     func clearSuggestions() {

@@ -35,7 +35,7 @@ struct SidebarMenuTab: View {
         .animation(.linear(duration: 0.1), value: isHovering)
         .animation(.linear(duration: 0.2), value: isActive)
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .onHover { state in
+        .onHoverTracking { state in
             isHovering = state
         }
         .onTapGesture {

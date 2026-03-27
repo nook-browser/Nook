@@ -33,7 +33,6 @@ public enum SidebarPosition: String, CaseIterable, Identifiable {
 }
 
 struct SidebarMenu: View {
-    @State private var selectedTab: Tabs = .history
     @Environment(BrowserWindowState.self) private var windowState
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(\.nookSettings) var nookSettings
@@ -44,7 +43,7 @@ struct SidebarMenu: View {
                 tabs
             }
             VStack {
-                switch selectedTab {
+                switch windowState.sidebarMenuSelectedTab {
                 case .history:
                     SidebarMenuHistoryTab()
                 case .downloads:
@@ -59,34 +58,28 @@ struct SidebarMenu: View {
         .frame(maxWidth: .infinity)
         .ignoresSafeArea()
     }
-    
+
     var tabs: some View{
         VStack {
-            HStack {
-                MacButtonsView()
-                    .frame(width: 70, height: 20)
-                    .padding(8)
-                Spacer()
-            }
-            
+
             Spacer()
             VStack(spacing: 20) {
                 SidebarMenuTab(
                     image: "clock",
                     activeImage: "clock.fill",
                     title: "History",
-                    isActive: selectedTab == .history,
+                    isActive: windowState.sidebarMenuSelectedTab == .history,
                     action: {
-                        selectedTab = .history
+                        windowState.sidebarMenuSelectedTab = .history
                     }
                 )
                 SidebarMenuTab(
                     image: "arrow.down.circle",
                     activeImage: "arrow.down.circle.fill",
                     title: "Downloads",
-                    isActive: selectedTab == .downloads,
+                    isActive: windowState.sidebarMenuSelectedTab == .downloads,
                     action: {
-                        selectedTab = .downloads
+                        windowState.sidebarMenuSelectedTab = .downloads
                     }
                 )
             }

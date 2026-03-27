@@ -8,470 +8,7 @@
 import AppKit
 import SwiftUI
 
-// MARK: - Settings Root (Native macOS Settings)
-struct SettingsView: View {
-    @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var gradientColorManager: GradientColorManager
-    @Environment(\.nookSettings) var nookSettings
-
-    var body: some View {
-        SettingsContent(nookSettings: nookSettings, browserManager: browserManager, gradientColorManager: gradientColorManager)
-    }
-}
-
-private struct SettingsContent: View {
-    @Bindable var nookSettings: NookSettingsService
-    @ObservedObject var browserManager: BrowserManager
-    @ObservedObject var gradientColorManager: GradientColorManager
-
-    var body: some View {
-        TabView(selection: $nookSettings.currentSettingsTab) {
-            SettingsPane {
-                SettingsGeneralTab()
-            }
-            .tabItem {
-                Label(
-                    SettingsTabs.general.name,
-                    systemImage: SettingsTabs.general.icon
-                )
-            }
-            .tag(SettingsTabs.general)
-            SettingsPane {
-                SettingsAppearanceTab()
-            }
-            .tabItem {
-                Label(
-                    SettingsTabs.appearance.name,
-                    systemImage: SettingsTabs.appearance.icon
-                )
-            }
-            .tag(SettingsTabs.appearance)
-            SettingsPane {
-                SettingsAITab()
-            }
-            .tabItem {
-                Label(
-                    SettingsTabs.ai.name,
-                    systemImage: SettingsTabs.ai.icon
-                )
-            }
-            .tag(SettingsTabs.ai)
-
-            SettingsPane {
-                PrivacySettingsView()
-            }
-            .tabItem {
-                Label(
-                    SettingsTabs.privacy.name,
-                    systemImage: SettingsTabs.privacy.icon
-                )
-            }
-            .tag(SettingsTabs.privacy)
-
-            SettingsPane {
-                ProfilesSettingsView()
-            }
-            .tabItem {
-                Label(
-                    SettingsTabs.profiles.name,
-                    systemImage: SettingsTabs.profiles.icon
-                )
-            }
-            .tag(SettingsTabs.profiles)
-
-
-            SettingsPane {
-                ShortcutsSettingsView()
-            }
-            .tabItem {
-                Label(
-                    SettingsTabs.shortcuts.name,
-                    systemImage: SettingsTabs.shortcuts.icon
-                )
-            }
-            .tag(SettingsTabs.shortcuts)
-
-            if #available(macOS 15.5, *),
-               let extensionManager = browserManager.extensionManager {
-                SettingsPane {
-                    ExtensionsSettingsView(extensionManager: extensionManager)
-                }
-                .tabItem {
-                    Label(
-                        SettingsTabs.extensions.name,
-                        systemImage: SettingsTabs.extensions.icon
-                    )
-                }
-                .tag(SettingsTabs.extensions)
-            }
-
-
-            #if DEBUG
-            SettingsPane {
-                AdvancedSettingsView()
-            }
-            .tabItem {
-                Label(
-                    SettingsTabs.advanced.name,
-                    systemImage: SettingsTabs.advanced.icon
-                )
-            }
-            .tag(SettingsTabs.advanced)
-            #endif
-
-        }
-    }
-}
-
-// MARK: - Reusable pane wrapper: fixed height + scrolling
-private struct SettingsPane<Content: View>: View {
-    let content: Content
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
-    private let fixedHeight: CGFloat = 500
-    private let minWidth: CGFloat = 500
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                content
-            }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-            .padding(20)
-        }
-        .scrollIndicators(.automatic)
-        .frame(minWidth: minWidth, maxWidth: 675)
-        .frame(
-            minHeight: fixedHeight,
-            idealHeight: fixedHeight,
-            maxHeight: fixedHeight
-        )
-    }
-}
-
-// MARK: - Horizontal Tab Bar
-// Legacy custom tab strip retained for reference but no longer used.
-struct SettingsTabStrip: View {
-    @Binding var selection: SettingsTabs
-    var body: some View { EmptyView() }
-}
-
-struct SettingsTabItem: View {
-    let tab: SettingsTabs
-    let isSelected: Bool
-    var body: some View { EmptyView() }
-}
-
-// MARK: - General Settings
-
-struct GeneralSettingsView: View {
-    @EnvironmentObject var browserManager: BrowserManager
-    @Environment(\.nookSettings) var nookSettings
-    @State private var showingAddEngine = false
-
-    var body: some View {
-        @Bindable var settings = nookSettings
-
-        HStack(alignment: .top, spacing: 16) {
-            // Hero card
-            SettingsHeroCard()
-                .frame(width: 320, height: 420)
-
-            // Right side stacked cards
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    SettingsSectionCard(
-                        title: "Appearance",
-                        subtitle: "Window materials and visual style"
-                    ) {
-                        VStack{
-                            HStack(alignment: .firstTextBaseline) {
-                                Text("Background Material")
-                                Spacer()
-                                Picker(
-                                    "Background Material",
-                                    selection: $settings
-                                        .currentMaterialRaw
-                                ) {
-                                    ForEach(materials, id: \.value.rawValue) {
-                                        material in
-                                        Text(material.name).tag(
-                                            material.value.rawValue
-                                        )
-                                    }
-                                }
-                                .labelsHidden()
-                                .pickerStyle(.menu)
-                                .frame(width: 220)
-                            }
-                            HStack(alignment: .firstTextBaseline) {
-                                Text("Pinned Tabs Look")
-                                Spacer()
-                                Picker(
-                                    "pinned tabs",
-                                    selection: $settings.pinnedTabsLook
-                                ) {
-                                    ForEach(PinnedTabsConfiguration.allCases) { config in
-                                        Text(config.name).tag(config)
-                                    }
-                                }
-                                .labelsHidden()
-                                .pickerStyle(.menu)
-                                .frame(width: 220)
-                            }
-                        }
-
-                    }
-                    
-                    SettingsSectionCard(
-                        title: "Nook",
-                        subtitle: "General Nook settings"
-                    ) {
-                        VStack(alignment: .leading, spacing: 16) {
-                            Toggle(
-                                isOn: $settings
-                                    .askBeforeQuit
-                            ) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Ask Before Quitting")
-                                    Text(
-                                        "Warn before quitting Nook"
-                                    )
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                }
-                            }.frame(maxWidth: .infinity, alignment: .leading)
-                            HStack(alignment: .firstTextBaseline) {
-                                Text("Sidebar Position")
-                                Spacer()
-                                Picker(
-                                    "Sidebar Position",
-                                    selection: $settings
-                                        .sidebarPosition
-                                ) {
-                                    ForEach(SidebarPosition.allCases) { provider in
-                                        Text(provider.displayName).tag(provider)
-                                    }
-                                }
-                                .labelsHidden()
-                                .pickerStyle(.menu)
-                                .frame(width: 220)
-                            }
-                            
-                            Toggle(
-                                isOn: $settings
-                                    .topBarAddressView
-                            ) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Top Bar Address View")
-                                    Text(
-                                        "Show address bar and navigation buttons at the top of the window"
-                                    )
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                }
-                            }.frame(maxWidth: .infinity, alignment: .leading)
-                            
-                            Divider().opacity(0.4)
-                            
-                            Toggle(
-                                isOn: $settings
-                                    .showLinkStatusBar
-                            ) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Link Status Bar")
-                                    Text(
-                                        "Show URL preview when hovering over links"
-                                    )
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                }
-                            }.frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-
-                    SettingsSectionCard(
-                        title: "Search",
-                        subtitle: "Default provider for address bar"
-                    ) {
-                        HStack(alignment: .firstTextBaseline) {
-                            Text("Search Engine")
-                            Spacer()
-                            Picker(
-                                "Search Engine",
-                                selection: $settings
-                                    .searchEngineId
-                            ) {
-                                ForEach(SearchProvider.allCases) { provider in
-                                    Text(provider.displayName).tag(provider.rawValue)
-                                }
-                                ForEach(nookSettings.customSearchEngines) { engine in
-                                    Text(engine.name).tag(engine.id.uuidString)
-                                }
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-                            .frame(width: 220)
-
-                            Button {
-                                showingAddEngine = true
-                            } label: {
-                                Image(systemName: "plus")
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                        }
-
-                        if let selected = nookSettings.customSearchEngines.first(where: { $0.id.uuidString == nookSettings.searchEngineId }) {
-                            HStack {
-                                Text(selected.name)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                Button("Remove") {
-                                    nookSettings.customSearchEngines.removeAll { $0.id == selected.id }
-                                    nookSettings.searchEngineId = SearchProvider.google.rawValue
-                                }
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-                    .sheet(isPresented: $showingAddEngine) {
-                        CustomSearchEngineEditor { newEngine in
-                            nookSettings.customSearchEngines.append(newEngine)
-                        }
-                    }
-                    
-                    SettingsSectionCard(
-                        title: "AI Assistant",
-                        subtitle: "Configure AI chat powered by Gemini"
-                    ) {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack(alignment: .firstTextBaseline) {
-                                Text("Enable AI Assistant")
-                                Spacer()
-                                Toggle("", isOn: $settings.showAIAssistant)
-                                    .labelsHidden()
-                            }
-                            
-                            if nookSettings.showAIAssistant {
-                                Divider().opacity(0.4)
-                                
-                                HStack(alignment: .firstTextBaseline) {
-                                    Text("Gemini API Key")
-                                    Spacer()
-                                    SecureField("Enter API Key", text: $settings.geminiApiKey)
-                                        .textFieldStyle(.roundedBorder)
-                                        .frame(width: 220)
-                                }
-                                
-                                Text("Get your API key from Google AI Studio")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                
-                                Link("Get API Key →", destination: URL(string: "https://aistudio.google.com/apikey")!)
-                                    .font(.caption)
-                                
-                                Divider().opacity(0.4)
-                                
-                                HStack(alignment: .firstTextBaseline) {
-                                    Text("Model")
-                                    Spacer()
-                                    Picker(
-                                        "Model",
-                                        selection: $settings.geminiModel
-                                    ) {
-                                        ForEach(GeminiModel.allCases) { model in
-                                            VStack(alignment: .leading) {
-                                                Text(model.displayName)
-                                                Text(model.description)
-                                                    .font(.caption)
-                                                    .foregroundStyle(.secondary)
-                                            }
-                                            .tag(model)
-                                        }
-                                    }
-                                    .labelsHidden()
-                                    .pickerStyle(.menu)
-                                    .frame(width: 220)
-                                }
-                                
-                                Text(nookSettings.geminiModel.description)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-
-                    SettingsSectionCard(
-                        title: "Performance",
-                        subtitle: "Manage memory by unloading inactive tabs"
-                    ) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(alignment: .firstTextBaseline) {
-                                Text("Tab Unload Timeout")
-                                Spacer()
-                                Picker(
-                                    "Tab Unload Timeout",
-                                    selection: Binding<TimeInterval>(
-                                        get: {
-                                            nearestTimeoutOption(
-                                                to: nookSettings
-                                                    .tabUnloadTimeout
-                                            )
-                                        },
-                                        set: { newValue in
-                                            nookSettings
-                                                .tabUnloadTimeout = newValue
-                                        }
-                                    )
-                                ) {
-                                    ForEach(unloadTimeoutOptions, id: \.self) {
-                                        value in
-                                        Text(formatTimeout(value)).tag(value)
-                                    }
-                                }
-                                .labelsHidden()
-                                .pickerStyle(.menu)
-                                .frame(width: 220)
-                                .onAppear {
-                                    nookSettings
-                                        .tabUnloadTimeout =
-                                        nearestTimeoutOption(
-                                            to: nookSettings
-                                                .tabUnloadTimeout
-                                        )
-                                }
-                            }
-
-                            Text(
-                                "Automatically unload inactive tabs to reduce memory usage."
-                            )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                            HStack {
-                                Button("Unload All Inactive Tabs") {
-                                    browserManager.tabManager
-                                        .unloadAllInactiveTabs()
-                                }
-                                .buttonStyle(.bordered)
-                                Spacer()
-                            }
-                        }
-                    }
-                }
-                .padding(.trailing, 4)
-            }
-        }
-        .frame(minHeight: 480)
-    }
-}
-
-// MARK: - Placeholder Settings Views
+// MARK: - Profiles Settings
 
 struct ProfilesSettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager
@@ -479,142 +16,83 @@ struct ProfilesSettingsView: View {
     @State private var profileToDelete: Profile? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Profiles list and actions
-            SettingsSectionCard(
-                title: "Profiles",
-                subtitle: "Create, switch, and manage browsing personas"
-            ) {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Button(action: showCreateDialog) {
-                            Label("Create Profile", systemImage: "plus")
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .accessibilityLabel("Create Profile")
-                        .accessibilityHint(
-                            "Open dialog to create a new profile"
-                        )
-
-                        Spacer()
+        Form {
+            Section("Profiles") {
+                HStack {
+                    Button(action: showCreateDialog) {
+                        Label("Create Profile", systemImage: "plus")
                     }
+                    .buttonStyle(.borderedProminent)
+                    Spacer()
+                }
 
-                    Divider().opacity(0.4)
-
-                    if browserManager.profileManager.profiles.isEmpty {
-                        HStack(spacing: 8) {
-                            Image(systemName: "person.crop.circle")
-                                .foregroundColor(.secondary)
-                            Text("No profiles yet. Create one to get started.")
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 8)
-                    } else {
-                        VStack(spacing: 8) {
-                            ForEach(
-                                browserManager.profileManager.profiles,
-                                id: \.id
-                            ) { profile in
-                                ProfileRowView(
-                                    profile: profile,
-                                    isCurrent: browserManager.currentProfile?.id
-                                        == profile.id,
-                                    spacesCount: spacesCount(for: profile),
-                                    tabsCount: tabsCount(for: profile),
-                                    dataSizeDescription: "Shared store",
-                                    pinnedCount: pinnedCount(for: profile),
-                                    onMakeCurrent: {
-                                        Task {
-                                            await browserManager.switchToProfile(
-                                                profile
-                                            )
-                                        }
-                                    },
-                                    onRename: { startRename(profile) },
-                                    onDelete: { startDelete(profile) },
-                                    onManageData: {
-                                        showDataManagement(for: profile)
-                                    }
-                                )
-                                .accessibilityLabel("Profile \(profile.name)")
-                                .accessibilityHint(
-                                    browserManager.currentProfile?.id
-                                        == profile.id
-                                        ? "Current profile" : "Inactive profile"
-                                )
+                if browserManager.profileManager.profiles.isEmpty {
+                    HStack(spacing: 8) {
+                        Image(systemName: "person.crop.circle")
+                            .foregroundColor(.secondary)
+                        Text("No profiles yet. Create one to get started.")
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    ForEach(
+                        browserManager.profileManager.profiles,
+                        id: \.id
+                    ) { profile in
+                        ProfileRowView(
+                            profile: profile,
+                            isCurrent: browserManager.currentProfile?.id == profile.id,
+                            spacesCount: spacesCount(for: profile),
+                            tabsCount: tabsCount(for: profile),
+                            dataSizeDescription: "Shared store",
+                            pinnedCount: pinnedCount(for: profile),
+                            onMakeCurrent: {
+                                Task {
+                                    await browserManager.switchToProfile(profile)
+                                }
+                            },
+                            onRename: { startRename(profile) },
+                            onDelete: { startDelete(profile) },
+                            onManageData: {
+                                showDataManagement(for: profile)
                             }
-                        }
+                        )
                     }
                 }
 
-                Divider().opacity(0.4)
-
-                // Migration controls appear under the profile list
                 MigrationControls()
                     .environmentObject(browserManager)
+            }
 
-                Divider().opacity(0.4)
-
-              }
-
-            // Space assignments management
-            SettingsSectionCard(
-                title: "Space Assignments",
-                subtitle: "Assign spaces to specific profiles"
-            ) {
-                VStack(alignment: .leading, spacing: 12) {
-                    // Bulk actions
-                    HStack(spacing: 8) {
-                        Button(action: assignAllSpacesToCurrentProfile) {
-                            Label(
-                                "Assign All to Current Profile",
-                                systemImage: "checkmark.circle"
-                            )
-                        }
-                        .buttonStyle(.bordered)
-                        .accessibilityLabel(
-                            "Assign all spaces to current profile"
-                        )
-
-                        Button(action: resetAllSpaceAssignments) {
-                            Label(
-                                "Reset to Default Profile",
-                                systemImage: "arrow.uturn.backward"
-                            )
-                        }
-                        .buttonStyle(.bordered)
-                        .accessibilityLabel("Reset space assignments to none")
-
-        
-                        Spacer()
+            Section("Space Assignments") {
+                HStack(spacing: 8) {
+                    Button(action: assignAllSpacesToCurrentProfile) {
+                        Label("Assign All to Current Profile", systemImage: "checkmark.circle")
                     }
+                    .buttonStyle(.bordered)
 
-                    Divider().opacity(0.4)
+                    Button(action: resetAllSpaceAssignments) {
+                        Label("Reset to Default Profile", systemImage: "arrow.uturn.backward")
+                    }
+                    .buttonStyle(.bordered)
 
-                    if browserManager.tabManager.spaces.isEmpty {
-                        HStack(spacing: 8) {
-                            Image(systemName: "rectangle.3.group")
-                                .foregroundStyle(.secondary)
-                            Text(
-                                "No spaces yet. Create a space to assign profiles."
-                            )
+                    Spacer()
+                }
+
+                if browserManager.tabManager.spaces.isEmpty {
+                    HStack(spacing: 8) {
+                        Image(systemName: "rectangle.3.group")
                             .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 8)
-                    } else {
-                        VStack(spacing: 8) {
-                            ForEach(browserManager.tabManager.spaces, id: \.id)
-                            { space in
-                                SpaceAssignmentRowView(space: space)
-                            }
-                        }
+                        Text("No spaces yet. Create a space to assign profiles.")
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    ForEach(browserManager.tabManager.spaces, id: \.id) { space in
+                        SpaceAssignmentRowView(space: space)
                     }
                 }
             }
-
-            Spacer()
         }
-        .padding()
+        .formStyle(.grouped)
     }
 
     // MARK: - Helpers
@@ -835,7 +313,6 @@ struct ProfilesSettingsView: View {
         }
     }
 
-    
     private func resolvedProfile(for id: UUID?) -> Profile? {
         guard let id else { return nil }
         return browserManager.profileManager.profiles.first(where: {
@@ -846,6 +323,11 @@ struct ProfilesSettingsView: View {
     private struct SpaceAssignmentRowView: View {
         @EnvironmentObject var browserManager: BrowserManager
         let space: Space
+        @State private var showDeleteConfirmation = false
+
+        private var canDelete: Bool {
+            browserManager.tabManager.spaces.count > 1
+        }
 
         var body: some View {
             HStack(spacing: 12) {
@@ -917,10 +399,31 @@ struct ProfilesSettingsView: View {
                         .labelStyle(.titleAndIcon)
                 }
                 .menuStyle(.borderlessButton)
+
+                // Delete space
+                if canDelete {
+                    Button(role: .destructive) {
+                        showDeleteConfirmation = true
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.red.opacity(0.7))
+                    .help("Delete Space")
+                }
             }
             .padding(10)
             .background(Color(.controlBackgroundColor))
             .clipShape(RoundedRectangle(cornerRadius: 8))
+            .alert("Delete \"\(space.name)\"?", isPresented: $showDeleteConfirmation) {
+                Button("Cancel", role: .cancel) {}
+                Button("Delete", role: .destructive) {
+                    browserManager.tabManager.removeSpace(space.id)
+                }
+            } message: {
+                let tabCount = (browserManager.tabManager.tabsBySpace[space.id]?.count ?? 0)
+                Text("This will close \(tabCount) tab\(tabCount == 1 ? "" : "s") in this space.")
+            }
         }
 
         private var currentProfileName: String {
@@ -1074,12 +577,11 @@ private struct MigrationControls: View {
                     Button("Continue", role: .cancel) {}
                 }
             }
-
-            Divider().opacity(0.4)
-
-                    }
+        }
     }
 }
+
+// MARK: - Shortcuts Settings
 
 struct ShortcutsSettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager
@@ -1117,118 +619,73 @@ struct ShortcutsSettingsView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Header with search and reset
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Keyboard Shortcuts")
-                        .font(.title)
-                        .fontWeight(.bold)
-                    Text("Customize keyboard shortcuts for faster navigation")
-                        .foregroundStyle(.secondary)
+        Form {
+            Section {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Detect Website Shortcuts")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        Text("When a website uses the same shortcut, press once for website, twice for Nook")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                    Toggle("", isOn: Binding(
+                        get: { WebsiteShortcutProfile.isFeatureEnabled },
+                        set: { WebsiteShortcutProfile.isFeatureEnabled = $0 }
+                    ))
+                    .labelsHidden()
                 }
-                Spacer()
-                Button("Reset to Defaults") {
-                    keyboardShortcutManager.resetToDefaults()
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
             }
-            
-            // Website shortcut detection toggle
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Detect Website Shortcuts")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                    Text("When a website uses the same shortcut, press once for website, twice for Nook")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer()
-                Toggle("", isOn: Binding(
-                    get: { WebsiteShortcutProfile.isFeatureEnabled },
-                    set: { WebsiteShortcutProfile.isFeatureEnabled = $0 }
-                ))
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .accessibilityLabel("Detect Website Shortcuts")
-            }
-            .padding(12)
-            .background(Color(.controlBackgroundColor).opacity(0.5))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
 
-            Divider().opacity(0.4)
+            Section {
+                HStack(spacing: 12) {
+                    TextField("Search shortcuts...", text: $searchText)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 240)
 
-            // Search and filter controls
-            HStack(spacing: 12) {
-                TextField("Search shortcuts...", text: $searchText)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 240)
-
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        CategoryFilterChip(
-                            title: "All",
-                            icon: nil,
-                            isSelected: selectedCategory == nil,
-                            onTap: { selectedCategory = nil }
-                        )
-                        ForEach(ShortcutCategory.allCases, id: \.self) { category in
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
                             CategoryFilterChip(
-                                title: category.displayName,
-                                icon: category.icon,
-                                isSelected: selectedCategory == category,
-                                onTap: { selectedCategory = category }
+                                title: "All",
+                                icon: nil,
+                                isSelected: selectedCategory == nil,
+                                onTap: { selectedCategory = nil }
                             )
+                            ForEach(ShortcutCategory.allCases, id: \.self) { category in
+                                CategoryFilterChip(
+                                    title: category.displayName,
+                                    icon: category.icon,
+                                    isSelected: selectedCategory == category,
+                                    onTap: { selectedCategory = category }
+                                )
+                            }
                         }
                     }
-                    .padding(.horizontal, 4)
+
+                    Spacer()
+
+                    Button("Reset to Defaults") {
+                        keyboardShortcutManager.resetToDefaults()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                 }
             }
 
-            Divider().opacity(0.4)
-
-            // Shortcuts list
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    ForEach(ShortcutCategory.allCases, id: \.self) { category in
-                        if let categoryShortcuts = shortcutsByCategory[category], !categoryShortcuts.isEmpty {
-                            CategorySection(
-                                category: category,
-                                shortcuts: categoryShortcuts
-                            )
+            ForEach(ShortcutCategory.allCases, id: \.self) { category in
+                if let categoryShortcuts = shortcutsByCategory[category], !categoryShortcuts.isEmpty {
+                    Section(category.displayName) {
+                        ForEach(categoryShortcuts, id: \.id) { shortcut in
+                            ShortcutRowView(shortcut: shortcut)
                         }
                     }
-                }
-                .padding(.vertical, 8)
-            }
-        }
-        .padding()
-    }
-}
-
-/// MARK: - Category Section
-private struct CategorySection: View {
-    let category: ShortcutCategory
-    let shortcuts: [KeyboardShortcut]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Label(category.displayName, systemImage: category.icon)
-                    .font(.headline)
-                Spacer()
-            }
-
-            VStack(spacing: 8) {
-                ForEach(shortcuts, id: \.id) { shortcut in
-                    ShortcutRowView(shortcut: shortcut)
                 }
             }
         }
-        .padding(.horizontal, 4)
+        .formStyle(.grouped)
     }
 }
 
@@ -1284,7 +741,6 @@ private struct ShortcutRowView: View {
                         keyboardShortcutManager.toggleShortcut(action: shortcut.action, isEnabled: newValue)
                     }
                 ))
-                .toggleStyle(.switch)
                 .labelsHidden()
             }
         }
@@ -1331,6 +787,8 @@ private struct CategoryFilterChip: View {
     }
 }
 
+// MARK: - Extensions Settings
+
 struct ExtensionsSettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @ObservedObject var extensionManager: ExtensionManager
@@ -1340,75 +798,63 @@ struct ExtensionsSettingsView: View {
     @State private var showSafariSection = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        Form {
             if #available(macOS 15.5, *) {
-                // Extension management UI
-                HStack {
-                    Text("Installed Extensions")
-                        .font(.headline)
-                    Spacer()
-                    Button("Install Extension...") {
-                        browserManager.showExtensionInstallDialog()
+                Section {
+                    HStack {
+                        Spacer()
+                        Button("Install Extension...") {
+                            browserManager.showExtensionInstallDialog()
+                        }
+                        .buttonStyle(.borderedProminent)
                     }
-                    .buttonStyle(.borderedProminent)
                 }
-
-                Divider()
 
                 if extensionManager.installedExtensions.isEmpty && !showSafariSection {
-                    VStack(spacing: 12) {
-                        Image(systemName: "puzzlepiece.extension")
-                            .font(.system(size: 48))
-                            .foregroundColor(.secondary)
-                        Text("No Extensions Installed")
-                            .font(.title2)
-                            .fontWeight(.medium)
-                        Text(
-                            "Install browser extensions to enhance your browsing experience"
-                        )
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
+                    Section {
+                        VStack(spacing: 12) {
+                            Image(systemName: "puzzlepiece.extension")
+                                .font(.system(size: 48))
+                                .foregroundColor(.secondary)
+                            Text("No Extensions Installed")
+                                .font(.title2)
+                                .fontWeight(.medium)
+                            Text("Install browser extensions to enhance your browsing experience")
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    ScrollView {
-                        LazyVStack(spacing: 12) {
-                            ForEach(
-                                extensionManager.installedExtensions,
-                                id: \.id
-                            ) { ext in
-                                ExtensionRowView(extension: ext)
-                                    .environmentObject(browserManager)
+                    Section("Installed Extensions") {
+                        ForEach(extensionManager.installedExtensions, id: \.id) { ext in
+                            ExtensionRowView(extension: ext)
+                                .environmentObject(browserManager)
+                        }
+                    }
+                }
+
+                Section("Safari Extensions") {
+                    HStack {
+                        if isScanningSafari {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Scanning...")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Button("Scan for Safari Extensions") {
+                                scanForSafariExtensions()
                             }
                         }
-                        .padding(.vertical)
+                        Spacer()
                     }
-                }
 
-                // Safari Extensions Discovery
-                Divider()
-
-                HStack {
-                    Text("Safari Extensions")
-                        .font(.headline)
-                    Spacer()
-                    if isScanningSafari {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Button("Scan for Safari Extensions") {
-                            scanForSafariExtensions()
-                        }
-                    }
-                }
-
-                if showSafariSection {
-                    if safariExtensions.isEmpty {
-                        Text("No Safari Web Extensions found on this Mac.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    } else {
-                        LazyVStack(spacing: 8) {
+                    if showSafariSection {
+                        if safariExtensions.isEmpty {
+                            Text("No Safari Web Extensions found on this Mac.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else {
                             ForEach(safariExtensions) { ext in
                                 SafariExtensionRowView(
                                     info: ext,
@@ -1424,22 +870,27 @@ struct ExtensionsSettingsView: View {
                     }
                 }
             } else {
-                // Unsupported OS version
-                VStack(spacing: 12) {
-                    Image(systemName: "puzzlepiece.extension")
-                        .font(.system(size: 48))
-                        .foregroundColor(.secondary)
-                    Text("Extensions Not Supported")
-                        .font(.title2)
-                        .fontWeight(.medium)
-                    Text("Extensions require macOS 15.5 or later")
-                        .foregroundColor(.secondary)
+                Section {
+                    VStack(spacing: 12) {
+                        Image(systemName: "puzzlepiece.extension")
+                            .font(.system(size: 48))
+                            .foregroundColor(.secondary)
+                        Text("Extensions Not Supported")
+                            .font(.title2)
+                            .fontWeight(.medium)
+                        Text("Extensions require macOS 15.5 or later")
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .padding()
-        .frame(minWidth: 520, minHeight: 360)
+        .formStyle(.grouped)
+        .onAppear {
+            if safariExtensions.isEmpty && !isScanningSafari {
+                scanForSafariExtensions()
+            }
+        }
     }
 
     private func scanForSafariExtensions() {
@@ -1578,7 +1029,6 @@ struct ExtensionRowView: View {
                         }
                     )
                 )
-                .toggleStyle(.switch)
 
                 Button("Remove") {
                     browserManager.uninstallExtension(`extension`.id)
@@ -1593,22 +1043,18 @@ struct ExtensionRowView: View {
     }
 }
 
+// MARK: - Advanced Settings
+
 struct AdvancedSettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(\.nookSettings) var nookSettings
 
     var body: some View {
         @Bindable var settings = nookSettings
-        return
-        VStack(alignment: .leading, spacing: 16) {
+        Form {
             #if DEBUG
-            SettingsSectionCard(
-                title: "Debug Options",
-                subtitle: "Development and debugging features"
-            ) {
-                Toggle(
-                    isOn: $settings.debugToggleUpdateNotification
-                ) {
+            Section("Debug Options") {
+                Toggle(isOn: $settings.debugToggleUpdateNotification) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Show Update Notification")
                         Text(
@@ -1621,245 +1067,11 @@ struct AdvancedSettingsView: View {
             }
             #endif
         }
-        .padding()
+        .formStyle(.grouped)
     }
 }
 
-// MARK: - Helper Functions
-private let unloadTimeoutOptions: [TimeInterval] = [
-    300,  // 5 min
-    600,  // 10 min
-    900,  // 15 min
-    1800,  // 30 min
-    2700,  // 45 min
-    3600,  // 1 hr
-    7200,  // 2 hr
-    14400,  // 4 hr
-    28800,  // 8 hr
-    43200,  // 12 hr
-    86400,  // 24 hr
-]
-
-private func nearestTimeoutOption(to value: TimeInterval) -> TimeInterval {
-    guard
-        let nearest = unloadTimeoutOptions.min(by: {
-            abs($0 - value) < abs($1 - value)
-        })
-    else {
-        return value
-    }
-    return nearest
-}
-
-// MARK: - Styled Components
-struct SettingsSectionCard<Content: View>: View {
-    let title: String
-    var subtitle: String? = nil
-    @ViewBuilder var content: Content
-
-    init(
-        title: String,
-        subtitle: String? = nil,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.title = title
-        self.subtitle = subtitle
-        self.content = content()
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.headline)
-                if let subtitle {
-                    Text(subtitle).font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            content
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.thinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(Color.primary.opacity(0.08))
-                )
-                .shadow(color: Color.black.opacity(0.08), radius: 12, y: 6)
-        )
-    }
-}
-
-struct SettingsHeroCard: View {
-    @EnvironmentObject var gradientColorManager: GradientColorManager
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .strokeBorder(Color.primary.opacity(0.08))
-                    )
-                BarycentricGradientView(
-                    gradient: gradientColorManager.displayGradient
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(12)
-            }
-            .frame(height: 220)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Nook")
-                    .font(.system(size: 24, weight: .bold))
-                Text("BROWSER")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            HStack(spacing: 12) {
-                Image(systemName: "square.and.arrow.up")
-                Image(systemName: "doc.on.doc")
-                Image(systemName: "gearshape")
-            }
-            .foregroundStyle(.secondary)
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(.thinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .strokeBorder(Color.primary.opacity(0.08))
-                )
-                .shadow(color: Color.black.opacity(0.1), radius: 14, y: 6)
-        )
-    }
-}
-
-struct SettingsPlaceholderView: View {
-    let title: String
-    let subtitle: String
-    let icon: String
-
-    var body: some View {
-        VStack(alignment: .center, spacing: 16) {
-            HStack { Spacer() }
-            VStack(spacing: 10) {
-                Image(systemName: icon)
-                    .font(.system(size: 48, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                Text(title).font(.title2).fontWeight(.semibold)
-                Text(subtitle).foregroundStyle(.secondary)
-            }
-            .padding(32)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(.thinMaterial)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .strokeBorder(Color.primary.opacity(0.08))
-                    )
-                    .shadow(color: Color.black.opacity(0.08), radius: 12, y: 6)
-            )
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.vertical, 20)
-    }
-}
-
-// MARK: - Site Search Settings
-
-struct SiteSearchSettingsCard: View {
-    @Environment(\.nookSettings) var nookSettings
-    @State private var showingAddSheet = false
-    @State private var editingEntry: SiteSearchEntry? = nil
-
-    var body: some View {
-        @Bindable var settings = nookSettings
-        SettingsSectionCard(
-            title: "Site Search",
-            subtitle: "Tab-to-Search shortcuts for quick site searches"
-        ) {
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(nookSettings.siteSearchEntries) { entry in
-                    HStack(spacing: 10) {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(entry.color)
-                            .frame(width: 14, height: 14)
-
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(entry.name)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                            Text(entry.domain)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-
-                        Button {
-                            editingEntry = entry
-                        } label: {
-                            Image(systemName: "pencil")
-                                .font(.caption)
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-
-                        Button {
-                            nookSettings.siteSearchEntries.removeAll { $0.id == entry.id }
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                    }
-                    .padding(8)
-                    .background(Color(.controlBackgroundColor))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-
-                HStack(spacing: 8) {
-                    Button {
-                        showingAddSheet = true
-                    } label: {
-                        Label("Add Site", systemImage: "plus")
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-
-                    Spacer()
-
-                    Button("Reset to Defaults") {
-                        nookSettings.siteSearchEntries = SiteSearchEntry.defaultSites
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                }
-            }
-        }
-        .sheet(isPresented: $showingAddSheet) {
-            SiteSearchEntryEditor(entry: nil) { newEntry in
-                nookSettings.siteSearchEntries.append(newEntry)
-            }
-        }
-        .sheet(item: $editingEntry) { entry in
-            SiteSearchEntryEditor(entry: entry) { updated in
-                if let idx = nookSettings.siteSearchEntries.firstIndex(where: { $0.id == updated.id }) {
-                    nookSettings.siteSearchEntries[idx] = updated
-                }
-            }
-        }
-    }
-}
+// MARK: - Site Search Entry Editor
 
 struct SiteSearchEntryEditor: View {
     let entry: SiteSearchEntry?
@@ -1913,26 +1125,5 @@ struct SiteSearchEntryEditor: View {
                 colorHex = entry.colorHex
             }
         }
-    }
-}
-
-private func formatTimeout(_ seconds: TimeInterval) -> String {
-    if seconds < 3600 {  // under 1 hour
-        let minutes = Int(seconds / 60)
-        return minutes == 1 ? "1 min" : "\(minutes) mins"
-    } else if seconds < 86400 {  // under 24 hours
-        let hours = seconds / 3600.0
-        let rounded = hours.rounded()
-        let isWhole = abs(hours - rounded) < 0.01
-        if isWhole {
-            let wholeHours = Int(rounded)
-            return wholeHours == 1 ? "1 hr" : "\(wholeHours) hrs"
-        } else {
-            // Show one decimal for non-integer hours
-            return String(format: "%.1f hrs", hours)
-        }
-    } else {
-        // 24 hours (cap in UI)
-        return "24 hr"
     }
 }

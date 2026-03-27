@@ -21,10 +21,16 @@ final class TabEntity {
     var profileId: UUID?
     var folderId: UUID? // Folder membership for tabs within spacepinned area
 
+    // Display name override (user or AI-assigned custom tab name)
+    var displayNameOverride: String?
+
     // Navigation state tracking
     var currentURLString: String? // The actual current page URL (may differ from urlString after navigation)
     var canGoBack: Bool = false
     var canGoForward: Bool = false
+
+    // Pinned tab home URL (the URL the tab resets to)
+    var pinnedURLString: String?
 
     init(
         id: UUID,
@@ -36,9 +42,11 @@ final class TabEntity {
         spaceId: UUID?,
         profileId: UUID? = nil,
         folderId: UUID? = nil,
+        displayNameOverride: String? = nil,
         currentURLString: String? = nil,
         canGoBack: Bool = false,
-        canGoForward: Bool = false
+        canGoForward: Bool = false,
+        pinnedURLString: String? = nil
     ) {
         self.id = id
         self.urlString = urlString
@@ -49,11 +57,13 @@ final class TabEntity {
         self.spaceId = spaceId
         self.profileId = profileId
         self.folderId = folderId
+        self.displayNameOverride = displayNameOverride
 
         // For backward compatibility, if currentURLString is not provided, use urlString
         self.currentURLString = currentURLString ?? urlString
         self.canGoBack = canGoBack
         self.canGoForward = canGoForward
+        self.pinnedURLString = pinnedURLString
     }
 }
 
@@ -66,6 +76,7 @@ final class FolderEntity {
     var spaceId: UUID
     var isOpen: Bool
     var index: Int
+    var isRegular: Bool
 
     init(
         id: UUID,
@@ -74,7 +85,8 @@ final class FolderEntity {
         color: String,
         spaceId: UUID,
         isOpen: Bool,
-        index: Int
+        index: Int,
+        isRegular: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -83,6 +95,7 @@ final class FolderEntity {
         self.spaceId = spaceId
         self.isOpen = isOpen
         self.index = index
+        self.isRegular = isRegular
     }
 }
 

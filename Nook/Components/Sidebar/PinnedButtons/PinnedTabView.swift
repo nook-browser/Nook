@@ -13,6 +13,7 @@ struct PinnedTabView: View {
     var tabURL: String
     var tabIcon: SwiftUI.Image
     var isActive: Bool
+    var isUnloaded: Bool = false
     var action: () -> Void
 
     @EnvironmentObject var browserManager: BrowserManager
@@ -40,12 +41,12 @@ struct PinnedTabView: View {
                                     .blur(radius: 30)
                                     .opacity(0.5)
                             }
-          
+
                         }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: pinnedTabsConfiguration.cornerRadius, style: .continuous))
 
-                
+
                 HStack {
                     Spacer()
                     VStack {
@@ -56,6 +57,7 @@ struct PinnedTabView: View {
                             .antialiased(true)
                             .scaledToFit()
                             .frame(height: pinnedTabsConfiguration.faviconHeight)
+                            .opacity(isUnloaded ? 0.5 : 1.0)
                         Spacer()
                     }
 
@@ -80,7 +82,7 @@ struct PinnedTabView: View {
             .contentShape(RoundedRectangle(cornerRadius: pinnedTabsConfiguration.cornerRadius, style: .continuous))
         }
         .buttonStyle(.plain)
-        .onHover { hovering in
+        .onHoverTracking { hovering in
             self.isHovered = hovering
         }
     }

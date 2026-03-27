@@ -91,7 +91,7 @@ struct SidebarUpdateNotification: View {
                         .fill(Color.gray.opacity(0.2))
                 )
                 .frame(maxWidth: .infinity)
-                .onHover { hovering in
+                .onHoverTracking { hovering in
                     isHovering = hovering
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                         isExpanded = hovering

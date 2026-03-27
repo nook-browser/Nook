@@ -199,6 +199,9 @@ struct WebsiteView: View {
     }
 
     var body: some View {
+        // Read observable properties directly so SwiftUI tracks changes
+        let _ = windowState.currentTabId
+        let _ = windowState.compositorVersion
         ZStack() {
             Group {
                 if browserManager.currentTab(for: windowState) != nil {
@@ -211,12 +214,18 @@ struct WebsiteView: View {
                             isSplit: splitManager.isSplit(for: windowState.id),
                             leftId: splitManager.leftTabId(for: windowState.id),
                             rightId: splitManager.rightTabId(for: windowState.id),
-                            windowState: windowState
+                            windowState: windowState,
+                            compositorVersion: windowState.compositorVersion,
+                            currentTabId: windowState.currentTabId
                         )
                         .coordinateSpace(name: dragCoordinateSpace)
                         .background(shouldShowSplit ? Color.clear : Color(nsColor: .windowBackgroundColor))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .clipShape(webViewClipShape)
+                        // compositingGroup creates a rendering barrier so the shadow is
+                        // computed from a flattened bitmap rather than recompositing the
+                        // WKWebView's live GPU video layer, which caused black flashes.
+                        .compositingGroup()
                         .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 0)
                         // Critical: Use allowsHitTesting to prevent SwiftUI from intercepting mouse events
                         // This allows right-clicks to pass through to the underlying NSView (WKWebView)
@@ -230,20 +239,6 @@ struct WebsiteView: View {
                 }
             }
             VStack {
-                HStack {
-                    Spacer()
-                    Group {
-                        if let assist = browserManager.oauthAssist,
-                           browserManager.currentTab(for: windowState)?.id == assist.tabId {
-                            OAuthAssistBanner(host: assist.host)
-                                .environmentObject(browserManager)
-                                .environment(windowState)
-                                .padding(10)
-                        }
-                    }
-                    // Animate toast insertions/removals
-                    .animation(.smooth(duration: 0.25), value: browserManager.oauthAssist != nil)
-                }
                 Spacer()
                 if nookSettings.showLinkStatusBar {
                     HStack {
@@ -444,6 +439,8 @@ struct TabCompositorWrapper: NSViewRepresentable {
     var leftId: UUID?
     var rightId: UUID?
     let windowState: BrowserWindowState
+    var compositorVersion: Int
+    var currentTabId: UUID?
 
     class Coordinator {
         weak var browserManager: BrowserManager?
@@ -472,7 +469,9 @@ struct TabCompositorWrapper: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let containerView = ContainerView()
         containerView.wantsLayer = true
-        containerView.layer?.backgroundColor = NSColor.clear.cgColor
+        // Use windowBackgroundColor instead of clear to prevent black flashes during
+        // video playback when the WKWebView's GPU compositing layer briefly shows through.
+        containerView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
         containerView.postsFrameChangedNotifications = true
 
         // Store reference to container view in WebViewCoordinator
@@ -496,9 +495,13 @@ struct TabCompositorWrapper: NSViewRepresentable {
             queue: .main
         ) { [weak containerView, weak coord] _ in
             guard let cv = containerView else { return }
-            // Rebuild compositor to anchor left/right panes to new bounds
+            // Only rebuild when bounds size actually changed — spurious frame
+            // notifications (e.g. from SwiftUI layout passes) should not trigger
+            // a compositor rebuild that could interrupt video playback.
+            let newSize = cv.bounds.size
+            guard coord?.lastSize != newSize else { return }
             updateCompositor(cv)
-            coord?.lastSize = cv.bounds.size
+            coord?.lastSize = newSize
         }
 
         // Set up link hover callbacks for current tab
@@ -568,46 +571,39 @@ struct TabCompositorWrapper: NSViewRepresentable {
     }
 
     private func updateCompositor(_ containerView: NSView) {
-        print("🔍 [MEMDEBUG] updateCompositor() CALLED - Window: \(windowState.id.uuidString.prefix(8)), Size: \(containerView.bounds.size)")
-        
-        // Remove all existing webview subviews
-        // Preserve the last overlay subview if present, then re-add
-        let overlay = containerView.subviews.compactMap { $0 as? SplitDropCaptureView }.first
-        let existingSubviews = containerView.subviews.count
-        print("🔍 [MEMDEBUG]   Removing \(existingSubviews) existing subviews")
-        containerView.subviews.forEach { $0.removeFromSuperview() }
-        
-        // Add tabs that should be displayed in this window. If split view is active, show two panes;
-        // otherwise show only the current tab.
+        // Non-destructive compositor: avoid removing/re-adding WKWebViews that are
+        // already correctly positioned. Removing a WKWebView from its superview
+        // disconnects its GPU video surface, causing black flashes during playback.
+
         let allTabs = browserManager.tabsForDisplay(in: windowState)
-        print("🔍 [MEMDEBUG]   Processing \(allTabs.count) tabs for display")
-        for tab in allTabs {
-            print("🔍 [MEMDEBUG]     Tab: \(tab.id.uuidString.prefix(8)), Name: \(tab.name), isUnloaded: \(tab.isUnloaded)")
-        }
-        
         let split = browserManager.splitManager
         let splitState = split.getSplitState(for: windowState.id)
-        
-        // Skip rendering split panes during preview - show only the current tab at full size
+
+        // Identify overlay (always preserved)
+        let overlay = containerView.subviews.compactMap { $0 as? SplitDropCaptureView }.first
+        // Content subviews = everything except the overlay
+        let contentSubviews = containerView.subviews.filter { !($0 is SplitDropCaptureView) }
+
         if splitState.isPreviewActive {
-            // During preview, show only the current tab at full size
-            let currentId = browserManager.currentTab(for: windowState)?.id
-            for tab in allTabs {
-                if !tab.isUnloaded {
-                    let webView = webView(for: tab, windowId: windowState.id)
-                    webView.frame = containerView.bounds
-                    webView.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
-                    containerView.addSubview(webView)
-                    webView.isHidden = tab.id != currentId
-                }
+            // Preview mode: show current tab at full size
+            let previewTab = browserManager.currentTab(for: windowState) ?? allTabs.first
+            if let currentTab = previewTab, !currentTab.isUnloaded {
+                let desired = webView(for: currentTab, windowId: windowState.id)
+                setSingleWebView(desired, in: containerView, replacing: contentSubviews)
+            } else {
+                removeContentViews(contentSubviews)
             }
         } else {
-            // Normal split view rendering (when not in preview)
             let currentId = browserManager.currentTab(for: windowState)?.id
             let leftId = split.leftTabId(for: windowState.id)
             let rightId = split.rightTabId(for: windowState.id)
             let isCurrentPane = (currentId != nil) && (currentId == leftId || currentId == rightId)
+
             if split.isSplit(for: windowState.id) && isCurrentPane {
+                // Split view — uses pane containers so we do a full rebuild here
+                // (pane containers have dynamic styling that must be recreated)
+                removeContentViews(contentSubviews)
+
                 // Auto-heal if one side is missing (tab closed etc.)
                 let leftResolved = split.resolveTab(leftId)
                 let rightResolved = split.resolveTab(rightId)
@@ -619,7 +615,6 @@ struct TabCompositorWrapper: NSViewRepresentable {
                     browserManager.splitManager.exitSplit(keep: .left, for: windowState.id)
                 }
 
-                // Compute pane rects with a visible gap
                 let gap: CGFloat = 8
                 let fraction = max(split.minFraction, min(split.maxFraction, split.dividerFraction(for: windowState.id)))
                 let total = containerView.bounds
@@ -637,14 +632,11 @@ struct TabCompositorWrapper: NSViewRepresentable {
                 let leftId = split.leftTabId(for: windowState.id)
                 let rightId = split.rightTabId(for: windowState.id)
 
-                // Add pane containers with rounded corners and background
                 let activeSide = split.activeSide(for: windowState.id)
                 let accent = browserManager.gradientColorManager.displayGradient.primaryNSColor
-                // Resolve pane tabs across ALL tabs (not just current space)
                 let allKnownTabs = browserManager.tabManager.allTabs()
 
                 if let lId = leftId, let leftTab = allKnownTabs.first(where: { $0.id == lId }) {
-                    // Force-create/ensure loaded when visible in split
                     let lWeb = webView(for: leftTab, windowId: windowState.id)
                     let pane = makePaneContainer(frame: leftRect, isActive: (activeSide == .left), accent: accent, side: .left)
                     containerView.addSubview(pane)
@@ -652,11 +644,9 @@ struct TabCompositorWrapper: NSViewRepresentable {
                     lWeb.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
                     lWeb.isHidden = false
                     pane.addSubview(lWeb)
-                    
                 }
 
                 if let rId = rightId, let rightTab = allKnownTabs.first(where: { $0.id == rId }) {
-                    // Force-create/ensure loaded when visible in split
                     let rWeb = webView(for: rightTab, windowId: windowState.id)
                     let pane = makePaneContainer(frame: rightRect, isActive: (activeSide == .right), accent: accent, side: .right)
                     containerView.addSubview(pane)
@@ -664,33 +654,32 @@ struct TabCompositorWrapper: NSViewRepresentable {
                     rWeb.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
                     rWeb.isHidden = false
                     pane.addSubview(rWeb)
-                    
                 }
             } else {
-                // Not in split view - show only current tab
-                for tab in allTabs {
-                    // Only add tabs that are still in the tab manager (not closed)
-                    if !tab.isUnloaded {
-                        let webView = webView(for: tab, windowId: windowState.id)
-                        webView.frame = containerView.bounds
-                        webView.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
-                        containerView.addSubview(webView)
-                        webView.isHidden = tab.id != browserManager.currentTab(for: windowState)?.id
-                    }
+                // Single tab (most common path during video playback)
+                let activeTab = browserManager.currentTab(for: windowState) ?? allTabs.first
+                if let currentTab = activeTab, !currentTab.isUnloaded {
+                    let desired = webView(for: currentTab, windowId: windowState.id)
+                    setSingleWebView(desired, in: containerView, replacing: contentSubviews)
+                } else {
+                    removeContentViews(contentSubviews)
                 }
             }
         }
 
-  
-        // Re-add overlay on top
+        // Ensure overlay is on top
         if let overlay = overlay {
             overlay.frame = containerView.bounds
             overlay.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
-            containerView.addSubview(overlay)
-            overlay.layer?.zPosition = 10_000
             overlay.browserManager = browserManager
             overlay.splitManager = browserManager.splitManager
             overlay.windowId = windowState.id
+            // Re-order to top if needed
+            if overlay !== containerView.subviews.last {
+                overlay.removeFromSuperview()
+                containerView.addSubview(overlay)
+            }
+            overlay.layer?.zPosition = 10_000
         } else {
             let newOverlay = SplitDropCaptureView(frame: containerView.bounds)
             newOverlay.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
@@ -700,11 +689,35 @@ struct TabCompositorWrapper: NSViewRepresentable {
             newOverlay.layer?.zPosition = 10_000
             containerView.addSubview(newOverlay)
         }
-        
-        // Log final state
-        let webViewCount = containerView.subviews.filter { $0 is WKWebView }.count
-        let totalSubviews = containerView.subviews.count
-        print("🔍 [MEMDEBUG] updateCompositor() COMPLETE - Window: \(windowState.id.uuidString.prefix(8)), WebViews in container: \(webViewCount), Total subviews: \(totalSubviews)")
+    }
+
+    /// Sets a single webview as the only content in the container without removing it
+    /// if it's already the sole content subview. This prevents GPU video surface
+    /// disconnection that causes black flashes during playback.
+    private func setSingleWebView(_ desired: WKWebView, in containerView: NSView, replacing contentSubviews: [NSView]) {
+        let isAlreadyCorrect = contentSubviews.count == 1 && contentSubviews.first === desired
+
+        if !isAlreadyCorrect {
+            // Remove stale content views
+            for subview in contentSubviews where subview !== desired {
+                subview.removeFromSuperview()
+            }
+            // Add the desired webview if not already a direct child
+            if desired.superview !== containerView {
+                containerView.addSubview(desired)
+            }
+        }
+
+        desired.frame = containerView.bounds
+        desired.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
+        desired.isHidden = false
+    }
+
+    /// Removes all non-overlay content subviews
+    private func removeContentViews(_ contentSubviews: [NSView]) {
+        for subview in contentSubviews {
+            subview.removeFromSuperview()
+        }
     }
 
     private func makePaneContainer(frame: NSRect, isActive: Bool, accent: NSColor, side: SplitViewManager.Side) -> NSView {
@@ -796,7 +809,6 @@ struct TabCompositorWrapper: NSViewRepresentable {
             DispatchQueue.main.async {
                 self.hoveredLink = href
                 if let href = href {
-                    print("Hovering over link: \(href)")
                 }
             }
         }
@@ -810,19 +822,13 @@ struct TabCompositorWrapper: NSViewRepresentable {
     }
 
     private func webView(for tab: Tab, windowId: UUID) -> WKWebView {
-        print("🔍 [MEMDEBUG] WebsiteView.webView() REQUESTED - Tab: \(tab.id.uuidString.prefix(8)), Name: \(tab.name), Window: \(windowId.uuidString.prefix(8))")
-        print("🔍 [MEMDEBUG]   tab.isUnloaded: \(tab.isUnloaded), tab.assignedWebView exists: \(tab.assignedWebView != nil), primaryWindowId: \(tab.primaryWindowId?.uuidString.prefix(8) ?? "nil")")
-        
         // Use the new smart WebView assignment system
         // This ensures only ONE WebView per tab in single-window mode
         if let coordinator = browserManager.webViewCoordinator {
-            let webView = coordinator.getOrCreateWebView(for: tab, in: windowId, tabManager: browserManager.tabManager)
-            print("🔍 [MEMDEBUG]   -> Got WebView via smart assignment: \(Unmanaged.passUnretained(webView).toOpaque())")
-            return webView
+            return coordinator.getOrCreateWebView(for: tab, in: windowId, tabManager: browserManager.tabManager)
         }
-        
+
         // Fallback to old behavior (should never happen)
-        print("⚠️ [MEMDEBUG] WARNING: No WebViewCoordinator found, using fallback!")
         return browserManager.createWebView(for: tab.id, in: windowId)
     }
 
@@ -853,19 +859,16 @@ private class ContainerView: NSView {
 
     // Forward right-clicks to the webview below so context menus work
     override func rightMouseDown(with event: NSEvent) {
-        print("🔽 [ContainerView] rightMouseDown received, forwarding to webview")
         // Find the webview at this point and forward the event
         let point = convert(event.locationInWindow, from: nil)
         // Use hitTest to find the actual view at this point (will skip overlay if hitTest returns nil)
         if let hitView = hitTest(point) {
             if let webView = hitView as? WKWebView {
-                print("🔽 [ContainerView] Found webview via hitTest, forwarding rightMouseDown")
                 webView.rightMouseDown(with: event)
                 return
             }
             // Check if hitView contains a webview
             if let webView = findWebView(in: hitView, at: point) {
-                print("🔽 [ContainerView] Found nested webview, forwarding rightMouseDown")
                 webView.rightMouseDown(with: event)
                 return
             }
@@ -873,12 +876,10 @@ private class ContainerView: NSView {
         // Fallback: search all subviews
         for subview in subviews.reversed() {
             if let webView = findWebView(in: subview, at: point) {
-                print("🔽 [ContainerView] Found webview in subviews, forwarding rightMouseDown")
                 webView.rightMouseDown(with: event)
                 return
             }
         }
-        print("🔽 [ContainerView] No webview found, calling super")
         super.rightMouseDown(with: event)
     }
     
@@ -962,7 +963,7 @@ private struct SplitControlsOverlay: View {
                     .contentShape(Rectangle())
                     .frame(width: gap, height: totalHeight)
                     .position(x: x, y: totalHeight / 2)
-                    .onHover { hovering in
+                    .onHoverTracking { hovering in
                         if hovering { NSCursor.resizeLeftRight.set() } else { NSCursor.arrow.set() }
                     }
                     .gesture(

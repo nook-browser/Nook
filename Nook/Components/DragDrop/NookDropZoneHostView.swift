@@ -40,28 +40,28 @@ class NookDropZoneNSView: NSView {
             width: frameInWindow.width,
             height: frameInWindow.height
         )
-        Task { @MainActor in
+        MainActor.assumeIsolated {
             coordinator.manager.zoneFrames[coordinator.zoneID] = flipped
         }
     }
 
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
         guard let coordinator = coordinator else { return [] }
-        Task { @MainActor in
+        MainActor.assumeIsolated {
             coordinator.manager.cursorEnteredZone(coordinator.zoneID)
         }
-        updateInsertionIndex(sender)
+        updateInsertionIndexSync(sender)
         return .move
     }
 
     override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
-        updateInsertionIndex(sender)
+        updateInsertionIndexSync(sender)
         return .move
     }
 
     override func draggingExited(_ sender: (any NSDraggingInfo)?) {
         guard let coordinator = coordinator else { return }
-        Task { @MainActor in
+        MainActor.assumeIsolated {
             coordinator.manager.cursorExitedZone(coordinator.zoneID)
         }
     }
@@ -85,11 +85,11 @@ class NookDropZoneNSView: NSView {
 
     override func concludeDragOperation(_ sender: (any NSDraggingInfo)?) {}
 
-    private func updateInsertionIndex(_ sender: NSDraggingInfo) {
+    private func updateInsertionIndexSync(_ sender: NSDraggingInfo) {
         guard let coordinator = coordinator else { return }
         let localPoint = convert(sender.draggingLocation, from: nil)
         let flippedPoint = CGPoint(x: localPoint.x, y: bounds.height - localPoint.y)
-        Task { @MainActor in
+        MainActor.assumeIsolated {
             coordinator.manager.updateInsertionIndex(
                 for: coordinator.zoneID,
                 localPoint: flippedPoint,
