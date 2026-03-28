@@ -246,7 +246,11 @@ struct SpacesSideBarView: View {
                 ForEach(SidebarPosition.allCases) { position in
                     Toggle(isOn: Binding(
                         get: { nookSettings.sidebarPosition == position },
-                        set: { _ in nookSettings.sidebarPosition = position }
+                        set: { _ in
+                            withAnimation(.smooth(duration: 0.3)) {
+                                nookSettings.sidebarPosition = position
+                            }
+                        }
                     )) {
                         Label(position.displayName, systemImage: position.icon)
                     }

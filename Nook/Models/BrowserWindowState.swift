@@ -100,6 +100,9 @@ class BrowserWindowState {
     /// Reference to this window's CommandPalette for global shortcuts
     weak var commandPalette: CommandPalette?
 
+    /// Reference to this window's HoverSidebarManager for checking floating visibility
+    weak var hoverSidebarManager: HoverSidebarManager?
+
     // MARK: - Incognito/Ephemeral State
     
     /// Whether this window is an incognito/private browsing window

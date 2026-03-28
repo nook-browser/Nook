@@ -87,6 +87,7 @@ class ObservableTabWrapper: ObservableObject {
 
 struct NavButtonsView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var hoverSidebarManager: HoverSidebarManager
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.nookSettings) var nookSettings
     var effectiveSidebarWidth: CGFloat?
@@ -109,7 +110,7 @@ struct NavButtonsView: View {
         
         HStack(spacing: 2) {
             Button("Toggle Sidebar", systemImage: sidebarOnLeft ? "sidebar.left" : "sidebar.right") {
-                browserManager.toggleSidebar(for: windowState)
+                browserManager.toggleSidebar(for: windowState, floatingVisible: hoverSidebarManager.isOverlayVisible)
             }
             .labelStyle(.iconOnly)
             .buttonStyle(NavButtonStyle())

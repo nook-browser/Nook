@@ -34,8 +34,14 @@ struct SettingsAppearanceTab: View {
             Toggle("Liquid Glass", isOn: .constant(true))
             Picker(
                 "Sidebar Position",
-                selection: $settings
-                    .sidebarPosition
+                selection: Binding(
+                    get: { settings.sidebarPosition },
+                    set: { newValue in
+                        withAnimation(.smooth(duration: 0.3)) {
+                            settings.sidebarPosition = newValue
+                        }
+                    }
+                )
             ) {
                 ForEach(SidebarPosition.allCases) { provider in
                     Text(provider.displayName).tag(provider)
