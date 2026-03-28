@@ -101,7 +101,7 @@ struct SidebarMenuHistoryTab: View {
                 )
                 .animation(.easeInOut(duration: 0.1), value: isHovering)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-                .onHover { state in
+                .onHoverTracking { state in
                     isHovering = state
                 }
                 .onTapGesture {
@@ -514,7 +514,7 @@ struct HistoryRowView: View {
                     .buttonStyle(PlainButtonStyle())
                     .help("Remove from history")
                     .transition(.scale.combined(with: .opacity))
-                    .onHover { state in
+                    .onHoverTracking { state in
                         isTrashIconHovered = state
                     }
                     // Open in a new tab
@@ -532,7 +532,7 @@ struct HistoryRowView: View {
                     .buttonStyle(PlainButtonStyle())
                     .help("Open in a new tab")
                     .transition(.scale.combined(with: .opacity))
-                    .onHover { state in
+                    .onHoverTracking { state in
                         isArrowIconHovered = state
                     }
                 }
@@ -546,7 +546,7 @@ struct HistoryRowView: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .contentShape(RoundedRectangle(cornerRadius: 12))
-        .onHover { hovered in
+        .onHoverTracking { hovered in
             withAnimation(.easeInOut(duration: 0.2)) {
                 isHovered = hovered
             }
@@ -707,7 +707,7 @@ struct FiltersSelectButton: View {
         .buttonStyle(.plain)
         .animation(.easeInOut(duration: 0.1), value: isHovering)
         .animation(.easeInOut(duration: 0.1), value: isActive)
-        .onHover { state in
+        .onHoverTracking { state in
             isHovering = state
         }
     }

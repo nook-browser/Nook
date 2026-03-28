@@ -14,6 +14,32 @@ import Foundation
 import SwiftUI
 import WebKit
 
+// MARK: - URL Sanitization (strip OAuth tokens & sensitive query params from logs)
+
+private let _sensitiveParams: Set<String> = [
+    "code", "access_token", "id_token", "oauth_token",
+    "oauth_verifier", "session_state", "token", "key",
+    "secret", "password", "samlresponse"
+]
+
+private func sanitizedURL(_ url: URL) -> String {
+    guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+        return url.host ?? "[unknown]"
+    }
+    components.queryItems = components.queryItems?.map { item in
+        if _sensitiveParams.contains(item.name.lowercased()) {
+            return URLQueryItem(name: item.name, value: "[REDACTED]")
+        }
+        return item
+    }
+    return components.url?.absoluteString ?? url.host ?? "[unknown]"
+}
+
+private func sanitizedURL(_ urlString: String) -> String {
+    guard let url = URL(string: urlString) else { return "[invalid URL]" }
+    return sanitizedURL(url)
+}
+
 @MainActor
 public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     public let id: UUID
@@ -39,10 +65,28 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     /// The URL pattern that indicates OAuth completion (redirect back to original domain)
     var oauthCompletionURLPattern: String?
 
+    // MARK: - Display Name Override
+    /// User/AI-set display name that persists across page title changes.
+    /// Only set by the tab organizer; cleared by the user via "Reset Tab Name".
+    var displayNameOverride: String? = nil
+
+    /// Display name for sidebar. Prefers user/AI override, falls back to page title.
+    var displayName: String {
+        displayNameOverride ?? name
+    }
+
     // MARK: - Pin State
     var isPinned: Bool = false  // Global pinned (essentials)
     var isSpacePinned: Bool = false  // Space-level pinned
     var folderId: UUID?  // Folder membership for tabs within spacepinned area
+    /// The "home" URL for pinned tabs. Set when tab is first pinned or via "Edit Pinned URL".
+    var pinnedURL: URL? = nil
+
+    /// Whether this tab's current URL differs from its pinned "home" URL.
+    var hasNavigatedAwayFromPinnedURL: Bool {
+        guard let pinnedURL else { return false }
+        return url.absoluteString != pinnedURL.absoluteString
+    }
     
     // MARK: - Ephemeral State
     /// Whether this tab belongs to an ephemeral/incognito session
@@ -60,6 +104,14 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     private static let faviconCacheQueue = DispatchQueue(
         label: "favicon.cache", attributes: .concurrent)
     private static let faviconCacheLock = NSLock()
+
+    /// Whether a real favicon has been successfully loaded (prevents redundant fetches)
+    private var hasFavicon: Bool = false
+    /// Whether a favicon fetch is currently in-flight (prevents concurrent fetches)
+    private var faviconFetchInFlight: Bool = false
+    /// Number of failed fetch attempts for the current URL host (caps retries)
+    private var faviconFetchAttempts: Int = 0
+    private static let maxFaviconRetries = 3
 
     // Persistent cache storage
     private static let faviconCacheDirectory: URL = {
@@ -121,7 +173,11 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         }
     }
 
-    var loadingState: LoadingState = .idle
+    @Published var loadingState: LoadingState = .idle
+
+    // MARK: - Web Process Crash Tracking
+    var webProcessCrashCount: Int = 0
+    var lastWebProcessCrashDate: Date = .distantPast
 
     @Published var canGoBack: Bool = false
     @Published var canGoForward: Bool = false
@@ -154,6 +210,9 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     
     // Track the last domain/subdomain we sampled color for
     private var lastSampledDomain: String? = nil
+    private var lastTopBarDomain: String? = nil
+    private var lastFallbackInjectionURL: String? = nil
+    private var pendingThemeColorUpdate: DispatchWorkItem? = nil
 
     // MARK: - Rename State
     @Published var isRenaming: Bool = false
@@ -161,6 +220,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     // MARK: - Native Audio Monitoring
     private var audioDeviceListenerProc: AudioObjectPropertyListenerProc?
+    private var audioListenerHelper: AudioListenerHelper?
     private var isMonitoringNativeAudio = false
     private var lastAudioDeviceCheckTime: Date = Date()
     private var audioMonitoringTimer: Timer?
@@ -170,6 +230,10 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     // Web Store integration
     private var webStoreHandler: WebStoreScriptHandler?
+
+    // Boosts integration — track boost scripts to optimize removal (only remove boost scripts, not all scripts)
+    // Use array instead of Set since WKUserScript doesn't conform to Hashable
+    private var currentBoostScripts: [WKUserScript] = []
 
     // Debounce task for SPA navigation persistence
     private var spaPersistDebounceTask: Task<Void, Never>?
@@ -204,9 +268,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     
     var webView: WKWebView? {
         if _webView == nil {
-            let stackSymbols = Thread.callStackSymbols.prefix(8).joined(separator: "\n  ")
-            print("🔍 [MEMDEBUG] Tab.webView LAZY ACCESS - Tab: \(id.uuidString.prefix(8)), URL: \(url.absoluteString)")
-            print("🔍 [MEMDEBUG] Stack trace:\n  \(stackSymbols)")
             setupWebView()
         }
         return _webView
@@ -227,18 +288,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     /// Assigns the WebView to a specific window as its "primary" display
     /// Call this when a window first displays this tab
     func assignWebViewToWindow(_ webView: WKWebView, windowId: UUID) {
-        print("🔍 [MEMDEBUG] Tab.assignWebViewToWindow() - Tab: \(id.uuidString.prefix(8)), Window: \(windowId.uuidString.prefix(8)), WebView: \(Unmanaged.passUnretained(webView).toOpaque())")
-        
-        // If we already have a WebView assigned to a different window, this is an error
-        // (should have been caught by WebViewCoordinator)
-        if let existingWindow = primaryWindowId, existingWindow != windowId {
-            print("⚠️ [MEMDEBUG] WARNING: Reassigning WebView from window \(existingWindow.uuidString.prefix(8)) to \(windowId.uuidString.prefix(8))")
-        }
-        
         _webView = webView
         primaryWindowId = windowId
-        
-        print("🔍 [MEMDEBUG]   -> Primary window assigned: \(windowId.uuidString.prefix(8))")
     }
 
     weak var browserManager: BrowserManager?
@@ -291,10 +342,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         self.browserManager = browserManager
         self._existingWebView = existingWebView
         super.init()
-
-        Task { @MainActor in
-            await fetchAndSetFavicon(for: url)
-        }
+        // Favicon is fetched lazily via ensureFaviconLoaded() when the tab becomes visible
     }
 
     public init(
@@ -313,10 +361,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         self.index = index
         self.browserManager = nil
         super.init()
-
-        Task { @MainActor in
-            await fetchAndSetFavicon(for: url)
-        }
+        // Favicon is fetched lazily via ensureFaviconLoaded() when the tab becomes visible
     }
 
     // MARK: - Controls
@@ -343,11 +388,14 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         loadingState = .idle
     }
 
+    /// Navigate this tab back to its pinned "home" URL.
+    func resetToPinnedURL() {
+        guard let pinnedURL else { return }
+        loadURL(pinnedURL)
+    }
+
     private func updateNavigationState() {
         guard let webView = _webView else { return }
-
-        // Force UI update by notifying object will change
-        objectWillChange.send()
 
         let newCanGoBack = webView.canGoBack
         let newCanGoForward = webView.canGoForward
@@ -379,17 +427,15 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         restoredCanGoForward = nil
     }
 
-    /// Enhanced navigation state update with aggressive timing for same-domain navigation
+    /// Enhanced navigation state update — KVO observers on canGoBack/canGoForward
+    /// provide real-time updates. A single delayed check catches edge cases where
+    /// WebKit's back-forward list settles asynchronously after navigation commit.
     func updateNavigationStateEnhanced(source: String = "unknown") {
         // Immediate update
         updateNavigationState()
 
-        // Additional delayed updates to catch timing issues with same-domain navigation
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            self?.updateNavigationState()
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+        // Single debounced fallback for edge cases where KVO fires before the list settles
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
             self?.updateNavigationState()
         }
     }
@@ -418,18 +464,13 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             webView.evaluateJavaScript(script.source) { _, error in
                 if let error = error {
-                    print("[Tab] Web Store script injection failed: \(error.localizedDescription)")
                 }
             }
         }
     }
 
     // MARK: - Boosts Integration
-    
-    // Track boost scripts to optimize removal (only remove boost scripts, not all scripts)
-    // Use array instead of Set since WKUserScript doesn't conform to Hashable
-    private var currentBoostScripts: [WKUserScript] = []
-    
+
     private func setupBoostUserScript(for url: URL, in webView: WKWebView) {
         guard let browserManager = browserManager,
             let domain = url.host
@@ -439,7 +480,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
         let userContentController = webView.configuration.userContentController
         let boostScriptIdentifier = "NOOK_BOOST_SCRIPT_IDENTIFIER"
-        
+
         // Optimized: Only remove boost scripts, preserve other user scripts
         // This is much faster than removing all scripts and re-adding them
         if !currentBoostScripts.isEmpty {
@@ -447,7 +488,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             // Compare by source content since WKUserScript doesn't conform to Equatable
             let allScripts = userContentController.userScripts
             userContentController.removeAllUserScripts()
-            
+
             // Re-add only non-boost scripts (those not in our tracked list)
             let boostScriptSources = Set(currentBoostScripts.map { $0.source })
 //            for script in allScripts {
@@ -456,7 +497,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 //                }
 //            }
 // MARK: This causes the browser to crash when loading boosted pages
-            
+
             currentBoostScripts.removeAll()
         } else {
             // First time setup - still need to check for any existing boost scripts
@@ -464,7 +505,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             let existingBoostScripts = userContentController.userScripts.filter { script in
                 script.source.contains(boostScriptIdentifier)
             }
-            
+
             if !existingBoostScripts.isEmpty {
                 // Remove existing boost scripts
                 let remainingScripts = userContentController.userScripts.filter { script in
@@ -486,7 +527,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         // Create and add boost user scripts (will inject at document start)
         // Returns array: [fontScript (optional), mainBoostScript]
         let boostScripts = browserManager.boostsManager.createBoostUserScripts(for: boostConfig, domain: domain)
-        
+
         // Track these scripts for efficient removal later
         // Prevent duplicates by checking if script source already exists
         let existingSources = Set(userContentController.userScripts.map { $0.source })
@@ -499,7 +540,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         }
         print("✅ [Tab] Added \(boostScripts.count) boost script(s) for: \(domain)")
     }
-    
+
     private func injectBoostIfNeeded(for url: URL, in webView: WKWebView) {
         // This method is kept for backward compatibility but boost injection
         // now happens via user scripts at document start
@@ -532,20 +573,14 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     // MARK: - WebView Setup
 
     private func setupWebView() {
-        print("🔍 [MEMDEBUG] Tab.setupWebView() START - Tab: \(id.uuidString.prefix(8)), Name: \(name), URL: \(url.absoluteString)")
-        print("🔍 [MEMDEBUG]   _webView exists: \(_webView != nil), _existingWebView exists: \(_existingWebView != nil)")
-        
         let resolvedProfile = resolveProfile()
         let configuration: WKWebViewConfiguration
         if let profile = resolvedProfile {
-            configuration = BrowserConfiguration.shared.cacheOptimizedWebViewConfiguration(
+            configuration = BrowserConfiguration.shared.webViewConfiguration(
                 for: profile)
         } else {
             // Edge case: currentProfile not yet available. Delay creating WKWebView until it resolves.
             if profileAwaitCancellable == nil {
-                print(
-                    "[Tab] No profile resolved yet; deferring WebView creation and observing currentProfile…"
-                )
                 profileAwaitCancellable = browserManager?
                     .$currentProfile
                     .receive(on: RunLoop.main)
@@ -555,8 +590,20 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
                             self.profileAwaitCancellable?.cancel()
                             self.profileAwaitCancellable = nil
                             self.setupWebView()
+                            // Refresh compositor for all windows so the newly-created
+                            // webview is picked up and displayed
+                            if self._webView != nil {
+                                for (_, windowState) in self.browserManager?.windowRegistry?.windows ?? [:] {
+                                    windowState.refreshCompositor()
+                                }
+                            }
                         }
                     }
+                // Timeout: cancel subscription after 5 seconds to prevent retain cycles
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+                    self?.profileAwaitCancellable?.cancel()
+                    self?.profileAwaitCancellable = nil
+                }
             }
             return
         }
@@ -574,8 +621,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             }
             let ctrl = configuration.webExtensionController
             let ctxs = ctrl?.extensionContexts.count ?? -1
-            let samePool = configuration.processPool === BrowserConfiguration.shared.webViewConfiguration.processPool
-            print("[EXT-CFG] '\(name)' controller=\(ctrl != nil), contexts=\(ctxs), sameProcessPool=\(samePool), existing=\(_existingWebView != nil)")
         }
 
         // Check if we have an existing WebView to inject
@@ -584,12 +629,14 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         } else {
             let newWebView = FocusableWKWebView(frame: .zero, configuration: configuration)
             _webView = newWebView
-            print("🔍 [MEMDEBUG] Tab CREATED NEW PRIMARY WebView - Tab: \(id.uuidString.prefix(8)), WebView: \(Unmanaged.passUnretained(newWebView).toOpaque()), ConfigStore: \(configuration.websiteDataStore.identifier?.uuidString.prefix(8) ?? "default")")
             if let fv = _webView as? FocusableWKWebView {
                 fv.owningTab = self
                 fv.contextMenuBridge = WebContextMenuBridge(tab: self, configuration: configuration)
             }
         }
+
+        // Notify observers that isUnloaded changed (webview now exists)
+        objectWillChange.send()
 
         _webView?.navigationDelegate = self
         _webView?.uiDelegate = self
@@ -626,6 +673,10 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
                 forName: "nookWebStore")
             _webView?.configuration.userContentController.removeScriptMessageHandler(
                 forName: "nookShortcutDetect")
+            _webView?.configuration.userContentController.removeScriptMessageHandler(
+                forName: "nookAdBlocker")
+            _webView?.configuration.userContentController.removeScriptMessageHandler(
+                forName: "nookSponsorBlock")
 
             // Add handlers
             _webView?.configuration.userContentController.add(self, name: "linkHover")
@@ -639,6 +690,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             _webView?.configuration.userContentController.add(self, name: "historyStateDidChange")
             _webView?.configuration.userContentController.add(self, name: "NookIdentity")
             _webView?.configuration.userContentController.add(self, name: "nookShortcutDetect")
+            _webView?.configuration.userContentController.add(self, name: "nookAdBlocker")
+            _webView?.configuration.userContentController.add(self, name: "nookSponsorBlock")
 
             // Add Web Store integration handler for Chrome Web Store extension installs
             if let browserManager = browserManager {
@@ -677,11 +730,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         }
 
         // For existing WebViews, ensure the delegates are updated to point to this tab
-        if _existingWebView != nil {
-            print("🔍 [MEMDEBUG] Tab setup COMPLETE (existing WebView) - Tab: \(id.uuidString.prefix(8))")
-        } else {
-            print("🔍 [MEMDEBUG] Tab setup COMPLETE (new WebView) - Tab: \(id.uuidString.prefix(8)), WebView: \(Unmanaged.passUnretained(_webView!).toOpaque())")
-        }
 
         // Inform extensions that this tab's view is now open/available BEFORE loading,
         // so content scripts and messaging can resolve this tab during early document phases
@@ -746,7 +794,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     // MARK: - Tab Actions
     func closeTab() {
-        print("Closing tab: \(self.name)")
 
         // IMMEDIATELY RESET PiP STATE to prevent any further PiP operations
         hasPiPActive = false
@@ -784,13 +831,20 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         // 15. REMOVE FROM TAB MANAGER
         browserManager?.tabManager.removeTab(self.id)
 
-        // Cancel any pending observations
+        // Clean up WebStore handler
+        if webStoreHandler != nil {
+            _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "nookWebStore")
+            webStoreHandler = nil
+        }
+
+        // Cancel any pending tasks and observations
+        spaPersistDebounceTask?.cancel()
+        spaPersistDebounceTask = nil
         profileAwaitCancellable?.cancel()
         profileAwaitCancellable = nil
         extensionAwaitCancellable?.cancel()
         extensionAwaitCancellable = nil
 
-        print("Tab killed: \(name)")
     }
 
     deinit {
@@ -810,7 +864,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         // Note: stopNativeAudioMonitoring() is main actor-isolated and cannot be called from deinit
         // The cleanup will be handled by the closeTab() method which is called before deinit
 
-        print("🧹 [Tab] deinit cleanup completed for: \(name)")
     }
 
     func loadURL(_ newURL: URL) {
@@ -827,17 +880,19 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         hasPlayingAudio = false
         // Note: isAudioMuted is preserved to maintain user's mute preference
 
+        // Reset favicon state so the new URL gets its own favicon
+        hasFavicon = false
+        faviconFetchAttempts = 0
+
         if newURL.isFileURL {
             // Grant read access to the containing directory for local resources
             let directoryURL = newURL.deletingLastPathComponent()
-            print("🔧 [Tab] Loading file URL with directory access: \(directoryURL.path)")
             activeWebView.loadFileURL(newURL, allowingReadAccessTo: directoryURL)
         } else {
             // Regular URL loading with aggressive caching
             var request = URLRequest(url: newURL)
             request.cachePolicy = .returnCacheDataElseLoad
             request.timeoutInterval = 30.0
-            print("🚀 [Tab] Loading URL with cache policy: \(request.cachePolicy.rawValue)")
             activeWebView.load(request)
         }
 
@@ -851,7 +906,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     func loadURL(_ urlString: String) {
         guard let newURL = URL(string: urlString) else {
-            print("Invalid URL: \(urlString)")
             return
         }
         loadURL(newURL)
@@ -864,11 +918,9 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         let normalizedUrl = normalizeURL(input, queryTemplate: template)
 
         guard let validURL = URL(string: normalizedUrl) else {
-            print("Invalid URL after normalization: \(input) -> \(normalizedUrl)")
             return
         }
 
-        print("🌐 [Tab] Navigating current tab to: \(normalizedUrl)")
         loadURL(validURL)
     }
 
@@ -890,7 +942,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     // MARK: - Rename Methods
     func startRenaming() {
         isRenaming = true
-        editingName = name
+        editingName = displayName
     }
 
     func saveRename() {
@@ -971,7 +1023,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
                 defer { group.leave() }
 
                 if let error = error {
-                    print("[Media Check] Error: \(error.localizedDescription)")
                     return
                 }
 
@@ -1010,6 +1061,16 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
                 // Track current URL for navigation detection
                 window.__NookCurrentURL = window.location.href;
+
+                // Throttle for timeupdate events — these fire ~4-15/sec during video
+                // playback but we only need to check state at most once per second.
+                let __nookLastMediaCheckTime = 0;
+                function throttledCheckMediaState() {
+                    const now = Date.now();
+                    if (now - __nookLastMediaCheckTime < 1000) return;
+                    __nookLastMediaCheckTime = now;
+                    checkMediaState();
+                }
 
                 function resetSoundTracking() {
                     window.webkit.messageHandlers[handlerName].postMessage({
@@ -1176,10 +1237,16 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
                 }
 
                 function addAudioListeners(element) {
-                    ['play', 'pause', 'ended', 'loadedmetadata', 'canplay', 'volumechange', 'timeupdate'].forEach(event => {
+                    // State-change events: check quickly
+                    ['play', 'pause', 'ended', 'loadedmetadata', 'canplay', 'volumechange'].forEach(event => {
                         element.addEventListener(event, function() {
                             setTimeout(checkMediaState, 50);
                         });
+                    });
+                    // timeupdate fires ~4-15/sec during playback — use throttled
+                    // version to avoid flooding Swift with identical state messages
+                    element.addEventListener('timeupdate', function() {
+                        throttledCheckMediaState();
                     });
 
                     try {
@@ -1303,18 +1370,14 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
         webView.evaluateJavaScript(mediaDetectionScript) { result, error in
             if let error = error {
-                print("[Media Detection] Error: \(error.localizedDescription)")
             } else {
-                print("[Media Detection] Audio event tracking injected successfully")
             }
         }
     }
 
     func unloadWebView() {
-        print("🔄 [Tab] Unloading webview for: \(name)")
 
         guard let webView = _webView else {
-            print("🔄 [Tab] WebView already unloaded for: \(name)")
             return
         }
 
@@ -1379,9 +1442,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             """
         webView.evaluateJavaScript(killScript) { _, error in
             if let error = error {
-                print("[Tab] Error during media/PiP kill in unload: \(error.localizedDescription)")
             } else {
-                print("[Tab] Media and PiP successfully killed during unload for: \(self.name)")
             }
         }
 
@@ -1397,6 +1458,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             "historyStateDidChange",
             "NookIdentity",
             "nookShortcutDetect",
+            "nookAdBlocker",
         ]
 
         for handlerName in allMessageHandlers {
@@ -1425,17 +1487,27 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         // Stop native audio monitoring since webview is unloaded
         stopNativeAudioMonitoring()
 
+        // Cancel pending SPA debounce task
+        spaPersistDebounceTask?.cancel()
+        spaPersistDebounceTask = nil
+
+        // Clean up WebStore handler
+        if webStoreHandler != nil {
+            controller.removeScriptMessageHandler(forName: "nookWebStore")
+            webStoreHandler = nil
+        }
+
         // Reset loading state
         loadingState = .idle
 
-        print("💀 [Tab] WebView FORCE UNLOADED for: \(name)")
     }
 
     func loadWebViewIfNeeded() {
         if _webView == nil {
-            print("🔄 [Tab] Loading webview for: \(name)")
             setupWebView()
         }
+        // Ensure favicon is loaded when the webview is loaded
+        ensureFaviconLoaded()
     }
 
     func toggleMute() {
@@ -1447,16 +1519,13 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             // Set the mute state using MuteableWKWebView's muted property
             webView.isMuted = muted
         } else {
-            print("🔇 [Tab] Mute state queued at \(muted); base webView not loaded yet")
         }
 
         browserManager?.setMuteState(
             muted, for: id, originatingWindowId: browserManager?.windowRegistry?.activeWindow?.id)
 
-        // Update our internal state
-        DispatchQueue.main.async { [weak self] in
-            self?.isAudioMuted = muted
-        }
+        // Update our internal state (already on main thread via @MainActor)
+        isAudioMuted = muted
     }
 
     // MARK: - Native Audio Monitoring
@@ -1464,9 +1533,9 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         guard !isMonitoringNativeAudio else { return }
         isMonitoringNativeAudio = true
 
-        audioMonitoringTimer = Timer.scheduledTimer(
-            timeInterval: 1.0, target: self,
-            selector: #selector(handleNativeAudioMonitoringTimer(_:)), userInfo: nil, repeats: true)
+        audioMonitoringTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.checkNativeAudioActivity() }
+        }
 
         setupAudioSessionNotifications()
     }
@@ -1485,8 +1554,18 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         setupCoreAudioPropertyListeners()
     }
 
+    /// Helper class that holds a weak reference to Tab for the Core Audio listener callback.
+    /// Prevents dangling pointer if Tab is deallocated before the listener is removed.
+    private class AudioListenerHelper {
+        weak var tab: Tab?
+        init(tab: Tab) { self.tab = tab }
+    }
+
     private func setupCoreAudioPropertyListeners() {
         guard !hasAddedCoreAudioListener else { return }
+
+        let helper = AudioListenerHelper(tab: self)
+        audioListenerHelper = helper
 
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDefaultOutputDevice,
@@ -1495,10 +1574,12 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         )
         audioDeviceListenerProc = { (objectID, numAddresses, addresses, clientData) in
             guard let clientData = clientData else { return noErr }
-            let tab = Unmanaged<Tab>.fromOpaque(clientData).takeUnretainedValue()
+            let helper = Unmanaged<AudioListenerHelper>.fromOpaque(clientData).takeUnretainedValue()
 
-            DispatchQueue.main.async {
-                tab.checkNativeAudioActivity()
+            if let tab = helper.tab {
+                DispatchQueue.main.async {
+                    tab.checkNativeAudioActivity()
+                }
             }
 
             return noErr
@@ -1509,17 +1590,21 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
                 AudioObjectID(kAudioObjectSystemObject),
                 &address,
                 listenerProc,
-                Unmanaged.passUnretained(self).toOpaque()
+                Unmanaged.passRetained(helper).toOpaque()
             )
 
             if status == noErr {
                 hasAddedCoreAudioListener = true
+            } else {
+                // Registration failed — release the retained helper
+                Unmanaged.passUnretained(helper).release()
             }
         }
     }
 
     private func removeCoreAudioPropertyListeners() {
-        guard hasAddedCoreAudioListener, let listenerProc = audioDeviceListenerProc else { return }
+        guard hasAddedCoreAudioListener, let listenerProc = audioDeviceListenerProc,
+              let helper = audioListenerHelper else { return }
 
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDefaultOutputDevice,
@@ -1531,17 +1616,16 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             AudioObjectID(kAudioObjectSystemObject),
             &address,
             listenerProc,
-            Unmanaged.passUnretained(self).toOpaque()
+            Unmanaged.passUnretained(helper).toOpaque()
         )
 
         if status == noErr {
+            // Balance the passRetained from setup
+            Unmanaged.passUnretained(helper).release()
             hasAddedCoreAudioListener = false
             audioDeviceListenerProc = nil
+            audioListenerHelper = nil
         }
-    }
-
-    @objc private func handleNativeAudioMonitoringTimer(_ timer: Timer) {
-        checkNativeAudioActivity()
     }
 
     private func checkNativeAudioActivity() {
@@ -1631,7 +1715,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             // NOTE: URL observer removed - it was firing during setup and overwriting
             // restored URLs. URL updates are handled by didCommit/didFinish delegates.
             navigationStateObservedWebViews.add(webView)
-            print("🔍 [Tab] Set up navigation state observers for \(name)")
         }
     }
 
@@ -1643,13 +1726,11 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             webView.removeObserver(self, forKeyPath: "title")
             // NOTE: URL observer removed - see setupNavigationStateObservers
             navigationStateObservedWebViews.remove(webView)
-            print("🔍 [Tab] Removed navigation state observers for \(name)")
         }
     }
 
     /// MEMORY LEAK FIX: Comprehensive WebView cleanup to prevent memory leaks
     func cleanupCloneWebView(_ webView: WKWebView) {
-        print("🧹 [Tab] Starting comprehensive WebView cleanup for: \(name)")
 
         // 1. Stop all loading and media
         webView.stopLoading()
@@ -1687,7 +1768,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             """
         webView.evaluateJavaScript(killScript) { _, error in
             if let error = error {
-                print("⚠️ [Tab] Cleanup script error: \(error.localizedDescription)")
             }
         }
 
@@ -1703,6 +1783,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             "historyStateDidChange",
             "NookIdentity",
             "nookShortcutDetect",
+            "nookAdBlocker",
         ]
 
         for handlerName in allMessageHandlers {
@@ -1730,14 +1811,12 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         // 7. Force remove from compositor
         browserManager?.webViewCoordinator?.removeWebViewFromContainers(webView)
 
-        print("✅ [Tab] WebView cleanup completed for: \(name)")
     }
 
     /// MEMORY LEAK FIX: Comprehensive cleanup for the main tab WebView
     public func performComprehensiveWebViewCleanup() {
         guard let webView = _webView else { return }
 
-        print("🧹 [Tab] Performing comprehensive cleanup for main WebView: \(name)")
 
         // Use the same comprehensive cleanup as clone WebViews
         cleanupCloneWebView(webView)
@@ -1745,7 +1824,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         // Additional cleanup for main WebView
         _webView = nil
 
-        print("✅ [Tab] Main WebView cleanup completed for: \(name)")
     }
 
     public override func observeValue(
@@ -1753,23 +1831,25 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         context: UnsafeMutableRawPointer?
     ) {
         if keyPath == "themeColor", let webView = object as? WKWebView {
-            updateBackgroundColor(from: webView)
+            // Debounce — themeColor KVO fires multiple times during page load
+            pendingThemeColorUpdate?.cancel()
+            let item = DispatchWorkItem { [weak self, weak webView] in
+                guard let self, let webView else { return }
+                self.updateBackgroundColor(from: webView)
+            }
+            pendingThemeColorUpdate = item
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: item)
         } else if keyPath == "canGoBack" || keyPath == "canGoForward",
             let webView = object as? WKWebView
         {
             // Real-time navigation state updates from KVO observers
-            let observedKeyPath = keyPath ?? "<unknown>"
-            print(
-                "🔄 [Tab] KVO navigation state change for \(name): \(observedKeyPath) = \(webView.canGoBack), \(webView.canGoForward)"
-            )
             updateNavigationState()
         } else if keyPath == "title", let webView = object as? WKWebView {
             // Real-time title updates from KVO (especially for SPAs)
             if let newTitle = webView.title, !newTitle.isEmpty, newTitle != self.name {
-                print("📄 [Tab] KVO title change for \(name): '\(newTitle)'")
                 updateTitle(newTitle)
             }
-        } else if keyPath == "URL", let webView = object as? WKWebView {
+        } else if keyPath == "URL", object is WKWebView {
             // URL observer disabled - was causing restored URLs to be overwritten
             // URL updates are handled by didCommit/didFinish navigation delegates
         } else {
@@ -1783,17 +1863,15 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
               let currentDomain = extractDomain(from: currentURL) else {
             // If no URL/domain, still try theme color but skip pixel sampling
             if #available(macOS 12.0, *), let themeColor = webView.themeColor {
-                DispatchQueue.main.async { [weak self] in
-                    self?.pageBackgroundColor = themeColor
-                    webView.underPageBackgroundColor = themeColor
-                }
+                pageBackgroundColor = themeColor
+                webView.underPageBackgroundColor = themeColor
             }
             return
         }
-        
+
         // Only sample if domain changed or we haven't sampled yet
         let shouldSample = lastSampledDomain != currentDomain
-        
+
         var newColor: NSColor? = nil
 
         if #available(macOS 12.0, *) {
@@ -1801,13 +1879,11 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         }
 
         if let themeColor = newColor {
-            DispatchQueue.main.async { [weak self] in
-                self?.pageBackgroundColor = themeColor
-                webView.underPageBackgroundColor = themeColor
-                // Update sampled domain even for theme color
-                if shouldSample {
-                    self?.lastSampledDomain = currentDomain
-                }
+            pageBackgroundColor = themeColor
+            webView.underPageBackgroundColor = themeColor
+            // Update sampled domain even for theme color
+            if shouldSample {
+                lastSampledDomain = currentDomain
             }
         } else if shouldSample {
             // Only extract via pixel sampling if domain changed
@@ -1833,18 +1909,16 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         configuration.snapshotWidth = 1
 
         webView.takeSnapshot(with: configuration) { [weak self, weak webView] image, error in
+            // takeSnapshot completion runs on main thread; no dispatch needed
             guard let self = self, let webView = webView else { return }
 
             if let color = image?.singlePixelColor {
-                DispatchQueue.main.async { [weak self] in
-                    guard let self = self else { return }
-                    self.pageBackgroundColor = color
-                    webView.underPageBackgroundColor = color
-                    // Update sampled domain after successful extraction
-                    if let currentURL = webView.url,
-                       let currentDomain = self.extractDomain(from: currentURL) {
-                        self.lastSampledDomain = currentDomain
-                    }
+                self.pageBackgroundColor = color
+                webView.underPageBackgroundColor = color
+                // Update sampled domain after successful extraction
+                if let currentURL = webView.url,
+                   let currentDomain = self.extractDomain(from: currentURL) {
+                    self.lastSampledDomain = currentDomain
                 }
             } else {
                 self.runLegacyBackgroundColorScript(on: webView)
@@ -1890,6 +1964,13 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
     
     private func extractTopBarColor(from webView: WKWebView) {
+        // Only sample once per domain
+        if let currentURL = webView.url,
+           let domain = extractDomain(from: currentURL) {
+            if lastTopBarDomain == domain { return }
+            lastTopBarDomain = domain
+        }
+
         guard let sampleRect = topRightPixelRect(for: webView) else {
             return
         }
@@ -1901,11 +1982,9 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         
         webView.takeSnapshot(with: configuration) { [weak self] image, error in
             guard let self = self else { return }
-            
+
             if let color = image?.singlePixelColor {
-                DispatchQueue.main.async {
-                    self.topBarBackgroundColor = color
-                }
+                self.topBarBackgroundColor = color
             }
         }
     }
@@ -2099,7 +2178,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
         webView.evaluateJavaScript(linkHoverScript) { result, error in
             if let error = error {
-                print("Error injecting link hover JavaScript: \(error.localizedDescription)")
             }
         }
     }
@@ -2144,9 +2222,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
         webView.evaluateJavaScript(historyScript) { _, error in
             if let error = error {
-                print(
-                    "[Tab] Error injecting history observer JavaScript: \(error.localizedDescription)"
-                )
             }
         }
     }
@@ -2197,9 +2272,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
         webView.evaluateJavaScript(pipStateScript) { result, error in
             if let error = error {
-                print("Error injecting PiP state listener: \(error.localizedDescription)")
             } else {
-                print("[PiP] State listener injected successfully")
             }
         }
     }
@@ -2210,9 +2283,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         
         webView.evaluateJavaScript(script) { _, error in
             if let error = error {
-                print("⚠️ [Tab] Error injecting shortcut detection: \(error.localizedDescription)")
             } else {
-                print("⌨️ [Tab] Shortcut detection script injected")
             }
         }
     }
@@ -2238,6 +2309,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         let newName = title.isEmpty ? url.host ?? "New Tab" : title
         // Only update if title actually changed to prevent redundant redraws
         guard newName != self.name else { return }
+        objectWillChange.send()
         self.name = newName
         if #available(macOS 15.5, *) {
             ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.title])
@@ -2245,6 +2317,20 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
 
     // MARK: - Favicon Logic
+
+    /// Lazily triggers a favicon fetch if one hasn't been loaded yet.
+    /// Called when the tab becomes visible in the sidebar or when the webview is loaded.
+    /// Retries up to maxFaviconRetries times for failed fetches.
+    func ensureFaviconLoaded() {
+        guard !hasFavicon, !faviconFetchInFlight else { return }
+        guard faviconFetchAttempts < Self.maxFaviconRetries else { return }
+        faviconFetchInFlight = true
+        Task { @MainActor in
+            await fetchAndSetFavicon(for: url)
+            faviconFetchInFlight = false
+        }
+    }
+
     private func fetchAndSetFavicon(for url: URL) async {
         let defaultFavicon = SwiftUI.Image(systemName: "globe")
 
@@ -2257,74 +2343,148 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             return
         }
 
-        // Check cache first
+        // Check cache: memory first (sync), then disk (async, off main thread)
         let cacheKey = url.host ?? url.absoluteString
-        if let cachedFavicon = Self.getCachedFavicon(for: cacheKey) {
-            print("🎯 [Favicon] Cache hit for: \(cacheKey)")
+
+        // Fast path: memory cache hit avoids any async work
+        if let memoryCached = Self.getMemoryCachedFavicon(for: cacheKey) {
             await MainActor.run {
-                self.favicon = cachedFavicon
+                self.favicon = memoryCached
+                self.hasFavicon = true
             }
             return
         }
 
-        print("🌐 [Favicon] Cache miss for: \(cacheKey), fetching from network...")
+        // Slow path: check disk cache off main thread
+        if let diskCached = await Self.getDiskCachedFavicon(for: cacheKey) {
+            await MainActor.run {
+                self.favicon = diskCached
+                self.hasFavicon = true
+            }
+            return
+        }
 
+        faviconFetchAttempts += 1
+
+        // Try FaviconFinder (parses HTML <link> tags, then falls back to /favicon.ico)
+        if let nsImage = await Self.fetchFaviconImage(for: url) {
+            let swiftUIImage = SwiftUI.Image(nsImage: nsImage)
+            Self.cacheFavicon(swiftUIImage, for: cacheKey)
+            Self.saveFaviconToDisk(nsImage, for: cacheKey)
+
+            await MainActor.run {
+                self.favicon = swiftUIImage
+                self.hasFavicon = true
+            }
+            return
+        }
+
+        // FaviconFinder failed — try direct /favicon.ico as last resort
+        // (handles sites where HTML <link> tags point to 403'd paths but root favicon works)
+        if let rootFaviconURL = URL(string: "/favicon.ico", relativeTo: url)?.absoluteURL,
+           let nsImage = await Self.downloadImage(from: rootFaviconURL) {
+            let swiftUIImage = SwiftUI.Image(nsImage: nsImage)
+            Self.cacheFavicon(swiftUIImage, for: cacheKey)
+            Self.saveFaviconToDisk(nsImage, for: cacheKey)
+
+            await MainActor.run {
+                self.favicon = swiftUIImage
+                self.hasFavicon = true
+            }
+            return
+        }
+
+        await MainActor.run {
+            self.favicon = defaultFavicon
+            // hasFavicon stays false — allows retry on next ensureFaviconLoaded()
+        }
+    }
+
+    // MARK: - Favicon Network Helpers
+
+    /// Attempt to fetch a favicon using FaviconFinder (HTML parsing + ICO fallback).
+    private static func fetchFaviconImage(for url: URL) async -> NSImage? {
         do {
             let favicon = try await FaviconFinder(url: url)
                 .fetchFaviconURLs()
                 .download()
                 .largest()
-
-            if let faviconImage = favicon.image {
-                let nsImage = faviconImage.image
-                let swiftUIImage = SwiftUI.Image(nsImage: nsImage)
-
-                // Cache the favicon (both in memory and on disk)
-                Self.cacheFavicon(swiftUIImage, for: cacheKey)
-                Self.saveFaviconToDisk(nsImage, for: cacheKey)
-                print("💾 [Favicon] Cached favicon for: \(cacheKey)")
-
-                await MainActor.run {
-                    self.favicon = swiftUIImage
-                }
-            } else {
-                await MainActor.run {
-                    self.favicon = defaultFavicon
-                }
-            }
+            return favicon.image?.image
         } catch {
-            print(
-                "Error fetching favicon for \(url): \(error.localizedDescription)"
-            )
-            await MainActor.run {
-                self.favicon = defaultFavicon
-            }
+            return nil
+        }
+    }
+
+    /// Download an image directly from a URL. Used as a last-resort fallback.
+    private static func downloadImage(from url: URL) async -> NSImage? {
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            guard let httpResponse = response as? HTTPURLResponse,
+                  httpResponse.statusCode == 200 else { return nil }
+            return NSImage(data: data)
+        } catch {
+            return nil
         }
     }
 
     // MARK: - Favicon Cache Management
+    /// Check the in-memory LRU cache (fast path, lock-protected).
+    static func getMemoryCachedFavicon(for key: String) -> SwiftUI.Image? {
+        faviconCacheLock.lock()
+        defer { faviconCacheLock.unlock() }
+        return faviconCache[key]
+    }
+
+    /// Asynchronously load a favicon from the disk cache on `faviconCacheQueue`.
+    /// On hit, promotes to the in-memory cache before returning.
+    static func getDiskCachedFavicon(for key: String) async -> SwiftUI.Image? {
+        return await withCheckedContinuation { continuation in
+            faviconCacheQueue.async {
+                let image = loadFaviconFromDisk(for: key)
+                if let image = image {
+                    // Promote to memory cache under the lock
+                    faviconCacheLock.lock()
+                    faviconCache[key] = image
+                    faviconCacheLock.unlock()
+                }
+                continuation.resume(returning: image)
+            }
+        }
+    }
+
+    /// Synchronous memory-only lookup. External callers that cannot await
+    /// use this; disk-backed lookup is available via getDiskCachedFavicon().
     static func getCachedFavicon(for key: String) -> SwiftUI.Image? {
         faviconCacheLock.lock()
         defer { faviconCacheLock.unlock() }
+        return faviconCache[key]
+    }
 
-        // Check memory cache first
-        if let cachedFavicon = faviconCache[key] {
-            return cachedFavicon
+    /// Restore favicon from cache (memory then disk) synchronously.
+    /// Used during startup to give pinned/visible tabs their favicons instantly.
+    func restoreFaviconFromCache() {
+        guard url.scheme == "http" || url.scheme == "https", let host = url.host else { return }
+        let cacheKey = host
+
+        // Fast path: memory cache
+        if let cached = Self.getMemoryCachedFavicon(for: cacheKey) {
+            self.favicon = cached
+            self.hasFavicon = true
+            return
         }
 
-        // Check persistent cache
-        if let persistentFavicon = loadFaviconFromDisk(for: key) {
-            // Load into memory cache for faster access
-            faviconCache[key] = persistentFavicon
-            return persistentFavicon
+        // Sync disk read — acceptable during startup for a small number of pinned tabs
+        if let diskCached = Self.loadFaviconFromDisk(for: cacheKey) {
+            // Promote to memory cache
+            Self.cacheFavicon(diskCached, for: cacheKey)
+            self.favicon = diskCached
+            self.hasFavicon = true
         }
-
-        return nil
+        // If not in cache, hasFavicon stays false → ensureFaviconLoaded() will fetch from network
     }
 
     static func cacheFavicon(_ favicon: SwiftUI.Image, for key: String) {
         faviconCacheLock.lock()
-        defer { faviconCacheLock.unlock() }
 
         faviconCache[key] = favicon
 
@@ -2333,23 +2493,36 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         faviconCacheOrder.append(key)
 
         // Evict oldest entries when cache exceeds max size
+        var keysToEvict: [String] = []
         if faviconCache.count > faviconCacheMaxSize {
             let evictCount = faviconCache.count - faviconCacheMaxSize + 20
-            let keysToRemove = Array(faviconCacheOrder.prefix(evictCount))
-            for keyToRemove in keysToRemove {
+            keysToEvict = Array(faviconCacheOrder.prefix(evictCount))
+            for keyToRemove in keysToEvict {
                 faviconCache.removeValue(forKey: keyToRemove)
-                removeFaviconFromDisk(for: keyToRemove)
             }
             faviconCacheOrder.removeFirst(min(evictCount, faviconCacheOrder.count))
+        }
+
+        faviconCacheLock.unlock()
+
+        // Disk eviction happens off main thread
+        if !keysToEvict.isEmpty {
+            faviconCacheQueue.async(flags: .barrier) {
+                for keyToRemove in keysToEvict {
+                    removeFaviconFromDisk(for: keyToRemove)
+                }
+            }
         }
     }
 
     // MARK: - Cache Management
     static func clearFaviconCache() {
         faviconCacheLock.lock()
-        defer { faviconCacheLock.unlock() }
         faviconCache.removeAll()
-        clearAllFaviconCacheFromDisk()
+        faviconCacheLock.unlock()
+        faviconCacheQueue.async(flags: .barrier) {
+            clearAllFaviconCacheFromDisk()
+        }
     }
 
     static func getFaviconCacheStats() -> (count: Int, domains: [String]) {
@@ -2359,18 +2532,21 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
 
     // MARK: - Persistent Storage Helpers
+    /// Saves favicon PNG to disk on `faviconCacheQueue` (barrier write).
     private static func saveFaviconToDisk(_ nsImage: NSImage, for key: String) {
-        let fileURL = faviconCacheDirectory.appendingPathComponent("\(key).png")
+        // Prepare the PNG data on the calling thread (image rendering is CPU-bound, not I/O)
+        guard let tiffData = nsImage.tiffRepresentation,
+              let bitmapRep = NSBitmapImageRep(data: tiffData),
+              let pngData = bitmapRep.representation(using: .png, properties: [:])
+        else { return }
 
-        // Convert NSImage to PNG data and save
-        if let tiffData = nsImage.tiffRepresentation,
-            let bitmapRep = NSBitmapImageRep(data: tiffData),
-            let pngData = bitmapRep.representation(using: .png, properties: [:])
-        {
+        faviconCacheQueue.async(flags: .barrier) {
+            let fileURL = faviconCacheDirectory.appendingPathComponent("\(key).png")
             try? pngData.write(to: fileURL)
         }
     }
 
+    /// Loads favicon from disk. Called from `faviconCacheQueue` — NOT from main thread.
     private static func loadFaviconFromDisk(for key: String) -> SwiftUI.Image? {
         let fileURL = faviconCacheDirectory.appendingPathComponent("\(key).png")
 
@@ -2383,6 +2559,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         return SwiftUI.Image(nsImage: nsImage)
     }
 
+    /// Removes a single cached favicon from disk. Called from `faviconCacheQueue` (barrier).
     private static func removeFaviconFromDisk(for key: String) {
         let fileURL = faviconCacheDirectory.appendingPathComponent("\(key).png")
         try? FileManager.default.removeItem(at: fileURL)
@@ -2403,9 +2580,6 @@ extension Tab: WKNavigationDelegate {
         _ webView: WKWebView,
         didStartProvisionalNavigation navigation: WKNavigation!
     ) {
-        print(
-            "🌐 [Tab] didStartProvisionalNavigation for: \(webView.url?.absoluteString ?? "unknown")"
-        )
         loadingState = .didStartProvisionalNavigation
         if #available(macOS 15.5, *) {
             ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.loading])
@@ -2417,14 +2591,13 @@ extension Tab: WKNavigationDelegate {
                 hasAudioContent = false
                 hasPlayingAudio = false
                 // Note: isAudioMuted is preserved to maintain user's mute preference
-                print(
-                    "🔄 [Tab] Swift reset audio tracking for navigation to: \(newURL.absoluteString)"
-                )
                 // Reset sampled domain to force resampling on new page
                 if let newDomain = extractDomain(from: newURL),
                    newDomain != lastSampledDomain {
                     lastSampledDomain = nil
+                    lastTopBarDomain = nil
                 }
+                lastFallbackInjectionURL = nil
                 // Update URL but don't persist yet - wait for navigation to complete
                 self.url = newURL
             } else {
@@ -2438,7 +2611,6 @@ extension Tab: WKNavigationDelegate {
         _ webView: WKWebView,
         didCommit navigation: WKNavigation!
     ) {
-        print("🌐 [Tab] didCommit navigation for: \(webView.url?.absoluteString ?? "unknown")")
         loadingState = .didCommit
         if #available(macOS 15.5, *) {
             ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.loading])
@@ -2461,7 +2633,6 @@ extension Tab: WKNavigationDelegate {
         _ webView: WKWebView,
         didFinish navigation: WKNavigation!
     ) {
-        print("✅ [Tab] didFinish navigation for: \(webView.url?.absoluteString ?? "unknown")")
         loadingState = .didFinish
         if #available(macOS 15.5, *) {
             ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.loading])
@@ -2473,7 +2644,9 @@ extension Tab: WKNavigationDelegate {
                 ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
 
                 // Extension diagnostics: check content scripts, background worker, and messaging
+                #if DEBUG
                 ExtensionManager.shared.diagnoseExtensionState(for: webView, url: newURL)
+                #endif
             }
             browserManager?.syncTabAcrossWindows(self.id)
 
@@ -2483,7 +2656,14 @@ extension Tab: WKNavigationDelegate {
             // CHROME WEB STORE INTEGRATION: Inject script after navigation
             injectWebStoreScriptIfNeeded(for: newURL, in: webView)
 
-            // BOOSTS: Inject boost if domain has one configured
+            // CONTENT BLOCKER: Fallback scriptlet injection (skip if already injected for this URL)
+            let urlString = newURL.absoluteString
+            if lastFallbackInjectionURL != urlString {
+                lastFallbackInjectionURL = urlString
+                browserManager?.contentBlockerManager.injectFallbackScripts(for: newURL, in: webView, tab: self)
+            }
+
+            // BOOSTS: Fallback boost injection after navigation completes
             injectBoostIfNeeded(for: newURL, in: webView)
         }
 
@@ -2492,35 +2672,30 @@ extension Tab: WKNavigationDelegate {
 
         webView.evaluateJavaScript("document.title") {
             [weak self] result, error in
+            // evaluateJavaScript completion runs on main thread; no dispatch needed
             if let title = result as? String {
-                print("📄 [Tab] Got title from JavaScript: '\(title)'")
-                DispatchQueue.main.async {
-                    self?.updateTitle(title)
+                self?.updateTitle(title)
 
-                    // Add to profile-aware history after title is updated
-                    if let currentURL = webView.url {
-                        let profile = self?.resolveProfile()
-                        let profileId = profile?.id ?? self?.browserManager?.currentProfile?.id
-                        let isEphemeral = profile?.isEphemeral ?? false
-                        self?.browserManager?.historyManager.addVisit(
-                            url: currentURL,
-                            title: title,
-                            timestamp: Date(),
-                            tabId: self?.id,
-                            profileId: profileId,
-                            isEphemeral: isEphemeral
-                        )
-                    }
-
-                    // Persist tab changes after navigation completes (only once)
-                    self?.browserManager?.tabManager.persistSnapshot()
+                // Add to profile-aware history after title is updated
+                if let currentURL = webView.url {
+                    let profile = self?.resolveProfile()
+                    let profileId = profile?.id ?? self?.browserManager?.currentProfile?.id
+                    let isEphemeral = profile?.isEphemeral ?? false
+                    self?.browserManager?.historyManager.addVisit(
+                        url: currentURL,
+                        title: title,
+                        timestamp: Date(),
+                        tabId: self?.id,
+                        profileId: profileId,
+                        isEphemeral: isEphemeral
+                    )
                 }
-            } else if let jsError = error {
-                print("⚠️ [Tab] Failed to get document.title: \(jsError.localizedDescription)")
+
+                // Persist tab changes after navigation completes (only once)
+                self?.browserManager?.tabManager.persistSnapshot()
+            } else if error != nil {
                 // Still persist even if title fetch failed, since URL was updated
-                DispatchQueue.main.async {
-                    self?.browserManager?.tabManager.persistSnapshot()
-                }
+                self?.browserManager?.tabManager.persistSnapshot()
             }
         }
 
@@ -2539,7 +2714,7 @@ extension Tab: WKNavigationDelegate {
         updateNavigationStateEnhanced(source: "didCommit")
 
         // Trigger background color extraction after page fully loads
-        // Wait a bit for boosts to apply and rendering to complete
+        // Wait a bit for rendering to complete
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self, weak webView] in
             guard let self = self, let webView = webView else { return }
             // Only sample if page is still loaded (not navigating away)
@@ -2567,8 +2742,6 @@ extension Tab: WKNavigationDelegate {
         didFail navigation: WKNavigation!,
         withError error: Error
     ) {
-        print("❌ [Tab] didFail navigation for: \(webView.url?.absoluteString ?? "unknown")")
-        print("   Error: \(error.localizedDescription)")
         loadingState = .didFail(error)
 
         // Set error favicon on navigation failure
@@ -2579,15 +2752,43 @@ extension Tab: WKNavigationDelegate {
         updateNavigationStateEnhanced(source: "didFail")
     }
 
+    // MARK: - Web Process Crash Recovery
+    public func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        let now = Date()
+        // Reset crash counter if last crash was more than 30 seconds ago (new crash burst)
+        if now.timeIntervalSince(lastWebProcessCrashDate) > 30 {
+            webProcessCrashCount = 0
+        }
+        webProcessCrashCount += 1
+        lastWebProcessCrashDate = now
+
+        NSLog("[Tab] WebContent process terminated for tab %@ (crash #%d in window)", id.uuidString, webProcessCrashCount)
+        loadingState = .idle
+
+        // Hard stop after 4 crashes in a 30-second window — the system is in a bad state
+        // (e.g., XPC services unavailable after sleep/wake) and retrying is making it worse.
+        // Load about:blank to stop WebKit from reloading the crashing content into respawned processes.
+        guard webProcessCrashCount <= 4 else {
+            NSLog("[Tab] Giving up on tab %@ after %d consecutive crashes — loading blank to break crash loop", id.uuidString, webProcessCrashCount)
+            webView.load(URLRequest(url: URL(string: "about:blank")!))
+            return
+        }
+
+        // Delay reload with exponential backoff. Immediately reloading spawns a new web process
+        // into the same broken XPC state, causing a tight crash loop. The delay gives launchservicesd
+        // and other XPC services time to finish restarting after a system wake.
+        let delay = Double(webProcessCrashCount) * 2.0 // 2s, 4s, 6s, 8s
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak webView] in
+            webView?.reload()
+        }
+    }
+
     // MARK: - Loading Failed (before content started loading)
     public func webView(
         _ webView: WKWebView,
         didFailProvisionalNavigation navigation: WKNavigation!,
         withError error: Error
     ) {
-        print(
-            "💥 [Tab] didFailProvisionalNavigation for: \(webView.url?.absoluteString ?? "unknown")")
-        print("   Error: \(error.localizedDescription)")
         loadingState = .didFailProvisionalNavigation(error)
 
         // Set connection error favicon
@@ -2622,16 +2823,20 @@ extension Tab: WKNavigationDelegate {
         if let url = navigationAction.request.url,
             navigationAction.targetFrame?.isMainFrame == true
         {
-            browserManager?.maybeShowOAuthAssist(for: url, in: self)
-
             // Grant extension access to this URL BEFORE navigation starts
             // so content scripts can inject at document_start
             if #available(macOS 15.4, *) {
                 ExtensionManager.shared.grantExtensionAccessToURL(url)
             }
 
-            // Setup boost user script before navigation starts
+            // Setup content blocker scripts before navigation starts
+            browserManager?.contentBlockerManager.setupContentBlockerScripts(for: url, in: webView, tab: self)
+
+            // BOOSTS: Setup boost user scripts before navigation starts
             setupBoostUserScript(for: url, in: webView)
+
+            // Inject SponsorBlock script (independent of content blocker)
+            browserManager?.sponsorBlockManager.injectScriptIfNeeded(for: url, in: webView)
         }
 
         // Check for Option+click to trigger Peek for any link
@@ -2652,6 +2857,19 @@ extension Tab: WKNavigationDelegate {
         if #available(macOS 12.3, *), navigationAction.shouldPerformDownload {
             decisionHandler(.download)
             return
+        }
+
+        // Air Traffic Control — route cross-domain navigations to designated spaces
+        if let url = navigationAction.request.url {
+            var currentHost = self.url.host?.lowercased() ?? ""
+            if currentHost.hasPrefix("www.") { currentHost = String(currentHost.dropFirst(4)) }
+            var destHost = url.host?.lowercased() ?? ""
+            if destHost.hasPrefix("www.") { destHost = String(destHost.dropFirst(4)) }
+            if !currentHost.isEmpty && !destHost.isEmpty && currentHost != destHost,
+               browserManager?.siteRoutingManager.applyRoute(url: url, from: self) == true {
+                decisionHandler(.cancel)
+                return
+            }
         }
 
         decisionHandler(.allow)
@@ -2687,9 +2905,6 @@ extension Tab: WKNavigationDelegate {
         let originalURL = navigationAction.request.url ?? URL(string: "https://example.com")!
         let suggestedFilename = navigationAction.request.url?.lastPathComponent ?? "download"
 
-        print("🔽 [Tab] Download started from navigationAction: \(originalURL.absoluteString)")
-        print("🔽 [Tab] Suggested filename: \(suggestedFilename)")
-        print("🔽 [Tab] BrowserManager available: \(browserManager != nil)")
 
         _ = browserManager?.downloadManager.addDownload(
             download, originalURL: originalURL, suggestedFilename: suggestedFilename)
@@ -2703,9 +2918,6 @@ extension Tab: WKNavigationDelegate {
         let originalURL = navigationResponse.response.url ?? URL(string: "https://example.com")!
         let suggestedFilename = navigationResponse.response.url?.lastPathComponent ?? "download"
 
-        print("🔽 [Tab] Download started from navigationResponse: \(originalURL.absoluteString)")
-        print("🔽 [Tab] Suggested filename: \(suggestedFilename)")
-        print("🔽 [Tab] BrowserManager available: \(browserManager != nil)")
 
         _ = browserManager?.downloadManager.addDownload(
             download, originalURL: originalURL, suggestedFilename: suggestedFilename)
@@ -2716,7 +2928,6 @@ extension Tab: WKNavigationDelegate {
         _ download: WKDownload, decideDestinationUsing response: URLResponse,
         suggestedFilename: String, completionHandler: @escaping (URL?) -> Void
     ) {
-        print("🔽 [Tab] WKDownloadDelegate decideDestinationUsing called")
         // Handle download destination directly
         guard
             let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)
@@ -2740,7 +2951,6 @@ extension Tab: WKNavigationDelegate {
             counter += 1
         }
 
-        print("🔽 [Tab] Download destination set: \(dest.path)")
         completionHandler(dest)
     }
 
@@ -2748,7 +2958,6 @@ extension Tab: WKNavigationDelegate {
         _ download: WKDownload, decideDestinationUsing response: URLResponse,
         suggestedFilename: String, completionHandler: @escaping (URL, Bool) -> Void
     ) {
-        print("🔽 [Tab] WKDownloadDelegate decideDestinationUsing (macOS) called")
         // Handle download destination directly for macOS
         guard
             let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)
@@ -2773,18 +2982,15 @@ extension Tab: WKNavigationDelegate {
             counter += 1
         }
 
-        print("🔽 [Tab] Download destination set: \(dest.path)")
         // Return true to grant sandbox extension - this allows WebKit to write to the destination
         completionHandler(dest, true)
     }
 
     public func download(_ download: WKDownload, didFinishDownloadingTo location: URL) {
-        print("🔽 [Tab] Download finished to: \(location.path)")
         // Download completed successfully
     }
 
     public func download(_ download: WKDownload, didFailWithError error: Error) {
-        print("🔽 [Tab] Download failed: \(error.localizedDescription)")
         // Download failed
     }
 
@@ -2795,77 +3001,87 @@ extension Tab: WKScriptMessageHandler {
     public func userContentController(
         _ userContentController: WKUserContentController, didReceive message: WKScriptMessage
     ) {
+        // WKScriptMessageHandler callbacks run on main thread; no dispatch needed
         switch message.name {
         case "linkHover":
             let href = message.body as? String
-            DispatchQueue.main.async {
-                self.onLinkHover?(href)
-            }
+            self.onLinkHover?(href)
 
         case "commandHover":
             let href = message.body as? String
-            DispatchQueue.main.async {
-                self.onCommandHover?(href)
-            }
+            self.onCommandHover?(href)
 
         case "commandClick":
             if let href = message.body as? String, let url = URL(string: href) {
-                DispatchQueue.main.async {
-                    self.handleCommandClick(url: url)
-                }
+                self.handleCommandClick(url: url)
             }
 
         case "pipStateChange":
             if let dict = message.body as? [String: Any], let active = dict["active"] as? Bool {
-                DispatchQueue.main.async {
-                    print("[PiP] State change detected from web: \(active)")
-                    self.hasPiPActive = active
-                }
+                self.hasPiPActive = active
             }
 
         case let name where name.hasPrefix("mediaStateChange_"):
             if let dict = message.body as? [String: Bool] {
-                DispatchQueue.main.async {
-                    self.hasPlayingVideo = dict["hasPlayingVideo"] ?? false
-                    self.hasVideoContent = dict["hasVideoContent"] ?? false
-                    self.hasAudioContent = dict["hasAudioContent"] ?? false
-                    self.hasPlayingAudio = dict["hasPlayingAudio"] ?? false
-                    // Don't override isAudioMuted - it's managed by toggleMute()
-                }
+                // Only set @Published properties when values actually change.
+                // @Published fires objectWillChange on every set (even same value),
+                // which causes cascading SwiftUI re-renders and video black flashes.
+                let newPlayingVideo = dict["hasPlayingVideo"] ?? false
+                let newVideoContent = dict["hasVideoContent"] ?? false
+                let newAudioContent = dict["hasAudioContent"] ?? false
+                let newPlayingAudio = dict["hasPlayingAudio"] ?? false
+
+                if self.hasPlayingVideo != newPlayingVideo { self.hasPlayingVideo = newPlayingVideo }
+                if self.hasVideoContent != newVideoContent { self.hasVideoContent = newVideoContent }
+                if self.hasAudioContent != newAudioContent { self.hasAudioContent = newAudioContent }
+                if self.hasPlayingAudio != newPlayingAudio { self.hasPlayingAudio = newPlayingAudio }
             }
 
         case let name where name.hasPrefix("backgroundColor_"):
             if let dict = message.body as? [String: String],
                 let colorHex = dict["backgroundColor"]
             {
-                DispatchQueue.main.async {
-                    self.pageBackgroundColor = NSColor(hex: colorHex)
-                    if let webView = self._webView, let color = NSColor(hex: colorHex) {
-                        webView.underPageBackgroundColor = color
-                        // Update sampled domain after successful extraction
-                        if let currentURL = webView.url,
-                           let currentDomain = self.extractDomain(from: currentURL) {
-                            self.lastSampledDomain = currentDomain
-                        }
+                self.pageBackgroundColor = NSColor(hex: colorHex)
+                if let webView = self._webView, let color = NSColor(hex: colorHex) {
+                    webView.underPageBackgroundColor = color
+                    // Update sampled domain after successful extraction
+                    if let currentURL = webView.url,
+                       let currentDomain = self.extractDomain(from: currentURL) {
+                        self.lastSampledDomain = currentDomain
                     }
                 }
             }
-            
 
         case "historyStateDidChange":
             if let href = message.body as? String, let url = URL(string: href) {
-                DispatchQueue.main.async {
-                    if self.url.absoluteString != url.absoluteString {
-                        self.url = url
-                        self.browserManager?.syncTabAcrossWindows(self.id)
+                if self.url.absoluteString != url.absoluteString {
+                    self.url = url
+                    // NOTE: Do NOT call syncTabAcrossWindows here. SPA navigations
+                    // (pushState/replaceState/popstate) happen inside the webview — the
+                    // content is already at the correct state. Calling syncTab would see a
+                    // URL mismatch (webView.url lags behind the JS-driven URL change) and
+                    // force webView.load(), causing a full page reload that breaks SPA
+                    // back/forward (e.g., Facebook lightbox close via browser back).
 
-                        // Debounce persistence for SPA navigation to avoid excessive writes
-                        self.spaPersistDebounceTask?.cancel()
-                        self.spaPersistDebounceTask = Task { [weak self] in
-                            try? await Task.sleep(nanoseconds: 200_000_000) // 200ms
-                            guard !Task.isCancelled else { return }
-                            self?.browserManager?.tabManager.persistSnapshot()
+                    // Fetch updated title after SPA navigation
+                    message.webView?.evaluateJavaScript("document.title") { [weak self] result, _ in
+                        // evaluateJavaScript completion runs on main thread
+                        if let title = result as? String, !title.isEmpty {
+                            self?.updateTitle(title)
                         }
+                    }
+
+                    // Fetch favicon for new URL
+                    Task { @MainActor [weak self] in
+                        await self?.fetchAndSetFavicon(for: url)
+                    }
+
+                    // Debounce persistence for SPA navigation to avoid excessive writes
+                    self.spaPersistDebounceTask?.cancel()
+                    self.spaPersistDebounceTask = Task { [weak self] in
+                        try? await Task.sleep(nanoseconds: 200_000_000) // 200ms
+                        guard !Task.isCancelled else { return }
+                        self?.browserManager?.tabManager.persistSnapshot()
                     }
                 }
             }
@@ -2875,6 +3091,56 @@ extension Tab: WKScriptMessageHandler {
             
         case "nookShortcutDetect":
             handleShortcutDetection(message: message)
+
+        case "nookAdBlocker":
+            // Native ad skip — evaluateJavaScript from the app process is invisible
+            // to YouTube's anti-adblock detection (no extension can do this)
+            if let body = message.body as? [String: Any],
+               let type = body["type"] as? String,
+               type == "ad-playing"
+            {
+                message.webView?.evaluateJavaScript("""
+                    (function() {
+                        var v = document.querySelector('#movie_player video');
+                        if (v && isFinite(v.duration) && v.duration > 0) {
+                            v.currentTime = v.duration;
+                        }
+                        var skip = document.querySelector(
+                            '.ytp-skip-ad-button, .ytp-ad-skip-button, .ytp-ad-skip-button-modern, ' +
+                            '.ytp-ad-skip-button-container button, button[id^="skip-button"], ' +
+                            '.ytp-ad-overlay-close-button'
+                        );
+                        if (skip) skip.click();
+                        var overlay = document.querySelector('.ytp-ad-overlay-container, .ytp-ad-image-overlay');
+                        if (overlay) overlay.style.setProperty('display', 'none', 'important');
+                    })()
+                    """)
+            }
+
+        case "nookSponsorBlock":
+            if let body = message.body as? [String: Any],
+               let type = body["type"] as? String
+            {
+                switch type {
+                case "video-changed":
+                    if let videoID = body["videoID"] as? String {
+                        Task { @MainActor [weak self] in
+                            guard let webView = message.webView else { return }
+                            let segments = await self?.browserManager?.sponsorBlockManager
+                                .fetchSegments(for: videoID) ?? []
+                            self?.browserManager?.sponsorBlockManager
+                                .deliverSegments(segments, to: webView)
+                        }
+                    }
+                case "segment-skipped":
+                    // Telemetry: report viewed segment to SponsorBlock
+                    if let uuid = body["uuid"] as? String {
+                        browserManager?.sponsorBlockManager.reportViewedSegment(uuid: uuid)
+                    }
+                default:
+                    break
+                }
+            }
 
         default:
             break
@@ -2910,7 +3176,6 @@ extension Tab: WKScriptMessageHandler {
             let urlString = dict["url"] as? String,
             let url = URL(string: urlString)
         else {
-            print("❌ [Tab] Invalid OAuth request: missing or invalid URL")
             return
         }
         let interactive = dict["interactive"] as? Bool ?? true
@@ -2921,9 +3186,6 @@ extension Tab: WKScriptMessageHandler {
             in: .whitespacesAndNewlines)
         let requestId = (rawRequestId?.isEmpty == false ? rawRequestId! : UUID().uuidString)
 
-        print(
-            "🔐 [Tab] OAuth request received: id=\(requestId) url=\(url.absoluteString) interactive=\(interactive) ephemeral=\(prefersEphemeral) scheme=\(providedScheme ?? "nil")"
-        )
 
         guard let manager = browserManager else {
             finishIdentityFlow(requestId: requestId, with: .failure(.unableToStart))
@@ -2946,7 +3208,6 @@ extension Tab: WKScriptMessageHandler {
         with result: AuthenticationManager.IdentityFlowResult
     ) {
         guard let webView else {
-            print("⚠️ [Tab] Unable to deliver identity result; webView missing")
             return
         }
 
@@ -2966,17 +3227,9 @@ extension Tab: WKScriptMessageHandler {
             payload["message"] = failure.message
         }
 
-        if let status = payload["status"] as? String {
-            let urlDescription = payload["url"] as? String ?? "nil"
-            print(
-                "🔐 [Tab] Identity flow completed: id=\(requestId) status=\(status) url=\(urlDescription)"
-            )
-        }
-
         guard let data = try? JSONSerialization.data(withJSONObject: payload, options: []),
             let jsonString = String(data: data, encoding: .utf8)
         else {
-            print("❌ [Tab] Failed to serialise identity payload for requestId=\(requestId)")
             return
         }
 
@@ -2984,7 +3237,6 @@ extension Tab: WKScriptMessageHandler {
             "window.__nookCompleteIdentityFlow && window.__nookCompleteIdentityFlow(\(jsonString));"
         webView.evaluateJavaScript(script) { _, error in
             if let error {
-                print("❌ [Tab] Failed to deliver identity result: \(error.localizedDescription)")
             }
         }
     }
@@ -2992,11 +3244,16 @@ extension Tab: WKScriptMessageHandler {
     private func isLikelyOAuthOrExternalWindow(url: URL, windowFeatures: WKWindowFeatures) -> Bool {
         if OAuthDetector.isLikelyOAuthPopupURL(url) { return true }
 
-        // If the popup has explicit dimensions it's almost certainly a modal sign-in window
+        // If the popup has explicit dimensions AND is cross-origin, it's likely a sign-in window.
+        // Same-origin popups with dimensions (e.g. log viewers, help windows) should open normally.
         if let width = windowFeatures.width, let height = windowFeatures.height,
             width.doubleValue > 0 && height.doubleValue > 0
         {
-            return true
+            let currentHost = self.url.host?.lowercased()
+            let popupHost = url.host?.lowercased()
+            if currentHost != popupHost {
+                return true
+            }
         }
 
         return false
@@ -3044,19 +3301,12 @@ extension Tab: WKUIDelegate {
             let url = navigationAction.request.url,
             isLikelyOAuthOrExternalWindow(url: url, windowFeatures: windowFeatures)
         {
-            print("🔐 [Tab] OAuth/signin popup detected, opening in miniwindow: \(url.absoluteString)")
-            
-            // Auto-allow the OAuth provider domain for tracking protection
-            if let providerHost = url.host?.lowercased() {
-                bm.oauthAllowDomain(providerHost)
-            }
             
             // Store reference to parent tab for completion callback
             let parentTabId = self.id
             
             // Open OAuth flow in miniwindow
             bm.externalMiniWindowManager.present(url: url) { [weak bm] success, finalURL in
-                print("🔐 [Tab] Miniwindow OAuth flow completed: success=\(success), url=\(finalURL?.absoluteString ?? "nil")")
                 
                 guard let bm = bm else { return }
                 
@@ -3066,7 +3316,6 @@ extension Tab: WKUIDelegate {
                         if success {
                             bm.tabManager.setActiveTab(parentTab)
                             parentTab.activeWebView.reload()
-                            print("🔐 [Tab] Parent tab reloaded after successful OAuth")
                         }
                     }
                 }
@@ -3089,6 +3338,12 @@ extension Tab: WKUIDelegate {
             }
 
             return nil  // Don't create a WebView, we're using Peek
+        }
+
+        // Air Traffic Control — route popup URLs to designated spaces
+        if let url = navigationAction.request.url,
+           browserManager?.siteRoutingManager.applyRoute(url: url, from: self) == true {
+            return nil
         }
 
         // For regular popups, create a new webView with the EXACT configuration that WebKit provided
@@ -3128,6 +3383,8 @@ extension Tab: WKUIDelegate {
             forName: "historyStateDidChange")
         newWebView.configuration.userContentController.removeScriptMessageHandler(
             forName: "NookIdentity")
+        newWebView.configuration.userContentController.removeScriptMessageHandler(
+            forName: "nookAdBlocker")
 
         // Now add the handlers
         newWebView.configuration.userContentController.add(newTab, name: "linkHover")
@@ -3140,6 +3397,7 @@ extension Tab: WKUIDelegate {
             newTab, name: "backgroundColor_\(newTab.id.uuidString)")
         newWebView.configuration.userContentController.add(newTab, name: "historyStateDidChange")
         newWebView.configuration.userContentController.add(newTab, name: "NookIdentity")
+        newWebView.configuration.userContentController.add(newTab, name: "nookAdBlocker")
 
         // Set custom user agent
         newWebView.customUserAgent =
@@ -3169,12 +3427,12 @@ extension Tab: WKUIDelegate {
         let handlerNames = ["linkHover", "commandHover", "commandClick", "pipStateChange",
                            "mediaStateChange_\(tab.id.uuidString)",
                            "backgroundColor_\(tab.id.uuidString)",
-                           "historyStateDidChange", "NookIdentity"]
-        
+                           "historyStateDidChange", "NookIdentity", "nookAdBlocker"]
+
         for handlerName in handlerNames {
             userContentController.removeScriptMessageHandler(forName: handlerName)
         }
-        
+
         // Add handlers for the OAuth tab
         userContentController.add(tab, name: "linkHover")
         userContentController.add(tab, name: "commandHover")
@@ -3184,6 +3442,7 @@ extension Tab: WKUIDelegate {
         userContentController.add(tab, name: "backgroundColor_\(tab.id.uuidString)")
         userContentController.add(tab, name: "historyStateDidChange")
         userContentController.add(tab, name: "NookIdentity")
+        userContentController.add(tab, name: "nookAdBlocker")
     }
     
     /// Checks if a URL indicates OAuth completion and handles the flow
@@ -3208,7 +3467,6 @@ extension Tab: WKUIDelegate {
         if let providerHost = oauthProviderHost, !host.contains(providerHost),
            (isSuccess || isError || !OAuthDetector.isLikelyOAuthURL(url)) {
             
-            print("🔐 [Tab] OAuth flow completed: success=\(isSuccess), closing OAuth tab")
             
             // Find and reload the parent tab
             if let parentTab = bm.tabManager.allTabs().first(where: { $0.id == parentTabId }) {
@@ -3223,23 +3481,18 @@ extension Tab: WKUIDelegate {
             // Close this OAuth tab
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak bm, weak self] in
                 guard let self = self, let bm = bm else { return }
-                print("🔐 [Tab] Auto-closing OAuth tab: \(self.name)")
                 bm.tabManager.removeTab(self.id)
             }
         }
     }
     
     private func handleMiniWindowAuthCompletion(success: Bool, finalURL: URL?) {
-        print(
-            "🪟 [Tab] Popup OAuth flow completed: success=\(success), finalURL=\(finalURL?.absoluteString ?? "nil")"
-        )
 
         if success {
             DispatchQueue.main.async { [weak self] in
                 self?.activeWebView.reload()
             }
         } else {
-            print("🪟 [Tab] Popup OAuth authentication failed")
         }
     }
 
@@ -3329,28 +3582,18 @@ extension Tab: WKUIDelegate {
             if let window = webView.window {
                 // Present as sheet if we have a window
                 openPanel.beginSheetModal(for: window) { response in
-                    print("📁 [Tab] Open panel sheet completed with response: \(response)")
                     if response == .OK {
-                        print(
-                            "📁 [Tab] User selected files: \(openPanel.urls.map { $0.lastPathComponent })"
-                        )
                         completionHandler(openPanel.urls)
                     } else {
-                        print("📁 [Tab] User cancelled file selection")
                         completionHandler(nil)
                     }
                 }
             } else {
                 // Fall back to modal presentation
                 openPanel.begin { response in
-                    print("📁 [Tab] Open panel modal completed with response: \(response)")
                     if response == .OK {
-                        print(
-                            "📁 [Tab] User selected files: \(openPanel.urls.map { $0.lastPathComponent })"
-                        )
                         completionHandler(openPanel.urls)
                     } else {
-                        print("📁 [Tab] User cancelled file selection")
                         completionHandler(nil)
                     }
                 }
@@ -3364,11 +3607,9 @@ extension Tab: WKUIDelegate {
         _ webView: WKWebView,
         enterFullScreenForVideoWith completionHandler: @escaping (Bool, Error?) -> Void
     ) {
-        print("🎬 [Tab] Entering full-screen for video - delegate method called!")
 
         // Get the window containing this webView
         guard let window = webView.window else {
-            print("❌ [Tab] No window found for full-screen")
             completionHandler(
                 false,
                 NSError(
@@ -3377,12 +3618,10 @@ extension Tab: WKUIDelegate {
             return
         }
 
-        print("🎬 [Tab] Found window: \(window), entering full-screen...")
 
         // Enter full-screen mode
         DispatchQueue.main.async {
             window.toggleFullScreen(nil)
-            print("🎬 [Tab] Full-screen toggle called")
         }
 
         // Call completion handler immediately - WebKit will handle the actual full-screen transition
@@ -3394,11 +3633,9 @@ extension Tab: WKUIDelegate {
         _ webView: WKWebView,
         exitFullScreenWith completionHandler: @escaping (Bool, Error?) -> Void
     ) {
-        print("🎬 [Tab] Exiting full-screen for video - delegate method called!")
 
         // Get the window containing this webView
         guard let window = webView.window else {
-            print("❌ [Tab] No window found for exiting full-screen")
             completionHandler(
                 false,
                 NSError(
@@ -3409,12 +3646,10 @@ extension Tab: WKUIDelegate {
             return
         }
 
-        print("🎬 [Tab] Found window: \(window), exiting full-screen...")
 
         // Exit full-screen mode
         DispatchQueue.main.async {
             window.toggleFullScreen(nil)
-            print("🎬 [Tab] Full-screen exit toggle called")
         }
 
         // Call completion handler immediately - WebKit will handle the actual full-screen transition
@@ -3432,9 +3667,6 @@ extension Tab: WKUIDelegate {
         initiatedByFrame frame: WKFrameInfo,
         decisionHandler: @escaping (WKPermissionDecision) -> Void
     ) {
-        print(
-            "🔐 [Tab] Media capture authorization requested for type: \(type.rawValue) from origin: \(origin)"
-        )
 
         decisionHandler(.grant)
     }
@@ -3561,21 +3793,17 @@ extension Tab {
 
         webView.evaluateJavaScript(script) { result, error in
             if let error = error {
-                print("Find JavaScript error: \(error.localizedDescription)")
                 completion(.failure(error))
                 return
             }
 
-            print("Find JavaScript result: \(String(describing: result))")
 
             if let dict = result as? [String: Any],
                 let matchCount = dict["matchCount"] as? Int,
                 let currentIndex = dict["currentIndex"] as? Int
             {
-                print("Find found \(matchCount) matches, current index: \(currentIndex)")
                 completion(.success((matchCount: matchCount, currentIndex: currentIndex)))
             } else {
-                print("Find result parsing failed, returning 0 matches")
                 completion(.success((matchCount: 0, currentIndex: 0)))
             }
         }
@@ -3781,13 +4009,10 @@ extension Tab {
 
 extension Tab {
     func deliverContextMenuPayload(_ payload: WebContextMenuPayload?) {
-        print("🔽 [Tab] deliverContextMenuPayload called, payload exists: \(payload != nil)")
         pendingContextMenuPayload = payload
         if let webView = _webView as? FocusableWKWebView {
-            print("🔽 [Tab] Calling webView.contextMenuPayloadDidUpdate")
             webView.contextMenuPayloadDidUpdate(payload)
         } else {
-            print("🔽 [Tab] WARNING: _webView is nil or not FocusableWKWebView")
         }
     }
 }

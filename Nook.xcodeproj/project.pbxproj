@@ -23,6 +23,8 @@
 		56C82BA92E9C2DB500DDD0D6 /* UniversalGlass in Frameworks */ = {isa = PBXBuildFile; productRef = 56C82BA82E9C2DB500DDD0D6 /* UniversalGlass */; };
 		7FAFC5DA2E3ADDCD009D7DC4 /* FaviconFinder in Frameworks */ = {isa = PBXBuildFile; productRef = 7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */; };
 		7FE9E0EB2EE59D3500584E16 /* ColorfulX in Frameworks */ = {isa = PBXBuildFile; productRef = 7FE9E0EA2EE59D3500584E16 /* ColorfulX */; };
+		A1B2C3D62F0E6A0100ABCDEF /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D52F0E6A0100ABCDEF /* MLXLLM */; };
+		A7A6FB442F70F4B8007C79C8 /* ContentBlockerConverter in Frameworks */ = {isa = PBXBuildFile; productRef = B1F2E3D52F0F8B0100FACADE /* ContentBlockerConverter */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -134,6 +136,8 @@
 				2D0822D82EC8A61800C302AC /* UniversalGlass in Frameworks */,
 				3600212E2EC6EADB0016A41E /* Numerics in Frameworks */,
 				360021332EC6EAEB0016A41E /* Atomics in Frameworks */,
+				A1B2C3D62F0E6A0100ABCDEF /* MLXLLM in Frameworks */,
+				A7A6FB442F70F4B8007C79C8 /* ContentBlockerConverter in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -201,6 +205,8 @@
 				360021432EC6EC7F0016A41E /* Motion */,
 				2D0822D72EC8A61800C302AC /* UniversalGlass */,
 				7FE9E0EA2EE59D3500584E16 /* ColorfulX */,
+				A1B2C3D52F0E6A0100ABCDEF /* MLXLLM */,
+				B1F2E3D52F0F8B0100FACADE /* ContentBlockerConverter */,
 			);
 			productName = Pulse;
 			productReference = 7F8340FC2E37F39400674A5D /* Nook.app */;
@@ -243,6 +249,8 @@
 				360021402EC6EC7F0016A41E /* XCRemoteSwiftPackageReference "Motion" */,
 				2D0822D62EC8A61800C302AC /* XCRemoteSwiftPackageReference "universalglass" */,
 				7FE9E0E92EE59D3500584E16 /* XCRemoteSwiftPackageReference "ColorfulX" */,
+				A1B2C3D42F0E6A0100ABCDEF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
+				B1F2E3D42F0F8B0100FACADE /* XCRemoteSwiftPackageReference "SafariConverterLib" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7F8340FD2E37F39400674A5D /* Products */;
@@ -616,6 +624,22 @@
 				minimumVersion = 6.0.2;
 			};
 		};
+		A1B2C3D42F0E6A0100ABCDEF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift-lm";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.30.6;
+			};
+		};
+		B1F2E3D42F0F8B0100FACADE /* XCRemoteSwiftPackageReference "SafariConverterLib" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/AdguardTeam/SafariConverterLib";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 4.2.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -698,6 +722,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 7FE9E0E92EE59D3500584E16 /* XCRemoteSwiftPackageReference "ColorfulX" */;
 			productName = ColorfulX;
+		};
+		A1B2C3D52F0E6A0100ABCDEF /* MLXLLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1B2C3D42F0E6A0100ABCDEF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			productName = MLXLLM;
+		};
+		B1F2E3D52F0F8B0100FACADE /* ContentBlockerConverter */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B1F2E3D42F0F8B0100FACADE /* XCRemoteSwiftPackageReference "SafariConverterLib" */;
+			productName = ContentBlockerConverter;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

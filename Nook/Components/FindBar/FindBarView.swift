@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import UniversalGlass
 
 struct FindBarView: View {
     @ObservedObject var findManager: FindManager
@@ -82,7 +81,7 @@ struct FindBarView: View {
                             }
                             .buttonStyle(.plain)
                             .disabled(findManager.searchText.isEmpty)
-                            .onHover { hovering in
+                            .onHoverTracking { hovering in
                                 withAnimation(.easeInOut(duration: 0.1)) {
                                     isUpButtonHovered = hovering
                                 }
@@ -99,7 +98,7 @@ struct FindBarView: View {
                             }
                             .buttonStyle(.plain)
                             .disabled(findManager.searchText.isEmpty)
-                            .onHover { hovering in
+                            .onHoverTracking { hovering in
                                 withAnimation(.easeInOut(duration: 0.1)) {
                                     isDownButtonHovered = hovering
                                 }
@@ -120,7 +119,7 @@ struct FindBarView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                         }
                         .buttonStyle(.plain)
-                        .onHover { hovering in
+                        .onHoverTracking { hovering in
                             withAnimation(.easeInOut(duration: 0.1)) {
                                 isCloseButtonHovered = hovering
                             }
@@ -131,10 +130,7 @@ struct FindBarView: View {
                     // Pill-shaped liquid glass styling
                     .background(Color(.windowBackgroundColor).opacity(0.35))
                     .clipShape(Capsule())
-                    .universalGlassEffect(
-                        .regular.tint(Color(.windowBackgroundColor).opacity(0.35)),
-                        in: .capsule
-                    )
+                    .nookGlassEffect(in: Capsule())
                     .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 2)
                     .padding(.trailing, 16)
                 }

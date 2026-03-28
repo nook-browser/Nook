@@ -7,7 +7,6 @@
 
 import Foundation
 import SwiftUI
-import WebKit
 
 @MainActor
 class FindManager: ObservableObject {
@@ -44,43 +43,36 @@ class FindManager: ObservableObject {
     }
     
     func search(for text: String, in tab: Tab?) {
-        print("FindManager.search called with text: '\(text)', tab: \(String(describing: tab))")
-        
         guard let tab = tab else {
-            print("FindManager: No tab provided, clearing search")
             clearSearch()
             return
         }
-        
+
         currentTab = tab
         searchText = text
         isSearching = true
-        
+
         if text.isEmpty {
-            print("FindManager: Empty text, clearing search")
             clearSearch()
             return
         }
-        
-        print("FindManager: Calling tab.findInPage with text: '\(text)'")
+
         // Use JavaScript-based find functionality
         tab.findInPage(text) { [weak self] result in
             DispatchQueue.main.async {
                 self?.isSearching = false
                 switch result {
                 case .success(let (matchCount, currentIndex)):
-                    print("FindManager: Search successful - \(matchCount) matches, current: \(currentIndex)")
                     self?.matchCount = matchCount
                     self?.currentMatchIndex = currentIndex
-                case .failure(let error):
-                    print("FindManager: Find error: \(error.localizedDescription)")
+                case .failure:
                     self?.matchCount = 0
                     self?.currentMatchIndex = 0
                 }
             }
         }
     }
-    
+
     func findNext() {
         guard let tab = currentTab, !searchText.isEmpty else { return }
         tab.findNextInPage { [weak self] result in
@@ -89,13 +81,13 @@ class FindManager: ObservableObject {
                 case .success(let (matchCount, currentIndex)):
                     self?.matchCount = matchCount
                     self?.currentMatchIndex = currentIndex
-                case .failure(let error):
-                    print("Find next error: \(error.localizedDescription)")
+                case .failure:
+                    break
                 }
             }
         }
     }
-    
+
     func findPrevious() {
         guard let tab = currentTab, !searchText.isEmpty else { return }
         tab.findPreviousInPage { [weak self] result in
@@ -104,8 +96,8 @@ class FindManager: ObservableObject {
                 case .success(let (matchCount, currentIndex)):
                     self?.matchCount = matchCount
                     self?.currentMatchIndex = currentIndex
-                case .failure(let error):
-                    print("Find previous error: \(error.localizedDescription)")
+                case .failure:
+                    break
                 }
             }
         }

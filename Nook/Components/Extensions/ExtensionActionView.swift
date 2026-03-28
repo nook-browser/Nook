@@ -31,25 +31,44 @@ struct ExtensionActionButton: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
     @State private var isHovering: Bool = false
-    
+    @State private var badgeText: String?
+    @State private var badgeRefreshId: UUID = UUID()
+
+    private var currentTab: Tab? {
+        browserManager.currentTab(for: windowState)
+    }
+
     var body: some View {
         Button(action: {
             showExtensionPopup()
         }) {
-            Group {
-                if let iconPath = ext.iconPath,
-                   let nsImage = NSImage(contentsOfFile: iconPath) {
-                    Image(nsImage: nsImage)
-                        .resizable()
-                        .interpolation(.high)
-                        .antialiased(true)
-                        .scaledToFit()
-                } else {
-                    Image(systemName: "puzzlepiece.extension")
-                        .foregroundColor(.white)
+            ZStack(alignment: .topTrailing) {
+                Group {
+                    if let iconPath = ext.iconPath,
+                       let nsImage = NSImage(contentsOfFile: iconPath) {
+                        Image(nsImage: nsImage)
+                            .resizable()
+                            .interpolation(.high)
+                            .antialiased(true)
+                            .scaledToFit()
+                    } else {
+                        Image(systemName: "puzzlepiece.extension")
+                            .foregroundColor(.white)
+                    }
+                }
+                .frame(width: 16, height: 16)
+
+                if let badge = badgeText, !badge.isEmpty {
+                    Text(badge)
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 3)
+                        .padding(.vertical, 1)
+                        .background(Color.red)
+                        .clipShape(Capsule())
+                        .offset(x: 6, y: -4)
                 }
             }
-            .frame(width: 16, height: 16)
             .padding(6)
             .background(isHovering ? .white.opacity(0.1) : .clear)
             .background(ActionAnchorView(extensionId: ext.id))
@@ -57,10 +76,35 @@ struct ExtensionActionButton: View {
         }
         .buttonStyle(.plain)
         .help(ext.name)
-        .onHover { state in
+        .onHoverTracking { state in
             isHovering = state
-            
         }
+        .onAppear { refreshBadge() }
+        .onReceive(NotificationCenter.default.publisher(for: .adBlockerStateChanged)) { _ in
+            refreshBadge()
+        }
+        .onChange(of: currentTab?.url) { _, _ in
+            refreshBadge()
+        }
+        .onChange(of: currentTab?.loadingState) { _, newState in
+            if newState == .didFinish {
+                // Small delay to let extension background process the tab update
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    refreshBadge()
+                }
+            }
+        }
+    }
+
+    private func refreshBadge() {
+        guard let ctx = ExtensionManager.shared.getExtensionContext(for: ext.id) else {
+            badgeText = nil
+            return
+        }
+        let tab = currentTab
+        let adapter: ExtensionTabAdapter? = tab.flatMap { ExtensionManager.shared.stableAdapter(for: $0) }
+        let action = ctx.action(for: adapter)
+        badgeText = action?.badgeText
     }
     
     private static let logger = Logger(subsystem: "com.nook.browser", category: "ExtensionAction")

@@ -17,7 +17,12 @@ class NookSettingsService {
     private let materialKey = "settings.currentMaterialRaw"
     private let searchEngineKey = "settings.searchEngine"
     private let tabUnloadTimeoutKey = "settings.tabUnloadTimeout"
+    private let tabManagementModeKey = "settings.tabManagementMode"
+    private let startupLoadModeKey = "settings.startupLoadMode"
     private let blockXSTKey = "settings.blockCrossSiteTracking"
+    private let adBlockerEnabledKey = "settings.adBlockerEnabled"
+    private let adBlockerWhitelistKey = "settings.adBlockerWhitelist"
+    private let adBlockerLastUpdateKey = "settings.adBlockerLastUpdate"
     private let debugToggleUpdateNotificationKey = "settings.debugToggleUpdateNotification"
     private let askBeforeQuitKey = "settings.askBeforeQuit"
     private let sidebarPositionKey = "settings.sidebarPosition"
@@ -41,6 +46,14 @@ class NookSettingsService {
     private let didFinishOnboardingKey = "settings.didFinishOnboarding"
     private let tabLayoutKey = "settings.tabLayout"
     private let customSearchEnginesKey = "settings.customSearchEngines"
+    private let appearanceModeKey = "settings.appearanceMode"
+    private let pinnedExtensionIDsKey = "settings.pinnedExtensionIDs"
+    private let tabOrganizerEnabledKey = "settings.tabOrganizerEnabled"
+    private let tabOrganizerModelDownloadedKey = "settings.tabOrganizerModelDownloaded"
+    private let tabOrganizerIdleTimeoutKey = "settings.tabOrganizerIdleTimeout"
+    private let sponsorBlockEnabledKey = "settings.sponsorBlockEnabled"
+    private let sponsorBlockCategoryOptionsKey = "settings.sponsorBlockCategoryOptions"
+    private let siteRoutingRulesKey = "settings.siteRoutingRules"
 
     var currentSettingsTab: SettingsTabs = .general
 
@@ -72,6 +85,14 @@ class NookSettingsService {
         }
     }
 
+    var siteRoutingRules: [SiteRoutingRule] = [] {
+        didSet {
+            if let data = try? JSONEncoder().encode(siteRoutingRules) {
+                userDefaults.set(data, forKey: siteRoutingRulesKey)
+            }
+        }
+    }
+
     /// Resolves the current `searchEngineId` to a query template string.
     /// Checks built-in `SearchProvider` cases first, then custom engines.
     var resolvedSearchEngineTemplate: String {
@@ -84,6 +105,23 @@ class NookSettingsService {
         return SearchProvider.google.queryTemplate
     }
     
+    var tabManagementMode: TabManagementMode {
+        didSet {
+            userDefaults.set(tabManagementMode.rawValue, forKey: tabManagementModeKey)
+            NotificationCenter.default.post(
+                name: .tabManagementModeChanged,
+                object: nil,
+                userInfo: ["mode": tabManagementMode.rawValue]
+            )
+        }
+    }
+
+    var startupLoadMode: StartupLoadMode {
+        didSet {
+            userDefaults.set(startupLoadMode.rawValue, forKey: startupLoadModeKey)
+        }
+    }
+
     var tabUnloadTimeout: TimeInterval {
         didSet {
             userDefaults.set(tabUnloadTimeout, forKey: tabUnloadTimeoutKey)
@@ -96,6 +134,43 @@ class NookSettingsService {
         didSet {
             userDefaults.set(blockCrossSiteTracking, forKey: blockXSTKey)
             NotificationCenter.default.post(name: .blockCrossSiteTrackingChanged, object: nil, userInfo: ["enabled": blockCrossSiteTracking])
+        }
+    }
+
+    var adBlockerEnabled: Bool {
+        didSet {
+            userDefaults.set(adBlockerEnabled, forKey: adBlockerEnabledKey)
+            NotificationCenter.default.post(name: .adBlockerEnabledChanged, object: nil, userInfo: ["enabled": adBlockerEnabled])
+        }
+    }
+
+    var adBlockerWhitelist: [String] {
+        didSet {
+            if let data = try? JSONEncoder().encode(adBlockerWhitelist) {
+                userDefaults.set(data, forKey: adBlockerWhitelistKey)
+            }
+        }
+    }
+
+    var pinnedExtensionIDs: [String] = [] {
+        didSet {
+            if let data = try? JSONEncoder().encode(pinnedExtensionIDs) {
+                userDefaults.set(data, forKey: pinnedExtensionIDsKey)
+            }
+        }
+    }
+
+    var adBlockerLastUpdate: Date? {
+        didSet {
+            userDefaults.set(adBlockerLastUpdate, forKey: adBlockerLastUpdateKey)
+        }
+    }
+
+    var enabledOptionalFilterLists: [String] {
+        didSet {
+            if let data = try? JSONEncoder().encode(enabledOptionalFilterLists) {
+                userDefaults.set(data, forKey: "settings.enabledOptionalFilterLists")
+            }
         }
     }
     
@@ -114,6 +189,13 @@ class NookSettingsService {
     var topBarAddressView: Bool {
         didSet {
             userDefaults.set(topBarAddressView, forKey: topBarAddressViewKey)
+        }
+    }
+
+    var appearanceMode: AppearanceMode {
+        didSet {
+            userDefaults.set(appearanceMode.rawValue, forKey: appearanceModeKey)
+            NotificationCenter.default.post(name: .appearanceModeChanged, object: nil)
         }
     }
 
@@ -232,6 +314,39 @@ class NookSettingsService {
         }
     }
 
+    var tabOrganizerEnabled: Bool {
+        didSet {
+            userDefaults.set(tabOrganizerEnabled, forKey: tabOrganizerEnabledKey)
+        }
+    }
+
+    var tabOrganizerModelDownloaded: Bool {
+        didSet {
+            userDefaults.set(tabOrganizerModelDownloaded, forKey: tabOrganizerModelDownloadedKey)
+        }
+    }
+
+    var tabOrganizerIdleTimeout: TimeInterval {
+        didSet {
+            userDefaults.set(tabOrganizerIdleTimeout, forKey: tabOrganizerIdleTimeoutKey)
+        }
+    }
+
+    var sponsorBlockEnabled: Bool {
+        didSet {
+            userDefaults.set(sponsorBlockEnabled, forKey: sponsorBlockEnabledKey)
+        }
+    }
+
+    /// Per-category skip options: category rawValue → skip option rawValue ("auto", "manual", "disabled")
+    var sponsorBlockCategoryOptions: [String: String] {
+        didSet {
+            if let data = try? JSONEncoder().encode(sponsorBlockCategoryOptions) {
+                userDefaults.set(data, forKey: sponsorBlockCategoryOptionsKey)
+            }
+        }
+    }
+
     init() {
         // Register default values
         userDefaults.register(defaults: [
@@ -239,7 +354,9 @@ class NookSettingsService {
             searchEngineKey: SearchProvider.google.rawValue,
             // Default tab unload timeout: 60 minutes
             tabUnloadTimeoutKey: 3600.0,
+            tabManagementModeKey: TabManagementMode.standard.rawValue,
             blockXSTKey: false,
+            adBlockerEnabledKey: false,
             debugToggleUpdateNotificationKey: false,
             askBeforeQuitKey: true,
             sidebarPositionKey: SidebarPosition.left.rawValue,
@@ -261,6 +378,11 @@ class NookSettingsService {
             pinnedTabsLookKey: "large",
             didFinishOnboardingKey: false,
             tabLayoutKey: TabLayout.sidebar.rawValue,
+            appearanceModeKey: AppearanceMode.system.rawValue,
+            tabOrganizerEnabledKey: false,
+            tabOrganizerModelDownloadedKey: false,
+            tabOrganizerIdleTimeoutKey: 300.0,
+            sponsorBlockEnabledKey: false,
         ])
 
         // Initialize properties from UserDefaults
@@ -276,10 +398,59 @@ class NookSettingsService {
         } else {
             self.customSearchEngines = []
         }
-        
+
+        if let srData = userDefaults.data(forKey: siteRoutingRulesKey),
+           let decoded = try? JSONDecoder().decode([SiteRoutingRule].self, from: srData) {
+            self.siteRoutingRules = decoded
+        } else {
+            self.siteRoutingRules = []
+        }
+
         // Initialize tab unload timeout
         self.tabUnloadTimeout = userDefaults.double(forKey: tabUnloadTimeoutKey)
+
+        // Initialize tab management mode (with migration from old timeout)
+        let resolvedMode: TabManagementMode
+        if userDefaults.object(forKey: tabManagementModeKey) == nil,
+           let oldTimeout = userDefaults.object(forKey: tabUnloadTimeoutKey) as? Double {
+            if oldTimeout <= 600 {
+                resolvedMode = .powerSaving
+            } else if oldTimeout <= 3600 {
+                resolvedMode = .standard
+            } else {
+                resolvedMode = .performance
+            }
+            userDefaults.set(resolvedMode.rawValue, forKey: tabManagementModeKey)
+        } else {
+            resolvedMode = TabManagementMode(
+                rawValue: userDefaults.string(forKey: tabManagementModeKey) ?? TabManagementMode.standard.rawValue
+            ) ?? .standard
+        }
+        self.tabManagementMode = resolvedMode
+        self.startupLoadMode = StartupLoadMode(
+            rawValue: userDefaults.string(forKey: startupLoadModeKey) ?? ""
+        ) ?? .favoritesAndSpace
         self.blockCrossSiteTracking = userDefaults.bool(forKey: blockXSTKey)
+        self.adBlockerEnabled = userDefaults.bool(forKey: adBlockerEnabledKey)
+        if let wlData = userDefaults.data(forKey: adBlockerWhitelistKey),
+           let decoded = try? JSONDecoder().decode([String].self, from: wlData) {
+            self.adBlockerWhitelist = decoded
+        } else {
+            self.adBlockerWhitelist = []
+        }
+        if let pinnedData = userDefaults.data(forKey: pinnedExtensionIDsKey),
+           let pinnedIDs = try? JSONDecoder().decode([String].self, from: pinnedData) {
+            self.pinnedExtensionIDs = pinnedIDs
+        } else {
+            self.pinnedExtensionIDs = []
+        }
+        self.adBlockerLastUpdate = userDefaults.object(forKey: adBlockerLastUpdateKey) as? Date
+        if let optData = userDefaults.data(forKey: "settings.enabledOptionalFilterLists"),
+           let optDecoded = try? JSONDecoder().decode([String].self, from: optData) {
+            self.enabledOptionalFilterLists = optDecoded
+        } else {
+            self.enabledOptionalFilterLists = []
+        }
         self.debugToggleUpdateNotification = userDefaults.bool(forKey: debugToggleUpdateNotificationKey)
         self.askBeforeQuit = userDefaults.bool(forKey: askBeforeQuitKey)
         self.sidebarPosition = SidebarPosition(rawValue: userDefaults.string(forKey: sidebarPositionKey) ?? "left") ?? SidebarPosition.left
@@ -299,13 +470,37 @@ class NookSettingsService {
         self.showLinkStatusBar = userDefaults.bool(forKey: showLinkStatusBarKey)
         self.pinnedTabsLook = PinnedTabsConfiguration(rawValue: userDefaults.string(forKey: pinnedTabsLookKey) ?? "large") ?? .large
         self.tabLayout = TabLayout(rawValue: userDefaults.string(forKey: tabLayoutKey) ?? TabLayout.sidebar.rawValue) ?? .sidebar
+        self.appearanceMode = AppearanceMode(rawValue: userDefaults.string(forKey: appearanceModeKey) ?? AppearanceMode.system.rawValue) ?? .system
         self.didFinishOnboarding = userDefaults.bool(forKey: didFinishOnboardingKey)
+        self.tabOrganizerEnabled = userDefaults.bool(forKey: tabOrganizerEnabledKey)
+        self.tabOrganizerModelDownloaded = userDefaults.bool(forKey: tabOrganizerModelDownloadedKey)
+        self.tabOrganizerIdleTimeout = userDefaults.double(forKey: tabOrganizerIdleTimeoutKey)
+        self.sponsorBlockEnabled = userDefaults.bool(forKey: sponsorBlockEnabledKey)
+        if let sbData = userDefaults.data(forKey: sponsorBlockCategoryOptionsKey),
+           let sbDecoded = try? JSONDecoder().decode([String: String].self, from: sbData) {
+            self.sponsorBlockCategoryOptions = sbDecoded
+        } else {
+            self.sponsorBlockCategoryOptions = SponsorBlockCategory.defaultCategoryOptions
+        }
 
         if let data = userDefaults.data(forKey: siteSearchEntriesKey),
            let decoded = try? JSONDecoder().decode([SiteSearchEntry].self, from: data) {
             self.siteSearchEntries = decoded
         } else {
             self.siteSearchEntries = SiteSearchEntry.defaultSites
+        }
+    }
+
+    /// Call once after ExtensionManager is ready on first launch to pin all existing extensions.
+    func migrateExtensionPinStateIfNeeded(installedExtensionIDs: [String]) {
+        let migrationKey = "settings.pinnedExtensionIDsMigrated"
+        guard !userDefaults.bool(forKey: migrationKey) else { return }
+        userDefaults.set(true, forKey: migrationKey)
+
+        // Pin all currently installed extensions so existing users
+        // see the same URL bar they had before the library button was added
+        if pinnedExtensionIDs.isEmpty {
+            pinnedExtensionIDs = installedExtensionIDs
         }
     }
 }
@@ -398,7 +593,11 @@ public enum OpenRouterModel: String, CaseIterable, Identifiable {
 // MARK: - Notification Names
 extension Notification.Name {
     static let tabUnloadTimeoutChanged = Notification.Name("tabUnloadTimeoutChanged")
+    static let tabManagementModeChanged = Notification.Name("tabManagementModeChanged")
     static let blockCrossSiteTrackingChanged = Notification.Name("blockCrossSiteTrackingChanged")
+    static let appearanceModeChanged = Notification.Name("appearanceModeChanged")
+    static let adBlockerEnabledChanged = Notification.Name("adBlockerEnabledChanged")
+    static let adBlockerStateChanged = Notification.Name("adBlockerStateChanged")
 }
 
 // MARK: - Environment Key
@@ -445,6 +644,30 @@ public func nameForMaterial(_ material: NSVisualEffectView.Material) -> String {
 
 // MARK: - Tab Layout
 
+public enum AppearanceMode: String, CaseIterable, Identifiable {
+    case system
+    case light
+    case dark
+
+    public var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .system: return "System"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        }
+    }
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+}
+
 public enum TabLayout: String, CaseIterable, Identifiable {
     case sidebar
     case topOfWindow
@@ -455,6 +678,109 @@ public enum TabLayout: String, CaseIterable, Identifiable {
         switch self {
         case .sidebar: return "Sidebar"
         case .topOfWindow: return "Top of Window"
+        }
+    }
+}
+
+// MARK: - Tab Management Mode
+
+public enum TabManagementMode: String, CaseIterable, Identifiable {
+    case powerSaving
+    case standard
+    case performance
+
+    public var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .powerSaving: return "Power Saving"
+        case .standard: return "Standard"
+        case .performance: return "Performance"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .powerSaving: return "Aggressively unloads tabs to minimize memory and battery usage. Best for laptops on battery."
+        case .standard: return "Balanced tab management for everyday browsing."
+        case .performance: return "Keeps tabs loaded longer for power users with many tabs open."
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .powerSaving: return "leaf.fill"
+        case .standard: return "speedometer"
+        case .performance: return "bolt.fill"
+        }
+    }
+
+    var unloadTimeout: TimeInterval {
+        switch self {
+        case .powerSaving: return 300       // 5 minutes
+        case .standard: return 1800         // 30 minutes
+        case .performance: return 14400     // 4 hours
+        }
+    }
+
+    var maxLoadedTabs: Int? {
+        switch self {
+        case .powerSaving: return 8
+        case .standard: return nil
+        case .performance: return nil
+        }
+    }
+
+    var unloadsOnBackground: Bool {
+        switch self {
+        case .powerSaving: return true
+        case .standard: return false
+        case .performance: return false
+        }
+    }
+
+    /// Number of tabs to keep loaded (in addition to current) under memory pressure.
+    /// nil means use fraction-based approach instead.
+    var memoryPressureKeepCount: Int? {
+        switch self {
+        case .powerSaving: return 2
+        case .standard: return nil
+        case .performance: return nil
+        }
+    }
+
+    /// Fraction of loaded tabs to unload under memory pressure (used when keepCount is nil).
+    var memoryPressureUnloadFraction: Double {
+        switch self {
+        case .powerSaving: return 1.0  // Not used — keepCount takes precedence for powerSaving
+        case .standard: return 0.5
+        case .performance: return 0.25
+        }
+    }
+}
+
+// MARK: - Startup Load Mode
+
+public enum StartupLoadMode: String, CaseIterable, Identifiable {
+    case nothing
+    case favorites
+    case favoritesAndSpace
+
+    public var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .nothing: return "Last Tab Only"
+        case .favorites: return "Last Tab & Favorites"
+        case .favoritesAndSpace: return "Last Tab, Favorites & Space"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .nothing: return "Only your last open tab is loaded. Other tabs load when selected."
+        case .favorites: return "Your last open tab and favorites are loaded on start. Space tabs load when selected."
+        case .favoritesAndSpace: return "Your last open tab, favorites, and current space tabs are loaded on start."
         }
     }
 }

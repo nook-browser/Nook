@@ -10,6 +10,7 @@ import SwiftUI
 
 struct SpacesList: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var tabManager: TabManager
     @Environment(BrowserWindowState.self) private var windowState
     @State private var availableWidth: CGFloat = 0
     @State private var hoveredSpaceId: UUID?
@@ -19,7 +20,7 @@ struct SpacesList: View {
     private var layoutMode: SpacesListLayoutMode {
         let spaces = windowState.isIncognito
             ? windowState.ephemeralSpaces
-            : browserManager.tabManager.spaces
+            : tabManager.spaces
         return SpacesListLayoutMode.determine(
             spacesCount: spaces.count,
             availableWidth: availableWidth
@@ -30,7 +31,7 @@ struct SpacesList: View {
         if windowState.isIncognito {
             return windowState.ephemeralSpaces
         }
-        return browserManager.tabManager.spaces
+        return tabManager.spaces
     }
 
     var body: some View {
@@ -74,14 +75,14 @@ struct SpacesList: View {
                                 removal: .scale.combined(with: .opacity)
                             ))
                             
-                            if index != Array(visibleSpaces.enumerated()).count - 1{
+                            if index != visibleSpaces.count - 1 {
                                 Spacer()
                                     .frame(minWidth: 1, maxWidth: 8)
                                     .layoutPriority(-1)
                             }
                         }
                     }
-                    .onHover { hovering in
+                    .onHoverTracking { hovering in
                         isHoveringList = hovering
                         if !hovering {
                             showPreview = false
@@ -105,7 +106,6 @@ struct SpacesList: View {
                     }
             }
             .animation(.easeInOut(duration: 0.3), value: visibleSpaces.count)
-            .animation(.easeInOut(duration: 0.3), value: visibleSpaces.map(\.id))
     }
 
     private var previewTextColor: Color {

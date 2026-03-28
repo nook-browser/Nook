@@ -52,6 +52,10 @@ class NookDragPreviewWindow: NSWindow {
             .receive(on: RunLoop.main)
             .sink { [weak self] (show: Bool) in
                 if show {
+                    // Position at cursor before showing to prevent flash at screen origin
+                    if let mgr = self?.manager {
+                        self?.updatePosition(screenPoint: mgr.cursorScreenLocation)
+                    }
                     self?.orderFront(nil)
                 } else {
                     self?.orderOut(nil)
@@ -59,7 +63,7 @@ class NookDragPreviewWindow: NSWindow {
             }
             .store(in: &cancellables)
 
-        manager.$cursorScreenLocation
+        manager.cursorScreenLocationSubject
             .receive(on: RunLoop.main)
             .sink { [weak self] screenPoint in
                 self?.updatePosition(screenPoint: screenPoint)

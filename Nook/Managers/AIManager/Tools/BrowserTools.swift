@@ -161,6 +161,6 @@ enum BrowserTools {
     ]
 
     static let toolsByName: [String: AIToolDefinition] = {
-        Dictionary(uniqueKeysWithValues: allTools.map { ($0.name, $0) })
+        Dictionary(allTools.map { ($0.name, $0) }, uniquingKeysWith: { _, latest in latest })
     }()
 }

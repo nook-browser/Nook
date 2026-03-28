@@ -20,177 +20,106 @@ struct PrivacySettingsView: View {
     var body: some View {
         @Bindable var settings = nookSettings
 
-        return
-        VStack(alignment: .leading, spacing: 20) {
-            // Cookie Management Section
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Cookie Management")
-                    .font(.headline)
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    cookieStatsView
-                    
-                    HStack {
-                        Button("Manage Cookies") {
-                            showingCookieManager = true
-                        }
-                        .buttonStyle(.bordered)
-                        
-                        Menu("Clear Data") {
-                            Button("Clear Expired Cookies") {
-                                clearExpiredCookies()
-                            }
-                            
-                            Button("Clear Third-Party Cookies") {
-                                clearThirdPartyCookies()
-                            }
-                            
-                            Button("Clear High-Risk Cookies") {
-                                clearHighRiskCookies()
-                            }
-                            
-                            Divider()
-                            
-                            Button("Clear All Cookies") {
-                                clearAllCookies()
-                            }
-                            
-                            Button("Privacy Cleanup") {
-                                performCookiePrivacyCleanup()
-                            }
-                            
-                            Divider()
-                            
-                            Button("Clear All Website Data", role: .destructive) {
-                                clearAllWebsiteData()
-                            }
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(isClearing)
-                        
-                        if isClearing {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                        }
-                    }
-                }
-                .padding()
-                .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(8)
-            }
-            
-            Divider()
-            
-            // Cache Management Section
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Cache Management")
-                    .font(.headline)
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    cacheStatsView
-                    
-                    HStack {
-                        Button("Manage Cache") {
-                            showingCacheManager = true
-                        }
-                        .buttonStyle(.bordered)
-                        
-                        Menu("Clear Cache") {
-                            Button("Clear Stale Cache") {
-                                clearStaleCache()
-                            }
-                            
-                            Button("Clear Personal Data Cache") {
-                                clearPersonalDataCache()
-                            }
-                            
-                            Button("Clear Disk Cache") {
-                                clearDiskCache()
-                            }
-                            
-                            Button("Clear Memory Cache") {
-                                clearMemoryCache()
-                            }
-                            
-                            Divider()
-                            
-                            Button("Privacy Cleanup") {
-                                performCachePrivacyCleanup()
-                            }
-                            
-                            Divider()
-                            
-                            Button("Clear All Cache", role: .destructive) {
-                                clearAllCache()
-                            }
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(isClearing)
-                        
-                        if isClearing {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                        }
-                    }
-                }
-                .padding()
-                .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(8)
-            }
-            
-            Divider()
-            
-            // Privacy Controls Section
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Privacy Controls")
-                    .font(.headline)
+        Form {
+            Section("Cookie Management") {
+                cookieStatsView
 
-                VStack(alignment: .leading, spacing: 8) {
-                    // Activated: Block cross‑site tracking via content rules + iframe cookie shim
-                    Toggle("Block Cross-Site Tracking", isOn: $settings.blockCrossSiteTracking)
-                        .onChange(of: nookSettings.blockCrossSiteTracking) { _, enabled in
-                            browserManager.trackingProtectionManager.setEnabled(enabled)
-                        }
-
-                    // Placeholders for future refinements
-                    Toggle("Block Third-Party Cookies", isOn: .constant(false))
-                        .disabled(true)
-                    Toggle("Prevent Cross-Site Tracking (ITP)", isOn: .constant(false))
-                        .disabled(true)
-                }
-                .padding()
-                .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(8)
-            }
-            
-            Divider()
-            
-            // Website Data Section
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Website Data")
-                    .font(.headline)
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    Button("Clear Browsing History") {
-                        clearBrowsingHistory()
+                HStack {
+                    Button("Manage Cookies") {
+                        showingCookieManager = true
                     }
                     .buttonStyle(.bordered)
-                    
-                    Button("Clear Cache") {
-                        clearCache()
+
+                    Menu("Clear Data") {
+                        Button("Clear Expired Cookies") {
+                            clearExpiredCookies()
+                        }
+                        Button("Clear Third-Party Cookies") {
+                            clearThirdPartyCookies()
+                        }
+                        Button("Clear High-Risk Cookies") {
+                            clearHighRiskCookies()
+                        }
+                        Divider()
+                        Button("Clear All Cookies") {
+                            clearAllCookies()
+                        }
+                        Button("Privacy Cleanup") {
+                            performCookiePrivacyCleanup()
+                        }
+                        Divider()
+                        Button("Clear All Website Data", role: .destructive) {
+                            clearAllWebsiteData()
+                        }
                     }
                     .buttonStyle(.bordered)
-                    
-                                    }
-                .padding()
-                .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(8)
+                    .disabled(isClearing)
+
+                    if isClearing {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                }
             }
-            
-            Spacer()
+
+            Section("Cache Management") {
+                cacheStatsView
+
+                HStack {
+                    Button("Manage Cache") {
+                        showingCacheManager = true
+                    }
+                    .buttonStyle(.bordered)
+
+                    Menu("Clear Cache") {
+                        Button("Clear Stale Cache") {
+                            clearStaleCache()
+                        }
+                        Button("Clear Personal Data Cache") {
+                            clearPersonalDataCache()
+                        }
+                        Button("Clear Disk Cache") {
+                            clearDiskCache()
+                        }
+                        Button("Clear Memory Cache") {
+                            clearMemoryCache()
+                        }
+                        Divider()
+                        Button("Privacy Cleanup") {
+                            performCachePrivacyCleanup()
+                        }
+                        Divider()
+                        Button("Clear All Cache", role: .destructive) {
+                            clearAllCache()
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(isClearing)
+
+                    if isClearing {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                }
+            }
+
+            Section("Privacy Controls") {
+                Toggle("Block Cross-Site Tracking", isOn: $settings.blockCrossSiteTracking)
+                    .onChange(of: nookSettings.blockCrossSiteTracking) { _, enabled in
+                        browserManager.contentBlockerManager.setEnabled(enabled)
+                    }
+            }
+
+            Section("Website Data") {
+                Button("Clear Browsing History") {
+                    clearBrowsingHistory()
+                }
+                Button("Clear Cache") {
+                    clearCache()
+                }
+            }
         }
-        .padding()
-        .frame(minWidth: 520, minHeight: 360)
+        .formStyle(.grouped)
         .onAppear {
             Task {
                 await cookieManager.loadCookies()

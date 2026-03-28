@@ -22,6 +22,7 @@ struct SidebarResizeView: View {
 
     private let minWidth: CGFloat = 180
     private let maxWidth: CGFloat = 520
+    private let defaultWidth: CGFloat = 250
 
     private var sitsOnRight: Bool {
         nookSettings.sidebarPosition == .right
@@ -54,7 +55,13 @@ struct SidebarResizeView: View {
                 .padding(.vertical, 30)
                 .offset(x: hitAreaOffset)
                 .contentShape(.interaction, .rect)
-                .onHover { hovering in
+                .onTapGesture(count: 2) {
+                    guard windowState.isSidebarVisible else { return }
+                    withAnimation(.spring(response: 0.2, dampingFraction: 0.85)) {
+                        browserManager.updateSidebarWidth(defaultWidth, for: windowState)
+                    }
+                }
+                .onHoverTracking { hovering in
                     guard windowState.isSidebarVisible else { return }
 
                     hoverTask?.cancel()
@@ -74,13 +81,12 @@ struct SidebarResizeView: View {
                     }
                 }
                 .gesture(
-                    DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                    DragGesture(minimumDistance: 2, coordinateSpace: .global)
                         .onChanged { value in
                             guard windowState.isSidebarVisible else { return }
 
                             if !isResizing {
                                 guard dragLockManager.startDrag(ownerID: dragSessionID) else {
-                                    print("🚫 [SidebarResizeView] Resize drag blocked - \(dragLockManager.debugInfo)")
                                     return
                                 }
 

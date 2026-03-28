@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import UniversalGlass
 
 /// A reusable toast container that provides standardized visual styling.
 /// Use with `.transition(.toast)` and `.animation(.smooth(duration: 0.25), value: condition)` in parent.
@@ -23,10 +22,7 @@ struct ToastView<Content: View>: View {
             .fixedSize(horizontal: true, vertical: false)
             .background(Color(.windowBackgroundColor).opacity(0.35))
             .clipShape(RoundedRectangle(cornerRadius: 16))
-            .universalGlassEffect(
-                .regular.tint(Color(.windowBackgroundColor).opacity(0.35)),
-                in: .rect(cornerRadius: 16)
-            )
+            .nookGlassEffect(in: .rect(cornerRadius: 16))
             .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 2)
     }
 }

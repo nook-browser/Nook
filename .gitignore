@@ -112,3 +112,4 @@ DerivedData/
 *.xcresult
 *.log
 *.profraw
+.superpowers/

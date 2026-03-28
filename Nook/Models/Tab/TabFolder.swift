@@ -18,6 +18,7 @@ public class TabFolder: NSObject, Identifiable, ObservableObject {
     @Published var icon: String = "folder"
     @Published var index: Int
     @Published var color: NSColor
+    var isRegular: Bool = false
 
     init(
         id: UUID = UUID(),
@@ -25,7 +26,8 @@ public class TabFolder: NSObject, Identifiable, ObservableObject {
         spaceId: UUID,
         icon: String = "folder",
         color: NSColor = .controlAccentColor,
-        index: Int = 0
+        index: Int = 0,
+        isRegular: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -33,6 +35,7 @@ public class TabFolder: NSObject, Identifiable, ObservableObject {
         self.icon = icon
         self.color = color
         self.index = index
+        self.isRegular = isRegular
         super.init()
     }
 }

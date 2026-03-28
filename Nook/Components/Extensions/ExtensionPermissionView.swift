@@ -15,6 +15,7 @@ struct ExtensionPermissionView: View {
     let optionalPermissions: [String]
     let requestedHostPermissions: [String]
     let optionalHostPermissions: [String]
+    var isRuntimeRequest: Bool = false
     let onGrant: () -> Void
     let onDeny: () -> Void
     let extensionLogo: NSImage
@@ -40,7 +41,9 @@ struct ExtensionPermissionView: View {
                 
             
             }
-            Text("Add the \"\(extensionName)\"extension to Nook?")
+            Text(isRuntimeRequest
+                 ? "\"\(extensionName)\" wants additional permissions"
+                 : "Add the \"\(extensionName)\" extension to Nook?")
                 .font(.system(size: 16, weight: .semibold))
             
             Text("It can:")
@@ -59,7 +62,7 @@ struct ExtensionPermissionView: View {
                     onDeny()
                 }
                 Spacer()
-                Button("Add Extension") {
+                Button(isRuntimeRequest ? "Allow" : "Add Extension") {
                     onGrant()
                 }
             }

@@ -87,7 +87,7 @@ final class SplitViewManager: ObservableObject {
 
     /// Keep legacy published properties aligned with the active window's state
     private func syncPublishedStateIfNeeded(for windowId: UUID) {
-        guard let bm = browserManager, windowRegistry?.activeWindow?.id == windowId else { return }
+        guard browserManager != nil, windowRegistry?.activeWindow?.id == windowId else { return }
         updatePublishedState(from: getSplitState(for: windowId))
     }
 
@@ -130,7 +130,6 @@ final class SplitViewManager: ObservableObject {
             browserManager?.refreshCompositor(for: windowState)
         }
         
-        print("🪟 [SplitViewManager] Entered split mode for window \(windowId)")
     }
     
     /// Exit split mode for a specific window
@@ -152,7 +151,6 @@ final class SplitViewManager: ObservableObject {
             browserManager?.refreshCompositor(for: windowState)
         }
         
-        print("🪟 [SplitViewManager] Exited split mode for window \(windowId), keeping \(keep)")
     }
     
     /// Close a pane in a specific window
@@ -177,10 +175,9 @@ final class SplitViewManager: ObservableObject {
 
     func cleanupWindow(_ windowId: UUID) {
         windowSplitStates.removeValue(forKey: windowId)
-        if let bm = browserManager, windowRegistry?.activeWindow?.id == windowId {
+        if browserManager != nil, windowRegistry?.activeWindow?.id == windowId {
             updatePublishedState(from: WindowSplitState())
         }
-        print("🪟 [SplitViewManager] Cleaned up split state for window \(windowId)")
     }
     
     /// Handle tab closure to prevent "zombie split" state
@@ -189,10 +186,8 @@ final class SplitViewManager: ObservableObject {
         for (windowId, state) in windowSplitStates {
             if state.isSplit {
                 if state.leftTabId == tabId {
-                    print("🪟 [SplitViewManager] Closing left pane for window \(windowId) due to tab closure")
                     exitSplit(keep: .right, for: windowId)
                 } else if state.rightTabId == tabId {
-                    print("🪟 [SplitViewManager] Closing right pane for window \(windowId) due to tab closure")
                     exitSplit(keep: .left, for: windowId)
                 }
             }
@@ -348,17 +343,17 @@ final class SplitViewManager: ObservableObject {
     }
 
     func exitSplit(keep side: Side = .left) {
-        guard let bm = browserManager, let activeWindow = windowRegistry?.activeWindow else { return }
+        guard browserManager != nil, let activeWindow = windowRegistry?.activeWindow else { return }
         exitSplit(keep: side, for: activeWindow.id)
     }
 
     func closePane(_ side: Side) {
-        guard let bm = browserManager, let activeWindow = windowRegistry?.activeWindow else { return }
+        guard browserManager != nil, let activeWindow = windowRegistry?.activeWindow else { return }
         closePane(side, for: activeWindow.id)
     }
 
     func swapSides() {
-        guard let bm = browserManager, let activeWindow = windowRegistry?.activeWindow else { return }
+        guard browserManager != nil, let activeWindow = windowRegistry?.activeWindow else { return }
         swapSides(for: activeWindow.id)
     }
     
@@ -378,7 +373,6 @@ final class SplitViewManager: ObservableObject {
             browserManager?.refreshCompositor(for: windowState)
         }
         
-        print("🪟 [SplitViewManager] Swapped sides for window \(windowId)")
     }
 
     func exitSplitCompletely() {
@@ -391,12 +385,12 @@ final class SplitViewManager: ObservableObject {
 
     // MARK: - Preview during drag-over
     func beginPreview(side: Side) {
-        guard let bm = browserManager, let windowState = windowRegistry?.activeWindow else { return }
+        guard browserManager != nil, let windowState = windowRegistry?.activeWindow else { return }
         beginPreview(side: side, for: windowState.id)
     }
 
     func endPreview(cancel: Bool) {
-        guard let bm = browserManager, let windowState = windowRegistry?.activeWindow else { return }
+        guard browserManager != nil, let windowState = windowRegistry?.activeWindow else { return }
         endPreview(cancel: cancel, for: windowState.id)
     }
 

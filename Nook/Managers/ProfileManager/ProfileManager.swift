@@ -38,7 +38,6 @@ final class ProfileManager: ObservableObject {
             let actual = entities.map { $0.index }
             if actual != expected { persistProfiles() }
         } catch {
-            print("[ProfileManager] Failed to load profiles: \(error)")
             self.profiles = []
         }
     }
@@ -51,7 +50,7 @@ final class ProfileManager: ObservableObject {
         let profile = Profile(name: name, icon: icon)
         let entity = ProfileEntity(id: profile.id, name: name, icon: icon, index: nextIndex)
         context.insert(entity)
-        do { try context.save() } catch { print("[ProfileManager] Save failed during create: \(error)") }
+        do { try context.save() } catch { }
         profiles.append(profile)
         return profile
     }
@@ -67,7 +66,6 @@ final class ProfileManager: ObservableObject {
             }
             try context.save()
         } catch {
-            print("[ProfileManager] Delete failed: \(error)")
             return false
         }
         // Remove from runtime and reindex
@@ -82,7 +80,7 @@ final class ProfileManager: ObservableObject {
         do {
             // Fetch all existing entities
             let all = try context.fetch(FetchDescriptor<ProfileEntity>())
-            var byId: [UUID: ProfileEntity] = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
+            var byId: [UUID: ProfileEntity] = Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest })
 
             // Update or insert to match runtime profiles order
             for (index, p) in profiles.enumerated() {
@@ -101,7 +99,6 @@ final class ProfileManager: ObservableObject {
             for (id, e) in byId where !keep.contains(id) { context.delete(e) }
             try context.save()
         } catch {
-            print("[ProfileManager] Persist failed: \(error)")
         }
     }
 
@@ -117,7 +114,6 @@ final class ProfileManager: ObservableObject {
     func createEphemeralProfile(for windowId: UUID) -> Profile {
         let profile = Profile.createEphemeral()
         ephemeralProfiles[windowId] = profile
-        print("🔒 [ProfileManager] Created ephemeral profile for window: \(windowId)")
         return profile
     }
     
@@ -126,7 +122,6 @@ final class ProfileManager: ObservableObject {
     func removeEphemeralProfile(for windowId: UUID) async {
         guard let profile = ephemeralProfiles[windowId] else { return }
         
-        print("🔒 [ProfileManager] Removing ephemeral profile: \(profile.id) for window: \(windowId)")
         
         // Remove from tracking immediately to stop tracking
         ephemeralProfiles.removeValue(forKey: windowId)
@@ -144,7 +139,6 @@ final class ProfileManager: ObservableObject {
             Task {
                 try? await Task.sleep(nanoseconds: 5_000_000_000)
                 if !resumed {
-                    print("⚠️ [ProfileManager] Timeout destroying ephemeral data store for: \(profile.id)")
                     resumeSafely()
                 }
             }
@@ -154,7 +148,6 @@ final class ProfileManager: ObservableObject {
             }
         }
         
-        print("🔒 [ProfileManager] Ephemeral profile removed: \(profile.id) for window: \(windowId)")
     }
     
     /// Get ephemeral profile for a window

@@ -137,7 +137,7 @@ private struct SpaceEditContent: View {
                     .background(EmojiPickerAnchor(manager: emojiManager))
                     .buttonStyle(PlainButtonStyle())
 
-                    Text("Choose an emoji or symbol to represent this space")
+                    Text("Choose an icon to represent this space")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.secondary)
                         .lineLimit(2)

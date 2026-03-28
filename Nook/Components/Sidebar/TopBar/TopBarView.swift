@@ -50,9 +50,6 @@ struct TopBarView: View {
                     urlBar
 
                     Spacer()
-                    
-                    extensionsView
-
 
                     if browserManager.nookSettings?.showAIAssistant ?? false
                         && !windowState.isSidebarAIChatVisible
@@ -139,20 +136,6 @@ struct TopBarView: View {
         }
     }
 
-    private var extensionsView: some View {
-        HStack(spacing: 4) {
-            if let extensionManager = browserManager.extensionManager {
-                ExtensionActionView(
-                    extensions: extensionManager.installedExtensions
-                )
-                .environmentObject(browserManager)
-            }
-
-        }
-
-
-    }
-
     private var navigationControls: some View {
         HStack(spacing: 4) {
             Button("Go Back", systemImage: "chevron.backward", action: goBack)
@@ -193,11 +176,16 @@ struct TopBarView: View {
                 )
             }
 
-            Button(
-                "Reload",
-                systemImage: "arrow.clockwise",
-                action: refreshCurrentTab
-            )
+            Button {
+                if tabWrapper.tab?.isLoading == true {
+                    tabWrapper.tab?.stop()
+                } else {
+                    refreshCurrentTab()
+                }
+            } label: {
+                Image(systemName: tabWrapper.tab?.isLoading == true ? "xmark" : "arrow.clockwise")
+                    .contentTransition(.symbolEffect(.replace))
+            }
             .labelStyle(.iconOnly)
             .buttonStyle(NavButtonStyle())
             .foregroundStyle(navButtonColor)
@@ -211,13 +199,43 @@ struct TopBarView: View {
     private var urlBar: some View {
         HStack(spacing: 8) {
             if browserManager.currentTab(for: windowState) != nil {
+                // URL text area — tappable to open command palette
                 Text(displayURL)
                     .font(.system(size: 13, weight: .medium, design: .default))
                     .foregroundStyle(urlBarTextColor)
                     .tracking(-0.1)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                Spacer()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if let currentTab = browserManager.currentTab(for: windowState) {
+                            commandPalette.openWithCurrentURL(currentTab.url)
+                        } else {
+                            commandPalette.open()
+                        }
+                    }
+
+                // Pinned extension buttons + library button (not covered by tap gesture)
+                if #available(macOS 15.5, *),
+                   let extensionManager = browserManager.extensionManager {
+                    let pinnedIDs = browserManager.nookSettings?.pinnedExtensionIDs ?? []
+                    let pinnedExtensions = extensionManager.installedExtensions.filter { pinnedIDs.contains($0.id) }
+
+                    if !pinnedExtensions.isEmpty {
+                        ExtensionActionView(extensions: pinnedExtensions)
+                            .environmentObject(browserManager)
+                    }
+
+                    ExtensionLibraryButton()
+                        .environmentObject(browserManager)
+                        .onAppear {
+                            let installedIDs = extensionManager.installedExtensions
+                                .filter { $0.isEnabled }
+                                .map { $0.id }
+                            browserManager.nookSettings?.migrateExtensionPinStateIfNeeded(installedExtensionIDs: installedIDs)
+                        }
+                }
             } else {
                 EmptyView()
             }
@@ -230,14 +248,7 @@ struct TopBarView: View {
             value: urlBarBackgroundColor
         )
         .clipShape(RoundedRectangle(cornerRadius: 8))
-        .onTapGesture {
-            if let currentTab = browserManager.currentTab(for: windowState) {
-                commandPalette.openWithCurrentURL(currentTab.url)
-            } else {
-                commandPalette.open()
-            }
-        }
-        .onHover { hovering in
+        .onHoverTracking { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovering = hovering
             }
@@ -554,7 +565,7 @@ struct ChatButton: View {
             )
         }
         .buttonStyle(.plain)
-        .onHover { state in
+        .onHoverTracking { state in
             isHovered = state
         }
 

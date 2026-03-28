@@ -27,12 +27,31 @@ class BrowserToolExecutor {
         BrowserTools.allTools.filter { enabledTools.contains($0.name) }
     }
 
+    /// Callback for requesting user confirmation before executing dangerous tools.
+    /// Set by AIService to route through the standard approval UI.
+    var confirmationHandler: ((_ toolName: String, _ args: [String: Any]) async -> Bool)?
+
     // MARK: - Execute Tool Call
 
     func execute(_ toolCall: AIToolCall) async throws -> AIToolResult {
         guard let browserManager = browserManager,
               let windowState = windowState else {
             return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: "Browser not available", isError: true)
+        }
+
+        // SECURITY: executeJavaScript ALWAYS requires user confirmation regardless of execution mode,
+        // because it can run arbitrary code on the current page.
+        if toolCall.name == "executeJavaScript" {
+            if let handler = confirmationHandler {
+                let approved = await handler(toolCall.name, toolCall.arguments)
+                if !approved {
+                    Self.log.warning("User denied executeJavaScript execution")
+                    return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: "User denied execution of executeJavaScript.", isError: true)
+                }
+            } else {
+                Self.log.error("executeJavaScript called without a confirmation handler — denying by default")
+                return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: "executeJavaScript requires user confirmation but no confirmation handler is available.", isError: true)
+            }
         }
 
         let result: String
@@ -110,9 +129,10 @@ class BrowserToolExecutor {
 
         let script: String
         if let selector = selector {
+            let selectorJSON = String(data: try JSONSerialization.data(withJSONObject: selector), encoding: .utf8) ?? "\"\""
             script = """
             (function() {
-                const el = document.querySelector('\(selector.replacingOccurrences(of: "'", with: "\\'"))');
+                const el = document.querySelector(\(selectorJSON));
                 if (!el) return { error: 'Element not found' };
                 return {
                     title: document.title,
@@ -155,11 +175,12 @@ class BrowserToolExecutor {
 
         // Support clicking by CSS selector OR by visible text
         if let selector = args["selector"] as? String, !selector.isEmpty {
-            let escapedSelector = selector.replacingOccurrences(of: "'", with: "\\'")
+            let selectorJSON = String(data: try JSONSerialization.data(withJSONObject: selector), encoding: .utf8) ?? "\"\""
             let script = """
             (function() {
-                const el = document.querySelector('\(escapedSelector)');
-                if (!el) return 'Element not found: \(escapedSelector)';
+                const sel = \(selectorJSON);
+                const el = document.querySelector(sel);
+                if (!el) return 'Element not found: ' + sel;
                 el.scrollIntoView({block: 'center'});
                 el.click();
                 return 'Clicked element: ' + (el.textContent || '').substring(0, 100).trim();
@@ -168,13 +189,10 @@ class BrowserToolExecutor {
             let result = try await webView.evaluateJavaScript(script)
             return result as? String ?? "Click executed"
         } else if let text = args["text"] as? String, !text.isEmpty {
-            let escapedText = text
-                .replacingOccurrences(of: "\\", with: "\\\\")
-                .replacingOccurrences(of: "'", with: "\\'")
-                .replacingOccurrences(of: "\n", with: "\\n")
+            let textJSON = String(data: try JSONSerialization.data(withJSONObject: text), encoding: .utf8) ?? "\"\""
             let script = """
             (function() {
-                const query = '\(escapedText)'.toLowerCase();
+                const query = \(textJSON).toLowerCase();
                 const candidates = document.querySelectorAll('a, button, input[type="submit"], input[type="button"], [role="button"], [onclick], [tabindex]');
                 let best = null;
                 let bestScore = Infinity;
@@ -212,13 +230,11 @@ class BrowserToolExecutor {
 
         let filter = args["filter"] as? String ?? ""
         let limit = args["limit"] as? Int ?? 50
-        let escapedFilter = filter
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "'", with: "\\'")
+        let filterJSON = String(data: (try? JSONSerialization.data(withJSONObject: filter)) ?? Data("\"\"".utf8), encoding: .utf8) ?? "\"\""
 
         let script = """
         (function() {
-            const filter = '\(escapedFilter)'.toLowerCase();
+            const filter = \(filterJSON).toLowerCase();
             const limit = \(limit);
             const selectors = 'a[href], button, input, select, textarea, [role="button"], [role="link"], [role="menuitem"], [onclick], [tabindex]';
             const elements = document.querySelectorAll(selectors);
@@ -372,11 +388,11 @@ class BrowserToolExecutor {
             return "No active tab"
         }
 
-        let escapedQuery = query.replacingOccurrences(of: "'", with: "\\'").replacingOccurrences(of: "\\", with: "\\\\")
+        let queryJSON = String(data: (try? JSONSerialization.data(withJSONObject: query)) ?? Data("\"\"".utf8), encoding: .utf8) ?? "\"\""
         let script = """
         (function() {
             const text = document.body.innerText;
-            const query = '\(escapedQuery)'.toLowerCase();
+            const query = \(queryJSON).toLowerCase();
             const matches = [];
             let idx = text.toLowerCase().indexOf(query);
             while (idx !== -1 && matches.length < 10) {
