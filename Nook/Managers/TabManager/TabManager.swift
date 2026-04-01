@@ -2506,13 +2506,17 @@ extension TabManager {
             }
         }
 
-        // Inform the extension controller about existing tabs and the active tab
+        // Inform the extension controller about existing tabs and the active tab.
+        // Only notify tabs that have webviews — tabs without webviews (lazy loaded)
+        // will self-register via notifyTabOpened() when their webview is created in
+        // Tab.setupWebView(). Registering tabs with nil webviews causes the controller
+        // to cache stale state, breaking chrome.runtime messaging.
         if #available(macOS 15.5, *) {
-            for t in allTabs() where t.didNotifyOpenToExtensions == false {
+            for t in allTabs() where t.didNotifyOpenToExtensions == false && !t.isUnloaded {
                 ExtensionManager.shared.notifyTabOpened(t)
                 t.didNotifyOpenToExtensions = true
             }
-            if let current = self.currentTab {
+            if let current = self.currentTab, !current.isUnloaded {
                 ExtensionManager.shared.notifyTabActivated(newTab: current, previous: nil)
             }
         }

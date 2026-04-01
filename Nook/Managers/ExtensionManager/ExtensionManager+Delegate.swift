@@ -44,19 +44,8 @@ extension ExtensionManager {
 
         Self.logger.debug("Granted \(extensionContext.currentPermissions.count) permissions for '\(extName, privacy: .public)'")
 
-        // Ensure background service worker is alive before showing the popup.
-        // MV3 workers auto-terminate after ~5 min of inactivity; if the popup
-        // tries chrome.runtime.sendMessage and the worker is dead, it hangs forever.
-        if extensionContext.webExtension.hasBackgroundContent {
-            Task { @MainActor in
-                do {
-                    try await extensionContext.loadBackgroundContent()
-                    Self.logger.debug("Background worker alive for '\(extName, privacy: .public)'")
-                } catch {
-                    Self.logger.error("Failed to wake background worker for '\(extName, privacy: .public)': \(error.localizedDescription, privacy: .public)")
-                }
-            }
-        }
+        // Background worker is already awaited by ExtensionActionView.showExtensionPopup()
+        // before performAction() is called. No need to double-wake here.
 
         guard let popover = action.popupPopover else {
             Self.logger.error("No popover available on action for '\(extName, privacy: .public)'")
@@ -90,8 +79,10 @@ extension ExtensionManager {
 
             Self.logger.debug("Popup webView: URL=\(webView.url?.absoluteString ?? "nil", privacy: .public), isLoading=\(webView.isLoading)")
 
-            // The popup webview is created by WKWebExtension with a URL set but not
-            // always loading. Explicitly trigger the load to ensure the popup renders.
+            // Only trigger a load if WebKit hasn't started loading the popup yet.
+            // Permissions are now granted in showExtensionPopup() BEFORE performAction(),
+            // so the popup's initial load already has full permissions. We only need
+            // to kick-start the load if WebKit created the webview without loading it.
             if !webView.isLoading, let popupURL = webView.url {
                 webView.load(URLRequest(url: popupURL))
             }

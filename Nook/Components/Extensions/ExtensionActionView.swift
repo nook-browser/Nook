@@ -117,20 +117,51 @@ struct ExtensionActionButton: View {
             return
         }
 
-        // Wake background worker before triggering the action so the popup
-        // doesn't hang waiting for a dead service worker to respond.
-        if extensionContext.webExtension.hasBackgroundContent {
-            extensionContext.loadBackgroundContent { error in
-                if let error {
-                    Self.logger.error("Background wake failed: \(error.localizedDescription, privacy: .public)")
-                }
-            }
-        }
-
         let tab = browserManager.currentTab(for: windowState)
         let adapter: ExtensionTabAdapter? = tab.flatMap { ExtensionManager.shared.stableAdapter(for: $0) }
-        Self.logger.info("Calling performAction (tab=\(tab?.name ?? "nil", privacy: .public), adapter=\(adapter != nil ? "yes" : "nil", privacy: .public))")
-        extensionContext.performAction(for: adapter)
+
+        // Grant ALL permissions BEFORE performAction(). WebKit may start loading the
+        // popup webview immediately when performAction() is called — before our
+        // presentActionPopup delegate fires. If the popup's JS runs chrome.tabs.query()
+        // or chrome.runtime.sendMessage() before permissions are granted, it gets empty
+        // results and shows no matching logins.
+        let webExtension = extensionContext.webExtension
+        for p in webExtension.requestedPermissions {
+            extensionContext.setPermissionStatus(.grantedExplicitly, for: p)
+        }
+        for p in webExtension.optionalPermissions {
+            extensionContext.setPermissionStatus(.grantedExplicitly, for: p)
+        }
+        for m in webExtension.allRequestedMatchPatterns {
+            extensionContext.setPermissionStatus(.grantedExplicitly, for: m)
+        }
+        for m in webExtension.optionalPermissionMatchPatterns {
+            extensionContext.setPermissionStatus(.grantedExplicitly, for: m)
+        }
+        // Also grant access to the current tab's URL specifically
+        if let tabURL = tab?.url, let scheme = tabURL.scheme, ["http", "https"].contains(scheme) {
+            extensionContext.setPermissionStatus(.grantedExplicitly, for: tabURL)
+        }
+
+        // Wake background worker and AWAIT it before triggering the action.
+        // MV3 workers auto-terminate after ~5 min; if the popup opens before the
+        // worker is alive, chrome.runtime.sendMessage hangs and the popup shows
+        // a spinner for several seconds.
+        if extensionContext.webExtension.hasBackgroundContent {
+            Task { @MainActor in
+                do {
+                    try await extensionContext.loadBackgroundContent()
+                    Self.logger.debug("Background worker alive for '\(self.ext.name, privacy: .public)'")
+                } catch {
+                    Self.logger.error("Background wake failed: \(error.localizedDescription, privacy: .public)")
+                }
+                Self.logger.info("Calling performAction (tab=\(tab?.name ?? "nil", privacy: .public), adapter=\(adapter != nil ? "yes" : "nil", privacy: .public))")
+                extensionContext.performAction(for: adapter)
+            }
+        } else {
+            Self.logger.info("Calling performAction (tab=\(tab?.name ?? "nil", privacy: .public), adapter=\(adapter != nil ? "yes" : "nil", privacy: .public))")
+            extensionContext.performAction(for: adapter)
+        }
     }
 }
 

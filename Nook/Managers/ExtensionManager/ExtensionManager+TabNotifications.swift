@@ -67,6 +67,22 @@ extension ExtensionManager {
         controller.didActivateTab(newA, previousActiveTab: oldA)
         controller.didSelectTabs([newA])
         if let oldA { controller.didDeselectTabs([oldA]) }
+
+        // Wake MV3 background workers on tab switch so they can update
+        // badge counts and autofill state for the newly active tab.
+        wakeBackgroundWorkers()
+
+        // Grant all extension contexts explicit access to the active tab's URL.
+        // Without this, content scripts can't inject and chrome.tabs.query()
+        // won't return the URL — WebKit requires per-URL grants even when
+        // match patterns already cover the domain.
+        if let scheme = newTab.url.scheme, ["http", "https"].contains(scheme) {
+            grantExtensionAccessToURL(newTab.url)
+        }
+
+        // Fire property changes so background workers re-evaluate the page
+        // (autofill detection, badge text, declarativeContent rules).
+        controller.didChangeTabProperties([.URL, .title], for: newA)
         tabCacheGeneration &+= 1
     }
 
@@ -90,6 +106,38 @@ extension ExtensionManager {
         let a = adapter(for: tab, browserManager: bm)
         controller.didChangeTabProperties(properties, for: a)
         tabCacheGeneration &+= 1
+    }
+
+    // MARK: - Extension Command Forwarding
+
+    /// Forward a keyboard event to all extension contexts to handle chrome.commands shortcuts.
+    /// Returns true if any extension consumed the event.
+    @available(macOS 15.4, *)
+    func tryPerformExtensionCommand(for event: NSEvent) -> Bool {
+        for (_, ctx) in extensionContexts {
+            if ctx.performCommand(for: event) {
+                return true
+            }
+        }
+        return false
+    }
+
+    // MARK: - Background Worker Lifecycle
+
+    /// Wake all MV3 background service workers so they can process the current page.
+    /// MV3 workers auto-terminate after ~5 min of inactivity. Waking them on navigation
+    /// and tab activation ensures content script messages reach a live worker for features
+    /// like autofill detection and badge count updates.
+    @available(macOS 15.4, *)
+    func wakeBackgroundWorkers() {
+        for (_, ctx) in extensionContexts {
+            guard ctx.webExtension.hasBackgroundContent else { continue }
+            ctx.loadBackgroundContent { error in
+                if let error {
+                    Self.logger.debug("Background wake failed: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+        }
     }
 
     /// Register a UI anchor view for an extension action button to position popovers.

@@ -2517,6 +2517,14 @@ extension Tab: WKNavigationDelegate {
             // Update website shortcut detector with new URL
             browserManager?.keyboardShortcutManager?.websiteShortcutDetector.updateCurrentURL(newURL)
             if #available(macOS 15.5, *) {
+                // Grant extension access to the committed URL. This is critical for
+                // server-side redirects (e.g. appstoreconnect.apple.com → idmsa.apple.com)
+                // where decidePolicyFor only granted access to the initial URL, not the
+                // redirect target. Without this, content scripts can't inject on the
+                // redirected page and chrome.tabs.query() won't return the URL.
+                if #available(macOS 15.4, *) {
+                    ExtensionManager.shared.grantExtensionAccessToURL(newURL)
+                }
                 ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
             }
             // Don't persist here - wait for navigation to complete
@@ -2536,7 +2544,18 @@ extension Tab: WKNavigationDelegate {
         if let newURL = webView.url {
             self.url = newURL
             if #available(macOS 15.5, *) {
+                // Grant extension access to the final URL after all redirects.
+                // decidePolicyFor only grants access to the initial navigation URL;
+                // server-side redirects land here with a different URL that needs
+                // its own grant for content scripts and chrome.tabs.query().
+                if #available(macOS 15.4, *) {
+                    ExtensionManager.shared.grantExtensionAccessToURL(newURL)
+                }
                 ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
+
+                // Wake MV3 background workers so they can process the new page
+                // (autofill detection, badge count updates, etc.)
+                ExtensionManager.shared.wakeBackgroundWorkers()
 
                 // Extension diagnostics: check content scripts, background worker, and messaging
                 #if DEBUG
