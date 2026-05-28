@@ -67,7 +67,7 @@ struct CommandPaletteSuggestionView: View {
         .background(backgroundColor)
         .clipShape(RoundedRectangle(cornerRadius: 8))
             
-        .onHover { hovering in
+        .onHoverTracking { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovered = hovering
             }

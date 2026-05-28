@@ -10,6 +10,7 @@ import SwiftUI
 /// Bottom bar of the sidebar containing menu button, spaces list, and new space button
 struct SidebarBottomBar: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var tabManager: TabManager
     @Environment(BrowserWindowState.self) private var windowState
     @Binding var isMenuButtonHovered: Bool
     let onMenuTap: () -> Void
@@ -44,7 +45,7 @@ struct SidebarBottomBar: View {
             .labelStyle(.iconOnly)
             .buttonStyle(NavButtonStyle())
             .foregroundStyle(Color.primary)
-            .onHover { isHovered in
+            .onHoverTracking { isHovered in
                 isMenuButtonHovered = isHovered
                 onMenuHover(isHovered)
             }
@@ -61,8 +62,8 @@ struct SidebarBottomBar: View {
             }
             
             Button("New Folder", systemImage: "folder.badge.plus") {
-                if let currentSpace = browserManager.tabManager.currentSpace {
-                    browserManager.tabManager.createFolder(for: currentSpace.id)
+                if let currentSpace = tabManager.currentSpace {
+                    tabManager.createFolder(for: currentSpace.id)
                 }
             }
             

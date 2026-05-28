@@ -53,108 +53,260 @@ struct TabCompositorView: NSViewRepresentable {
 class TabCompositorManager: ObservableObject {
     private var unloadTimers: [UUID: Timer] = [:]
     private var lastAccessTimes: [UUID: Date] = [:]
-    
-    // Default unload timeout (5 minutes)
-    var unloadTimeout: TimeInterval = 300
-    
+    private var memoryPressureSource: DispatchSourceMemoryPressure?
+    private var appResignObserver: Any?
+    private var lastMemoryPressureTime: Date?
+
+    private(set) var mode: TabManagementMode = .standard
+
     init() {
-        // Listen for timeout changes
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleTimeoutChange),
-            name: .tabUnloadTimeoutChanged,
-            object: nil
-        )
+        setupMemoryPressureMonitoring()
     }
-    
+
     deinit {
-        NotificationCenter.default.removeObserver(self)
-    }
-    
-    @objc private func handleTimeoutChange(_ notification: Notification) {
-        if let timeout = notification.userInfo?["timeout"] as? TimeInterval {
-            setUnloadTimeout(timeout)
+        memoryPressureSource?.cancel()
+        if let observer = appResignObserver {
+            NotificationCenter.default.removeObserver(observer)
         }
     }
-    
-    func setUnloadTimeout(_ timeout: TimeInterval) {
-        self.unloadTimeout = timeout
+
+    // MARK: - Mode Configuration
+
+    func setMode(_ newMode: TabManagementMode) {
+        self.mode = newMode
+
         // Restart timers with new timeout
         restartAllTimers()
+
+        // Set up or tear down background monitoring
+        if newMode.unloadsOnBackground {
+            setupBackgroundMonitoring()
+        } else {
+            teardownBackgroundMonitoring()
+        }
+
+        // Enforce max loaded tabs if switching to a mode with a limit
+        if newMode.maxLoadedTabs != nil {
+            enforceMaxLoadedTabs()
+        }
     }
-    
+
+    // MARK: - Tab Access & Loading
+
     func markTabAccessed(_ tabId: UUID) {
         lastAccessTimes[tabId] = Date()
         restartTimer(for: tabId)
     }
-    
+
     func unloadTab(_ tab: Tab) {
-        print("🔄 [Compositor] Unloading tab: \(tab.name)")
-        
-        // Stop any existing timer
         unloadTimers[tab.id]?.invalidate()
         unloadTimers.removeValue(forKey: tab.id)
         lastAccessTimes.removeValue(forKey: tab.id)
-        
-        // Unload the webview
+
         tab.unloadWebView()
     }
-    
+
     func loadTab(_ tab: Tab) {
-        print("🔄 [Compositor] Loading tab: \(tab.name)")
-        
-        // Mark as accessed
         markTabAccessed(tab.id)
-        
-        // Load the webview if needed
         tab.loadWebViewIfNeeded()
+
+        // After loading, enforce max loaded tabs for power saving mode
+        if mode.maxLoadedTabs != nil {
+            enforceMaxLoadedTabs()
+        }
     }
-    
+
+    // MARK: - Timer Management
+
     private func restartTimer(for tabId: UUID) {
-        // Cancel existing timer
         unloadTimers[tabId]?.invalidate()
-        
-        // Create new timer
-        let timer = Timer.scheduledTimer(withTimeInterval: unloadTimeout, repeats: false) { [weak self] _ in
+
+        let timer = Timer.scheduledTimer(withTimeInterval: mode.unloadTimeout, repeats: false) { [weak self] _ in
             Task { @MainActor in
                 self?.handleTabTimeout(tabId)
             }
         }
         unloadTimers[tabId] = timer
     }
-    
+
     private func restartAllTimers() {
-        // Cancel all existing timers
         unloadTimers.values.forEach { $0.invalidate() }
         unloadTimers.removeAll()
-        
-        // Restart timers for all accessed tabs
+
         for tabId in lastAccessTimes.keys {
             restartTimer(for: tabId)
         }
     }
-    
+
     private func handleTabTimeout(_ tabId: UUID) {
         guard let tab = findTab(by: tabId) else { return }
-        
-        // Don't unload if it's the current tab
-        if tab.id == tabId && tab.isCurrentTab {
-            // Restart timer for current tab
+
+        if isExemptFromUnloading(tab) {
             restartTimer(for: tabId)
             return
         }
-        
-        // Don't unload if tab has playing media
-        if tab.hasPlayingVideo || tab.hasPlayingAudio || tab.hasAudioContent {
-            // Restart timer for tabs with media
-            restartTimer(for: tabId)
-            return
-        }
-        
-        // Unload the tab
-        unloadTab(tab)
+
+        // Route through TabManager to preserve pinned-tab guard
+        browserManager?.tabManager.unloadTab(tab)
     }
-    
+
+    // MARK: - Tab Importance & Exemptions
+
+    private func isExemptFromUnloading(_ tab: Tab) -> Bool {
+        if isCurrentTabInAnyWindow(tab) { return true }
+        if tab.hasPlayingVideo || tab.hasPlayingAudio || tab.hasAudioContent { return true }
+        if tab.isPinned || tab.isSpacePinned { return true }
+        return false
+    }
+
+    private func isCurrentTabInAnyWindow(_ tab: Tab) -> Bool {
+        guard let registry = browserManager?.windowRegistry else {
+            return tab.isCurrentTab
+        }
+        return registry.allWindows.contains { $0.currentTabId == tab.id }
+    }
+
+    /// Scores tab importance for deciding unload order. Higher = more important to keep.
+    private func tabImportanceScore(_ tab: Tab) -> Int {
+        var score = 0
+        if isCurrentTabInAnyWindow(tab) { score += 1000 }
+        if tab.hasPlayingVideo || tab.hasPlayingAudio || tab.hasAudioContent { score += 500 }
+        if tab.isPinned || tab.isSpacePinned { score += 200 }
+        // Recency bonus: up to 100 points for recently accessed tabs
+        if let lastAccess = lastAccessTimes[tab.id] {
+            let minutesAgo = Date().timeIntervalSince(lastAccess) / 60
+            score += max(0, 100 - Int(minutesAgo))
+        }
+        return score
+    }
+
+    // MARK: - Memory Pressure Monitoring
+
+    private func setupMemoryPressureMonitoring() {
+        let source = DispatchSource.makeMemoryPressureSource(
+            eventMask: [.warning, .critical],
+            queue: .main
+        )
+        source.setEventHandler { [weak self] in
+            Task { @MainActor in
+                self?.handleMemoryPressure()
+            }
+        }
+        source.resume()
+        memoryPressureSource = source
+    }
+
+    private func handleMemoryPressure() {
+        // Throttle: don't act on memory pressure more than once per 30 seconds
+        let now = Date()
+        if let lastTime = lastMemoryPressureTime, now.timeIntervalSince(lastTime) < 30 {
+            return
+        }
+        lastMemoryPressureTime = now
+
+        guard let browserManager = browserManager else { return }
+
+        let allTabs = browserManager.tabManager.allTabs()
+        let loadedNonExempt = allTabs.filter { !$0.isUnloaded && !isExemptFromUnloading($0) }
+
+        guard !loadedNonExempt.isEmpty else { return }
+
+        // Sort by importance ascending (least important first)
+        let sorted = loadedNonExempt.sorted { tabImportanceScore($0) < tabImportanceScore($1) }
+
+        let tabsToUnload: ArraySlice<Tab>
+        if let keepCount = mode.memoryPressureKeepCount {
+            // Power Saving: unload all but current + keepCount MRU
+            let totalLoaded = allTabs.filter { !$0.isUnloaded }.count
+            let countToUnload = max(0, totalLoaded - 1 - keepCount) // -1 for current tab
+            tabsToUnload = sorted.prefix(countToUnload)
+        } else {
+            // Standard/Performance: unload a fraction of loaded tabs
+            let countToUnload = Int(ceil(Double(sorted.count) * mode.memoryPressureUnloadFraction))
+            tabsToUnload = sorted.prefix(countToUnload)
+        }
+
+        for tab in tabsToUnload {
+            browserManager.tabManager.unloadTab(tab)
+        }
+    }
+
+    // MARK: - Background Unloading
+
+    private func setupBackgroundMonitoring() {
+        teardownBackgroundMonitoring()
+
+        appResignObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didResignActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.handleAppDidResignActive()
+            }
+        }
+    }
+
+    private func teardownBackgroundMonitoring() {
+        if let observer = appResignObserver {
+            NotificationCenter.default.removeObserver(observer)
+            appResignObserver = nil
+        }
+    }
+
+    private func handleAppDidResignActive() {
+        guard mode.unloadsOnBackground, let browserManager = browserManager else { return }
+
+        // Collect current tab IDs from ALL windows
+        let currentTabIds = Set(
+            browserManager.windowRegistry?.allWindows.compactMap { $0.currentTabId } ?? []
+        )
+
+        let allTabs = browserManager.tabManager.allTabs()
+        var unloadCount = 0
+        for tab in allTabs {
+            guard !tab.isUnloaded,
+                  !currentTabIds.contains(tab.id),
+                  !isExemptFromUnloading(tab) else { continue }
+            browserManager.tabManager.unloadTab(tab)
+            unloadCount += 1
+        }
+
+    }
+
+    // MARK: - Max Loaded Tab Enforcement
+
+    private func enforceMaxLoadedTabs() {
+        guard let maxTabs = mode.maxLoadedTabs, let browserManager = browserManager else { return }
+
+        let allTabs = browserManager.tabManager.allTabs()
+        let loadedNonExempt = allTabs.filter { !$0.isUnloaded && !isExemptFromUnloading($0) }
+
+        // Don't count pinned tabs toward the limit
+        let loadedRegular = loadedNonExempt.filter { !$0.isPinned && !$0.isSpacePinned }
+
+        guard loadedRegular.count > maxTabs else { return }
+
+        // Grace period: don't unload tabs accessed within last 30 seconds
+        let gracePeriod: TimeInterval = 30
+        let now = Date()
+        let eligible = loadedRegular.filter { tab in
+            guard let lastAccess = lastAccessTimes[tab.id] else { return true }
+            return now.timeIntervalSince(lastAccess) > gracePeriod
+        }
+
+        // Sort by importance ascending (least important first)
+        let sorted = eligible.sorted { tabImportanceScore($0) < tabImportanceScore($1) }
+        let countToUnload = loadedRegular.count - maxTabs
+        let tabsToUnload = sorted.prefix(max(0, countToUnload))
+
+        for tab in tabsToUnload {
+            browserManager.tabManager.unloadTab(tab)
+        }
+    }
+
+    // MARK: - Tab Lookup
+
     private func findTab(by id: UUID) -> Tab? {
         guard let browserManager = browserManager else { return nil }
         return browserManager.tabManager.allTabs().first { $0.id == id }
@@ -164,8 +316,9 @@ class TabCompositorManager: ObservableObject {
         guard let browserManager = browserManager else { return nil }
         return browserManager.tabManager.allTabs().first { $0.webView === webView }
     }
-    
+
     // MARK: - Public Interface
+
     func updateTabVisibility(currentTabId: UUID?) {
         guard let browserManager = browserManager,
               let coordinator = browserManager.webViewCoordinator else { return }
@@ -174,12 +327,11 @@ class TabCompositorManager: ObservableObject {
             browserManager.refreshCompositor(for: windowState)
         }
     }
-    
-    /// Update tab visibility for a specific window
+
     func updateTabVisibility(for windowState: BrowserWindowState) {
         browserManager?.refreshCompositor(for: windowState)
     }
-    
+
     // MARK: - Dependencies
     weak var browserManager: BrowserManager?
 }

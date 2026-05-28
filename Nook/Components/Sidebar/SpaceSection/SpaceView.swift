@@ -35,8 +35,11 @@ struct SpaceView: View {
     let isActive: Bool
     @Binding var isSidebarHovered: Bool
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var tabManager: TabManager
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(CommandPalette.self) private var commandPalette
+    @Environment(TabOrganizerManager.self) private var tabOrganizerManager
+    @Environment(\.nookSettings) private var nookSettings
     @EnvironmentObject var gradientColorManager: GradientColorManager
     @ObservedObject private var dragSession = NookDragSessionManager.shared
     @State private var canScrollUp: Bool = false
@@ -83,21 +86,21 @@ struct SpaceView: View {
         if windowState.isIncognito {
             return windowState.ephemeralTabs.sorted { $0.index < $1.index }
         }
-        return browserManager.tabManager.tabs(in: space)
+        return tabManager.tabs(in: space)
     }
 
     private var spacePinnedTabs: [Tab] {
         if windowState.isIncognito {
             return []
         }
-        return browserManager.tabManager.spacePinnedTabs(for: space.id)
+        return tabManager.spacePinnedTabs(for: space.id)
     }
 
     private var folders: [TabFolder] {
         if windowState.isIncognito {
             return []
         }
-        return browserManager.tabManager.folders(for: space.id)
+        return tabManager.folders(for: space.id)
     }
 
     private var hasSpacePinnedContent: Bool {
@@ -118,14 +121,15 @@ struct SpaceView: View {
 
         var items: [AnyHashable] = []
 
-        // Filter out folder tabs from spacePinnedTabs before processing
-        // Only tabs with folderId == nil should appear outside folders
-        let nonFolderSpacePinnedTabs = currentSpacePinnedTabs.filter { $0.folderId == nil }
-        let folderSpacePinnedTabs = currentSpacePinnedTabs.filter { $0.folderId != nil }
-
-        // Group folder tabs by their folderId
-        let tabsByFolderId = Dictionary(grouping: folderSpacePinnedTabs) { tab in
-            tab.folderId
+        // Single-pass partition: split tabs into folder vs non-folder
+        var nonFolderSpacePinnedTabs: [Tab] = []
+        var tabsByFolderId: [UUID: [Tab]] = [:]
+        for tab in currentSpacePinnedTabs {
+            if let folderId = tab.folderId {
+                tabsByFolderId[folderId, default: []].append(tab)
+            } else {
+                nonFolderSpacePinnedTabs.append(tab)
+            }
         }
 
         // Add folders with their tabs
@@ -166,7 +170,7 @@ struct SpaceView: View {
         .onReceive(NotificationCenter.default.publisher(for: .init("TabFoldersDidChange"))) { _ in
             folderChangeCount += 1
         }
-        .onHover { state in
+        .onHoverTracking { state in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovered = state
             }
@@ -196,12 +200,17 @@ struct SpaceView: View {
         }
         guard isTargetingThisSpace else { return }
 
-        let allTabs = browserManager.tabManager.allTabs()
+        let allTabs = tabManager.allTabs()
         guard let tab = allTabs.first(where: { $0.id == drop.item.tabId }) else { return }
 
         let op = dragSession.makeDragOperation(from: drop, tab: tab)
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-            browserManager.tabManager.handleDragOperation(op)
+        // Disable all animations — items are already at their visual positions
+        // from drag offsets, so the drop should just "lock in" instantly
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            dragSession.clearDrag()
+            tabManager.handleDragOperation(op)
         }
         dragSession.pendingDrop = nil
     }
@@ -220,14 +229,19 @@ struct SpaceView: View {
         }
         guard isForThisSpace else { return }
 
-        guard let tab = browserManager.tabManager.allTabs().first(where: { $0.id == reorder.item.tabId }) else {
+        guard let tab = tabManager.allTabs().first(where: { $0.id == reorder.item.tabId }) else {
             dragSession.pendingReorder = nil
             return
         }
 
         let op = dragSession.makeDragOperation(from: reorder, tab: tab)
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-            browserManager.tabManager.handleDragOperation(op)
+        // Disable all animations — items are already at their visual positions
+        // from drag offsets, so the reorder should just "lock in" instantly
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            dragSession.clearDrag()
+            tabManager.handleDragOperation(op)
         }
         dragSession.pendingReorder = nil
     }
@@ -240,21 +254,21 @@ struct SpaceView: View {
                         VStack(spacing: 8) {
                             pinnedTabsSection
 
-                            NookDropZoneHostView(
-                                zoneID: .spaceRegular(space.id),
-                                isVertical: true,
-                                manager: dragSession
-                            ) {
-                                VStack(spacing: 8) {
-                                    newTabButtonSectionWithClear
+                            VStack(spacing: 8) {
+                                newTabButtonSectionWithClear
+                                NookDropZoneHostView(
+                                    zoneID: .spaceRegular(space.id),
+                                    isVertical: true,
+                                    manager: dragSession
+                                ) {
                                     regularTabsListInner
                                 }
-                            }
-                            .onAppear {
-                                updateRegularTabsCaches()
-                            }
-                            .onChange(of: tabs.count) { _, _ in
-                                updateRegularTabsCaches()
+                                .onAppear {
+                                    updateRegularTabsCaches()
+                                }
+                                .onChange(of: tabs.count) { _, _ in
+                                    updateRegularTabsCaches()
+                                }
                             }
                         }
                         .frame(minWidth: 0, maxWidth: innerWidth, alignment: .leading)
@@ -400,7 +414,7 @@ struct SpaceView: View {
 
     private func pinnedTabView(_ tab: Tab, index: Int) -> some View {
         NookDragSourceView(
-            item: NookDragItem(tabId: tab.id, title: tab.name, urlString: tab.url.absoluteString),
+            item: NookDragItem(tabId: tab.id, title: tab.displayName, urlString: tab.url.absoluteString),
             tab: tab,
             zoneID: .spacePinned(space.id),
             index: index,
@@ -409,7 +423,8 @@ struct SpaceView: View {
             SpaceTab(
                 tab: tab,
                 action: { handleUserTabActivation(tab) },
-                onClose: { onCloseTab(tab) },
+                onClose: { tabManager.forceRemoveTab(tab.id) },
+                onUnload: { tab.unloadWebView() },
                 onMute: { onMuteTab(tab) }
             )
         }
@@ -434,7 +449,29 @@ struct SpaceView: View {
             Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState) } label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
             Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) } label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
             Divider()
-            Button { browserManager.tabManager.unpinTabFromSpace(tab) } label: { Label("Unpin from Space", systemImage: "pin.slash") }
+            if tab.hasNavigatedAwayFromPinnedURL {
+                Button { tab.resetToPinnedURL() } label: { Label("Reset to Pinned URL", systemImage: "arrow.uturn.backward.circle") }
+            }
+            if tab.pinnedURL != nil {
+                Button {
+                    browserManager.dialogManager.showDialog(
+                        EditPinnedURLDialog(
+                            tab: tab,
+                            onSave: { newURL in
+                                tab.pinnedURL = newURL
+                                tab.loadURL(newURL)
+                                browserManager.dialogManager.closeDialog()
+                                tabManager.debouncedPersistSnapshot()
+                            },
+                            onCancel: {
+                                browserManager.dialogManager.closeDialog()
+                            }
+                        )
+                    )
+                } label: { Label("Edit Pinned URL", systemImage: "pencil.circle") }
+            }
+            Divider()
+            Button { tabManager.unpinTabFromSpace(tab) } label: { Label("Unpin from Space", systemImage: "pin.slash") }
             Button { onPinTab(tab) } label: { Label("Pin Globally", systemImage: "pin.circle") }
             Divider()
             Button { onCloseTab(tab) } label: { Label("Close tab", systemImage: "xmark") }
@@ -457,9 +494,22 @@ struct SpaceView: View {
 
     private var newTabButtonSectionWithClear: some View {
         VStack(spacing: 0) {
-            SpaceSeparator(isHovering: $isSidebarHovered) {
-                browserManager.tabManager.clearRegularTabs(for: space.id)
-            }
+            SpaceSeparator(
+                isHovering: $isSidebarHovered,
+                onClear: {
+                    tabManager.clearRegularTabs(for: space.id)
+                },
+                onOrganize: nookSettings.tabOrganizerEnabled ? {
+                    Task {
+                        await tabOrganizerManager.organizeTabs(
+                            in: space,
+                            using: tabManager
+                        )
+                    }
+                } : nil,
+                isOrganizing: tabOrganizerManager.isOrganizing,
+                tabCount: tabs.filter { $0.folderId == nil }.count
+            )
             .padding(.horizontal, 8)
             .padding(.top, 4)
 
@@ -534,7 +584,23 @@ struct SpaceView: View {
 
     private func regularTabsView(currentTabs: [Tab]) -> some View {
         VStack(spacing: 2) {
-            ForEach(Array(currentTabs.enumerated()), id: \.element.id) { index, tab in
+            // Regular folders
+            let regFolders = tabManager.regularFolders(for: space.id)
+            ForEach(regFolders.sorted(by: { $0.index < $1.index })) { folder in
+                TabFolderView(
+                    folder: folder,
+                    space: space,
+                    onDelete: { deleteFolder(folder) },
+                    onAddTab: { addTabToFolder(folder) },
+                    onActivateTab: { onActivateTab($0) },
+                    isRegular: true
+                )
+                .environmentObject(browserManager)
+            }
+
+            // Loose tabs (no folder)
+            let looseTabs = currentTabs.filter { $0.folderId == nil }
+            ForEach(Array(looseTabs.enumerated()), id: \.element.id) { index, tab in
                 regularTabView(tab, index: index)
             }
         }
@@ -549,7 +615,7 @@ struct SpaceView: View {
 
     private func regularTabView(_ tab: Tab, index: Int) -> some View {
         NookDragSourceView(
-            item: NookDragItem(tabId: tab.id, title: tab.name, urlString: tab.url.absoluteString),
+            item: NookDragItem(tabId: tab.id, title: tab.displayName, urlString: tab.url.absoluteString),
             tab: tab,
             zoneID: .spaceRegular(space.id),
             index: index,
@@ -588,7 +654,7 @@ struct SpaceView: View {
             Button { onMoveTabDown(tab) } label: { Label("Move Down", systemImage: "arrow.down") }
                 .disabled(isLastTab(tab))
             Divider()
-            Button { browserManager.tabManager.pinTabToSpace(tab, spaceId: space.id) } label: { Label("Pin to Space", systemImage: "pin") }
+            Button { tabManager.pinTabToSpace(tab, spaceId: space.id) } label: { Label("Pin to Space", systemImage: "pin") }
             Button { onPinTab(tab) } label: { Label("Pin Globally", systemImage: "pin.circle") }
             Button { onCloseTab(tab) } label: { Label("Close tab", systemImage: "xmark") }
         }
@@ -604,15 +670,15 @@ struct SpaceView: View {
     // MARK: - Folder Management
 
     private func deleteFolder(_ folder: TabFolder) {
-        browserManager.tabManager.deleteFolder(folder.id)
+        tabManager.deleteFolder(folder.id)
     }
 
     private func addTabToFolder(_ folder: TabFolder) {
         // Create a new tab and add it to the folder
-        let newTab = browserManager.tabManager.createNewTab(in: space)
+        let newTab = tabManager.createNewTab(in: space)
         newTab.folderId = folder.id
         newTab.isSpacePinned = true
-        browserManager.tabManager.persistSnapshot()
+        tabManager.persistSnapshot()
     }
 
     private func isFirstTab(_ tab: Tab) -> Bool {

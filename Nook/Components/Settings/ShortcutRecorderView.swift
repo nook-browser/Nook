@@ -41,7 +41,7 @@ struct ShortcutRecorderView: View {
                 )
             }
             .buttonStyle(.plain)
-            .onHover { isHovered in
+            .onHoverTracking { isHovered in
                 if isHovered {
                     NSCursor.pointingHand.push()
                 } else {

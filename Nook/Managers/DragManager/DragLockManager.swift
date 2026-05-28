@@ -22,11 +22,9 @@ class DragLockManager: ObservableObject {
 
     func attemptLock(ownerID: String = UUID().uuidString) -> Bool {
         if isLocked {
-            print("🔒 [DragLockManager] Lock DENIED - Already locked by \(lockOwner ?? "unknown")")
             return false
         }
 
-        print("🔒 [DragLockManager] Universal Lock ACQUIRED [\(ownerID)]")
         isLocked = true
         lockOwner = ownerID
         lockStartTime = Date()
@@ -35,17 +33,12 @@ class DragLockManager: ObservableObject {
 
     func releaseLock(ownerID: String = UUID().uuidString) {
         guard isLocked else {
-            print("🔓 [DragLockManager] Lock RELEASE - No active lock")
             return
         }
 
         guard lockOwner == ownerID else {
-            print("⚠️ [DragLockManager] Lock RELEASE DENIED - Current owner: \(lockOwner ?? "unknown"), Requester: \(ownerID)")
             return
         }
-
-        let lockDuration = lockStartTime.map { Date().timeIntervalSince($0) } ?? 0
-        print("🔓 [DragLockManager] Universal Lock RELEASED [\(ownerID)] after \(String(format: "%.2f", lockDuration))s")
 
         isLocked = false
         lockOwner = nil
@@ -53,9 +46,6 @@ class DragLockManager: ObservableObject {
     }
 
     func forceReleaseAll() {
-        if isLocked {
-            print("💥 [DragLockManager] FORCE RELEASE all locks (was locked by \(lockOwner ?? "unknown"))")
-        }
         isLocked = false
         lockOwner = nil
         lockStartTime = nil
@@ -64,11 +54,7 @@ class DragLockManager: ObservableObject {
     // MARK: - Convenience Methods
 
     func canStartAnyDrag() -> Bool {
-        let canStart = !isLocked
-        if !canStart {
-            print("🚫 [DragLockManager] Drag BLOCKED - Already locked by \(lockOwner ?? "unknown")")
-        }
-        return canStart
+        return !isLocked
     }
 
     func startDrag(ownerID: String = UUID().uuidString) -> Bool {

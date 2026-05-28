@@ -147,7 +147,7 @@ func parseSafariBookmarks(from fileURL: URL) throws -> [SafariBookmark] {
         if trimmed.hasPrefix("<DT><H3") {
             if let startRange = trimmed.range(of: ">", range: trimmed.index(after: trimmed.startIndex)..<trimmed.endIndex),
                let endRange = trimmed.range(of: "</H3>", options: .caseInsensitive) {
-                currentFolder = String(trimmed[startRange.upperBound..<endRange.lowerBound])
+                currentFolder = decodeHTMLEntities(String(trimmed[startRange.upperBound..<endRange.lowerBound]))
             }
         }
 
@@ -157,7 +157,7 @@ func parseSafariBookmarks(from fileURL: URL) throws -> [SafariBookmark] {
                let titleStart = trimmed.range(of: ">", range: hrefEnd.upperBound..<trimmed.endIndex),
                let titleEnd = trimmed.range(of: "</A>", options: .caseInsensitive) {
                 let url = String(trimmed[hrefStart.upperBound..<hrefEnd.lowerBound])
-                let title = String(trimmed[titleStart.upperBound..<titleEnd.lowerBound])
+                let title = decodeHTMLEntities(String(trimmed[titleStart.upperBound..<titleEnd.lowerBound]))
 
                 bookmarks.append(SafariBookmark(
                     title: title,
@@ -173,6 +173,53 @@ func parseSafariBookmarks(from fileURL: URL) throws -> [SafariBookmark] {
     }
 
     return bookmarks
+}
+
+/// Decodes common HTML entities and numeric character references in a string.
+private func decodeHTMLEntities(_ string: String) -> String {
+    var result = string
+    let entities: [(String, String)] = [
+        ("&amp;", "&"),
+        ("&lt;", "<"),
+        ("&gt;", ">"),
+        ("&quot;", "\""),
+        ("&#39;", "'"),
+        ("&apos;", "'"),
+        ("&#x27;", "'"),
+        ("&#x2F;", "/"),
+        ("&nbsp;", " "),
+    ]
+    for (entity, char) in entities {
+        result = result.replacingOccurrences(of: entity, with: char)
+    }
+
+    // Decode decimal numeric entities (&#NNN;)
+    if let numericPattern = try? NSRegularExpression(pattern: "&#(\\d+);") {
+        let matches = numericPattern.matches(in: result, range: NSRange(result.startIndex..., in: result))
+        for match in matches.reversed() {
+            if let numRange = Range(match.range(at: 1), in: result),
+               let num = UInt32(result[numRange]),
+               let scalar = Unicode.Scalar(num) {
+                let charRange = Range(match.range, in: result)!
+                result.replaceSubrange(charRange, with: String(scalar))
+            }
+        }
+    }
+
+    // Decode hexadecimal numeric entities (&#xHHHH;)
+    if let hexPattern = try? NSRegularExpression(pattern: "&#[xX]([0-9a-fA-F]+);") {
+        let matches = hexPattern.matches(in: result, range: NSRange(result.startIndex..., in: result))
+        for match in matches.reversed() {
+            if let hexRange = Range(match.range(at: 1), in: result),
+               let num = UInt32(result[hexRange], radix: 16),
+               let scalar = Unicode.Scalar(num) {
+                let charRange = Range(match.range, in: result)!
+                result.replaceSubrange(charRange, with: String(scalar))
+            }
+        }
+    }
+
+    return result
 }
 
 func parseSafariHistory(from fileURL: URL) throws -> [SafariImportHistoryEntry] {

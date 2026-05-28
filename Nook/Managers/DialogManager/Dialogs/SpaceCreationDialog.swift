@@ -101,21 +101,17 @@ struct SpaceCreationContent: View {
                     Button {
                         emojiManager.toggle()
                     } label: {
-                        Text(
-                            emojiManager.selectedEmoji.isEmpty
-                                ? "✨" : emojiManager.selectedEmoji
-                        )
-                        .font(.system(size: 14))
-                        .frame(width: 20, height: 20)
-                        .padding(4)
-                        .background(.white.opacity(0.2))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        SpaceCreationIconPreview(icon: emojiManager.selectedEmoji)
+                            .frame(width: 20, height: 20)
+                            .padding(4)
+                            .background(.white.opacity(0.2))
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
                     .contentShape(RoundedRectangle(cornerRadius: 6))
                     .background(EmojiPickerAnchor(manager: emojiManager))
                     .buttonStyle(PlainButtonStyle())
 
-                    Text("Choose an emoji to represent this space")
+                    Text("Choose an icon to represent this space")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
@@ -172,6 +168,31 @@ struct SpaceCreationContent: View {
             return browserManager.profileManager.profiles.first?.icon ?? "person.circle"
         }
         return profile.icon
+    }
+}
+
+private struct SpaceCreationIconPreview: View {
+    let icon: String
+
+    var body: some View {
+        if icon.isEmpty {
+            Image(systemName: "square.grid.2x2")
+                .font(.system(size: 14, weight: .medium))
+        } else if isEmoji(icon) {
+            Text(icon)
+                .font(.system(size: 14))
+        } else {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .medium))
+        }
+    }
+
+    private func isEmoji(_ string: String) -> Bool {
+        string.unicodeScalars.contains { scalar in
+            (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF)
+                || (scalar.value >= 0x2600 && scalar.value <= 0x26FF)
+                || (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
+        }
     }
 }
 

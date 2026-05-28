@@ -24,7 +24,7 @@ struct PeekWebView: NSViewRepresentable {
         let configuration: WKWebViewConfiguration
         if let profileId = session.sourceProfileId,
            let profile = peekManager?.browserManager?.profileManager.profiles.first(where: { $0.id == profileId }) {
-            configuration = BrowserConfiguration.shared.cacheOptimizedWebViewConfiguration(for: profile)
+            configuration = BrowserConfiguration.shared.webViewConfiguration(for: profile)
         } else {
             // Fallback to default configuration
             configuration = BrowserConfiguration.shared.webViewConfiguration
@@ -107,7 +107,6 @@ struct PeekWebView: NSViewRepresentable {
             webView.evaluateJavaScript(WKWebView.themeColorExtractionScript) { [weak self] result, error in
                 guard let self else { return }
                 if let error {
-                    print("🎨 [Peek] Failed to evaluate theme color script: \(error.localizedDescription)")
                 }
 
                 var hexString = (result as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -201,24 +200,18 @@ struct PeekWebView: NSViewRepresentable {
                 if let window = webView.window {
                     // Present as sheet if we have a window
                     openPanel.beginSheetModal(for: window) { response in
-                        print("📁 [PeekWebView] Open panel sheet completed with response: \(response)")
                         if response == .OK {
-                            print("📁 [PeekWebView] User selected files: \(openPanel.urls.map { $0.lastPathComponent })")
                             completionHandler(openPanel.urls)
                         } else {
-                            print("📁 [PeekWebView] User cancelled file selection")
                             completionHandler(nil)
                         }
                     }
                 } else {
                     // Fall back to modal presentation
                     openPanel.begin { response in
-                        print("📁 [PeekWebView] Open panel modal completed with response: \(response)")
                         if response == .OK {
-                            print("📁 [PeekWebView] User selected files: \(openPanel.urls.map { $0.lastPathComponent })")
                             completionHandler(openPanel.urls)
                         } else {
-                            print("📁 [PeekWebView] User cancelled file selection")
                             completionHandler(nil)
                         }
                     }

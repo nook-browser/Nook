@@ -16,6 +16,10 @@ final class MediaControlsManager {
     weak var windowState: BrowserWindowState?
     weak var windowRegistry: WindowRegistry?
 
+    /// Cached active media tab to avoid iterating all tabs on every query.
+    /// Set when media is found playing; cleared when the tab stops playing or is deallocated.
+    private weak var _cachedActiveMediaTab: Tab?
+
     /// List of media host domains that support media controls
     /// Add new domains here to expand support to other platforms
     private let mediaHosts: [String] = [
@@ -37,8 +41,19 @@ final class MediaControlsManager {
         return findActiveMediaTab() != nil
     }
 
-    /// Find the first tab with actively playing media (prioritize tabs with playing media)
+    /// Find the first tab with actively playing media (prioritize tabs with playing media).
+    /// Uses a cached weak reference to avoid iterating all tabs when possible.
     func findActiveMediaTab() -> Tab? {
+        // Fast path: check if the cached tab is still actively playing media
+        if let cached = _cachedActiveMediaTab,
+           isMediaHostURL(cached.url),
+           (cached.hasPlayingAudio || cached.hasPlayingVideo) {
+            return cached
+        }
+
+        // Cache miss or stale — fall back to full search
+        _cachedActiveMediaTab = nil
+
         guard let browserManager = browserManager else {
             return nil
         }
@@ -50,11 +65,25 @@ final class MediaControlsManager {
             let hasVideo = tab.hasPlayingVideo
 
             if isMediaHost && (hasAudio || hasVideo) {
+                _cachedActiveMediaTab = tab
                 return tab
             }
         }
 
         return nil
+    }
+
+    /// Refresh a tab's title by reading document.title directly from the webview.
+    /// Ensures the tab name stays in sync even if KVO misses a YouTube SPA title change.
+    func refreshTitle(for tab: Tab) async {
+        let webViews = resolveWebViews(for: tab)
+        for webView in webViews {
+            if let title = try? await webView.evaluateJavaScript("document.title") as? String,
+               !title.isEmpty, title != tab.name {
+                tab.updateTitle(title)
+                break
+            }
+        }
     }
 
     /// Check if a URL is from a supported media host
@@ -121,12 +150,7 @@ final class MediaControlsManager {
                     break
                 }
             } catch {
-                print("❌ [MediaControls] Failed to \(description): \(error)")
             }
-        }
-
-        if !handled {
-            print("❌ [MediaControls] No web view handled \(description)")
         }
 
         return (handled, payload)
@@ -217,6 +241,10 @@ final class MediaControlsManager {
         """
 
         _ = await executeMediaScript(for: tab, script: script, description: "skip to next")
+
+        // YouTube takes time to navigate after clicking next — refresh title after a delay
+        try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5s
+        await refreshTitle(for: tab)
     }
 
     /// Skip to previous video
@@ -247,6 +275,10 @@ final class MediaControlsManager {
         """
 
         _ = await executeMediaScript(for: tab, script: script, description: "skip to previous")
+
+        // YouTube takes time to navigate after clicking previous — refresh title after a delay
+        try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5s
+        await refreshTitle(for: tab)
     }
 
     /// Toggle mute state
@@ -297,7 +329,6 @@ final class MediaControlsManager {
                     return boolResult
                 }
             } catch {
-                print("❌ [MediaControls] Failed to get playback state: \(error)")
             }
         }
 

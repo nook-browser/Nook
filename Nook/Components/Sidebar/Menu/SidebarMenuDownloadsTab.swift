@@ -57,7 +57,7 @@ struct SidebarMenuDownloadsTab: View {
             .background(isHovering ? .white.opacity(0.08) : .white.opacity(0.05))
             .animation(.easeInOut(duration: 0.1), value: isHovering)
             .clipShape(RoundedRectangle(cornerRadius: 12))
-            .onHover { state in
+            .onHoverTracking { state in
                 isHovering = state
             }
             .onTapGesture {
@@ -156,7 +156,7 @@ struct DownloadItem: View {
                 }
                 .buttonStyle(.plain)
                 .transition(.scale.combined(with: .opacity))
-                .onHover { state in
+                .onHoverTracking { state in
                     isIconHovered = state
                 }
             }
@@ -166,7 +166,7 @@ struct DownloadItem: View {
         .background(isHovering ? .white.opacity(0.2) : .clear)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .animation(.easeInOut(duration: 0.1), value: isHovering)
-        .onHover { state in
+        .onHoverTracking { state in
             isHovering = state
         }
         .onTapGesture {
@@ -190,7 +190,7 @@ struct DownloadItem: View {
                         forTypeIdentifier: utType.identifier,
                         visibility: .all
                     ) { completion in
-                        completion(fileData, nil)
+                        Task { @MainActor in completion(fileData, nil) }
                         return nil
                     }
                 }
@@ -202,14 +202,10 @@ struct DownloadItem: View {
 
     private func openFile() {
         guard let destinationURL = download.destinationURL else {
-            print(
-                "No destination URL available for download: \(download.suggestedFilename)"
-            )
             return
         }
 
         guard FileManager.default.fileExists(atPath: destinationURL.path) else {
-            print("File does not exist at path: \(destinationURL.path)")
             return
         }
 
@@ -218,14 +214,10 @@ struct DownloadItem: View {
 
     private func copyFile() {
         guard let destinationURL = download.destinationURL else {
-            print(
-                "No destination URL available for download: \(download.suggestedFilename)"
-            )
             return
         }
 
         guard FileManager.default.fileExists(atPath: destinationURL.path) else {
-            print("File does not exist at path: \(destinationURL.path)")
             return
         }
 
@@ -236,14 +228,10 @@ struct DownloadItem: View {
 
     private func showInFinder() {
         guard let destinationURL = download.destinationURL else {
-            print(
-                "No destination URL available for download: \(download.suggestedFilename)"
-            )
             return
         }
 
         guard FileManager.default.fileExists(atPath: destinationURL.path) else {
-            print("File does not exist at path: \(destinationURL.path)")
             return
         }
 

@@ -11,6 +11,7 @@ struct SettingsAITab: View {
     @Environment(\.nookSettings) var nookSettings
     @Environment(AIConfigService.self) var configService
     @Environment(MCPManager.self) var mcpManager
+    @Environment(TabOrganizerManager.self) var tabOrganizerManager
 
     @State private var openRouterSearch: String = ""
     @State private var testingConnection: Bool = false
@@ -18,6 +19,7 @@ struct SettingsAITab: View {
     @State private var newMCPServerName: String = ""
     @State private var newMCPServerCommand: String = ""
     @State private var newMCPServerArgs: String = ""
+    @State private var showDownloadConfirmation: Bool = false
     @State private var showAddMCPServer: Bool = false
     @State private var showAddCustomProvider: Bool = false
     @State private var customProviderName: String = ""
@@ -27,7 +29,110 @@ struct SettingsAITab: View {
     @State private var showFetchedModels: Bool = false
 
     var body: some View {
+        @Bindable var settings = nookSettings
         Form {
+            // MARK: - Tab Organizer
+            Section {
+                Toggle(isOn: Binding(
+                    get: { nookSettings.tabOrganizerEnabled },
+                    set: { newValue in
+                        if newValue && !nookSettings.tabOrganizerModelDownloaded {
+                            showDownloadConfirmation = true
+                        } else {
+                            nookSettings.tabOrganizerEnabled = newValue
+                        }
+                    }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Tab Organizer")
+                            .font(.system(size: 13, weight: .medium))
+                        Text("Uses a small on-device AI model to group, rename, sort, and deduplicate tabs")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if nookSettings.tabOrganizerEnabled {
+                    if case .downloading(let progress) = tabOrganizerManager.engine.status {
+                        HStack(spacing: 8) {
+                            ProgressView(value: progress)
+                                .frame(maxWidth: .infinity)
+                            Text("\(Int(progress * 100))%")
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        }
+                        Text("Downloading model (~350 MB)...")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    } else if case .loading = tabOrganizerManager.engine.status {
+                        HStack(spacing: 8) {
+                            ProgressView().controlSize(.small)
+                            Text("Loading model...")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
+                    } else if case .error(let message) = tabOrganizerManager.engine.status {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                                .font(.system(size: 12))
+                            Text(message)
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
+                        Button("Retry Download") {
+                            Task { try? await tabOrganizerManager.engine.ensureDownloaded() }
+                        }
+                        .font(.system(size: 11))
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    } else if nookSettings.tabOrganizerModelDownloaded {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                                .font(.system(size: 12))
+                            Text("Model ready")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Button("Delete Model") {
+                                tabOrganizerManager.engine.unload()
+                                // TODO: delete cached model files
+                                nookSettings.tabOrganizerModelDownloaded = false
+                                nookSettings.tabOrganizerEnabled = false
+                            }
+                            .font(.system(size: 11))
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        }
+                    }
+                }
+            } header: {
+                Text("Tab Organizer")
+            } footer: {
+                if nookSettings.tabOrganizerEnabled {
+                    Text("Right-click a space or press \u{2318}\u{21E7}\u{2325}O to organize tabs")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .alert("Download AI Model?", isPresented: $showDownloadConfirmation) {
+                Button("Download") {
+                    nookSettings.tabOrganizerEnabled = true
+                    Task {
+                        do {
+                            try await tabOrganizerManager.engine.ensureDownloaded()
+                            nookSettings.tabOrganizerModelDownloaded = true
+                        } catch {
+                            nookSettings.tabOrganizerEnabled = false
+                        }
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Tab Organizer requires a one-time download of a small AI model (~350 MB). The model runs entirely on your device — no data is sent to any server.")
+            }
+
             // MARK: - Providers
             Section("Providers") {
                 ForEach(configService.providers) { provider in
@@ -359,8 +464,6 @@ struct SettingsAITab: View {
                             }
                         }
                     }
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
                 }
             }
 
@@ -431,8 +534,6 @@ struct SettingsAITab: View {
                         configService.updateProvider(updated)
                     }
                 ))
-                .toggleStyle(.switch)
-                .controlSize(.small)
 
                 if configService.config.activeProviderId != provider.id {
                     Button("Use") {
@@ -564,8 +665,6 @@ struct SettingsAITab: View {
                         }
                     }
                 ))
-                .toggleStyle(.switch)
-                .controlSize(.small)
 
                 Button(action: { mcpManager.reconnectServer(server) }) {
                     Image(systemName: "arrow.clockwise")

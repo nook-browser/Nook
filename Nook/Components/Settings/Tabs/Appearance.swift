@@ -14,6 +14,11 @@ struct SettingsAppearanceTab: View {
     var body: some View {
         @Bindable var settings = nookSettings
         Form {
+            Picker("Appearance", selection: $settings.appearanceMode) {
+                ForEach(AppearanceMode.allCases) { mode in
+                    Text(mode.displayName).tag(mode)
+                }
+            }
             Picker(
                 "Background Material",
                 selection: $settings
@@ -29,8 +34,14 @@ struct SettingsAppearanceTab: View {
             Toggle("Liquid Glass", isOn: .constant(true))
             Picker(
                 "Sidebar Position",
-                selection: $settings
-                    .sidebarPosition
+                selection: Binding(
+                    get: { settings.sidebarPosition },
+                    set: { newValue in
+                        withAnimation(.smooth(duration: 0.3)) {
+                            settings.sidebarPosition = newValue
+                        }
+                    }
+                )
             ) {
                 ForEach(SidebarPosition.allCases) { provider in
                     Text(provider.displayName).tag(provider)

@@ -46,11 +46,25 @@ class BrowserWindowState {
     /// Whether the sidebar menu is visible in this window
     var isSidebarMenuVisible: Bool = false
 
+    /// The selected tab in the sidebar menu (history or downloads)
+    var sidebarMenuSelectedTab: Tabs = .history
+
     /// Whether the AI chat panel is visible in this window
     var isSidebarAIChatVisible: Bool = false
 
     /// Whether the command palette is visible in this window
     var isCommandPaletteVisible: Bool = false
+
+    /// Whether the extension library panel is visible in this window
+    var isExtensionLibraryVisible: Bool = false
+
+    // MARK: - Extension Library
+    private var _extensionLibraryPanelController: Any?
+    @available(macOS 15.5, *)
+    var extensionLibraryPanelController: ExtensionLibraryPanelController? {
+        get { _extensionLibraryPanelController as? ExtensionLibraryPanelController }
+        set { _extensionLibraryPanelController = newValue }
+    }
 
     /// Frame of the URL bar within this window
     var urlBarFrame: CGRect = .zero
@@ -85,6 +99,9 @@ class BrowserWindowState {
 
     /// Reference to this window's CommandPalette for global shortcuts
     weak var commandPalette: CommandPalette?
+
+    /// Reference to this window's HoverSidebarManager for checking floating visibility
+    weak var hoverSidebarManager: HoverSidebarManager?
 
     // MARK: - Incognito/Ephemeral State
     

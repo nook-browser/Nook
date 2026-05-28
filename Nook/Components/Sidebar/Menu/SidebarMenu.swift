@@ -33,60 +33,58 @@ public enum SidebarPosition: String, CaseIterable, Identifiable {
 }
 
 struct SidebarMenu: View {
-    @State private var selectedTab: Tabs = .history
     @Environment(BrowserWindowState.self) private var windowState
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(\.nookSettings) var nookSettings
 
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
-            if nookSettings.sidebarPosition == .left{
+            if nookSettings.sidebarPosition == .left {
                 tabs
-            }
-            VStack {
-                switch selectedTab {
-                case .history:
-                    SidebarMenuHistoryTab()
-                case .downloads:
-                    SidebarMenuDownloadsTab()
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            if nookSettings.sidebarPosition == .right{
+                content
+            } else {
+                content
                 tabs
             }
         }
         .frame(maxWidth: .infinity)
         .ignoresSafeArea()
     }
-    
+
+    @ViewBuilder
+    private var content: some View {
+        VStack {
+            switch windowState.sidebarMenuSelectedTab {
+            case .history:
+                SidebarMenuHistoryTab()
+            case .downloads:
+                SidebarMenuDownloadsTab()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     var tabs: some View{
         VStack {
-            HStack {
-                MacButtonsView()
-                    .frame(width: 70, height: 20)
-                    .padding(8)
-                Spacer()
-            }
-            
+
             Spacer()
             VStack(spacing: 20) {
                 SidebarMenuTab(
                     image: "clock",
                     activeImage: "clock.fill",
                     title: "History",
-                    isActive: selectedTab == .history,
+                    isActive: windowState.sidebarMenuSelectedTab == .history,
                     action: {
-                        selectedTab = .history
+                        windowState.sidebarMenuSelectedTab = .history
                     }
                 )
                 SidebarMenuTab(
                     image: "arrow.down.circle",
                     activeImage: "arrow.down.circle.fill",
                     title: "Downloads",
-                    isActive: selectedTab == .downloads,
+                    isActive: windowState.sidebarMenuSelectedTab == .downloads,
                     action: {
-                        selectedTab = .downloads
+                        windowState.sidebarMenuSelectedTab = .downloads
                     }
                 )
             }

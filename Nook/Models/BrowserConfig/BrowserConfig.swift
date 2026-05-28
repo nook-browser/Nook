@@ -27,30 +27,31 @@ class BrowserConfiguration {
         config.defaultWebpagePreferences = preferences
 
         // Core WebKit preferences for extensions
-        config.preferences.javaScriptCanOpenWindowsAutomatically = true
+        config.preferences.javaScriptCanOpenWindowsAutomatically = false
 
-        // Media settings
+        // Enable JavaScript clipboard access (navigator.clipboard API, document.execCommand('copy'))
+        // Required for third-party WKWebView apps — Safari enables this by default.
+        config.preferences.setValue(true, forKey: "javaScriptCanAccessClipboard")
+        config.preferences.setValue(true, forKey: "DOMPasteAllowed")
+
+        // Media settings — use macOS default (no restrictions, matching Safari behavior).
+        // [.audio] blocks programmatic play() for media with audio tracks, which breaks
+        // YouTube autoplay since SPA navigations call play() outside user-gesture context.
         config.mediaTypesRequiringUserActionForPlayback = []
         
         // Enable Picture-in-Picture for web media
         config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
-        
+
         // Enable full-screen API support
         config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
-        config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
-        
+        // NOTE: "mediaDevicesEnabled" intentionally NOT set — it causes the WebContent
+        // process to eagerly register with com.apple.audio.AudioComponentRegistrar,
+        // which is sandbox-denied for third-party WKWebView apps and crashes the process.
+        // getUserMedia still works through WKUIDelegate permission prompts without this.
+
         // CRITICAL: Enable HTML5 Fullscreen API
         config.preferences.isElementFullscreenEnabled = true
-        
-        
-        // Enable full-screen API support
-        config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
-        config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
-        
-        // CRITICAL: Enable HTML5 Fullscreen API
-        config.preferences.isElementFullscreenEnabled = true
-        
-        
+
         // Enable background media playback
         config.allowsAirPlayForMediaPlayback = true
         
@@ -58,14 +59,41 @@ class BrowserConfiguration {
         config.applicationNameForUserAgent = "Version/26.0.1 Safari/605.1.15"
 
         // Web inspector will be enabled per-webview using isInspectable property
+        #if DEBUG
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        #endif
 
         // Note: webExtensionController will be set by ExtensionManager during initialization
-        // Note: WebAuthn/Passkey support is enabled by default in WKWebView on macOS 13.3+
-        // and requires only: entitlements, WKUIDelegate methods, and Info.plist descriptions
+
+        // MARK: Passkey suppression
+        // Pending Apple approval of com.apple.developer.web-browser.public-key-credential,
+        // tell websites we don't support platform authenticators so they won't prompt for passkeys.
+        // TODO: Remove this once the entitlement is granted.
+        let passkeySuppress = WKUserScript(
+            source: """
+            (function() {
+                if (window.PublicKeyCredential) {
+                    PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable = function() {
+                        return Promise.resolve(false);
+                    };
+                    if (PublicKeyCredential.isConditionalMediationAvailable) {
+                        PublicKeyCredential.isConditionalMediationAvailable = function() {
+                            return Promise.resolve(false);
+                        };
+                    }
+                }
+            })();
+            """,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: false
+        )
+        config.userContentController.addUserScript(passkeySuppress)
 
         return config
     }()
+
+    /// Optional hook for ContentBlockerManager to apply rule lists to new controllers.
+    var contentRuleListApplicator: ((WKUserContentController) -> Void)?
 
     // MARK: - Fresh User Content Controller
     // Creates a fresh WKUserContentController but preserves shared user scripts
@@ -76,6 +104,8 @@ class BrowserConfiguration {
         for script in webViewConfiguration.userContentController.userScripts {
             controller.addUserScript(script)
         }
+        // Apply content blocker rule lists if available
+        contentRuleListApplicator?(controller)
         return controller
     }
 
@@ -98,17 +128,6 @@ class BrowserConfiguration {
         // Use the profile's website data store for isolation
         config.websiteDataStore = profile.dataStore
 
-        return config
-    }
-
-    // Returns a profile-scoped configuration with cache/perf optimizations applied
-    func cacheOptimizedWebViewConfiguration(for profile: Profile) -> WKWebViewConfiguration {
-        let config = webViewConfiguration(for: profile)
-        // Enable aggressive caching and media capabilities (mirror default optimized config)
-        config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
-        config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
-        config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
-        
         return config
     }
 

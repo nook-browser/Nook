@@ -10,6 +10,7 @@ import SwiftUI
 /// Header section of the sidebar (window controls, navigation buttons, URL bar)
 struct SidebarHeader: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var hoverSidebarManager: HoverSidebarManager
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.nookSettings) var nookSettings
     let isSidebarHovered: Bool
@@ -57,6 +58,7 @@ struct SidebarHeader: View {
 // MARK: - Sidebar Window Controls (Top Bar Mode)
 struct SidebarWindowControlsView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var hoverSidebarManager: HoverSidebarManager
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.nookSettings) var nookSettings
 
@@ -66,7 +68,7 @@ struct SidebarWindowControlsView: View {
                 .frame(width: 70)
 
             Button("Toggle Sidebar", systemImage: nookSettings.sidebarPosition == .left ? "sidebar.left" : "sidebar.right") {
-                browserManager.toggleSidebar(for: windowState)
+                browserManager.toggleSidebar(for: windowState, floatingVisible: hoverSidebarManager.isOverlayVisible)
             }
             .labelStyle(.iconOnly)
             .buttonStyle(NavButtonStyle())

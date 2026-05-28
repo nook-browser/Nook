@@ -58,7 +58,7 @@ struct HistorySuggestionItem: View {
             Spacer()
         }
         .frame(maxWidth: .infinity)
-        .onHover { hovering in
+        .onHoverTracking { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovered = hovering
             }

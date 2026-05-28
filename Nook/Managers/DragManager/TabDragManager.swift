@@ -7,10 +7,7 @@
 
 import SwiftUI
 
-@MainActor
-class TabDragManager: ObservableObject {
-    static let shared = TabDragManager()
-
+enum TabDragManager {
     enum DragContainer: Equatable {
         case none
         case essentials

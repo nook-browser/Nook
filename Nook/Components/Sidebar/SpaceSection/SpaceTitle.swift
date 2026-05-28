@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SpaceTitle: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var tabManager: TabManager
     @Environment(\.colorScheme) var colorScheme
 
     let space: Space
@@ -32,7 +33,7 @@ struct SpaceTitle: View {
                             // Safely unwrap the last character
                             guard let lastChar = newValue.last else { return }
                             space.icon = String(lastChar)
-                            browserManager.tabManager.persistSnapshot()
+                            tabManager.persistSnapshot()
                             selectedEmoji = ""
                         }
                     }
@@ -45,9 +46,8 @@ struct SpaceTitle: View {
                             emojiManager.toggle()
                         }
                         .onChange(of: emojiManager.selectedEmoji) { _, newValue in
-                            print(newValue)
                             space.icon = newValue
-                            browserManager.tabManager.persistSnapshot()
+                            tabManager.persistSnapshot()
                          }
                 } else {
                     Image(systemName: space.icon)
@@ -57,9 +57,8 @@ struct SpaceTitle: View {
                             emojiManager.toggle()
                         }
                         .onChange(of: emojiManager.selectedEmoji) { _, newValue in
-                            print(newValue)
                             space.icon = newValue
-                            browserManager.tabManager.persistSnapshot()
+                            tabManager.persistSnapshot()
                          }
                 }
 
@@ -100,7 +99,6 @@ struct SpaceTitle: View {
 
             Spacer()
             
-
 
             Menu {
                 SpaceContextMenu(
@@ -143,12 +141,12 @@ struct SpaceTitle: View {
         // Match tabs' internal left/right padding so text aligns
         .onChange(of: dragSession.pendingDrop) { _, drop in
             guard let drop = drop, drop.targetZone == .spacePinned(space.id) else { return }
-            guard browserManager.tabManager.spacePinnedTabs(for: space.id).isEmpty else { return }
-            let allTabs = browserManager.tabManager.allTabs()
+            guard tabManager.spacePinnedTabs(for: space.id).isEmpty else { return }
+            let allTabs = tabManager.allTabs()
             guard let tab = allTabs.first(where: { $0.id == drop.item.tabId }) else { return }
             let op = dragSession.makeDragOperation(from: drop, tab: tab)
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                browserManager.tabManager.handleDragOperation(op)
+                tabManager.handleDragOperation(op)
             }
             dragSession.pendingDrop = nil
         }
@@ -159,7 +157,7 @@ struct SpaceTitle: View {
         .background(hoverColor)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .contentShape(RoundedRectangle(cornerRadius: 12))
-        .onHover { hovering in
+        .onHoverTracking { hovering in
             withAnimation(.easeInOut(duration: 0.1)) {
                 isHovering = hovering
             }
@@ -206,7 +204,7 @@ struct SpaceTitle: View {
     private var isDropHovering: Bool {
         guard dragSession.isDragging else { return false }
         return dragSession.activeZone == .spacePinned(space.id)
-            && browserManager.tabManager.spacePinnedTabs(for: space.id).isEmpty
+            && tabManager.spacePinnedTabs(for: space.id).isEmpty
     }
 
     private var hoverColor: Color {
@@ -221,7 +219,7 @@ struct SpaceTitle: View {
     }
 
     private var canDeleteSpace: Bool {
-        browserManager.tabManager.spaces.count > 1
+        tabManager.spaces.count > 1
     }
 
     // MARK: - Actions
@@ -241,12 +239,11 @@ struct SpaceTitle: View {
         let newName = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
         if !newName.isEmpty, newName != space.name {
             do {
-                try browserManager.tabManager.renameSpace(
+                try tabManager.renameSpace(
                     spaceId: space.id,
                     newName: newName
                 )
             } catch {
-                print("⚠️ Failed to rename space \(space.id.uuidString):", error)
             }
         }
         isRenaming = false
@@ -254,32 +251,30 @@ struct SpaceTitle: View {
     }
 
     private func deleteSpace() {
-        browserManager.tabManager.removeSpace(space.id)
+        tabManager.removeSpace(space.id)
     }
 
     private func createFolder() {
-        print("🎯 SpaceTitle.createFolder() called for space '\(space.name)' (id: \(space.id.uuidString.prefix(8))...)")
-        browserManager.tabManager.createFolder(for: space.id)
+        tabManager.createFolder(for: space.id)
     }
 
     private func assignProfile(_ id: UUID) {
-        browserManager.tabManager.assign(spaceId: space.id, toProfile: id)
+        tabManager.assign(spaceId: space.id, toProfile: id)
     }
 
     private func updateSpace(name: String, icon: String, profileId: UUID?) {
         do {
             if icon != space.icon {
-                try browserManager.tabManager.updateSpaceIcon(spaceId: space.id, icon: icon)
+                try tabManager.updateSpaceIcon(spaceId: space.id, icon: icon)
             }
             if name != space.name {
-                try browserManager.tabManager.renameSpace(spaceId: space.id, newName: name)
+                try tabManager.renameSpace(spaceId: space.id, newName: name)
             }
             if profileId != space.profileId, let profileId = profileId {
-                browserManager.tabManager.assign(spaceId: space.id, toProfile: profileId)
+                tabManager.assign(spaceId: space.id, toProfile: profileId)
             }
             browserManager.dialogManager.closeDialog()
         } catch {
-            print("⚠️ Failed to update space \(space.id.uuidString):", error)
         }
     }
 

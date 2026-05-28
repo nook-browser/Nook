@@ -11,7 +11,6 @@ import Carbon
 import OSLog
 import Sparkle
 import SwiftUI
-import WebKit
 
 @main
 struct NookApp: App {
@@ -22,6 +21,7 @@ struct NookApp: App {
     @State private var aiConfigService: AIConfigService
     @State private var mcpManager = MCPManager()
     @State private var aiService: AIService
+    @State private var tabOrganizerManager = TabOrganizerManager()
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     // TEMPORARY: BrowserManager will be phased out as a global singleton.
@@ -47,6 +47,7 @@ struct NookApp: App {
                     .ignoresSafeArea(.all)
                     .background(BackgroundWindowModifier())
                     .environmentObject(browserManager)
+                    .environmentObject(browserManager.tabManager)
                     .environment(windowRegistry)
                     .environment(webViewCoordinator)
                     .environment(\.nookSettings, settingsManager)
@@ -54,6 +55,7 @@ struct NookApp: App {
                     .environment(aiConfigService)
                     .environment(mcpManager)
                     .environment(aiService)
+                    .environment(tabOrganizerManager)
                     .onAppear {
                         setupApplicationLifecycle()
                         setupAIServices()
@@ -68,21 +70,26 @@ struct NookApp: App {
             NookCommands(
                 browserManager: browserManager,
                 windowRegistry: windowRegistry,
-                shortcutManager: keyboardShortcutManager
+                shortcutManager: keyboardShortcutManager,
+                tabOrganizerManager: tabOrganizerManager
             )
         }
 
 
-        // Native macOS Settings window
-        Settings {
-            SettingsView()
+        // macOS 26 style sidebar settings window
+        Window("Nook Settings", id: "nook-settings") {
+            SettingsWindow()
                 .environmentObject(browserManager)
+                .environmentObject(browserManager.tabManager)
                 .environmentObject(browserManager.gradientColorManager)
                 .environment(\.nookSettings, settingsManager)
                 .environment(keyboardShortcutManager)
                 .environment(aiConfigService)
                 .environment(mcpManager)
+                .environment(tabOrganizerManager)
         }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
     }
 
     // MARK: - Application Lifecycle Setup
@@ -120,6 +127,7 @@ struct NookApp: App {
         appDelegate.browserManager = browserManager
         appDelegate.windowRegistry = windowRegistry
         appDelegate.mcpManager = mcpManager
+        appDelegate.drainPendingURLs()
         browserManager.appDelegate = appDelegate
 
         // TEMPORARY: Wire coordinators to BrowserManager
@@ -128,24 +136,44 @@ struct NookApp: App {
         browserManager.windowRegistry = windowRegistry
         browserManager.nookSettings = settingsManager
         browserManager.tabManager.nookSettings = settingsManager
+        browserManager.siteRoutingManager.settingsService = settingsManager
+        browserManager.siteRoutingManager.browserManager = browserManager
         browserManager.aiService = aiService
         browserManager.aiConfigService = aiConfigService
 
         // Configure managers that depend on settings
-        browserManager.compositorManager.setUnloadTimeout(
-            settingsManager.tabUnloadTimeout
+        browserManager.compositorManager.setMode(
+            settingsManager.tabManagementMode
         )
-        browserManager.trackingProtectionManager.setEnabled(
-            settingsManager.blockCrossSiteTracking
+        browserManager.contentBlockerManager.setEnabled(
+            settingsManager.blockCrossSiteTracking || settingsManager.adBlockerEnabled
         )
+
+        // Apply appearance mode
+        applyAppearanceMode(settingsManager.appearanceMode)
+        NotificationCenter.default.addObserver(
+            forName: .appearanceModeChanged,
+            object: nil,
+            queue: .main
+        ) { [weak settingsManager] _ in
+            guard let settings = settingsManager else { return }
+            applyAppearanceMode(settings.appearanceMode)
+        }
 
         // Initialize keyboard shortcut manager
         keyboardShortcutManager.setBrowserManager(browserManager)
         browserManager.keyboardShortcutManager = keyboardShortcutManager
+        browserManager.mcpManager = mcpManager
+        browserManager.tabOrganizerManager = tabOrganizerManager
 
         // Set up window lifecycle callbacks
         windowRegistry.onWindowRegister = { [weak browserManager] windowState in
             browserManager?.setupWindowState(windowState)
+        }
+        // Retroactively set up any windows that registered before this callback was set
+        // (child .onAppear fires before parent .onAppear in SwiftUI)
+        for (_, windowState) in windowRegistry.windows {
+            browserManager.setupWindowState(windowState)
         }
 
         windowRegistry.onWindowClose = {
@@ -169,9 +197,6 @@ struct NookApp: App {
                 // BrowserManager was deallocated - perform minimal cleanup
                 // Remove compositor container view to prevent leaks
                 webViewCoordinator.removeCompositorContainerView(for: windowId)
-                print(
-                    "⚠️ [NookApp] Window \(windowId) closed after BrowserManager deallocation - performed minimal cleanup"
-                )
             }
         }
 
@@ -182,12 +207,25 @@ struct NookApp: App {
     }
 }
 
+// MARK: - Appearance Mode
+
+private func applyAppearanceMode(_ mode: AppearanceMode) {
+    switch mode {
+    case .system:
+        NSApp.appearance = nil  // Follow system
+    case .light:
+        NSApp.appearance = NSAppearance(named: .aqua)
+    case .dark:
+        NSApp.appearance = NSAppearance(named: .darkAqua)
+    }
+}
+
 // MARK: - Window Configuration
 
 /// Configures the window appearance and behavior for Nook browser windows
 ///
 /// This modifier:
-/// - Hides the standard macOS title bar and window buttons
+/// - Hides the title bar text while keeping native traffic light buttons visible
 /// - Sets transparent background for custom window styling
 /// - Configures minimum window size
 /// - Enables full-size content view for edge-to-edge content
@@ -203,28 +241,34 @@ struct BackgroundWindowModifier: NSViewRepresentable {
                 window.isReleasedWhenClosed = false
                 // window.isMovableByWindowBackground = true // Disabled - use SwiftUI-based window drag system instead
                 window.isMovable = true
-                window.styleMask = [
+                var mask: NSWindow.StyleMask = [
                     .titled, .closable, .miniaturizable, .resizable,
                     .fullSizeContentView,
                 ]
+                // Preserve fullScreen flag — removing it outside a transition crashes on macOS 15.5+
+                if window.styleMask.contains(.fullScreen) {
+                    mask.insert(.fullScreen)
+                }
+                window.styleMask = mask
 
-                window.standardWindowButton(.closeButton)?.isHidden = true
-                window.standardWindowButton(.zoomButton)?.isHidden = true
-                window.standardWindowButton(.miniaturizeButton)?.isHidden = true
                 window.minSize = NSSize(width: 470, height: 382)
                 window.contentMinSize = NSSize(width: 470, height: 382)
+
+                // Persist and restore window frame (position + size) across launches.
+                // setFrameAutosaveName makes macOS automatically save the frame to
+                // UserDefaults whenever it changes, so the window size is remembered
+                // on close — not just on quit.
+                window.setFrameAutosaveName("NookBrowserWindow")
             }
         }
         return view
     }
     func updateNSView(_ nsView: NSView, context: Context) {
         guard let window = nsView.window else { return }
-        // Re-apply titlebar hiding on every update to prevent flash during view transitions
+        // Only re-apply if somehow reset (e.g., view transition flash)
+        guard !window.titlebarAppearsTransparent else { return }
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
-        window.standardWindowButton(.closeButton)?.isHidden = true
-        window.standardWindowButton(.zoomButton)?.isHidden = true
-        window.standardWindowButton(.miniaturizeButton)?.isHidden = true
     }
 }
 
