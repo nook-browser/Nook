@@ -82,6 +82,8 @@ class AIConfigService {
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             let data = try JSONEncoder().encode(config)
             try data.write(to: configURL, options: .atomic)
+            // SECURITY: Restrict config file permissions to owner-only (may contain sensitive paths/settings)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: configURL.path)
         } catch {
             Self.log.error("Failed to save AI config: \(error.localizedDescription)")
         }
@@ -340,7 +342,7 @@ class AIConfigService {
             activeModelId: nil,
             generationConfig: AIGenerationConfig(),
             mcpServers: [],
-            browserToolsConfig: BrowserToolsConfig()
+            browserToolsConfig: BrowserToolsConfig(executionMode: .askBeforeExecuting)
         )
     }
 

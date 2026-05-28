@@ -28,7 +28,6 @@ struct NavButtonStyle: ButtonStyle {
 
             configuration.label
                 .foregroundStyle(.primary)
-//                .font(.system(size: iconSize))
         }
         .opacity(isEnabled ? 1.0 : 0.3)
         
@@ -36,7 +35,7 @@ struct NavButtonStyle: ButtonStyle {
         .scaleEffect(configuration.isPressed && isEnabled ? 0.95 : 1.0)
         .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
         .animation(.easeInOut(duration: 0.15), value: isHovering)
-        .onHover { hovering in
+        .onHoverTracking { hovering in
             isHovering = hovering
         }
     }
@@ -52,17 +51,6 @@ struct NavButtonStyle: ButtonStyle {
         @unknown default: 32
         }
     }
-    
-//    private var iconSize: CGFloat {
-//        switch controlSize {
-//        case .mini: 12
-//        case .small: 14
-//        case .regular: 16
-//        case .large: 18
-//        case .extraLarge: 20
-//        @unknown default: 16
-//        }
-//    }
     
     private var cornerRadius: CGFloat {
         8
@@ -100,7 +88,7 @@ struct RectNavButtonStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed && isEnabled ? 0.95 : 1.0)
             .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
             .animation(.easeInOut(duration: 0.15), value: isHovering)
-            .onHover { hovering in
+            .onHoverTracking { hovering in
                 isHovering = hovering
             }
     }
@@ -144,7 +132,6 @@ struct RectNavButtonStyle: ButtonStyle {
     VStack(spacing: 20) {
         // Default
         Button {
-            print("Tapped")
         } label: {
             Image(systemName: "arrow.left")
         }
@@ -153,7 +140,6 @@ struct RectNavButtonStyle: ButtonStyle {
 
         // With foregroundStyle
         Button {
-            print("Tapped")
         } label: {
             Image(systemName: "heart.fill")
         }
@@ -184,7 +170,6 @@ struct RectNavButtonStyle: ButtonStyle {
 
         // Disabled
         Button {
-            print("Tapped")
         } label: {
             Image(systemName: "trash")
         }
@@ -199,7 +184,6 @@ struct RectNavButtonStyle: ButtonStyle {
     VStack(spacing: 20) {
         // Icon with text
         Button {
-            print("New Space")
         } label: {
             Label("New Space", systemImage: "plus")
         }
@@ -208,7 +192,6 @@ struct RectNavButtonStyle: ButtonStyle {
 
         // Icon only (still rectangular due to padding)
         Button {
-            print("Add")
         } label: {
             Image(systemName: "plus")
         }
@@ -239,7 +222,6 @@ struct RectNavButtonStyle: ButtonStyle {
 
         // Disabled
         Button {
-            print("Disabled")
         } label: {
             Label("Disabled", systemImage: "xmark")
         }

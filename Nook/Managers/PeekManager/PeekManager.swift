@@ -24,7 +24,7 @@ final class PeekManager: ObservableObject {
     }
 
     func presentExternalURL(_ url: URL, from tab: Tab?) {
-        guard let browserManager else { return }
+        guard browserManager != nil else { return }
 
         // Don't show Peek if already showing this URL
         if currentSession?.currentURL == url {
@@ -47,9 +47,11 @@ final class PeekManager: ObservableObject {
         self.webView = peekWebView
         
         // Defer activation to avoid runloop-mode reentrancy from WebKit delegates
-        RunLoop.current.perform {
-            self.isActive = true
-            NotificationCenter.default.post(name: .peekDidActivate, object: self)
+        RunLoop.current.perform { [weak self] in
+            MainActor.assumeIsolated {
+                self?.isActive = true
+                NotificationCenter.default.post(name: .peekDidActivate, object: self)
+            }
         }
     }
 

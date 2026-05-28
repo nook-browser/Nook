@@ -361,7 +361,7 @@ struct BrowserToolsConfig: Codable, Equatable {
     ]
 
     init(
-        executionMode: BrowserToolExecutionMode = .auto,
+        executionMode: BrowserToolExecutionMode = .askBeforeExecuting,
         enabledTools: Set<String> = BrowserToolsConfig.allToolNames
     ) {
         self.executionMode = executionMode

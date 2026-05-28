@@ -60,8 +60,6 @@ struct NookButtonStyle: ButtonStyle {
             let baseColor = backgroundColor()
             let contrastingShade = contrastingTextColor(for: baseColor)
             let backgroundWithHover = baseColor.mix(with: contrastingShade, by: isHovering ? hoverMixAmount : 0)
-            let shadowColor = shadowColorForBackground(baseColor)
-            let highlightColor = highlightColorForBackground(baseColor)
 
             // Main button label with background
             configuration.label
@@ -76,7 +74,7 @@ struct NookButtonStyle: ButtonStyle {
         .opacity(isEnabled ? 1.0 : disabledOpacity)
         .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
         .animation(.easeInOut(duration: 0.15), value: isHovering)
-        .onHover { hovering in
+        .onHoverTracking { hovering in
             isHovering = hovering
         }
     }
@@ -85,30 +83,12 @@ struct NookButtonStyle: ButtonStyle {
 
     /// Returns the contrasting text color for the given background
     private func contrastingTextColor(for background: Color) -> Color {
-        (try? Garnish.contrastingShade(
+        Garnish.contrastingShade(
             of: background,
             targetRatio: 2,
             direction: .preferLight,
             blendStyle: .strong
-        )) ?? textColor
-    }
-
-    /// Returns the shadow color for the given background
-    private func shadowColorForBackground(_ background: Color) -> Color {
-        (try? Garnish.contrastingShade(
-            of: background,
-            targetRatio: 1.5,
-            direction: .forceDark
-        )) ?? textColor
-    }
-
-    /// Returns the highlight color for the given background
-    private func highlightColorForBackground(_ background: Color) -> Color {
-        (try? Garnish.contrastingShade(
-            of: background,
-            targetRatio: 2,
-            direction: .preferLight
-        )) ?? textColor
+        ) ?? textColor
     }
 
     /// Returns the highlight opacity based on button state
@@ -235,28 +215,23 @@ private struct ButtonPreviewSection: View {
     private var buttonStack: some View {
         VStack(spacing: 20) {
             Button("Create Space", systemImage: "plus") {
-                print("Create")
             }
             .buttonStyle(.nookButtonProminent)
             .background(.red)
 
             Button("Cancel") {
-                print("Cancel")
             }
             .buttonStyle(.nookButton)
 
             Button("Delete", systemImage: "trash") {
-                print("Delete")
             }
             .buttonStyle(.nookButton(role: .destructive))
 
             Button("Erase Everything", systemImage: "flame") {
-                print("Erase")
             }
             .buttonStyle(.nookButtonProminent(role: .destructive))
 
             Button("Disabled") {
-                print("Disabled")
             }
             .buttonStyle(.nookButtonProminent)
             .disabled(true)

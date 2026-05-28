@@ -8,7 +8,6 @@ struct AppColors {
     static let textPrimary = Color(nsColor: .labelColor)
     static let textSecondary = Color(nsColor: .secondaryLabelColor)
     static let textTertiary = Color(nsColor: .tertiaryLabelColor)
-    static let textQuaternary = Color(nsColor: .quaternaryLabelColor)
 
     static let background = Color(nsColor: .windowBackgroundColor)
     static let backgroundSecondary = Color(nsColor: .underPageBackgroundColor)
@@ -17,19 +16,11 @@ struct AppColors {
     static let controlBackgroundHover = Color.gray.opacity(0.8)
     static let controlBackgroundHoverLight = Color.gray.opacity(0.2)
     static let controlBackgroundActive = Color.white.opacity(0.3)
-    static let activeTab = Color.white.opacity(1.0)
-    static let inactiveTab = Color(nsColor: .controlBackgroundColor).opacity(0.1)
-    
-    
-    
+
     static let iconActiveLight = Color.white.opacity(0.6)
-    static let iconDisabledLight = Color.white.opacity(0.25)
-    static let iconHoverLight = Color.white.opacity(0.1)
-    
+
     static let iconActiveDark = Color.black.opacity(0.55)
-    static let iconDisabledDark = Color.black.opacity(0.15)
-    static let iconHoverDark = Color.black.opacity(0.1)
-    
+
     static let spaceTabActiveLight = Color.white.opacity(0.2)
     static let spaceTabHoverLight = Color.white.opacity(0.1)
     static let spaceTabTextLight = Color(hex: "EAE6DC")

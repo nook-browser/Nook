@@ -11,19 +11,20 @@ struct SpaceTab: View {
     @ObservedObject var tab: Tab
     var action: () -> Void
     var onClose: () -> Void
+    var onUnload: (() -> Void)? = nil
     var onMute: () -> Void
     @State private var isHovering: Bool = false
     @State private var isCloseHovering: Bool = false
     @State private var isSpeakerHovering: Bool = false
     @FocusState private var isTextFieldFocused: Bool
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var tabManager: TabManager
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.colorScheme) var colorScheme
 
     var body: some View {
         Button(action: {
             if isCurrentTab {
-                print("🔄 [SpaceTab] Starting rename for tab '\(tab.name)' in window \(windowState.id)")
                 tab.startRenaming()
                 isTextFieldFocused = true
             } else {
@@ -34,23 +35,12 @@ struct SpaceTab: View {
             }
         }) {
             HStack(spacing: 8) {
-                ZStack {
-                    tab.favicon
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 18, height: 18)
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                        .opacity(tab.isUnloaded ? 0.5 : 1.0)
-                    
-                    if tab.isUnloaded {
-                        Image(systemName: "arrow.down.circle.fill")
-                            .font(.system(size: 8))
-                            .foregroundColor(.secondary)
-                            .background(Color.gray)
-                            .clipShape(Circle())
-                            .offset(x: 6, y: -6)
-                    }
-                }
+                tab.favicon
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 18, height: 18)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .opacity(tab.isUnloaded ? 0.5 : 1.0)
                 if tab.hasAudioContent || tab.hasPlayingAudio || tab.isAudioMuted {
                     Button(action: {
                         onMute()
@@ -67,7 +57,7 @@ struct SpaceTab: View {
                         }
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .onHover { hovering in
+                    .onHoverTracking { hovering in
                         isSpeakerHovering = hovering
                     }
                     .help(tab.isAudioMuted ? "Unmute Audio" : "Mute Audio")
@@ -84,16 +74,12 @@ struct SpaceTab: View {
                         .onExitCommand {
                             tab.cancelRename()
                         }
-                        .onAppear {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                if let textField = NSApp.keyWindow?.firstResponder as? NSTextView {
-                                    textField.selectAll(nil)
-                                }
-                            }
-                        }
                         .focused($isTextFieldFocused)
+                        .onAppear {
+                            isTextFieldFocused = true
+                        }
                 } else {
-                    Text(tab.name)
+                    Text(tab.displayName)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(textTab)
                         .lineLimit(1)
@@ -103,18 +89,19 @@ struct SpaceTab: View {
                 Spacer()
 
 
-
                 if isHovering {
-                    Button(action: onClose) {
-                        Image(systemName: "xmark")
+                    // Space-pinned loaded tabs: show "-" to unload; unloaded: show "x" to remove
+                    let useUnload = onUnload != nil && !tab.isUnloaded
+                    Button(action: useUnload ? onUnload! : onClose) {
+                        Image(systemName: useUnload ? "minus" : "xmark")
                             .font(.system(size: 12, weight: .heavy))
                             .foregroundColor(textTab)
-                            .frame(width: 24,height: 24)
+                            .frame(width: 24, height: 24)
                             .background(isCloseHovering ? (isCurrentTab ? AppColors.controlBackgroundHoverLight : AppColors.controlBackgroundActive) : Color.clear)
                             .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .onHover { hovering in
+                    .onHoverTracking { hovering in
                         isCloseHovering = hovering
                     }
                 }
@@ -128,7 +115,7 @@ struct SpaceTab: View {
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(PlainButtonStyle())
-        .onHover { hovering in
+        .onHoverTracking { hovering in
             withAnimation(.easeInOut(duration: 0.05)) {
                 isHovering = hovering
             }
@@ -148,6 +135,9 @@ struct SpaceTab: View {
             Options()
         }
         .shadow(color: isActive ? shadowColor : Color.clear, radius: isActive ? 2 : 0, y: 1.5)
+        .onAppear {
+            tab.ensureFaviconLoaded()
+        }
     }
     
     @ViewBuilder
@@ -166,23 +156,25 @@ struct SpaceTab: View {
     @ViewBuilder
     private var addToMenuSection: some View {
         let spaceId = tab.spaceId ?? UUID()
-        let folders = browserManager.tabManager.folders(for: spaceId)
+        let folders = tabManager.folders(for: spaceId)
 
-        Menu {
-            ForEach(folders, id: \.id) { folder in
-                Button {
-                    // TODO: Add tab to folder
-                } label: {
-                    Label(folder.name, systemImage: "folder.fill")
+        if !folders.isEmpty {
+            Menu {
+                ForEach(folders, id: \.id) { folder in
+                    Button {
+                        tabManager.moveTabToRegularFolder(tab: tab, folderId: folder.id)
+                    } label: {
+                        Label(folder.name, systemImage: "folder.fill")
+                    }
                 }
+            } label: {
+                Label("Add to Folder", systemImage: "folder.badge.plus")
             }
-        } label: {
-            Label("Add to Folder", systemImage: "folder.badge.plus")
         }
 
         if !tab.isPinned && !tab.isSpacePinned {
             Button {
-                browserManager.tabManager.pinTab(tab)
+                tabManager.pinTab(tab)
             } label: {
                 Label("Add to Favorites", systemImage: "star.fill")
             }
@@ -199,17 +191,58 @@ struct SpaceTab: View {
         }
 
         Button {
-            // TODO: Implement share
+            let picker = NSSharingServicePicker(items: [tab.url as NSURL])
+            if let window = NSApp.keyWindow {
+                let origin = NSPoint(x: window.frame.midX, y: window.frame.midY)
+                picker.show(relativeTo: .zero, of: window.contentView ?? NSView(), preferredEdge: .minY)
+                _ = origin
+            }
         } label: {
             Label("Share", systemImage: "square.and.arrow.up")
         }
-        .disabled(true)
 
         Button {
             tab.startRenaming()
             isTextFieldFocused = true
         } label: {
             Label("Rename", systemImage: "character.cursor.ibeam")
+        }
+
+        if tab.displayNameOverride != nil {
+            Button {
+                tab.displayNameOverride = nil
+            } label: {
+                Label("Reset Tab Name", systemImage: "arrow.uturn.backward")
+            }
+        }
+
+        if (tab.isPinned || tab.isSpacePinned), tab.hasNavigatedAwayFromPinnedURL {
+            Button {
+                tab.resetToPinnedURL()
+            } label: {
+                Label("Reset to Pinned URL", systemImage: "arrow.uturn.backward.circle")
+            }
+        }
+
+        if (tab.isPinned || tab.isSpacePinned), tab.pinnedURL != nil {
+            Button {
+                browserManager.dialogManager.showDialog(
+                    EditPinnedURLDialog(
+                        tab: tab,
+                        onSave: { newURL in
+                            tab.pinnedURL = newURL
+                            tab.loadURL(newURL)
+                            browserManager.dialogManager.closeDialog()
+                            tabManager.debouncedPersistSnapshot()
+                        },
+                        onCancel: {
+                            browserManager.dialogManager.closeDialog()
+                        }
+                    )
+                )
+            } label: {
+                Label("Edit Pinned URL", systemImage: "pencil.circle")
+            }
         }
     }
 
@@ -250,11 +283,11 @@ struct SpaceTab: View {
 
     @ViewBuilder
     private var moveToSpaceMenu: some View {
-        let spaces = browserManager.tabManager.spaces
+        let spaces = tabManager.spaces
         Menu {
             ForEach(spaces, id: \.id) { space in
                 Button {
-                    browserManager.tabManager.moveTab(tab.id, to: space.id)
+                    tabManager.moveTab(tab.id, to: space.id)
                 } label: {
                     spaceLabel(for: space)
                 }
@@ -282,18 +315,20 @@ struct SpaceTab: View {
     private var closeMenuSection: some View {
         if !tab.isPinned && !tab.isSpacePinned && tab.spaceId != nil {
             Button {
-                browserManager.tabManager.closeAllTabsBelow(tab)
+                tabManager.closeAllTabsBelow(tab)
             } label: {
                 Label("Close All Below", systemImage: "arrow.down.to.line")
             }
         }
 
-        Button {
-            // TODO: Implement close all except this
-        } label: {
-            Label("Close Others", systemImage: "xmark.circle")
+        let hasOtherTabs = (tabManager.tabsBySpace[tab.spaceId ?? UUID()]?.filter { $0.id != tab.id }.isEmpty == false)
+        if hasOtherTabs && !tab.isPinned && !tab.isSpacePinned {
+            Button {
+                tabManager.closeOtherTabs(tab)
+            } label: {
+                Label("Close Others", systemImage: "xmark.circle")
+            }
         }
-        .disabled(true)
 
         Button(role: .destructive) {
             onClose()

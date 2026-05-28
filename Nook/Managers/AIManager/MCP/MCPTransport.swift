@@ -36,6 +36,17 @@ final class StdioTransport: MCPTransportProtocol, @unchecked Sendable {
     }
 
     func start() throws {
+        // SECURITY: Validate that the command path exists and is executable before launching
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: command) else {
+            Self.log.warning("MCP command path does not exist: \(self.command)")
+            throw MCPTransportError.invalidCommandPath
+        }
+        guard fm.isExecutableFile(atPath: command) else {
+            Self.log.warning("MCP command path is not executable: \(self.command)")
+            throw MCPTransportError.invalidCommandPath
+        }
+
         let process = Process()
         let stdinPipe = Pipe()
         let stdoutPipe = Pipe()
@@ -47,6 +58,40 @@ final class StdioTransport: MCPTransportProtocol, @unchecked Sendable {
         process.standardError = FileHandle.nullDevice
 
         var env = ProcessInfo.processInfo.environment
+
+        // Remove sensitive environment variables that shouldn't be passed to MCP servers
+        let sensitiveKeys: Set<String> = [
+            "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN",
+            "GITHUB_TOKEN", "GH_TOKEN", "GITLAB_TOKEN",
+            "OPENAI_API_KEY", "ANTHROPIC_API_KEY",
+            "DATABASE_URL", "DB_PASSWORD",
+            "SECRET_KEY", "PRIVATE_KEY",
+            "STRIPE_SECRET_KEY", "TWILIO_AUTH_TOKEN",
+        ]
+        let beforeCount = env.count
+        for key in sensitiveKeys {
+            env.removeValue(forKey: key)
+        }
+        // Also remove any key containing "SECRET", "PASSWORD", "PRIVATE_KEY", or "_TOKEN"
+        // (but keep PATH, HOME, TERM, etc.)
+        let safePatterns: Set<String> = ["PATH", "HOME", "USER", "SHELL", "TERM", "LANG", "LC_", "TMPDIR", "XDG_"]
+        env = env.filter { (key, _) in
+            let upper = key.uppercased()
+            // Keep if it's a known-safe key
+            if safePatterns.contains(where: { upper.hasPrefix($0) }) { return true }
+            // Remove if it looks like a secret
+            if upper.contains("SECRET") || upper.contains("PASSWORD") || upper.contains("PRIVATE_KEY") { return false }
+            if upper.contains("_TOKEN") && !upper.hasPrefix("DBUS") { return false }
+            if upper.contains("_API_KEY") { return false }
+            // Keep everything else
+            return true
+        }
+        let filteredCount = beforeCount - env.count
+        if filteredCount > 0 {
+            Self.log.info("Filtered \(filteredCount) sensitive environment variables from MCP subprocess")
+        }
+
+        // Apply user-specified env vars (these are intentional)
         for (key, value) in envVars {
             env[key] = value
         }
@@ -174,15 +219,27 @@ final class SSETransport: MCPTransportProtocol, @unchecked Sendable {
     // Track the receive task for cancellation
     private var receiveTask: Task<Void, Never>?
 
+    /// Maximum allowed size for a single SSE message (10 MB)
+    private static let maxMessageSize = 10 * 1024 * 1024
 
     init(url: String) {
         self.url = url
     }
 
     func connect() async throws {
-        guard URL(string: url) != nil else {
+        guard let parsedURL = URL(string: url) else {
             throw MCPTransportError.invalidURL
         }
+
+        // Require HTTPS for non-local connections to prevent MITM attacks
+        let scheme = parsedURL.scheme?.lowercased() ?? ""
+        let host = parsedURL.host?.lowercased() ?? ""
+        let isLocal = host == "localhost" || host == "127.0.0.1" || host == "::1"
+        if scheme != "https" && !isLocal {
+            Self.log.warning("MCP SSE transport requires HTTPS for non-local connections. Got: \(scheme)://\(host)")
+            throw MCPTransportError.invalidURL
+        }
+
         Self.log.info("Connected to SSE endpoint: \(self.url)")
     }
 
@@ -235,6 +292,11 @@ final class SSETransport: MCPTransportProtocol, @unchecked Sendable {
                         if line.hasPrefix("data: ") {
                             let dataStr = String(line.dropFirst(6))
                             if let data = dataStr.data(using: .utf8) {
+                                // SECURITY: Discard messages that exceed the maximum size limit
+                                if data.count > SSETransport.maxMessageSize {
+                                    Self.log.warning("SSE message exceeds maximum size limit (\(data.count) bytes > \(SSETransport.maxMessageSize) bytes) — discarding")
+                                    continue
+                                }
                                 continuation.yield(data)
                             }
                         }
@@ -274,6 +336,8 @@ enum MCPTransportError: LocalizedError {
     case invalidURL
     case sendFailed
     case processNotRunning
+    case invalidCommandPath
+    case messageTooLarge
 
     var errorDescription: String? {
         switch self {
@@ -281,6 +345,8 @@ enum MCPTransportError: LocalizedError {
         case .invalidURL: return "Invalid URL"
         case .sendFailed: return "Failed to send message"
         case .processNotRunning: return "Process is not running"
+        case .invalidCommandPath: return "Command path does not exist or is not executable"
+        case .messageTooLarge: return "Message exceeds maximum allowed size"
         }
     }
 }

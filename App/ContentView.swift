@@ -11,6 +11,7 @@ import AppKit
 
 struct ContentView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var tabManager: TabManager
     @Environment(WindowRegistry.self) private var windowRegistry
     @State private var defaultWindowState = BrowserWindowState()
     @State private var commandPalette = CommandPalette()
@@ -34,7 +35,7 @@ struct ContentView: View {
             .frame(minWidth: 470, minHeight: 382)
             .onAppear {
                 // Set TabManager reference for computed properties
-                windowState.tabManager = browserManager.tabManager
+                windowState.tabManager = tabManager
                 // Set CommandPalette reference for global shortcuts
                 windowState.commandPalette = commandPalette
                 // Register this window state with the registry
@@ -64,9 +65,9 @@ private struct WindowFocusBridge: NSViewRepresentable {
     }
     
     func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async {
-            context.coordinator.attach(to: nsView.window)
-        }
+        // Window is available at update time — call synchronously.
+        // The attach method guards against re-attachment to the same window.
+        context.coordinator.attach(to: nsView.window)
     }
     
     static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
@@ -89,6 +90,12 @@ private struct WindowFocusBridge: NSViewRepresentable {
             detach()
             self.window = window
             guard let window else { return }
+
+            // Store NSWindow reference on the window state so other systems
+            // (e.g. KeyboardShortcutManager) can identify browser windows
+            Task { @MainActor in
+                windowState.window = window
+            }
 
             keyObserver = NotificationCenter.default.addObserver(
                 forName: NSWindow.didBecomeKeyNotification,

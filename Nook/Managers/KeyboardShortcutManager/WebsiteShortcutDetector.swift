@@ -35,20 +35,12 @@ class WebsiteShortcutDetector {
     /// The timeout duration for double-press detection (1 second as specified)
     let conflictTimeout: TimeInterval = 1.0
     
-    /// Timer for cleaning up expired pending shortcuts
-    nonisolated(unsafe) private var cleanupTimer: Timer?
-    
     /// Weak reference to browser manager for notifications
     weak var browserManager: BrowserManager?
-    
+
     // MARK: - Initialization
-    
+
     init() {
-        startCleanupTimer()
-    }
-    
-    deinit {
-        cleanupTimer?.invalidate()
     }
     
     // MARK: - Public Interface
@@ -62,10 +54,8 @@ class WebsiteShortcutDetector {
         if let url = url {
             let matchedProfile = WebsiteShortcutProfile.knownProfiles.first { $0.matches(url: url) }
             currentProfile = matchedProfile
-            print("⌨️ [Detector] URL updated: \(url.host ?? "nil"), matched profile: \(matchedProfile?.name ?? "none")")
         } else {
             currentProfile = nil
-            print("⌨️ [Detector] URL cleared, no profile")
         }
     }
     
@@ -73,18 +63,13 @@ class WebsiteShortcutDetector {
     /// Returns the website shortcut info if found, nil otherwise
     func isKnownWebsiteShortcut(_ keyCombination: KeyCombination) -> WebsiteShortcut? {
         guard WebsiteShortcutProfile.isFeatureEnabled else { 
-            print("⌨️ [Detector] Feature disabled, not checking shortcuts")
             return nil 
         }
         
-        print("⌨️ [Detector] Checking shortcut: \(keyCombination.lookupKey)")
-        print("⌨️ [Detector] Current URL: \(currentURL?.host ?? "nil")")
-        print("⌨️ [Detector] Current profile: \(currentProfile?.name ?? "nil")")
         
         // Check known profile first
         if let profile = currentProfile,
            let shortcut = profile.hasShortcut(matching: keyCombination) {
-            print("⌨️ [Detector] ✅ Found matching shortcut in profile: \(profile.name)")
             return shortcut
         }
         
@@ -92,12 +77,10 @@ class WebsiteShortcutDetector {
         if let urlKey = currentURL?.absoluteString,
            let detectedKeys = jsDetectedShortcuts[urlKey],
            detectedKeys.contains(keyCombination.lookupKey) {
-            print("⌨️ [Detector] ✅ Found matching shortcut in JS-detected: \(keyCombination.lookupKey)")
             // Return a generic detected shortcut
             return WebsiteShortcut(key: keyCombination.key, modifiers: keyCombination.modifiers, description: nil)
         }
         
-        print("⌨️ [Detector] ❌ No matching shortcut found")
         return nil
     }
     
@@ -109,16 +92,17 @@ class WebsiteShortcutDetector {
         windowId: UUID,
         nookActionName: String
     ) -> Bool {
-        guard WebsiteShortcutProfile.isFeatureEnabled else { 
-            print("⌨️ [Detector] Feature disabled, not passing through")
-            return false 
+        guard WebsiteShortcutProfile.isFeatureEnabled else {
+            return false
         }
-        
-        guard let websiteShortcut = isKnownWebsiteShortcut(keyCombination) else { 
-            print("⌨️ [Detector] No matching website shortcut for: \(keyCombination.lookupKey)")
-            return false 
+
+        guard let websiteShortcut = isKnownWebsiteShortcut(keyCombination) else {
+            return false
         }
-        
+
+        // Clean up expired entries on-demand instead of polling
+        cleanupExpiredPendingShortcuts()
+
         let now = Date()
         
         // Check if there's already a pending shortcut for this window
@@ -127,14 +111,12 @@ class WebsiteShortcutDetector {
            now.timeIntervalSince(pending.timestamp) <= conflictTimeout {
             // This is the SECOND press within timeout - clear pending and return false
             // so Nook can capture it
-            print("⌨️ [Detector] SECOND press detected - capturing for Nook")
             pendingShortcuts.removeValue(forKey: windowId)
             return false
         }
         
         // This is the FIRST press - set pending state and show toast
         let websiteName = currentProfile?.name ?? "Website"
-        print("⌨️ [Detector] FIRST press - passing to website: \(websiteName)")
         pendingShortcuts[windowId] = PendingShortcut(
             keyCombination: keyCombination,
             timestamp: now,
@@ -156,6 +138,7 @@ class WebsiteShortcutDetector {
     
     /// Check if there's a pending shortcut for the given window
     func hasPendingShortcut(for windowId: UUID) -> Bool {
+        cleanupExpiredPendingShortcuts()
         guard let pending = pendingShortcuts[windowId] else { return false }
         return Date().timeIntervalSince(pending.timestamp) <= conflictTimeout
     }
@@ -177,16 +160,7 @@ class WebsiteShortcutDetector {
     }
     
     // MARK: - Private Methods
-    
-    private func startCleanupTimer() {
-        // Clean up expired pending shortcuts every 500ms
-        cleanupTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.cleanupExpiredPendingShortcuts()
-            }
-        }
-    }
-    
+
     private func cleanupExpiredPendingShortcuts() {
         let now = Date()
         let expiredWindows = pendingShortcuts.filter { now.timeIntervalSince($0.value.timestamp) > 1.5 }

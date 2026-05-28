@@ -18,9 +18,11 @@ struct WebView: NSViewRepresentable {
         webView.allowsMagnification = true
         
         // Enable web inspector for debugging
+        #if DEBUG
         if #available(macOS 13.3, *) {
             webView.isInspectable = true
         }
+        #endif
 
         webView.customUserAgent =
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
@@ -36,9 +38,8 @@ struct WebView: NSViewRepresentable {
 
         if webView.url != url {
             if url.isFileURL {
-                // Grant read access to the containing directory for local resources
-                let readAccessURL = url.deletingLastPathComponent()
-                webView.loadFileURL(url, allowingReadAccessTo: readAccessURL)
+                // Grant read access only to the specific file for security
+                webView.loadFileURL(url, allowingReadAccessTo: url)
             } else {
                 var request = URLRequest(url: url)
                 request.cachePolicy = .returnCacheDataElseLoad
@@ -70,19 +71,15 @@ extension WebView.Coordinator: WKNavigationDelegate {
         _ webView: WKWebView,
         didStartProvisionalNavigation navigation: WKNavigation!
     ) {
-        print("Started loading: \(webView.url?.absoluteString ?? "")")
         if let url = webView.url?.absoluteString {
             onURLChange?(url)
         }
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
-        print("Content started loading: \(webView.url?.absoluteString ?? "")")
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        print("Finished loading: \(webView.url?.absoluteString ?? "")")
-
         webView.evaluateJavaScript("document.title") {
             [weak self] result, error in
             if let title = result as? String, !title.isEmpty {
@@ -102,7 +99,6 @@ extension WebView.Coordinator: WKNavigationDelegate {
         didFail navigation: WKNavigation!,
         withError error: Error
     ) {
-        print("Navigation failed: \(error.localizedDescription)")
     }
 
     func webView(
@@ -110,7 +106,6 @@ extension WebView.Coordinator: WKNavigationDelegate {
         didFailProvisionalNavigation navigation: WKNavigation!,
         withError error: Error
     ) {
-        print("Provisional navigation failed: \(error.localizedDescription)")
     }
 
     func webView(
@@ -118,7 +113,26 @@ extension WebView.Coordinator: WKNavigationDelegate {
         decidePolicyFor navigationAction: WKNavigationAction,
         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
     ) {
-        decisionHandler(.allow)
+        guard let url = navigationAction.request.url else {
+            decisionHandler(.allow)
+            return
+        }
+
+        let scheme = url.scheme?.lowercased() ?? ""
+        let allowedSchemes: Set<String> = ["http", "https", "about", "blob", "data", "webkit-extension", "safari-web-extension"]
+
+        if scheme.isEmpty || allowedSchemes.contains(scheme) {
+            decisionHandler(.allow)
+        } else if scheme == "javascript" {
+            // Block javascript: URLs to prevent XSS
+            decisionHandler(.cancel)
+        } else {
+            // For other schemes (mailto:, tel:, app-specific), let macOS handle them
+            if let url = navigationAction.request.url {
+                NSWorkspace.shared.open(url)
+            }
+            decisionHandler(.cancel)
+        }
     }
 
     func webView(
@@ -150,9 +164,11 @@ extension WebView.Coordinator: WKUIDelegate {
         initiatedByFrame frame: WKFrameInfo,
         completionHandler: @escaping () -> Void
     ) {
+        let domain = frame.securityOrigin.host
+        let truncatedMessage = message.count > 500 ? String(message.prefix(500)) + "..." : message
         let alert = NSAlert()
-        alert.messageText = "JavaScript Alert"
-        alert.informativeText = message
+        alert.messageText = "JavaScript Alert from \(domain)"
+        alert.informativeText = truncatedMessage
         alert.addButton(withTitle: "OK")
         alert.runModal()
         completionHandler()
@@ -164,9 +180,11 @@ extension WebView.Coordinator: WKUIDelegate {
         initiatedByFrame frame: WKFrameInfo,
         completionHandler: @escaping (Bool) -> Void
     ) {
+        let domain = frame.securityOrigin.host
+        let truncatedMessage = message.count > 500 ? String(message.prefix(500)) + "..." : message
         let alert = NSAlert()
-        alert.messageText = "JavaScript Confirm"
-        alert.informativeText = message
+        alert.messageText = "JavaScript Confirm from \(domain)"
+        alert.informativeText = truncatedMessage
         alert.addButton(withTitle: "OK")
         alert.addButton(withTitle: "Cancel")
         let response = alert.runModal()
@@ -180,9 +198,11 @@ extension WebView.Coordinator: WKUIDelegate {
         initiatedByFrame frame: WKFrameInfo,
         completionHandler: @escaping (String?) -> Void
     ) {
+        let domain = frame.securityOrigin.host
+        let truncatedMessage = prompt.count > 500 ? String(prompt.prefix(500)) + "..." : prompt
         let alert = NSAlert()
-        alert.messageText = "JavaScript Prompt"
-        alert.informativeText = prompt
+        alert.messageText = "JavaScript Prompt from \(domain)"
+        alert.informativeText = truncatedMessage
         alert.addButton(withTitle: "OK")
         alert.addButton(withTitle: "Cancel")
 
@@ -206,11 +226,8 @@ extension WebView.Coordinator: WKUIDelegate {
         _ webView: WKWebView,
         enterFullScreenForVideoWith completionHandler: @escaping (Bool, Error?) -> Void
     ) {
-        print("🎬 [WebView] Entering full-screen for video")
-        
         // Get the window containing this webView
         guard let window = webView.window else {
-            print("❌ [WebView] No window found for full-screen")
             completionHandler(false, NSError(domain: "WebView", code: -1, userInfo: [NSLocalizedDescriptionKey: "No window available for full-screen"]))
             return
         }
@@ -263,24 +280,18 @@ extension WebView.Coordinator: WKUIDelegate {
             if let window = webView.window {
                 // Present as sheet if we have a window
                 openPanel.beginSheetModal(for: window) { response in
-                    print("📁 [WebView] Open panel sheet completed with response: \(response)")
                     if response == .OK {
-                        print("📁 [WebView] User selected files: \(openPanel.urls.map { $0.lastPathComponent })")
                         completionHandler(openPanel.urls)
                     } else {
-                        print("📁 [WebView] User cancelled file selection")
                         completionHandler(nil)
                     }
                 }
             } else {
                 // Fall back to modal presentation
                 openPanel.begin { response in
-                    print("📁 [WebView] Open panel modal completed with response: \(response)")
                     if response == .OK {
-                        print("📁 [WebView] User selected files: \(openPanel.urls.map { $0.lastPathComponent })")
                         completionHandler(openPanel.urls)
                     } else {
-                        print("📁 [WebView] User cancelled file selection")
                         completionHandler(nil)
                     }
                 }

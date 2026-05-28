@@ -7,15 +7,16 @@
 //
 
 import SwiftUI
-import UniversalGlass
 
 /// Main window view that orchestrates the browser UI layout
 struct WindowView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var tabManager: TabManager
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(CommandPalette.self) private var commandPalette
     @Environment(WindowRegistry.self) private var windowRegistry
     @Environment(AIService.self) private var aiService
+    @Environment(TabOrganizerManager.self) private var tabOrganizerManager
     @Environment(\.nookSettings) var nookSettings
     @StateObject private var hoverSidebarManager = HoverSidebarManager()
     @Environment(\.colorScheme) var colorScheme
@@ -27,7 +28,7 @@ struct WindowView: View {
                     Button("Customize Space Gradient...") {
                         browserManager.showGradientEditor()
                     }
-                    .disabled(browserManager.tabManager.currentSpace == nil)
+                    .disabled(tabManager.currentSpace == nil)
                 }
 
             SidebarWebViewStack()
@@ -134,11 +135,35 @@ struct WindowView: View {
                 windowState.isShowingShortcutConflictToast = false
             }
         }
+        // Handle organize tabs notification from keyboard shortcut manager
+        .onReceive(NotificationCenter.default.publisher(for: .organizeTabsRequested)) { _ in
+            guard windowRegistry.activeWindow?.id == windowState.id else { return }
+            let targetSpace =
+                windowState.currentSpaceId.flatMap { id in
+                    browserManager.tabManager.spaces.first(where: { $0.id == id })
+                } ?? browserManager.tabManager.currentSpace
+            if let space = targetSpace {
+                Task {
+                    await tabOrganizerManager.organizeTabs(
+                        in: space,
+                        using: browserManager.tabManager
+                    )
+                }
+            }
+        }
         .environmentObject(browserManager)
         .environmentObject(browserManager.gradientColorManager)
         .environmentObject(browserManager.splitManager)
         .environmentObject(hoverSidebarManager)
-        .preferredColorScheme(windowState.gradient.primaryColor.isPerceivedDark ? .dark : .light)
+        .preferredColorScheme(resolvedColorScheme)
+    }
+
+    private var resolvedColorScheme: ColorScheme? {
+        switch nookSettings.appearanceMode {
+        case .light: return .light
+        case .dark: return .dark
+        case .system: return nil  // Follow system appearance
+        }
     }
 
     // MARK: - Layout Components
@@ -152,10 +177,6 @@ struct WindowView: View {
             SpaceGradientBackgroundView()
 
 
-//            Rectangle()
-//                .fill(Color.clear)
-////                .universalGlassEffect(.regular.tint(Color(.windowBackgroundColor).opacity(0.35)), in: .rect(cornerRadius: 0))
-//                .clipped()
         }
         .backgroundDraggable()
         .environment(windowState)

@@ -15,6 +15,7 @@ struct TabFolderView: View {
     let onDelete: () -> Void
     let onAddTab: () -> Void
     let onActivateTab: (Tab) -> Void
+    var isRegular: Bool = false
 
     @State private var isHovering: Bool = false
     @State private var isFolderIconAnimating: Bool = false
@@ -24,12 +25,16 @@ struct TabFolderView: View {
     @FocusState private var nameFieldFocused: Bool
 
     @EnvironmentObject var browserManager: BrowserManager
+    @EnvironmentObject var tabManager: TabManager
     @Environment(BrowserWindowState.self) private var windowState
     @ObservedObject private var dragSession = NookDragSessionManager.shared
 
     // Get tabs in this folder
     private var tabsInFolder: [Tab] {
-        let tabs = browserManager.tabManager.spacePinnedTabs(for: space.id)
+        if isRegular {
+            return tabManager.regularFolderTabs(for: space.id, folderId: folder.id)
+        }
+        let tabs = tabManager.spacePinnedTabs(for: space.id)
             .filter { $0.folderId == folder.id }
             .sorted { $0.index < $1.index }
         return tabs
@@ -61,11 +66,14 @@ struct TabFolderView: View {
 
     private func handleFolderDrop(_ drop: PendingDrop?) {
         guard let drop = drop, case .folder(let folderId) = drop.targetZone, folderId == folder.id else { return }
-        let allTabs = browserManager.tabManager.allTabs()
+        let allTabs = tabManager.allTabs()
         guard let tab = allTabs.first(where: { $0.id == drop.item.tabId }) else { return }
         let op = dragSession.makeDragOperation(from: drop, tab: tab)
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-            browserManager.tabManager.handleDragOperation(op)
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            dragSession.clearDrag()
+            tabManager.handleDragOperation(op)
         }
         triggerFolderAnimation()
         dragSession.pendingDrop = nil
@@ -80,8 +88,11 @@ struct TabFolderView: View {
         }
         let tab = tabs[reorder.fromIndex]
         let op = dragSession.makeDragOperation(from: reorder, tab: tab)
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-            browserManager.tabManager.handleDragOperation(op)
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            dragSession.clearDrag()
+            tabManager.handleDragOperation(op)
         }
         dragSession.pendingReorder = nil
     }
@@ -168,7 +179,7 @@ struct TabFolderView: View {
         }
         .buttonStyle(PlainButtonStyle())
         .contentShape(RoundedRectangle(cornerRadius: 12))
-        .onHover { hovering in
+        .onHoverTracking { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovering = hovering
             }
@@ -251,7 +262,7 @@ struct TabFolderView: View {
 
     private func folderTabView(_ tab: Tab, index: Int) -> some View {
         NookDragSourceView(
-            item: NookDragItem(tabId: tab.id, title: tab.name, urlString: tab.url.absoluteString),
+            item: NookDragItem(tabId: tab.id, title: tab.displayName, urlString: tab.url.absoluteString),
             tab: tab,
             zoneID: .folder(folder.id),
             index: index,
@@ -262,7 +273,7 @@ struct TabFolderView: View {
                 action: {
                     onActivateTab(tab)
                 },
-                onClose: { browserManager.tabManager.removeTab(tab.id) },
+                onClose: { tabManager.removeTab(tab.id) },
                 onMute: { tab.toggleMute() }
             )
             .padding(.leading, 12)
@@ -306,6 +317,14 @@ struct TabFolderView: View {
             Button { browserManager.duplicateCurrentTab() }
             label: { Label("Duplicate Tab", systemImage: "doc.on.doc") }
 
+            if tab.displayNameOverride != nil {
+                Button {
+                    tab.displayNameOverride = nil
+                } label: {
+                    Label("Reset Tab Name", systemImage: "arrow.uturn.backward")
+                }
+            }
+
             Divider()
             // Mute/Unmute option (show if tab has audio content OR is muted)
             if tab.hasAudioContent || tab.isAudioMuted {
@@ -318,14 +337,14 @@ struct TabFolderView: View {
 
             // Unload options
             Button(action: {
-                browserManager.tabManager.unloadTab(tab)
+                tabManager.unloadTab(tab)
             }) {
                 Label("Unload Tab", systemImage: "arrow.down.circle")
             }
             .disabled(tab.isUnloaded)
 
             Button(action: {
-                browserManager.tabManager.unloadAllInactiveTabs()
+                tabManager.unloadAllInactiveTabs()
             }) {
                 Label("Unload All Inactive Tabs", systemImage: "arrow.down.circle.fill")
             }
@@ -333,7 +352,7 @@ struct TabFolderView: View {
             Divider()
 
             Button(action: {
-                browserManager.tabManager.removeTab(tab.id)
+                tabManager.removeTab(tab.id)
             }) {
                 Label("Close Tab", systemImage: "xmark.circle")
             }
@@ -352,7 +371,7 @@ struct TabFolderView: View {
             for (index, tab) in sortedTabs.enumerated() {
                 tab.index = index
             }
-            browserManager.tabManager.persistSnapshot()
+            tabManager.persistSnapshot()
         }
     }
 
@@ -372,7 +391,7 @@ struct TabFolderView: View {
     private func commitRename() {
         let newName = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
         if !newName.isEmpty && newName != folder.name {
-            browserManager.tabManager.renameFolder(folder.id, newName: newName)
+            tabManager.renameFolder(folder.id, newName: newName)
         }
         isRenaming = false
         nameFieldFocused = false

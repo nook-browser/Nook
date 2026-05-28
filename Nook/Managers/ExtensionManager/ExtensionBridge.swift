@@ -15,6 +15,14 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
     private static let logger = Logger(subsystem: "com.nook.browser", category: "ExtensionBridge")
     private unowned let browserManager: BrowserManager
 
+    // MARK: - Tab query cache
+    // Extensions poll chrome.tabs.query() frequently (e.g. SponsorBlock on YouTube).
+    // Cache results and only rebuild when tabs actually change.
+    private var cachedTabs: [any WKWebExtensionTab]?
+    private var cachedActiveTab: (any WKWebExtensionTab)?
+    private var cachedActiveTabValid = false
+    private var cacheGeneration: UInt = 0
+
     init(browserManager: BrowserManager) {
         self.browserManager = browserManager
         super.init()
@@ -31,29 +39,42 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
         return ObjectIdentifier(browserManager).hashValue
     }
 
+    private func refreshCacheIfNeeded() {
+        let gen = ExtensionManager.shared.tabCacheGeneration
+        if gen != cacheGeneration {
+            cachedTabs = nil
+            cachedActiveTab = nil
+            cachedActiveTabValid = false
+            cacheGeneration = gen
+        }
+    }
+
     func activeTab(for extensionContext: WKWebExtensionContext) -> (any WKWebExtensionTab)? {
+        refreshCacheIfNeeded()
+        if cachedActiveTabValid { return cachedActiveTab }
+
+        var result: (any WKWebExtensionTab)?
         if let t = browserManager.currentTabForActiveWindow(),
            let a = ExtensionManager.shared.stableAdapter(for: t) {
-            Self.logger.debug("activeTab → '\(t.name)' webView=\(a.tab.isUnloaded ? "nil" : "yes")")
-            return a
+            result = a
+        } else if let first = browserManager.tabManager.pinnedTabs.first ?? browserManager.tabManager.tabs.first,
+                  let a = ExtensionManager.shared.stableAdapter(for: first) {
+            result = a
         }
 
-        if let first = browserManager.tabManager.pinnedTabs.first ?? browserManager.tabManager.tabs.first,
-           let a = ExtensionManager.shared.stableAdapter(for: first) {
-            Self.logger.debug("activeTab fallback → '\(first.name)'")
-            return a
-        }
-
-        Self.logger.debug("activeTab → nil")
-        return nil
+        cachedActiveTab = result
+        cachedActiveTabValid = true
+        return result
     }
 
     func tabs(for extensionContext: WKWebExtensionContext) -> [any WKWebExtensionTab] {
+        refreshCacheIfNeeded()
+        if let cached = cachedTabs { return cached }
+
         let all = browserManager.tabManager.pinnedTabs + browserManager.tabManager.tabs
-        let adapters = all.compactMap { ExtensionManager.shared.stableAdapter(for: $0) }
-        let withWebViews = adapters.filter { !$0.tab.isUnloaded }
-        Self.logger.debug("tabs → \(adapters.count) total, \(withWebViews.count) with webviews")
-        return adapters
+        let result = all.compactMap { ExtensionManager.shared.stableAdapter(for: $0) }
+        cachedTabs = result
+        return result
     }
 
     func frame(for extensionContext: WKWebExtensionContext) -> CGRect {
@@ -211,9 +232,12 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
     }
 
     func webView(for extensionContext: WKWebExtensionContext) -> WKWebView? {
-        // Use assignedWebView to avoid triggering lazy initialization
-        // Extensions can only interact with tabs that are currently displayed
-        return tab.assignedWebView
+        // Use existingWebView to return the webview without triggering lazy init.
+        // Must NOT use assignedWebView here — it requires primaryWindowId to be set,
+        // but tabs are registered with the extension controller before the compositor
+        // assigns a window. Using assignedWebView causes "Tab not found" errors
+        // because WebKit can't match content script messages to tab adapters.
+        return tab.existingWebView
     }
 
     func activate(for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {

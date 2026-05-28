@@ -5,7 +5,7 @@
 //
 
 import SwiftUI
-import AppKit
+@preconcurrency import AppKit
 import Combine
 
 // MARK: - Pending Drop
@@ -37,9 +37,13 @@ final class NookDragSessionManager: ObservableObject {
     @Published var sourceIndex: Int?
 
     @Published var activeZone: DropZoneID?
-    @Published var isOutsideWindow: Bool = false
-    @Published var cursorLocation: CGPoint = .zero // window-flipped coords (top-left origin)
-    @Published var cursorScreenLocation: NSPoint = .zero // raw screen coords for preview window
+    var isOutsideWindow: Bool = false
+    var cursorLocation: CGPoint = .zero // window-flipped coords (top-left origin)
+    var cursorScreenLocation: NSPoint = .zero // raw screen coords for preview window
+
+    /// Non-@Published subject for high-frequency cursor updates.
+    /// Only consumed by NookDragPreviewWindow — avoids triggering objectWillChange on every mouse move.
+    let cursorScreenLocationSubject = PassthroughSubject<NSPoint, Never>()
 
     @Published var insertionIndex: [DropZoneID: Int] = [:]
 
@@ -183,11 +187,13 @@ final class NookDragSessionManager: ObservableObject {
 
     // MARK: - Drag Lifecycle
 
-    func beginDrag(item: NookDragItem, tab: Tab, from zone: DropZoneID, at index: Int) {
-        #if DEBUG
-        print("🚀 [DragSession] beginDrag: \(item.title) from \(zone) at \(index)")
-        #endif
+    func beginDrag(item: NookDragItem, tab: Tab, from zone: DropZoneID, at index: Int, cursorScreenPoint: NSPoint) {
         ensurePreviewWindow()
+
+        // Set cursor position BEFORE draggedItem so the preview window
+        // positions correctly before orderFront is called by the Combine subscriber
+        _updateCursorScreenPosition(cursorScreenPoint)
+
         draggedItem = item
         draggedTab = tab
         sourceZone = zone
@@ -196,18 +202,18 @@ final class NookDragSessionManager: ObservableObject {
         isOutsideWindow = false
         pendingDrop = nil
         pendingReorder = nil
-        insertionIndex = [:]
-        hapticFeedback(.alignment)
+        insertionIndex = [zone: index]
     }
 
     nonisolated func updateCursorScreenPosition(_ screenPoint: NSPoint) {
-        Task { @MainActor in
+        MainActor.assumeIsolated {
             self._updateCursorScreenPosition(screenPoint)
         }
     }
 
     private func _updateCursorScreenPosition(_ screenPoint: NSPoint) {
         cursorScreenLocation = screenPoint
+        cursorScreenLocationSubject.send(screenPoint)
 
         guard let window = NSApp.mainWindow ?? NSApp.windows.first(where: { $0.isVisible && !($0 is NookDragPreviewWindow) }),
               let contentView = window.contentView else { return }
@@ -289,9 +295,6 @@ final class NookDragSessionManager: ObservableObject {
 
     func completeDrop(targetZone: DropZoneID, targetIndex: Int) {
         guard let item = draggedItem, let source = sourceZone else {
-            #if DEBUG
-            print("🔴 [DragSession] completeDrop: no draggedItem or sourceZone")
-            #endif
             return
         }
 
@@ -303,9 +306,13 @@ final class NookDragSessionManager: ObservableObject {
                 targetZone: targetZone,
                 targetIndex: targetIndex
             )
+            hapticFeedback(.generic)
+            // Don't clearDrag here — handler will clear inside withAnimation
+            // so the visual state resets in the same transaction as the data change
+        } else {
+            hapticFeedback(.generic)
+            clearDrag()
         }
-        hapticFeedback(.generic)
-        clearDrag()
     }
 
     func completeReorder() {
@@ -315,9 +322,13 @@ final class NookDragSessionManager: ObservableObject {
            let to = insertionIndex[zone],
            from != to {
             pendingReorder = PendingReorder(item: item, zone: zone, fromIndex: from, toIndex: to)
+            hapticFeedback(.generic)
+            // Don't clearDrag here — handler will clear inside withAnimation
+            // so the visual state resets in the same transaction as the data change
+        } else {
+            hapticFeedback(.generic)
+            clearDrag()
         }
-        hapticFeedback(.generic)
-        clearDrag()
     }
 
     func cancelDrag() {
@@ -325,7 +336,7 @@ final class NookDragSessionManager: ObservableObject {
         NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
     }
 
-    private func clearDrag() {
+    func clearDrag() {
         draggedItem = nil
         draggedTab = nil
         sourceZone = nil

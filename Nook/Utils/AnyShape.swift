@@ -8,13 +8,14 @@
 import SwiftUI
 
 /// Type-erased wrapper for Shape protocol
-struct AnyShape: Shape {
-    private let _path: (CGRect) -> Path
-    
+struct AnyShape: Shape, @unchecked Sendable {
+    private let _path: @Sendable (CGRect) -> Path
+
     init<S: Shape>(_ shape: S) {
-        _path = shape.path(in:)
+        let pathFn = shape.path(in:)
+        _path = { rect in pathFn(rect) }
     }
-    
+
     func path(in rect: CGRect) -> Path {
         _path(rect)
     }

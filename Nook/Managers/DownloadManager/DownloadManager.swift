@@ -117,15 +117,21 @@ public class Download: Identifiable {
             return
         }
 
+        #if DEBUG
         print("Loading thumbnail for: \(destinationURL.lastPathComponent)")
+        #endif
 
         if shouldGenerateThumbnail(for: destinationURL) {
             if let thumbnail = await getQuickLookThumbnail(for: destinationURL, size: size) {
                 downloadThumbnail = thumbnail
+                #if DEBUG
                 print("QuickLook thumbnail loaded for: \(destinationURL.lastPathComponent)")
+                #endif
                 return
             }
+            #if DEBUG
             print("QuickLook thumbnail failed, falling back to Finder icon for: \(destinationURL.lastPathComponent)")
+            #endif
         }
 
         let finderIcon = NSWorkspace.shared.icon(forFile: destinationURL.path)
@@ -141,7 +147,9 @@ public class Download: Identifiable {
         highResIcon.unlockFocus()
 
         downloadThumbnail = highResIcon
+        #if DEBUG
         print("Finder icon loaded for: \(destinationURL.lastPathComponent)")
+        #endif
     }
 
     private func shouldGenerateThumbnail(for fileURL: URL) -> Bool {
@@ -284,8 +292,10 @@ public class DownloadManager: NSObject {
         downloadDelegates[downloadModel.id] = delegate
         download.delegate = delegate
 
+        #if DEBUG
         print("Added download: \(suggestedFilename) with ID: \(downloadModel.id)")
         print("Download delegate set: \(download.delegate != nil)")
+        #endif
         return downloadModel
     }
 
@@ -298,12 +308,16 @@ public class DownloadManager: NSObject {
         guard let download = downloads[id] else { return }
         download.state = .cancelled
         download.download.cancel()
+        #if DEBUG
         print("Cancelled download: \(download.suggestedFilename)")
+        #endif
     }
 
     func retryDownload(_ id: UUID) {
         guard let download = downloads[id], download.state == .failed else { return }
+        #if DEBUG
         print("Retry not supported for WKDownload")
+        #endif
     }
 
     func clearCompletedDownloads() {
@@ -329,11 +343,15 @@ public class DownloadManager: NSObject {
 
     func updateDownloadProgress(_ id: UUID, progress: Double, downloadedBytes: Int64, fileSize: Int64?) {
         guard let download = downloads[id] else {
+            #if DEBUG
             print("Download not found for ID: \(id)")
+            #endif
             return
         }
 
+        #if DEBUG
         print("Updating download progress: \(progress * 100)% for \(download.suggestedFilename)")
+        #endif
 
         download.progress = progress
         download.downloadedBytes = downloadedBytes
@@ -350,20 +368,26 @@ public class DownloadManager: NSObject {
 
     func updateDownloadState(_ id: UUID, state: Download.DownloadState, error: Error? = nil) {
         guard let download = downloads[id] else {
+            #if DEBUG
             print("Download not found for ID: \(id)")
+            #endif
             return
         }
 
+        #if DEBUG
         print("Updating download state to \(state.description) for \(download.suggestedFilename)")
+        #endif
 
         download.state = state
         download.error = error
 
+        #if DEBUG
         if state == .completed {
             print("Download completed: \(download.suggestedFilename)")
         } else if state == .failed {
             print("Download failed: \(download.suggestedFilename) - \(error?.localizedDescription ?? "Unknown error")")
         }
+        #endif
     }
 
     func setDownloadDestination(_ id: UUID, destination: URL) {
@@ -420,7 +444,23 @@ private class DownloadDelegate: NSObject, WKDownloadDelegate {
 
     private func decideDestination(response: URLResponse, suggestedFilename: String, completion: @escaping (DestinationDecision) -> Void) {
         let defaultName = suggestedFilename.isEmpty ? "download" : suggestedFilename
-        let cleanName = defaultName.replacingOccurrences(of: "/", with: "_")
+        var cleanName = defaultName
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "\0", with: "")       // Strip null bytes
+        // Strip leading dots to prevent creating hidden files
+        while cleanName.hasPrefix(".") {
+            cleanName = String(cleanName.dropFirst())
+        }
+        if cleanName.isEmpty { cleanName = "download" }
+        // Limit filename length to 255 characters (filesystem maximum)
+        if cleanName.count > 255 {
+            let ext = (cleanName as NSString).pathExtension
+            let base = (cleanName as NSString).deletingPathExtension
+            let maxBase = 255 - (ext.isEmpty ? 0 : ext.count + 1)
+            cleanName = String(base.prefix(maxBase)) + (ext.isEmpty ? "" : ".\(ext)")
+        }
+        // Safety: use lastPathComponent to ensure no directory traversal
+        cleanName = (cleanName as NSString).lastPathComponent
 
         switch download.destinationPreference {
         case .automaticDownloadsFolder:
@@ -466,7 +506,9 @@ private class DownloadDelegate: NSObject, WKDownloadDelegate {
                     self.configureDownload(for: url, response: response)
                     completion(.proceed(url))
                 } else {
+                    #if DEBUG
                     print("Download cancelled by user")
+                    #endif
                     self.downloadManager?.updateDownloadState(self.download.id, state: .cancelled)
                     completion(.cancel)
                 }
@@ -476,7 +518,9 @@ private class DownloadDelegate: NSObject, WKDownloadDelegate {
 
     private func configureDownload(for destination: URL, response: URLResponse) {
         let fileSize = response.expectedContentLength
+        #if DEBUG
         print("Download destination set: \(destination.path) with fileSize: \(fileSize) bytes")
+        #endif
         downloadManager?.updateDownloadProgress(download.id, progress: 0.0, downloadedBytes: 0, fileSize: fileSize)
         downloadManager?.updateDownloadState(download.id, state: .downloading)
         downloadManager?.setDownloadDestination(download.id, destination: destination)
@@ -533,11 +577,15 @@ private class DownloadDelegate: NSObject, WKDownloadDelegate {
                                 )
                             }
 
+                            #if DEBUG
                             print("File size monitoring: \(clampedProgress * 100)% (\(fileSize) / \(expectedSize))")
+                            #endif
                         }
                     }
                 } catch {
+                    #if DEBUG
                     print("Error monitoring file size: \(error)")
+                    #endif
                 }
 
                 Thread.sleep(forTimeInterval: 0.5)
@@ -551,7 +599,9 @@ private class DownloadDelegate: NSObject, WKDownloadDelegate {
 
     func download(_: WKDownload, didReceive response: URLResponse) {
         let fileSize = response.expectedContentLength
+        #if DEBUG
         print("Download started with file size: \(fileSize) bytes")
+        #endif
         downloadManager?.updateDownloadProgress(download.id, progress: 0.0, downloadedBytes: 0, fileSize: fileSize)
         downloadManager?.updateDownloadState(download.id, state: .downloading)
     }
@@ -564,36 +614,78 @@ private class DownloadDelegate: NSObject, WKDownloadDelegate {
 
         downloadManager?.updateDownloadProgress(download.id, progress: clampedProgress, downloadedBytes: downloadedBytes, fileSize: download.fileSize)
 
+        #if DEBUG
         print("Download progress: \(clampedProgress * 100)% (\(downloadedBytes) / \(download.fileSize ?? 0))")
+        #endif
     }
 
     func downloadDidFinish(_: WKDownload) {
+        #if DEBUG
         print("Download finished: \(download.suggestedFilename)")
+        #endif
+
+        // Set quarantine attribute so Gatekeeper warns about downloaded executables
+        if let destinationURL = download.destinationURL {
+            DownloadDelegate.setQuarantineAttribute(on: destinationURL)
+        }
+
         downloadManager?.updateDownloadState(download.id, state: .completed)
     }
 
+    /// Sets the `com.apple.quarantine` extended attribute on a downloaded file.
+    ///
+    /// This ensures macOS Gatekeeper will prompt the user before opening
+    /// executables, disk images, or other potentially dangerous files
+    /// downloaded from the web.
+    private static func setQuarantineAttribute(on fileURL: URL) {
+        // com.apple.quarantine format: flags;timestamp_hex;agent_name;uuid
+        // 0083 = "downloaded from the web, not yet opened by the user"
+        let quarantineValue = "0083;\(String(format: "%08x", Int(Date().timeIntervalSince1970)));Nook;\(UUID().uuidString)"
+        guard let data = quarantineValue.data(using: .utf8) else { return }
+
+        fileURL.withUnsafeFileSystemRepresentation { path in
+            guard let path = path else { return }
+            let result = setxattr(path, "com.apple.quarantine", (data as NSData).bytes, data.count, 0, 0)
+            if result != 0 {
+                #if DEBUG
+                print("Failed to set quarantine attribute on \(fileURL.lastPathComponent): errno \(errno)")
+                #endif
+            }
+        }
+    }
+
     func download(_: WKDownload, didFailWithError error: Error, resumeData _: Data?) {
+        #if DEBUG
         print("Download failed: \(download.suggestedFilename) - \(error.localizedDescription)")
+        #endif
         downloadManager?.updateDownloadState(download.id, state: .failed, error: error)
     }
 
     func downloadWillPerformHTTPRedirection(_: WKDownload, navigationResponse _: HTTPURLResponse, newRequest request: URLRequest, decisionHandler: @escaping (URLRequest?) -> Void) {
+        #if DEBUG
         print("Download will perform HTTP redirection")
+        #endif
         decisionHandler(request)
     }
 
     func download(_: WKDownload, didReceive _: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        #if DEBUG
         print("Download received authentication challenge")
+        #endif
         completionHandler(.performDefaultHandling, nil)
     }
 
     public func download(_: WKDownload, didFinishDownloadingTo location: URL) {
+        #if DEBUG
         print("🔽 [DownloadManager] Download finished to: \(location.path)")
+        #endif
         // The download is already handled by downloadDidFinish, but we can add additional logic here if needed
     }
 
     public func download(_: WKDownload, didFailWithError error: Error) {
+        #if DEBUG
         print("🔽 [DownloadManager] Download failed: \(error.localizedDescription)")
+        #endif
         // The download is already handled by the existing didFailWithError method, but we can add additional logic here if needed
     }
 }

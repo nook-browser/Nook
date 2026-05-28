@@ -7,6 +7,22 @@
 
 import SwiftUI
 
+/// Reactive title display that re-renders when the tab's name changes.
+/// Uses @ObservedObject so it subscribes to the Tab's objectWillChange publisher.
+private struct MediaControlsTabTitle: View {
+    @ObservedObject var tab: Tab
+
+    var body: some View {
+        Text(tab.name)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(Color.white)
+            .padding(.top, 4)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .leading)))
+    }
+}
+
 struct MediaControlsView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
@@ -54,13 +70,7 @@ struct MediaControlsView: View {
                 VStack(spacing: 8) {
                     // Tab name (shows on hover)
                     if isHovering {
-                        Text(tab.name)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Color.white)
-                            .padding(.top, 4)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                            .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .leading)))
+                        MediaControlsTabTitle(tab: tab)
                     }
                     HStack(spacing: 0) {
                         // Tab favicon (collapses first)
@@ -167,7 +177,7 @@ struct MediaControlsView: View {
                 )
                 .padding(.horizontal, 8)
                 .frame(maxWidth: .infinity)
-                .onHover { hovering in
+                .onHoverTracking { hovering in
                     withAnimation(.easeInOut(duration: 0.15)) {
                         isHovering = hovering
                     }
@@ -261,6 +271,12 @@ struct MediaControlsView: View {
 
             if activeMediaTab?.id != resolvedTab?.id {
                 activeMediaTab = resolvedTab
+            }
+
+            // Actively sync title from the webview to catch YouTube SPA title changes
+            // that KVO may have missed or that happened after the last state update
+            if let resolvedTab {
+                await manager.refreshTitle(for: resolvedTab)
             }
 
             if let resolvedTab {
