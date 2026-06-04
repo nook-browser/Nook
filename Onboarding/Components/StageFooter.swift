@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@MainActor
 struct StageFooter: View {
     var currentStage: Int
     var isLoading: Bool = false
