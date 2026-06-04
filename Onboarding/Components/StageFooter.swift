@@ -65,7 +65,14 @@ struct StageFooter: View {
             .disabled(isLoading)
             if !(currentStage == 0) {
                 Button {
-                    if currentStage > 0 { onBack() }
+                    if currentStage > 0 {
+                        if currentStage == 1 {
+                            // Skip at stage 1 should advance, not go back
+                            onContinue()
+                        } else {
+                            onBack()
+                        }
+                    }
                 } label: {
                     Text(secondaryText)
                         .font(.system(size: 14, weight: .semibold))
