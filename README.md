@@ -130,11 +130,11 @@ Nook follows a manager-based architecture where:
 
 ## Star History
 
-<a href="https://www.star-history.com/#nook-browser/nook&type=date&legend=bottom-right">
+<a href="https://star-history.dera.page/#nook-browser/nook&type=date&legend=bottom-right">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nook-browser/nook&type=date&theme=dark&legend=bottom-right" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nook-browser/nook&type=date&legend=bottom-right" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=nook-browser/nook&type=date&legend=bottom-right" width="600" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://star-history.dera.page/svg?repos=nook-browser/nook&type=date&theme=dark&legend=bottom-right" />
+   <source media="(prefers-color-scheme: light)" srcset="https://star-history.dera.page/svg?repos=nook-browser/nook&type=date&legend=bottom-right" />
+   <img alt="Star History Chart" src="https://star-history.dera.page/svg?repos=nook-browser/nook&type=date&legend=bottom-right" width="600" />
  </picture>
 </a>
 
