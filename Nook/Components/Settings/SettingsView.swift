@@ -333,7 +333,7 @@ struct ProfilesSettingsView: View {
             HStack(spacing: 12) {
                 // Space icon
                 Group {
-                    if isEmoji(space.icon) {
+                    if space.icon.isEmojiIcon {
                         Text(space.icon)
                             .font(NookDesign.Font.body)
                             .frame(width: 24, height: 24)
@@ -443,13 +443,6 @@ struct ProfilesSettingsView: View {
             browserManager.tabManager.assign(spaceId: space.id, toProfile: id)
         }
 
-        private func isEmoji(_ string: String) -> Bool {
-            return string.unicodeScalars.contains { scalar in
-                (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF)
-                    || (scalar.value >= 0x2600 && scalar.value <= 0x26FF)
-                    || (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
-            }
-        }
     }
 }
 

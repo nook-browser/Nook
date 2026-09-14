@@ -341,14 +341,6 @@ struct CommandPaletteView: View {
         }
     }
 
-    private func isEmoji(_ string: String) -> Bool {
-        return string.unicodeScalars.contains { scalar in
-            (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF)
-                || (scalar.value >= 0x2600 && scalar.value <= 0x26FF)
-                || (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
-        }
-    }
-
     // MARK: - Suggestions List Subview
     private struct CommandPaletteSuggestionsListView: View {
         @EnvironmentObject var gradientColorManager: GradientColorManager

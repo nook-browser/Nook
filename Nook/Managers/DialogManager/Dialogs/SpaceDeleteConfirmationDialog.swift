@@ -27,7 +27,7 @@ struct SpaceDeleteConfirmationDialog: DialogPresentable {
     func dialogContent() -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
-                if isEmoji(spaceIcon) {
+                if spaceIcon.isEmojiIcon {
                     Text(spaceIcon)
                         .font(NookDesign.Font.titleLarge)
                 } else {
@@ -77,13 +77,5 @@ struct SpaceDeleteConfirmationDialog: DialogPresentable {
                 )
             ]
         )
-    }
-
-    private func isEmoji(_ string: String) -> Bool {
-        string.unicodeScalars.contains { scalar in
-            (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF) // Emoticons & pictographs
-                || (scalar.value >= 0x2600 && scalar.value <= 0x26FF) // Miscellaneous symbols
-                || (scalar.value >= 0x2700 && scalar.value <= 0x27BF) // Dingbats
-        }
     }
 }

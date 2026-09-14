@@ -55,6 +55,7 @@ enum NookDesign {
         static let urlBar: CGFloat = 32
         static let navRow: CGFloat = 28
         static let bottomBar: CGFloat = 40
+        static let spaceIcon: CGFloat = 14      // switcher and header symbol
     }
 
     // MARK: - Type

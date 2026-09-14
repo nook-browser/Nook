@@ -11,59 +11,25 @@ struct SpaceTitle: View {
     @State private var isHovering: Bool = false
     @State private var isRenaming: Bool = false
     @State private var draftName: String = ""
-    @State private var selectedEmoji: String = ""
     @FocusState private var nameFieldFocused: Bool
-    @FocusState private var emojiFieldFocused: Bool
     @State private var isEllipsisHovering: Bool = false
     @ObservedObject private var dragSession = NookDragSessionManager.shared
-    
-    @StateObject private var emojiManager = EmojiPickerManager()
+
+    @State private var showIconPicker = false
 
     var body: some View {
         HStack(spacing: 6) {
-            // Show emoji or SF Symbol icon
-            ZStack {
-                // Hidden TextField for capturing emoji selection
-                TextField("", text: $selectedEmoji)
-                    .frame(width: 0, height: 0)
-                    .opacity(0)
-                    .focused($emojiFieldFocused)
-                    .onChange(of: selectedEmoji) { _, newValue in
-                        if !newValue.isEmpty {
-                            // Safely unwrap the last character
-                            guard let lastChar = newValue.last else { return }
-                            space.icon = String(lastChar)
-                            tabManager.persistSnapshot()
-                            selectedEmoji = ""
-                        }
-                    }
-
-                if isEmoji(space.icon) {
-                    Text(space.icon)
-                        .font(.system(size: iconSize))
-                        .background(EmojiPickerAnchor(manager: emojiManager))
-                        .onTapGesture(count: 2) {
-                            emojiManager.toggle()
-                        }
-                        .onChange(of: emojiManager.selectedEmoji) { _, newValue in
-                            space.icon = newValue
-                            tabManager.persistSnapshot()
-                         }
-                } else {
-                    Image(systemName: space.icon)
-                        .font(.system(size: iconSize))
-                        .background(EmojiPickerAnchor(manager: emojiManager))
-                        .onTapGesture(count: 2) {
-                            emojiManager.toggle()
-                        }
-                        .onChange(of: emojiManager.selectedEmoji) { _, newValue in
-                            space.icon = newValue
-                            tabManager.persistSnapshot()
-                         }
+            SpaceIconView(icon: space.icon, size: iconSize, tint: space.accentColor)
+                .onTapGesture(count: 2) {
+                    showIconPicker = true
                 }
-
-            }
-
+                .popover(isPresented: $showIconPicker) {
+                    SpaceIconPicker(selected: space.icon, onPick: {
+                        space.icon = $0
+                        tabManager.persistSnapshot()
+                        showIconPicker = false
+                    })
+                }
 
             if isRenaming {
                 TextField("", text: $draftName)
@@ -108,7 +74,7 @@ struct SpaceTitle: View {
                         startRenaming()
                     },
                     onEditIcon: {
-                        emojiManager.toggle()
+                        showIconPicker = true
                     },
                     onOpenSettings: {
                         browserManager.showSpaceSettings(for: space)
@@ -166,7 +132,7 @@ struct SpaceTitle: View {
                     startRenaming()
                 },
                 onEditIcon: {
-                    emojiManager.toggle()
+                    showIconPicker = true
                 },
                 onOpenSettings: {
                     browserManager.showSpaceSettings(for: space)
@@ -245,11 +211,4 @@ struct SpaceTitle: View {
         return browserManager.profileManager.profiles.first(where: { $0.id == id })?.name
     }
     
-    private func isEmoji(_ string: String) -> Bool {
-        return string.unicodeScalars.contains { scalar in
-            (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF) ||
-            (scalar.value >= 0x2600 && scalar.value <= 0x26FF) ||
-            (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
-        }
-    }
 }

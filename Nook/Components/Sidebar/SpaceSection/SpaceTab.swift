@@ -321,7 +321,7 @@ struct SpaceTab: View {
 
     @ViewBuilder
     private func spaceLabel(for space: Space) -> some View {
-        if space.icon.unicodeScalars.first?.properties.isEmoji == true {
+        if space.icon.isEmojiIcon {
             Label {
                 Text(space.name)
             } icon: {

@@ -105,7 +105,7 @@ private struct SpaceEditContent: View {
     let originalIcon: String
     let mode: SpaceEditDialog.Mode
 
-    @StateObject private var emojiManager = EmojiPickerManager()
+    @State private var showIconPicker = false
     @EnvironmentObject var browserManager: BrowserManager
 
     var body: some View {
@@ -130,10 +130,9 @@ private struct SpaceEditContent: View {
 
                 HStack(spacing: 12) {
                     Button {
-                        emojiManager.toggle()
+                        showIconPicker = true
                     } label: {
-                        SpaceIconView(icon: currentIcon)
-                            .frame(width: 28, height: 28)
+                        SpaceIconView(icon: currentIcon, size: NookDesign.Size.iconButton - NookDesign.Spacing.md, tint: .primary)
                             .padding(4)
                             .background(
                                 NookDesign.Radius.shape(NookDesign.Radius.md)
@@ -141,8 +140,13 @@ private struct SpaceEditContent: View {
                             )
                     }
                     .contentShape(NookDesign.Radius.shape(NookDesign.Radius.md))
-                    .background(EmojiPickerAnchor(manager: emojiManager))
                     .buttonStyle(PlainButtonStyle())
+                    .popover(isPresented: $showIconPicker) {
+                        SpaceIconPicker(selected: currentIcon, onPick: {
+                            spaceIcon = $0
+                            showIconPicker = false
+                        })
+                    }
 
                     Text("Choose an icon to represent this space")
                         .font(NookDesign.Font.secondary)
@@ -182,18 +186,6 @@ private struct SpaceEditContent: View {
             }
         }
         .padding(.horizontal, 4)
-        .onAppear {
-            if !spaceIcon.isEmpty {
-                emojiManager.selectedEmoji = spaceIcon
-            } else {
-                emojiManager.selectedEmoji = originalIcon
-            }
-        }
-        .onChange(of: emojiManager.selectedEmoji) { _, newValue in
-            if !newValue.isEmpty {
-                spaceIcon = newValue
-            }
-        }
     }
 
     private var currentIcon: String {
@@ -219,31 +211,6 @@ private struct SpaceEditContent: View {
             return browserManager.profileManager.profiles.first?.icon ?? "person.circle"
         }
         return profile.icon
-    }
-}
-
-private struct SpaceIconView: View {
-    let icon: String
-
-    var body: some View {
-        Group {
-            if isEmoji(icon) {
-                Text(icon)
-                    .font(NookDesign.Font.heading)
-            } else {
-                Image(systemName: icon)
-                    .font(NookDesign.Font.heading)
-            }
-        }
-        .frame(width: 20, height: 20)
-    }
-
-    private func isEmoji(_ string: String) -> Bool {
-        return string.unicodeScalars.contains { scalar in
-            (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF)
-                || (scalar.value >= 0x2600 && scalar.value <= 0x26FF)
-                || (scalar.value >= 0x2700 && scalar.value <= 0x27BF)
-        }
     }
 }
 

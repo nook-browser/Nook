@@ -20,7 +20,6 @@ struct SpacesListItem: View {
     let onHoverChange: ((Bool) -> Void)?
 
     @State private var isHovering: Bool = false
-    @StateObject private var emojiManager = EmojiPickerManager()
 
     private let dotSize: CGFloat = 6
 
@@ -46,12 +45,12 @@ struct SpacesListItem: View {
             }
         } label: {
             spaceIcon
-                .opacity(isActive ? 1.0 : 0.7)
                 .frame(maxWidth: .infinity)
 
         }
         .labelStyle(.iconOnly)
-        .buttonStyle(NookIconButtonStyle(radius: NookDesign.Radius.lg))
+        .buttonStyle(NookIconButtonStyle())
+        .background(NookDesign.Radius.shape(NookDesign.Radius.md).fill(isActive ? NookDesign.Surface.fill : .clear))
         .layoutPriority(2)
         .foregroundStyle(Color.primary)
         .layoutPriority(isActive ? 1 : 0)
@@ -70,38 +69,12 @@ struct SpacesListItem: View {
     @ViewBuilder
     private var spaceIcon: some View {
         if compact && !isActive {
-            // Compact mode: show dot
             Circle()
-                .fill(iconColor)
+                .fill(Color.secondary)
                 .frame(width: dotSize, height: dotSize)
         } else {
-            // Normal mode: show icon or emoji
-            if isEmoji(space.icon) {
-                Text(space.icon)
-                    .colorMultiply(isActive ? .white : .gray)
-                    .blendMode(isActive ? .normal : .luminosity)
-                    .background(EmojiPickerAnchor(manager: emojiManager))
-                    .onChange(of: emojiManager.selectedEmoji) { _, newValue in
-                        space.icon = newValue
-                        tabManager.persistSnapshot()
-                    }
-
-            } else {
-                Image(systemName: space.icon)
-                    .foregroundStyle(iconColor)
-                    .background(EmojiPickerAnchor(manager: emojiManager))
-                    .onChange(of: emojiManager.selectedEmoji) { _, newValue in
-                        space.icon = newValue
-                        tabManager.persistSnapshot()
-                    }
-            }
+            SpaceIconView(icon: space.icon, tint: isActive ? space.accentColor : .secondary)
         }
-    }
-
-    private var iconColor: Color {
-        browserManager.gradientColorManager.isDark
-            ? AppColors.spaceTabTextDark
-            : AppColors.spaceTabTextLight
     }
 
     // MARK: - Context Menu
@@ -146,13 +119,5 @@ struct SpacesListItem: View {
                 }
             )
         )
-    }
-
-    private func isEmoji(_ string: String) -> Bool {
-        string.unicodeScalars.contains { scalar in
-            (scalar.value >= 0x1F300 && scalar.value <= 0x1F9FF) // Emoticons & pictographs
-                || (scalar.value >= 0x2600 && scalar.value <= 0x26FF) // Miscellaneous symbols
-                || (scalar.value >= 0x2700 && scalar.value <= 0x27BF) // Dingbats
-        }
     }
 }
