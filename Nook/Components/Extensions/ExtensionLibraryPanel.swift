@@ -65,14 +65,14 @@ final class ExtensionLibraryPanelController {
             visualEffect.state = .active
             visualEffect.blendingMode = .behindWindow
             visualEffect.wantsLayer = true
-            visualEffect.layer?.cornerRadius = 16
+            visualEffect.layer?.cornerRadius = NookDesign.Radius.xl
             visualEffect.layer?.masksToBounds = true
             visualEffect.translatesAutoresizingMaskIntoConstraints = false
 
             // Container with rounded corners and clipping
             let container = NSView()
             container.wantsLayer = true
-            container.layer?.cornerRadius = 16
+            container.layer?.cornerRadius = NookDesign.Radius.xl
             container.layer?.masksToBounds = true
             container.translatesAutoresizingMaskIntoConstraints = false
             container.addSubview(visualEffect)
