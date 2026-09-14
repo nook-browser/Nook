@@ -50,7 +50,7 @@ struct SidebarMenuHoverDownloads: View {
                             ? 1 : 0
                     )
                     .animation(
-                        .easeOut(duration: 0.15)
+                        NookDesign.Motion.quick
                             .delay(
                                 Double(prioritizedDownloads.count - index)
                                     * 0.01
@@ -226,7 +226,7 @@ struct SidebarMenuHoverDownloadItem: View {
         .padding(.vertical, 6)
         .background(isHovering ? .white.opacity(0.2) : .clear)
         .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
-        .animation(.easeInOut(duration: 0.1), value: isHovering)
+        .animation(NookDesign.Motion.quick, value: isHovering)
         .onHoverTracking { state in
             isHovering = state
         }

@@ -57,7 +57,7 @@ struct TabSuggestionItem: View {
         }
         .frame(maxWidth: .infinity)
         .onHoverTracking { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(NookDesign.Motion.quick) {
                 isHovered = hovering
             }
         }

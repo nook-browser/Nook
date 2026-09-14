@@ -68,7 +68,7 @@ struct CommandPaletteSuggestionView: View {
         .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
             
         .onHoverTracking { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(NookDesign.Motion.quick) {
                 isHovered = hovering
             }
         }

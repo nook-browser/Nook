@@ -22,6 +22,11 @@ struct ToolExecutionGlowView: View {
         Color(hex: "BC82F3"),
     ]
 
+    // continuous motion, not a state transition
+    private let rotation1Duration: Double = 2
+    private let rotation2Duration: Double = 2.5
+    private let rotation3Duration: Double = 3
+
     var body: some View {
         let cornerRadius: CGFloat = NookDesign.Radius.lg
 
@@ -56,13 +61,13 @@ struct ToolExecutionGlowView: View {
         .padding(1)
         .allowsHitTesting(false)
         .onAppear {
-            withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
+            withAnimation(.linear(duration: rotation1Duration).repeatForever(autoreverses: false)) {
                 rotation1 = 360
             }
-            withAnimation(.linear(duration: 2.5).repeatForever(autoreverses: false)) {
+            withAnimation(.linear(duration: rotation2Duration).repeatForever(autoreverses: false)) {
                 rotation2 = 360
             }
-            withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
+            withAnimation(.linear(duration: rotation3Duration).repeatForever(autoreverses: false)) {
                 rotation3 = 360
             }
         }

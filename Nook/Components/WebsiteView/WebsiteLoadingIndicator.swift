@@ -17,7 +17,7 @@ struct WebsiteLoadingIndicator: View {
             Capsule()
                 .fill(Color.white.opacity(0.3))
                 .frame(width: indicatorWidth, height: 3)
-                .animation(.spring(response: 0.6, dampingFraction: 0.8), value: indicatorWidth)
+                .animation(NookDesign.Motion.spring, value: indicatorWidth)
             Spacer()
         }
         .frame(maxWidth: .infinity)

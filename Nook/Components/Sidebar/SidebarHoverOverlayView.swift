@@ -29,7 +29,7 @@ struct SidebarHoverOverlayView: View {
                     .contentShape(Rectangle())
                     .onHoverTracking { isIn in
                         if isIn && !windowState.isSidebarVisible {
-                            withAnimation(.easeInOut(duration: 0.12)) {
+                            withAnimation(NookDesign.Motion.quick) {
                                 hoverManager.isOverlayVisible = true
                             }
                         }

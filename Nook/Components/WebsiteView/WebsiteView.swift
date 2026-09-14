@@ -35,7 +35,7 @@ struct LinkStatusBar: View {
                         .stroke(borderColor, lineWidth: 1)
                 )
                 .opacity(shouldShow ? 1 : 0)
-                .animation(.easeOut(duration: 0.25), value: shouldShow)
+                .animation(NookDesign.Motion.standard, value: shouldShow)
                 .onChange(of: hoveredLink) {_,  newLink in
                     handleHoverChange(newLink: newLink)
                 }
@@ -258,7 +258,7 @@ struct WebsiteView: View {
                     .environment(windowState)
                     .coordinateSpace(name: dragCoordinateSpace)
                     .animation(
-                        .spring(response: 0.3, dampingFraction: 0.6, blendDuration: 0.2),
+                        NookDesign.Motion.spring,
                         value: splitManager.getSplitState(for: windowState.id).isPreviewActive
                     )
             }
@@ -369,7 +369,7 @@ private struct MagneticCardView: View {
         .offset(offset)
         .scaleEffect(1.0) // Cards appear at full size
         .animation(
-            dragLocation != nil ? .interactiveSpring(response: 0.3, dampingFraction: 0.7) : .spring(response: 0.4, dampingFraction: 0.6),
+            dragLocation != nil ? NookDesign.Motion.spring : NookDesign.Motion.spring,
             value: offset
         )
         .transition(.asymmetric(

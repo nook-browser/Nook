@@ -260,7 +260,7 @@ struct SpacesSideBarView: View {
     // MARK: - Helper Functions
 
     private func handleMenuTap() {
-        withAnimation(.easeInOut(duration: 0.2)) {
+        withAnimation(NookDesign.Motion.standard) {
             windowState.isSidebarMenuVisible = true
             windowState.isSidebarAIChatVisible = false
             let previousWidth = windowState.sidebarWidth

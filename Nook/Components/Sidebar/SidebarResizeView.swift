@@ -44,8 +44,8 @@ struct SidebarResizeView: View {
                     .frame(width: 4)
                     .frame(maxHeight: .infinity)
                     .offset(x: indicatorOffset)
-                    .animation(.easeInOut(duration: 0.15), value: isResizing)
-                    .animation(.easeInOut(duration: 0.15), value: isHovering)
+                    .animation(NookDesign.Motion.quick, value: isResizing)
+                    .animation(NookDesign.Motion.quick, value: isHovering)
                     .padding(.vertical, 30)
             }
 
@@ -57,7 +57,7 @@ struct SidebarResizeView: View {
                 .contentShape(.interaction, .rect)
                 .onTapGesture(count: 2) {
                     guard windowState.isSidebarVisible else { return }
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.85)) {
+                    withAnimation(NookDesign.Motion.spring) {
                         browserManager.updateSidebarWidth(defaultWidth, for: windowState)
                     }
                 }

@@ -131,7 +131,7 @@ struct SidebarAIChat: View {
     private var headerView: some View {
         HStack(spacing: 8) {
             Button("Close", systemImage: "xmark") {
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(NookDesign.Motion.standard) {
                     windowState.isSidebarAIChatVisible = false
                 }
             }
@@ -286,7 +286,7 @@ struct SidebarAIChat: View {
 
     private var webSearchToggle: some View {
         Button(action: {
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(NookDesign.Motion.standard) {
                 var config = configService.generationConfig
                 config.webSearchEnabled.toggle()
                 configService.generationConfig = config
@@ -451,7 +451,7 @@ struct SidebarAIChat: View {
                                 iconName: "trash",
                                 variant: .primary,
                                 action: {
-                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                    withAnimation(NookDesign.Motion.standard) {
                                         aiService.clearMessages()
                                     }
                                     browserManager.dialogManager.closeDialog()
@@ -591,7 +591,7 @@ struct MessageBubble: View {
             }
         }
         .onHoverTracking { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(NookDesign.Motion.quick) {
                 isHovered = hovering
             }
         }
@@ -785,7 +785,7 @@ struct CitationView: View {
         }
         .buttonStyle(.plain)
         .onHoverTracking { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(NookDesign.Motion.quick) {
                 isHovered = hovering
             }
         }

@@ -122,7 +122,7 @@ struct SimpleIconPicker: View {
         LazyVGrid(columns: columns, spacing: 8) {
             ForEach(keyIcons, id: \.self) { icon in
                 Button {
-                    withAnimation(.easeInOut(duration: 0.15)) {
+                    withAnimation(NookDesign.Motion.quick) {
                         selectedIcon = icon
                     }
                 } label: {
@@ -149,7 +149,7 @@ struct SimpleIconPicker: View {
                 .help(icon)
                 .accessibilityLabel(icon)
                 .accessibilityAddTraits(selectedIcon == icon ? .isSelected : [])
-                .animation(.easeInOut(duration: 0.15), value: selectedIcon == icon)
+                .animation(NookDesign.Motion.quick, value: selectedIcon == icon)
             }
         }
         .accessibilityElement(children: .contain)

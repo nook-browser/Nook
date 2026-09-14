@@ -171,7 +171,7 @@ struct SpaceView: View {
             folderChangeCount += 1
         }
         .onHoverTracking { state in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(NookDesign.Motion.quick) {
                 isHovered = state
             }
         }
@@ -352,12 +352,12 @@ struct SpaceView: View {
             if hasSpacePinnedContent {
                 pinnedTabsList
                     .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .scale(scale: 0.95, anchor: .top)).animation(.easeInOut(duration: 0.3)),
-                        removal: .opacity.combined(with: .scale(scale: 0.95, anchor: .top)).animation(.easeInOut(duration: 0.2))
+                        insertion: .opacity.combined(with: .scale(scale: 0.95, anchor: .top)).animation(NookDesign.Motion.standard),
+                        removal: .opacity.combined(with: .scale(scale: 0.95, anchor: .top)).animation(NookDesign.Motion.standard)
                     ))
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: hasSpacePinnedContent)
+        .animation(NookDesign.Motion.standard, value: hasSpacePinnedContent)
     }
 
     private var pinnedTabsList: some View {
@@ -381,20 +381,20 @@ struct SpaceView: View {
                         .environmentObject(browserManager)
                         .environment(windowState)
                         .transition(.asymmetric(
-                            insertion: .scale.combined(with: .opacity).animation(.easeInOut(duration: 0.3)),
-                            removal: .scale.combined(with: .opacity).animation(.easeInOut(duration: 0.2))
+                            insertion: .scale.combined(with: .opacity).animation(NookDesign.Motion.standard),
+                            removal: .scale.combined(with: .opacity).animation(NookDesign.Motion.standard)
                         ))
                     } else if let tab = item as? Tab {
                         pinnedTabView(tab, index: index)
                         .transition(.asymmetric(
-                            insertion: .opacity.combined(with: .move(edge: .top)).animation(.easeInOut(duration: 0.2)),
-                            removal: .opacity.combined(with: .move(edge: .top)).animation(.easeInOut(duration: 0.15))
+                            insertion: .opacity.combined(with: .move(edge: .top)).animation(NookDesign.Motion.standard),
+                            removal: .opacity.combined(with: .move(edge: .top)).animation(NookDesign.Motion.quick)
                         ))
                     }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .animation(.easeInOut(duration: 0.25), value: items.count)
+            .animation(NookDesign.Motion.standard, value: items.count)
         }
         .onAppear {
             updateSpacePinnedCaches()
@@ -437,7 +437,7 @@ struct SpaceView: View {
         )
         .opacity(dragSession.draggedItem?.tabId == tab.id ? 0.0 : 1.0)
         .offset(y: dragSession.reorderOffset(for: .spacePinned(space.id), at: index))
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: dragSession.insertionIndex[.spacePinned(space.id)])
+        .animation(NookDesign.Motion.spring, value: dragSession.insertionIndex[.spacePinned(space.id)])
         .transition(.move(edge: .top).combined(with: .opacity))
         .contextMenu {
             pinnedTabContextMenu(tab)
@@ -525,7 +525,7 @@ struct SpaceView: View {
                 emptyRegularTabsDropTarget
             }
         }
-        .animation(.easeInOut(duration: 0.15), value: tabs.count)
+        .animation(NookDesign.Motion.quick, value: tabs.count)
     }
 
     private var regularTabsContent: some View {
@@ -637,7 +637,7 @@ struct SpaceView: View {
         )
         .opacity(dragSession.draggedItem?.tabId == tab.id ? 0.0 : 1.0)
         .offset(y: dragSession.reorderOffset(for: .spaceRegular(space.id), at: index))
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: dragSession.insertionIndex[.spaceRegular(space.id)])
+        .animation(NookDesign.Motion.spring, value: dragSession.insertionIndex[.spaceRegular(space.id)])
         .transition(.move(edge: .top).combined(with: .opacity))
         .contextMenu {
             regularTabContextMenu(tab)
@@ -807,7 +807,7 @@ struct SpaceView: View {
 
         let activeTabTop = activeTabPosition.minY
         if activeTabTop > scrollOffset + viewportHeight {
-            withAnimation(.easeInOut(duration: 0.3)) {
+            withAnimation(NookDesign.Motion.standard) {
                 proxy.scrollTo(activeTab.id, anchor: .bottom)
             }
             return
@@ -815,7 +815,7 @@ struct SpaceView: View {
 
         let activeTabBottom = activeTabPosition.maxY
         if activeTabBottom < scrollOffset {
-            withAnimation(.easeInOut(duration: 0.3)) {
+            withAnimation(NookDesign.Motion.standard) {
                 proxy.scrollTo(activeTab.id, anchor: .top)
             }
             return
@@ -823,7 +823,7 @@ struct SpaceView: View {
     }
 
     private func scrollToTop(proxy: ScrollViewProxy) {
-        withAnimation(.easeInOut(duration: 0.3)) {
+        withAnimation(NookDesign.Motion.standard) {
             proxy.scrollTo("space-separator-top", anchor: .top)
         }
     }

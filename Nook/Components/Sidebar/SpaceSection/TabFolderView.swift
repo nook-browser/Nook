@@ -99,7 +99,7 @@ struct TabFolderView: View {
 
     private var folderHeader: some View {
         Button(action: {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            withAnimation(NookDesign.Motion.spring) {
                 folder.isOpen.toggle()
             }
         }) {
@@ -180,7 +180,7 @@ struct TabFolderView: View {
         .buttonStyle(PlainButtonStyle())
         .contentShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
         .onHoverTracking { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(NookDesign.Motion.quick) {
                 isHovering = hovering
             }
         }
@@ -228,10 +228,10 @@ struct TabFolderView: View {
                             .asymmetric(
                                 insertion: .move(edge: .top)
                                     .combined(with: .opacity)
-                                    .animation(.spring(response: 0.3, dampingFraction: 0.8).delay(Double(index) * 0.03)),
+                                    .animation(NookDesign.Motion.spring.delay(Double(index) * 0.03)),
                                 removal: .move(edge: .top)
                                     .combined(with: .opacity)
-                                    .animation(.spring(response: 0.2, dampingFraction: 0.7).delay(Double(tabs.count - index - 1) * 0.02))
+                                    .animation(NookDesign.Motion.spring.delay(Double(tabs.count - index - 1) * 0.02))
                             )
                         )
                 }
@@ -280,7 +280,7 @@ struct TabFolderView: View {
         }
         .opacity(dragSession.draggedItem?.tabId == tab.id ? 0.0 : 1.0)
         .offset(y: dragSession.reorderOffset(for: .folder(folder.id), at: index))
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: dragSession.insertionIndex[.folder(folder.id)])
+        .animation(NookDesign.Motion.spring, value: dragSession.insertionIndex[.folder(folder.id)])
         .transition(.move(edge: .top).combined(with: .opacity))
         .contextMenu {
             folderTabContextMenu(tab)
@@ -366,7 +366,7 @@ struct TabFolderView: View {
     private func alphabetizeTabs() {
         let sortedTabs = tabsInFolder.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
 
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+        withAnimation(NookDesign.Motion.spring) {
             // Update tab indices to match alphabetical order
             for (index, tab) in sortedTabs.enumerated() {
                 tab.index = index

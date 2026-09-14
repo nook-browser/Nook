@@ -46,6 +46,6 @@ struct SplitCardView: View {
                 .opacity(0.1)
         )
         .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xxl))
-        .animation(.easeInOut(duration: 0.2), value: currentTextColor)
+        .animation(NookDesign.Motion.standard, value: currentTextColor)
     }
 }

@@ -105,7 +105,7 @@ struct ProfileRowView: View {
                 .fill(isHovering ? Color.primary.opacity(0.04) : Color(.controlBackgroundColor))
         )
         .onHoverTracking { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) { isHovering = hovering }
+            withAnimation(NookDesign.Motion.quick) { isHovering = hovering }
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Profile row: \(profile.name)")

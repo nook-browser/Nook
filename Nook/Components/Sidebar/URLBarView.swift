@@ -116,7 +116,7 @@ struct URLBarView: View {
             }
         )
         .onHoverTracking { hovering in
-            withAnimation(.easeInOut(duration: 0.1)) {
+            withAnimation(NookDesign.Motion.quick) {
                 isHovering = hovering
             }
         }
@@ -156,7 +156,7 @@ struct URLBarView: View {
         NSPasteboard.general.setString(urlString, forType: .string)
         
         // Show checkmark icon briefly
-        withAnimation(.easeInOut(duration: 0.2)) {
+        withAnimation(NookDesign.Motion.standard) {
             showCheckmark = true
         }
         
@@ -165,7 +165,7 @@ struct URLBarView: View {
         
         // Reset checkmark after 1 second
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(NookDesign.Motion.standard) {
                 showCheckmark = false
             }
         }

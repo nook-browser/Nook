@@ -300,11 +300,11 @@ private struct CopyButton: View {
     var body: some View {
         Button {
             if action() {
-                withAnimation(.easeInOut(duration: 0.15)) {
+                withAnimation(NookDesign.Motion.quick) {
                     showCheckmark = true
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                    withAnimation(.easeInOut(duration: 0.15)) {
+                    withAnimation(NookDesign.Motion.quick) {
                         showCheckmark = false
                     }
                 }

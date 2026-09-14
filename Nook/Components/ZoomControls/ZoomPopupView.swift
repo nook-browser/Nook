@@ -106,7 +106,7 @@ struct ZoomPopupView: View {
         .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
         .scaleEffect(isVisible ? 1.0 : 0.8)
         .opacity(isVisible ? 1.0 : 0.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isVisible)
+        .animation(NookDesign.Motion.spring, value: isVisible)
         .onAppear {
             isVisible = true
             startHideTimer()

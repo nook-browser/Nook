@@ -145,7 +145,7 @@ struct SpaceTitle: View {
             let allTabs = tabManager.allTabs()
             guard let tab = allTabs.first(where: { $0.id == drop.item.tabId }) else { return }
             let op = dragSession.makeDragOperation(from: drop, tab: tab)
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            withAnimation(NookDesign.Motion.spring) {
                 tabManager.handleDragOperation(op)
             }
             dragSession.pendingDrop = nil
@@ -158,7 +158,7 @@ struct SpaceTitle: View {
         .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
         .contentShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
         .onHoverTracking { hovering in
-            withAnimation(.easeInOut(duration: 0.1)) {
+            withAnimation(NookDesign.Motion.quick) {
                 isHovering = hovering
             }
         }

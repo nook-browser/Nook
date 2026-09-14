@@ -26,7 +26,7 @@ struct SpaceSeparator: View {
                     ProgressView()
                         .controlSize(.mini)
                         .padding(.horizontal, 4)
-                        .transition(.blur.animation(.smooth(duration: 0.08)))
+                        .transition(.blur.animation(NookDesign.Motion.quick))
                 } else if let onOrganize {
                     Button(action: onOrganize) {
                         HStack(spacing: 4) {
@@ -40,7 +40,7 @@ struct SpaceSeparator: View {
                     }
                     .buttonStyle(PlainButtonStyle())
                     .help("Organize tabs with AI")
-                    .transition(.blur.animation(.smooth(duration: 0.08)))
+                    .transition(.blur.animation(NookDesign.Motion.quick))
                     .onHoverTracking { state in
                         isOrganizeHovered = state
                     }
@@ -50,7 +50,7 @@ struct SpaceSeparator: View {
             Capsule()
                 .fill(colorScheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.15))
                 .frame(height: 1)
-                .animation(.smooth(duration: 0.1), value: isHovering)
+                .animation(NookDesign.Motion.quick, value: isHovering)
 
             // Clear button (right side)
             if hasTabs && isHovering {
@@ -66,7 +66,7 @@ struct SpaceSeparator: View {
                 }
                 .buttonStyle(PlainButtonStyle())
                 .help("Clear all regular tabs")
-                .transition(.blur.animation(.smooth(duration: 0.08)))
+                .transition(.blur.animation(NookDesign.Motion.quick))
                 .onHoverTracking { state in
                     isClearHovered = state
                 }

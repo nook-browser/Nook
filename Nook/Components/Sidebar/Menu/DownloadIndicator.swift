@@ -21,7 +21,7 @@ struct DownloadIndicator: View {
                     .transition(.slideFromTop)
             }
         }
-        .animation(.spring(duration: 0.55, bounce: 0.6), value: currentDownload?.id)
+        .animation(NookDesign.Motion.spring, value: currentDownload?.id)
     }
 }
 

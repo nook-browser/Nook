@@ -99,7 +99,7 @@ struct SidebarMenuHistoryTab: View {
                 .background(
                     isHovering ? contrastText.opacity(0.08) : contrastText.opacity(0.05)
                 )
-                .animation(.easeInOut(duration: 0.1), value: isHovering)
+                .animation(NookDesign.Motion.quick, value: isHovering)
                 .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
                 .onHoverTracking { state in
                     isHovering = state
@@ -131,7 +131,7 @@ struct SidebarMenuHistoryTab: View {
                             ? contrastText.opacity(0.6) : contrastText.opacity(0.05)
                     )
                     .animation(
-                        .easeInOut(duration: 0.1),
+                        NookDesign.Motion.quick,
                         value: isShowingFilters
                     )
                     .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
@@ -254,7 +254,7 @@ struct SidebarMenuHistoryTab: View {
                 pageSize: pageSize
             )
 
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(NookDesign.Motion.standard) {
                 historyEntries = result.entries
                 groupedHistoryEntries = groupHistoryEntries(result.entries)
                 hasMoreResults = result.hasMore
@@ -286,9 +286,9 @@ struct SidebarMenuHistoryTab: View {
                 )
             }
 
-            let animationDelay = historyEntries.count > 100 ? 0.1 : 0.2
+            let animationCurve = historyEntries.count > 100 ? NookDesign.Motion.quick : NookDesign.Motion.standard
 
-            withAnimation(.easeInOut(duration: animationDelay)) {
+            withAnimation(animationCurve) {
                 historyEntries.append(contentsOf: result.entries)
                 groupedHistoryEntries = groupHistoryEntries(historyEntries)
                 hasMoreResults = result.hasMore
@@ -313,7 +313,7 @@ struct SidebarMenuHistoryTab: View {
                 pageSize: pageSize
             )
 
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(NookDesign.Motion.standard) {
                 historyEntries = result.entries
                 groupedHistoryEntries = groupHistoryEntries(result.entries)
                 hasMoreResults = result.hasMore
@@ -547,7 +547,7 @@ struct HistoryRowView: View {
         .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
         .contentShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
         .onHoverTracking { hovered in
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(NookDesign.Motion.standard) {
                 isHovered = hovered
             }
         }
@@ -705,8 +705,8 @@ struct FiltersSelectButton: View {
                 .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
         }
         .buttonStyle(.plain)
-        .animation(.easeInOut(duration: 0.1), value: isHovering)
-        .animation(.easeInOut(duration: 0.1), value: isActive)
+        .animation(NookDesign.Motion.quick, value: isHovering)
+        .animation(NookDesign.Motion.quick, value: isActive)
         .onHoverTracking { state in
             isHovering = state
         }

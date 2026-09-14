@@ -87,7 +87,7 @@ struct SidebarMenu: View {
             Spacer()
             HStack {
                 Button("Back", systemImage: "arrow.backward") {
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    withAnimation(NookDesign.Motion.standard) {
                         windowState.isSidebarMenuVisible = false
                         let restoredWidth = windowState.savedSidebarWidth
                         windowState.sidebarWidth = restoredWidth

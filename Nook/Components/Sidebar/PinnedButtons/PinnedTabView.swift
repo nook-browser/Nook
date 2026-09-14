@@ -34,7 +34,7 @@ struct PinnedTabView: View {
                         .fill(
                             backgroundColor
                         )
-                        .animation(.easeInOut(duration: 0.1), value: isHovered)
+                        .animation(NookDesign.Motion.quick, value: isHovered)
                         .overlay {
                             if isActive {
                                 tabIcon

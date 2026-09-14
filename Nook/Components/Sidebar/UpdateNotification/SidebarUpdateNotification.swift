@@ -17,6 +17,9 @@ struct SidebarUpdateNotification: View {
     @State private var isHovering: Bool = false
     @State private var gradientPhase: Double = 0.0
 
+    // continuous motion, not a state transition
+    private let gradientAnimationDuration: Double = 2.0
+
     private var availability: BrowserManager.UpdateAvailability? {
         if let update = browserManager.updateAvailability {
             return update
@@ -93,19 +96,19 @@ struct SidebarUpdateNotification: View {
                 .frame(maxWidth: .infinity)
                 .onHoverTracking { hovering in
                     isHovering = hovering
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    withAnimation(NookDesign.Motion.spring) {
                         isExpanded = hovering
                     }
                 }
             }
             .opacity(isVisible ? 1 : 0)
             .offset(y: isVisible ? notificationOffset : 50)
-            .animation(.easeOut(duration: 0.3), value: isVisible)
-            .animation(.easeOut(duration: 0.3), value: notificationOffset)
-            .animation(.easeInOut(duration: 0.2), value: isExpanded)
+            .animation(NookDesign.Motion.standard, value: isVisible)
+            .animation(NookDesign.Motion.standard, value: notificationOffset)
+            .animation(NookDesign.Motion.standard, value: isExpanded)
             .onAppear {
                 showNotification()
-                withAnimation(.linear(duration: 2.0).repeatForever(autoreverses: false)) {
+                withAnimation(.linear(duration: gradientAnimationDuration).repeatForever(autoreverses: false)) {
                     gradientPhase = 1.0
                 }
             }

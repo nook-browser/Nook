@@ -124,7 +124,7 @@ struct MiniWindowToolbar: View {
                 .blur(radius: 0.8)
         }
         .contentShape(Rectangle())
-        .animation(.easeInOut(duration: 0.25), value: session.toolbarColor)
+        .animation(NookDesign.Motion.standard, value: session.toolbarColor)
     }
 
     private var hostLabel: String {

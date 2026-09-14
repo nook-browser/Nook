@@ -23,7 +23,7 @@ struct DialogView: View {
                     .zIndex(1)
             }
         }
-        .animation(.bouncy(duration: 0.2, extraBounce: -0.1), value: browserManager.dialogManager.isVisible)
+        .animation(NookDesign.Motion.spring, value: browserManager.dialogManager.isVisible)
         .onChange(of: browserManager.dialogManager.isVisible) { _, isVisible in
             if isVisible {
                 // Resign WebView first responder so keyboard events reach the dialog

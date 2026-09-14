@@ -41,7 +41,7 @@ struct SpacesListItem: View {
     var body: some View {
         Button {
             NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(NookDesign.Motion.standard) {
                 browserManager.setActiveSpace(space, in: windowState)
             }
         } label: {

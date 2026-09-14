@@ -106,7 +106,7 @@ struct PeekOverlayView: View {
 
     @MainActor
     private func presentPeek() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+        withAnimation(NookDesign.Motion.spring) {
             scale = 1.0
             opacity = 1.0
             backgroundOpacity = 1.0
@@ -116,12 +116,12 @@ struct PeekOverlayView: View {
     @MainActor
     private func dismissPeek() {
         // Animate web content opacity out first (reverse of appearing)
-        withAnimation(.easeOut(duration: 0.15)) {
+        withAnimation(NookDesign.Motion.quick) {
             webContentOpacity = 0.0
         }
 
         // Then animate the main overlay elements with spring animation
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+        withAnimation(NookDesign.Motion.spring) {
             scale = 0.001
             opacity = 0.0
             backgroundOpacity = 0.0
@@ -189,7 +189,7 @@ struct PeekOverlayView: View {
                 webView
                     .allowsHitTesting(true) // Ensure webview is interactable
                     .onAppear {
-                        withAnimation(.easeIn(duration: 0.15)) {
+                        withAnimation(NookDesign.Motion.quick) {
                             webContentOpacity = 1.0
                         }
                     }
@@ -293,8 +293,8 @@ struct PeekOverlayView: View {
                     NSCursor.arrow.set()
                 }
             }
-            .animation(.easeInOut(duration: 0.12), value: isHovering)
-            .animation(.easeInOut(duration: 0.1), value: disabled)
+            .animation(NookDesign.Motion.quick, value: isHovering)
+            .animation(NookDesign.Motion.quick, value: disabled)
         }
     }
 

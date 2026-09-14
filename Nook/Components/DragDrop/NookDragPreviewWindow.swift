@@ -118,7 +118,7 @@ private struct NookDragPreviewContent: View {
     @ObservedObject var manager: NookDragSessionManager
 
     private var morphSpring: Animation {
-        .spring(response: 0.3, dampingFraction: 0.78)
+        NookDesign.Motion.spring
     }
 
     var body: some View {

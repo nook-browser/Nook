@@ -62,8 +62,8 @@ struct NookTextField: View {
         )
         .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
         .focused($isFocused)
-        .animation(.easeInOut(duration: 0.15), value: isFocused)
-        .animation(.easeInOut(duration: 0.15), value: hasError)
+        .animation(NookDesign.Motion.quick, value: isFocused)
+        .animation(NookDesign.Motion.quick, value: hasError)
         .accessibilityLabel(placeholder)
         .accessibilityHint(hasError ? "Error state" : "Text input field")
     }

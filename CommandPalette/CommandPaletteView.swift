@@ -94,7 +94,7 @@ struct CommandPaletteView: View {
                                             ? "globe" : "magnifyingglass"
                                 )
                                 .id(activeSiteSearch != nil ? "magnifyingglass" : isLikelyURL(text) ? "globe" : "magnifyingglass")
-                                .transition(.blur(intensity: 2, scale: 0.6).animation(.smooth(duration: 0.3)))
+                                .transition(.blur(intensity: 2, scale: 0.6).animation(NookDesign.Motion.standard))
                                 .font(NookDesign.Font.bodyRegular)
                                 .foregroundStyle(isDark ? .white : .black)
                                 .frame(width: 15)
@@ -109,7 +109,7 @@ struct CommandPaletteView: View {
                                         .clipShape(Capsule())
                                         .transition(
                                             .blur(intensity: 8, scale: 0.6)
-                                            .animation(.spring(response: 0.35, dampingFraction: 0.75))
+                                            .animation(NookDesign.Motion.spring)
                                         )
                                 }
 
@@ -135,7 +135,7 @@ struct CommandPaletteView: View {
                                     .focused($isSearchFocused)
                                     .onKeyPress(.tab) {
                                         if let match = siteSearchMatch, activeSiteSearch == nil {
-                                            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                            withAnimation(NookDesign.Motion.spring) {
                                                 activeSiteSearch = match
                                             }
                                             text = ""
@@ -170,7 +170,7 @@ struct CommandPaletteView: View {
                                     }
                                     .onKeyPress(.escape) {
                                         if activeSiteSearch != nil {
-                                            withAnimation(.smooth(duration: 0.25)) {
+                                            withAnimation(NookDesign.Motion.standard) {
                                                 activeSiteSearch = nil
                                             }
                                             return .handled
@@ -180,7 +180,7 @@ struct CommandPaletteView: View {
                                     }
                                     .onKeyPress(.delete) {
                                         if activeSiteSearch != nil && text.isEmpty {
-                                            withAnimation(.smooth(duration: 0.25)) {
+                                            withAnimation(NookDesign.Motion.standard) {
                                                 activeSiteSearch = nil
                                             }
                                             return .handled
@@ -189,7 +189,7 @@ struct CommandPaletteView: View {
                                     }
                                     .onKeyPress(characters: CharacterSet(charactersIn: "\u{7F}")) { _ in
                                         if activeSiteSearch != nil && text.isEmpty {
-                                            withAnimation(.smooth(duration: 0.25)) {
+                                            withAnimation(NookDesign.Motion.standard) {
                                                 activeSiteSearch = nil
                                             }
                                             return .handled
@@ -231,12 +231,12 @@ struct CommandPaletteView: View {
                                         .allowsHitTesting(false)
                                         .transition(
                                             .blur(intensity: 4, scale: 0.92)
-                                            .animation(.smooth(duration: 0.3))
+                                            .animation(NookDesign.Motion.standard)
                                         )
                                     }
                                 }
                             }
-                            .animation(.spring(response: 0.35, dampingFraction: 0.75), value: activeSiteSearch != nil)
+                            .animation(NookDesign.Motion.spring, value: activeSiteSearch != nil)
                             .padding(.vertical, 8)
                             .padding(.horizontal, 8)
 
@@ -269,7 +269,7 @@ struct CommandPaletteView: View {
                         .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xxl))
                         .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.xxl))
                         .animation(
-                            .easeInOut(duration: 0.15),
+                            NookDesign.Motion.quick,
                             value: searchManager.suggestions.count
                         )
                         Spacer()
@@ -329,7 +329,7 @@ struct CommandPaletteView: View {
                 selectedSuggestionIndex = count - 1
             }
         }
-        .animation(.easeInOut(duration: 0.15), value: selectedSuggestionIndex)
+        .animation(NookDesign.Motion.quick, value: selectedSuggestionIndex)
         .onChange(of: commandPalette.prefilledText) { _, newValue in
             if isVisible {
                 text = newValue
@@ -382,7 +382,7 @@ struct CommandPaletteView: View {
                         .foregroundStyle(.white)
                         .contentShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
                         .onHoverTracking { hovering in
-                            withAnimation(.easeInOut(duration: 0.12)) {
+                            withAnimation(NookDesign.Motion.quick) {
                                 if hovering {
                                     hoveredIndex = index
                                 } else {

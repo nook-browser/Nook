@@ -78,7 +78,7 @@ struct PinnedGrid: View {
                             : Color.clear
                         )
                 }
-                .animation(.easeInOut(duration: 0.15), value: isDragging)
+                .animation(NookDesign.Motion.quick, value: isDragging)
             }
             .onAppear {
                 dragSession.pinnedTabsConfig = pinnedTabsConfiguration
@@ -164,7 +164,7 @@ struct PinnedGrid: View {
                                     essentialsPlaceholder
                                 }
                             }
-                            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: essentialsInsertionIndex(itemCount: items.count))
+                            .animation(NookDesign.Motion.spring, value: essentialsInsertionIndex(itemCount: items.count))
                         }
                         .onAppear {
                             dragSession.pinnedTabsConfig = pinnedTabsConfiguration
@@ -185,8 +185,8 @@ struct PinnedGrid: View {
                 }
                 // Natural updates; avoid cross-profile transition artifacts
             }
-            .animation(shouldAnimate ? .easeInOut(duration: 0.18) : nil, value: colsCount)
-            .animation(shouldAnimate ? .easeInOut(duration: 0.18) : nil, value: items.count)
+            .animation(shouldAnimate ? NookDesign.Motion.standard : nil, value: colsCount)
+            .animation(shouldAnimate ? NookDesign.Motion.standard : nil, value: items.count)
             .allowsHitTesting(!browserManager.isTransitioningProfile)
             .onChange(of: dragSession.pendingDrop) { _, drop in
                 handleEssentialsDrop(drop, items: items)

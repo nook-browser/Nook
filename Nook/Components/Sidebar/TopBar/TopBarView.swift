@@ -62,7 +62,7 @@ struct TopBarView: View {
             .frame(height: TopBarMetrics.height)
             .background(topBarBackgroundColor)
             .animation(
-                shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil,
+                shouldAnimateColorChange ? NookDesign.Motion.standard : nil,
                 value: topBarBackgroundColor
             )
             .clipShape(
@@ -81,7 +81,7 @@ struct TopBarView: View {
                     .frame(height: 1)
                     .animation(
                         shouldAnimateColorChange
-                            ? .easeInOut(duration: 0.3) : nil,
+                            ? NookDesign.Motion.standard : nil,
                         value: bottomBorderColor
                     )
             }
@@ -139,7 +139,7 @@ struct TopBarView: View {
                 .buttonStyle(NookIconButtonStyle())
                 .foregroundStyle(navButtonColor)
                 .animation(
-                    shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil,
+                    shouldAnimateColorChange ? NookDesign.Motion.standard : nil,
                     value: navButtonColor
                 )
                 .disabled(!tabWrapper.canGoBack)
@@ -160,7 +160,7 @@ struct TopBarView: View {
             .buttonStyle(NookIconButtonStyle())
             .foregroundStyle(navButtonColor)
             .animation(
-                shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil,
+                shouldAnimateColorChange ? NookDesign.Motion.standard : nil,
                 value: navButtonColor
             )
             .disabled(!tabWrapper.canGoForward)
@@ -186,7 +186,7 @@ struct TopBarView: View {
             .buttonStyle(NookIconButtonStyle())
             .foregroundStyle(navButtonColor)
             .animation(
-                shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil,
+                shouldAnimateColorChange ? NookDesign.Motion.standard : nil,
                 value: navButtonColor
             )
         }
@@ -239,12 +239,12 @@ struct TopBarView: View {
         .padding(6)
         .background(urlBarBackgroundColor)
         .animation(
-            shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil,
+            shouldAnimateColorChange ? NookDesign.Motion.standard : nil,
             value: urlBarBackgroundColor
         )
         .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         .onHoverTracking { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(NookDesign.Motion.quick) {
                 isHovering = hovering
             }
         }
@@ -519,7 +519,7 @@ struct TopBarView: View {
             .font(NookDesign.Font.secondary)
             .foregroundStyle(urlBarTextColor)
             .animation(
-                shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil,
+                shouldAnimateColorChange ? NookDesign.Motion.standard : nil,
                 value: urlBarTextColor
             )
             .frame(width: 16, height: 16)

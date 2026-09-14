@@ -27,7 +27,7 @@ struct MiniWindowPrimaryButtonStyle: ButtonStyle {
                 y: configuration.isPressed ? 2 : 6
             )
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .animation(NookDesign.Motion.quick, value: configuration.isPressed)
     }
 
     private func background(for isPressed: Bool) -> some View {
@@ -67,7 +67,7 @@ struct MiniWindowSuccessButtonStyle: ButtonStyle {
                 y: configuration.isPressed ? 2 : 6
             )
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .animation(NookDesign.Motion.quick, value: configuration.isPressed)
     }
 
     private func background(for isPressed: Bool) -> some View {
@@ -107,7 +107,7 @@ struct MiniWindowErrorButtonStyle: ButtonStyle {
                 y: configuration.isPressed ? 2 : 6
             )
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .animation(NookDesign.Motion.quick, value: configuration.isPressed)
     }
 
     private func background(for isPressed: Bool) -> some View {

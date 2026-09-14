@@ -49,7 +49,7 @@ struct SpaceTab: View {
                             NookDesign.Radius.shape(NookDesign.Radius.sm)
                                 .fill(isSpeakerHovering ? (isCurrentTab ? AppColors.controlBackgroundHoverLight : AppColors.controlBackgroundActive) : AppColors.controlBackgroundHoverLight.opacity(0))
                                 .frame(width: 22, height: 22)
-                                .animation(.easeInOut(duration: 0.05), value: isSpeakerHovering)
+                                .animation(NookDesign.Motion.quick, value: isSpeakerHovering)
                             Image(systemName: tab.isAudioMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                                 .contentTransition(.symbolEffect(.replace))
                                 .font(NookDesign.Font.secondary)
@@ -116,7 +116,7 @@ struct SpaceTab: View {
         }
         .buttonStyle(PlainButtonStyle())
         .onHoverTracking { hovering in
-            withAnimation(.easeInOut(duration: 0.05)) {
+            withAnimation(NookDesign.Motion.quick) {
                 isHovering = hovering
             }
         }

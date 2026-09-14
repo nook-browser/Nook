@@ -56,7 +56,7 @@ struct SpacesList: View {
                                         } else {
                                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
                                                 if hoveredSpaceId == space.id && isHoveringList {
-                                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                                    withAnimation(NookDesign.Motion.standard) {
                                                         showPreview = true
                                                     }
                                                 }
@@ -100,12 +100,12 @@ struct SpacesList: View {
                                 .opacity(0.7)
                                 .lineLimit(1)
                                 .id(hoveredSpace.id)
-                                .transition(.blur.animation(.smooth(duration: 0.2)))
+                                .transition(.blur.animation(NookDesign.Motion.standard))
                                 .offset(y: -20)
                         }
                     }
             }
-            .animation(.easeInOut(duration: 0.3), value: visibleSpaces.count)
+            .animation(NookDesign.Motion.standard, value: visibleSpaces.count)
     }
 
     private var previewTextColor: Color {

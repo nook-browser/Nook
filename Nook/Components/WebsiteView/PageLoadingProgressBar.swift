@@ -33,12 +33,12 @@ struct PageLoadingProgressBar: View {
                         )
                     )
                     .frame(width: geo.size.width * observer.progress)
-                    .animation(.easeOut(duration: 0.15), value: observer.progress)
+                    .animation(NookDesign.Motion.quick, value: observer.progress)
                     .opacity(observer.isLoading ? 1 : 0)
             }
         }
         .frame(height: 2.5)
-        .animation(.easeInOut(duration: 0.15), value: observer.isLoading)
+        .animation(NookDesign.Motion.quick, value: observer.isLoading)
         .onChange(of: tab?.id) { _, _ in
             observer.attach(to: tab?.existingWebView)
         }

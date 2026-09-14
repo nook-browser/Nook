@@ -8,7 +8,7 @@
 import SwiftUI
 
 /// A reusable toast container that provides standardized visual styling.
-/// Use with `.transition(.toast)` and `.animation(.smooth(duration: 0.25), value: condition)` in parent.
+/// Use with `.transition(.toast)` and `.animation(NookDesign.Motion.standard, value: condition)` in parent.
 struct ToastView<Content: View>: View {
     let content: Content
 
