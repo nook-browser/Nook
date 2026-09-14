@@ -63,6 +63,8 @@ enum NookDesign {
         static let spaceIcon: CGFloat = 14      // switcher and header symbol
         static let rowGlyph: CGFloat = 13       // inline glyphs in a row: audio, lock, chevron
         static let rowButton: CGFloat = 20      // hover-only close/unload button in a row
+        static let hairlineWidth: CGFloat = 1   // 1pt rule
+        static let dropTail: CGFloat = 100      // empty drop target height below the last row
     }
 
     // MARK: - Type
@@ -97,6 +99,7 @@ enum NookDesign {
         static let fillPressed = Color.primary.opacity(0.08)
         static let hairline = Color.primary.opacity(0.08)
         static let raised = Color(nsColor: .controlBackgroundColor) // active row, active tile
+        static let unloadedOpacity: Double = 0.55
     }
 
     // MARK: - Elevation

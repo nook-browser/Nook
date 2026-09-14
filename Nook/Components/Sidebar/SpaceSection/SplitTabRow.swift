@@ -13,7 +13,7 @@ struct SplitTabRow: View {
     @ObservedObject private var dragSession = NookDragSessionManager.shared
 
     var body: some View {
-        HStack(spacing: 1) {
+        HStack(spacing: 0) {
             SplitHalfTab(
                 tab: left,
                 side: .left,
@@ -22,9 +22,9 @@ struct SplitTabRow: View {
                 onClose: { onClose(left) }
             )
             Rectangle()
-                .fill(Color(nsColor: .separatorColor).opacity(0.6))
-                .frame(width: 1, height: 24)
-                .padding(.vertical, 4)
+                .fill(NookDesign.Surface.hairline)
+                .frame(width: NookDesign.Size.hairlineWidth)
+                .padding(.vertical, NookDesign.Spacing.sm)
             SplitHalfTab(
                 tab: right,
                 side: .right,
@@ -33,7 +33,7 @@ struct SplitTabRow: View {
                 onClose: { onClose(right) }
             )
         }
-        .frame(height: 34)
+        .frame(height: NookDesign.Size.row)
         .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
     }
 }
@@ -62,24 +62,24 @@ private struct SplitHalfTab: View {
         ) {
             ZStack {
                 Button(action: onActivate) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: NookDesign.Spacing.md) {
                         tab.favicon
                             .resizable()
                             .scaledToFit()
-                            .frame(width: 18, height: 18)
+                            .frame(width: NookDesign.Size.favicon, height: NookDesign.Size.favicon)
                             .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
                         Text(tab.displayName)
                             .font(NookDesign.Font.body)
                             .foregroundStyle(textTab)
                             .lineLimit(1)
                             .truncationMode(.tail)
-                        Spacer(minLength: 4)
+                        Spacer(minLength: NookDesign.Spacing.xs)
                         if isHovering {
                             Button(action: onClose) {
                                 Image(systemName: "xmark")
                                     .font(NookDesign.Font.secondary)
                                     .foregroundColor(textTab)
-                                    .frame(width: 24, height: 24)
+                                    .frame(width: NookDesign.Size.rowButton, height: NookDesign.Size.rowButton)
                                     .background(
                                         isCloseHovering
                                             ? NookDesign.Surface.fillPressed
@@ -93,7 +93,7 @@ private struct SplitHalfTab: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, NookDesign.Spacing.rowPadding)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
                 }
@@ -116,8 +116,14 @@ private struct SplitHalfTab: View {
                 }
             }
         }
-        .opacity(dragSession.draggedItem?.tabId == tab.id ? 0.25 : 1.0)
+        .opacity(dragSession.draggedItem?.tabId == tab.id ? 0 : 1.0)
         .background(backgroundColor)
+        .overlay {
+            if isActive {
+                NookDesign.Radius.shape(NookDesign.Radius.md)
+                    .strokeBorder(NookDesign.Surface.hairline, lineWidth: 1)
+            }
+        }
     }
 
     private var isActive: Bool {

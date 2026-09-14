@@ -79,7 +79,7 @@ struct SpaceView: View {
     }
 
     private var innerWidth: CGFloat {
-        max(outerWidth - 16, 0)
+        max(outerWidth - NookDesign.Spacing.sidebarInset * 2, 0)
     }
 
     private var tabs: [Tab] {
@@ -147,7 +147,7 @@ struct SpaceView: View {
 
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: NookDesign.Spacing.xs) {
             // Wrap SpaceTitle in a spacePinned drop zone so tabs can be dropped
             // onto the title to pin them (especially when pinned section is empty)
             NookDropZoneHostView(
@@ -157,14 +157,15 @@ struct SpaceView: View {
             ) {
                 SpaceTitle(space: space)
             }
+            .id("space-separator-top")
             .onAppear {
                 updateSpacePinnedCaches()
             }
 
             mainContentContainer
         }
-        .padding(.horizontal, 8)
-        .frame(minWidth: 0, maxWidth: outerWidth, alignment: .leading)
+        .padding(.horizontal, NookDesign.Spacing.sidebarInset)
+        .frame(minWidth: NookDesign.Spacing.zero, maxWidth: outerWidth, alignment: .leading)
         .contentShape(Rectangle())
         .coordinateSpace(name: "SpaceViewCoordinateSpace")
         .onReceive(NotificationCenter.default.publisher(for: .init("TabFoldersDidChange"))) { _ in
@@ -251,10 +252,10 @@ struct SpaceView: View {
             GeometryReader { geometry in
                 ZStack {
                     ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: 8) {
+                        VStack(spacing: NookDesign.Spacing.sectionGap) {
                             pinnedTabsSection
 
-                            VStack(spacing: 8) {
+                            VStack(spacing: NookDesign.Spacing.sectionGap) {
                                 newTabButtonSectionWithClear
                                 NookDropZoneHostView(
                                     zoneID: .spaceRegular(space.id),
@@ -271,7 +272,7 @@ struct SpaceView: View {
                                 }
                             }
                         }
-                        .frame(minWidth: 0, maxWidth: innerWidth, alignment: .leading)
+                        .frame(minWidth: NookDesign.Spacing.zero, maxWidth: innerWidth, alignment: .leading)
                         .coordinateSpace(name: "ScrollSpace")
                     }
                     .contentShape(Rectangle())
@@ -284,8 +285,8 @@ struct SpaceView: View {
                         if showTopArrow {
                             HStack {
                                 Rectangle()
-                                    .fill(Color.gray.opacity(0.3))
-                                    .frame(height: 1)
+                                    .fill(NookDesign.Surface.hairline)
+                                    .frame(height: NookDesign.Size.hairlineWidth)
                                 Spacer()
                                 Button {
                                     scrollToTop(proxy: proxy)
@@ -293,16 +294,16 @@ struct SpaceView: View {
                                     Image(systemName: "chevron.up")
                                         .font(NookDesign.Font.secondary)
                                         .foregroundColor(.gray)
-                                        .frame(width: 24, height: 24)
-                                        .background(Color.white.opacity(0.9))
+                                        .frame(width: NookDesign.Size.iconButton, height: NookDesign.Size.iconButton)
+                                        .background(NookDesign.Surface.raised)
                                         .clipShape(Circle())
                                         .nookElevation(.raised)
                                 }
                                 .buttonStyle(PlainButtonStyle())
                                 .transition(.move(edge: .top).combined(with: .opacity))
                             }
-                            .padding(.horizontal, 8)
-                            .padding(.top, 4)
+                            .padding(.horizontal, NookDesign.Spacing.sidebarInset)
+                            .padding(.top, NookDesign.Spacing.xs)
                         }
                         Spacer()
                     }
@@ -313,8 +314,8 @@ struct SpaceView: View {
                         if showBottomArrow {
                             HStack {
                                 Rectangle()
-                                    .fill(Color.gray.opacity(0.3))
-                                    .frame(height: 1)
+                                    .fill(NookDesign.Surface.hairline)
+                                    .frame(height: NookDesign.Size.hairlineWidth)
                                 Spacer()
                                 Button {
                                     scrollToActiveTab(proxy: proxy)
@@ -322,16 +323,16 @@ struct SpaceView: View {
                                     Image(systemName: "chevron.down")
                                         .font(NookDesign.Font.secondary)
                                         .foregroundColor(.gray)
-                                        .frame(width: 24, height: 24)
-                                        .background(Color.white.opacity(0.9))
+                                        .frame(width: NookDesign.Size.iconButton, height: NookDesign.Size.iconButton)
+                                        .background(NookDesign.Surface.raised)
                                         .clipShape(Circle())
                                         .nookElevation(.raised)
                                 }
                                 .buttonStyle(PlainButtonStyle())
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
                             }
-                            .padding(.horizontal, 8)
-                            .padding(.bottom, 4)
+                            .padding(.horizontal, NookDesign.Spacing.sidebarInset)
+                            .padding(.bottom, NookDesign.Spacing.xs)
                         }
                     }
                 }
@@ -368,7 +369,7 @@ struct SpaceView: View {
             isVertical: true,
             manager: dragSession
         ) {
-            VStack(spacing: 0) {
+            VStack(spacing: NookDesign.Spacing.rowGap) {
                 ForEach(Array(items.enumerated()), id: \.element) { index, item in
                     if let folderWithTabs = item as? FolderWithTabs {
                         TabFolderView(
@@ -407,8 +408,8 @@ struct SpaceView: View {
     private func updateSpacePinnedCaches() {
         let zone = DropZoneID.spacePinned(space.id)
         let nonFolderTabs = spacePinnedTabs.filter { $0.folderId == nil }
-        dragSession.itemCellSize[zone] = 36
-        dragSession.itemCellSpacing[zone] = 2
+        dragSession.itemCellSize[zone] = NookDesign.Size.row
+        dragSession.itemCellSpacing[zone] = NookDesign.Spacing.rowGap
         dragSession.itemCounts[zone] = nonFolderTabs.count + folders.count
     }
 
@@ -482,14 +483,14 @@ struct SpaceView: View {
         Button {
             commandPalette.open()
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: NookDesign.Spacing.md) {
                 Image(systemName: "plus")
                 Text("New Tab")
                 Spacer()
             }
         }
         .buttonStyle(RectNavButtonStyle())
-        .padding(.top, 8)
+        .padding(.top, NookDesign.Spacing.md)
     }
 
     private var newTabButtonSectionWithClear: some View {
@@ -510,15 +511,15 @@ struct SpaceView: View {
                 isOrganizing: tabOrganizerManager.isOrganizing,
                 tabCount: tabs.filter { $0.folderId == nil }.count
             )
-            .padding(.horizontal, 8)
-            .padding(.top, 4)
+            .padding(.horizontal, NookDesign.Spacing.sidebarInset)
+            .padding(.top, NookDesign.Spacing.xs)
 
             newTabButtonSection
         }
     }
 
     private var regularTabsListInner: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: NookDesign.Spacing.rowGap) {
             if !tabs.isEmpty {
                 regularTabsContent
             } else {
@@ -529,7 +530,7 @@ struct SpaceView: View {
     }
 
     private var regularTabsContent: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: NookDesign.Spacing.rowGap) {
             let currentTabs = tabs
             let split = splitManager
             let windowId = windowState.id
@@ -549,11 +550,11 @@ struct SpaceView: View {
             Color.clear
                 .contentShape(Rectangle())
                 .conditionalWindowDrag()
-                .frame(height: 100)
+                .frame(height: NookDesign.Size.dropTail)
         }
-        .frame(minWidth: 0, maxWidth: innerWidth, alignment: .leading)
+        .frame(minWidth: NookDesign.Spacing.zero, maxWidth: innerWidth, alignment: .leading)
         .contentShape(Rectangle())
-        .padding(.top, 2)
+        .padding(.top, NookDesign.Spacing.rowGap)
     }
 
     private func splitTabsView(currentTabs: [Tab], leftIdx: Int, rightIdx: Int) -> some View {
@@ -583,7 +584,7 @@ struct SpaceView: View {
     }
 
     private func regularTabsView(currentTabs: [Tab]) -> some View {
-        VStack(spacing: 2) {
+        VStack(spacing: NookDesign.Spacing.rowGap) {
             // Regular folders
             let regFolders = tabManager.regularFolders(for: space.id)
             ForEach(regFolders.sorted(by: { $0.index < $1.index })) { folder in
@@ -608,8 +609,8 @@ struct SpaceView: View {
 
     private func updateRegularTabsCaches() {
         let zone = DropZoneID.spaceRegular(space.id)
-        dragSession.itemCellSize[zone] = 36
-        dragSession.itemCellSpacing[zone] = 2
+        dragSession.itemCellSize[zone] = NookDesign.Size.row
+        dragSession.itemCellSpacing[zone] = NookDesign.Spacing.rowGap
         dragSession.itemCounts[zone] = tabs.count
     }
 
@@ -662,8 +663,8 @@ struct SpaceView: View {
 
     private var emptyRegularTabsDropTarget: some View {
         Color.clear
-            .frame(minHeight: 100, maxHeight: .infinity)
-            .padding(.top, 2)
+            .frame(minHeight: NookDesign.Size.dropTail, maxHeight: .infinity)
+            .padding(.top, NookDesign.Spacing.rowGap)
             .contentShape(Rectangle())
     }
 
@@ -689,16 +690,6 @@ struct SpaceView: View {
         return tabs.last?.id == tab.id
     }
 
-    private var windowDragSpacer: some View {
-        GeometryReader { geometry in
-            Rectangle()
-                .fill(Color.clear)
-                .frame(width: geometry.size.width, height: max(40, geometry.size.height))
-                .contentShape(Rectangle())
-                .conditionalWindowDrag()
-        }
-    }
-
     // MARK: - Scroll State
 
     private func updateScrollState(bounds: CGRect) {
@@ -722,21 +713,21 @@ struct SpaceView: View {
     private func updateContentHeight() {
         var height: CGFloat = 0
 
-        height += 17
+        height += NookDesign.Size.row // title row
 
         let pinnedCount = spacePinnedItems.count
         if pinnedCount > 0 {
-            height += CGFloat(pinnedCount) * 40
-            height += 8
+            height += CGFloat(pinnedCount) * (NookDesign.Size.row + NookDesign.Spacing.rowGap)
+            height += NookDesign.Spacing.sectionGap
         }
 
-        height += 32 + 8
+        height += NookDesign.Size.row + NookDesign.Spacing.sectionGap // new-tab row + separator gap
 
         let regularCount = tabs.count
         if regularCount > 0 {
-            height += CGFloat(regularCount) * 40
+            height += CGFloat(regularCount) * (NookDesign.Size.row + NookDesign.Spacing.rowGap)
         } else {
-            height += 40
+            height += NookDesign.Size.row + NookDesign.Spacing.rowGap
         }
 
         totalContentHeight = height

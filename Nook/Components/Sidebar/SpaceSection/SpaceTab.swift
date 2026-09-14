@@ -15,7 +15,6 @@ struct SpaceTab: View {
     var onMute: () -> Void
     @State private var isHovering: Bool = false
     @State private var isCloseHovering: Bool = false
-    @State private var isSpeakerHovering: Bool = false
     @FocusState private var isTextFieldFocused: Bool
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var tabManager: TabManager
@@ -27,9 +26,9 @@ struct SpaceTab: View {
         HStack(spacing: 0) {
             Color.black
             LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing)
-                .frame(width: 20)
+                .frame(width: NookDesign.Spacing.titleFade)
             Color.clear
-                .frame(width: isHovering ? 32 : 0)
+                .frame(width: isHovering ? NookDesign.Size.row : 0)
         }
     }
 
@@ -45,33 +44,21 @@ struct SpaceTab: View {
                 action()
             }
         }) {
-            HStack(spacing: 8) {
+            HStack(spacing: NookDesign.Spacing.md) {
                 tab.favicon
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 18, height: 18)
-                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
-                    .opacity(tab.isUnloaded ? 0.5 : 1.0)
+                    .frame(width: NookDesign.Size.favicon, height: NookDesign.Size.favicon)
+                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
                 if tab.hasAudioContent || tab.hasPlayingAudio || tab.isAudioMuted {
-                    Button(action: {
-                        onMute()
-                    }) {
-                        ZStack {
-                            NookDesign.Radius.shape(NookDesign.Radius.sm)
-                                .fill(isSpeakerHovering ? NookDesign.Surface.fillPressed : Color.clear)
-                                .frame(width: 22, height: 22)
-                                .animation(NookDesign.Motion.quick, value: isSpeakerHovering)
-                            Image(systemName: tab.isAudioMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                                .contentTransition(.symbolEffect(.replace))
-                                .font(NookDesign.Font.secondary)
-                                .foregroundColor(tab.isAudioMuted ? AppColors.textSecondary : textTab)
-                        }
+                    Button(action: onMute) {
+                        Image(systemName: tab.isAudioMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                            .contentTransition(.symbolEffect(.replace))
+                            .font(.system(size: NookDesign.Size.rowGlyph, weight: .medium))
+                            .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(PlainButtonStyle())
-                    .onHoverTracking { hovering in
-                        isSpeakerHovering = hovering
-                    }
-                    .help(tab.isAudioMuted ? "Unmute Audio" : "Mute Audio")
+                    .buttonStyle(.plain)
+                    .help(tab.isAudioMuted ? "Unmute" : "Mute")
                 }
                 
                 if tab.isRenaming {
@@ -116,8 +103,8 @@ struct SpaceTab: View {
                         Image(systemName: useUnload ? "minus" : "xmark")
                             .font(NookDesign.Font.secondary)
                             .foregroundColor(textTab)
-                            .frame(width: 24, height: 24)
-                            .background(isCloseHovering ? (isCurrentTab ? NookDesign.Surface.fill : NookDesign.Surface.fillPressed) : Color.clear)
+                            .frame(width: NookDesign.Size.rowButton, height: NookDesign.Size.rowButton)
+                            .background(isCloseHovering ? NookDesign.Surface.fillPressed : Color.clear)
                             .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -126,13 +113,23 @@ struct SpaceTab: View {
                     }
                 }
             }
-            .padding(.horizontal, 10)
-            .frame(height: 36)
-            .frame(minWidth: 0, maxWidth: .infinity)
+            .padding(.horizontal, NookDesign.Spacing.rowPadding)
+            .frame(height: NookDesign.Size.row)
+            .frame(minWidth: NookDesign.Spacing.zero, maxWidth: .infinity)
             .background(
                 backgroundColor
             )
-            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
+            .overlay {
+                if tab.isRenaming {
+                    NookDesign.Radius.shape(NookDesign.Radius.md)
+                        .strokeBorder(browserManager.gradientColorManager.accentColor, lineWidth: 1)
+                } else if isCurrentTab {
+                    NookDesign.Radius.shape(NookDesign.Radius.md)
+                        .strokeBorder(NookDesign.Surface.hairline, lineWidth: 1)
+                }
+            }
+            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
+            .opacity(tab.isUnloaded ? NookDesign.Surface.unloadedOpacity : 1)
         }
         .buttonStyle(PlainButtonStyle())
         .onHoverTracking { hovering in
