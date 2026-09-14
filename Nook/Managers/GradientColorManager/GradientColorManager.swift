@@ -7,11 +7,13 @@
 //  derived from it.
 //
 
+import AppKit
 import SwiftUI
 
 @MainActor
 final class GradientColorManager: ObservableObject {
     @Published private(set) var accentColor: Color = SpaceGradient.default.primaryColor
+    @Published private(set) var accentNSColor: NSColor = NSColor(SpaceGradient.default.primaryColor)
 
     /// Set the accent with no animation (window setup, non-active windows).
     func setImmediate(_ gradient: SpaceGradient) {
@@ -19,6 +21,7 @@ final class GradientColorManager: ObservableObject {
         tx.disablesAnimations = true
         withTransaction(tx) {
             accentColor = gradient.primaryColor
+            accentNSColor = NSColor(gradient.primaryColor)
         }
     }
 
@@ -26,6 +29,7 @@ final class GradientColorManager: ObservableObject {
     func transition(to gradient: SpaceGradient) {
         withAnimation(NookDesign.Motion.standard) {
             accentColor = gradient.primaryColor
+            accentNSColor = NSColor(gradient.primaryColor)
         }
     }
 }

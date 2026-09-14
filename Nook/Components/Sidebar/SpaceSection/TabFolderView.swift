@@ -171,8 +171,8 @@ struct TabFolderView: View {
                 NookDesign.Radius.shape(NookDesign.Radius.lg)
                     .fill(
                         isDropTargeted
-                            ? NookDesign.Surface.fillPressed.opacity(0.25)
-                            : (isHovering ? NookDesign.Surface.fillPressed : Color.clear)
+                            ? NookDesign.Surface.fillPressed
+                            : (isHovering ? NookDesign.Surface.fill : Color.clear)
                     )
             )
             .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
@@ -241,7 +241,7 @@ struct TabFolderView: View {
         .padding(.vertical, 4)
         .background(
             NookDesign.Radius.shape(NookDesign.Radius.md)
-                .fill(isDropTargeted ? NookDesign.Surface.fillPressed.opacity(0.18) : Color.clear)
+                .fill(isDropTargeted ? NookDesign.Surface.fillPressed : (isHovering ? NookDesign.Surface.fill : Color.clear))
         )
         .onAppear {
             let zone = DropZoneID.folder(folder.id)

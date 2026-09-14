@@ -16,7 +16,6 @@ struct PinnedGrid: View {
     @EnvironmentObject var tabManager: TabManager
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(WindowRegistry.self) private var windowRegistry
-    @Environment(\.nookSettings) var nookSettings
     @ObservedObject private var dragSession = NookDragSessionManager.shared
     private let maxColumns = 4
 

@@ -378,11 +378,6 @@ struct SpacesSideBarView: View {
         )
     }
 
-    private func showSpaceEditDialog(mode: SpaceEditDialog.Mode) {
-        guard let targetSpace = resolveCurrentSpace() else { return }
-        browserManager.showSpaceSettings(for: targetSpace)
-    }
-
     private func resolveCurrentSpace() -> Space? {
         // For incognito windows, use ephemeral spaces
         if windowState.isIncognito {

@@ -51,8 +51,6 @@ struct SpacesListItem: View {
         .labelStyle(.iconOnly)
         .buttonStyle(NookIconButtonStyle())
         .background(NookDesign.Radius.shape(NookDesign.Radius.md).fill(isActive ? NookDesign.Surface.fill : .clear))
-        .layoutPriority(2)
-        .foregroundStyle(Color.primary)
         .layoutPriority(isActive ? 1 : 0)
         .opacity(isFaded ? 0.3 : 1.0)
         .onHoverTracking { hovering in
@@ -70,10 +68,10 @@ struct SpacesListItem: View {
     private var spaceIcon: some View {
         if compact && !isActive {
             Circle()
-                .fill(Color.secondary)
+                .fill(.tertiary)
                 .frame(width: dotSize, height: dotSize)
         } else {
-            SpaceIconView(icon: space.icon, tint: isActive ? space.accentColor : .secondary)
+            SpaceIconView(icon: space.icon, tint: isActive ? space.accentColor : AppColors.textTertiary)
         }
     }
 

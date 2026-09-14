@@ -6,6 +6,7 @@
 //  emoji; those still render as text so nothing breaks on upgrade.
 //
 
+import AppKit
 import SwiftUI
 
 extension String {
@@ -28,7 +29,7 @@ struct SpaceIconView: View {
 
     var body: some View {
         Group {
-            if icon.isEmojiIcon {
+            if icon.isEmojiIcon || !Self.isSymbol(icon) {
                 Text(icon)
                     .font(.system(size: size))
             } else {
@@ -38,5 +39,10 @@ struct SpaceIconView: View {
             }
         }
         .frame(width: size + NookDesign.Spacing.sm, height: size + NookDesign.Spacing.sm)
+    }
+
+    /// Empty resolves to the default symbol; anything else must be a real SF Symbol name.
+    private static func isSymbol(_ name: String) -> Bool {
+        name.isEmpty || NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil
     }
 }

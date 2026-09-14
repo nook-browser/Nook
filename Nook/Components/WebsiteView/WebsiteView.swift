@@ -629,7 +629,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
                 let rightId = split.rightTabId(for: windowState.id)
 
                 let activeSide = split.activeSide(for: windowState.id)
-                let accent = NSColor(browserManager.gradientColorManager.accentColor)
+                let accent = browserManager.gradientColorManager.accentNSColor
                 let allKnownTabs = browserManager.tabManager.allTabs()
 
                 if let lId = leftId, let leftTab = allKnownTabs.first(where: { $0.id == lId }) {

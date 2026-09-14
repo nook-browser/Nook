@@ -58,7 +58,7 @@ struct SpaceTab: View {
                     }) {
                         ZStack {
                             NookDesign.Radius.shape(NookDesign.Radius.sm)
-                                .fill(isSpeakerHovering ? (isCurrentTab ? NookDesign.Surface.fill : NookDesign.Surface.fillPressed) : NookDesign.Surface.fill.opacity(0))
+                                .fill(isSpeakerHovering ? NookDesign.Surface.fillPressed : Color.clear)
                                 .frame(width: 22, height: 22)
                                 .animation(NookDesign.Motion.quick, value: isSpeakerHovering)
                             Image(systemName: tab.isAudioMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")

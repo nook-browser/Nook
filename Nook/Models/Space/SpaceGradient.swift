@@ -38,9 +38,7 @@ struct SpaceGradient: Codable, Hashable {
     }
 
     static var incognito: SpaceGradient {
-        let n1 = GradientNode(colorHex: "#1C1C1E", location: 0.0)
-        let n2 = GradientNode(colorHex: "#2C2C2E", location: 1.0)
-        return SpaceGradient(angle: 180.0, nodes: [n1, n2], grain: 0.0, opacity: 1.0)
+        accent(hex: "#8E8E93")
     }
 
     var encoded: Data? {

@@ -39,7 +39,7 @@ struct SidebarResizeView: View {
         ZStack {
             if isHovering || isResizing {
                 Capsule()
-                    .fill(NookDesign.Surface.hairline)
+                    .fill(Color.secondary)
                     .frame(width: 4)
                     .frame(maxHeight: .infinity)
                     .offset(x: indicatorOffset)

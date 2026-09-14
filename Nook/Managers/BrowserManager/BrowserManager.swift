@@ -1914,10 +1914,8 @@ class BrowserManager: ObservableObject {
         sidebarContentWidth = windowState.sidebarContentWidth
         isSidebarVisible = windowState.isSidebarVisible
         urlBarFrame = windowState.urlBarFrame
-        // Skip gradient sync for incognito windows - they use their own dark gradient
-        if !windowState.isIncognito {
-            gradientColorManager.setImmediate(windowState.gradient)
-        }
+        // windowState.gradient is the incognito accent for incognito windows
+        gradientColorManager.setImmediate(windowState.gradient)
         splitManager.refreshPublishedState(for: windowState.id)
         isCommandPaletteVisible = windowState.isCommandPaletteVisible
         if windowState.currentProfileId == nil {

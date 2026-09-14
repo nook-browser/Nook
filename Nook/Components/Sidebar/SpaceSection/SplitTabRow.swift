@@ -82,9 +82,7 @@ private struct SplitHalfTab: View {
                                     .frame(width: 24, height: 24)
                                     .background(
                                         isCloseHovering
-                                            ? (isActive
-                                                ? NookDesign.Surface.fill
-                                                : NookDesign.Surface.fillPressed)
+                                            ? NookDesign.Surface.fillPressed
                                             : Color.clear
                                     )
                                     .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
