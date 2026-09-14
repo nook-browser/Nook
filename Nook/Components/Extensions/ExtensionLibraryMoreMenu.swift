@@ -46,7 +46,7 @@ final class ExtensionLibraryMoreMenuController {
 
         // Position adjacent to main panel
         let fittingSize = hosting.fittingSize
-        let panelSize = CGSize(width: menuWidth, height: fittingSize.height)
+        let panelSize = CGSize(width: menuWidth, height: max(fittingSize.height, 200))
 
         // Try right side of anchor, fall back to left
         var origin = CGPoint(
@@ -59,6 +59,7 @@ final class ExtensionLibraryMoreMenuController {
         }
 
         panel.setFrame(NSRect(origin: origin, size: panelSize), display: true)
+        panel.invalidateShadow()
         panel.alphaValue = 0
         panel.orderFront(nil)
 
@@ -95,7 +96,7 @@ final class ExtensionLibraryMoreMenuController {
         panel.hidesOnDeactivate = true
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = false
+        panel.hasShadow = true
         panel.isReleasedWhenClosed = false
         panel.level = .floating
         return panel

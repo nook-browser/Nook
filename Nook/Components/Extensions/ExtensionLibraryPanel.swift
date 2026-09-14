@@ -54,7 +54,9 @@ final class ExtensionLibraryPanelController {
         )
 
         let root = AnyView(
-            content.nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
+            content
+                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
+                .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
         )
 
         if let hostingView = self.hostingView {
@@ -94,6 +96,7 @@ final class ExtensionLibraryPanelController {
         Self.logger.info("show() — origin=\(origin.debugDescription, privacy: .public), window.frame=\(window.frame.debugDescription, privacy: .public)")
 
         panel.setFrame(NSRect(origin: origin, size: panelSize), display: true)
+        panel.invalidateShadow()
         panel.orderFront(nil)
         panel.alphaValue = 1
 
@@ -126,7 +129,7 @@ final class ExtensionLibraryPanelController {
         panel.hidesOnDeactivate = true
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = false
+        panel.hasShadow = true
         panel.isReleasedWhenClosed = false
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]

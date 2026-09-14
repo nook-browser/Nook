@@ -44,10 +44,11 @@ struct SidebarHoverOverlayView: View {
                         .environment(commandPalette)
                         .environmentObject(browserManager.gradientColorManager)
                         .frame(maxHeight: .infinity)
-                        .nookGlassEffect(in: NookDesign.Radius.shape(cornerRadius))
+                        .background(Color(.windowBackgroundColor).opacity(0.35))
                         .alwaysArrowCursor()
                         .padding(nookSettings.sidebarPosition == .left ? .leading : .trailing, horizontalInset)
                         .padding(.vertical, verticalInset)
+                        .nookGlassEffect(in: NookDesign.Radius.shape(cornerRadius))
                         .transition(
                             .move(edge: nookSettings.sidebarPosition == .left ? .leading : .trailing)
                                 .combined(with: .opacity)

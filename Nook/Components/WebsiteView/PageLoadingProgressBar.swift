@@ -2,7 +2,7 @@
 //  PageLoadingProgressBar.swift
 //  Nook
 //
-//  Thin glass-effect progress bar shown on the URL bar during page loads.
+//  Thin progress bar shown on the URL bar during page loads.
 //  Observes WKWebView.estimatedProgress + isLoading via KVO.
 //
 
@@ -20,8 +20,8 @@ struct PageLoadingProgressBar: View {
             ZStack(alignment: .leading) {
                 // Track background
                 Rectangle()
-                    .fill(NookDesign.Surface.fill)
-                    .opacity(observer.isLoading ? 0.6 : 0)
+                    .fill(NookDesign.Surface.fillPressed)
+                    .opacity(observer.isLoading ? 1 : 0)
 
                 // Progress fill
                 Rectangle()

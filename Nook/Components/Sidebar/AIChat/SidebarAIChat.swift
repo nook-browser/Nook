@@ -201,7 +201,7 @@ struct SidebarAIChat: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(NookDesign.Surface.raised)
+        .background(NookDesign.Surface.fill)
         .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
         .padding(.horizontal, 8)
     }
