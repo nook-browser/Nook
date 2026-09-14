@@ -4,10 +4,13 @@
 //
 //  Orchestrator for native ad blocking.
 //  Manages enable/disable, per-domain whitelist, per-tab disable, OAuth exemption.
-//  Coordinates filter download, compilation, and injection via three layers:
-//  - Network blocking (WKContentRuleList)
-//  - Cosmetic filtering (CSS injection via WKUserScript)
-//  - Scriptlet injection (JS main-world WKUserScript via AdGuard Scriptlets corelibs)
+//  Three layers:
+//  - Network blocking + simple element hiding: WKContentRuleList (native, out of process)
+//  - Advanced rules (cosmetic CSS, extended CSS, scriptlets, JS): AdvancedRulesEngine lookup
+//    + nook-advanced-blocking.js runtime injected in every frame
+//  - Site-specific blockers (YouTube, Facebook, X): bundled scripts, main frame only
+//
+//  Foundation + WebKit only; nothing here is AppKit-specific.
 //
 
 import Foundation
@@ -17,42 +20,23 @@ import OSLog
 private let cbLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "ContentBlocker")
 
 @MainActor
-final class ContentBlockerManager {
+final class ContentBlockerManager: NSObject {
     weak var browserManager: BrowserManager?
-    private(set) var isEnabled: Bool = false
-    private(set) var isCompiling: Bool = false
+    private(set) var isEnabled = false
+    private(set) var isCompiling = false
 
     let filterListManager = FilterListManager()
-    private let advancedBlockingEngine = AdvancedBlockingEngine()
+    let advancedRulesEngine = AdvancedRulesEngine()
+
+    /// In-flight activation; startup tab loading waits on it so the first page is protected.
+    private(set) var activationTask: Task<Void, Never>?
 
     private var compiledRuleLists: [WKContentRuleList] = []
     private var updateTimer: Timer?
-    private static let updateInterval: TimeInterval = 24 * 60 * 60  // 24 hours
-    private var thirdPartyCookieScript: WKUserScript {
-        let js = """
-        (function() {
-          try {
-            if (window.top === window) return;
-            var ref = document.referrer || "";
-            var thirdParty = false;
-            try {
-              var refHost = ref ? new URL(ref).hostname : null;
-              thirdParty = !!refHost && refHost !== window.location.hostname;
-            } catch (e) { thirdParty = false; }
-            if (!thirdParty) return;
-            Object.defineProperty(document, 'cookie', {
-              configurable: false, enumerable: false,
-              get: function() { return ''; },
-              set: function(_) { return true; }
-            });
-            try {
-              document.requestStorageAccess = function() { return Promise.reject(new DOMException('Blocked by Nook', 'NotAllowedError')); };
-            } catch (e) {}
-          } catch (e) {}
-        })();
-        """
-        return WKUserScript(source: js, injectionTime: .atDocumentStart, forMainFrameOnly: false)
-    }
+    private static let updateInterval: TimeInterval = 24 * 60 * 60
+
+    /// Webviews whose blocking has been removed (whitelisted domain, temporary disable, OAuth flow).
+    private let exemptedWebViews = NSHashTable<WKWebView>.weakObjects()
 
     // MARK: - Exceptions
 
@@ -68,20 +52,13 @@ final class ContentBlockerManager {
     }
 
     func disableTemporarily(for tab: Tab, duration: TimeInterval) {
-        let until = Date().addingTimeInterval(duration)
-        temporarilyDisabledTabs[tab.id] = until
-        if let wv = tab.existingWebView {
-            removeBlocking(from: wv)
-            wv.reloadFromOrigin()
-        }
+        temporarilyDisabledTabs[tab.id] = Date().addingTimeInterval(duration)
+        reconcileAndReload(tab)
         DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self, weak tab] in
             guard let self, let tab else { return }
             if let exp = self.temporarilyDisabledTabs[tab.id], exp <= Date() {
                 self.temporarilyDisabledTabs.removeValue(forKey: tab.id)
-                if self.shouldApplyBlocking(to: tab), let wv = tab.existingWebView {
-                    self.applyBlocking(to: wv)
-                    wv.reloadFromOrigin()
-                }
+                self.reconcileAndReload(tab)
             }
         }
     }
@@ -89,23 +66,33 @@ final class ContentBlockerManager {
     func allowDomain(_ host: String, allowed: Bool = true) {
         let norm = host.lowercased()
         if allowed { allowedDomains.insert(norm) } else { allowedDomains.remove(norm) }
-
-        // Persist to settings
         browserManager?.nookSettings?.adBlockerWhitelist = Array(allowedDomains)
 
-        if let bm = browserManager {
-            for tab in bm.tabManager.allTabs() {
-                if tab.existingWebView?.url?.host?.lowercased() == norm, let wv = tab.existingWebView {
-                    if allowed { removeBlocking(from: wv) } else { applyBlocking(to: wv) }
-                    wv.reloadFromOrigin()
-                }
-            }
+        guard let bm = browserManager else { return }
+        for tab in bm.tabManager.allTabs() {
+            guard let h = tab.existingWebView?.url?.host?.lowercased(), h == norm || h.hasSuffix("." + norm) else { continue }
+            reconcileAndReload(tab)
         }
     }
 
+    /// Whitelist matches the host and any subdomain of it.
     func isDomainAllowed(_ host: String?) -> Bool {
-        guard let h = host?.lowercased() else { return false }
-        return allowedDomains.contains(h)
+        guard let h = host?.lowercased(), !h.isEmpty else { return false }
+        return allowedDomains.contains { h == $0 || h.hasSuffix("." + $0) }
+    }
+
+    private func isExempt(_ tab: Tab, host: String?) -> Bool {
+        !isEnabled || isTemporarilyDisabled(tabId: tab.id) || isDomainAllowed(host) || tab.isOAuthFlow
+    }
+
+    func shouldApplyBlocking(to tab: Tab) -> Bool {
+        !isExempt(tab, host: tab.existingWebView?.url?.host)
+    }
+
+    private func reconcileAndReload(_ tab: Tab) {
+        guard let wv = tab.existingWebView else { return }
+        reconcile(wv, exempt: !shouldApplyBlocking(to: tab))
+        wv.reloadFromOrigin()
     }
 
     // MARK: - Lifecycle
@@ -113,311 +100,204 @@ final class ContentBlockerManager {
     func attach(browserManager: BrowserManager) {
         self.browserManager = browserManager
 
-        // Hydrate whitelist from persisted settings
         if let whitelist = browserManager.nookSettings?.adBlockerWhitelist {
             allowedDomains = Set(whitelist.map { $0.lowercased() })
         }
-
-        // Hydrate enabled optional filter lists
         if let enabled = browserManager.nookSettings?.enabledOptionalFilterLists {
             filterListManager.enabledOptionalFilterListFilenames = Set(enabled)
+        }
+
+        // Every new user content controller gets the reply handler (always) and rule lists (when enabled).
+        BrowserConfiguration.shared.contentRuleListApplicator = { [weak self] controller in
+            self?.configureNewController(controller)
         }
     }
 
     func setEnabled(_ enabled: Bool) {
         cbLog.info("setEnabled(\(enabled)) — current isEnabled=\(self.isEnabled)")
-        guard enabled != isEnabled else { return }
-        if !enabled {
-            isEnabled = false
-            deactivateBlocking()
+        guard enabled != isEnabled, !isCompiling else { return }
+        if enabled {
+            isCompiling = true  // set synchronously so a second setEnabled(true) before the Task starts is a no-op
+            activationTask = Task { @MainActor in await activateBlocking() }
         } else {
-            Task { @MainActor in
-                await activateBlocking()
-                isEnabled = true
-                cbLog.info("Content blocker fully activated")
-            }
+            deactivateBlocking()
         }
     }
 
     // MARK: - Activation
 
     private func activateBlocking() async {
-        let startTime = CFAbsoluteTimeGetCurrent()
+        let start = CFAbsoluteTimeGetCurrent()
         isCompiling = true
 
-        // Download filter lists if we have none cached
-        if !filterListManager.hasCachedLists {
-            cbLog.info("No cached filter lists — downloading")
-            await filterListManager.downloadAllLists()
-            cbLog.info("Download completed in \(String(format: "%.2f", CFAbsoluteTimeGetCurrent() - startTime))s")
-        }
-
-        // Load raw filter text
-        let loadStart = CFAbsoluteTimeGetCurrent()
-        let rules = await Task.detached(priority: .userInitiated) { [filterListManager] in
-            filterListManager.loadAllFilterRulesAsLines()
-        }.value
-        cbLog.info("Loaded \(rules.count) filter rules in \(String(format: "%.2f", CFAbsoluteTimeGetCurrent() - loadStart))s")
-
-        // Compile via SafariConverterLib → WKContentRuleLists + advancedRulesText
-        let compileStart = CFAbsoluteTimeGetCurrent()
-        let result = await ContentRuleListCompiler.compile(rules: rules)
-        compiledRuleLists = result.ruleLists
-        cbLog.info("Compile completed in \(String(format: "%.2f", CFAbsoluteTimeGetCurrent() - compileStart))s")
-
-        // Configure advanced blocking engine with scriptlet/CSS rules
-        advancedBlockingEngine.configure(advancedRulesText: result.advancedRulesText)
+        // Bundled snapshots of every default list guarantee rules on first run; the
+        // network refresh happens afterwards via scheduleAutoUpdate().
+        await rebuild()
 
         isCompiling = false
-
-        // Register applicator for new tab controllers
-        BrowserConfiguration.shared.contentRuleListApplicator = { [weak self] controller in
-            self?.applyRuleLists(to: controller)
-        }
-
-        // Apply to shared configuration and existing webviews
+        isEnabled = true
         applyToSharedConfiguration()
         applyToExistingWebViews()
-
-        // Post update notification
         NotificationCenter.default.post(name: .adBlockerStateChanged, object: nil)
-
-        // Record initial download timestamp
-        if browserManager?.nookSettings?.adBlockerLastUpdate == nil {
-            browserManager?.nookSettings?.adBlockerLastUpdate = Date()
-        }
-
-        // Schedule periodic filter list updates
         scheduleAutoUpdate()
 
-        let totalTime = CFAbsoluteTimeGetCurrent() - startTime
-        cbLog.info("Activated with \(self.compiledRuleLists.count) rule list(s) in \(String(format: "%.2f", totalTime))s total")
+        cbLog.info("Activated with \(self.compiledRuleLists.count) rule list(s) in \(String(format: "%.2f", CFAbsoluteTimeGetCurrent() - start), privacy: .public)s")
     }
 
     private func deactivateBlocking() {
         updateTimer?.invalidate()
         updateTimer = nil
-
-        BrowserConfiguration.shared.contentRuleListApplicator = nil
-
+        isEnabled = false
         removeFromSharedConfiguration()
         removeFromExistingWebViews()
-
         NotificationCenter.default.post(name: .adBlockerStateChanged, object: nil)
-
         cbLog.info("Deactivated")
+    }
+
+    /// Load rules (disk cache, else bundled snapshot), compile rule lists, build the advanced engine.
+    private func rebuild() async {
+        let loadStart = CFAbsoluteTimeGetCurrent()
+        let rules = await Task.detached(priority: .userInitiated) { [filterListManager] in
+            filterListManager.loadAllFilterRulesAsLines()
+        }.value
+        cbLog.info("Loaded \(rules.count) filter rules in \(String(format: "%.2f", CFAbsoluteTimeGetCurrent() - loadStart), privacy: .public)s")
+
+        let compileStart = CFAbsoluteTimeGetCurrent()
+        let result = await ContentRuleListCompiler.compile(rules: rules)
+        compiledRuleLists = result.ruleLists
+        cbLog.info("Compile completed in \(String(format: "%.2f", CFAbsoluteTimeGetCurrent() - compileStart), privacy: .public)s")
+
+        await advancedRulesEngine.build(rulesText: result.advancedRulesText, reuseSerialized: result.fromCache)
     }
 
     // MARK: - Filter List Updates
 
     /// Update filter lists from remote sources. Returns true if lists were updated and recompiled.
+    @discardableResult
     func updateFilterLists() async -> Bool {
-        guard isEnabled else { return false }
-
+        guard isEnabled, !isCompiling else { return false }
         isCompiling = true
+        defer { isCompiling = false }
+
         let updated = await filterListManager.downloadAllLists()
-
         if updated {
-            let rules = filterListManager.loadAllFilterRulesAsLines()
-            let result = await ContentRuleListCompiler.compile(rules: rules)
-            compiledRuleLists = result.ruleLists
-            advancedBlockingEngine.configure(advancedRulesText: result.advancedRulesText)
-
+            await rebuild()
             applyToSharedConfiguration()
             applyToExistingWebViews()
-
-            browserManager?.nookSettings?.adBlockerLastUpdate = Date()
-
             cbLog.info("Filter lists updated and recompiled")
         }
-
-        isCompiling = false
+        browserManager?.nookSettings?.adBlockerLastUpdate = Date()
         return updated
     }
 
-    /// Force recompile all filter lists (e.g. after enabling/disabling an optional list).
+    /// Force recompile (e.g. after enabling/disabling an optional list).
     func recompileFilterLists() async {
-        guard isEnabled else { return }
-
+        guard isEnabled, !isCompiling else { return }
         isCompiling = true
+        defer { isCompiling = false }
 
-        // Download any lists we don't have cached yet
         await filterListManager.downloadAllLists()
-
-        // Load and compile
-        let rules = await Task.detached(priority: .userInitiated) { [filterListManager] in
-            filterListManager.loadAllFilterRulesAsLines()
-        }.value
-
-        let result = await ContentRuleListCompiler.compile(rules: rules)
-        compiledRuleLists = result.ruleLists
-        advancedBlockingEngine.configure(advancedRulesText: result.advancedRulesText)
-
+        await rebuild()
         applyToSharedConfiguration()
         applyToExistingWebViews()
-
         browserManager?.nookSettings?.adBlockerLastUpdate = Date()
         NotificationCenter.default.post(name: .adBlockerStateChanged, object: nil)
-
-        isCompiling = false
         cbLog.info("Filter lists recompiled")
     }
-
-    // MARK: - Auto-Update
 
     private func scheduleAutoUpdate() {
         updateTimer?.invalidate()
 
-        // Check if an update is due now (>24h since last update)
-        if let lastUpdate = browserManager?.nookSettings?.adBlockerLastUpdate {
-            let elapsed = Date().timeIntervalSince(lastUpdate)
-            if elapsed >= Self.updateInterval {
-                Task { await updateFilterLists() }
-            }
+        let lastUpdate = browserManager?.nookSettings?.adBlockerLastUpdate
+        if lastUpdate == nil || Date().timeIntervalSince(lastUpdate!) >= Self.updateInterval {
+            Task { await updateFilterLists() }
         }
 
-        // Schedule repeating timer for daily checks
         updateTimer = Timer.scheduledTimer(withTimeInterval: Self.updateInterval, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 await self?.updateFilterLists()
             }
         }
-        updateTimer?.tolerance = 60 * 60  // 1 hour tolerance for energy efficiency
+        updateTimer?.tolerance = 60 * 60
     }
 
-    // MARK: - Per-Navigation Injection
+    // MARK: - Per-Navigation (main frame, from Tab.decidePolicyFor)
 
-    /// Set up content blocker scripts for a navigation. Called from Tab's decidePolicyFor.
     func setupContentBlockerScripts(for url: URL, in webView: WKWebView, tab: Tab) {
         guard isEnabled else { return }
-
-        // For exempted navigations, remove all blocking (including WKContentRuleList) and return
-        if isDomainAllowed(url.host) || isTemporarilyDisabled(tabId: tab.id) || tab.isOAuthFlow {
-            removeBlocking(from: webView)
-            return
-        }
-
-        // Ensure network-level blocking is active (may have been removed for a previous allowed-domain navigation)
-        applyBlocking(to: webView)
-
-        let ucc = webView.configuration.userContentController
-
-        // Remove previous content blocker scripts (identified by marker comment)
-        let marker = "// Nook Content Blocker"
-        let remaining = ucc.userScripts.filter { !$0.source.hasPrefix(marker) }
-        if remaining.count != ucc.userScripts.count {
-            ucc.removeAllUserScripts()
-            remaining.forEach { ucc.addUserScript($0) }
-        }
-
-        // Inject all advanced blocking scripts (scriptlets + CSS + cosmetic)
-        let scripts = advancedBlockingEngine.userScripts(for: url)
-        for script in scripts {
-            ucc.addUserScript(script)
-        }
-
-        let host = url.host ?? "unknown"
-        cbLog.info("setupScripts for \(host, privacy: .public): \(scripts.count) advanced scripts, ruleLists=\(self.compiledRuleLists.count)")
+        let exempt = isExempt(tab, host: url.host)
+        reconcile(webView, exempt: exempt)
+        let config = exempt ? nil : advancedRulesEngine.configUserScript(for: url)
+        replaceConfigScript(in: webView.configuration.userContentController, with: config)
+        cbLog.info("main frame \(url.host ?? "-", privacy: .public): exempt=\(exempt) config=\(config?.source.count ?? 0, privacy: .public)B ruleLists=\(self.compiledRuleLists.count)")
     }
 
-    /// Fallback injection after didFinish — re-inject cosmetic CSS if scripts didn't take.
-    func injectFallbackScripts(for url: URL, in webView: WKWebView, tab: Tab) {
-        guard isEnabled else { return }
-        guard !isDomainAllowed(url.host) else { return }
-        guard !isTemporarilyDisabled(tabId: tab.id) else { return }
-        guard !tab.isOAuthFlow else { return }
-
-        // Re-inject CSS/cosmetic scripts as fallback
-        let scripts = advancedBlockingEngine.userScripts(for: url)
-        for script in scripts {
-            webView.evaluateJavaScript(script.source) { _, error in
-                if let error {
-                    cbLog.warning("Fallback injection error: \(error.localizedDescription, privacy: .public)")
-                }
-            }
-        }
+    /// Swap the main-frame configuration script. It must precede the runtime script, so it goes first.
+    private func replaceConfigScript(in ucc: WKUserContentController, with script: WKUserScript?) {
+        let marker = AdvancedRulesEngine.configScriptMarker
+        let existing = ucc.userScripts
+        let hadConfig = existing.contains { $0.source.hasPrefix(marker) }
+        guard hadConfig || script != nil else { return }
+        ucc.removeAllUserScripts()
+        if let script { ucc.addUserScript(script) }
+        existing.filter { !$0.source.hasPrefix(marker) }.forEach { ucc.addUserScript($0) }
     }
 
-    // MARK: - Rule List Application (for BrowserConfig)
+    // MARK: - New controllers (from BrowserConfiguration.freshUserContentController)
 
-    /// Apply compiled rule lists to a WKUserContentController.
-    func applyRuleLists(to controller: WKUserContentController) {
+    private func configureNewController(_ controller: WKUserContentController) {
+        controller.addScriptMessageHandler(self, contentWorld: .page, name: AdvancedRulesEngine.messageHandlerName)
         guard isEnabled else { return }
-        for list in compiledRuleLists {
-            controller.add(list)
-        }
-        if !controller.userScripts.contains(where: { $0.source.contains("document.referrer") }) {
-            controller.addUserScript(thirdPartyCookieScript)
-        }
+        for list in compiledRuleLists { controller.add(list) }
+        // Static scripts arrive by copy from the shared configuration.
     }
 
     // MARK: - Shared Configuration
 
     private func applyToSharedConfiguration() {
-        let config = BrowserConfiguration.shared.webViewConfiguration
-        let ucc = config.userContentController
+        let ucc = BrowserConfiguration.shared.webViewConfiguration.userContentController
         ucc.removeAllContentRuleLists()
-        for list in compiledRuleLists {
-            ucc.add(list)
-        }
-        if !ucc.userScripts.contains(where: { $0.source.contains("document.referrer") }) {
-            ucc.addUserScript(thirdPartyCookieScript)
-        }
+        for list in compiledRuleLists { ucc.add(list) }
+        ensureStaticScripts(in: ucc)
     }
 
     private func removeFromSharedConfiguration() {
-        let config = BrowserConfiguration.shared.webViewConfiguration
-        let ucc = config.userContentController
+        let ucc = BrowserConfiguration.shared.webViewConfiguration.userContentController
         ucc.removeAllContentRuleLists()
-        let marker = "// Nook Content Blocker"
-        let remaining = ucc.userScripts.filter {
-            !$0.source.contains("document.referrer") && !$0.source.hasPrefix(marker)
-        }
-        ucc.removeAllUserScripts()
-        remaining.forEach { ucc.addUserScript($0) }
+        removeOwnScripts(from: ucc)
     }
 
-    // MARK: - Per-WebView Helpers
+    // MARK: - Per-WebView
 
-    func shouldApplyBlocking(to tab: Tab) -> Bool {
-        if !isEnabled { return false }
-        if isTemporarilyDisabled(tabId: tab.id) { return false }
-        if isDomainAllowed(tab.existingWebView?.url?.host) { return false }
-        if tab.isOAuthFlow { return false }
-        return true
+    private func reconcile(_ webView: WKWebView, exempt: Bool) {
+        let isExempt = exemptedWebViews.contains(webView)
+        if exempt && !isExempt {
+            removeBlocking(from: webView)
+        } else if !exempt && isExempt {
+            applyBlocking(to: webView)
+        }
     }
 
     private func applyBlocking(to webView: WKWebView) {
         let ucc = webView.configuration.userContentController
         ucc.removeAllContentRuleLists()
-        for list in compiledRuleLists {
-            ucc.add(list)
-        }
-        if !ucc.userScripts.contains(where: { $0.source.contains("document.referrer") }) {
-            ucc.addUserScript(thirdPartyCookieScript)
-        }
+        for list in compiledRuleLists { ucc.add(list) }
+        ensureStaticScripts(in: ucc)
+        exemptedWebViews.remove(webView)
     }
 
     private func removeBlocking(from webView: WKWebView) {
         let ucc = webView.configuration.userContentController
         ucc.removeAllContentRuleLists()
-        let marker = "// Nook Content Blocker"
-        let remaining = ucc.userScripts.filter {
-            !$0.source.contains("document.referrer") && !$0.source.hasPrefix(marker)
-        }
-        ucc.removeAllUserScripts()
-        remaining.forEach { ucc.addUserScript($0) }
+        removeOwnScripts(from: ucc)
+        exemptedWebViews.add(webView)
     }
 
     private func applyToExistingWebViews() {
         guard let bm = browserManager else { return }
         for tab in bm.tabManager.allTabs() {
             guard let wv = tab.existingWebView else { continue }
-            if shouldApplyBlocking(to: tab) {
-                applyBlocking(to: wv)
-            } else {
-                removeBlocking(from: wv)
-            }
+            if shouldApplyBlocking(to: tab) { applyBlocking(to: wv) } else { removeBlocking(from: wv) }
         }
     }
 
@@ -427,15 +307,54 @@ final class ContentBlockerManager {
             guard let wv = tab.existingWebView else { continue }
             removeBlocking(from: wv)
         }
+        exemptedWebViews.removeAllObjects()
     }
 
-    func refreshFor(tab: Tab) {
-        guard let wv = tab.existingWebView else { return }
-        if shouldApplyBlocking(to: tab) {
-            applyBlocking(to: wv)
-        } else {
-            removeBlocking(from: wv)
+    private func ensureStaticScripts(in ucc: WKUserContentController) {
+        let marker = AdvancedRulesEngine.scriptMarker
+        guard !ucc.userScripts.contains(where: { $0.source.hasPrefix(marker) }) else { return }
+        AdvancedRulesEngine.staticUserScripts.forEach { ucc.addUserScript($0) }
+    }
+
+    private func removeOwnScripts(from ucc: WKUserContentController) {
+        let markers = [AdvancedRulesEngine.scriptMarker, AdvancedRulesEngine.configScriptMarker]
+        let remaining = ucc.userScripts.filter { script in !markers.contains { script.source.hasPrefix($0) } }
+        guard remaining.count != ucc.userScripts.count else { return }
+        ucc.removeAllUserScripts()
+        remaining.forEach { ucc.addUserScript($0) }
+    }
+
+    private func tab(for webView: WKWebView) -> Tab? {
+        browserManager?.tabManager.allTabs().first { $0.existingWebView === webView }
+    }
+}
+
+// MARK: - Subframe lookups (nook-advanced-blocking.js asks by its own frame URL)
+
+extension ContentBlockerManager: WKScriptMessageHandlerWithReply {
+    func userContentController(
+        _ userContentController: WKUserContentController,
+        didReceive message: WKScriptMessage,
+        replyHandler: @escaping (Any?, String?) -> Void
+    ) {
+        guard isEnabled, let webView = message.webView else { replyHandler(nil, nil); return }
+
+        let body = message.body as? [String: Any]
+        let frameURL = message.frameInfo.request.url
+            ?? (body?["url"] as? String).flatMap { URL(string: $0) }
+        guard let pageUrl = frameURL, let scheme = pageUrl.scheme?.lowercased(), scheme == "http" || scheme == "https" else {
+            replyHandler(nil, nil); return
         }
-        wv.reloadFromOrigin()
+
+        let topUrl = webView.url
+        if let tab = tab(for: webView) {
+            if isExempt(tab, host: topUrl?.host) { replyHandler(nil, nil); return }
+        } else if isDomainAllowed(topUrl?.host) {
+            replyHandler(nil, nil); return
+        }
+
+        let conf = advancedRulesEngine.configuration(for: pageUrl, topUrl: message.frameInfo.isMainFrame ? nil : topUrl)
+        cbLog.info("frame lookup \(pageUrl.host ?? "-", privacy: .public) main=\(message.frameInfo.isMainFrame) rules=\(conf == nil ? 0 : 1, privacy: .public)")
+        replyHandler(conf, nil)
     }
 }

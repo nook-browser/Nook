@@ -174,21 +174,20 @@ Settings stored in `NookSettingsService`: `aiProvider`, API keys per provider, m
 
 ## Content Blocker System
 
-Located in `Nook/Managers/ContentBlockerManager/`. Full pipeline description in `docs/adblocker-architecture.md`.
+Located in `Nook/Managers/ContentBlockerManager/`. Full description in `docs/adblocker-architecture.md`. Foundation + WebKit only, no AppKit, so it ports to iOS unchanged.
 
-- **ContentBlockerManager**: Coordinates ad/tracker blocking. Integrates with `AdvancedBlockingEngine` for per-navigation script injection.
-- **FilterListManager**: Downloads, caches, validates filter lists (EasyList, uBlock filters, etc.).
-- **ContentRuleListCompiler**: Chunks converted rules into 30K-rule batches for `WKContentRuleListStore.compile()`.
-- **AdvancedBlockingEngine**: Converts filter lists via SafariConverterLib, produces `WKContentRuleList` plus injectable user scripts (AdGuard scriptlets, cosmetic filters, extended CSS, site-specific blockers).
-- **Resources/**: site-specific scripts `facebook-sponsored-blocker.js`, `youtube-ad-blocker.js`, `twitter-ad-blocker.js`, `youtube-sponsorblock.js`.
+- **ContentBlockerManager**: enable/disable, whitelist (domain suffix match), per-tab temporary disable, OAuth exemption, per-navigation main-frame config, subframe lookups via the `nookAdvancedBlocking` reply handler.
+- **FilterListManager**: downloads, caches, validates filter lists (conditional GET, daily). Snapshots of every default list ship in `Resources/`, so first run is protected before any network.
+- **ContentRuleListCompiler**: SafariConverterLib conversion, 30K-entry chunks, `WKContentRuleListStore` compile, SHA-256 cache.
+- **AdvancedRulesEngine**: wraps SafariConverterLib's `FilterEngine`/`WebExtension` for per-URL lookup of advanced rules (cosmetic CSS, extended CSS, scriptlets, JS) with correct exception semantics.
+- **Resources/nook-advanced-blocking.js**: AdGuard's `@adguard/safari-extension` content-script library (ExtendedCss + Scriptlets) bundled by esbuild; rebuild per `Resources/BUILD-advanced-blocking.md`. Injected in all frames at document start.
+- **Resources/*-blocker.js**: site-specific scripts (YouTube, Facebook, X), static, main frame only, hostname-guarded.
 
-**Injection flow**: `Tab.decidePolicyFor` → `ContentBlockerManager.setupContentBlockerScripts(for:in:tab:)` → removes old scripts → adds new scripts from `AdvancedBlockingEngine.userScripts(for:)`. Fallback re-injection in `didFinish` via `injectFallbackScripts`.
-
-**Site-specific ad blockers** are registered in `AdvancedBlockingEngine.loadSiteSpecificScripts()` with resource name → domain list mappings. Scripts inject at `atDocumentStart`. New site-specific blockers should:
-- Use `MutationObserver` on `childList` (NOT attributes, to avoid infinite loops from own DOM mutations)
-- Validate content (e.g., check for "Sponsored" text) rather than relying on internal DOM attributes that may be used for non-ad content
-- Use `display: none` to fully collapse hidden elements
-- Guard against double-execution with `window.__nook<Name>Loaded`
+**Rules for changes:**
+- Every blocker-owned user script starts with `// Nook Content Blocker` or `// Nook Content Blocker Config`; removal filters on those prefixes.
+- Do not re-inject scripts after load. Scriptlets are not idempotent.
+- Do not rewrite `:has()` rules out of the content rule list; WebKit supports them natively.
+- Site-specific scripts: `MutationObserver` on `childList` only, validate content (e.g. "Sponsored" text), `display: none`, guard with `window.__nook<Name>Loaded`.
 
 ## Entitlements & Security
 

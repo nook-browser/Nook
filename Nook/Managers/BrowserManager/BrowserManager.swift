@@ -607,6 +607,17 @@ class BrowserManager: ObservableObject {
     /// Load tabs according to the user's startup mode preference.
     /// Always loads the last active tab. Called after windowState is fully configured.
     private func applyStartupLoadMode(for windowState: BrowserWindowState) {
+        // Content blocking must be active before the first navigation, otherwise the startup
+        // page loads without scriptlets/cosmetics. Warm activation is ~0.2s (cache hit).
+        if contentBlockerManager.isCompiling, let activation = contentBlockerManager.activationTask {
+            Task { @MainActor [weak self, weak windowState] in
+                await activation.value
+                guard let self, let windowState else { return }
+                self.applyStartupLoadMode(for: windowState)
+            }
+            return
+        }
+
         let activeSpace = tabManager.currentSpace ?? tabManager.spaces.first
 
         // Always load the last active tab so the user sees content immediately.

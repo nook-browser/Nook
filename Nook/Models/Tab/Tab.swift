@@ -211,7 +211,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     // Track the last domain/subdomain we sampled color for
     private var lastSampledDomain: String? = nil
     private var lastTopBarDomain: String? = nil
-    private var lastFallbackInjectionURL: String? = nil
     private var pendingThemeColorUpdate: DispatchWorkItem? = nil
 
     // MARK: - Rename State
@@ -2478,7 +2477,6 @@ extension Tab: WKNavigationDelegate {
                     lastSampledDomain = nil
                     lastTopBarDomain = nil
                 }
-                lastFallbackInjectionURL = nil
                 // Update URL but don't persist yet - wait for navigation to complete
                 self.url = newURL
             } else {
@@ -2544,12 +2542,6 @@ extension Tab: WKNavigationDelegate {
             // CHROME WEB STORE INTEGRATION: Inject script after navigation
             injectWebStoreScriptIfNeeded(for: newURL, in: webView)
 
-            // CONTENT BLOCKER: Fallback scriptlet injection (skip if already injected for this URL)
-            let urlString = newURL.absoluteString
-            if lastFallbackInjectionURL != urlString {
-                lastFallbackInjectionURL = urlString
-                browserManager?.contentBlockerManager.injectFallbackScripts(for: newURL, in: webView, tab: self)
-            }
         }
 
         // CRITICAL: Update navigation state after back/forward navigation

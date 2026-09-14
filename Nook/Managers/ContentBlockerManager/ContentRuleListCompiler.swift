@@ -28,6 +28,8 @@ final class ContentRuleListCompiler {
     struct CompilationResult {
         let ruleLists: [WKContentRuleList]
         let advancedRulesText: String?
+        /// True when nothing changed since the last compile (rule lists and advanced text came from cache).
+        var fromCache = false
     }
 
     // MARK: - Cache
@@ -58,8 +60,9 @@ final class ContentRuleListCompiler {
         }.value
 
         // Try cache
-        if let cached = await loadFromCache(hash: rulesHash, store: store) {
+        if var cached = await loadFromCache(hash: rulesHash, store: store) {
             cbLog.info("Cache hit: loaded \(cached.ruleLists.count) rule list(s) without recompiling")
+            cached.fromCache = true
             return cached
         }
 
@@ -67,25 +70,9 @@ final class ContentRuleListCompiler {
 
         // Run SafariConverterLib conversion off the main thread
         let (jsonEntries, advancedText, stats) = await Task.detached(priority: .userInitiated) {
-            // Pre-process: promote cosmetic ##rules containing :has() to #?# (extended CSS).
-            // SafariConverterLib routes ## :has() rules into safariRulesJSON as css-display-none,
-            // but WKContentRuleList doesn't support :has() selectors — they silently fail.
-            // Using #?# sends them through advancedRulesText → AdvancedBlockingEngine,
-            // where they're CSS-injected into a <style> element (WebKit CSS supports :has()).
-            let preprocessed = rules.map { rule -> String in
-                guard rule.contains("##") && !rule.contains("#?#") && !rule.contains("#@") else { return rule }
-                // Only cosmetic hiding rules (##), not scriptlet (##+js) or CSS inject (#$#)
-                guard let range = rule.range(of: "##"),
-                      !rule[range.upperBound...].hasPrefix("+js("),
-                      !rule[range.upperBound...].hasPrefix("$"),
-                      !rule[range.upperBound...].hasPrefix("%"),
-                      rule[range.upperBound...].contains(":has(") else { return rule }
-                return rule.replacingCharacters(in: range, with: "#?#")
-            }
-
             let converter = ContentBlockerConverter()
             let result = converter.convertArray(
-                rules: preprocessed,
+                rules: rules,
                 safariVersion: SafariVersion.autodetect(),
                 advancedBlocking: true
             )

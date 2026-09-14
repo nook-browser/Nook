@@ -2,107 +2,93 @@
 
 ## Overview
 
-Nook's ad blocker is a wBlock-style implementation built directly into the browser. It uses the same two core libraries as wBlock (the GPL-3.0 Safari ad blocker):
+Nook's ad blocker is built directly into the browser on top of the same two AdGuard
+components AdGuard for Safari and wBlock use, both GPL-3.0:
 
-- **SafariConverterLib** (AdguardTeam, SPM) — parses AdGuard/uBlock filter rules, produces Safari-compatible JSON + advanced rules text
-- **AdGuard Scriptlets corelibs** (AdguardTeam, MIT) — 99 production-quality scriptlet implementations bundled as `scriptlets.corelibs.json`
+- **SafariConverterLib** (SPM, product `ContentBlockerConverter`, targets `ContentBlockerConverter` + `FilterEngine`)
+  converts AdGuard/uBlock filter rules into Safari content-blocker JSON plus an "advanced rules" text,
+  and provides `FilterEngine`/`WebExtension` for per-URL lookup of those advanced rules.
+- **@adguard/safari-extension** (npm, bundled as `Resources/nook-advanced-blocking.js`) applies advanced
+  rules in-page. It bundles AdGuard ExtendedCss and AdGuard Scriptlets. Rebuild recipe:
+  `Resources/BUILD-advanced-blocking.md`.
 
-The key difference from wBlock: instead of running as a Safari Content Blocker extension, Nook injects directly into `WKWebView` via `WKUserScript`, giving us per-tab control (whitelisting, OAuth exemption, temporary disable).
+Unlike a Safari extension, Nook injects directly into `WKWebView` via `WKUserScript`, which gives
+per-tab control (whitelist, temporary disable, OAuth exemption) and no extension process.
+
+Everything in `Nook/Managers/ContentBlockerManager/` is Foundation + WebKit only, so it is reusable
+as-is for an iOS target.
 
 ## Pipeline
 
 ```
-Filter Lists (EasyList, uBlock Filters, etc.)
-  ↓ FilterListManager downloads, caches, validates
-  ↓ loadAllFilterRulesAsLines() → [String]
-  ↓
-SafariConverterLib.convertArray(advancedBlocking: true)
-  │
-  ├─ safariRulesJSON ──→ ContentRuleListCompiler
-  │                        ↓ + YouTube built-in rules
-  │                        ↓ chunk into 30K batches
-  │                        ↓ WKContentRuleListStore.compile()
-  │                        → [WKContentRuleList]  (network blocking, simple CSS hiding)
-  │
-  └─ advancedRulesText ─→ AdvancedBlockingEngine
-                            ↓ parse scriptlet rules (#%#//scriptlet(), ##+js())
-                            ↓ parse CSS injection rules (#$#)
-                            ↓ parse extended CSS rules (#?#, :has-text, :upward, etc.)
-                            ↓ look up scriptlet function in corelibs JSON
-                            ↓ wrap as IIFE with {name, args, engine: "corelibs"} source
-                            → [WKUserScript]  (injected at document_start)
+Filter lists (bundled snapshots in Resources/, refreshed daily from the network)
+  ↓ FilterListManager.loadAllFilterRulesAsLines()        (disk cache → bundled fallback)
+  ↓ SafariConverterLib.convertArray(advancedBlocking: true)
+  ├─ safariRulesJSON  → ContentRuleListCompiler → 30K-entry chunks → WKContentRuleListStore.compile()
+  │                     → [WKContentRuleList]   (network blocking, css-display-none incl. :has())
+  └─ advancedRulesText → AdvancedRulesEngine.build() → WebExtension.buildFilterEngine()
+                         (trie index, serialized under Application Support/.../AdvancedRules)
 ```
 
-## Files
+Compiled rule lists and the advanced text are cached by SHA-256 of the input rules, so a launch with
+unchanged lists does no conversion.
 
-```
-Nook/Managers/ContentBlockerManager/
-├── ContentBlockerManager.swift      — Orchestrator: enable/disable, whitelist, per-tab disable, OAuth exemption
-├── ContentRuleListCompiler.swift    — SafariConverterLib → WKContentRuleList compilation with chunking
-├── AdvancedBlockingEngine.swift     — advancedRulesText → AdGuard corelibs → WKUserScript generation
-├── FilterListManager.swift          — Download, cache, validate filter lists (ETag, conditional GET)
-└── Resources/
-    ├── scriptlets.corelibs.json     — AdGuard Scriptlets v2.3.0 (99 scriptlets, MIT license)
-    └── nook-filters-default.txt     — Bundled fallback filter list
-```
+## Three blocking layers
 
-## Three Blocking Layers
+1. **WKContentRuleList** (native, out of process): network blocking, exceptions, simple and `:has()`
+   element hiding, plus a few hardcoded YouTube endpoint rules. Added to the shared
+   `WKWebViewConfiguration` and to every fresh `WKUserContentController`.
+2. **Advanced rules** (cosmetic CSS with styles, extended CSS, scriptlets, JS): looked up per frame URL
+   by `AdvancedRulesEngine.configuration(for:topUrl:)` and applied by the runtime script.
+   - Main frame: `Tab.decidePolicyFor` → `ContentBlockerManager.setupContentBlockerScripts` embeds the
+     configuration as `window.__nookAdvancedBlockingConfig` in a user script that precedes the runtime,
+     so rules apply synchronously at document start.
+   - Subframes: the runtime posts `{url, topUrl}` to the `nookAdvancedBlocking` reply handler
+     (`WKScriptMessageHandlerWithReply`, registered on every controller) and applies the answer.
+     AdGuard's delayed-event dispatcher holds `DOMContentLoaded`/`load` up to 1s meanwhile.
+   Domain, path, `$elemhide`/`$generichide` and scriptlet exceptions are handled by FilterEngine.
+3. **Site-specific scripts** (`Resources/*-blocker.js`): YouTube, Facebook, X. Added once as static
+   user scripts, main frame only, wrapped in a hostname guard. Each guards against double execution
+   with `window.__nook<Name>Loaded`.
 
-### 1. Network Blocking (WKContentRuleList)
-- Compiled by SafariConverterLib from filter list network rules
-- Runs in WebKit's content rule list engine (native, fast)
-- Blocks requests, hides elements via `css-display-none`, allows exceptions
-- Includes hardcoded YouTube ad endpoint rules
+## Script ownership
 
-### 2. Scriptlet Injection (WKUserScript, document_start)
-- Advanced rules that require JavaScript execution
-- Examples: `prevent-fetch` (intercepts `window.fetch`), `json-prune` (modifies JSON responses), `set-constant` (stubs properties)
-- Uses AdGuard's corelibs — each scriptlet is a self-contained function that takes `(source, args)`
-- Wrapped as IIFE: function definition + source object + invocation
-- Domain-specific scripts injected in main frame; generic scripts injected in all frames
+Every user script the blocker owns starts with `// Nook Content Blocker` (static runtime + site
+scripts) or `// Nook Content Blocker Config` (per-navigation main-frame configuration). Removal and
+replacement filter by those prefixes; nothing else in the app may use them.
 
-### 3. CSS/Extended CSS Injection (WKUserScript, document_start)
-- CSS injection rules (`#$#`) — arbitrary CSS added via `<style>` element
-- Extended CSS (`:has-text()`, `:upward()`, `:remove()`, etc.) — MutationObserver-based runtime
-- Cosmetic hiding for domain-specific selectors
+Static scripts live on the shared configuration's controller and are copied into each new controller
+by `BrowserConfiguration.freshUserContentController()`. Per navigation only the config script changes.
 
-## Filter Lists
+## Exemptions
 
-### Default (always enabled)
-- EasyList, EasyPrivacy, Peter Lowe's
-- uBlock Filters, Unbreak, Privacy, Badware, Quick Fixes
-- Nook Filters (custom)
-- URLhaus (malware)
+`isExempt(tab, host)` = blocker disabled, tab temporarily disabled (basic-auth flow), host or any
+parent domain whitelisted, or OAuth flow. Exempt webviews have rule lists and scripts removed and are
+tracked in a weak set; state only changes on transitions, not on every navigation.
 
-### Optional (user-selectable)
-- AdGuard: Base, Annoyances, Mobile Ads, Tracking Protection
-- Fanboy's: Annoyance, Social, Cookie
-- EasyList Cookie
-- Regional: Chinese, Japanese, French, German, Russian, Spanish/Portuguese, Turkish, Indian, Korean
+## Filter lists
 
-## Key Scriptlets for YouTube/Facebook
+Default (always on, snapshots bundled): EasyList, EasyPrivacy, Peter Lowe's, uBlock filters /
+unbreak / badware / privacy / quick fixes, URLhaus. `nook-filters-default.txt` is bundle-only.
+Optional lists (AdGuard, Fanboy, regional) are downloaded on enable. Updates use conditional GET
+(ETag / If-Modified-Since) once every 24h; the first update runs right after activation.
 
-| Scriptlet | Purpose | Why it matters |
-|-----------|---------|----------------|
-| `prevent-fetch` | Intercepts `window.fetch` calls matching patterns | YouTube uses fetch for ad payloads; AdGuard's version preserves `Request.prototype.clone` before YouTube can overwrite it |
-| `json-prune` | Removes properties from JSON responses | Strips `adPlacements` from YouTube player responses |
-| `set-constant` | Stubs JavaScript properties to fixed values | Disables ad-related flags and handlers |
-| `abort-on-property-read` | Throws when specific properties are accessed | Prevents ad detection scripts from running |
-| `no-xhr-if` | Blocks XMLHttpRequest calls matching patterns | Blocks ad-related API calls |
+## Known limits (WebKit)
 
-## Exception Handling
+No `$redirect`, `$csp`, `$removeparam`, `$replace`, `$header`; no request counters. Scriptlets run in
+the page world from the user-script realm, so they are not blocked by page CSP.
 
-- **Domain whitelist** — persisted in `NookSettingsService.adBlockerWhitelist`
-- **Temporary disable** — per-tab, time-limited, auto-restores
-- **OAuth exemption** — `tab.isOAuthFlow` bypasses all blocking
-- **Exception rules** — filter list `@@` rules and `#@#`/`#@#+js()` exceptions
+## Updating dependencies
 
-## Updating
-
-- **Corelibs**: Update `scriptlets.corelibs.json` by running `npm install && npm run build` in the [AdGuard Scriptlets repo](https://github.com/AdguardTeam/Scriptlets) and copying `dist/scriptlets.corelibs.json`
-- **SafariConverterLib**: Update version in Xcode SPM dependencies
-- **Filter lists**: Auto-updated every 24 hours via conditional GET (ETag/If-Modified-Since)
+- Runtime JS: follow `Resources/BUILD-advanced-blocking.md` (bump `@adguard/safari-extension`).
+- SafariConverterLib: bump the SPM requirement in the Xcode project; keep it on the same major as the
+  npm package.
+- Filter list snapshots: re-download the files in `Resources/` (same names as `FilterListManager.defaultLists`).
 
 ## History
 
-Originally used 97 hand-written JavaScript scriptlet templates with a custom `FilterListParser` and `ScriptletEngine`. Replaced in March 2026 with the wBlock approach (SafariConverterLib + AdGuard Scriptlets corelibs) to fix YouTube anti-adblock bypass issues — our hand-written `prevent-fetch` couldn't handle YouTube overwriting `window.fetch` after proxy installation.
+- Originally 97 hand-written scriptlet templates with a custom parser.
+- March 2026: SafariConverterLib + AdGuard Scriptlets corelibs JSON, with a home-grown advanced-rules
+  interpreter (`AdvancedBlockingEngine`).
+- September 2026: interpreter replaced by SafariConverterLib's FilterEngine + `@adguard/safari-extension`;
+  per-frame lookup, proper extended CSS, exception handling, no double injection, bundled list snapshots.

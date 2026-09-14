@@ -23,7 +23,7 @@ final class FilterListManager {
         case social = "Social"
     }
 
-    struct FilterList {
+    struct FilterList: Sendable {
         let name: String
         let url: URL
         let filename: String
@@ -41,7 +41,7 @@ final class FilterListManager {
         }
     }
 
-    static let defaultLists: [FilterList] = [
+    nonisolated static let defaultLists: [FilterList] = [
         FilterList(name: "EasyList", url: URL(string: "https://easylist.to/easylist/easylist.txt")!, filename: "easylist.txt", knownSizeRange: 100_000...10_000_000, category: .ads),
         FilterList(name: "EasyPrivacy", url: URL(string: "https://easylist.to/easylist/easyprivacy.txt")!, filename: "easyprivacy.txt", knownSizeRange: 50_000...5_000_000, category: .privacy),
         FilterList(name: "Peter Lowe's", url: URL(string: "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=0")!, filename: "peter-lowes.txt", knownSizeRange: 10_000...2_000_000, category: .ads),
@@ -49,12 +49,14 @@ final class FilterListManager {
         FilterList(name: "uBlock Unbreak", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/unbreak.txt")!, filename: "ublock-unbreak.txt", knownSizeRange: 5_000...2_000_000, category: .ads),
         FilterList(name: "uBlock Badware", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/badware.txt")!, filename: "ublock-badware.txt", knownSizeRange: 5_000...2_000_000, category: .malware),
         FilterList(name: "uBlock Privacy", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/privacy.txt")!, filename: "ublock-privacy.txt", knownSizeRange: 5_000...2_000_000, category: .privacy),
-        FilterList(name: "Nook Filters", url: URL(string: "https://raw.githubusercontent.com/nook-browser/nook-filters/main/nook-filters.txt")!, filename: "nook-filters.txt", knownSizeRange: 1_000...1_000_000, category: .ads),
         FilterList(name: "uBlock Quick Fixes", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/quick-fixes.txt")!, filename: "ublock-quick-fixes.txt", knownSizeRange: 1_000...2_000_000, category: .ads),
         FilterList(name: "Online Malicious URL Blocklist", url: URL(string: "https://malware-filter.gitlab.io/malware-filter/urlhaus-filter-online.txt")!, filename: "urlhaus-filter.txt", knownSizeRange: 10_000...5_000_000, category: .malware),
     ]
 
-    static let optionalLists: [FilterList] = [
+    /// Lists shipped only in the app bundle (no remote source). Resource name without extension.
+    nonisolated static let bundledOnlyLists: [String] = ["nook-filters-default"]
+
+    nonisolated static let optionalLists: [FilterList] = [
         // Annoyances
         FilterList(name: "AdGuard Annoyances", url: URL(string: "https://filters.adtidy.org/extension/ublock/filters/14.txt")!, filename: "adguard-annoyances.txt", knownSizeRange: 10_000...5_000_000, category: .annoyances, isOptional: true),
         FilterList(name: "uBlock Annoyances (cookies)", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/annoyances-cookies.txt")!, filename: "ublock-annoyances-cookies.txt", knownSizeRange: 1_000...2_000_000, category: .annoyances, isOptional: true),
@@ -164,8 +166,17 @@ final class FilterListManager {
         let enabledFilenames = enabledOptionalFilterListFilenames
         let optionalLists = Self.optionalLists.filter { enabledFilenames.contains($0.filename) }
 
+        var contents: [String] = []
         for list in Self.defaultLists + optionalLists {
-            guard let content = loadCachedList(list) else { continue }
+            if let content = loadCachedList(list) { contents.append(content) }
+        }
+        for name in Self.bundledOnlyLists {
+            if let path = Bundle.main.path(forResource: name, ofType: "txt"),
+               let content = try? String(contentsOfFile: path, encoding: .utf8) {
+                contents.append(content)
+            }
+        }
+        for content in contents {
             let lines = content.components(separatedBy: "\n")
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty }
