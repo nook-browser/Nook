@@ -347,7 +347,6 @@ extension MiniWindowWebView.Coordinator: WKUIDelegate {
     }
     
     // MARK: - Full-Screen Video Support
-    @available(macOS 10.15, *)
     func webView(
         _ webView: WKWebView,
         enterFullScreenForVideoWith completionHandler: @escaping (Bool, Error?) -> Void
@@ -366,7 +365,6 @@ extension MiniWindowWebView.Coordinator: WKUIDelegate {
         completionHandler(true, nil)
     }
     
-    @available(macOS 10.15, *)
     func webView(
         _ webView: WKWebView,
         exitFullScreenWith completionHandler: @escaping (Bool, Error?) -> Void
@@ -389,7 +387,6 @@ extension MiniWindowWebView.Coordinator: WKUIDelegate {
 
     /// Handle requests for media capture authorization (camera/microphone).
     /// This is used for OAuth providers that may require getUserMedia during auth flows.
-    @available(macOS 13.0, *)
     func webView(
         _ webView: WKWebView,
         requestMediaCaptureAuthorization type: WKMediaCaptureType,

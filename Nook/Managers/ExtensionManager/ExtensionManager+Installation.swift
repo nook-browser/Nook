@@ -12,7 +12,6 @@ import SwiftData
 import UniformTypeIdentifiers
 import WebKit
 
-@available(macOS 15.4, *)
 extension ExtensionManager {
 
     // MARK: - Locale String Resolution

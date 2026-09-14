@@ -12,7 +12,6 @@ import WebKit
 
 // MARK: - Debugging Utilities
 
-@available(macOS 15.4, *)
 extension ExtensionManager {
 
     /// Show debugging console for popup troubleshooting
@@ -23,7 +22,6 @@ extension ExtensionManager {
 
 // MARK: - WKScriptMessageHandler (popup bridge)
 
-@available(macOS 15.4, *)
 extension ExtensionManager: WKScriptMessageHandler {
     func userContentController(
         _ userContentController: WKUserContentController,
@@ -35,7 +33,6 @@ extension ExtensionManager: WKScriptMessageHandler {
 
 // MARK: - WKNavigationDelegate (popup diagnostics)
 
-@available(macOS 15.4, *)
 extension ExtensionManager: WKNavigationDelegate {
     func webView(
         _ webView: WKWebView,
@@ -198,7 +195,6 @@ extension ExtensionManager: WKNavigationDelegate {
 
 // MARK: - Extension Diagnostics
 
-@available(macOS 15.4, *)
 extension ExtensionManager {
 
     /// Probe the background webview after load to check for JS-level errors.
@@ -262,7 +258,6 @@ extension ExtensionManager {
     }
 
     /// Comprehensive diagnostic for extension content script + messaging state
-    @available(macOS 15.5, *)
     func diagnoseExtensionState(for webView: WKWebView, url: URL) {
         guard let controller = extensionController else {
             Self.logger.debug("No extension controller")
@@ -348,7 +343,6 @@ extension ExtensionManager {
 
 // MARK: - Extension Resource Testing
 
-@available(macOS 15.4, *)
 extension ExtensionManager {
 
     /// List all installed extensions with their UUIDs for easy testing

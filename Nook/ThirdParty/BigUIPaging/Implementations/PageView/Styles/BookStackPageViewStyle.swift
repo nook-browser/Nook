@@ -4,7 +4,6 @@ import SwiftUI
 ///
 /// Pages are stacked on top of each other. Pages animate out to the left to reveal the next page. Previous pages animate in from the left.
 @available(iOS, unavailable)
-@available(macOS 13.0, *)
 public struct BookStackPageViewStyle: PageViewStyle {
         
     /// Creates a new instance
@@ -23,7 +22,6 @@ public struct BookStackPageViewStyle: PageViewStyle {
 }
 
 @available(iOS, unavailable)
-@available(macOS 13.0, *)
 extension PageViewStyle where Self == BookStackPageViewStyle {
     
     /// A style that stacks pages.
@@ -33,7 +31,6 @@ extension PageViewStyle where Self == BookStackPageViewStyle {
 }
 
 @available(iOS, unavailable)
-@available(macOS 13.0, *)
 struct BookStackPageViewStyle_Previews: PreviewProvider {
     
     public static var previews: some View {

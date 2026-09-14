@@ -799,89 +799,73 @@ struct ExtensionsSettingsView: View {
 
     var body: some View {
         Form {
-            if #available(macOS 15.5, *) {
-                Section {
-                    HStack {
-                        Spacer()
-                        Button("Install Extension...") {
-                            browserManager.showExtensionInstallDialog()
-                        }
-                        .buttonStyle(.borderedProminent)
+            Section {
+                HStack {
+                    Spacer()
+                    Button("Install Extension...") {
+                        browserManager.showExtensionInstallDialog()
                     }
+                    .buttonStyle(.borderedProminent)
                 }
+            }
 
-                if extensionManager.installedExtensions.isEmpty && !showSafariSection {
-                    Section {
-                        VStack(spacing: 12) {
-                            Image(systemName: "puzzlepiece.extension")
-                                .font(.system(size: 48))
-                                .foregroundColor(.secondary)
-                            Text("No Extensions Installed")
-                                .font(.title2)
-                                .fontWeight(.medium)
-                            Text("Install browser extensions to enhance your browsing experience")
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                } else {
-                    Section("Installed Extensions") {
-                        ForEach(extensionManager.installedExtensions, id: \.id) { ext in
-                            ExtensionRowView(extension: ext)
-                                .environmentObject(browserManager)
-                        }
-                    }
-                }
-
-                Section("Safari Extensions") {
-                    HStack {
-                        if isScanningSafari {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text("Scanning...")
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Button("Scan for Safari Extensions") {
-                                scanForSafariExtensions()
-                            }
-                        }
-                        Spacer()
-                    }
-
-                    if showSafariSection {
-                        if safariExtensions.isEmpty {
-                            Text("No Safari Web Extensions found on this Mac.")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        } else {
-                            ForEach(safariExtensions) { ext in
-                                SafariExtensionRowView(
-                                    info: ext,
-                                    isAlreadyInstalled: extensionManager.installedExtensions.contains(where: {
-                                        $0.name == ext.name
-                                    }),
-                                    onInstall: {
-                                        installSafariExtension(ext)
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-            } else {
+            if extensionManager.installedExtensions.isEmpty && !showSafariSection {
                 Section {
                     VStack(spacing: 12) {
                         Image(systemName: "puzzlepiece.extension")
                             .font(.system(size: 48))
                             .foregroundColor(.secondary)
-                        Text("Extensions Not Supported")
+                        Text("No Extensions Installed")
                             .font(.title2)
                             .fontWeight(.medium)
-                        Text("Extensions require macOS 15.5 or later")
+                        Text("Install browser extensions to enhance your browsing experience")
                             .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
                     }
                     .frame(maxWidth: .infinity)
+                }
+            } else {
+                Section("Installed Extensions") {
+                    ForEach(extensionManager.installedExtensions, id: \.id) { ext in
+                        ExtensionRowView(extension: ext)
+                            .environmentObject(browserManager)
+                    }
+                }
+            }
+
+            Section("Safari Extensions") {
+                HStack {
+                    if isScanningSafari {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Scanning...")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Button("Scan for Safari Extensions") {
+                            scanForSafariExtensions()
+                        }
+                    }
+                    Spacer()
+                }
+
+                if showSafariSection {
+                    if safariExtensions.isEmpty {
+                        Text("No Safari Web Extensions found on this Mac.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(safariExtensions) { ext in
+                            SafariExtensionRowView(
+                                info: ext,
+                                isAlreadyInstalled: extensionManager.installedExtensions.contains(where: {
+                                    $0.name == ext.name
+                                }),
+                                onInstall: {
+                                    installSafariExtension(ext)
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -924,7 +908,6 @@ struct ExtensionsSettingsView: View {
     }
 }
 
-@available(macOS 15.5, *)
 struct SafariExtensionRowView: View {
     let info: ExtensionManager.SafariExtensionInfo
     let isAlreadyInstalled: Bool

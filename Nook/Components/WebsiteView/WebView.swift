@@ -19,9 +19,7 @@ struct WebView: NSViewRepresentable {
         
         // Enable web inspector for debugging
         #if DEBUG
-        if #available(macOS 13.3, *) {
-            webView.isInspectable = true
-        }
+        webView.isInspectable = true
         #endif
 
         webView.customUserAgent =
@@ -221,7 +219,6 @@ extension WebView.Coordinator: WKUIDelegate {
     }
     
     // MARK: - Full-Screen Video Support
-    @available(macOS 10.15, *)
     func webView(
         _ webView: WKWebView,
         enterFullScreenForVideoWith completionHandler: @escaping (Bool, Error?) -> Void
@@ -239,7 +236,6 @@ extension WebView.Coordinator: WKUIDelegate {
         completionHandler(true, nil)
     }
     
-    @available(macOS 10.15, *)
     func webView(
         _ webView: WKWebView,
         exitFullScreenWith completionHandler: @escaping (Bool, Error?) -> Void

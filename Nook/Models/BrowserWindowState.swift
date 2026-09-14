@@ -60,7 +60,6 @@ class BrowserWindowState {
 
     // MARK: - Extension Library
     private var _extensionLibraryPanelController: Any?
-    @available(macOS 15.5, *)
     var extensionLibraryPanelController: ExtensionLibraryPanelController? {
         get { _extensionLibraryPanelController as? ExtensionLibraryPanelController }
         set { _extensionLibraryPanelController = newValue }

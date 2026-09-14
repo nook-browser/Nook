@@ -80,22 +80,14 @@ final class Profile: NSObject, Identifiable {
     /// Falls back to the default store for compatibility scenarios.
     private static func createDataStore(for profileId: UUID) -> WKWebsiteDataStore {
         // Prefer a persistent store identified by the profile UUID when available
-        if #available(macOS 15.4, *) {
-            let store = WKWebsiteDataStore(forIdentifier: profileId)
-            return store
-        } else {
-            // Fallback: use default shared store on older systems
-            let store = WKWebsiteDataStore.default()
-            return store
-        }
+        let store = WKWebsiteDataStore(forIdentifier: profileId)
+        return store
     }
 
     // MARK: - Validation & Stats
     func validateDataStore() async -> Bool {
-        if #available(macOS 15.4, *) {
-            // Basic check: store exists and is persistent
-            if dataStore.isPersistent == false { return false }
-        }
+        // Basic check: store exists and is persistent
+        if dataStore.isPersistent == false { return false }
         await refreshDataStoreStats()
         return true
     }

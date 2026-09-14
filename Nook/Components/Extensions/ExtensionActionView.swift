@@ -10,7 +10,6 @@ import WebKit
 import AppKit
 import os
 
-@available(macOS 15.5, *)
 struct ExtensionActionView: View {
     let extensions: [InstalledExtension]
     @EnvironmentObject var browserManager: BrowserManager
@@ -25,7 +24,6 @@ struct ExtensionActionView: View {
     }
 }
 
-@available(macOS 15.5, *)
 struct ExtensionActionButton: View {
     let ext: InstalledExtension
     @EnvironmentObject var browserManager: BrowserManager
@@ -182,7 +180,6 @@ struct ExtensionActionButton: View {
     }
 }
 
-@available(macOS 15.5, *)
 #Preview {
     ExtensionActionView(extensions: [])
 }
@@ -193,15 +190,11 @@ private struct ActionAnchorView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSView {
         let view = NSView(frame: .zero)
-        if #available(macOS 15.5, *) {
-            ExtensionManager.shared.setActionAnchor(for: extensionId, anchorView: view)
-        }
+        ExtensionManager.shared.setActionAnchor(for: extensionId, anchorView: view)
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        if #available(macOS 15.5, *) {
-            ExtensionManager.shared.setActionAnchor(for: extensionId, anchorView: nsView)
-        }
+        ExtensionManager.shared.setActionAnchor(for: extensionId, anchorView: nsView)
     }
 }

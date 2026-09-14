@@ -29,7 +29,7 @@ final class WebStoreScriptHandler: NSObject, WKScriptMessageHandler {
         }
         
         // Install the extension
-        if #available(macOS 15.5, *), let extensionManager = browserManager?.extensionManager {
+        if let extensionManager = browserManager?.extensionManager {
             extensionManager.installFromWebStore(extensionId: extensionId) { result in
                 Task { @MainActor in
                     // Notify the web page of completion

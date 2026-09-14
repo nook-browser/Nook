@@ -25,11 +25,7 @@ struct TopBarView: View {
 
     var body: some View {
         let cornerRadius: CGFloat = {
-            if #available(macOS 26.0, *) {
-                return 8
-            } else {
-                return 8
-            }
+            return 8
         }()
 
         let currentTab = browserManager.currentTab(for: windowState)
@@ -217,8 +213,7 @@ struct TopBarView: View {
                     }
 
                 // Pinned extension buttons + library button (not covered by tap gesture)
-                if #available(macOS 15.5, *),
-                   let extensionManager = browserManager.extensionManager {
+                if let extensionManager = browserManager.extensionManager {
                     let pinnedIDs = browserManager.nookSettings?.pinnedExtensionIDs ?? []
                     let pinnedExtensions = extensionManager.installedExtensions.filter { pinnedIDs.contains($0.id) }
 

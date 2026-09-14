@@ -10,7 +10,6 @@ import Foundation
 import os
 import WebKit
 
-@available(macOS 15.4, *)
 extension ExtensionManager {
 
     // MARK: - Externally Connectable Bridge
@@ -25,7 +24,6 @@ extension ExtensionManager {
     /// When called with an external extensionId, it strips the ID and forwards as a regular
     /// content-script-to-background message (which the background handles — this is the same
     /// path Firefox uses via its postMessage fallback).
-    @available(macOS 15.4, *)
     func setupExternallyConnectableBridge(
         for extensionContext: WKWebExtensionContext,
         extensionId: String,

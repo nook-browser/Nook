@@ -10,7 +10,6 @@ import Foundation
 import os
 import WebKit
 
-@available(macOS 15.4, *)
 final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
     private static let logger = Logger(subsystem: "com.nook.browser", category: "ExtensionBridge")
     private unowned let browserManager: BrowserManager
@@ -170,7 +169,6 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
     }
 }
 
-@available(macOS 15.4, *)
 final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
     internal let tab: Tab
     private unowned let browserManager: BrowserManager

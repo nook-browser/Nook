@@ -18,11 +18,7 @@ struct EmptyWebsiteView: View {
                 // Match the exact background and styling of the real webview
                 Color(nsColor: .windowBackgroundColor).opacity(0.2)
                     .clipShape(RoundedRectangle(cornerRadius: {
-                        if #available(macOS 26.0, *) {
-                            return 12
-                        } else {
-                            return 6
-                        }
+                        return 12
                     }(), style: .continuous))
                     .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 0)
 

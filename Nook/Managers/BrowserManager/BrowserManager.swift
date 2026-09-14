@@ -508,11 +508,7 @@ class BrowserManager: ObservableObject {
     init() {
         // Phase 1: initialize all stored properties
         self.modelContext = Persistence.shared.container.mainContext
-        if #available(macOS 15.5, *) {
-            self.extensionManager = ExtensionManager.shared
-        } else {
-            self.extensionManager = nil
-        }
+        self.extensionManager = ExtensionManager.shared
         self.profileManager = ProfileManager(context: modelContext)
         // Ensure at least one profile exists and set current immediately for manager initialization
         self.profileManager.ensureDefaultProfile()
@@ -543,7 +539,7 @@ class BrowserManager: ObservableObject {
         // Note: settingsManager will be injected later, so we skip initialization here
         self.tabManager.browserManager = self
         self.tabManager.reattachBrowserManager(self)
-        if #available(macOS 15.5, *), let mgr = self.extensionManager {
+        if let mgr = self.extensionManager {
             // Attach extension manager BEFORE any WKWebView is created so content scripts can inject
             mgr.attach(browserManager: self)
             if let pid = currentProfile?.id {
@@ -733,7 +729,7 @@ class BrowserManager: ObservableObject {
                 // TabManager awareness (updates currentTab/currentSpace visibility)
                 self.tabManager.handleProfileSwitch()
                 // Update extension manager
-                if #available(macOS 15.5, *), let mgr = self.extensionManager {
+                if let mgr = self.extensionManager {
                     mgr.switchProfile(profile.id)
                 }
             }
@@ -838,7 +834,6 @@ class BrowserManager: ObservableObject {
     // MARK: - Extension Library Panel
 
     /// Toggles the extension library panel for the active window via keyboard shortcut.
-    @available(macOS 15.5, *)
     func toggleExtensionLibrary() {
         guard let windowState = windowRegistry?.activeWindow,
               let window = windowState.window,
@@ -1391,35 +1386,19 @@ class BrowserManager: ObservableObject {
     // MARK: - Extension Management
 
     func showExtensionInstallDialog() {
-        if #available(macOS 15.5, *) {
-            extensionManager?.showExtensionInstallDialog()
-        } else {
-            // Show unsupported OS alert
-            let alert = NSAlert()
-            alert.messageText = "Extensions Not Supported"
-            alert.informativeText = "Extensions require macOS 15.5 or later."
-            alert.alertStyle = .informational
-            alert.addButton(withTitle: "OK")
-            alert.runModal()
-        }
+        extensionManager?.showExtensionInstallDialog()
     }
 
     func enableExtension(_ extensionId: String) {
-        if #available(macOS 15.5, *) {
-            extensionManager?.enableExtension(extensionId)
-        }
+        extensionManager?.enableExtension(extensionId)
     }
 
     func disableExtension(_ extensionId: String) {
-        if #available(macOS 15.5, *) {
-            extensionManager?.disableExtension(extensionId)
-        }
+        extensionManager?.disableExtension(extensionId)
     }
 
     func uninstallExtension(_ extensionId: String) {
-        if #available(macOS 15.5, *) {
-            extensionManager?.uninstallExtension(extensionId)
-        }
+        extensionManager?.uninstallExtension(extensionId)
     }
 
     // MARK: - Window-Aware Tab Operations for Commands
@@ -1508,22 +1487,14 @@ class BrowserManager: ObservableObject {
             return
         }
 
-        if #available(macOS 13.3, *) {
-            let webView = currentTab.activeWebView
+        let webView = currentTab.activeWebView
 
-            // Ensure the webview is inspectable (macOS 16+)
-            if #available(macOS 16.0, *) {
-                webView.isInspectable = true
-            }
+        // Ensure the webview is inspectable
+        webView.isInspectable = true
 
-            // There is no public API to programmatically open the Web Inspector
-            // Show an alert instructing the user how to open it manually
-            showWebInspectorAlert()
-        } else {
-            #if DEBUG
-            print("Web inspector requires macOS 13.3 or later")
-            #endif
-        }
+        // There is no public API to programmatically open the Web Inspector
+        // Show an alert instructing the user how to open it manually
+        showWebInspectorAlert()
     }
 
     private func showWebInspectorAlert() {
@@ -1698,10 +1669,8 @@ class BrowserManager: ObservableObject {
     func createFreshProfileStores() async {
         // Ensure each profile's dataStore is initialized and empty if requested
         for p in profileManager.profiles {
-            if #available(macOS 15.4, *) {
-                // No-op if already created; optionally clear
-                await p.clearAllData()
-            }
+            // No-op if already created; optionally clear
+            await p.clearAllData()
         }
     }
 
@@ -2015,9 +1984,7 @@ class BrowserManager: ObservableObject {
         tab.checkMediaState()
 
         // Notify extensions about tab activation
-        if #available(macOS 15.5, *) {
-            ExtensionManager.shared.notifyTabActivated(newTab: tab, previous: nil)
-        }
+        ExtensionManager.shared.notifyTabActivated(newTab: tab, previous: nil)
 
         // Update find manager with new current tab
         updateFindManagerCurrentTab()

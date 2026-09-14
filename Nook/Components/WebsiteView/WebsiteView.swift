@@ -175,11 +175,7 @@ struct WebsiteView: View {
     private let dragCoordinateSpace = "splitPreview"
 
     private var cornerRadius: CGFloat {
-        if #available(macOS 26.0, *) {
-            return 8
-        } else {
-            return 8
-        }
+        return 8
     }
     
     private var webViewClipShape: AnyShape {
@@ -722,7 +718,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
 
     private func makePaneContainer(frame: NSRect, isActive: Bool, accent: NSColor, side: SplitViewManager.Side) -> NSView {
         let cornerRadius: CGFloat = {
-            if #available(macOS 26.0, *) { return 8 } else { return 8 }
+            return 8
         }()
         
         let v = NSView(frame: frame)

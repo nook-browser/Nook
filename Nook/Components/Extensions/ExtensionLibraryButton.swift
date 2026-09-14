@@ -7,7 +7,6 @@ import SwiftUI
 import AppKit
 import os
 
-@available(macOS 15.5, *)
 struct ExtensionLibraryButton: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState

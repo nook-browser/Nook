@@ -8,7 +8,6 @@
 import SwiftUI
 import WebKit
 
-@available(macOS 15.4, *)
 struct ExtensionPermissionView: View {
     let extensionName: String
     let requestedPermissions: [String]

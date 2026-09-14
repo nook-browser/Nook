@@ -13,7 +13,6 @@ import SwiftUI
 import UniformTypeIdentifiers
 import WebKit
 
-@available(macOS 15.4, *)
 @MainActor
 final class ExtensionManager: NSObject, ObservableObject,
     WKWebExtensionControllerDelegate, NSPopoverDelegate
@@ -178,17 +177,15 @@ final class ExtensionManager: NSObject, ObservableObject,
         }
 
         // Critical: Associate our app's browsing WKWebViews with this controller so content scripts inject
-        if #available(macOS 15.5, *) {
-            sharedWebConfig.webExtensionController = controller
+        sharedWebConfig.webExtensionController = controller
 
-            sharedWebConfig.defaultWebpagePreferences.allowsContentJavaScript =
-                true
+        sharedWebConfig.defaultWebpagePreferences.allowsContentJavaScript =
+            true
 
-            Self.logger.debug("Configured shared WebView configuration with extension controller")
+        Self.logger.debug("Configured shared WebView configuration with extension controller")
 
-            // Update existing WebViews with controller
-            updateExistingWebViewsWithController(controller)
-        }
+        // Update existing WebViews with controller
+        updateExistingWebViewsWithController(controller)
 
         // Verify storage is working after setup
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
@@ -202,13 +199,11 @@ final class ExtensionManager: NSObject, ObservableObject,
     /// Register internal native port handlers for Safari extensions that expect
     /// the host app to handle native messaging (e.g. biometric unlock).
     private func registerInternalNativePortHandlers() {
-        if #available(macOS 15.5, *) {
-            let bitwarden = BitwardenBiometricHandler()
-            for appId in BitwardenBiometricHandler.applicationIdentifiers {
-                internalPortHandlers[appId] = bitwarden
-            }
-            Self.logger.debug("Registered \(self.internalPortHandlers.count) internal native port handlers")
+        let bitwarden = BitwardenBiometricHandler()
+        for appId in BitwardenBiometricHandler.applicationIdentifiers {
+            internalPortHandlers[appId] = bitwarden
         }
+        Self.logger.debug("Registered \(self.internalPortHandlers.count) internal native port handlers")
     }
 
     /// Lookup an internal handler for a native messaging application identifier.
@@ -321,7 +316,6 @@ final class ExtensionManager: NSObject, ObservableObject,
 
     /// Update existing WebViews to use the extension controller
     /// This fixes content script injection issues for tabs created before extension setup
-    @available(macOS 15.5, *)
     private func updateExistingWebViewsWithController(
         _ controller: WKWebExtensionController
     ) {
@@ -371,7 +365,7 @@ final class ExtensionManager: NSObject, ObservableObject,
     func attach(browserManager: BrowserManager) {
         self.browserManagerRef = browserManager
         // Ensure a stable window adapter and notify controller about the window
-        if #available(macOS 15.5, *), let controller = extensionController {
+        if let controller = extensionController {
             let adapter =
                 self.windowAdapter
                 ?? ExtensionWindowAdapter(browserManager: browserManager)

@@ -12,7 +12,6 @@ import WebKit
 
 // MARK: - Native Messaging Handler
 
-@available(macOS 15.4, *)
 class NativeMessagingHandler: NSObject {
     private static let logger = Logger(subsystem: "com.nook.browser", category: "NativeMessaging")
     let applicationId: String

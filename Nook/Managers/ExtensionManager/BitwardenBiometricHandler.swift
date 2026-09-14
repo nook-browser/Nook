@@ -18,7 +18,6 @@ import os
 import Security
 import WebKit
 
-@available(macOS 15.5, *)
 @MainActor
 final class BitwardenBiometricHandler: InternalNativePortHandler {
 

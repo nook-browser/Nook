@@ -509,14 +509,12 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         // inject once individual extension contexts finish loading asynchronously.
 
         // Ensure the configuration has the extension controller so content scripts can inject
-        if #available(macOS 15.5, *) {
-            if configuration.webExtensionController == nil,
-               let controller = ExtensionManager.shared.nativeController {
-                configuration.webExtensionController = controller
-            }
-            let ctrl = configuration.webExtensionController
-            let ctxs = ctrl?.extensionContexts.count ?? -1
+        if configuration.webExtensionController == nil,
+           let controller = ExtensionManager.shared.nativeController {
+            configuration.webExtensionController = controller
         }
+        let ctrl = configuration.webExtensionController
+        let ctxs = ctrl?.extensionContexts.count ?? -1
 
         // Check if we have an existing WebView to inject
         if let existingWebView = _existingWebView {
@@ -612,9 +610,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         }
 
         if let webView = _webView {
-            if #available(macOS 13.3, *) {
-                webView.isInspectable = true
-            }
+            webView.isInspectable = true
 
             webView.allowsLinkPreview = true
             webView.configuration.preferences
@@ -628,7 +624,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
         // Inform extensions that this tab's view is now open/available BEFORE loading,
         // so content scripts and messaging can resolve this tab during early document phases
-        if #available(macOS 15.5, *), didNotifyOpenToExtensions == false {
+        if didNotifyOpenToExtensions == false {
             ExtensionManager.shared.notifyTabOpened(self)
             // Also activate this tab if it's the current one, so the controller
             // can route chrome.runtime messages correctly
@@ -682,7 +678,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     // Minimal hook to satisfy ExtensionManager: update extension controller on existing webView.
     func applyWebViewConfigurationOverride(_ configuration: WKWebViewConfiguration) {
         guard let existing = _webView else { return }
-        if #available(macOS 15.5, *), let controller = configuration.webExtensionController {
+        if let controller = configuration.webExtensionController {
             existing.configuration.webExtensionController = controller
         }
     }
@@ -766,9 +762,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         loadingState = .didStartProvisionalNavigation
 
         // Grant extension access before loading so content scripts inject at document_start
-        if #available(macOS 15.4, *) {
-            ExtensionManager.shared.grantExtensionAccessToURL(newURL)
-        }
+        ExtensionManager.shared.grantExtensionAccessToURL(newURL)
 
         // Reset audio tracking for new page but preserve mute state
         hasAudioContent = false
@@ -1580,7 +1574,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     // MARK: - Background Color Management
     func setupThemeColorObserver(for webView: WKWebView) {
-        guard #available(macOS 12.0, *) else { return }
         if !themeColorObservedWebViews.contains(webView) {
             webView.addObserver(
                 self, forKeyPath: "themeColor", options: [.new, .initial], context: nil)
@@ -1589,7 +1582,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
 
     func removeThemeColorObserver(from webView: WKWebView) {
-        guard #available(macOS 12.0, *) else { return }
         if themeColorObservedWebViews.contains(webView) {
             webView.removeObserver(self, forKeyPath: "themeColor")
             themeColorObservedWebViews.remove(webView)
@@ -1757,7 +1749,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         guard let currentURL = webView.url,
               let currentDomain = extractDomain(from: currentURL) else {
             // If no URL/domain, still try theme color but skip pixel sampling
-            if #available(macOS 12.0, *), let themeColor = webView.themeColor {
+            if let themeColor = webView.themeColor {
                 pageBackgroundColor = themeColor
                 webView.underPageBackgroundColor = themeColor
             }
@@ -1769,9 +1761,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
         var newColor: NSColor? = nil
 
-        if #available(macOS 12.0, *) {
-            newColor = webView.themeColor
-        }
+        newColor = webView.themeColor
 
         if let themeColor = newColor {
             pageBackgroundColor = themeColor
@@ -2206,9 +2196,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         guard newName != self.name else { return }
         objectWillChange.send()
         self.name = newName
-        if #available(macOS 15.5, *) {
-            ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.title])
-        }
+        ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.title])
     }
 
     // MARK: - Favicon Logic
@@ -2476,9 +2464,7 @@ extension Tab: WKNavigationDelegate {
         didStartProvisionalNavigation navigation: WKNavigation!
     ) {
         loadingState = .didStartProvisionalNavigation
-        if #available(macOS 15.5, *) {
-            ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.loading])
-        }
+        ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.loading])
 
         if let newURL = webView.url {
             // Only reset for actual URL changes, not just reloads
@@ -2507,26 +2493,20 @@ extension Tab: WKNavigationDelegate {
         didCommit navigation: WKNavigation!
     ) {
         loadingState = .didCommit
-        if #available(macOS 15.5, *) {
-            ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.loading])
-        }
+        ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.loading])
 
         if let newURL = webView.url {
             self.url = newURL
             browserManager?.syncTabAcrossWindows(self.id)
             // Update website shortcut detector with new URL
             browserManager?.keyboardShortcutManager?.websiteShortcutDetector.updateCurrentURL(newURL)
-            if #available(macOS 15.5, *) {
-                // Grant extension access to the committed URL. This is critical for
-                // server-side redirects (e.g. appstoreconnect.apple.com → idmsa.apple.com)
-                // where decidePolicyFor only granted access to the initial URL, not the
-                // redirect target. Without this, content scripts can't inject on the
-                // redirected page and chrome.tabs.query() won't return the URL.
-                if #available(macOS 15.4, *) {
-                    ExtensionManager.shared.grantExtensionAccessToURL(newURL)
-                }
-                ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
-            }
+            // Grant extension access to the committed URL. This is critical for
+            // server-side redirects (e.g. appstoreconnect.apple.com → idmsa.apple.com)
+            // where decidePolicyFor only granted access to the initial URL, not the
+            // redirect target. Without this, content scripts can't inject on the
+            // redirected page and chrome.tabs.query() won't return the URL.
+            ExtensionManager.shared.grantExtensionAccessToURL(newURL)
+            ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
             // Don't persist here - wait for navigation to complete
         }
     }
@@ -2537,31 +2517,25 @@ extension Tab: WKNavigationDelegate {
         didFinish navigation: WKNavigation!
     ) {
         loadingState = .didFinish
-        if #available(macOS 15.5, *) {
-            ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.loading])
-        }
+        ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.loading])
 
         if let newURL = webView.url {
             self.url = newURL
-            if #available(macOS 15.5, *) {
-                // Grant extension access to the final URL after all redirects.
-                // decidePolicyFor only grants access to the initial navigation URL;
-                // server-side redirects land here with a different URL that needs
-                // its own grant for content scripts and chrome.tabs.query().
-                if #available(macOS 15.4, *) {
-                    ExtensionManager.shared.grantExtensionAccessToURL(newURL)
-                }
-                ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
+            // Grant extension access to the final URL after all redirects.
+            // decidePolicyFor only grants access to the initial navigation URL;
+            // server-side redirects land here with a different URL that needs
+            // its own grant for content scripts and chrome.tabs.query().
+            ExtensionManager.shared.grantExtensionAccessToURL(newURL)
+            ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
 
-                // Wake MV3 background workers so they can process the new page
-                // (autofill detection, badge count updates, etc.)
-                ExtensionManager.shared.wakeBackgroundWorkers()
+            // Wake MV3 background workers so they can process the new page
+            // (autofill detection, badge count updates, etc.)
+            ExtensionManager.shared.wakeBackgroundWorkers()
 
-                // Extension diagnostics: check content scripts, background worker, and messaging
-                #if DEBUG
-                ExtensionManager.shared.diagnoseExtensionState(for: webView, url: newURL)
-                #endif
-            }
+            // Extension diagnostics: check content scripts, background worker, and messaging
+            #if DEBUG
+            ExtensionManager.shared.diagnoseExtensionState(for: webView, url: newURL)
+            #endif
             browserManager?.syncTabAcrossWindows(self.id)
 
             // Load saved zoom level for the new domain
@@ -2736,9 +2710,7 @@ extension Tab: WKNavigationDelegate {
         {
             // Grant extension access to this URL BEFORE navigation starts
             // so content scripts can inject at document_start
-            if #available(macOS 15.4, *) {
-                ExtensionManager.shared.grantExtensionAccessToURL(url)
-            }
+            ExtensionManager.shared.grantExtensionAccessToURL(url)
 
             // Setup content blocker scripts before navigation starts
             browserManager?.contentBlockerManager.setupContentBlockerScripts(for: url, in: webView, tab: self)
@@ -2762,7 +2734,7 @@ extension Tab: WKNavigationDelegate {
             return
         }
 
-        if #available(macOS 12.3, *), navigationAction.shouldPerformDownload {
+        if navigationAction.shouldPerformDownload {
             decisionHandler(.download)
             return
         }
@@ -3510,7 +3482,6 @@ extension Tab: WKUIDelegate {
     }
 
     // MARK: - Full-Screen Video Support
-    @available(macOS 10.15, *)
     public func webView(
         _ webView: WKWebView,
         enterFullScreenForVideoWith completionHandler: @escaping (Bool, Error?) -> Void
@@ -3536,7 +3507,6 @@ extension Tab: WKUIDelegate {
         completionHandler(true, nil)
     }
 
-    @available(macOS 10.15, *)
     public func webView(
         _ webView: WKWebView,
         exitFullScreenWith completionHandler: @escaping (Bool, Error?) -> Void
@@ -3567,7 +3537,6 @@ extension Tab: WKUIDelegate {
     // MARK: - Media Capture Authorization
 
     /// Handle requests for camera/microphone capture authorization
-    @available(macOS 13.0, *)
     public func webView(
         _ webView: WKWebView,
         requestMediaCaptureAuthorization type: WKMediaCaptureType,

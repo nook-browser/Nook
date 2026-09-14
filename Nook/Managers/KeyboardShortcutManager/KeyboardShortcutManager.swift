@@ -556,8 +556,7 @@ class KeyboardShortcutManager {
 
             // Forward unhandled key events to extension commands (chrome.commands API).
             // This enables extension keyboard shortcuts like Bitwarden's Ctrl+Shift+L.
-            if #available(macOS 15.4, *),
-               ExtensionManager.shared.tryPerformExtensionCommand(for: event) {
+            if ExtensionManager.shared.tryPerformExtensionCommand(for: event) {
                 return nil
             }
 

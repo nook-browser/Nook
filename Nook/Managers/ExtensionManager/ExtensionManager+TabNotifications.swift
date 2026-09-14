@@ -10,12 +10,10 @@ import Foundation
 import os
 import WebKit
 
-@available(macOS 15.4, *)
 extension ExtensionManager {
 
     // MARK: - Controller event notifications for tabs
 
-    @available(macOS 15.5, *)
     func adapter(for tab: Tab, browserManager: BrowserManager)
         -> ExtensionTabAdapter
     {
@@ -32,13 +30,11 @@ extension ExtensionManager {
     }
 
     // Expose a stable adapter getter for window adapters
-    @available(macOS 15.4, *)
     func stableAdapter(for tab: Tab) -> ExtensionTabAdapter? {
         guard let bm = browserManagerRef else { return nil }
         return adapter(for: tab, browserManager: bm)
     }
 
-    @available(macOS 15.4, *)
     func notifyTabOpened(_ tab: Tab) {
         guard let bm = browserManagerRef, let controller = extensionController
         else { return }
@@ -51,7 +47,6 @@ extension ExtensionManager {
     /// WKWebExtensionController uses Safari's per-URL permission model where even
     /// granted match patterns don't give implicit URL access. Without this, content
     /// scripts won't inject and messaging fails. Call before navigation starts.
-    @available(macOS 15.4, *)
     func grantExtensionAccessToURL(_ url: URL) {
         for (_, ctx) in extensionContexts {
             ctx.setPermissionStatus(.grantedExplicitly, for: url)
@@ -74,7 +69,6 @@ extension ExtensionManager {
         }
     }
 
-    @available(macOS 15.4, *)
     func notifyTabActivated(newTab: Tab, previous: Tab?) {
         guard let bm = browserManagerRef, let controller = extensionController
         else { return }
@@ -102,7 +96,6 @@ extension ExtensionManager {
         tabCacheGeneration &+= 1
     }
 
-    @available(macOS 15.4, *)
     func notifyTabClosed(_ tab: Tab) {
         guard let bm = browserManagerRef, let controller = extensionController
         else { return }
@@ -112,7 +105,6 @@ extension ExtensionManager {
         tabCacheGeneration &+= 1
     }
 
-    @available(macOS 15.4, *)
     func notifyTabPropertiesChanged(
         _ tab: Tab,
         properties: WKWebExtension.TabChangedProperties
@@ -128,7 +120,6 @@ extension ExtensionManager {
 
     /// Forward a keyboard event to all extension contexts to handle chrome.commands shortcuts.
     /// Returns true if any extension consumed the event.
-    @available(macOS 15.4, *)
     func tryPerformExtensionCommand(for event: NSEvent) -> Bool {
         for (_, ctx) in extensionContexts {
             if ctx.performCommand(for: event) {
@@ -144,7 +135,6 @@ extension ExtensionManager {
     /// MV3 workers auto-terminate after ~5 min of inactivity. Waking them on navigation
     /// and tab activation ensures content script messages reach a live worker for features
     /// like autofill detection and badge count updates.
-    @available(macOS 15.4, *)
     func wakeBackgroundWorkers() {
         for (_, ctx) in extensionContexts {
             guard ctx.webExtension.hasBackgroundContent else { continue }

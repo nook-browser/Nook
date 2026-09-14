@@ -820,7 +820,7 @@ class TabManager: ObservableObject {
 
         debouncedPersistSnapshot()
         // Notify extensions only on real activation change
-        if isTabChanging, #available(macOS 15.5, *), let newActive = currentTab {
+        if isTabChanging, let newActive = currentTab {
             ExtensionManager.shared.notifyTabActivated(newTab: newActive, previous: previousTab)
         }
     }
@@ -1015,9 +1015,7 @@ class TabManager: ObservableObject {
         }
         
         // Notify extension system about new tab
-        if #available(macOS 15.5, *) {
-            ExtensionManager.shared.notifyTabOpened(tab)
-        }
+        ExtensionManager.shared.notifyTabOpened(tab)
 
         debouncedPersistSnapshot()
     }
@@ -1092,9 +1090,7 @@ class TabManager: ObservableObject {
         browserManager?.compositorManager.unloadTab(tab)
         browserManager?.webViewCoordinator?.removeAllWebViews(for: tab)
 
-        if #available(macOS 15.5, *) {
-            ExtensionManager.shared.notifyTabClosed(tab)
-        }
+        ExtensionManager.shared.notifyTabClosed(tab)
 
         if wasCurrent {
             // Remove closed tab from MRU
@@ -2511,14 +2507,12 @@ extension TabManager {
         // will self-register via notifyTabOpened() when their webview is created in
         // Tab.setupWebView(). Registering tabs with nil webviews causes the controller
         // to cache stale state, breaking chrome.runtime messaging.
-        if #available(macOS 15.5, *) {
-            for t in allTabs() where t.didNotifyOpenToExtensions == false && !t.isUnloaded {
-                ExtensionManager.shared.notifyTabOpened(t)
-                t.didNotifyOpenToExtensions = true
-            }
-            if let current = self.currentTab, !current.isUnloaded {
-                ExtensionManager.shared.notifyTabActivated(newTab: current, previous: nil)
-            }
+        for t in allTabs() where t.didNotifyOpenToExtensions == false && !t.isUnloaded {
+            ExtensionManager.shared.notifyTabOpened(t)
+            t.didNotifyOpenToExtensions = true
+        }
+        if let current = self.currentTab, !current.isUnloaded {
+            ExtensionManager.shared.notifyTabActivated(newTab: current, previous: nil)
         }
 
         // After reattaching, ensure gradient matches the restored current space.
@@ -2960,9 +2954,7 @@ extension TabManager {
         browserManager?.compositorManager.unloadTab(tab)
         browserManager?.webViewCoordinator?.removeAllWebViews(for: tab)
 
-        if #available(macOS 15.5, *) {
-            ExtensionManager.shared.notifyTabClosed(tab)
-        }
+        ExtensionManager.shared.notifyTabClosed(tab)
 
         if wasCurrent {
             if tab.spaceId == nil {

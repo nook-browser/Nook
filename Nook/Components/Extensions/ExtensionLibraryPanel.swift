@@ -7,7 +7,6 @@ import SwiftUI
 import AppKit
 import os
 
-@available(macOS 15.5, *)
 @MainActor
 final class ExtensionLibraryPanelController {
     private var panel: NSPanel?

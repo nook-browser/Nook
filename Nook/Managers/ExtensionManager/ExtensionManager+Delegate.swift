@@ -12,7 +12,6 @@ import SwiftData
 import SwiftUI
 import WebKit
 
-@available(macOS 15.4, *)
 extension ExtensionManager {
 
     // MARK: - WKWebExtensionControllerDelegate
@@ -187,7 +186,6 @@ extension ExtensionManager {
 
     // MARK: - Windows exposure (tabs/windows APIs)
 
-    @available(macOS 15.5, *)
     func webExtensionController(
         _ controller: WKWebExtensionController,
         focusedWindowFor extensionContext: WKWebExtensionContext
@@ -201,7 +199,6 @@ extension ExtensionManager {
         return windowAdapter
     }
 
-    @available(macOS 15.5, *)
     func webExtensionController(
         _ controller: WKWebExtensionController,
         openWindowsFor extensionContext: WKWebExtensionContext
@@ -216,7 +213,6 @@ extension ExtensionManager {
     }
 
     // MARK: - Permission prompting helper (invoked by delegate when needed)
-    @available(macOS 15.4, *)
     func presentPermissionPrompt(
         requestedPermissions: Set<WKWebExtension.Permission>,
         optionalPermissions: Set<WKWebExtension.Permission>,
@@ -281,7 +277,6 @@ extension ExtensionManager {
     }
 
     // Delegate entry point for permission requests from extensions at runtime
-    @available(macOS 15.5, *)
     func webExtensionController(
         _ controller: WKWebExtensionController,
         promptForPermissions permissions: Set<WKWebExtension.Permission>,
@@ -360,7 +355,6 @@ extension ExtensionManager {
     // SDK variations while retaining popup and permission handling.
 
     // MARK: - Opening tabs/windows requested by extensions
-    @available(macOS 15.5, *)
     func webExtensionController(
         _ controller: WKWebExtensionController,
         openNewTabUsing configuration: WKWebExtension.TabConfiguration,
@@ -443,7 +437,6 @@ extension ExtensionManager {
         completionHandler(tabAdapter, nil)
     }
 
-    @available(macOS 15.5, *)
     func webExtensionController(
         _ controller: WKWebExtensionController,
         openNewWindowUsing configuration: WKWebExtension.WindowConfiguration,
@@ -513,7 +506,6 @@ extension ExtensionManager {
 
     // MARK: - Native Messaging Support
 
-    @available(macOS 15.5, *)
     func webExtensionController(
         _ controller: WKWebExtensionController,
         sendMessage message: Any,
@@ -616,7 +608,6 @@ extension ExtensionManager {
         }
     }
 
-    @available(macOS 15.5, *)
     func webExtensionController(
         _ controller: WKWebExtensionController,
         connectUsing port: WKWebExtension.MessagePort,
@@ -666,7 +657,6 @@ extension ExtensionManager {
     /// Routes messages through registered `InternalNativePortHandler` instances first
     /// (e.g. Bitwarden biometric handler), then falls back to generic command handling
     /// (clipboard, popover) that's common across many Safari extensions.
-    @available(macOS 15.5, *)
     private func setupInternalPortHandler(
         port: WKWebExtension.MessagePort,
         extensionContext: WKWebExtensionContext,
@@ -727,7 +717,6 @@ extension ExtensionManager {
     }
 
     // Open the extension's options page (inside a browser tab)
-    @available(macOS 15.5, *)
     func webExtensionController(
         _ controller: WKWebExtensionController,
         openOptionsPageFor extensionContext: WKWebExtensionContext,
@@ -913,7 +902,6 @@ extension ExtensionManager {
     }
 
     // Resolve options page URL from manifest as a fallback for SDKs that don't expose optionsPageURL
-    @available(macOS 15.5, *)
     private func computeOptionsPageURL(for context: WKWebExtensionContext)
         -> URL?
     {
@@ -982,7 +970,6 @@ extension ExtensionManager {
         }
         return nil
     }
-    @available(macOS 15.5, *)
     func webExtensionController(
         _ controller: WKWebExtensionController,
         promptForPermissionMatchPatterns matchPatterns: Set<
@@ -1034,7 +1021,6 @@ extension ExtensionManager {
     // URL-specific access prompts (used for cross-origin network requests from extension contexts)
     // Auto-grant URLs that fall within the extension's already-granted host permissions.
     // Only prompt for URLs the extension has no declared permission for.
-    @available(macOS 15.5, *)
     func webExtensionController(
         _ controller: WKWebExtensionController,
         promptForPermissionToAccess urls: Set<URL>,
@@ -1105,7 +1091,6 @@ extension ExtensionManager {
     // MARK: - URL Conversion Helpers
 
     /// Convert extension URL (webkit-extension:// or safari-web-extension://) to file URL
-    @available(macOS 15.5, *)
     private func convertExtensionURLToFileURL(
         _ urlString: String,
         for context: WKWebExtensionContext

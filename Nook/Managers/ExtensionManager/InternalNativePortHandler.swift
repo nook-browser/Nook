@@ -12,7 +12,6 @@ import WebKit
 
 /// A handler for native messaging commands received on a port.
 /// Implementations are extension-specific (e.g. Bitwarden biometric unlock).
-@available(macOS 15.5, *)
 @MainActor
 protocol InternalNativePortHandler: AnyObject {
     /// The native messaging application identifiers this handler supports.

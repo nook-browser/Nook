@@ -16,7 +16,6 @@ import WebKit
 /// Handles extensions that use navigator.clipboard or document.execCommand('copy')
 /// instead of native messaging. (Safari-style extensions like Bitwarden use native
 /// messaging, which is handled in ExtensionManager+Delegate.swift.)
-@available(macOS 15.4, *)
 class PopupClipboardHandler: NSObject, WKScriptMessageHandler {
     static let handlerName = "nookClipboard"
 
@@ -107,7 +106,6 @@ class PopupClipboardHandler: NSObject, WKScriptMessageHandler {
 
 // MARK: - Popup UI Delegate
 
-@available(macOS 15.4, *)
 class PopupUIDelegate: NSObject, WKUIDelegate {
     weak var webView: WKWebView?
 

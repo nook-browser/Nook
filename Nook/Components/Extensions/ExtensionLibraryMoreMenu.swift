@@ -9,7 +9,6 @@ import WebKit
 import AVFoundation
 import CoreLocation
 
-@available(macOS 15.5, *)
 @MainActor
 final class ExtensionLibraryMoreMenuController {
     private var panel: NSPanel?
@@ -143,7 +142,6 @@ final class ExtensionLibraryMoreMenuController {
 
 // MARK: - More Menu SwiftUI Content
 
-@available(macOS 15.5, *)
 private struct MoreMenuView: View {
     let browserManager: BrowserManager
     let windowState: BrowserWindowState

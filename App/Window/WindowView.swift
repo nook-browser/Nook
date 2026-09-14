@@ -238,11 +238,7 @@ struct WindowView: View {
     @ViewBuilder
     private func WebContent() -> some View {
         let cornerRadius: CGFloat = {
-            if #available(macOS 26.0, *) {
-                return 8
-            } else {
-                return 8
-            }
+            return 8
         }()
         
         let hasTopBar = nookSettings.topBarAddressView

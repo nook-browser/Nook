@@ -37,9 +37,7 @@ struct PeekWebView: NSViewRepresentable {
         webView.allowsMagnification = false // Disable zoom for peek
 
         // Enable web inspector for debugging
-        if #available(macOS 13.3, *) {
-            webView.isInspectable = true
-        }
+        webView.isInspectable = true
 
         // Store reference in coordinator for transfer to tabs
         context.coordinator.webView = webView

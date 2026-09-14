@@ -8,7 +8,6 @@ import AppKit
 import WebKit
 import os
 
-@available(macOS 15.5, *)
 struct ExtensionLibraryView: View {
     let browserManager: BrowserManager
     let windowState: BrowserWindowState
@@ -342,7 +341,6 @@ private struct CopyButton: View {
 
 // MARK: - Extension Grid Item
 
-@available(macOS 15.5, *)
 private struct ExtensionGridItem: View {
     let ext: InstalledExtension
     let isPinned: Bool

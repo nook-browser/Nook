@@ -75,8 +75,7 @@ struct URLBarView: View {
                     }
                     
                     // Pinned extension buttons + library button
-                    if #available(macOS 15.5, *),
-                       let extensionManager = browserManager.extensionManager {
+                    if let extensionManager = browserManager.extensionManager {
                         let pinnedIDs = browserManager.nookSettings?.pinnedExtensionIDs ?? []
                         let pinnedExtensions = extensionManager.installedExtensions.filter { pinnedIDs.contains($0.id) }
 

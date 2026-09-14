@@ -38,8 +38,7 @@ private struct SettingsSidebar: View {
                 Section {
                     ForEach(group, id: \.self) { tab in
                         if tab == .extensions {
-                            if #available(macOS 15.5, *),
-                               browserManager.extensionManager != nil {
+                            if browserManager.extensionManager != nil {
                                 sidebarRow(tab)
                             }
                         } else {
@@ -98,8 +97,7 @@ private struct SettingsDetailPane: View {
             case .shortcuts:
                 ShortcutsSettingsView()
             case .extensions:
-                if #available(macOS 15.5, *),
-                   let extensionManager = browserManager.extensionManager {
+                if let extensionManager = browserManager.extensionManager {
                     ExtensionsSettingsView(extensionManager: extensionManager)
                 }
             case .advanced:
