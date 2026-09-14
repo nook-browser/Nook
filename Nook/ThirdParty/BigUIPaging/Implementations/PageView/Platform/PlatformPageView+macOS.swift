@@ -70,98 +70,43 @@ extension PlatformPageView {
         var viewCache = [SelectionValue: NSView]()
         weak var pageController: NSPageController?
 
-        // Scroll gesture tracking (centralized so state survives view changes)
-        private var scrollAccumulator: CGFloat = 0
-        private var gestureAxis: NSEvent.GestureAxis? = nil
-        private var hasTriggered = false
-        private var isAnimating = false
-        private let swipeThreshold: CGFloat = 25
-        private let scrollMultiplier: CGFloat = 2.5
+        // Haptic feedback during live swipe
+        var hasPlayedSwipeHaptic = false
+        private var swipeAccumulator: CGFloat = 0
 
         init(_ parent: PlatformPageView) {
             self.parent = parent
         }
 
-        // MARK: - Scroll Handling
+        // MARK: - Haptic on Swipe Progress
 
-        /// Handles a scroll wheel event for snappy horizontal page switching.
-        /// Returns `true` if the event was consumed (horizontal gesture), `false` to let SwiftUI handle it.
-        func handleScrollWheel(_ event: NSEvent) -> Bool {
-            guard event.hasPreciseScrollingDeltas else { return false }
-
-            // Handle momentum phase — swallow momentum from horizontal gestures
-            if event.momentumPhase != [] {
-                return gestureAxis == .horizontal
-            }
+        /// Track scroll delta to fire haptic at 15% of page width.
+        func trackSwipeHaptic(_ event: NSEvent) {
+            guard event.hasPreciseScrollingDeltas else { return }
 
             if event.phase.contains(.began) {
-                scrollAccumulator = 0
-                gestureAxis = nil
-                hasTriggered = false
-                return false
+                swipeAccumulator = 0
+                hasPlayedSwipeHaptic = false
+                return
             }
 
             if event.phase.contains(.changed) {
-                // Determine gesture direction on first significant movement
-                if gestureAxis == nil {
-                    let absX = abs(event.scrollingDeltaX)
-                    let absY = abs(event.scrollingDeltaY)
-                    if absX > 1 || absY > 1 {
-                        gestureAxis = absX > absY ? .horizontal : .vertical
+                guard !hasPlayedSwipeHaptic else { return }
+                swipeAccumulator += event.scrollingDeltaX
+
+                if let pc = pageController {
+                    let pageWidth = pc.view.frame.width
+                    guard pageWidth > 0 else { return }
+                    let threshold = pageWidth * 0.15
+                    if abs(swipeAccumulator) > threshold {
+                        hasPlayedSwipeHaptic = true
+                        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
                     }
                 }
-
-                if gestureAxis == .horizontal {
-                    if !hasTriggered {
-                        scrollAccumulator += event.scrollingDeltaX * scrollMultiplier
-                        if scrollAccumulator > swipeThreshold {
-                            navigateByDirection(-1) // swipe right = previous
-                            hasTriggered = true
-                        } else if scrollAccumulator < -swipeThreshold {
-                            navigateByDirection(1) // swipe left = next
-                            hasTriggered = true
-                        }
-                    }
-                    return true // consume horizontal events
-                }
-
-                return false // vertical — let SwiftUI handle
             }
 
             if event.phase.contains(.ended) || event.phase.contains(.cancelled) {
-                let wasHorizontal = gestureAxis == .horizontal
-                scrollAccumulator = 0
-                gestureAxis = nil
-                hasTriggered = false
-                return wasHorizontal
-            }
-
-            return false
-        }
-
-        /// Navigates one page in the given direction with a snappy animation.
-        private func navigateByDirection(_ direction: Int) {
-            guard let pc = pageController, !isAnimating else { return }
-
-            let newIndex = pc.selectedIndex + direction
-            guard newIndex >= 0 && newIndex < pc.arrangedObjects.count else { return }
-
-            isAnimating = true
-
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.18
-                // Snappy ease-out: fast initial movement, smooth settle
-                context.timingFunction = CAMediaTimingFunction(controlPoints: 0.16, 1, 0.3, 1)
-                pc.animator().selectedIndex = newIndex
-            } completionHandler: { [weak self] in
-                pc.completeTransition()
-                if let value = self?.selectedValue(in: pc) {
-                    self?.parent.selection = value
-                }
-                self?.isAnimating = false
-                // Allow continued gesture or momentum to trigger another page switch
-                self?.hasTriggered = false
-                self?.scrollAccumulator = 0
+                swipeAccumulator = 0
             }
         }
 
@@ -196,6 +141,7 @@ extension PlatformPageView {
         }
 
         func pageControllerDidEndLiveTransition(_ pageController: NSPageController) {
+            hasPlayedSwipeHaptic = false
             pageController.completeTransition()
             parent.selection = selectedValue(in: pageController) ?? parent.selection
         }
@@ -330,18 +276,16 @@ extension PlatformPageView {
 
         weak var coordinator: Coordinator?
 
-        // Don't forward scroll events to NSPageController — we handle
-        // horizontal swipes ourselves for snappier page switching.
+        // Forward horizontal scroll events to NSPageController for native
+        // 1:1 tracking swipes (direct manipulation feel).
         override func wantsForwardedScrollEvents(for axis: NSEvent.GestureAxis) -> Bool {
-            return false
+            return axis == .horizontal
         }
 
         override func scrollWheel(with event: NSEvent) {
-            // Let the coordinator decide if this is a horizontal page swipe
-            if let coordinator = coordinator, coordinator.handleScrollWheel(event) {
-                return // consumed — don't send to SwiftUI
-            }
-            // Vertical or undetermined — forward to SwiftUI for normal scrolling
+            // Track horizontal swipe progress for haptic feedback
+            coordinator?.trackSwipeHaptic(event)
+            // Vertical scrolls go to SwiftUI for normal list scrolling
             super.scrollWheel(with: event)
         }
     }

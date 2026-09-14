@@ -56,6 +56,22 @@ extension ExtensionManager {
         for (_, ctx) in extensionContexts {
             ctx.setPermissionStatus(.grantedExplicitly, for: url)
         }
+
+        // Also grant a match pattern covering the URL's origin for content script injection.
+        // The per-URL grant above covers chrome.tabs.query() and messaging, but content
+        // scripts require a matching pattern to inject. WebKit's <all_urls> may not match
+        // IP addresses (e.g. local servers at 192.168.x.x, 10.x.x.x), so we create an
+        // explicit origin pattern like "http://192.168.1.140/*" to ensure injection.
+        if let scheme = url.scheme, let host = url.host {
+            var hostPort = host
+            if let port = url.port { hostPort = "\(host):\(port)" }
+            let patternString = "\(scheme)://\(hostPort)/*"
+            if let pattern = try? WKWebExtension.MatchPattern(string: patternString) {
+                for (_, ctx) in extensionContexts {
+                    ctx.setPermissionStatus(.grantedExplicitly, for: pattern)
+                }
+            }
+        }
     }
 
     @available(macOS 15.4, *)

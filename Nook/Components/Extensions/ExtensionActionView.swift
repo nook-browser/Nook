@@ -83,6 +83,13 @@ struct ExtensionActionButton: View {
         .onReceive(NotificationCenter.default.publisher(for: .adBlockerStateChanged)) { _ in
             refreshBadge()
         }
+        // Wake workers when returning to Nook from another app. MV3 workers
+        // auto-terminate after ~5 min of inactivity; if the user was away, the
+        // worker may be dead and badge state cleared. Tab switches already wake
+        // workers via notifyTabActivated — this covers the app-reactivation case.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            wakeAndRefreshBadge()
+        }
         .onChange(of: currentTab?.url) { _, _ in
             refreshBadge()
         }
@@ -93,6 +100,16 @@ struct ExtensionActionButton: View {
                     refreshBadge()
                 }
             }
+        }
+    }
+
+    /// Wake background workers then refresh the badge after a short delay.
+    /// Called on app reactivation; MV3 workers may have terminated while Nook was in the background.
+    private func wakeAndRefreshBadge() {
+        ExtensionManager.shared.wakeBackgroundWorkers()
+        // Give the worker time to process the current tab and update badge text
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            refreshBadge()
         }
     }
 

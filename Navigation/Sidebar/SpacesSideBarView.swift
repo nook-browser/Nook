@@ -298,10 +298,7 @@ struct SpacesSideBarView: View {
 
         let space = spaces[newIndex]
 
-        // Trigger haptic feedback
-        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .default)
-
-        // Activate the space
+        // Activate the space (haptic fires during the swipe at 15% offset in PlatformPageView)
         browserManager.setActiveSpace(space, in: windowState)
     }
 
