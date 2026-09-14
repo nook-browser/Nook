@@ -136,7 +136,7 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
         case .hardReload: return "Hard Reload"
         case .muteUnmuteAudio: return "Mute/Unmute Audio"
         case .installExtension: return "Install Extension"
-        case .customizeSpaceGradient: return "Customize Space Gradient"
+        case .customizeSpaceGradient: return "Space Settings"
         case .organizeTabs: return "Organize Tabs"
         }
     }

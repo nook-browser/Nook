@@ -58,15 +58,6 @@ struct SpaceContextMenu: View {
                 }
             }
 
-            // Customize appearance
-            Button {
-                browserManager.showGradientEditor()
-            } label: {
-                Label("Customize Appearance", systemImage: "paintpalette")
-            }
-
-            Divider()
-
             // Space settings
             Button {
                 onOpenSettings()

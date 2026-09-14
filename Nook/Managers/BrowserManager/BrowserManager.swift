@@ -1070,26 +1070,21 @@ class BrowserManager: ObservableObject {
         dialogManager.showDialog(builder: builder)
     }
 
-    // MARK: - Appearance / Gradient Editing
-    private final class GradientDraft: ObservableObject {
-        @Published var value: SpaceGradient
-        init(_ value: SpaceGradient) { self.value = value }
-    }
+    // MARK: - Space Settings
 
-    func showGradientEditor() {
+    /// Opens Space Settings for the current space, or a notice when there is none.
+    func showSpaceSettings() {
         guard let space = tabManager.currentSpace else {
             dialogManager.showDialog {
                 StandardDialog(
                     header: {
                         DialogHeader(
-                            icon: "paintpalette",
+                            icon: "square.grid.2x2",
                             title: "No Space Available",
-                            subtitle: "Create a space to customize its gradient."
+                            subtitle: "Create a space to change its settings."
                         )
                     },
-                    content: {
-                        Color.clear.frame(height: 0)
-                    },
+                    content: { Color.clear.frame(height: 0) },
                     footer: {
                         DialogFooter(rightButtons: [
                             DialogButton(text: "OK", variant: .primary) { [weak self] in
@@ -1101,53 +1096,37 @@ class BrowserManager: ObservableObject {
             }
             return
         }
+        showSpaceSettings(for: space)
+    }
 
-        let draft = GradientDraft(space.gradient)
-        let binding = Binding<SpaceGradient>(
-            get: { draft.value },
-            set: { draft.value = $0 }
-        )
-
-        dialogManager.showDialog {
-            StandardDialog(
-                header: { EmptyView() },
-                content: {
-                    GradientEditorView(gradient: binding)
-                        .environmentObject(self.gradientColorManager)
+    /// The single presentation path for the space edit dialog (name, icon, profile).
+    func showSpaceSettings(for space: Space) {
+        dialogManager.showDialog(
+            SpaceEditDialog(
+                space: space,
+                mode: .icon,
+                onSave: { [weak self] newName, newIcon, newProfileId in
+                    guard let self else { return }
+                    do {
+                        if newIcon != space.icon {
+                            try self.tabManager.updateSpaceIcon(spaceId: space.id, icon: newIcon)
+                        }
+                        if newName != space.name {
+                            try self.tabManager.renameSpace(spaceId: space.id, newName: newName)
+                        }
+                        if newProfileId != space.profileId, let profileId = newProfileId {
+                            self.tabManager.assign(spaceId: space.id, toProfile: profileId)
+                        }
+                    } catch {
+                        print("Failed to update space: \(error)")
+                    }
+                    self.closeDialog()
                 },
-                footer: {
-                    DialogFooter(
-                        leftButton: DialogButton(
-                            text: "Cancel",
-                            variant: .secondary,
-                            action: { [weak self] in
-                                self?.gradientColorManager.endInteractivePreview()
-                                self?.gradientColorManager.transition(
-                                    to: space.gradient, duration: 0.25)
-                                self?.refreshGradientsForSpace(space, animate: true)
-                                self?.closeDialog()
-                            }
-                        ),
-                        rightButtons: [
-                            DialogButton(
-                                text: "Save",
-                                iconName: "checkmark",
-                                variant: .primary,
-                                action: { [weak self] in
-                                    space.gradient = draft.value
-                                    self?.gradientColorManager.endInteractivePreview()
-                                    self?.gradientColorManager.transition(
-                                        to: draft.value, duration: 0.35)
-                                    self?.refreshGradientsForSpace(space, animate: true)
-                                    self?.tabManager.persistSnapshot()
-                                    self?.closeDialog()
-                                }
-                            )
-                        ]
-                    )
+                onCancel: { [weak self] in
+                    self?.closeDialog()
                 }
             )
-        }
+        )
     }
 
     func closeDialog() {

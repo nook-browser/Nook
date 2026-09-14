@@ -109,7 +109,7 @@ struct SpacesListItem: View {
     @ViewBuilder
     private var spaceContextMenu: some View {
         Button {
-            showSpaceEditDialog()
+            browserManager.showSpaceSettings(for: space)
         } label: {
             Label("Space Settings", systemImage: "gear")
         }
@@ -140,43 +140,6 @@ struct SpacesListItem: View {
                 onDelete: {
                     tabManager.removeSpace(space.id)
                     browserManager.dialogManager.closeDialog()
-                },
-                onCancel: {
-                    browserManager.dialogManager.closeDialog()
-                }
-            )
-        )
-    }
-
-    private func showSpaceEditDialog() {
-        browserManager.dialogManager.showDialog(
-            SpaceEditDialog(
-                space: space,
-                mode: .icon,
-                onSave: { newName, newIcon, newProfileId in
-                    do {
-                        if newIcon != space.icon {
-                            try tabManager.updateSpaceIcon(
-                                spaceId: space.id,
-                                icon: newIcon
-                            )
-                        }
-
-                        if newName != space.name {
-                            try tabManager.renameSpace(
-                                spaceId: space.id,
-                                newName: newName
-                            )
-                        }
-
-                        // Update profile if changed
-                        if newProfileId != space.profileId, let profileId = newProfileId {
-                            tabManager.assign(spaceId: space.id, toProfile: profileId)
-                        }
-
-                        browserManager.dialogManager.closeDialog()
-                    } catch {
-                    }
                 },
                 onCancel: {
                     browserManager.dialogManager.closeDialog()

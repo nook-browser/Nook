@@ -533,7 +533,7 @@ class KeyboardShortcutManager {
             case .installExtension:
                 browserManager.showExtensionInstallDialog()
             case .customizeSpaceGradient:
-                browserManager.showGradientEditor()
+                browserManager.showSpaceSettings()
             case .organizeTabs:
                 NotificationCenter.default.post(name: .organizeTabsRequested, object: nil)
             }

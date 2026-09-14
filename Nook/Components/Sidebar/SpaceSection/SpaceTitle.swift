@@ -111,18 +111,7 @@ struct SpaceTitle: View {
                         emojiManager.toggle()
                     },
                     onOpenSettings: {
-                        browserManager.dialogManager.showDialog(
-                            SpaceEditDialog(
-                                space: space,
-                                mode: .icon,
-                                onSave: { newName, newIcon, newProfileId in
-                                    updateSpace(name: newName, icon: newIcon, profileId: newProfileId)
-                                },
-                                onCancel: {
-                                    browserManager.dialogManager.closeDialog()
-                                }
-                            )
-                        )
+                        browserManager.showSpaceSettings(for: space)
                     },
                     onDeleteSpace: deleteSpace
                 )
@@ -180,18 +169,7 @@ struct SpaceTitle: View {
                     emojiManager.toggle()
                 },
                 onOpenSettings: {
-                    browserManager.dialogManager.showDialog(
-                        SpaceEditDialog(
-                            space: space,
-                            mode: .icon,
-                            onSave: { newName, newIcon, newProfileId in
-                                updateSpace(name: newName, icon: newIcon, profileId: newProfileId)
-                            },
-                            onCancel: {
-                                browserManager.dialogManager.closeDialog()
-                            }
-                        )
-                    )
+                    browserManager.showSpaceSettings(for: space)
                 },
                 onDeleteSpace: deleteSpace
             )
@@ -260,22 +238,6 @@ struct SpaceTitle: View {
 
     private func assignProfile(_ id: UUID) {
         tabManager.assign(spaceId: space.id, toProfile: id)
-    }
-
-    private func updateSpace(name: String, icon: String, profileId: UUID?) {
-        do {
-            if icon != space.icon {
-                try tabManager.updateSpaceIcon(spaceId: space.id, icon: icon)
-            }
-            if name != space.name {
-                try tabManager.renameSpace(spaceId: space.id, newName: name)
-            }
-            if profileId != space.profileId, let profileId = profileId {
-                tabManager.assign(spaceId: space.id, toProfile: profileId)
-            }
-            browserManager.dialogManager.closeDialog()
-        } catch {
-        }
     }
 
     private func resolvedProfileName(for id: UUID?) -> String? {

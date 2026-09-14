@@ -25,8 +25,8 @@ struct WindowView: View {
         ZStack {
             WindowBackground()
                 .contextMenu {
-                    Button("Customize Space Gradient...") {
-                        browserManager.showGradientEditor()
+                    Button("Space Settings...") {
+                        browserManager.showSpaceSettings()
                     }
                     .disabled(tabManager.currentSpace == nil)
                 }

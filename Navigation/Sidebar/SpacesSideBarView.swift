@@ -379,43 +379,7 @@ struct SpacesSideBarView: View {
 
     private func showSpaceEditDialog(mode: SpaceEditDialog.Mode) {
         guard let targetSpace = resolveCurrentSpace() else { return }
-
-        browserManager.dialogManager.showDialog(
-            SpaceEditDialog(
-                space: targetSpace,
-                mode: mode,
-                onSave: { newName, newIcon, newProfileId in
-                    let spaceId = targetSpace.id
-
-                    do {
-                        if newIcon != targetSpace.icon {
-                            try tabManager.updateSpaceIcon(
-                                spaceId: spaceId,
-                                icon: newIcon
-                            )
-                        }
-
-                        if newName != targetSpace.name {
-                            try tabManager.renameSpace(
-                                spaceId: spaceId,
-                                newName: newName
-                            )
-                        }
-
-                        // Update profile if changed
-                        if newProfileId != targetSpace.profileId, let profileId = newProfileId {
-                            tabManager.assign(spaceId: spaceId, toProfile: profileId)
-                        }
-
-                        browserManager.dialogManager.closeDialog()
-                    } catch {
-                    }
-                },
-                onCancel: {
-                    browserManager.dialogManager.closeDialog()
-                }
-            )
-        )
+        browserManager.showSpaceSettings(for: targetSpace)
     }
 
     private func resolveCurrentSpace() -> Space? {
