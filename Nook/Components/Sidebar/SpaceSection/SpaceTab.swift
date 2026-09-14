@@ -134,7 +134,7 @@ struct SpaceTab: View {
         .contextMenu {
             Options()
         }
-        .nookElevation(.raised)
+        .nookElevation(isActive ? .raised : .none)
         .onAppear {
             tab.ensureFaviconLoaded()
         }

@@ -174,7 +174,7 @@ struct DialogCard<Content: View>: View {
                 NookDesign.Radius.shape(NookDesign.Radius.xl)
                     .stroke(.white.opacity(0.25), lineWidth: 1)
             }
-            .nookElevation(.raised)
+            .nookElevation(.floating)
     }
 }
 

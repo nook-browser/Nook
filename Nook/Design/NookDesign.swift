@@ -96,6 +96,7 @@ enum NookDesign {
     enum Elevation {
         case raised    // hairline + tight shadow: active row, tile, settings group
         case floating  // menu, palette, toast, dialog, popover
+        case none      // no shadow; for conditional elevation
     }
 }
 
@@ -112,6 +113,8 @@ private struct NookElevationModifier: ViewModifier {
             content
                 .shadow(color: .black.opacity(0.16), radius: 32, y: 12)
                 .shadow(color: .black.opacity(0.06), radius: 2, y: 1)
+        case .none:
+            content
         }
     }
 }
