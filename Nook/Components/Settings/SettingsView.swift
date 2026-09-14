@@ -889,6 +889,8 @@ struct ExtensionsSettingsView: View {
                 // Remove from available list since it's now installed
                 safariExtensions.removeAll { $0.id == info.id }
                 _ = ext // suppress unused warning
+            case .failure(.cancelled):
+                break
             case .failure(let error):
                 let alert = NSAlert()
                 alert.messageText = "Failed to Install Safari Extension"

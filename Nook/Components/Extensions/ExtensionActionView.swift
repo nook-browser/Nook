@@ -135,28 +135,8 @@ struct ExtensionActionButton: View {
         let tab = browserManager.currentTab(for: windowState)
         let adapter: ExtensionTabAdapter? = tab.flatMap { ExtensionManager.shared.stableAdapter(for: $0) }
 
-        // Grant ALL permissions BEFORE performAction(). WebKit may start loading the
-        // popup webview immediately when performAction() is called — before our
-        // presentActionPopup delegate fires. If the popup's JS runs chrome.tabs.query()
-        // or chrome.runtime.sendMessage() before permissions are granted, it gets empty
-        // results and shows no matching logins.
-        let webExtension = extensionContext.webExtension
-        for p in webExtension.requestedPermissions {
-            extensionContext.setPermissionStatus(.grantedExplicitly, for: p)
-        }
-        for p in webExtension.optionalPermissions {
-            extensionContext.setPermissionStatus(.grantedExplicitly, for: p)
-        }
-        for m in webExtension.allRequestedMatchPatterns {
-            extensionContext.setPermissionStatus(.grantedExplicitly, for: m)
-        }
-        for m in webExtension.optionalPermissionMatchPatterns {
-            extensionContext.setPermissionStatus(.grantedExplicitly, for: m)
-        }
-        // Also grant access to the current tab's URL specifically
-        if let tabURL = tab?.url, let scheme = tabURL.scheme, ["http", "https"].contains(scheme) {
-            extensionContext.setPermissionStatus(.grantedExplicitly, for: tabURL)
-        }
+        // No permission grants here: required permissions were granted at load, site access
+        // follows the extension's approved patterns, and activeTab is granted by WebKit on click.
 
         // Wake background worker and AWAIT it before triggering the action.
         // MV3 workers auto-terminate after ~5 min; if the popup opens before the

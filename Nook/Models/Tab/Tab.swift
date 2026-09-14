@@ -439,31 +439,22 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     // MARK: - Chrome Web Store Integration
 
-    /// Inject Web Store script after navigation completes
+    /// Inject the Web Store "Add to Nook" script after navigation completes on a store page.
+    /// Script and message handler both live in an isolated content world, so page scripts
+    /// on any site (including the store itself) cannot call the install handler.
     private func injectWebStoreScriptIfNeeded(for url: URL, in webView: WKWebView) {
-        guard let browserManager = browserManager else {
-            return
-        }
+        guard let browserManager = browserManager,
+              WebStoreScriptHandler.store(for: url) != nil,
+              let script = BrowserConfiguration.webStoreInjectorScript()
+        else { return }
 
-        guard BrowserConfiguration.isChromeWebStore(url) else { return }
-
-        // Ensure message handler is registered (remove old handler first to avoid duplicates)
-        webView.configuration.userContentController.removeScriptMessageHandler(
-            forName: "nookWebStore")
-
-        webStoreHandler = WebStoreScriptHandler(browserManager: browserManager)
-        webView.configuration.userContentController.add(webStoreHandler!, name: "nookWebStore")
-
-        // Get the script source from bundle
-        guard let script = BrowserConfiguration.webStoreInjectorScript() else { return }
-
-        // Inject with slight delay to ensure DOM is ready
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            webView.evaluateJavaScript(script.source) { _, error in
-                if let error = error {
-                }
-            }
-        }
+        let ucc = webView.configuration.userContentController
+        let world = WebStoreScriptHandler.contentWorld
+        ucc.removeScriptMessageHandler(forName: WebStoreScriptHandler.handlerName, contentWorld: world)
+        let handler = WebStoreScriptHandler(browserManager: browserManager)
+        webStoreHandler = handler
+        ucc.add(handler, contentWorld: world, name: WebStoreScriptHandler.handlerName)
+        webView.evaluateJavaScript(script.source, in: nil, in: world, completionHandler: nil)
     }
 
     // MARK: - WebView Setup
@@ -509,8 +500,10 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         // extension controller set (from setupExtensionController). Content scripts will
         // inject once individual extension contexts finish loading asynchronously.
 
-        // Ensure the configuration has the extension controller so content scripts can inject
+        // Ensure the configuration has the extension controller so content scripts can inject.
+        // Private (ephemeral) profiles never get one: extensions do not run in private tabs.
         if configuration.webExtensionController == nil,
+           resolvedProfile?.isEphemeral != true,
            let controller = ExtensionManager.shared.nativeController {
             configuration.webExtensionController = controller
         }
@@ -564,8 +557,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             _webView?.configuration.userContentController.removeScriptMessageHandler(
                 forName: "NookIdentity")
             _webView?.configuration.userContentController.removeScriptMessageHandler(
-                forName: "nookWebStore")
-            _webView?.configuration.userContentController.removeScriptMessageHandler(
                 forName: "nookShortcutDetect")
             _webView?.configuration.userContentController.removeScriptMessageHandler(
                 forName: "nookAdBlocker")
@@ -586,20 +577,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             _webView?.configuration.userContentController.add(self, name: "nookShortcutDetect")
             _webView?.configuration.userContentController.add(self, name: "nookAdBlocker")
             _webView?.configuration.userContentController.add(self, name: "nookSponsorBlock")
-
-            // Add Web Store integration handler for Chrome Web Store extension installs
-            if let browserManager = browserManager {
-                webStoreHandler = WebStoreScriptHandler(browserManager: browserManager)
-                _webView?.configuration.userContentController.add(
-                    webStoreHandler!, name: "nookWebStore")
-
-                // Inject Web Store script at setup time if already on Chrome Web Store
-                if BrowserConfiguration.isChromeWebStore(url),
-                    let script = BrowserConfiguration.webStoreInjectorScript()
-                {
-                    _webView?.configuration.userContentController.addUserScript(script)
-                }
-            }
 
             _webView?.customUserAgent =
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0.1 Safari/605.1.15"
@@ -725,7 +702,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
         // Clean up WebStore handler
         if webStoreHandler != nil {
-            _webView?.configuration.userContentController.removeScriptMessageHandler(forName: "nookWebStore")
+            _webView?.configuration.userContentController.removeScriptMessageHandler(
+                forName: WebStoreScriptHandler.handlerName, contentWorld: WebStoreScriptHandler.contentWorld)
             webStoreHandler = nil
         }
 
@@ -1383,7 +1361,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
         // Clean up WebStore handler
         if webStoreHandler != nil {
-            controller.removeScriptMessageHandler(forName: "nookWebStore")
+            controller.removeScriptMessageHandler(
+                forName: WebStoreScriptHandler.handlerName, contentWorld: WebStoreScriptHandler.contentWorld)
             webStoreHandler = nil
         }
 

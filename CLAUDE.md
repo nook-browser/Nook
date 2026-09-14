@@ -73,7 +73,7 @@ The app uses ~30 specialized **Managers**, one per feature domain, coordinated t
 | **BrowserManager** | `Nook/Managers/BrowserManager/` | Central coordinator (~2900 lines). Aggregates all other managers. Being refactored toward independent injection. |
 | **TabManager** | `Nook/Managers/TabManager/` | Tab lifecycle (~3000 lines), persistence via `PersistenceActor`, spaces, folders, pins. `Tab` itself is ~3950 lines in `Nook/Models/Tab/Tab.swift`. |
 | **ProfileManager** | `Nook/Managers/ProfileManager/` | Profile lifecycle, ephemeral/incognito profiles with non-persistent `WKWebsiteDataStore` |
-| **ExtensionManager** | `Nook/Managers/ExtensionManager/` | WKWebExtension integration (~5300 lines across 11 files). Singleton. See [Extension CLAUDE.md](Nook/Managers/ExtensionManager/CLAUDE.md) |
+| **ExtensionManager** | `Nook/Managers/ExtensionManager/` | WKWebExtension integration (12 files). Singleton, global across profiles, disabled in private tabs. See [Extension CLAUDE.md](Nook/Managers/ExtensionManager/CLAUDE.md) |
 | **ContentBlockerManager** | `Nook/Managers/ContentBlockerManager/` | Ad/tracker blocking. See Content Blocker System below and `docs/adblocker-architecture.md` |
 | **WindowRegistry** | `Nook/Managers/WindowRegistry/` | Multi-window state tracking. Single source of truth for all open windows |
 | **WebViewCoordinator** | `Nook/Managers/WebViewCoordinator/` | WebView pool for multi-window tab display |

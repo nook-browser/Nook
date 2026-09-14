@@ -2,7 +2,7 @@
 //  ExtensionManager+ExternallyConnectable.swift
 //  Nook
 //
-//  Externally Connectable Bridge — page-world polyfill and manifest patching
+//  externally_connectable bridge content scripts and manifest patching for WebKit
 //
 
 import AppKit
@@ -14,60 +14,34 @@ extension ExtensionManager {
 
     // MARK: - Externally Connectable Bridge
 
-    /// Set up the externally_connectable bridge for an extension.
+    /// Problem: web pages (like account.proton.me) call `browser.runtime.sendMessage(SAFARI_EXT_ID, msg)`
+    /// to talk to the extension. That ID does not match our WKWebExtension `uniqueIdentifier`, so
+    /// the call fails and the page shows an error.
     ///
-    /// Problem: Web pages (like account.proton.me) call browser.runtime.sendMessage(SAFARI_EXT_ID, msg)
-    /// to communicate with the extension. The Safari extension ID doesn't match our WKWebExtension
-    /// uniqueIdentifier, so the call fails and the page shows an error.
+    /// Fix: two content scripts added to the extension's own manifest by `patchManifestForWebKit`:
+    /// - `nook_ec_polyfill.js` (MAIN world) wraps the page's `runtime.sendMessage` / `connect` and
+    ///   relays over `window.postMessage`.
+    /// - `nook_bridge.js` (ISOLATED world) forwards those to the background with the real runtime.
     ///
-    /// Fix: Inject a user script into matching pages that wraps browser.runtime.sendMessage.
-    /// When called with an external extensionId, it strips the ID and forwards as a regular
-    /// content-script-to-background message (which the background handles — this is the same
-    /// path Firefox uses via its postMessage fallback).
-    func setupExternallyConnectableBridge(
-        for extensionContext: WKWebExtensionContext,
-        extensionId: String,
-        packagePath: String
-    ) {
-        let manifestURL = URL(fileURLWithPath: packagePath).appendingPathComponent("manifest.json")
-        guard let data = try? Data(contentsOf: manifestURL),
-              let manifest = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let ec = manifest["externally_connectable"] as? [String: Any],
-              let matchPatterns = ec["matches"] as? [String], !matchPatterns.isEmpty
-        else { return }
-
-        // Extract hostnames from match patterns
-        var hostnames = Set<String>()
-        for pattern in matchPatterns {
-            guard let schemeEnd = pattern.range(of: "://") else { continue }
-            let afterScheme = pattern[schemeEnd.upperBound...]
-            guard let slashIndex = afterScheme.firstIndex(of: "/") else { continue }
-            let host = String(afterScheme[afterScheme.startIndex..<slashIndex])
-            if host != "*" {
-                hostnames.insert(host.replacingOccurrences(of: "*.", with: ""))
-            }
-        }
-        let sortedHostnames = hostnames.sorted()
-        guard !sortedHostnames.isEmpty else { return }
-
-        Self.logger.info("Installing page-world externally_connectable polyfill for extension \(extensionId, privacy: .public): \(sortedHostnames.joined(separator: ", "), privacy: .public)")
-
-        let hostnamesJSON = sortedHostnames.map { "\"\($0)\"" }.joined(separator: ",")
-        let escapedTargetRuntimeId = extensionId
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-
-        // PAGE-world polyfill: wraps browser/chrome runtime APIs used by externally_connectable
-        // pages and relays extension traffic via window.postMessage to nook_bridge.js (ISOLATED world).
-        let polyfillJS = """
+    /// Because both are the extension's content scripts, WebKit injects them into every tab and
+    /// window attached to the controller, never into private tabs, and stops injecting when the
+    /// extension is disabled or removed. Verified for MV2 and MV3: MAIN world -> ISOLATED world
+    /// -> background -> reply round trip works.
+    ///
+    /// Trust note: the background receives these on `runtime.onMessage` as if from its own
+    /// content script, not on `onMessageExternal`. Any script on a listed origin can therefore
+    /// send them. Exposure is limited to the sane scheme and host patterns the extension itself
+    /// declared as externally connectable.
+    nonisolated static func externallyConnectablePolyfill(runtimeId: String) -> String {
+        let runtimeIdLiteral = (try? JSONSerialization.data(withJSONObject: runtimeId, options: [.fragmentsAllowed]))
+            .flatMap { String(data: $0, encoding: .utf8) } ?? "null"
+        return """
+        // Nook: externally_connectable page-world polyfill (MAIN world content script)
         (function() {
-            var _hosts = [\(hostnamesJSON)];
-            var _configuredRuntimeId = "\(escapedTargetRuntimeId)";
+            var _configuredRuntimeId = \(runtimeIdLiteral);
             var _activeRuntimeId = _configuredRuntimeId;
             var _pendingBridgeRuntimeId = null;
             var _bridgeRuntimeRetargetTimer = null;
-            var h = location.hostname;
-            if (!_hosts.some(function(p) { return h === p || h.endsWith('.' + p); })) return;
             if (window.__nookEcShimInstalled) return;
             window.__nookEcShimInstalled = true;
 
@@ -503,7 +477,8 @@ extension ExtensionManager {
                 var currentSendMessage = typeof runtimeObject.sendMessage === 'function'
                     ? runtimeObject.sendMessage
                     : null;
-                if (runtimeObject.sendMessage !== runtimeObject.__nookEcWrappedSendMessage) {
+                // Wrap when never wrapped (both undefined on a fresh object) or when a page replaced the wrapper.
+            if (typeof runtimeObject.__nookEcWrappedSendMessage !== 'function' || runtimeObject.sendMessage !== runtimeObject.__nookEcWrappedSendMessage) {
                     runtimeObject.__nookEcWrappedSendMessage = makeSendMessageWrapper(
                         currentSendMessage,
                         runtimeKind,
@@ -515,7 +490,7 @@ extension ExtensionManager {
                 var currentConnect = typeof runtimeObject.connect === 'function'
                     ? runtimeObject.connect
                     : null;
-                if (runtimeObject.connect !== runtimeObject.__nookEcWrappedConnect) {
+                if (typeof runtimeObject.__nookEcWrappedConnect !== 'function' || runtimeObject.connect !== runtimeObject.__nookEcWrappedConnect) {
                     runtimeObject.__nookEcWrappedConnect = makeConnectWrapper(
                         currentConnect,
                         runtimeKind,
@@ -570,44 +545,61 @@ extension ExtensionManager {
             console.log('[NOOK-EC] Polyfill ready — runtime sendMessage/connect wrapped (configured=' + _configuredRuntimeId + ')');
         })();
         """
-
-        let sharedConfig = BrowserConfiguration.shared.webViewConfiguration
-        let hostsSignature = "var _hosts = [\(hostnamesJSON)];"
-        let sharedUserContentController = sharedConfig.userContentController
-        let retainedScripts = sharedUserContentController.userScripts.filter { script in
-            let source = script.source
-            guard source.contains("[NOOK-EC] Installing externally_connectable polyfill on ") else {
-                return true
-            }
-            return !source.contains(hostsSignature)
-        }
-        if retainedScripts.count != sharedUserContentController.userScripts.count {
-            sharedUserContentController.removeAllUserScripts()
-            retainedScripts.forEach { sharedUserContentController.addUserScript($0) }
-            Self.logger.info("Removed stale page-world externally_connectable shim for hosts: \(sortedHostnames.joined(separator: ", "), privacy: .public)")
-        }
-
-        let pageScript = WKUserScript(
-            source: polyfillJS,
-            injectionTime: .atDocumentStart,
-            forMainFrameOnly: false,
-            in: .page
-        )
-        sharedUserContentController.addUserScript(pageScript)
     }
 
-    /// Patch manifest.json so domain-specific content scripts run in MAIN world.
+    /// `externally_connectable` match patterns Nook will honor. Chrome rejects wildcard-only and
+    /// TLD-wide hosts there; skip those so a sloppy manifest cannot expose every site.
+    nonisolated static func acceptableExternallyConnectableMatches(_ patterns: [String]) -> [String] {
+        patterns.filter { pattern in
+            guard let schemeEnd = pattern.range(of: "://") else { return false }
+            let scheme = String(pattern[..<schemeEnd.lowerBound])
+            guard ["http", "https", "*"].contains(scheme) else { return false }
+            let rawHost = String(pattern[schemeEnd.upperBound...].prefix { $0 != "/" }).lowercased()
+            let host = rawHost.hasPrefix("*.") ? String(rawHost.dropFirst(2)) : rawHost
+            return !host.isEmpty && !host.contains("*") && (host.contains(".") || host == "localhost")
+        }
+    }
+
+    /// Insert or update a Nook-owned content script entry. Returns true if the manifest changed.
+    private static func upsertContentScript(
+        in manifest: inout [String: Any],
+        file: String,
+        matches: [String],
+        world: String?
+    ) -> Bool {
+        var contentScripts = manifest["content_scripts"] as? [[String: Any]] ?? []
+        var entry: [String: Any] = [
+            "all_frames": true,
+            "js": [file],
+            "matches": matches,
+            "run_at": "document_start",
+        ]
+        if let world { entry["world"] = world }
+        if let index = contentScripts.firstIndex(where: { ($0["js"] as? [String])?.contains(file) == true }) {
+            guard !(contentScripts[index] as NSDictionary).isEqual(to: entry) else { return false }
+            contentScripts[index] = entry
+        } else {
+            contentScripts.append(entry)
+        }
+        manifest["content_scripts"] = contentScripts
+        return true
+    }
+
+    /// Write `contents` only when it differs from what is on disk.
+    private static func writeIfChanged(_ contents: String, to url: URL) {
+        guard (try? String(contentsOf: url, encoding: .utf8)) != contents else { return }
+        try? contents.write(to: url, atomically: true, encoding: .utf8)
+    }
+
+    /// Patch an extension package for WebKit compatibility. Runs at install and on every launch
+    /// so fixes in newer Nook builds reach installed extensions. It never changes the `world`
+    /// an extension declared for its own content scripts.
     ///
-    /// In Chrome MV3, content script fetch() uses the page's origin. In WebKit's
-    /// ISOLATED world, fetch() uses the extension's origin (webkit-extension://)
-    /// which causes CORS failures and prevents cookies from being sent. This
-    /// particularly breaks SSO/auth flows like Proton Pass's fork session handoff
-    /// where a content script needs to make authenticated requests to the page's API.
-    ///
-    /// The fix: content scripts that target a small set of specific domains (not
-    /// wildcard all-sites patterns) and don't already specify a world are patched
-    /// to run in MAIN world, where fetch() uses the page's origin and cookies.
-    func patchManifestForWebKit(at manifestURL: URL) {
+    /// - Adds `nook_ec_polyfill.js` (MAIN) and `nook_bridge.js` (ISOLATED) when
+    ///   `externally_connectable` is present. `extensionId` is baked into the polyfill.
+    /// - Adds `scripting` to MV2 manifests, which WebKit exposes and some MV2 extensions probe for.
+    /// - Bitwarden only: adds a MAIN-world relay for its inline menu iframe height messages.
+    func patchManifestForWebKit(at manifestURL: URL, extensionId: String) {
         guard let data = try? Data(contentsOf: manifestURL),
               var manifest = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return }
@@ -615,78 +607,23 @@ extension ExtensionManager {
         let extensionDirName = manifestURL.deletingLastPathComponent().lastPathComponent
         var changed = false
 
-        // --- Revert any previous MAIN-world patches on domain-specific content scripts ---
-        // (Earlier code incorrectly patched domain-specific scripts to MAIN world,
-        // but MAIN world content scripts lose browser.runtime access in WKWebExtension.)
-        if var contentScripts = manifest["content_scripts"] as? [[String: Any]] {
-            for i in contentScripts.indices {
-                guard let world = contentScripts[i]["world"] as? String, world == "MAIN" else { continue }
-                guard let matches = contentScripts[i]["matches"] as? [String] else { continue }
-                let jsFiles = contentScripts[i]["js"] as? [String] ?? []
-
-                // Don't touch our own bridge entry
-                if jsFiles.contains("nook_bridge.js") { continue }
-
-                // If ALL matches are domain-specific (no wildcard hosts), this was likely our patch
-                let allDomainSpecific = matches.allSatisfy { pattern in
-                    guard let schemeEnd = pattern.range(of: "://") else { return false }
-                    let afterScheme = pattern[schemeEnd.upperBound...]
-                    guard let slashIndex = afterScheme.firstIndex(of: "/") else { return false }
-                    let host = String(afterScheme[afterScheme.startIndex..<slashIndex])
-                    return host != "*" && !host.hasPrefix("*.")
-                }
-
-                if allDomainSpecific {
-                    contentScripts[i].removeValue(forKey: "world")
-                    Self.logger.info("Reverted MAIN world on [\(jsFiles.joined(separator: ", "), privacy: .public)] — restoring to ISOLATED")
-                    changed = true
-                }
-            }
-            manifest["content_scripts"] = contentScripts
-        }
-
-        // --- Add externally_connectable bridge content script ---
-        if let ec = manifest["externally_connectable"] as? [String: Any],
-           let matchPatterns = ec["matches"] as? [String], !matchPatterns.isEmpty {
-
-            var contentScripts = manifest["content_scripts"] as? [[String: Any]] ?? []
-
-            let existingBridgeIndex = contentScripts.firstIndex { entry in
-                (entry["js"] as? [String])?.contains("nook_bridge.js") == true
-            }
-
-            if let bridgeIndex = existingBridgeIndex {
-                var bridgeEntry = contentScripts[bridgeIndex]
-                let currentAllFrames = bridgeEntry["all_frames"] as? Bool ?? false
-                let currentRunAt = bridgeEntry["run_at"] as? String
-                let currentMatches = bridgeEntry["matches"] as? [String] ?? []
-
-                if currentAllFrames != true || currentRunAt != "document_start" || currentMatches != matchPatterns {
-                    bridgeEntry["all_frames"] = true
-                    bridgeEntry["run_at"] = "document_start"
-                    bridgeEntry["matches"] = matchPatterns
-                    contentScripts[bridgeIndex] = bridgeEntry
-                    manifest["content_scripts"] = contentScripts
-                    changed = true
-                    Self.logger.info("Updated existing nook_bridge.js content script entry for all-frames document_start coverage")
-                }
-            } else {
-                // Add bridge content script entry — runs in ISOLATED world (has browser.runtime)
-                let bridgeEntry: [String: Any] = [
-                    "all_frames": true,
-                    "js": ["nook_bridge.js"],
-                    "matches": matchPatterns,
-                    "run_at": "document_start"
-                ]
-                contentScripts.append(bridgeEntry)
-                manifest["content_scripts"] = contentScripts
+        // --- externally_connectable bridge content scripts ---
+        let ecMatches = Self.acceptableExternallyConnectableMatches(
+            (manifest["externally_connectable"] as? [String: Any])?["matches"] as? [String] ?? []
+        )
+        if !ecMatches.isEmpty {
+            let packageDir = manifestURL.deletingLastPathComponent()
+            if Self.upsertContentScript(in: &manifest, file: "nook_ec_polyfill.js", matches: ecMatches, world: "MAIN") {
                 changed = true
-                Self.logger.warning("Extension manifest modified: injected nook_bridge.js into \(extensionDirName, privacy: .public)")
             }
+            if Self.upsertContentScript(in: &manifest, file: "nook_bridge.js", matches: ecMatches, world: nil) {
+                changed = true
+            }
+            Self.writeIfChanged(
+                Self.externallyConnectablePolyfill(runtimeId: extensionId),
+                to: packageDir.appendingPathComponent("nook_ec_polyfill.js")
+            )
 
-            // Always refresh bridge file to keep compatibility fixes for already-installed extensions.
-            let bridgeDir = manifestURL.deletingLastPathComponent()
-            let bridgeFileURL = bridgeDir.appendingPathComponent("nook_bridge.js")
             let bridgeJS = """
             // Nook: externally_connectable bridge relay
             // Runs as extension content script (ISOLATED world) with browser.runtime access.
@@ -939,16 +876,7 @@ extension ExtensionManager {
             })();
             """
 
-            let existingBridgeJS = try? String(contentsOf: bridgeFileURL, encoding: .utf8)
-            if existingBridgeJS != bridgeJS {
-                try? bridgeJS.write(to: bridgeFileURL, atomically: true, encoding: .utf8)
-                Self.logger.info("Updated nook_bridge.js for externally_connectable bridge compatibility")
-                changed = true
-            }
-
-            if existingBridgeIndex == nil {
-                Self.logger.info("Created nook_bridge.js and registered in manifest for externally_connectable bridge")
-            }
+            Self.writeIfChanged(bridgeJS, to: packageDir.appendingPathComponent("nook_bridge.js"))
         }
 
         // --- Ensure MV2 extensions have "scripting" permission ---
@@ -972,7 +900,6 @@ extension ExtensionManager {
         // parent.postMessage(). In WKWebExtension, content scripts run in an isolated world
         // and don't receive these messages. We inject a MAIN-world script that forwards
         // iframe messages to the isolated content script.
-        let extensionId = manifestURL.deletingLastPathComponent().lastPathComponent
         let isBitwarden = (manifest["name"] as? String)?.contains("Bitwarden") == true ||
                           extensionId == "9c120cf8-9b3a-468c-9f1f-a37f29bd519c"
         if isBitwarden {

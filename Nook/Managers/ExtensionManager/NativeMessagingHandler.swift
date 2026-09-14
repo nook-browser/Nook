@@ -12,278 +12,351 @@ import WebKit
 
 // MARK: - Native Messaging Handler
 
-class NativeMessagingHandler: NSObject {
+/// One native host conversation. Host lookup and process I/O run off the main thread;
+/// every callback into WebKit or the caller is delivered on the main thread.
+final class NativeMessagingHandler: NSObject {
     private static let logger = Logger(subsystem: "com.nook.browser", category: "NativeMessaging")
+
+    static let errorDomain = "NativeMessaging"
+    enum ErrorCode: Int {
+        case hostNotFound = 1
+        case noInputPipe = 2
+        case hostClosed = 4
+        case badResponse = 5
+        case timedOut = 6
+    }
+
+    /// Chrome caps host-to-browser messages at 1 MB.
+    private static let maxResponseSize = 1024 * 1024
+
     let applicationId: String
-    private var process: Process?
-    private var inputPipe: Pipe?
-    private var outputPipe: Pipe?
-    private var errorPipe: Pipe?
+    private let callerOrigins: Set<String>
+    private let callerExtensionIDs: Set<String>
+
+    // Port mode state (main thread only)
     private weak var port: WKWebExtension.MessagePort?
+    private var process: Process?
+    private var inputHandle: FileHandle?
+    private var pendingMessages: [Any] = []
+    private var isClosed = false
+    private let writeQueue = DispatchQueue(label: "com.nook.native-messaging.write")
+
+    // Read on the pipe's readability queue only
     private var outputBuffer = Data()
 
-    init(applicationId: String) {
+    /// Called on the main thread once a port conversation ends.
+    var onClose: (() -> Void)?
+
+    init(applicationId: String, extensionContext: WKWebExtensionContext) {
         self.applicationId = applicationId
+        let identity = Self.callerIdentity(for: extensionContext)
+        self.callerOrigins = identity.origins
+        self.callerExtensionIDs = identity.extensionIDs
         super.init()
     }
 
+    /// How the calling extension identifies itself to host manifests: Chrome `allowed_origins`
+    /// entries (`chrome-extension://<id>/`, or `nook-extension://<id>/` for Nook-specific hosts)
+    /// and Firefox `allowed_extensions` IDs.
+    private static func callerIdentity(for context: WKWebExtensionContext) -> (origins: Set<String>, extensionIDs: Set<String>) {
+        let id = context.uniqueIdentifier
+        var origins: Set<String> = ["nook-extension://\(id)/"]
+        if ExtensionStore.isValidExtensionID(id) {
+            origins.insert("chrome-extension://\(id)/")
+        }
+        var extensionIDs: Set<String> = []
+        let manifest = context.webExtension.manifest
+        for key in ["browser_specific_settings", "applications"] {
+            if let gecko = (manifest[key] as? [String: Any])?["gecko"] as? [String: Any],
+               let geckoId = gecko["id"] as? String {
+                extensionIDs.insert(geckoId)
+            }
+        }
+        return (origins, extensionIDs)
+    }
+
+    private static func error(_ code: ErrorCode, _ description: String) -> NSError {
+        NSError(domain: errorDomain, code: code.rawValue, userInfo: [NSLocalizedDescriptionKey: description])
+    }
+
+    // MARK: - Single-shot messages
+
+    /// Launch the host, send one message, read one reply (5 s timeout), terminate.
     func sendMessage(_ message: Any, completion: @escaping (Any?, Error?) -> Void) {
-        // Single-shot message: Launch, write, read response, terminate
-        launchProcess { [weak self] success in
-            guard success, let self = self else {
-                completion(nil, NSError(domain: "NativeMessaging", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to launch host"]))
+        let finish: (Any?, Error?) -> Void = { response, error in
+            DispatchQueue.main.async { completion(response, error) }
+        }
+
+        DispatchQueue.global(qos: .userInitiated).async { [self] in
+            guard let executable = resolveHostExecutable() else {
+                return finish(nil, Self.error(.hostNotFound, "Native messaging host \(applicationId) not found or not allowed for this extension"))
+            }
+
+            let process = Process()
+            let input = Pipe()
+            let output = Pipe()
+            process.executableURL = executable
+            process.arguments = callerOrigins.sorted().filter { $0.hasPrefix("chrome-extension://") }
+            process.standardInput = input
+            process.standardOutput = output
+            process.standardError = FileHandle.nullDevice
+
+            do {
+                try process.run()
+                try Self.write(message, to: input.fileHandleForWriting)
+            } catch {
+                process.terminate()
+                return finish(nil, error)
+            }
+
+            var response: Any?
+            var readError: Error?
+            let done = DispatchSemaphore(value: 0)
+            DispatchQueue.global(qos: .userInitiated).async {
+                defer { done.signal() }
+                let handle = output.fileHandleForReading
+                let lengthData = handle.readData(ofLength: 4)
+                guard lengthData.count == 4 else {
+                    readError = Self.error(.hostClosed, "Host closed without response")
+                    return
+                }
+                let length = Int(lengthData.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) })
+                guard length <= Self.maxResponseSize else {
+                    readError = Self.error(.badResponse, "Host response too large")
+                    return
+                }
+                let jsonData = handle.readData(ofLength: length)
+                if let json = try? JSONSerialization.jsonObject(with: jsonData, options: [.fragmentsAllowed]) {
+                    response = json
+                } else {
+                    readError = Self.error(.badResponse, "Failed to parse host response")
+                }
+            }
+
+            let timedOut = done.wait(timeout: .now() + 5) == .timedOut
+            // Terminating closes the pipes, which also unblocks a reader stuck after a timeout.
+            process.terminate()
+            if timedOut {
+                finish(nil, Self.error(.timedOut, "Host response timed out"))
+            } else {
+                finish(response, readError)
+            }
+        }
+    }
+
+    // MARK: - Long-lived ports
+
+    /// Connect a `runtime.connectNative` port to a host process. `hostAvailability` is called on
+    /// the main thread; on `false` the port is left open so the caller can handle it in-process.
+    func connect(port: WKWebExtension.MessagePort, hostAvailability: @escaping (Bool) -> Void) {
+        self.port = port
+
+        // WebKit calls port handlers on the main thread. The handler is (message, error).
+        port.messageHandler = { [weak self] message, error in
+            guard error == nil, let message else { return }
+            self?.post(message)
+        }
+        port.disconnectHandler = { [weak self] _ in
+            self?.close(disconnectPort: false)
+        }
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { return }
+            guard let executable = self.resolveHostExecutable() else {
+                DispatchQueue.main.async { hostAvailability(false) }
                 return
             }
 
-            do {
-                // Disable the readabilityHandler to avoid conflict with long-lived port mode
-                self.outputPipe?.fileHandleForReading.readabilityHandler = nil
+            let process = Process()
+            let input = Pipe()
+            let output = Pipe()
+            process.executableURL = executable
+            process.arguments = self.callerOrigins.sorted().filter { $0.hasPrefix("chrome-extension://") }
+            process.standardInput = input
+            process.standardOutput = output
+            process.standardError = FileHandle.nullDevice
 
-                try self.writeMessage(message)
-
-                // Read the response synchronously with a 5-second timeout
-                let readHandle = self.outputPipe?.fileHandleForReading
-                var responseData: Any?
-                var readError: Error?
-                let semaphore = DispatchSemaphore(value: 0)
-
-                DispatchQueue.global(qos: .userInitiated).async {
-                    defer { semaphore.signal() }
-                    guard let handle = readHandle else {
-                        readError = NSError(domain: "NativeMessaging", code: 3, userInfo: [NSLocalizedDescriptionKey: "No output pipe"])
-                        return
-                    }
-
-                    // Read 4-byte length prefix
-                    let lengthData = handle.readData(ofLength: 4)
-                    guard lengthData.count == 4 else {
-                        readError = NSError(domain: "NativeMessaging", code: 4, userInfo: [NSLocalizedDescriptionKey: "Host closed without response"])
-                        return
-                    }
-
-                    let length: UInt32 = lengthData.withUnsafeBytes { $0.load(as: UInt32.self) }
-                    let jsonData = handle.readData(ofLength: Int(length))
-
-                    if let json = try? JSONSerialization.jsonObject(with: jsonData) {
-                        responseData = json
-                    } else {
-                        readError = NSError(domain: "NativeMessaging", code: 5, userInfo: [NSLocalizedDescriptionKey: "Failed to parse host response"])
-                    }
-                }
-
-                let result = semaphore.wait(timeout: .now() + 5)
-                self.terminateProcess()
-
-                if result == .timedOut {
-                    completion(nil, NSError(domain: "NativeMessaging", code: 6, userInfo: [NSLocalizedDescriptionKey: "Host response timed out"]))
-                } else if let error = readError {
-                    completion(nil, error)
+            output.fileHandleForReading.readabilityHandler = { [weak self] handle in
+                let data = handle.availableData
+                if data.isEmpty {
+                    handle.readabilityHandler = nil
                 } else {
-                    completion(responseData, nil)
+                    self?.handleOutput(data)
                 }
-            } catch {
-                self.terminateProcess()
-                completion(nil, error)
             }
-        }
-    }
+            process.terminationHandler = { [weak self] _ in
+                DispatchQueue.main.async { self?.close(disconnectPort: true) }
+            }
 
-    func connect(port: WKWebExtension.MessagePort, hostAvailability: ((Bool) -> Void)? = nil) {
-        self.port = port
-
-        // Use closure-based handlers since delegate is not available
-        port.messageHandler = { [weak self] (port, message) in
             do {
-                try self?.writeMessage(message as Any)
+                try process.run()
             } catch {
-                Self.logger.error("[NativeMessaging] Failed to write to host: \(error.localizedDescription, privacy: .public)")
+                output.fileHandleForReading.readabilityHandler = nil
+                Self.logger.error("Failed to launch host \(self.applicationId, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                DispatchQueue.main.async { hostAvailability(false) }
+                return
             }
-        }
 
-        port.disconnectHandler = { [weak self] port in
-            self?.terminateProcess()
-        }
-
-        launchProcess { [weak self] success in
-            guard let self = self else { return }
-            if !success {
-                Self.logger.error("[NativeMessaging] Failed to launch host for \(self.applicationId)")
-                DispatchQueue.main.async {
-                    hostAvailability?(false)
+            DispatchQueue.main.async {
+                guard !self.isClosed else {
+                    process.terminate()
+                    return
                 }
-                port.disconnect()
-            } else {
-                DispatchQueue.main.async {
-                    hostAvailability?(true)
-                }
+                self.process = process
+                self.inputHandle = input.fileHandleForWriting
+                let queued = self.pendingMessages
+                self.pendingMessages.removeAll()
+                queued.forEach { self.post($0) }
+                hostAvailability(true)
             }
         }
     }
 
-    // MARK: - Process Management
-
-    private func launchProcess(completion: @escaping (Bool) -> Void) {
-        Self.logger.debug("Launching host for \(self.applicationId)...")
-
-        DispatchQueue.global(qos: .userInitiated).async {
-            let home = FileManager.default.homeDirectoryForCurrentUser
-            let manifestName = "\(self.applicationId).json"
-            let browserDirs = [
-                // Nook-specific (highest priority)
-                "Library/Application Support/Nook/NativeMessagingHosts",
-                // Chrome
-                "Library/Application Support/Google/Chrome/NativeMessagingHosts",
-                // Chromium
-                "Library/Application Support/Chromium/NativeMessagingHosts",
-                // Microsoft Edge
-                "Library/Application Support/Microsoft Edge/NativeMessagingHosts",
-                // Brave
-                "Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts",
-                // Firefox / Mozilla
-                "Library/Application Support/Mozilla/NativeMessagingHosts",
-            ]
-            var paths: [URL] = []
-            for dir in browserDirs {
-                // User-level
-                paths.append(home.appendingPathComponent(dir).appendingPathComponent(manifestName))
-                // System-level
-                paths.append(URL(fileURLWithPath: "/\(dir)").appendingPathComponent(manifestName))
+    /// Main thread. Messages sent before the host finishes launching are queued.
+    private func post(_ message: Any) {
+        guard !isClosed else { return }
+        guard let inputHandle else {
+            pendingMessages.append(message)
+            return
+        }
+        writeQueue.async {
+            do {
+                try Self.write(message, to: inputHandle)
+            } catch {
+                Self.logger.error("Failed to write to host: \(error.localizedDescription, privacy: .public)")
             }
-
-            for path in paths {
-                if let data = try? Data(contentsOf: path),
-                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let binaryPath = json["path"] as? String {
-
-                    Self.logger.info("Found manifest at \(path.path, privacy: .public)")
-
-                    // SECURITY: Validate the binary path before launching
-                    let binaryURL = URL(fileURLWithPath: binaryPath)
-                    let fm = FileManager.default
-
-                    // 1. Verify the binary path exists
-                    guard fm.fileExists(atPath: binaryPath) else {
-                        Self.logger.error("[NativeMessaging] SECURITY: Binary path does not exist: \(binaryPath, privacy: .public)")
-                        continue
-                    }
-
-                    // 2. Resolve symlinks and verify the canonical path matches expected locations
-                    let canonicalURL = binaryURL.resolvingSymlinksInPath()
-                    let canonicalPath = canonicalURL.path
-                    if canonicalPath != binaryPath {
-                        Self.logger.warning("[NativeMessaging] SECURITY: Binary path is a symlink: \(binaryPath, privacy: .public) -> \(canonicalPath, privacy: .public)")
-                    }
-
-                    // 3. Verify the binary is in an expected directory
-                    let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
-                    let allowedPrefixes = [
-                        "\(homeDir)/Library/",
-                        "/Applications/",
-                        "/usr/local/",
-                        "/usr/bin/",
-                        "/opt/",
-                        "/Library/"
-                    ]
-                    let isInExpectedLocation = allowedPrefixes.contains { prefix in
-                        canonicalPath.hasPrefix(prefix)
-                    }
-                    if !isInExpectedLocation {
-                        Self.logger.error("[NativeMessaging] SECURITY: Refusing to launch binary in an unexpected location: \(canonicalPath, privacy: .public)")
-                        continue
-                    }
-
-                    // 4. Verify the binary path doesn't contain path traversal
-                    if binaryPath.contains("..") {
-                        Self.logger.error("[NativeMessaging] SECURITY: Path traversal detected in binary path: \(binaryPath, privacy: .public)")
-                        continue
-                    }
-
-                    Self.logger.info("[NativeMessaging] Launching binary: \(canonicalPath, privacy: .public) (original: \(binaryPath, privacy: .public))")
-
-                    // Launch it
-                    let process = Process()
-                    process.executableURL = canonicalURL
-
-                    let input = Pipe()
-                    let output = Pipe()
-                    let error = Pipe()
-
-                    process.standardInput = input
-                    process.standardOutput = output
-                    process.standardError = error
-
-                    self.inputPipe = input
-                    self.outputPipe = output
-                    self.errorPipe = error
-                    self.process = process
-
-                    // Handle stdout (messages from host)
-                    output.fileHandleForReading.readabilityHandler = { [weak self] handle in
-                        let data = handle.availableData
-                        if !data.isEmpty {
-                            self?.handleOutput(data)
-                        }
-                    }
-
-                    do {
-                        try process.run()
-                        Self.logger.debug("   🚀 Process launched!")
-                        completion(true)
-                        return
-                    } catch {
-                        Self.logger.error("Failed to launch process: \(error.localizedDescription, privacy: .public)")
-                    }
-                }
-            }
-
-            Self.logger.debug("   ⚠️ No manifest found for \(self.applicationId)")
-            completion(false)
         }
     }
 
-    private func terminateProcess() {
-        process?.terminate()
+    /// Main thread.
+    private func close(disconnectPort: Bool) {
+        guard !isClosed else { return }
+        isClosed = true
+        if let process, process.isRunning { process.terminate() }
         process = nil
-        inputPipe = nil
-        outputPipe = nil
-        errorPipe = nil
+        inputHandle = nil
+        pendingMessages.removeAll()
+        if disconnectPort { port?.disconnect() }
+        onClose?()
+        onClose = nil
     }
 
-    private func writeMessage(_ message: Any) throws {
-        guard let input = inputPipe else {
-            throw NSError(domain: "NativeMessaging", code: 2, userInfo: [NSLocalizedDescriptionKey: "No input pipe available — host process not running"])
+    // MARK: - Host lookup
+
+    private static let manifestDirectories = [
+        "Library/Application Support/Nook/NativeMessagingHosts",
+        "Library/Application Support/Google/Chrome/NativeMessagingHosts",
+        "Library/Application Support/Chromium/NativeMessagingHosts",
+        "Library/Application Support/Microsoft Edge/NativeMessagingHosts",
+        "Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts",
+        "Library/Application Support/Mozilla/NativeMessagingHosts",
+    ]
+
+    /// Find a host manifest for `applicationId` that allows the calling extension, and return
+    /// its validated executable. Mirrors Chrome's rules: the manifest `name` must match, the
+    /// type must be stdio, the path must be absolute, and the caller must be listed in
+    /// `allowed_origins` (Chrome) or `allowed_extensions` (Firefox).
+    private func resolveHostExecutable() -> URL? {
+        // Host names are dot-separated lowercase alphanumerics and underscores; this also keeps
+        // the manifest filename from escaping the host directories.
+        guard !applicationId.isEmpty,
+              applicationId.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_" || $0 == ".") }),
+              !applicationId.hasPrefix("."), !applicationId.contains("..")
+        else {
+            Self.logger.error("Rejected invalid native host name \(self.applicationId, privacy: .public)")
+            return nil
         }
 
-        let jsonData = try JSONSerialization.data(withJSONObject: message, options: [])
+        let fm = FileManager.default
+        let home = fm.homeDirectoryForCurrentUser
+        let manifestName = "\(applicationId).json"
+        var manifestPaths: [URL] = []
+        for dir in Self.manifestDirectories {
+            manifestPaths.append(home.appendingPathComponent(dir).appendingPathComponent(manifestName))
+            manifestPaths.append(URL(fileURLWithPath: "/\(dir)").appendingPathComponent(manifestName))
+        }
+
+        for manifestURL in manifestPaths {
+            guard let data = try? Data(contentsOf: manifestURL),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else { continue }
+
+            guard json["name"] as? String == applicationId,
+                  (json["type"] as? String ?? "stdio") == "stdio",
+                  let binaryPath = json["path"] as? String, binaryPath.hasPrefix("/")
+            else {
+                Self.logger.error("Ignoring malformed host manifest \(manifestURL.path, privacy: .public)")
+                continue
+            }
+
+            let allowedOrigins = Set(json["allowed_origins"] as? [String] ?? [])
+            let allowedExtensions = Set(json["allowed_extensions"] as? [String] ?? [])
+            guard !allowedOrigins.isDisjoint(with: callerOrigins)
+                    || !allowedExtensions.isDisjoint(with: callerExtensionIDs)
+            else {
+                Self.logger.info("Host manifest \(manifestURL.path, privacy: .public) does not allow this extension")
+                continue
+            }
+
+            let canonicalURL = URL(fileURLWithPath: binaryPath).resolvingSymlinksInPath()
+            let canonicalPath = canonicalURL.path
+            let allowedPrefixes = [
+                "\(home.path)/Library/",
+                "/Applications/",
+                "/usr/local/",
+                "/usr/bin/",
+                "/opt/",
+                "/Library/",
+            ]
+            guard !binaryPath.contains(".."),
+                  fm.isExecutableFile(atPath: canonicalPath),
+                  allowedPrefixes.contains(where: { canonicalPath.hasPrefix($0) })
+            else {
+                Self.logger.error("SECURITY: Refusing host binary \(canonicalPath, privacy: .public) from \(manifestURL.path, privacy: .public)")
+                continue
+            }
+
+            Self.logger.info("Using native host \(canonicalPath, privacy: .public) from \(manifestURL.path, privacy: .public)")
+            return canonicalURL
+        }
+        return nil
+    }
+
+    // MARK: - Framing
+
+    /// Native messaging protocol: 4-byte native-endian length, then UTF-8 JSON.
+    private static func write(_ message: Any, to handle: FileHandle) throws {
+        // JSONSerialization raises an Objective-C exception (not a Swift error) on invalid input.
+        guard JSONSerialization.isValidJSONObject(message) || message is String || message is NSNumber else {
+            throw error(.badResponse, "Message is not JSON-serializable")
+        }
+        let jsonData = try JSONSerialization.data(withJSONObject: message, options: [.fragmentsAllowed])
         var length = UInt32(jsonData.count)
-
-        // Native messaging protocol: 4 bytes length (native byte order) + JSON
-        let lengthData = Data(bytes: &length, count: 4)
-
-        try input.fileHandleForWriting.write(contentsOf: lengthData)
-        try input.fileHandleForWriting.write(contentsOf: jsonData)
+        try handle.write(contentsOf: Data(bytes: &length, count: 4))
+        try handle.write(contentsOf: jsonData)
     }
 
     private func handleOutput(_ data: Data) {
         outputBuffer.append(data)
 
-        // Process all complete messages in the buffer
         while outputBuffer.count >= 4 {
-            // Read 4-byte length prefix (native byte order)
-            let length: UInt32 = outputBuffer.withUnsafeBytes { $0.load(as: UInt32.self) }
-            let totalNeeded = 4 + Int(length)
-
-            guard outputBuffer.count >= totalNeeded else {
-                // Wait for more data
-                break
+            let length = Int(outputBuffer.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) })
+            guard length <= Self.maxResponseSize else {
+                Self.logger.error("Host message exceeds 1 MB; closing port")
+                outputBuffer.removeAll()
+                DispatchQueue.main.async { [weak self] in self?.close(disconnectPort: true) }
+                return
             }
+            let totalNeeded = 4 + length
+            guard outputBuffer.count >= totalNeeded else { break }
 
-            let jsonData = outputBuffer.subdata(in: 4..<totalNeeded)
-            outputBuffer.removeSubrange(0..<totalNeeded)
+            let jsonData = outputBuffer.subdata(in: outputBuffer.startIndex + 4..<outputBuffer.startIndex + totalNeeded)
+            outputBuffer.removeSubrange(outputBuffer.startIndex..<outputBuffer.startIndex + totalNeeded)
 
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) {
-                Self.logger.debug("Received from host: \(String(describing: json))")
-                port?.sendMessage(json) { _ in }
+            if let json = try? JSONSerialization.jsonObject(with: jsonData, options: [.fragmentsAllowed]) {
+                DispatchQueue.main.async { [weak self] in
+                    self?.port?.sendMessage(json) { _ in }
+                }
             } else {
                 Self.logger.error("Failed to parse JSON from host (\(jsonData.count) bytes)")
             }

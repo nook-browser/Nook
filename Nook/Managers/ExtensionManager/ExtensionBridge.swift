@@ -53,9 +53,9 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
         if cachedActiveTabValid { return cachedActiveTab }
 
         var result: (any WKWebExtensionTab)?
-        if let t = browserManager.currentTabForActiveWindow(),
-           let a = ExtensionManager.shared.stableAdapter(for: t) {
-            result = a
+        if let t = browserManager.currentTabForActiveWindow() {
+            // nil when the focused window shows a private tab: never substitute another tab.
+            result = ExtensionManager.shared.stableAdapter(for: t)
         } else if let first = browserManager.tabManager.pinnedTabs.first ?? browserManager.tabManager.tabs.first,
                   let a = ExtensionManager.shared.stableAdapter(for: first) {
             result = a
@@ -98,9 +98,7 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
     }
 
     func isPrivate(for extensionContext: WKWebExtensionContext) -> Bool {
-        if let currentTab = browserManager.currentTabForActiveWindow() {
-            return currentTab.isEphemeral
-        }
+        // Private tabs have no extension controller and are never exposed through this adapter.
         return false
     }
 

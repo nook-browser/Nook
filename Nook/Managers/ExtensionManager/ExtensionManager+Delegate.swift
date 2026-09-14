@@ -25,26 +25,8 @@ extension ExtensionManager {
         let extName = extensionContext.webExtension.displayName ?? "?"
         Self.logger.info("presentActionPopup for '\(extName, privacy: .public)'")
 
-        // Grant ALL the extension's requested + optional permissions so the popup
-        // can use chrome.tabs, chrome.runtime, etc. without hanging.
-        // allRequestedMatchPatterns includes content_scripts patterns, not just host_permissions.
-        for p in extensionContext.webExtension.requestedPermissions {
-            extensionContext.setPermissionStatus(.grantedExplicitly, for: p)
-        }
-        for p in extensionContext.webExtension.optionalPermissions {
-            extensionContext.setPermissionStatus(.grantedExplicitly, for: p)
-        }
-        for m in extensionContext.webExtension.allRequestedMatchPatterns {
-            extensionContext.setPermissionStatus(.grantedExplicitly, for: m)
-        }
-        for m in extensionContext.webExtension.optionalPermissionMatchPatterns {
-            extensionContext.setPermissionStatus(.grantedExplicitly, for: m)
-        }
-
-        Self.logger.debug("Granted \(extensionContext.currentPermissions.count) permissions for '\(extName, privacy: .public)'")
-
-        // Background worker is already awaited by ExtensionActionView.showExtensionPopup()
-        // before performAction() is called. No need to double-wake here.
+        // Permissions were granted when the context loaded. Optional permissions stay
+        // behind chrome.permissions.request(); opening a popup does not grant them.
 
         guard let popover = action.popupPopover else {
             Self.logger.error("No popover available on action for '\(extName, privacy: .public)'")
@@ -78,13 +60,9 @@ extension ExtensionManager {
 
             Self.logger.debug("Popup webView: URL=\(webView.url?.absoluteString ?? "nil", privacy: .public), isLoading=\(webView.isLoading)")
 
-            // Only trigger a load if WebKit hasn't started loading the popup yet.
-            // Permissions are now granted in showExtensionPopup() BEFORE performAction(),
-            // so the popup's initial load already has full permissions. We only need
-            // to kick-start the load if WebKit created the webview without loading it.
-            if !webView.isLoading, let popupURL = webView.url {
-                webView.load(URLRequest(url: popupURL))
-            }
+            // No reload here. WebKit calls this delegate after the popup has finished loading, in a
+            // fresh webview on every open (verified in a WKWebExtensionController harness), so the
+            // old reload-if-not-loading branch reloaded every popup a second time.
         } else {
             Self.logger.warning("No popupWebView on action for '\(extName, privacy: .public)'")
         }
@@ -234,12 +212,10 @@ extension ExtensionManager {
         }
 
         // Convert enums to readable strings for UI
-        let reqPerms = requestedPermissions.map { String(describing: $0) }
-            .sorted()
-        let optPerms = optionalPermissions.map { String(describing: $0) }
-            .sorted()
-        let reqHosts = requestedMatches.map { String(describing: $0) }.sorted()
-        let optHosts = optionalMatches.map { String(describing: $0) }.sorted()
+        let reqPerms = requestedPermissions.map(\.rawValue).sorted()
+        let optPerms = optionalPermissions.map(\.rawValue).sorted()
+        let reqHosts = requestedMatches.map(\.string).sorted()
+        let optHosts = optionalMatches.map(\.string).sorted()
 
         bm.showDialog {
             StandardDialog(
@@ -348,11 +324,6 @@ extension ExtensionManager {
 
         try? context.save()
     }
-
-    // Note: We can provide implementations for opening new tabs/windows once the
-    // exact parameter types are finalized for the targeted SDK. These delegate
-    // methods are optional; omitting them avoids type resolution issues across
-    // SDK variations while retaining popup and permission handling.
 
     // MARK: - Opening tabs/windows requested by extensions
     func webExtensionController(
@@ -532,7 +503,10 @@ extension ExtensionManager {
 
             case "copyToClipboard":
                 // Bitwarden Safari sends clipboard writes via native messaging.
-                // Handle it by writing directly to NSPasteboard.
+                guard declaresPermission("clipboardWrite", in: extensionContext) else {
+                    replyHandler(["success": false, "error": "clipboardWrite permission required"], nil)
+                    return
+                }
                 let text = msg["text"] as? String ?? msg["data"] as? String ?? ""
                 if !text.isEmpty {
                     NSPasteboard.general.clearContents()
@@ -542,27 +516,12 @@ extension ExtensionManager {
                 return
 
             case "readFromClipboard":
-                // SECURITY: Clipboard read access is restricted to known extensions that
-                // declare clipboard needs (e.g. password managers).
-                let extensionId = extensionContext.uniqueIdentifier
-                let extensionName = extensionContext.webExtension.displayName ?? "Unknown"
-
-                // Allowlist of known extensions that legitimately need clipboard access
-                let knownClipboardExtensions: Set<String> = [
-                    "com.bitwarden.desktop.safari", // Bitwarden Safari
-                    "com.8bit.bitwarden.safari",    // Bitwarden Safari (alt bundle)
-                ]
-
-                let hasClipboardPermission = knownClipboardExtensions.contains(extensionId)
-                    || extensionContext.currentPermissions.contains(where: { String(describing: $0).lowercased().contains("clipboard") })
-
-                if !hasClipboardPermission {
-                    Self.logger.warning("[NativeMessaging] SECURITY: Denying clipboard read from extension '\(extensionName, privacy: .public)' (id: \(extensionId, privacy: .public)) — not in clipboard allowlist")
+                // Same rule as Chrome: reading the clipboard requires the clipboardRead permission.
+                guard declaresPermission("clipboardRead", in: extensionContext) else {
+                    Self.logger.warning("[NativeMessaging] Denying clipboard read from '\(extensionContext.webExtension.displayName ?? "Unknown", privacy: .public)': clipboardRead not declared")
                     replyHandler(["text": "", "error": "Clipboard access denied"], nil)
                     return
                 }
-
-                Self.logger.info("[NativeMessaging] Allowing clipboard read for extension '\(extensionName, privacy: .public)' (id: \(extensionId, privacy: .public))")
                 let text = NSPasteboard.general.string(forType: .string) ?? ""
                 replyHandler(["text": text], nil)
                 return
@@ -589,7 +548,8 @@ extension ExtensionManager {
         // Fast-path: if we already know this host is unavailable, return immediately
         // without launching a process or logging. Extensions like Bitwarden poll every
         // 500ms. Return a valid reply (not an error) so WebKit doesn't log a runtime error.
-        if unavailableNativeHosts.contains(applicationId) {
+        let cacheKey = nativeHostCacheKey(applicationId, extensionContext)
+        if unavailableNativeHosts.contains(cacheKey) {
             replyHandler(["command": "disconnected"] as [String: Any], nil)
             return
         }
@@ -597,12 +557,14 @@ extension ExtensionManager {
         Self.logger.info("[NativeMessaging] sendMessage to '\(applicationId, privacy: .public)'")
 
         // Single-shot message handling
-        let handler = NativeMessagingHandler(applicationId: applicationId)
+        let handler = NativeMessagingHandler(applicationId: applicationId, extensionContext: extensionContext)
         handler.sendMessage(message) { [weak self] response, error in
-            // If the host failed to launch, cache it as unavailable
-            if error != nil && response == nil {
-                self?.unavailableNativeHosts.insert(applicationId)
-                Self.logger.info("[NativeMessaging] Marked '\(applicationId, privacy: .public)' as unavailable (host not found)")
+            // Cache only a missing or disallowed host; timeouts and bad replies may be transient.
+            if let error = error as NSError?,
+               error.domain == NativeMessagingHandler.errorDomain,
+               error.code == NativeMessagingHandler.ErrorCode.hostNotFound.rawValue {
+                self?.unavailableNativeHosts.insert(cacheKey)
+                Self.logger.info("[NativeMessaging] Marked '\(applicationId, privacy: .public)' as unavailable for this extension")
             }
             replyHandler(response, error)
         }
@@ -625,28 +587,40 @@ extension ExtensionManager {
         // expecting the HOST APP to respond — not an external process. If we disconnect
         // the port, the extension retries immediately creating a CPU-burning loop.
         // Instead, keep the port alive and handle known commands (clipboard, popover).
-        if unavailableNativeHosts.contains(applicationId) {
+        let cacheKey = nativeHostCacheKey(applicationId, extensionContext)
+        if unavailableNativeHosts.contains(cacheKey) {
             Self.logger.debug("[NativeMessaging] Handling port internally for '\(applicationId, privacy: .public)' (no external host)")
             setupInternalPortHandler(port: port, extensionContext: extensionContext, applicationId: applicationId)
             completionHandler(nil)
             return
         }
 
-        let handler = NativeMessagingHandler(applicationId: applicationId)
+        let handler = NativeMessagingHandler(applicationId: applicationId, extensionContext: extensionContext)
+        // Keep the handler alive for the life of the conversation.
         nativeMessagingHandlers.append(handler)
-        handler.connect(port: port) { [weak self] hostFound in
-            guard let self else { return }
-            if !hostFound {
-                self.unavailableNativeHosts.insert(applicationId)
-                Self.logger.info("[NativeMessaging] Marked '\(applicationId, privacy: .public)' as unavailable (host not found via port)")
-                // External host not available — fall back to internal handling
-                // so the port stays alive and Safari extension commands still work
-                self.setupInternalPortHandler(port: port, extensionContext: extensionContext, applicationId: applicationId)
-            }
-            // Clean up handler reference
+        handler.onClose = { [weak self, weak handler] in
+            self?.nativeMessagingHandlers.removeAll { $0 === handler }
+        }
+        handler.connect(port: port) { [weak self, weak handler] hostFound in
+            guard let self, !hostFound else { return }
             self.nativeMessagingHandlers.removeAll { $0 === handler }
+            self.unavailableNativeHosts.insert(cacheKey)
+            Self.logger.info("[NativeMessaging] No allowed host '\(applicationId, privacy: .public)'; handling port in-process")
+            // Keep the port alive so Safari extension commands (clipboard, popover) still work.
+            self.setupInternalPortHandler(port: port, extensionContext: extensionContext, applicationId: applicationId)
         }
         completionHandler(nil)
+    }
+
+    /// Host availability depends on the calling extension (allowed_origins), so cache per pair.
+    private func nativeHostCacheKey(_ applicationId: String, _ context: WKWebExtensionContext) -> String {
+        "\(context.uniqueIdentifier)|\(applicationId)"
+    }
+
+    /// Whether the extension lists `permission` in its manifest `permissions`. Used for
+    /// permissions WebKit does not model itself (clipboardRead).
+    func declaresPermission(_ permission: String, in context: WKWebExtensionContext) -> Bool {
+        (context.webExtension.manifest["permissions"] as? [String])?.contains(permission) == true
     }
 
     // MARK: - Internal Port Handler for Safari Extensions
@@ -666,7 +640,9 @@ extension ExtensionManager {
         let registeredHandler: (any InternalNativePortHandler)? =
             applicationId.flatMap { internalHandler(for: $0) }
 
-        port.messageHandler = { [weak self] (_, message) in
+        // The handler is (message, error); earlier code read the error slot as the message.
+        port.messageHandler = { [weak self] message, error in
+            guard error == nil else { return }
             MainActor.assumeIsolated {
                 guard let msg = message as? [String: Any] else {
                     // Unknown message format — ack to keep port alive
@@ -687,6 +663,10 @@ extension ExtensionManager {
 
                 switch command {
                 case "copyToClipboard":
+                    guard self?.declaresPermission("clipboardWrite", in: extensionContext) == true else {
+                        port.sendMessage(["command": command, "success": false] as [String: Any]) { _ in }
+                        return
+                    }
                     let text = msg["text"] as? String ?? msg["data"] as? String ?? ""
                     if !text.isEmpty {
                         NSPasteboard.general.clearContents()
@@ -695,6 +675,10 @@ extension ExtensionManager {
                     port.sendMessage(["command": command, "success": true] as [String: Any]) { _ in }
 
                 case "readFromClipboard":
+                    guard self?.declaresPermission("clipboardRead", in: extensionContext) == true else {
+                        port.sendMessage(["command": command, "text": "", "error": "Clipboard access denied"] as [String: Any]) { _ in }
+                        return
+                    }
                     let text = NSPasteboard.general.string(forType: .string) ?? ""
                     port.sendMessage(["command": command, "text": text] as [String: Any]) { _ in }
 
@@ -776,19 +760,7 @@ extension ExtensionManager {
         webView.isInspectable = true
         // No navigation delegate needed for options page
 
-        // Provide a lightweight alias to help extensions that only check `chrome`.
-        // This only affects the options page web view, not normal websites.
-        let aliasJS = """
-            if (typeof window.chrome === 'undefined' && typeof window.browser !== 'undefined') {
-              try { window.chrome = window.browser; } catch (e) {}
-            }
-            """
-        let aliasScript = WKUserScript(
-            source: aliasJS,
-            injectionTime: .atDocumentStart,
-            forMainFrameOnly: true
-        )
-        webView.configuration.userContentController.addUserScript(aliasScript)
+        // WebKit exposes both `browser` and `chrome` in extension pages; no alias script needed.
 
         // SECURITY FIX: Load the options page with restricted file access
         if optionsURL.isFileURL {
@@ -1086,49 +1058,5 @@ extension ExtensionManager {
                 footer: { EmptyView() }
             )
         }
-    }
-
-    // MARK: - URL Conversion Helpers
-
-    /// Convert extension URL (webkit-extension:// or safari-web-extension://) to file URL
-    private func convertExtensionURLToFileURL(
-        _ urlString: String,
-        for context: WKWebExtensionContext
-    ) -> URL? {
-        Self.logger.debug("🔄 [convertExtensionURLToFileURL] Converting: \(urlString)")
-
-        // Extract the path from the extension URL
-        guard let url = URL(string: urlString) else {
-            Self.logger.error("Invalid URL string")
-            return nil
-        }
-
-        let path = url.path
-
-        // Find the corresponding installed extension
-        if let extId = extensionContexts.first(where: { $0.value === context })?
-            .key,
-            let inst = installedExtensions.first(where: { $0.id == extId })
-        {
-            Self.logger.debug("   📦 Found extension: \(inst.name)")
-
-            // Build file URL from extension package path
-            let extensionURL = URL(fileURLWithPath: inst.packagePath)
-            let fileURL = extensionURL.appendingPathComponent(
-                path.hasPrefix("/") ? String(path.dropFirst()) : path
-            )
-
-            // Verify the file exists
-            if FileManager.default.fileExists(atPath: fileURL.path) {
-                Self.logger.info("File exists at: \(fileURL.path)")
-                return fileURL
-            } else {
-                Self.logger.error("File not found at: \(fileURL.path)")
-            }
-        } else {
-            Self.logger.error("Could not find installed extension for context")
-        }
-
-        return nil
     }
 }

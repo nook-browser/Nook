@@ -3,6 +3,9 @@
 
 (function () {
   "use strict";
+  // Runs in Nook's isolated "NookWebStore" content world, never the page world.
+  if (window.__nookWebStoreInjected) return;
+  window.__nookWebStoreInjected = true;
 
   const CHROME_STORE_PATTERNS = [
     /^https?:\/\/chrome\.google\.com\/webstore\/.+?\/([a-z]{32})(?=[\/#?]|$)/,
@@ -63,7 +66,9 @@
         "0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08)";
     });
 
-    button.addEventListener("click", () => {
+    button.addEventListener("click", (event) => {
+      // Ignore clicks synthesized by page scripts; Nook also confirms natively.
+      if (!event.isTrusted) return;
       button.disabled = true;
       button.textContent = "Installing...";
       button.style.opacity = "0.7";

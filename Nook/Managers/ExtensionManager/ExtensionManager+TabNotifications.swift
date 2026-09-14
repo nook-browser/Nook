@@ -29,51 +29,72 @@ extension ExtensionManager {
         return created
     }
 
-    // Expose a stable adapter getter for window adapters
+    /// Adapter for exposing a tab to extensions, or nil for private tabs, which extensions never see.
     func stableAdapter(for tab: Tab) -> ExtensionTabAdapter? {
-        guard let bm = browserManagerRef else { return nil }
+        guard let bm = browserManagerRef, !tab.isEphemeral else { return nil }
         return adapter(for: tab, browserManager: bm)
     }
 
     func notifyTabOpened(_ tab: Tab) {
-        guard let bm = browserManagerRef, let controller = extensionController
+        guard let controller = extensionController,
+              !openedTabIDs.contains(tab.id),
+              let a = stableAdapter(for: tab)
         else { return }
-        let a = adapter(for: tab, browserManager: bm)
+        openedTabIDs.insert(tab.id)
         controller.didOpenTab(a)
         tabCacheGeneration &+= 1
     }
 
-    /// Grant all extension contexts explicit access to a URL.
-    /// WKWebExtensionController uses Safari's per-URL permission model where even
-    /// granted match patterns don't give implicit URL access. Without this, content
-    /// scripts won't inject and messaging fails. Call before navigation starts.
-    func grantExtensionAccessToURL(_ url: URL) {
-        for (_, ctx) in extensionContexts {
-            ctx.setPermissionStatus(.grantedExplicitly, for: url)
-        }
+    /// Adapter for a tab the controller already knows about; nil for private or unopened tabs.
+    private func openedAdapter(for tab: Tab) -> ExtensionTabAdapter? {
+        guard openedTabIDs.contains(tab.id), let bm = browserManagerRef else { return nil }
+        return adapter(for: tab, browserManager: bm)
+    }
 
-        // Also grant a match pattern covering the URL's origin for content script injection.
-        // The per-URL grant above covers chrome.tabs.query() and messaging, but content
-        // scripts require a matching pattern to inject. WebKit's <all_urls> may not match
-        // IP addresses (e.g. local servers at 192.168.x.x, 10.x.x.x), so we create an
-        // explicit origin pattern like "http://192.168.1.140/*" to ensure injection.
-        if let scheme = url.scheme, let host = url.host {
-            var hostPort = host
-            if let port = url.port { hostPort = "\(host):\(port)" }
-            let patternString = "\(scheme)://\(hostPort)/*"
-            if let pattern = try? WKWebExtension.MatchPattern(string: patternString) {
-                for (_, ctx) in extensionContexts {
-                    ctx.setPermissionStatus(.grantedExplicitly, for: pattern)
-                }
+    /// Give each loaded extension explicit access to `url`, but only when that extension's
+    /// granted match patterns already cover it. Some WebKit builds did not treat a granted
+    /// pattern as access to a URL (content scripts skipped, `tabs.query` without URLs), so
+    /// this makes the implicit grant explicit. It never widens what an extension may reach.
+    func grantExtensionAccessToURL(_ url: URL) {
+        guard let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme),
+              let host = url.host
+        else { return }
+
+        let originPattern: WKWebExtension.MatchPattern? = {
+            let hostPort = url.port.map { "\(host):\($0)" } ?? host
+            return try? WKWebExtension.MatchPattern(string: "\(scheme)://\(hostPort)/*")
+        }()
+
+        for ctx in extensionContexts.values where ctx.isLoaded {
+            switch ctx.permissionStatus(for: url) {
+            case .grantedExplicitly, .grantedImplicitly, .deniedExplicitly:
+                continue
+            default:
+                break
+            }
+            let covered = ctx.grantedPermissionMatchPatterns.keys.contains { pattern in
+                if pattern.matchesAllURLs { return true }
+                // `<all_urls>`-style host wildcards did not always match IP-address hosts.
+                if pattern.matchesAllHosts, let s = pattern.scheme, s == "*" || s == scheme { return true }
+                return pattern.matches(url)
+            }
+            guard covered else { continue }
+            ctx.setPermissionStatus(.grantedExplicitly, for: url)
+            if let originPattern {
+                ctx.setPermissionStatus(.grantedExplicitly, for: originPattern)
             }
         }
     }
 
     func notifyTabActivated(newTab: Tab, previous: Tab?) {
-        guard let bm = browserManagerRef, let controller = extensionController
-        else { return }
-        let newA = adapter(for: newTab, browserManager: bm)
-        let oldA = previous.map { adapter(for: $0, browserManager: bm) }
+        guard let controller = extensionController else { return }
+        let oldA = previous.flatMap { openedAdapter(for: $0) }
+        guard let newA = openedAdapter(for: newTab) else {
+            // Switching to a private or unloaded tab: just deselect the previous one.
+            if let oldA { controller.didDeselectTabs([oldA]) }
+            tabCacheGeneration &+= 1
+            return
+        }
         controller.didActivateTab(newA, previousActiveTab: oldA)
         controller.didSelectTabs([newA])
         if let oldA { controller.didDeselectTabs([oldA]) }
@@ -82,13 +103,7 @@ extension ExtensionManager {
         // badge counts and autofill state for the newly active tab.
         wakeBackgroundWorkers()
 
-        // Grant all extension contexts explicit access to the active tab's URL.
-        // Without this, content scripts can't inject and chrome.tabs.query()
-        // won't return the URL — WebKit requires per-URL grants even when
-        // match patterns already cover the domain.
-        if let scheme = newTab.url.scheme, ["http", "https"].contains(scheme) {
-            grantExtensionAccessToURL(newTab.url)
-        }
+        grantExtensionAccessToURL(newTab.url)
 
         // Fire property changes so background workers re-evaluate the page
         // (autofill detection, badge text, declarativeContent rules).
@@ -97,21 +112,20 @@ extension ExtensionManager {
     }
 
     func notifyTabClosed(_ tab: Tab) {
-        guard let bm = browserManagerRef, let controller = extensionController
-        else { return }
-        let a = adapter(for: tab, browserManager: bm)
+        defer {
+            tabAdapters[tab.id] = nil
+            openedTabIDs.remove(tab.id)
+            tabCacheGeneration &+= 1
+        }
+        guard let controller = extensionController, let a = openedAdapter(for: tab) else { return }
         controller.didCloseTab(a, windowIsClosing: false)
-        tabAdapters[tab.id] = nil
-        tabCacheGeneration &+= 1
     }
 
     func notifyTabPropertiesChanged(
         _ tab: Tab,
         properties: WKWebExtension.TabChangedProperties
     ) {
-        guard let bm = browserManagerRef, let controller = extensionController
-        else { return }
-        let a = adapter(for: tab, browserManager: bm)
+        guard let controller = extensionController, let a = openedAdapter(for: tab) else { return }
         controller.didChangeTabProperties(properties, for: a)
         tabCacheGeneration &+= 1
     }
@@ -121,7 +135,7 @@ extension ExtensionManager {
     /// Forward a keyboard event to all extension contexts to handle chrome.commands shortcuts.
     /// Returns true if any extension consumed the event.
     func tryPerformExtensionCommand(for event: NSEvent) -> Bool {
-        for (_, ctx) in extensionContexts {
+        for ctx in extensionContexts.values where ctx.isLoaded {
             if ctx.performCommand(for: event) {
                 return true
             }
@@ -136,7 +150,7 @@ extension ExtensionManager {
     /// and tab activation ensures content script messages reach a live worker for features
     /// like autofill detection and badge count updates.
     func wakeBackgroundWorkers() {
-        for (_, ctx) in extensionContexts {
+        for ctx in extensionContexts.values where ctx.isLoaded {
             guard ctx.webExtension.hasBackgroundContent else { continue }
             ctx.loadBackgroundContent { error in
                 if let error {

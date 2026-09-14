@@ -542,9 +542,6 @@ class BrowserManager: ObservableObject {
         if let mgr = self.extensionManager {
             // Attach extension manager BEFORE any WKWebView is created so content scripts can inject
             mgr.attach(browserManager: self)
-            if let pid = currentProfile?.id {
-                mgr.switchProfile(pid)
-            }
             
             // Bind popup active state
             mgr.$isPopupActive
@@ -749,10 +746,6 @@ class BrowserManager: ObservableObject {
                 self.historyManager.switchProfile(profile.id)
                 // TabManager awareness (updates currentTab/currentSpace visibility)
                 self.tabManager.handleProfileSwitch()
-                // Update extension manager
-                if let mgr = self.extensionManager {
-                    mgr.switchProfile(profile.id)
-                }
             }
 
             if animateTransition {
@@ -1922,6 +1915,14 @@ class BrowserManager: ObservableObject {
             windowState.currentProfileId = currentProfile?.id
         }
         adoptProfileIfNeeded(for: windowState, context: .windowActivation)
+
+        // Extensions resolve tabs.query({active: true, currentWindow: true}) from the focused
+        // window's current tab, so switching windows must switch their active tab too.
+        if let tab = currentTab(for: windowState) {
+            ExtensionManager.shared.notifyTabActivated(newTab: tab, previous: nil)
+        } else {
+            ExtensionManager.shared.tabCacheGeneration &+= 1
+        }
     }
 
     // MARK: - Window-Aware Tab Operations

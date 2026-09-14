@@ -63,7 +63,9 @@ enum ExtensionError: LocalizedError {
     case invalidManifest(String)
     case installationFailed(String)
     case permissionDenied
-    
+    /// The user declined the install or update confirmation. Callers should not show an error.
+    case cancelled
+
     var errorDescription: String? {
         switch self {
         case .unsupportedOS:
@@ -74,6 +76,8 @@ enum ExtensionError: LocalizedError {
             return "Installation failed: \(reason)"
         case .permissionDenied:
             return "Permission denied"
+        case .cancelled:
+            return "Installation cancelled"
         }
     }
 }

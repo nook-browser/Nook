@@ -2,13 +2,15 @@
 //  ExtensionManager+Installation.swift
 //  Nook
 //
-//  Extension installation, management, persistence, and Safari extension discovery.
+//  Extension installation, updates, management, persistence, and Safari extension discovery.
 //
 
 import AppKit
+import CryptoKit
 import Foundation
 import os
 import SwiftData
+import SwiftUI
 import UniformTypeIdentifiers
 import WebKit
 
@@ -57,406 +59,367 @@ extension ExtensionManager {
         return nil
     }
 
-    // MARK: - MV3 Support Methods
+    // MARK: - Extension Identity
 
-    // Note: commonPermissions array removed - now using minimalSafePermissions for better security
+    /// Chrome's extension ID for a manifest `key` (base64 DER public key): SHA-256 of the key,
+    /// first 16 bytes as hex, with hex digits 0-f mapped to letters a-p.
+    nonisolated static func chromeExtensionID(fromManifestKey key: String) -> String? {
+        guard let der = Data(base64Encoded: key.filter { !$0.isWhitespace }), !der.isEmpty else { return nil }
+        let hex = SHA256.hash(data: der).prefix(16).map { String(format: "%02x", $0) }.joined()
+        return String(hex.compactMap { digit in
+            Int(String(digit), radix: 16).map { Character(UnicodeScalar(UInt8(97 + $0))) }
+        })
+    }
 
-    /// Grant all requested permissions at install time (matches Chrome behavior).
-    /// Chrome auto-grants everything in the manifest `permissions` array on install.
-    /// Only `optional_permissions` require a runtime `chrome.permissions.request()` call.
-    private func grantRequestedPermissions(
-        to extensionContext: WKWebExtensionContext,
-        webExtension: WKWebExtension
-    ) {
-        for permission in webExtension.requestedPermissions {
-            extensionContext.setPermissionStatus(.grantedExplicitly, for: permission)
+    func fetchEntity(id: String) -> ExtensionEntity? {
+        let target = id
+        let predicate = #Predicate<ExtensionEntity> { $0.id == target }
+        return try? context.fetch(FetchDescriptor<ExtensionEntity>(predicate: predicate)).first
+    }
+
+    // MARK: - Install Consent
+
+    /// Permissions and host patterns the user must approve. For a fresh install that is
+    /// everything required; for an update it is only what the new version adds.
+    static func consentItems(
+        for new: WKWebExtension,
+        comparedTo previous: WKWebExtension?
+    ) -> (permissions: [String], hosts: [String]) {
+        func requiredPatterns(_ ext: WKWebExtension) -> [WKWebExtension.MatchPattern] {
+            let optional = ext.optionalPermissionMatchPatterns
+            return ext.allRequestedMatchPatterns.filter { !optional.contains($0) }
         }
-        Self.logger.debug("Granted requested permissions: \(webExtension.requestedPermissions.map { String(describing: $0) }.joined(separator: ", "), privacy: .public)")
+        let newPermissions = Set(new.requestedPermissions.map(\.rawValue))
+        let newPatterns = requiredPatterns(new)
+        guard let previous else {
+            return (newPermissions.sorted(), Set(newPatterns.map(\.string)).sorted())
+        }
+        let oldPatterns = requiredPatterns(previous)
+        let oldStrings = Set(oldPatterns.map(\.string))
+        // ponytail: host coverage is exact string match or an old all-hosts pattern; a new narrower
+        // pattern under an old broad wildcard (e.g. *.google.com) still prompts. Fine for rare updates.
+        let oldCoversAllHosts = oldPatterns.contains { $0.matchesAllURLs || $0.matchesAllHosts }
+        let addedHosts = oldCoversAllHosts ? [] : Set(newPatterns.map(\.string)).subtracting(oldStrings).sorted()
+        let addedPermissions = newPermissions.subtracting(previous.requestedPermissions.map(\.rawValue)).sorted()
+        return (addedPermissions, addedHosts)
     }
 
-    /// Backward-compatible alias used by the loadInstalledExtensions path.
-    private func grantCommonPermissions(
-        to extensionContext: WKWebExtensionContext,
-        webExtension: WKWebExtension,
-        isExisting: Bool = false
-    ) {
-        grantRequestedPermissions(to: extensionContext, webExtension: webExtension)
-    }
-
-    /// Validate MV3-specific requirements
-    private func validateMV3Requirements(manifest: [String: Any], baseURL: URL)
-        throws
-    {
-        // Check for service worker
-        if let background = manifest["background"] as? [String: Any] {
-            if let serviceWorker = background["service_worker"] as? String {
-                let serviceWorkerPath = baseURL.appendingPathComponent(
-                    serviceWorker
+    /// Show the permission sheet and wait for the user's decision.
+    private func confirmInstallation(
+        of webExtension: WKWebExtension,
+        name: String,
+        permissions: [String],
+        hosts: [String],
+        isUpdate: Bool
+    ) async -> Bool {
+        guard let bm = browserManagerRef else { return false }
+        return await withCheckedContinuation { continuation in
+            let decide = ResumeOnce(fallback: false) { continuation.resume(returning: $0) }
+            bm.showDialog {
+                StandardDialog(
+                    header: { EmptyView() },
+                    content: {
+                        ExtensionPermissionView(
+                            extensionName: name,
+                            requestedPermissions: permissions,
+                            optionalPermissions: [],
+                            requestedHostPermissions: hosts,
+                            optionalHostPermissions: [],
+                            isUpdate: isUpdate,
+                            onGrant: {
+                                bm.closeDialog()
+                                decide(true)
+                            },
+                            onDeny: {
+                                bm.closeDialog()
+                                decide(false)
+                            },
+                            extensionLogo: webExtension.icon(for: .init(width: 64, height: 64)) ?? NSImage()
+                        )
+                    },
+                    footer: { EmptyView() }
                 )
-                if !FileManager.default.fileExists(
-                    atPath: serviceWorkerPath.path
-                ) {
-                    throw ExtensionError.installationFailed(
-                        "MV3 service worker not found: \(serviceWorker)"
-                    )
-                }
-                Self.logger.debug("MV3 service worker found: \(serviceWorker, privacy: .public)")
-            }
-        }
-
-        // Validate content scripts with world parameter
-        if let contentScripts = manifest["content_scripts"] as? [[String: Any]]
-        {
-            for script in contentScripts {
-                if let world = script["world"] as? String, world == "MAIN" {
-                    Self.logger.debug("MAIN world content script detected - requires macOS 15.5+ for full support")
-                }
-            }
-        }
-
-        // Validate host_permissions vs permissions
-        if let hostPermissions = manifest["host_permissions"] as? [String] {
-            Self.logger.debug("MV3 host_permissions: \(hostPermissions, privacy: .public)")
-        }
-    }
-
-    /// Configure MV3-specific extension features
-    private func configureMV3Extension(
-        webExtension: WKWebExtension,
-        context: WKWebExtensionContext,
-        manifest: [String: Any]
-    ) async throws {
-        // MV3: Service worker background handling
-        if webExtension.hasBackgroundContent {
-            Self.logger.debug("MV3 service worker background detected")
-        }
-
-        // MV3: Enhanced content script injection support
-        if webExtension.hasInjectedContent {
-            Self.logger.debug("MV3 content scripts detected - ensuring MAIN/ISOLATED world support")
-        }
-
-        // MV3: Action popup validation
-        if let action = manifest["action"] as? [String: Any] {
-            if let popup = action["default_popup"] as? String {
-                Self.logger.debug("MV3 action popup: \(popup, privacy: .public)")
             }
         }
     }
 
     // MARK: - Extension Installation
 
+    /// Install or update an extension from a ZIP, directory, `.appex`, or `.app`.
+    /// - Parameters:
+    ///   - store: set for Chrome Web Store / Edge Add-ons installs; enables automatic updates.
+    ///   - extensionId: stable ID from the caller (store ID, Safari bundle ID). Falls back to the
+    ///     ID derived from the manifest `key`, then a random UUID.
+    ///   - interactive: when false (background updates), an update that needs new permissions
+    ///     is skipped instead of prompting.
     func installExtension(
         from url: URL,
-        completionHandler:
-            @escaping (Result<InstalledExtension, ExtensionError>) -> Void
+        store: ExtensionStore? = nil,
+        extensionId: String? = nil,
+        interactive: Bool = true,
+        completionHandler: @escaping (Result<InstalledExtension, ExtensionError>) -> Void
     ) {
         guard isExtensionSupportAvailable else {
             completionHandler(.failure(.unsupportedOS))
             return
         }
 
-        Task {
+        Task { @MainActor in
             do {
-                let installedExtension = try await performInstallation(
-                    from: url
+                let installed = try await performInstallation(
+                    from: url, store: store, extensionId: extensionId, interactive: interactive
                 )
-                await MainActor.run {
-                    self.installedExtensions.append(installedExtension)
-                    completionHandler(.success(installedExtension))
+                if let index = installedExtensions.firstIndex(where: { $0.id == installed.id }) {
+                    installedExtensions[index] = installed
+                } else {
+                    installedExtensions.append(installed)
                 }
+                completionHandler(.success(installed))
             } catch let error as ExtensionError {
-                await MainActor.run {
-                    completionHandler(.failure(error))
-                }
+                completionHandler(.failure(error))
             } catch {
-                await MainActor.run {
-                    completionHandler(
-                        .failure(
-                            .installationFailed(error.localizedDescription)
-                        )
-                    )
-                }
+                completionHandler(.failure(.installationFailed(error.localizedDescription)))
             }
         }
     }
 
-    private func performInstallation(from sourceURL: URL) async throws
-        -> InstalledExtension
-    {
+    private func performInstallation(
+        from sourceURL: URL,
+        store: ExtensionStore?,
+        extensionId callerId: String?,
+        interactive: Bool
+    ) async throws -> InstalledExtension {
+        let fm = FileManager.default
         let extensionsDir = getExtensionsDirectory()
-        try FileManager.default.createDirectory(
-            at: extensionsDir,
-            withIntermediateDirectories: true
-        )
+        try fm.createDirectory(at: extensionsDir, withIntermediateDirectories: true)
 
-        // STEP 1: Extract to temporary location first
-        let tempId = UUID().uuidString
-        let tempDir = extensionsDir.appendingPathComponent("temp_\(tempId)")
+        // STEP 1: Stage the package in a temporary directory (removed on any failure).
+        let tempDir = extensionsDir.appendingPathComponent("temp_\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: tempDir) }
 
-        let ext = sourceURL.pathExtension.lowercased()
-        if ext == "zip" {
+        switch sourceURL.pathExtension.lowercased() {
+        case "zip":
             try await extractZip(from: sourceURL, to: tempDir)
-        } else if ext == "appex" || ext == "app" {
-            // Safari Web Extension bundle — resolve and copy web resources
-            let resourcesDir = try resolveSafariExtensionResources(at: sourceURL)
-            try FileManager.default.copyItem(at: resourcesDir, to: tempDir)
-        } else {
-            try FileManager.default.copyItem(at: sourceURL, to: tempDir)
+        case "appex", "app":
+            try fm.copyItem(at: try resolveSafariExtensionResources(at: sourceURL), to: tempDir)
+        default:
+            try fm.copyItem(at: sourceURL, to: tempDir)
         }
+        try rejectSymbolicLinks(in: tempDir)
 
-        // Validate manifest exists
         let manifestURL = tempDir.appendingPathComponent("manifest.json")
         let manifest = try ExtensionUtils.validateManifest(at: manifestURL)
+        if manifest["manifest_version"] as? Int == 3 {
+            try validateMV3Requirements(manifest: manifest, baseURL: tempDir)
+        }
+        let keyId = (manifest["key"] as? String).flatMap(Self.chromeExtensionID(fromManifestKey:))
+        let hasStableId = callerId != nil || keyId != nil
+        let extensionId = callerId ?? keyId ?? UUID().uuidString
+        // Patch before parsing so the consent sheet sees Nook's bridge content script hosts too.
+        patchManifestForWebKit(at: manifestURL, extensionId: extensionId)
 
-        // MV3 Validation: Ensure proper manifest version support
-        if let manifestVersion = manifest["manifest_version"] as? Int {
-            Self.logger.info("Installing MV\(manifestVersion) extension")
-            if manifestVersion == 3 {
-                try validateMV3Requirements(
-                    manifest: manifest,
-                    baseURL: tempDir
-                )
+        let staged = try await WKWebExtension(resourceBaseURL: tempDir)
+        let name = staged.displayName ?? manifest["name"] as? String ?? "Unknown Extension"
+        let version = manifest["version"] as? String ?? "1.0"
+
+        // STEP 2: Decide between fresh install, in-place update, and duplicate.
+        let existing = fetchEntity(id: extensionId)
+        // ponytail: a copy installed before stable IDs existed (random UUID) with the same name is
+        // treated as the same extension and replaced; its storage does not carry over.
+        let legacyCopy = (existing == nil && hasStableId)
+            ? installedExtensions.first { $0.name == name && UUID(uuidString: $0.id) != nil }
+            : nil
+        if let existing {
+            guard existing.version != version else {
+                throw ExtensionError.installationFailed("\(name) v\(version) is already installed")
+            }
+        } else if legacyCopy == nil,
+                  installedExtensions.contains(where: { $0.name == name && $0.version == version }) {
+            throw ExtensionError.installationFailed("\(name) v\(version) is already installed")
+        }
+
+        // STEP 3: Consent. Fresh installs always ask; updates ask only when permissions grow.
+        var previous: WKWebExtension?
+        if let existing {
+            previous = extensionContexts[extensionId]?.webExtension
+            if previous == nil {
+                previous = try? await WKWebExtension(resourceBaseURL: URL(fileURLWithPath: existing.packagePath))
+            }
+        }
+        let consent = Self.consentItems(for: staged, comparedTo: previous)
+        let needsConsent = existing == nil || !consent.permissions.isEmpty || !consent.hosts.isEmpty
+        if needsConsent {
+            guard interactive else {
+                Self.logger.info("Skipping update of '\(name, privacy: .public)': new version requests additional permissions")
+                throw ExtensionError.cancelled
+            }
+            guard await confirmInstallation(
+                of: staged, name: name,
+                permissions: consent.permissions, hosts: consent.hosts,
+                isUpdate: existing != nil
+            ) else {
+                throw ExtensionError.cancelled
             }
         }
 
-        // Patch domain-specific content scripts to MAIN world for WebKit fetch compatibility
-        patchManifestForWebKit(at: manifestURL)
-
-        // STEP 2: Create a temporary WKWebExtension just to get the uniqueIdentifier
-        Self.logger.debug("Initializing WKWebExtension from \(tempDir.path, privacy: .public)")
-
-        let tempExtension = try await WKWebExtension(resourceBaseURL: tempDir)
-        let tempContext = WKWebExtensionContext(for: tempExtension)
-        let extensionId = tempContext.uniqueIdentifier
-        let finalDestinationDir = extensionsDir.appendingPathComponent(extensionId)
-
-        Self.logger.info("Extension ID: \(extensionId, privacy: .public), name: \(tempExtension.displayName ?? "Unknown", privacy: .public)")
-
-        // STEP 2.5: Check for duplicate — same name and version already installed
-        let newName = tempExtension.displayName
-            ?? Self.resolveLocaleString(
-                manifest["name"] as? String ?? "",
-                in: tempDir
-            )
-            ?? manifest["name"] as? String
-            ?? "Unknown"
-        let newVersion = manifest["version"] as? String ?? ""
-
-        if let existing = await MainActor.run(body: {
-            installedExtensions.first(where: { $0.name == newName && $0.version == newVersion })
-        }) {
-            // Clean up temp directory
-            try? FileManager.default.removeItem(at: tempDir)
-            Self.logger.warning("Duplicate extension: '\(newName, privacy: .public)' v\(newVersion, privacy: .public) already installed as \(existing.id, privacy: .public)")
-            throw ExtensionError.installationFailed(
-                "\(newName) v\(newVersion) is already installed"
-            )
+        if let legacyCopy {
+            Self.logger.info("Replacing legacy copy of '\(name, privacy: .public)' (\(legacyCopy.id, privacy: .public)) with \(extensionId, privacy: .public)")
+            uninstallExtension(legacyCopy.id)
         }
 
-        // STEP 3: Move files to final directory named after the extension ID
-        if FileManager.default.fileExists(atPath: finalDestinationDir.path) {
-            try FileManager.default.removeItem(at: finalDestinationDir)
+        // STEP 4: Swap files into place. Unload the running version first.
+        if let running = extensionContexts.removeValue(forKey: extensionId) {
+            if running.isLoaded { try? extensionController?.unload(running) }
         }
-        try FileManager.default.moveItem(at: tempDir, to: finalDestinationDir)
+        let finalDir = extensionsDir.appendingPathComponent(extensionId)
+        if fm.fileExists(atPath: finalDir.path) {
+            _ = try fm.replaceItemAt(finalDir, withItemAt: tempDir)
+        } else {
+            try fm.moveItem(at: tempDir, to: finalDir)
+        }
 
-        // STEP 4: Re-create WKWebExtension from the FINAL location so the
-        // resource base URL points to where the files actually live. This is
-        // critical — the service worker, popup HTML, and all resources are
-        // loaded from this path at runtime.
-        let webExtension = try await WKWebExtension(resourceBaseURL: finalDestinationDir)
+        // STEP 5: Persist. Updates keep the entity, so enabled state and optional grants survive.
+        let entity: ExtensionEntity
+        if let existing {
+            entity = existing
+            entity.name = name
+            entity.version = version
+            entity.manifestVersion = manifest["manifest_version"] as? Int ?? 3
+            entity.extensionDescription = staged.displayDescription ?? ""
+            entity.lastUpdateDate = Date()
+            entity.packagePath = finalDir.path
+            entity.iconPath = findExtensionIcon(in: finalDir, manifest: manifest)
+        } else {
+            entity = ExtensionEntity(
+                id: extensionId,
+                name: name,
+                version: version,
+                manifestVersion: manifest["manifest_version"] as? Int ?? 3,
+                extensionDescription: staged.displayDescription ?? "",
+                isEnabled: true,
+                packagePath: finalDir.path,
+                iconPath: findExtensionIcon(in: finalDir, manifest: manifest)
+            )
+            context.insert(entity)
+        }
+        if let store { entity.sourceStore = store.rawValue }
+        try context.save()
+
+        // STEP 6: Load from the final location so resource URLs resolve to real files.
+        if entity.isEnabled {
+            let webExtension = try await WKWebExtension(resourceBaseURL: finalDir)
+            registerContext(for: entity, webExtension: webExtension)
+        }
+
+        Self.logger.info("\(existing == nil ? "Installed" : "Updated", privacy: .public) '\(name, privacy: .public)' v\(version, privacy: .public) as \(extensionId, privacy: .public)")
+        return InstalledExtension(from: entity, manifest: manifest)
+    }
+
+    /// Create a context for an installed extension, grant its manifest permissions, and load it.
+    /// The externally_connectable bridge ships as the extension's own content scripts (see
+    /// `patchManifestForWebKit`), so loading and unloading the context is all it needs.
+    @discardableResult
+    func registerContext(for entity: ExtensionEntity, webExtension: WKWebExtension) -> WKWebExtensionContext? {
         let extensionContext = WKWebExtensionContext(for: webExtension)
-        configureContextIdentity(extensionContext, extensionId: extensionId)
+        configureContextIdentity(extensionContext, extensionId: entity.id)
 
-        Self.logger.info("WKWebExtension created from final path: \(finalDestinationDir.path, privacy: .public)")
-        Self.logger.debug("Requested permissions: \(webExtension.requestedPermissions.map { String(describing: $0) }.joined(separator: ", "), privacy: .public)")
-
-        // Grant only explicitly requested permissions (shown in install dialog).
-        // Optional permissions will be requested at runtime via chrome.permissions.request()
-        // and the promptForPermissions delegate.
+        // Required permissions and match patterns were approved at install time.
         for p in webExtension.requestedPermissions {
             extensionContext.setPermissionStatus(.grantedExplicitly, for: p)
-            Self.logger.info("Granted permission: \(String(describing: p), privacy: .public)")
         }
-        // Grant required match patterns only (host_permissions + content_scripts matches),
-        // excluding optional_host_permissions which should be requested at runtime.
         let optionalMatches = webExtension.optionalPermissionMatchPatterns
-        for m in webExtension.allRequestedMatchPatterns {
-            if !optionalMatches.contains(m) {
-                extensionContext.setPermissionStatus(.grantedExplicitly, for: m)
-                Self.logger.info("Granted match pattern: \(String(describing: m), privacy: .public)")
-            }
+        for m in webExtension.allRequestedMatchPatterns where !optionalMatches.contains(m) {
+            extensionContext.setPermissionStatus(.grantedExplicitly, for: m)
         }
-        // Optional permissions/match patterns will be handled at runtime via
-        // chrome.permissions.request() and the promptForPermissions delegate.
 
-        // Enable Web Inspector for extension pages (background, popup)
+        // Restore optional grants the user approved at runtime.
+        let savedPerms = Set(entity.grantedOptionalPermissions ?? [])
+        for p in webExtension.optionalPermissions where savedPerms.contains(String(describing: p)) {
+            extensionContext.setPermissionStatus(.grantedExplicitly, for: p)
+        }
+        let savedMatches = Set(entity.grantedOptionalMatchPatterns ?? [])
+        for m in optionalMatches where savedMatches.contains(String(describing: m)) {
+            extensionContext.setPermissionStatus(.grantedExplicitly, for: m)
+        }
+
         extensionContext.isInspectable = true
+        extensionContexts[entity.id] = extensionContext
 
-        // Store context and load into controller
-        extensionContexts[extensionId] = extensionContext
-
-        // Set up externally_connectable bridge BEFORE loading background
-        setupExternallyConnectableBridge(
-            for: extensionContext,
-            extensionId: extensionId,
-            packagePath: finalDestinationDir.path
-        )
-
-        try extensionController?.load(extensionContext)
-
-        // Start the background service worker so it can handle
-        // messages from popup and content scripts.
-        Task { @MainActor [weak self] in
-            do {
-                try await extensionContext.loadBackgroundContent()
-                Self.logger.info("Background content loaded for new extension")
-                self?.probeBackgroundHealth(for: extensionContext, name: "new extension")
-            } catch {
-                Self.logger.error("Background load failed for new extension: \(error.localizedDescription, privacy: .public)")
-            }
-        }
-
-        func getLocaleText(key: String) -> String? {
-            guard let manifestValue = manifest[key] as? String else {
-                return nil
-            }
-
-            if manifestValue.hasPrefix("__MSG_") {
-                let localesDirectory = finalDestinationDir.appending(
-                    path: "_locales"
-                )
-                guard
-                    FileManager.default.fileExists(
-                        atPath: localesDirectory.path(percentEncoded: false)
-                    )
-                else {
-                    return nil
-                }
-
-                var pathToDirectory: URL? = nil
-
-                do {
-                    let items = try FileManager.default.contentsOfDirectory(
-                        at: localesDirectory,
-                        includingPropertiesForKeys: nil
-                    )
-
-                    // Build a priority list from the user's current locale
-                    var localeCandidates: [String] = []
-                    let current = Locale.current
-                    if let langCode = current.language.languageCode?.identifier {
-                        if let regionCode = current.language.region?.identifier {
-                            // Full locale with underscore and hyphen variants (e.g. pt_BR, pt-BR)
-                            localeCandidates.append("\(langCode)_\(regionCode)")
-                            localeCandidates.append("\(langCode)-\(regionCode)")
-                        }
-                        // Language-only (e.g. pt)
-                        localeCandidates.append(langCode)
-                    }
-                    // Always fall back to English
-                    localeCandidates.append("en")
-
-                    // Case-insensitive matching against available locale directories
-                    for candidate in localeCandidates {
-                        if let match = items.first(where: { $0.lastPathComponent.caseInsensitiveCompare(candidate) == .orderedSame }) {
-                            pathToDirectory = match
-                            break
-                        }
-                    }
-                } catch {
-                    return nil
-                }
-
-                guard let pathToDirectory = pathToDirectory else {
-                    return nil
-                }
-
-                let messagesPath = pathToDirectory.appending(
-                    path: "messages.json"
-                )
-                guard
-                    FileManager.default.fileExists(
-                        atPath: messagesPath.path(percentEncoded: false)
-                    )
-                else {
-                    return nil
-                }
-
-                do {
-                    let data = try Data(contentsOf: messagesPath)
-                    guard
-                        let messages = try JSONSerialization.jsonObject(
-                            with: data
-                        ) as? [String: Any]
-                    else {
-                        return nil
-                    }
-
-                    // Remove the __MSG_ from the start and the __ at the end
-                    let formattedManifestValue = String(
-                        manifestValue.dropFirst(6).dropLast(2)
-                    )
-
-                    // Look up the key (case-insensitive) and extract "message"
-                    let entry = messages.first(where: { $0.key.caseInsensitiveCompare(formattedManifestValue) == .orderedSame })?.value
-                    if let dict = entry as? [String: Any],
-                       let messageText = dict["message"] as? String {
-                        return messageText
-                    }
-
-                    return nil
-                } catch {
-                    return nil
-                }
-
-            }
-
+        do {
+            try extensionController?.load(extensionContext)
+        } catch {
+            Self.logger.error("Failed to load extension '\(entity.name, privacy: .public)': \(error.localizedDescription, privacy: .public)")
             return nil
         }
 
-        // Create extension entity for persistence
-        let entity = ExtensionEntity(
-            id: extensionId,
-            name: getLocaleText(key: "name") ?? manifest["name"] as? String ?? "Unknown Extension",
-            version: manifest["version"] as? String ?? "1.0",
-            manifestVersion: manifest["manifest_version"] as? Int ?? 3,
-            extensionDescription: getLocaleText(key: "description") ?? "",
-            isEnabled: true,
-            packagePath: finalDestinationDir.path,
-            iconPath: findExtensionIcon(in: finalDestinationDir, manifest: manifest)
-        )
+        if webExtension.hasBackgroundContent {
+            let name = entity.name
+            Task { @MainActor [weak self] in
+                do {
+                    try await extensionContext.loadBackgroundContent()
+                    #if DEBUG
+                    self?.probeBackgroundHealth(for: extensionContext, name: name)
+                    #endif
+                } catch {
+                    Self.logger.error("Background content failed for '\(name, privacy: .public)': \(error.localizedDescription, privacy: .public)")
+                }
+            }
+        }
 
-        // Save to database
-        self.context.insert(entity)
-        try self.context.save()
+        // Tabs that navigated before this extension loaded missed their URL grants.
+        if let bm = browserManagerRef {
+            for tab in bm.tabManager.pinnedTabs + bm.tabManager.tabs where openedTabIDs.contains(tab.id) {
+                grantExtensionAccessToURL(tab.url)
+            }
+        }
 
-        let installedExtension = InstalledExtension(
-            from: entity,
-            manifest: manifest
-        )
-        Self.logger.info("Successfully installed extension '\(installedExtension.name, privacy: .public)'")
-
-        // Required permissions and match patterns were granted above.
-        // Optional permissions will be handled at runtime via
-        // chrome.permissions.request() and the promptForPermissions delegate.
-
-        return installedExtension
+        Self.logger.info("Loaded '\(entity.name, privacy: .public)' MV\(Int(webExtension.manifestVersion)) (contexts: \(self.extensionController?.extensionContexts.count ?? 0))")
+        return extensionContext
     }
 
-    private func extractZip(from zipURL: URL, to destinationURL: URL)
-        async throws
-    {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
-        task.arguments = ["-q", zipURL.path, "-d", destinationURL.path]
+    /// Only the MV3 service worker file is checked; WebKit validates the rest when loading.
+    private func validateMV3Requirements(manifest: [String: Any], baseURL: URL) throws {
+        guard let background = manifest["background"] as? [String: Any],
+              let serviceWorker = background["service_worker"] as? String
+        else { return }
+        if !FileManager.default.fileExists(atPath: baseURL.appendingPathComponent(serviceWorker).path) {
+            throw ExtensionError.installationFailed("MV3 service worker not found: \(serviceWorker)")
+        }
+    }
 
-        try task.run()
-        task.waitUntilExit()
+    private func extractZip(from zipURL: URL, to destinationURL: URL) async throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+        process.arguments = ["-q", zipURL.path, "-d", destinationURL.path]
 
-        if task.terminationStatus != 0 {
+        let status: Int32 = try await withCheckedThrowingContinuation { continuation in
+            process.terminationHandler = { continuation.resume(returning: $0.terminationStatus) }
+            do {
+                try process.run()
+            } catch {
+                process.terminationHandler = nil
+                continuation.resume(throwing: error)
+            }
+        }
+        if status != 0 {
+            throw ExtensionError.installationFailed("Failed to extract ZIP file")
+        }
+    }
+
+    /// Extension resources are served to web content, so a link pointing outside the package
+    /// would expose arbitrary local files. Reject packages that contain any.
+    private func rejectSymbolicLinks(in directory: URL) throws {
+        let keys: Set<URLResourceKey> = [.isSymbolicLinkKey]
+        if (try? directory.resourceValues(forKeys: keys))?.isSymbolicLink == true {
+            throw ExtensionError.installationFailed("Extension package is a symbolic link")
+        }
+        guard let enumerator = FileManager.default.enumerator(
+            at: directory, includingPropertiesForKeys: Array(keys)
+        ) else { return }
+        for case let url as URL in enumerator
+        where (try? url.resourceValues(forKeys: keys))?.isSymbolicLink == true {
             throw ExtensionError.installationFailed(
-                "Failed to extract ZIP file"
+                "Extension package contains a symbolic link (\(url.lastPathComponent)), which is not allowed"
             )
         }
     }
@@ -532,126 +495,86 @@ extension ExtensionManager {
     // MARK: - Extension Management
 
     func enableExtension(_ extensionId: String) {
-        guard let context = extensionContexts[extensionId] else { return }
+        guard let entity = fetchEntity(id: extensionId) else { return }
+        updateExtensionEnabled(extensionId, enabled: true)
 
-        do {
-            try extensionController?.load(context)
-            updateExtensionEnabled(extensionId, enabled: true)
-
-            // Start the background service worker
-            context.loadBackgroundContent { error in
-                if let error {
-                    Self.logger.error("Background load failed on enable: \(error.localizedDescription, privacy: .public)")
+        if let context = extensionContexts[extensionId] {
+            guard !context.isLoaded else { return }
+            do {
+                try extensionController?.load(context)
+                if context.webExtension.hasBackgroundContent {
+                    context.loadBackgroundContent { error in
+                        if let error {
+                            Self.logger.error("Background load failed on enable: \(error.localizedDescription, privacy: .public)")
+                        }
+                    }
                 }
+            } catch {
+                Self.logger.error("Failed to enable extension: \(error.localizedDescription, privacy: .public)")
             }
-        } catch {
-            Self.logger.error("Failed to enable extension: \(error.localizedDescription, privacy: .public)")
+            return
+        }
+
+        // Disabled at launch, so no context exists yet: build one from the package.
+        let packageURL = URL(fileURLWithPath: entity.packagePath)
+        Task { @MainActor [weak self] in
+            do {
+                let webExtension = try await WKWebExtension(resourceBaseURL: packageURL)
+                self?.registerContext(for: entity, webExtension: webExtension)
+            } catch {
+                Self.logger.error("Failed to enable extension '\(entity.name, privacy: .public)': \(error.localizedDescription, privacy: .public)")
+            }
         }
     }
 
     func disableExtension(_ extensionId: String) {
-        guard let context = extensionContexts[extensionId] else { return }
-
-        do {
-            try extensionController?.unload(context)
-            updateExtensionEnabled(extensionId, enabled: false)
-        } catch {
-            Self.logger.error("Failed to disable extension: \(error.localizedDescription, privacy: .public)")
-        }
-    }
-
-    /// Disable all extensions (used when experimental extension support is disabled)
-    func disableAllExtensions() {
-        let enabledExtensions = installedExtensions.filter { $0.isEnabled }
-
-        for ext in enabledExtensions {
-            disableExtension(ext.id)
-        }
-
-        Self.logger.info("Disabled \(enabledExtensions.count) extensions")
-    }
-
-    /// Enable all previously enabled extensions (used when experimental extension support is re-enabled)
-    func enableAllExtensions() {
-        let disabledExtensions = installedExtensions.filter { !$0.isEnabled }
-
-        for ext in disabledExtensions {
-            // Only enable extensions that were previously enabled (check database)
+        if let context = extensionContexts[extensionId], context.isLoaded {
             do {
-                let id = ext.id
-                let predicate = #Predicate<ExtensionEntity> { $0.id == id }
-                let entities = try self.context.fetch(
-                    FetchDescriptor<ExtensionEntity>(predicate: predicate)
-                )
-
-                if let entity = entities.first, entity.isEnabled {
-                    enableExtension(ext.id)
-                }
+                try extensionController?.unload(context)
             } catch {
-                Self.logger.error("Failed to check extension \(ext.name, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                Self.logger.error("Failed to disable extension: \(error.localizedDescription, privacy: .public)")
+                return
             }
         }
-
-        Self.logger.info("Re-enabled extensions complete")
+        updateExtensionEnabled(extensionId, enabled: false)
     }
 
     func uninstallExtension(_ extensionId: String) {
-        if let context = extensionContexts[extensionId] {
+        if let context = extensionContexts.removeValue(forKey: extensionId), context.isLoaded {
             do {
                 try extensionController?.unload(context)
             } catch {
                 Self.logger.error("Failed to unload extension context: \(error.localizedDescription, privacy: .public)")
             }
-            extensionContexts.removeValue(forKey: extensionId)
         }
+        optionsWindows.removeValue(forKey: extensionId)?.close()
+        actionAnchors[extensionId] = nil
 
-        // Remove from database and filesystem
-        do {
-            let id = extensionId
-            let predicate = #Predicate<ExtensionEntity> { $0.id == id }
-            let entities = try self.context.fetch(
-                FetchDescriptor<ExtensionEntity>(predicate: predicate)
-            )
-
-            for entity in entities {
-                let packageURL = URL(fileURLWithPath: entity.packagePath)
-                try? FileManager.default.removeItem(at: packageURL)
-                self.context.delete(entity)
+        if let entity = fetchEntity(id: extensionId) {
+            try? FileManager.default.removeItem(at: URL(fileURLWithPath: entity.packagePath))
+            context.delete(entity)
+            do {
+                try context.save()
+            } catch {
+                Self.logger.error("Failed to uninstall extension: \(error.localizedDescription, privacy: .public)")
             }
-
-            try self.context.save()
-
-            installedExtensions.removeAll { $0.id == extensionId }
-        } catch {
-            Self.logger.error("Failed to uninstall extension: \(error.localizedDescription, privacy: .public)")
         }
+        installedExtensions.removeAll { $0.id == extensionId }
     }
 
     private func updateExtensionEnabled(_ extensionId: String, enabled: Bool) {
+        guard let entity = fetchEntity(id: extensionId) else { return }
+        entity.isEnabled = enabled
         do {
-            let id = extensionId
-            let predicate = #Predicate<ExtensionEntity> { $0.id == id }
-            let entities = try self.context.fetch(
-                FetchDescriptor<ExtensionEntity>(predicate: predicate)
-            )
-
-            if let entity = entities.first {
-                entity.isEnabled = enabled
-                try self.context.save()
-
-                // Update UI
-                if let index = installedExtensions.firstIndex(where: {
-                    $0.id == extensionId
-                }) {
-                    let updatedExtension = InstalledExtension(
-                        from: entity,
-                        manifest: installedExtensions[index].manifest
-                    )
-                    installedExtensions[index] = updatedExtension
-                }
-            }
+            try context.save()
         } catch {
             Self.logger.error("Failed to update extension enabled state: \(error.localizedDescription, privacy: .public)")
+        }
+        if let index = installedExtensions.firstIndex(where: { $0.id == extensionId }) {
+            installedExtensions[index] = InstalledExtension(
+                from: entity,
+                manifest: installedExtensions[index].manifest
+            )
         }
     }
 
@@ -742,7 +665,7 @@ extension ExtensionManager {
 
     /// Install a discovered Safari extension by its resources path
     func installSafariExtension(_ info: SafariExtensionInfo, completionHandler: @escaping (Result<InstalledExtension, ExtensionError>) -> Void) {
-        installExtension(from: info.appexPath, completionHandler: completionHandler)
+        installExtension(from: info.appexPath, extensionId: info.id, completionHandler: completionHandler)
     }
 
     // MARK: - File Picker
@@ -766,6 +689,8 @@ extension ExtensionManager {
                 switch result {
                 case .success(let ext):
                     Self.logger.info("Successfully installed extension: \(ext.name, privacy: .public)")
+                case .failure(.cancelled):
+                    break
                 case .failure(let error):
                     Self.logger.error("Failed to install extension: \(error.localizedDescription, privacy: .public)")
                     self.showErrorAlert(error)
@@ -845,9 +770,8 @@ extension ExtensionManager {
             let manifestURL = URL(fileURLWithPath: entity.packagePath)
                 .appendingPathComponent("manifest.json")
             do {
-                // Patch domain-specific content scripts to MAIN world on each load
-                // (idempotent — skips entries that already have a world set)
-                patchManifestForWebKit(at: manifestURL)
+                // Refresh Nook's bridge scripts so app updates reach installed extensions
+                patchManifestForWebKit(at: manifestURL, extensionId: entity.id)
                 let manifest = try ExtensionUtils.validateManifest(at: manifestURL)
                 // Re-resolve __MSG_ names that weren't properly resolved at install time
                 if entity.name.hasPrefix("__MSG_") {
@@ -908,83 +832,12 @@ extension ExtensionManager {
 
             // Phase 2: Register contexts sequentially (must be on MainActor)
             for (entity, webExtension) in parsed {
-                let extensionContext = WKWebExtensionContext(for: webExtension)
-                let extensionId = entity.id
-                self.configureContextIdentity(
-                    extensionContext,
-                    extensionId: extensionId
-                )
-
-                Self.logger.info("Loading '\(webExtension.displayName ?? entity.name, privacy: .public)' MV\(webExtension.manifestVersion) hasBackground=\(webExtension.hasBackgroundContent)")
-
-                // Grant explicitly requested permissions (shown at install time).
-                for p in webExtension.requestedPermissions {
-                    extensionContext.setPermissionStatus(.grantedExplicitly, for: p)
-                }
-                // Grant required match patterns only (host_permissions + content_scripts matches),
-                // excluding optional_host_permissions which should be requested at runtime.
-                let optionalMatches = webExtension.optionalPermissionMatchPatterns
-                let requiredMatches = webExtension.allRequestedMatchPatterns.filter { !optionalMatches.contains($0) }
-                for m in requiredMatches {
-                    extensionContext.setPermissionStatus(.grantedExplicitly, for: m)
-                }
-
-                // Restore previously-granted optional permissions so the extension
-                // doesn't re-prompt on every app launch.
-                let savedPerms = Set(entity.grantedOptionalPermissions ?? [])
-                var restoredPermCount = 0
-                for p in webExtension.optionalPermissions {
-                    if savedPerms.contains(String(describing: p)) {
-                        extensionContext.setPermissionStatus(.grantedExplicitly, for: p)
-                        restoredPermCount += 1
-                    }
-                }
-                let savedMatches = Set(entity.grantedOptionalMatchPatterns ?? [])
-                var restoredMatchCount = 0
-                for m in optionalMatches {
-                    if savedMatches.contains(String(describing: m)) {
-                        extensionContext.setPermissionStatus(.grantedExplicitly, for: m)
-                        restoredMatchCount += 1
-                    }
-                }
-                Self.logger.debug("Granted \(webExtension.requestedPermissions.count) permissions and \(requiredMatches.count) match patterns for '\(entity.name, privacy: .public)' (restored \(restoredPermCount) optional permissions, \(restoredMatchCount) optional matches)")
-
-                extensionContext.isInspectable = true
-
-                self.extensionContexts[extensionId] = extensionContext
-
-                // Set up externally_connectable bridge BEFORE loading background
-                self.setupExternallyConnectableBridge(
-                    for: extensionContext,
-                    extensionId: extensionId,
-                    packagePath: entity.packagePath
-                )
-
-                do {
-                    try self.extensionController?.load(extensionContext)
-                } catch {
-                    Self.logger.error("Failed to register extension '\(entity.name, privacy: .public)': \(error.localizedDescription, privacy: .public)")
-                    continue
-                }
-
-                // Start background service worker if the extension has one
-                if webExtension.hasBackgroundContent {
-                    Task { @MainActor [weak self] in
-                        do {
-                            try await extensionContext.loadBackgroundContent()
-                            Self.logger.info("Background content started for '\(entity.name, privacy: .public)'")
-                            self?.probeBackgroundHealth(for: extensionContext, name: entity.name)
-                        } catch {
-                            Self.logger.error("Background content failed for '\(entity.name, privacy: .public)': \(error.localizedDescription, privacy: .public)")
-                        }
-                    }
-                }
-
-                Self.logger.info("Loaded '\(entity.name, privacy: .public)' — contexts: \(self.extensionController?.extensionContexts.count ?? 0, privacy: .public)")
+                self.registerContext(for: entity, webExtension: webExtension)
             }
 
             Self.logger.info("All extensions loaded — signaling ready")
             self.extensionsLoaded = true
+            self.checkForExtensionUpdatesIfDue()
         }
     }
 
@@ -1000,30 +853,48 @@ extension ExtensionManager {
 
     // MARK: - Chrome Web Store Integration
 
-    /// Install extension from Chrome Web Store by extension ID
+    /// Install (or update) an extension from the Chrome Web Store or Edge Add-ons by store ID.
     func installFromWebStore(
         extensionId: String,
-        completionHandler:
-            @escaping (Result<InstalledExtension, ExtensionError>) -> Void
+        store: ExtensionStore = .chrome,
+        interactive: Bool = true,
+        completionHandler: @escaping (Result<InstalledExtension, ExtensionError>) -> Void
     ) {
-        WebStoreDownloader.downloadExtension(extensionId: extensionId) {
-            [weak self] result in
-            guard let self = self else { return }
-
+        WebStoreDownloader.downloadExtension(extensionId: extensionId, store: store) { [weak self] result in
+            guard let self else { return }
             switch result {
             case .success(let zipURL):
-                // Install the downloaded extension
-                self.installExtension(from: zipURL) { installResult in
-                    // Clean up temporary file
+                self.installExtension(
+                    from: zipURL, store: store, extensionId: extensionId, interactive: interactive
+                ) { installResult in
                     try? FileManager.default.removeItem(at: zipURL)
                     completionHandler(installResult)
                 }
-
             case .failure(let error):
-                completionHandler(
-                    .failure(.installationFailed(error.localizedDescription))
-                )
+                completionHandler(.failure(.installationFailed(error.localizedDescription)))
             }
         }
+    }
+}
+
+/// Calls its closure at most once. If never called, `fallback` is delivered on deinit, so a
+/// continuation waiting on a dialog still resumes when the dialog is dismissed some other way.
+final class ResumeOnce<T> {
+    private var body: ((T) -> Void)?
+    private let fallback: T
+
+    init(fallback: T, _ body: @escaping (T) -> Void) {
+        self.fallback = fallback
+        self.body = body
+    }
+
+    func callAsFunction(_ value: T) {
+        let run = body
+        body = nil
+        run?(value)
+    }
+
+    deinit {
+        body?(fallback)
     }
 }
