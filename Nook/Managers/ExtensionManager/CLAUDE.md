@@ -164,3 +164,15 @@ Debug builds only (`#if DEBUG`):
 - `probeBackgroundHealth()` — Runs at +3s and +8s after background load; reads the private `_backgroundWebView` only after a `responds(to:)` check (plain KVC on a renamed key raises) and evaluates a capability probe.
 - `diagnoseExtensionState()` — Per navigation: content script and messaging state per extension, including `urlAccess` (`WKWebExtensionContext.PermissionStatus` raw value: 2 implicit grant, 3 explicit grant, 0 unknown).
 
+## Verifying WebKit Extension Behavior Without the App
+
+There is no test target, and the app needs clicks for installs and popups. For questions about what WebKit itself does (content script worlds, messaging, popup lifecycle, permission status), build a standalone harness instead of guessing:
+
+1. Write a throwaway extension directory (manifest + scripts) and a page served by `python3 -m http.server 8765`.
+2. A single-file Swift program: `NSApplication.shared`, `.setActivationPolicy(.prohibited)`, a `WKWebExtensionController(configuration: .nonPersistent())`, load a `WKWebExtensionContext`, grant `allRequestedMatchPatterns`, `loadBackgroundContent()`, create a `WKWebView` with `webExtensionController` set, load the page, then `evaluateJavaScript` to read results. Run the work in `Task { @MainActor in ... }` and call `app.run()`.
+3. **Register the webview as a tab** with minimal `WKWebExtensionTab` / `WKWebExtensionWindow` adapters and `didOpenWindow` / `didOpenTab` / `didActivateTab`. Without that, content-script `runtime.sendMessage` silently gets no reply.
+4. To test generated JavaScript, extract the Swift string-building function into the harness (`swiftc` it alongside) so the exact shipped script runs. Syntax-check with `/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc`.
+5. Compile assertion-based checks with `-Onone`; `-O` strips `assert`.
+
+Keep harnesses in the session scratchpad, not the repo.
+
