@@ -32,7 +32,7 @@ struct SplitCardView: View {
             }
             .opacity(0.6)
             
-            RoundedRectangle(cornerRadius: 14)
+            NookDesign.Radius.shape(NookDesign.Radius.lg)
                 .strokeBorder(currentTextColor, style: StrokeStyle(lineWidth: 2, dash: [7,10]))
                 .opacity(0.3)
         }
@@ -45,7 +45,7 @@ struct SplitCardView: View {
             Color(currentTextColor)
                 .opacity(0.1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xxl))
         .animation(.easeInOut(duration: 0.2), value: currentTextColor)
     }
 }

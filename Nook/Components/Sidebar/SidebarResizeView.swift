@@ -39,7 +39,7 @@ struct SidebarResizeView: View {
     var body: some View {
         ZStack {
             if isHovering || isResizing {
-                RoundedRectangle(cornerRadius: 100)
+                Capsule()
                     .fill(colorScheme == .dark  ? .white.opacity(0.45) : .black.opacity(0.45))
                     .frame(width: 4)
                     .frame(maxHeight: .infinity)

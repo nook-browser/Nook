@@ -36,7 +36,7 @@ struct AISidebarResizeView: View {
     var body: some View {
         ZStack {
             if isHovering || isResizing {
-                RoundedRectangle(cornerRadius: 1)
+                NookDesign.Radius.shape(NookDesign.Radius.xs)
                     .fill(Color.accentColor)
                     .frame(width: 2)
                     .frame(maxHeight: .infinity)

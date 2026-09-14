@@ -23,11 +23,11 @@ struct ToolExecutionGlowView: View {
     ]
 
     var body: some View {
-        let cornerRadius: CGFloat = 12
+        let cornerRadius: CGFloat = NookDesign.Radius.lg
 
         ZStack {
             // Layer 1 — tight, sharp glow
-            RoundedRectangle(cornerRadius: cornerRadius)
+            NookDesign.Radius.shape(cornerRadius)
                 .stroke(
                     AngularGradient(colors: colors, center: .center, angle: .degrees(rotation1)),
                     lineWidth: 4
@@ -36,7 +36,7 @@ struct ToolExecutionGlowView: View {
                 .opacity(0.9)
 
             // Layer 2 — medium spread
-            RoundedRectangle(cornerRadius: cornerRadius)
+            NookDesign.Radius.shape(cornerRadius)
                 .stroke(
                     AngularGradient(colors: colors, center: .center, angle: .degrees(rotation2)),
                     lineWidth: 8
@@ -45,7 +45,7 @@ struct ToolExecutionGlowView: View {
                 .opacity(0.6)
 
             // Layer 3 — wide ambient glow
-            RoundedRectangle(cornerRadius: cornerRadius)
+            NookDesign.Radius.shape(cornerRadius)
                 .stroke(
                     AngularGradient(colors: colors, center: .center, angle: .degrees(rotation3)),
                     lineWidth: 12

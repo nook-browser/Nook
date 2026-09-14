@@ -47,7 +47,7 @@ struct SpaceSeparator: View {
                 }
             }
 
-            RoundedRectangle(cornerRadius: 100)
+            Capsule()
                 .fill(colorScheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.15))
                 .frame(height: 1)
                 .animation(.smooth(duration: 0.1), value: isHovering)

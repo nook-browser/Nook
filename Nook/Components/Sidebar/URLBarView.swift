@@ -103,9 +103,9 @@ struct URLBarView: View {
         )
         .overlay(alignment: .bottom) {
             PageLoadingProgressBar(tab: browserManager.currentTab(for: windowState))
-                .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 12, bottomTrailingRadius: 12))
+                .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: NookDesign.Radius.lg, bottomTrailingRadius: NookDesign.Radius.lg, style: .continuous))
         }
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
         // Report the frame in the window space so we can overlay the mini palette above all content
         .background(
             GeometryReader { proxy in

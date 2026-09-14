@@ -220,11 +220,11 @@ struct CommandPaletteView: View {
                                                 .padding(.horizontal, 6)
                                                 .padding(.vertical, 2)
                                                 .background(
-                                                    RoundedRectangle(cornerRadius: 4)
+                                                    NookDesign.Radius.shape(NookDesign.Radius.xs)
                                                         .fill(isDark ? .white.opacity(0.1) : .black.opacity(0.08))
                                                 )
                                                 .overlay(
-                                                    RoundedRectangle(cornerRadius: 4)
+                                                    NookDesign.Radius.shape(NookDesign.Radius.xs)
                                                         .stroke(isDark ? .white.opacity(0.15) : .black.opacity(0.12), lineWidth: 0.5)
                                                 )
                                         }
@@ -241,7 +241,7 @@ struct CommandPaletteView: View {
                             .padding(.horizontal, 8)
 
                             if !visibleSuggestions.isEmpty {
-                                RoundedRectangle(cornerRadius: 100)
+                                Capsule()
                                     .fill(
                                         isDark
                                             ? Color.white.opacity(0.4)
@@ -266,8 +266,8 @@ struct CommandPaletteView: View {
                         .frame(maxWidth: .infinity)
                         .frame(width: effectiveCommandPaletteWidth)
                         .background(Color(.windowBackgroundColor).opacity(0.35))
-                        .clipShape(.rect(cornerRadius: 26))
-                        .nookGlassEffect(in: .rect(cornerRadius: 26))
+                        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xxl))
+                        .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.xxl))
                         .animation(
                             .easeInOut(duration: 0.15),
                             value: searchManager.suggestions.count
@@ -376,11 +376,11 @@ struct CommandPaletteView: View {
                                         : .black.opacity(0.05) : .clear
                         )
                         .clipShape(
-                            RoundedRectangle(cornerRadius: 6)
+                            NookDesign.Radius.shape(NookDesign.Radius.sm)
                         )
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.white)
-                        .contentShape(RoundedRectangle(cornerRadius: 6))
+                        .contentShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
                         .onHoverTracking { hovering in
                             withAnimation(.easeInOut(duration: 0.12)) {
                                 if hovering {

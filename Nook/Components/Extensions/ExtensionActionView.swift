@@ -70,7 +70,7 @@ struct ExtensionActionButton: View {
             .padding(6)
             .background(isHovering ? .white.opacity(0.1) : .clear)
             .background(ActionAnchorView(extensionId: ext.id))
-            .clipShape(RoundedRectangle(cornerRadius: 7))
+            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
         }
         .buttonStyle(.plain)
         .help(ext.name)

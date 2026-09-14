@@ -225,7 +225,7 @@ struct SidebarMenuHoverDownloadItem: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .background(isHovering ? .white.opacity(0.2) : .clear)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
         .animation(.easeInOut(duration: 0.1), value: isHovering)
         .onHoverTracking { state in
             isHovering = state

@@ -102,7 +102,7 @@ struct ExtensionLibraryView: View {
                     ExtensionManager.shared.showExtensionInstallDialog()
                 } label: {
                     VStack(spacing: 5) {
-                        RoundedRectangle(cornerRadius: 9)
+                        NookDesign.Radius.shape(NookDesign.Radius.md)
                             .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
                             .foregroundStyle(.secondary.opacity(0.2))
                             .frame(width: 34, height: 34)
@@ -167,7 +167,7 @@ struct ExtensionLibraryView: View {
                                 .font(.system(size: 11, weight: .semibold))
                                 .frame(width: 22, height: 22)
                                 .background(.secondary.opacity(0.1))
-                                .clipShape(RoundedRectangle(cornerRadius: 5))
+                                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
                         }
                         .buttonStyle(.plain)
 
@@ -184,7 +184,7 @@ struct ExtensionLibraryView: View {
                                 .font(.system(size: 11, weight: .semibold))
                                 .frame(width: 22, height: 22)
                                 .background(.secondary.opacity(0.1))
-                                .clipShape(RoundedRectangle(cornerRadius: 5))
+                                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
                         }
                         .buttonStyle(.plain)
                     }
@@ -227,7 +227,7 @@ struct ExtensionLibraryView: View {
                     .foregroundStyle(.secondary.opacity(0.5))
                     .frame(width: 26, height: 26)
                     .background(.secondary.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 7))
+                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
             }
             .buttonStyle(.plain)
         }
@@ -275,7 +275,7 @@ private struct MuteButton: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
             .background(isHovering ? Color.secondary.opacity(0.12) : Color.secondary.opacity(0.06))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         }
         .buttonStyle(.plain)
         .disabled(tab == nil)
@@ -323,7 +323,7 @@ private struct CopyButton: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
             .background(isHovering ? Color.secondary.opacity(0.12) : Color.secondary.opacity(0.06))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         }
         .buttonStyle(.plain)
         .onHoverTracking { isHovering = $0 }
@@ -368,7 +368,7 @@ private struct ExtensionGridItem: View {
                     }
                     .frame(width: 34, height: 34)
                     .background(.secondary.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 9))
+                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
 
                     if let badge = badgeText, !badge.isEmpty {
                         Text(badge)
@@ -394,7 +394,7 @@ private struct ExtensionGridItem: View {
             .padding(.horizontal, 4)
             .frame(maxWidth: .infinity)
             .background(isHovering ? Color.secondary.opacity(0.08) : Color.clear)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
             .overlay(alignment: .topTrailing) {
                 if isPinned {
                     Image(systemName: "pin.fill")
@@ -485,7 +485,7 @@ private struct SiteSettingRow<Control: View>: View {
                 .foregroundStyle(iconColor)
                 .frame(width: 28, height: 28)
                 .background(iconColor.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 7))
+                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
@@ -504,7 +504,7 @@ private struct SiteSettingRow<Control: View>: View {
         .padding(.horizontal, 6)
         .padding(.vertical, 7)
         .background(isHovering ? Color.secondary.opacity(0.06) : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         .onHoverTracking { isHovering = $0 }
     }
 }

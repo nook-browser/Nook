@@ -127,11 +127,11 @@ struct SimpleIconPicker: View {
                     }
                 } label: {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 10)
+                        NookDesign.Radius.shape(NookDesign.Radius.md)
                             .fill(selectedIcon == icon ? Color.accentColor.opacity(0.15) : Color.primary.opacity(0.05))
                             .frame(width: 48, height: 48)
 
-                        RoundedRectangle(cornerRadius: 10)
+                        NookDesign.Radius.shape(NookDesign.Radius.md)
                             .stroke(
                                 selectedIcon == icon ? Color.accentColor : Color.primary.opacity(0.1),
                                 lineWidth: selectedIcon == icon ? 2 : 1

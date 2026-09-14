@@ -31,11 +31,11 @@ struct ZoomPopupView: View {
                     .foregroundColor(.white)
                     .frame(width: 28, height: 28)
                     .background(
-                        RoundedRectangle(cornerRadius: 6)
+                        NookDesign.Radius.shape(NookDesign.Radius.sm)
                             .fill(.white.opacity(0.15))
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 6)
+                        NookDesign.Radius.shape(NookDesign.Radius.sm)
                             .stroke(.white.opacity(0.3), lineWidth: 1)
                     )
             }
@@ -53,11 +53,11 @@ struct ZoomPopupView: View {
                     .frame(minWidth: 50, maxHeight: 28)
                     .padding(.horizontal, 8)
                     .background(
-                        RoundedRectangle(cornerRadius: 6)
+                        NookDesign.Radius.shape(NookDesign.Radius.sm)
                             .fill(.white.opacity(0.2))
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 6)
+                        NookDesign.Radius.shape(NookDesign.Radius.sm)
                             .stroke(.white.opacity(0.4), lineWidth: 1)
                     )
             }
@@ -73,11 +73,11 @@ struct ZoomPopupView: View {
                     .foregroundColor(.white)
                     .frame(width: 28, height: 28)
                     .background(
-                        RoundedRectangle(cornerRadius: 6)
+                        NookDesign.Radius.shape(NookDesign.Radius.sm)
                             .fill(.white.opacity(0.15))
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 6)
+                        NookDesign.Radius.shape(NookDesign.Radius.sm)
                             .stroke(.white.opacity(0.3), lineWidth: 1)
                     )
             }
@@ -87,7 +87,7 @@ struct ZoomPopupView: View {
         .padding(12)
         .frame(maxWidth: 160)
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            NookDesign.Radius.shape(NookDesign.Radius.lg)
                 .fill(
                     LinearGradient(
                         colors: [
@@ -100,7 +100,7 @@ struct ZoomPopupView: View {
                 )
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            NookDesign.Radius.shape(NookDesign.Radius.lg)
                 .stroke(.white.opacity(0.2), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)

@@ -345,7 +345,7 @@ struct ProfilesSettingsView: View {
                     }
                 }
                 .background(Color(.controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(space.name)
@@ -414,7 +414,7 @@ struct ProfilesSettingsView: View {
             }
             .padding(10)
             .background(Color(.controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
             .alert("Delete \"\(space.name)\"?", isPresented: $showDeleteConfirmation) {
                 Button("Cancel", role: .cancel) {}
                 Button("Delete", role: .destructive) {
@@ -730,7 +730,7 @@ private struct ShortcutRowView: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .background(Color(.controlBackgroundColor))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
             }
 
             // Enable toggle
@@ -746,7 +746,7 @@ private struct ShortcutRowView: View {
         }
         .padding(12)
         .background(Color(.controlBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         .onChange(of: shortcut) { _, newShortcut in
             localKeyCombination = newShortcut.keyCombination
         }
@@ -778,7 +778,7 @@ private struct CategoryFilterChip: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .background(
-                RoundedRectangle(cornerRadius: 16)
+                NookDesign.Radius.shape(NookDesign.Radius.xl)
                     .fill(isSelected ? Color.accentColor : Color(.controlBackgroundColor))
             )
             .foregroundColor(isSelected ? .white : .primary)
@@ -946,7 +946,7 @@ struct SafariExtensionRowView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(Color(.controlBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
     }
 }
 
@@ -970,7 +970,7 @@ struct ExtensionRowView: View {
             }
             .frame(width: 32, height: 32)
             .background(Color(.controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
 
             // Extension info
             VStack(alignment: .leading, spacing: 2) {
@@ -1022,7 +1022,7 @@ struct ExtensionRowView: View {
         }
         .padding(12)
         .background(Color(.controlBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
     }
 }
 

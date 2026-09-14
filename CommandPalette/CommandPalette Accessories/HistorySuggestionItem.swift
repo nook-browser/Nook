@@ -36,7 +36,7 @@ struct HistorySuggestionItem: View {
             }
             .frame(width: 24, height: 24)
             .background(colors.faviconBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
             
             HStack(spacing: 4) {
                 Text(entry.displayTitle)

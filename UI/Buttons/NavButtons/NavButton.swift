@@ -60,7 +60,7 @@ struct RectNavButtonStyle: ButtonStyle {
             .padding(.horizontal, horizontalPadding)
             .frame(height: height)
             .background {
-                RoundedRectangle(cornerRadius: cornerRadius)
+                NookDesign.Radius.shape(cornerRadius)
                     .fill(.primary.opacity(backgroundColorOpacity(isPressed: configuration.isPressed)))
             }
             .contentShape(.rect)

@@ -57,10 +57,10 @@ struct NookTextField: View {
         .padding(.horizontal, 16)
         .background(backgroundColor)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            NookDesign.Radius.shape(NookDesign.Radius.lg)
                 .stroke(borderColor, lineWidth: borderWidth)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
         .focused($isFocused)
         .animation(.easeInOut(duration: 0.15), value: isFocused)
         .animation(.easeInOut(duration: 0.15), value: hasError)

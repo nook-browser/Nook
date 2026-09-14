@@ -61,7 +61,7 @@ private struct SettingsSidebar: View {
                 .foregroundStyle(.white)
                 .frame(width: 24, height: 24)
                 .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    NookDesign.Radius.shape(NookDesign.Radius.sm)
                         .fill(tab.iconColor.gradient)
                 )
         }

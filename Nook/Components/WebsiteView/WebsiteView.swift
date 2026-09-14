@@ -29,9 +29,9 @@ struct LinkStatusBar: View {
                 .padding(.horizontal, 7)
                 .padding(.vertical, 4)
                 .background(.ultraThickMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 999))
+                .clipShape(Capsule())
                 .overlay(
-                    RoundedRectangle(cornerRadius: 999)
+                    Capsule()
                         .stroke(borderColor, lineWidth: 1)
                 )
                 .opacity(shouldShow ? 1 : 0)
@@ -175,12 +175,12 @@ struct WebsiteView: View {
     private let dragCoordinateSpace = "splitPreview"
 
     private var cornerRadius: CGFloat {
-        return 8
+        return NookDesign.Radius.md
     }
-    
+
     private var webViewClipShape: AnyShape {
         let hasTopBar = nookSettings.topBarAddressView
-        
+
         if hasTopBar {
             return AnyShape(UnevenRoundedRectangle(
                 topLeadingRadius: 0,
@@ -190,7 +190,7 @@ struct WebsiteView: View {
                 style: .continuous
             ))
         } else {
-            return AnyShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            return AnyShape(NookDesign.Radius.shape(cornerRadius))
         }
     }
 
@@ -718,7 +718,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
 
     private func makePaneContainer(frame: NSRect, isActive: Bool, accent: NSColor, side: SplitViewManager.Side) -> NSView {
         let cornerRadius: CGFloat = {
-            return 8
+            return NookDesign.Radius.md
         }()
         
         let v = NSView(frame: frame)
@@ -924,8 +924,8 @@ private struct SplitControlsOverlay: View {
                     }
                     .buttonStyle(.plain)
                     .background(.ultraThinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.25), lineWidth: 1))
+                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
+                    .overlay(NookDesign.Radius.shape(NookDesign.Radius.md).stroke(Color.white.opacity(0.25), lineWidth: 1))
                     .shadow(color: Color.black.opacity(0.2), radius: 2, x: 0, y: 1)
                     .padding(.leading, 8)
 
@@ -938,8 +938,8 @@ private struct SplitControlsOverlay: View {
                     }
                     .buttonStyle(.plain)
                     .background(.ultraThinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.25), lineWidth: 1))
+                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
+                    .overlay(NookDesign.Radius.shape(NookDesign.Radius.md).stroke(Color.white.opacity(0.25), lineWidth: 1))
                     .shadow(color: Color.black.opacity(0.2), radius: 2, x: 0, y: 1)
                     .padding(.trailing, 8)
                 }
@@ -954,7 +954,7 @@ private struct SplitControlsOverlay: View {
                     .position(x: x, y: totalHeight / 2)
                     .allowsHitTesting(false)
                 // Invisible drag handle centered in the gap between panes
-                RoundedRectangle(cornerRadius: 4)
+                NookDesign.Radius.shape(NookDesign.Radius.xs)
                     .fill(Color.clear)
                     .contentShape(Rectangle())
                     .frame(width: gap, height: totalHeight)

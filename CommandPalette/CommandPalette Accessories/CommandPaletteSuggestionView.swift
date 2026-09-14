@@ -65,7 +65,7 @@ struct CommandPaletteSuggestionView: View {
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
         .background(backgroundColor)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
             
         .onHoverTracking { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {

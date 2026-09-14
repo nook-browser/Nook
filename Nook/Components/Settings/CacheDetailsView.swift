@@ -90,7 +90,7 @@ struct CacheDetailsView: View {
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
                                 .background(Color(NSColor.controlBackgroundColor))
-                                .cornerRadius(4)
+                                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
                             }
                         }
                     }
@@ -194,7 +194,7 @@ struct CacheDetailsView: View {
             }
             .padding()
             .background(Color(NSColor.controlBackgroundColor))
-            .cornerRadius(8)
+            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         }
     }
     

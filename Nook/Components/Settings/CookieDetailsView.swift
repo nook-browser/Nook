@@ -71,7 +71,7 @@ struct CookieDetailsView: View {
                                     .textSelection(.enabled)
                                     .padding()
                                     .background(Color(NSColor.controlBackgroundColor))
-                                    .cornerRadius(6)
+                                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
                             }
                             .frame(maxHeight: 200)
                         }
@@ -153,7 +153,7 @@ struct CookieDetailsView: View {
             }
             .padding()
             .background(Color(NSColor.controlBackgroundColor))
-            .cornerRadius(8)
+            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         }
     }
     

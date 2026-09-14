@@ -52,7 +52,7 @@ struct PeekOverlayView: View {
                     .zIndex(1000)
             } else {
                 // Loading state while session is being set up
-                RoundedRectangle(cornerRadius: 16)
+                NookDesign.Radius.shape(NookDesign.Radius.xl)
                     .fill(colorScheme == .dark ? Color.black : Color.white)
                     .frame(width: 600, height: 400)
                     .scaleEffect(scale, anchor: .center)
@@ -152,14 +152,14 @@ struct PeekOverlayView: View {
 
             ZStack {
                 // Themed placeholder behind web content
-                RoundedRectangle(cornerRadius: cornerRadius)
+                NookDesign.Radius.shape(cornerRadius)
                     .fill(colorScheme == .dark ? Color.black : Color.white)
 
                 // Peek webview with shadow
                 webViewContainer(session: session)
                     .opacity(webContentOpacity)
                     .frame(width: frame.width, height: frame.height)
-                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                    .clipShape(NookDesign.Radius.shape(cornerRadius))
                     .shadow(
                         color: Color.black.opacity(0.3),
                         radius: 20,
@@ -198,7 +198,7 @@ struct PeekOverlayView: View {
                     }
             } else {
                 // Themed placeholder that matches system theme; this scales up during presentation
-                RoundedRectangle(cornerRadius: 12)
+                NookDesign.Radius.shape(NookDesign.Radius.lg)
                     .fill(colorScheme == .dark ? Color.black : Color.white)
             }
         }
@@ -310,7 +310,7 @@ struct PeekOverlayView: View {
         let webAreaWidth = max(0, windowSize.width - sidebarWidth)
 
         let webViewHeight = windowSize.height - 10 // Full height PLUS 10pts
-        let cornerRadius: CGFloat = 16
+        let cornerRadius: CGFloat = NookDesign.Radius.xl
 
         // Center within the web area (excluding sidebar) with 60pt margins
         let horizontalMargin: CGFloat = 60

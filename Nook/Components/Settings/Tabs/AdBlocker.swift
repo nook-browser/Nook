@@ -63,7 +63,7 @@ struct SettingsAdBlockerTab: View {
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(Color.secondary.opacity(0.15))
-                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
                         }
                     }
                 }

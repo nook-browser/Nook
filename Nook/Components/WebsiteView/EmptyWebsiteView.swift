@@ -17,9 +17,7 @@ struct EmptyWebsiteView: View {
             ZStack {
                 // Match the exact background and styling of the real webview
                 Color(nsColor: .windowBackgroundColor).opacity(0.2)
-                    .clipShape(RoundedRectangle(cornerRadius: {
-                        return 12
-                    }(), style: .continuous))
+                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
                     .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 0)
 
                 VStack(spacing: 16) {

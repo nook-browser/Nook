@@ -129,7 +129,7 @@ struct CookieManagementView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .background(Color(NSColor.controlBackgroundColor))
-            .cornerRadius(6)
+            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
             .frame(maxWidth: 300)
             
             Spacer()

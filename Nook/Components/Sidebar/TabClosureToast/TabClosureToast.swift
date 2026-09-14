@@ -19,9 +19,9 @@ struct TabClosureToast: View {
                     .frame(width: 14, height: 14)
                     .padding(4)
                     .background(Color.white.opacity(0.2))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
                     .overlay {
-                        RoundedRectangle(cornerRadius: 6)
+                        NookDesign.Radius.shape(NookDesign.Radius.sm)
                             .stroke(.white.opacity(0.4), lineWidth: 1)
                     }
 

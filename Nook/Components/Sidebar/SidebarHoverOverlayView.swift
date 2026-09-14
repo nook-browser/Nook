@@ -15,7 +15,7 @@ struct SidebarHoverOverlayView: View {
     @Environment(CommandPalette.self) private var commandPalette
     @Environment(\.nookSettings) var nookSettings
 
-    private let cornerRadius: CGFloat = 12
+    private let cornerRadius: CGFloat = NookDesign.Radius.lg
     private let horizontalInset: CGFloat = 7
     private let verticalInset: CGFloat = 7
 
@@ -51,11 +51,11 @@ struct SidebarHoverOverlayView: View {
                                 .environmentObject(browserManager)
                                 .environmentObject(browserManager.gradientColorManager)
                                 .environment(windowState)
-                                .clipShape(.rect(cornerRadius: cornerRadius))
-                            
+                                .clipShape(NookDesign.Radius.shape(cornerRadius))
+
                                 Rectangle()
                                     .fill(Color.clear)
-                                    .nookGlassEffect(in: .rect(cornerRadius: cornerRadius))
+                                    .nookGlassEffect(in: NookDesign.Radius.shape(cornerRadius))
                         }
                         .alwaysArrowCursor()
                         .padding(nookSettings.sidebarPosition == .left ? .leading : .trailing, horizontalInset)

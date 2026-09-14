@@ -21,7 +21,7 @@ struct NookButtonStyle: ButtonStyle {
 
     // MARK: - Constants
 
-    private let cornerRadius: CGFloat = 14
+    private let cornerRadius: CGFloat = NookDesign.Radius.lg
     private let verticalPadding: CGFloat = 12
     private let horizontalPadding: CGFloat = 12
 
@@ -68,7 +68,7 @@ struct NookButtonStyle: ButtonStyle {
                 .padding(.vertical, verticalPadding)
                 .padding(.horizontal, horizontalPadding)
                 .background(backgroundWithHover)
-                .clipShape(.rect(cornerRadius: cornerRadius))
+                .clipShape(NookDesign.Radius.shape(cornerRadius))
         }
         .compositingGroup()
         .opacity(isEnabled ? 1.0 : disabledOpacity)
@@ -205,7 +205,7 @@ private struct ButtonPreviewSection: View {
         }
         .padding()
         .background(.background.opacity(0.5))
-        .cornerRadius(12)
+        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
         .environmentObject(makeColorManager())
     }
 

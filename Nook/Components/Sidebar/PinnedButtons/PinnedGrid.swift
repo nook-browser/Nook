@@ -67,12 +67,12 @@ struct PinnedGrid: View {
                 .padding(.vertical, 16)
                 .padding(.horizontal, 12)
                 .background {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    NookDesign.Radius.shape(NookDesign.Radius.xl)
                         .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
                         .foregroundStyle(isDragging ? Color.primary.opacity(0.4) : Color.secondary.opacity(0.3))
                 }
                 .background {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    NookDesign.Radius.shape(NookDesign.Radius.xl)
                         .fill(isDragging
                             ? (colorScheme == .dark ? AppColors.pinnedTabHoverLight : AppColors.pinnedTabHoverDark)
                             : Color.clear
@@ -247,7 +247,7 @@ struct PinnedGrid: View {
     }
 
     private var essentialsPlaceholder: some View {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
+        NookDesign.Radius.shape(NookDesign.Radius.lg)
             .fill(Color.primary.opacity(0.08))
             .frame(minWidth: nookSettings.pinnedTabsLook.minWidth, minHeight: nookSettings.pinnedTabsLook.minWidth)
     }

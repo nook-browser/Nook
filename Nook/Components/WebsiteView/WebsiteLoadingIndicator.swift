@@ -14,7 +14,7 @@ struct WebsiteLoadingIndicator: View {
     var body: some View {
         HStack {
             Spacer()
-            RoundedRectangle(cornerRadius: 100)
+            Capsule()
                 .fill(Color.white.opacity(0.3))
                 .frame(width: indicatorWidth, height: 3)
                 .animation(.spring(response: 0.6, dampingFraction: 0.8), value: indicatorWidth)

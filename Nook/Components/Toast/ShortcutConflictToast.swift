@@ -25,9 +25,9 @@ struct ShortcutConflictToast: View {
                     .frame(width: 18, height: 18)
                     .padding(5)
                     .background(Color.white.opacity(0.2))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
                     .overlay {
-                        RoundedRectangle(cornerRadius: 8)
+                        NookDesign.Radius.shape(NookDesign.Radius.md)
                             .stroke(.white.opacity(0.4), lineWidth: 1)
                     }
                 

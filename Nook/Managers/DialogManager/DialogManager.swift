@@ -173,9 +173,9 @@ struct DialogCard<Content: View>: View {
             .padding(16)
             .frame(maxWidth: 500, alignment: .leading)
             .background(BlurEffectView(material: .headerView, state: .active))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xl))
             .overlay {
-                RoundedRectangle(cornerRadius: 12)
+                NookDesign.Radius.shape(NookDesign.Radius.xl)
                     .stroke(.white.opacity(0.25), lineWidth: 1)
             }
             .shadow(color: .black, radius: 1, y: 0)
@@ -402,7 +402,7 @@ struct DialogButtonStyle: ButtonStyle {
         bottom: 10,
         trailing: 16
     )
-    private let cornerRadius: CGFloat = 10
+    private let cornerRadius: CGFloat = NookDesign.Radius.md
 
     private var backgroundColor: Color {
         switch variant {
@@ -436,7 +436,7 @@ struct DialogButtonStyle: ButtonStyle {
         .padding(padding)
         .background(backgroundColor)
         .foregroundColor(foregroundColor)
-        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+        .clipShape(NookDesign.Radius.shape(cornerRadius))
         .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
         .opacity(configuration.isPressed ? 0.8 : 1.0)
         .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
@@ -457,6 +457,6 @@ struct KeycapLabel: View {
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
             .background(.white.opacity(0.12))
-            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
     }
 }

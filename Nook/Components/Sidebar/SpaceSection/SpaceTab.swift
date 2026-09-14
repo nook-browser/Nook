@@ -39,14 +39,14 @@ struct SpaceTab: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: 18, height: 18)
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
                     .opacity(tab.isUnloaded ? 0.5 : 1.0)
                 if tab.hasAudioContent || tab.hasPlayingAudio || tab.isAudioMuted {
                     Button(action: {
                         onMute()
                     }) {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 6)
+                            NookDesign.Radius.shape(NookDesign.Radius.sm)
                                 .fill(isSpeakerHovering ? (isCurrentTab ? AppColors.controlBackgroundHoverLight : AppColors.controlBackgroundActive) : AppColors.controlBackgroundHoverLight.opacity(0))
                                 .frame(width: 22, height: 22)
                                 .animation(.easeInOut(duration: 0.05), value: isSpeakerHovering)
@@ -98,7 +98,7 @@ struct SpaceTab: View {
                             .foregroundColor(textTab)
                             .frame(width: 24, height: 24)
                             .background(isCloseHovering ? (isCurrentTab ? AppColors.controlBackgroundHoverLight : AppColors.controlBackgroundActive) : Color.clear)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
                     }
                     .buttonStyle(PlainButtonStyle())
                     .onHoverTracking { hovering in
@@ -112,7 +112,7 @@ struct SpaceTab: View {
             .background(
                 backgroundColor
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
         }
         .buttonStyle(PlainButtonStyle())
         .onHoverTracking { hovering in

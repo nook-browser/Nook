@@ -21,8 +21,8 @@ struct ToastView<Content: View>: View {
             .padding(12)
             .fixedSize(horizontal: true, vertical: false)
             .background(Color(.windowBackgroundColor).opacity(0.35))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .nookGlassEffect(in: .rect(cornerRadius: 16))
+            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xl))
+            .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.xl))
             .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 2)
     }
 }
@@ -65,9 +65,9 @@ struct ToastContent: View {
                 .frame(width: 14, height: 14)
                 .padding(4)
                 .background(Color.white.opacity(0.2))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 6)
+                    NookDesign.Radius.shape(NookDesign.Radius.sm)
                         .stroke(.white.opacity(0.4), lineWidth: 1)
                 }
 
@@ -92,9 +92,9 @@ struct ToastContentWithSubtitle: View {
                 .frame(width: 14, height: 14)
                 .padding(4)
                 .background(Color.white.opacity(0.2))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 6)
+                    NookDesign.Radius.shape(NookDesign.Radius.sm)
                         .stroke(.white.opacity(0.4), lineWidth: 1)
                 }
 

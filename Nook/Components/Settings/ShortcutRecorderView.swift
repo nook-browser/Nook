@@ -32,11 +32,11 @@ struct ShortcutRecorderView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(
-                    RoundedRectangle(cornerRadius: 6)
+                    NookDesign.Radius.shape(NookDesign.Radius.sm)
                         .fill(isRecording ? Color.red.opacity(0.2) : Color(.controlBackgroundColor))
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 6)
+                    NookDesign.Radius.shape(NookDesign.Radius.sm)
                         .stroke(hasConflict ? Color.red : Color.clear, lineWidth: 1)
                 )
             }

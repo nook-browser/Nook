@@ -102,12 +102,12 @@ struct MiniWindowToolbar: View {
                     .padding(.horizontal, 6)
                     .padding(.vertical, 6)
                     .background(
-                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        NookDesign.Radius.shape(NookDesign.Radius.sm)
                             .fill(controlBackgroundColor)
                             .shadow(radius: 1, x: 1, y: 1)
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        NookDesign.Radius.shape(NookDesign.Radius.xs)
                             .stroke(controlBorderColor, lineWidth: 1)
                     )
                 }
@@ -148,12 +148,12 @@ struct MiniWindowToolbar: View {
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
         .background(
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
+            NookDesign.Radius.shape(NookDesign.Radius.sm)
                 .fill(controlBackgroundColor)
                 .shadow(radius: 1, x: 1, y: 1)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 5, style: .continuous)
+            NookDesign.Radius.shape(NookDesign.Radius.xs)
                 .stroke(controlBorderColor, lineWidth: 1)
         )
     }
@@ -280,12 +280,12 @@ private struct MiniWindowShareButtonContainer: View {
         MiniWindowShareButton(session: session, tintColor: tintColor)
             .frame(width: 26, height: 29)
             .background(
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                NookDesign.Radius.shape(NookDesign.Radius.xs)
                     .fill(backgroundColor)
                     .shadow(radius: 1, x: 1, y: 1)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                NookDesign.Radius.shape(NookDesign.Radius.xs)
                     .stroke(borderColor, lineWidth: 1)
             )
     }

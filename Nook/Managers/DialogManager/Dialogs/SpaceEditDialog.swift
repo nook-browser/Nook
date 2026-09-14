@@ -129,11 +129,11 @@ private struct SpaceEditContent: View {
                             .frame(width: 28, height: 28)
                             .padding(4)
                             .background(
-                                RoundedRectangle(cornerRadius: 8)
+                                NookDesign.Radius.shape(NookDesign.Radius.md)
                                     .fill(Color.primary.opacity(0.05))
                             )
                     }
-                    .contentShape(RoundedRectangle(cornerRadius: 8))
+                    .contentShape(NookDesign.Radius.shape(NookDesign.Radius.md))
                     .background(EmojiPickerAnchor(manager: emojiManager))
                     .buttonStyle(PlainButtonStyle())
 

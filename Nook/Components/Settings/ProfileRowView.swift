@@ -25,7 +25,7 @@ struct ProfileRowView: View {
         HStack(spacing: 12) {
             // Icon
             ZStack {
-                RoundedRectangle(cornerRadius: 6)
+                NookDesign.Radius.shape(NookDesign.Radius.sm)
                     .fill(Color(.controlBackgroundColor))
                 Image(systemName: profile.icon)
                     .font(.system(size: 18, weight: .semibold))
@@ -101,7 +101,7 @@ struct ProfileRowView: View {
         }
         .padding(12)
         .background(
-            RoundedRectangle(cornerRadius: 8)
+            NookDesign.Radius.shape(NookDesign.Radius.md)
                 .fill(isHovering ? Color.primary.opacity(0.04) : Color(.controlBackgroundColor))
         )
         .onHoverTracking { hovering in

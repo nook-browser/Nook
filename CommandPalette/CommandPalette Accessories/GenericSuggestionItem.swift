@@ -25,7 +25,7 @@ struct GenericSuggestionItem: View {
                     .foregroundStyle(isSelected ? .white : isDark ? .white.opacity(0.7) : .black.opacity(0.7))
             }
             .frame(width: 24, height: 24)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
 
             Text(text)
                 .font(.system(size: 13, weight: .semibold))

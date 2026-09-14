@@ -77,7 +77,7 @@ struct FindBarView: View {
                                     .font(.system(size: 11, weight: .medium))
                                     .frame(width: 22, height: 22)
                                     .background(isUpButtonHovered ? Color.secondary.opacity(0.2) : Color.clear)
-                                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
                             }
                             .buttonStyle(.plain)
                             .disabled(findManager.searchText.isEmpty)
@@ -94,7 +94,7 @@ struct FindBarView: View {
                                     .font(.system(size: 11, weight: .medium))
                                     .frame(width: 22, height: 22)
                                     .background(isDownButtonHovered ? Color.secondary.opacity(0.2) : Color.clear)
-                                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
                             }
                             .buttonStyle(.plain)
                             .disabled(findManager.searchText.isEmpty)
@@ -116,7 +116,7 @@ struct FindBarView: View {
                                 .font(.system(size: 11, weight: .medium))
                                 .frame(width: 22, height: 22)
                                 .background(isCloseButtonHovered ? Color.secondary.opacity(0.2) : Color.clear)
-                                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
                         }
                         .buttonStyle(.plain)
                         .onHoverTracking { hovering in

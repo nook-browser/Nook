@@ -44,7 +44,7 @@ final class ExtensionLibraryMoreMenuController {
         visualEffect.state = .active
         visualEffect.blendingMode = .behindWindow
         visualEffect.wantsLayer = true
-        visualEffect.layer?.cornerRadius = 12
+        visualEffect.layer?.cornerRadius = NookDesign.Radius.lg
         visualEffect.layer?.masksToBounds = true
         visualEffect.translatesAutoresizingMaskIntoConstraints = false
 
@@ -210,7 +210,7 @@ private struct MoreMenuView: View {
                             .foregroundStyle(.red.opacity(0.9))
                             .frame(width: 26, height: 26)
                             .background(.red.opacity(0.08))
-                            .clipShape(RoundedRectangle(cornerRadius: 7))
+                            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
                         Text("Clear All Site Data")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.red.opacity(0.9))
@@ -219,7 +219,7 @@ private struct MoreMenuView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 8)
                     .background(.clear)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
                 }
                 .buttonStyle(.plain)
                 .disabled(currentHost == nil)
@@ -304,7 +304,7 @@ private struct MoreMenuItem: View {
                 .foregroundStyle(iconColor)
                 .frame(width: 26, height: 26)
                 .background(iconColor.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 7))
+                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
 
             Text(label)
                 .font(.system(size: 13, weight: .medium))
@@ -318,7 +318,7 @@ private struct MoreMenuItem: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(isHovering ? Color.secondary.opacity(0.07) : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         .onHoverTracking { isHovering = $0 }
     }
 }

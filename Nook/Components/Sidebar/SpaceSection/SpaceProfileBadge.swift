@@ -33,7 +33,7 @@ struct SpaceProfileBadge: View {
         Group {
             if let p = assignedProfile {
                 ZStack {
-                    RoundedRectangle(cornerRadius: cornerRadius)
+                    NookDesign.Radius.shape(cornerRadius)
                         .fill(isCurrentProfile ? Color.accentColor.opacity(0.15) : Color(.controlBackgroundColor))
                     Image(systemName: p.icon)
                         .font(.system(size: iconSize, weight: .semibold))
@@ -45,7 +45,7 @@ struct SpaceProfileBadge: View {
             } else {
                 // This should never happen now since we always show the default profile
                 ZStack {
-                    RoundedRectangle(cornerRadius: cornerRadius)
+                    NookDesign.Radius.shape(cornerRadius)
                         .fill(Color(.controlBackgroundColor))
                     Image(systemName: "person.crop.circle")
                         .font(.system(size: iconSize, weight: .regular))
@@ -60,6 +60,6 @@ struct SpaceProfileBadge: View {
 
     private var badgeSide: CGFloat { size == .compact ? 14 : 18 }
     private var iconSize: CGFloat { size == .compact ? 9 : 12 }
-    private var cornerRadius: CGFloat { size == .compact ? 3 : 4 }
+    private var cornerRadius: CGFloat { NookDesign.Radius.xs }
 }
 

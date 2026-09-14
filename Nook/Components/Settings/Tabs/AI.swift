@@ -515,7 +515,7 @@ struct SettingsAITab: View {
                                 .foregroundStyle(.green)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(RoundedRectangle(cornerRadius: 4).fill(.green.opacity(0.15)))
+                                .background(NookDesign.Radius.shape(NookDesign.Radius.xs).fill(.green.opacity(0.15)))
                         }
                     }
 

@@ -30,7 +30,7 @@ struct PinnedTabView: View {
         Button(action: action) {
             ZStack {
                 ZStack {
-                    RoundedRectangle(cornerRadius: pinnedTabsConfiguration.cornerRadius, style: .continuous)
+                    NookDesign.Radius.shape(pinnedTabsConfiguration.cornerRadius)
                         .fill(
                             backgroundColor
                         )
@@ -44,7 +44,7 @@ struct PinnedTabView: View {
 
                         }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: pinnedTabsConfiguration.cornerRadius, style: .continuous))
+                .clipShape(NookDesign.Radius.shape(pinnedTabsConfiguration.cornerRadius))
 
 
                 HStack {
@@ -79,7 +79,7 @@ struct PinnedTabView: View {
             .frame(maxWidth: .infinity)
             .frame(height: pinnedTabsConfiguration.height)
             .frame(minWidth: pinnedTabsConfiguration.minWidth)
-            .contentShape(RoundedRectangle(cornerRadius: pinnedTabsConfiguration.cornerRadius, style: .continuous))
+            .contentShape(NookDesign.Radius.shape(pinnedTabsConfiguration.cornerRadius))
         }
         .buttonStyle(.plain)
         .onHoverTracking { hovering in
@@ -116,8 +116,8 @@ struct PinnedTabView: View {
     ) -> some View {
         GeometryReader { proxy in
             let size = proxy.size
-            let outerRect = RoundedRectangle(cornerRadius: corner - (thickness), style: .continuous)
-            let innerRect = RoundedRectangle(cornerRadius: max(0, corner - (thickness)), style: .continuous)
+            let outerRect = NookDesign.Radius.shape(corner - (thickness))
+            let innerRect = NookDesign.Radius.shape(max(0, corner - (thickness)))
 
             ZStack {
                 let ringMask = ZStack {

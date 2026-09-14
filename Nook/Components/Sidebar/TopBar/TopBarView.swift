@@ -25,7 +25,7 @@ struct TopBarView: View {
 
     var body: some View {
         let cornerRadius: CGFloat = {
-            return 8
+            return NookDesign.Radius.md
         }()
 
         let currentTab = browserManager.currentTab(for: windowState)
@@ -242,7 +242,7 @@ struct TopBarView: View {
             shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil,
             value: urlBarBackgroundColor
         )
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         .onHoverTracking { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovering = hovering
@@ -523,7 +523,7 @@ struct TopBarView: View {
                 value: urlBarTextColor
             )
             .frame(width: 16, height: 16)
-            .contentShape(RoundedRectangle(cornerRadius: 3))
+            .contentShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -553,10 +553,10 @@ struct ChatButton: View {
             .padding(.vertical, 6)
             .background(backgroundColor)
             .clipShape(
-                RoundedRectangle(cornerRadius: 6)
+                NookDesign.Radius.shape(NookDesign.Radius.sm)
             )
             .contentShape(
-                RoundedRectangle(cornerRadius: 6)
+                NookDesign.Radius.shape(NookDesign.Radius.sm)
             )
         }
         .buttonStyle(.plain)

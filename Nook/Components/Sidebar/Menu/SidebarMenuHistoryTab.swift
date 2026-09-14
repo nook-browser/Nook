@@ -100,7 +100,7 @@ struct SidebarMenuHistoryTab: View {
                     isHovering ? contrastText.opacity(0.08) : contrastText.opacity(0.05)
                 )
                 .animation(.easeInOut(duration: 0.1), value: isHovering)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
                 .onHoverTracking { state in
                     isHovering = state
                 }
@@ -134,7 +134,7 @@ struct SidebarMenuHistoryTab: View {
                         .easeInOut(duration: 0.1),
                         value: isShowingFilters
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
                 }
                 .buttonStyle(PlainButtonStyle())
             }
@@ -467,7 +467,7 @@ struct HistoryRowView: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            RoundedRectangle(cornerRadius: 3)
+            NookDesign.Radius.shape(NookDesign.Radius.xs)
                 .fill(.clear)
                 .frame(width: 16, height: 16)
                 .overlay(
@@ -510,7 +510,7 @@ struct HistoryRowView: View {
                     .background(
                         isTrashIconHovered ? contrastText.opacity(0.1) : .clear
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
                     .buttonStyle(PlainButtonStyle())
                     .help("Remove from history")
                     .transition(.scale.combined(with: .opacity))
@@ -528,7 +528,7 @@ struct HistoryRowView: View {
                     .background(
                         isArrowIconHovered ? contrastText.opacity(0.1) : .clear
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
                     .buttonStyle(PlainButtonStyle())
                     .help("Open in a new tab")
                     .transition(.scale.combined(with: .opacity))
@@ -541,11 +541,11 @@ struct HistoryRowView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 14)
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            NookDesign.Radius.shape(NookDesign.Radius.xl)
                 .fill(isHovered ? contrastText.opacity(0.1) : .clear)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
+        .contentShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
         .onHoverTracking { hovered in
             withAnimation(.easeInOut(duration: 0.2)) {
                 isHovered = hovered
@@ -702,7 +702,7 @@ struct FiltersSelectButton: View {
                         : isHovering
                         ? contrastText.opacity(0.08) : contrastText.opacity(0.05)
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
         }
         .buttonStyle(.plain)
         .animation(.easeInOut(duration: 0.1), value: isHovering)

@@ -30,7 +30,7 @@ struct TabSuggestionItem: View {
                 .frame(width: 24, height: 24)
                 .background(isSelected ? .white : .clear)
                 .clipShape(
-                    RoundedRectangle(cornerRadius: 4)
+                    NookDesign.Radius.shape(NookDesign.Radius.xs)
                 )
                 Text(tab.name)
                     .font(.system(size: 13, weight: .semibold))
@@ -51,7 +51,7 @@ struct TabSuggestionItem: View {
                 }
                 .frame(width: 24, height: 24)
                 .background(isSelected ? .white : isDark ? .white.opacity(0.05) : .black.opacity(0.05))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
 
             }
         }

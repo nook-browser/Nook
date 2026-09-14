@@ -56,7 +56,7 @@ struct SidebarMenuDownloadsTab: View {
             .frame(maxWidth: .infinity)
             .background(isHovering ? .white.opacity(0.08) : .white.opacity(0.05))
             .animation(.easeInOut(duration: 0.1), value: isHovering)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
             .onHoverTracking { state in
                 isHovering = state
             }
@@ -151,7 +151,7 @@ struct DownloadItem: View {
                     }
                     .padding(8)
                     .background(isIconHovered ? .white.opacity(0.1) : .clear)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
                     .buttonStyle(PlainButtonStyle())
                 }
                 .buttonStyle(.plain)
@@ -164,7 +164,7 @@ struct DownloadItem: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
         .background(isHovering ? .white.opacity(0.2) : .clear)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xl))
         .animation(.easeInOut(duration: 0.1), value: isHovering)
         .onHoverTracking { state in
             isHovering = state

@@ -79,7 +79,7 @@ struct MediaControlsView: View {
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 20, height: 20)
-                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
                                 .transition(.opacity.combined(with: .scale(scale: 0.8)))
                         }
 
@@ -168,11 +168,11 @@ struct MediaControlsView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
                 .background(
-                    RoundedRectangle(cornerRadius: 10)
+                    NookDesign.Radius.shape(NookDesign.Radius.md)
                         .fill(Color.black)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10)
+                    NookDesign.Radius.shape(NookDesign.Radius.md)
                         .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
                 )
                 .padding(.horizontal, 8)
