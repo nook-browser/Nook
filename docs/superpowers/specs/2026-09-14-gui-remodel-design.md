@@ -125,14 +125,14 @@ Context menus: three shared `@ViewBuilder` builders, `TabContextMenu`, `FolderCo
 
 ## 6. Glass layer
 
-`nookGlassEffect(in:)` is used for, and only for: command palette (`Radius.xxl`), toasts (`Radius.xl`), hover sidebar overlay (`Radius.lg`), find bar (`Capsule`), dialog cards (`Radius.xl`), extension library panel and its more-menu (`Radius.lg`). Each gets `.floating` elevation. Dialog presentation stays the in-window ZStack overlay with the 0.4 black scrim; the transition uses `Motion.spring`. `DialogCard` loses its stroke and shadow literals.
+`nookGlassEffect(in:)` is used for, and only for: command palette (`Radius.xxl`), toasts (`Radius.xl`), hover sidebar overlay (`Radius.lg`), find bar (`Capsule`), dialog cards (`Radius.xl`), extension library panel and its more-menu (`Radius.lg`), and the split drop card (`Radius.lg`). The wrapper applies `.floating` elevation itself. Dialog presentation stays the in-window ZStack overlay with the 0.4 black scrim; the transition uses `Motion.spring`. `DialogCard` loses its stroke and shadow literals.
 
 ## 7. Settings
 
 - Window becomes a SwiftUI `Settings` scene. The `openWindow` call in `NookCommands` is replaced by the system Settings command (Cmd-comma comes free).
 - `SettingsWindow` keeps `NavigationSplitView`, sidebar rows 28pt `Radius.sm`, tinted 22pt chips at `Radius.sm`.
-- Every tab is `Form { Section("...") { ... } }.formStyle(.grouped)`. Rows use `LabeledContent`, `Toggle`, `Picker` with `.menu` or `.segmented` style. Custom row structs are deleted where a standard control covers them; `ProfileRowView`, `ShortcutRecorderView`, and the extension row keep custom bodies but live inside grouped sections.
-- `SettingsView.swift` splits into `Tabs/Profiles.swift`, `Tabs/Shortcuts.swift`, `Tabs/Extensions.swift`, `Tabs/Advanced.swift`, `Tabs/SiteSearch.swift`. `SettingsTabs` enum and `SettingsUtils.swift` are unchanged.
+- Every tab is `Form { Section("...") { ... } }.formStyle(.grouped)`. The cache and cookie managers keep their entry lists in a virtualized `List` below the grouped summary and filter sections; a `ForEach` inside the Form would lay out every entry eagerly. Rows use `LabeledContent`, `Toggle`, `Picker` with `.menu` or `.segmented` style. Custom row structs are deleted where a standard control covers them; `ProfileRowView`, `ShortcutRecorderView`, and the extension row keep custom bodies but live inside grouped sections.
+- `SettingsView.swift` splits into `Tabs/Profiles.swift`, `Tabs/Shortcuts.swift`, `Tabs/Extensions.swift`, `Tabs/Advanced.swift`, `Tabs/SiteSearchEditor.swift` (a model file already owns the `SiteSearch` name). `SettingsTabs` enum and `SettingsUtils.swift` are unchanged.
 
 ## Phases
 
@@ -141,8 +141,8 @@ Each phase is one commit on `main` that builds with `xcodebuild -scheme Nook -co
 1. **Tokens and sweep.** Add `NookDesign.swift`, replace literals, collapse button styles, delete `ConditionalModifiers`. Visual change is whatever the tokens define: continuous corners, snapped radii, 28pt icon buttons, new hover fill, elevation scale, type roles. Done 2026-09-14, commits 206859b..197ba61 on `gui-remodel`.
 2. **Surface and accent.** Gradient off, sidebar material on, `GradientColorManager` reduced to accent, gradient editor replaced by swatches, space icons to symbols with emoji fallback, `EmojiPicker` deleted. Incognito windows use a neutral gray accent. Done 2026-09-14, commits d5b2363..c2866a8 on `gui-remodel-p2`.
 3. **Sidebar and menus.** Rows, essentials, header, URL bar, nav row, bottom bar, folders, separator, new tab row rebuilt to section 5. Context menus extracted. Done 2026-09-14, commits 749ce71..1655d5b on `gui-remodel-p3`.
-4. **Glass layer.** Section 6.
-5. **Settings.** Section 7.
+4. **Glass layer.** Section 6. Done 2026-09-14, commits e21b1d5..82cb1e8.
+5. **Settings.** Section 7. Done 2026-09-14, commits 3fff8f0..3f4896c.
 
 ## Manual checklist (every phase)
 
