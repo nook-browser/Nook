@@ -296,7 +296,7 @@ struct SpaceView: View {
                                         .frame(width: 24, height: 24)
                                         .background(Color.white.opacity(0.9))
                                         .clipShape(Circle())
-                                        .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                                        .nookElevation(.raised)
                                 }
                                 .buttonStyle(PlainButtonStyle())
                                 .transition(.move(edge: .top).combined(with: .opacity))
@@ -325,7 +325,7 @@ struct SpaceView: View {
                                         .frame(width: 24, height: 24)
                                         .background(Color.white.opacity(0.9))
                                         .clipShape(Circle())
-                                        .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                                        .nookElevation(.raised)
                                 }
                                 .buttonStyle(PlainButtonStyle())
                                 .transition(.move(edge: .bottom).combined(with: .opacity))

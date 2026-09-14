@@ -20,12 +20,7 @@ struct MiniWindowPrimaryButtonStyle: ButtonStyle {
                 Capsule()
                     .stroke(Color.white.opacity(0.35), lineWidth: 1)
             )
-            .shadow(
-                color: Color.black.opacity(configuration.isPressed ? 0.1 : 0.18),
-                radius: configuration.isPressed ? 4 : 8,
-                x: 0,
-                y: configuration.isPressed ? 2 : 6
-            )
+            .nookElevation(.floating)
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .animation(NookDesign.Motion.quick, value: configuration.isPressed)
     }
@@ -60,12 +55,7 @@ struct MiniWindowSuccessButtonStyle: ButtonStyle {
                 Capsule()
                     .stroke(Color.white.opacity(0.35), lineWidth: 1)
             )
-            .shadow(
-                color: Color.black.opacity(configuration.isPressed ? 0.1 : 0.18),
-                radius: configuration.isPressed ? 4 : 8,
-                x: 0,
-                y: configuration.isPressed ? 2 : 6
-            )
+            .nookElevation(.floating)
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .animation(NookDesign.Motion.quick, value: configuration.isPressed)
     }
@@ -100,12 +90,7 @@ struct MiniWindowErrorButtonStyle: ButtonStyle {
                 Capsule()
                     .stroke(Color.white.opacity(0.35), lineWidth: 1)
             )
-            .shadow(
-                color: Color.black.opacity(configuration.isPressed ? 0.1 : 0.18),
-                radius: configuration.isPressed ? 4 : 8,
-                x: 0,
-                y: configuration.isPressed ? 2 : 6
-            )
+            .nookElevation(.floating)
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .animation(NookDesign.Motion.quick, value: configuration.isPressed)
     }

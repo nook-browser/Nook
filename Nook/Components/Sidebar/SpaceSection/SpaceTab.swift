@@ -134,7 +134,7 @@ struct SpaceTab: View {
         .contextMenu {
             Options()
         }
-        .shadow(color: isActive ? shadowColor : Color.clear, radius: isActive ? 2 : 0, y: 1.5)
+        .nookElevation(.raised)
         .onAppear {
             tab.ensureFaviconLoaded()
         }
@@ -344,10 +344,6 @@ struct SpaceTab: View {
     private var isCurrentTab: Bool {
         return browserManager.currentTab(for: windowState)?.id == tab.id
     }
-    private var shadowColor: Color {
-        return colorScheme == .dark ? Color.clear : Color.black.opacity(0.15)
-    }
-
     private var backgroundColor: Color {
         if isCurrentTab {
             return colorScheme == .dark ? AppColors.spaceTabActiveLight : AppColors.spaceTabActiveDark

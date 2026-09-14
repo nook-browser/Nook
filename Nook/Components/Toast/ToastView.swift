@@ -23,7 +23,7 @@ struct ToastView<Content: View>: View {
             .background(Color(.windowBackgroundColor).opacity(0.35))
             .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xl))
             .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.xl))
-            .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 2)
+            .nookElevation(.floating)
     }
 }
 

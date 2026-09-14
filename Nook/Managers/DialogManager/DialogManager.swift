@@ -78,11 +78,7 @@ class DialogManager {
                             .resizable()
                             .scaledToFit()
                             .frame(width: 50, height: 50)
-                            .shadow(
-                                color: AppColors.textPrimary.opacity(0.3),
-                                radius: 0.5,
-                                y: 1
-                            )
+                            .nookElevation(.raised)
                         Text("Quit Nook?")
                             .font(NookDesign.Font.heading)
                             .foregroundStyle(AppColors.textPrimary)
@@ -178,7 +174,7 @@ struct DialogCard<Content: View>: View {
                 NookDesign.Radius.shape(NookDesign.Radius.xl)
                     .stroke(.white.opacity(0.25), lineWidth: 1)
             }
-            .shadow(color: .black, radius: 1, y: 0)
+            .nookElevation(.raised)
     }
 }
 

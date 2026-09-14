@@ -104,7 +104,7 @@ struct MiniWindowToolbar: View {
                     .background(
                         NookDesign.Radius.shape(NookDesign.Radius.sm)
                             .fill(controlBackgroundColor)
-                            .shadow(radius: 1, x: 1, y: 1)
+                            .nookElevation(.raised)
                     )
                     .overlay(
                         NookDesign.Radius.shape(NookDesign.Radius.xs)
@@ -150,7 +150,7 @@ struct MiniWindowToolbar: View {
         .background(
             NookDesign.Radius.shape(NookDesign.Radius.sm)
                 .fill(controlBackgroundColor)
-                .shadow(radius: 1, x: 1, y: 1)
+                .nookElevation(.raised)
         )
         .overlay(
             NookDesign.Radius.shape(NookDesign.Radius.xs)
@@ -282,7 +282,7 @@ private struct MiniWindowShareButtonContainer: View {
             .background(
                 NookDesign.Radius.shape(NookDesign.Radius.xs)
                     .fill(backgroundColor)
-                    .shadow(radius: 1, x: 1, y: 1)
+                    .nookElevation(.raised)
             )
             .overlay(
                 NookDesign.Radius.shape(NookDesign.Radius.xs)

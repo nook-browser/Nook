@@ -215,7 +215,7 @@ private struct NookMorphingPreview: View {
                 standardPreview
             }
         }
-        .shadow(color: .black.opacity(0.25), radius: style == .ghost ? 12 : 8, y: style == .ghost ? 4 : 2)
+        .nookElevation(.floating)
     }
 
     private var pinnedTilePreview: some View {

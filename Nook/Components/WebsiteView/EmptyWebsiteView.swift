@@ -18,7 +18,7 @@ struct EmptyWebsiteView: View {
                 // Match the exact background and styling of the real webview
                 Color(nsColor: .windowBackgroundColor).opacity(0.2)
                     .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
-                    .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 0)
+                    .nookElevation(.raised)
 
                 VStack(spacing: 16) {
                     Image(systemName: "moon.stars")

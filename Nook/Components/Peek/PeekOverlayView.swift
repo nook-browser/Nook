@@ -160,12 +160,7 @@ struct PeekOverlayView: View {
                     .opacity(webContentOpacity)
                     .frame(width: frame.width, height: frame.height)
                     .clipShape(NookDesign.Radius.shape(cornerRadius))
-                    .shadow(
-                        color: Color.black.opacity(0.3),
-                        radius: 20,
-                        x: 0,
-                        y: 10
-                    )
+                    .nookElevation(.floating)
 
                 // Action buttons positioned outside the main content but within the scaled area
                 actionButtons(session: session)

@@ -222,7 +222,7 @@ struct WebsiteView: View {
                         // computed from a flattened bitmap rather than recompositing the
                         // WKWebView's live GPU video layer, which caused black flashes.
                         .compositingGroup()
-                        .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 0)
+                        .nookElevation(.raised)
                         // Critical: Use allowsHitTesting to prevent SwiftUI from intercepting mouse events
                         // This allows right-clicks to pass through to the underlying NSView (WKWebView)
                         .allowsHitTesting(!browserManager.dialogManager.isVisible)
@@ -926,7 +926,7 @@ private struct SplitControlsOverlay: View {
                     .background(.ultraThinMaterial)
                     .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
                     .overlay(NookDesign.Radius.shape(NookDesign.Radius.md).stroke(Color.white.opacity(0.25), lineWidth: 1))
-                    .shadow(color: Color.black.opacity(0.2), radius: 2, x: 0, y: 1)
+                    .nookElevation(.raised)
                     .padding(.leading, 8)
 
                     Spacer()
@@ -940,7 +940,7 @@ private struct SplitControlsOverlay: View {
                     .background(.ultraThinMaterial)
                     .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
                     .overlay(NookDesign.Radius.shape(NookDesign.Radius.md).stroke(Color.white.opacity(0.25), lineWidth: 1))
-                    .shadow(color: Color.black.opacity(0.2), radius: 2, x: 0, y: 1)
+                    .nookElevation(.raised)
                     .padding(.trailing, 8)
                 }
                 .padding(.top, 8)

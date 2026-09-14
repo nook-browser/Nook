@@ -98,14 +98,6 @@ struct PinnedTabView: View {
         }
     }
 
-    private var shadowColor: Color {
-        if isActive {
-            return colorScheme == .dark ? Color.clear : Color.black.opacity(0.15)
-        } else {
-            return Color.clear
-        }
-    }
-
     // MARK: - Favicon stroke overlay
 
     private func faviconStrokeOverlay(
@@ -123,7 +115,6 @@ struct PinnedTabView: View {
                 let ringMask = ZStack {
                     outerRect
                         .fill(Color.white)
-                        .shadow(color: .clear, radius: 0)
 
                     innerRect
                         .inset(by: thickness)
