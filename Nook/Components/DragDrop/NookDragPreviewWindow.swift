@@ -128,8 +128,7 @@ private struct NookDragPreviewContent: View {
                     tab: manager.draggedTab,
                     title: manager.draggedItem?.title ?? "",
                     style: currentStyle,
-                    sidebarWidth: manager.sidebarScreenFrame.width,
-                    pinnedConfig: manager.pinnedTabsConfig
+                    sidebarWidth: manager.sidebarScreenFrame.width
                 )
                 .animation(morphSpring, value: currentStyle)
             }
@@ -160,7 +159,6 @@ private struct NookMorphingPreview: View {
     let title: String
     let style: NookPreviewStyle
     let sidebarWidth: CGFloat
-    let pinnedConfig: PinnedTabsConfiguration
 
     private let sidebarHorizontalPadding: CGFloat = 16
 
@@ -172,7 +170,7 @@ private struct NookMorphingPreview: View {
             }
             return 200
         case .pinnedTile:
-            return pinnedConfig.minWidth
+            return NookDesign.Size.essentialsTile
         case .ghost:
             return 160
         }
@@ -181,7 +179,7 @@ private struct NookMorphingPreview: View {
     private var effectiveHeight: CGFloat {
         switch style {
         case .tabRow: return 36
-        case .pinnedTile: return pinnedConfig.height
+        case .pinnedTile: return NookDesign.Size.essentialsTile
         case .ghost: return 100
         }
     }
@@ -189,7 +187,7 @@ private struct NookMorphingPreview: View {
     private var effectiveCornerRadius: CGFloat {
         switch style {
         case .tabRow: return NookDesign.Radius.lg
-        case .pinnedTile: return pinnedConfig.cornerRadius
+        case .pinnedTile: return NookDesign.Radius.lg
         case .ghost: return NookDesign.Radius.md
         }
     }
@@ -218,7 +216,7 @@ private struct NookMorphingPreview: View {
 
     private var pinnedTilePreview: some View {
         ZStack {
-            NookDesign.Radius.shape(pinnedConfig.cornerRadius)
+            NookDesign.Radius.shape(NookDesign.Radius.lg)
                 .fill(backgroundColor)
 
             if let tab = tab {
@@ -227,15 +225,15 @@ private struct NookMorphingPreview: View {
                     .interpolation(.high)
                     .antialiased(true)
                     .scaledToFit()
-                    .frame(height: pinnedConfig.faviconHeight)
+                    .frame(height: NookDesign.Size.essentialsFavicon)
             } else {
                 Image(systemName: "globe")
-                    .font(.system(size: pinnedConfig.faviconHeight, weight: .medium))
+                    .font(.system(size: NookDesign.Size.essentialsFavicon, weight: .medium))
                     .foregroundColor(.secondary)
             }
         }
-        .frame(width: pinnedConfig.minWidth, height: pinnedConfig.height)
-        .clipShape(NookDesign.Radius.shape(pinnedConfig.cornerRadius))
+        .frame(width: NookDesign.Size.essentialsTile, height: NookDesign.Size.essentialsTile)
+        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
     }
 
     private var standardPreview: some View {

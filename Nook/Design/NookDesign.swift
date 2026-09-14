@@ -52,6 +52,8 @@ enum NookDesign {
         static let iconButton: CGFloat = 28
         static let favicon: CGFloat = 16
         static let essentialsTile: CGFloat = 44
+        static let essentialsFavicon: CGFloat = 20
+        static let essentialsStroke: CGFloat = 2
         static let urlBar: CGFloat = 32
         static let navRow: CGFloat = 28
         static let bottomBar: CGFloat = 40

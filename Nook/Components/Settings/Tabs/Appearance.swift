@@ -29,14 +29,6 @@ struct SettingsAppearanceTab: View {
                 }
             }
             Toggle("Show URL bar in the web view",isOn: $settings.topBarAddressView)
-            Picker(
-                "Favorites Appearance",
-                selection: $settings.pinnedTabsLook
-            ) {
-                ForEach(PinnedTabsConfiguration.allCases) { config in
-                    Text(config.name).tag(config)
-                }
-            }
             Toggle("Preview link URL on hover",
                 isOn: $settings
                     .showLinkStatusBar

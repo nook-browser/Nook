@@ -18,6 +18,7 @@ struct PinnedGrid: View {
     @Environment(WindowRegistry.self) private var windowRegistry
     @Environment(\.nookSettings) var nookSettings
     @ObservedObject private var dragSession = NookDragSessionManager.shared
+    private let maxColumns = 4
 
     init(width: CGFloat, profileId: UUID? = nil) {
         self.width = width
@@ -26,7 +27,6 @@ struct PinnedGrid: View {
 
     @ViewBuilder
     var body: some View {
-        let pinnedTabsConfiguration: PinnedTabsConfiguration = nookSettings.pinnedTabsLook
         // Use profile-filtered essentials
         let effectiveProfileId = profileId ?? windowState.currentProfileId ?? browserManager.currentProfile?.id
         let items: [Tab] = effectiveProfileId != nil
@@ -77,9 +77,8 @@ struct PinnedGrid: View {
                 .animation(NookDesign.Motion.quick, value: isDragging)
             }
             .onAppear {
-                dragSession.pinnedTabsConfig = pinnedTabsConfiguration
-                dragSession.itemCellSize[.essentials] = pinnedTabsConfiguration.minWidth
-                dragSession.itemCellSpacing[.essentials] = pinnedTabsConfiguration.gridSpacing
+                dragSession.itemCellSize[.essentials] = NookDesign.Size.essentialsTile
+                dragSession.itemCellSpacing[.essentials] = NookDesign.Spacing.sm
                 dragSession.itemCounts[.essentials] = 0
                 dragSession.gridColumnCount[.essentials] = colsCount
             }
@@ -95,7 +94,7 @@ struct PinnedGrid: View {
                             isVertical: false,
                             manager: dragSession
                         ) {
-                            LazyVGrid(columns: columns, alignment: .center, spacing: pinnedTabsConfiguration.gridSpacing) {
+                            LazyVGrid(columns: columns, alignment: .center, spacing: NookDesign.Spacing.sm) {
                                 let insertionIdx = essentialsInsertionIndex(itemCount: items.count)
 
                                 ForEach(Array(items.enumerated()), id: \.element.id) { index, tab in
@@ -163,9 +162,8 @@ struct PinnedGrid: View {
                             .animation(NookDesign.Motion.spring, value: essentialsInsertionIndex(itemCount: items.count))
                         }
                         .onAppear {
-                            dragSession.pinnedTabsConfig = pinnedTabsConfiguration
-                            dragSession.itemCellSize[.essentials] = pinnedTabsConfiguration.minWidth
-                            dragSession.itemCellSpacing[.essentials] = pinnedTabsConfiguration.gridSpacing
+                            dragSession.itemCellSize[.essentials] = NookDesign.Size.essentialsTile
+                            dragSession.itemCellSpacing[.essentials] = NookDesign.Spacing.sm
                             dragSession.itemCounts[.essentials] = items.count
                             dragSession.gridColumnCount[.essentials] = colsCount
                         }
@@ -245,7 +243,7 @@ struct PinnedGrid: View {
     private var essentialsPlaceholder: some View {
         NookDesign.Radius.shape(NookDesign.Radius.lg)
             .fill(Color.primary.opacity(0.08))
-            .frame(minWidth: nookSettings.pinnedTabsLook.minWidth, minHeight: nookSettings.pinnedTabsLook.minWidth)
+            .frame(minWidth: NookDesign.Size.essentialsTile, minHeight: NookDesign.Size.essentialsTile)
     }
 
     private func safeTitle(_ tab: Tab) -> String {
@@ -255,9 +253,9 @@ struct PinnedGrid: View {
 
     private func columnCount(for width: CGFloat, itemCount: Int) -> Int {
         guard width > 0, itemCount > 0 else { return 1 }
-        var cols = min(nookSettings.pinnedTabsLook.maxColumns, itemCount)
+        var cols = min(maxColumns, itemCount)
         while cols > 1 {
-            let needed = CGFloat(cols) * nookSettings.pinnedTabsLook.minWidth + CGFloat(cols - 1) * nookSettings.pinnedTabsLook.gridSpacing
+            let needed = CGFloat(cols) * NookDesign.Size.essentialsTile + CGFloat(cols - 1) * NookDesign.Spacing.sm
             if needed <= width { break }
             cols -= 1
         }
@@ -267,8 +265,8 @@ struct PinnedGrid: View {
     private func makeColumns(count: Int) -> [GridItem] {
         Array(
             repeating: GridItem(
-                .flexible(minimum: nookSettings.pinnedTabsLook.minWidth),
-                spacing: nookSettings.pinnedTabsLook.gridSpacing,
+                .flexible(minimum: NookDesign.Size.essentialsTile),
+                spacing: NookDesign.Spacing.sm,
                 alignment: .center
             ),
             count: count

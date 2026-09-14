@@ -39,7 +39,6 @@ class NookSettingsService {
     private let webSearchMaxResultsKey = "settings.webSearchMaxResults"
     private let webSearchContextSizeKey = "settings.webSearchContextSize"
     private let showLinkStatusBarKey = "settings.showLinkStatusBar"
-    private let pinnedTabsLookKey = "settings.pinnedTabsLook"
     private let siteSearchEntriesKey = "settings.siteSearchEntries"
     private let didFinishOnboardingKey = "settings.didFinishOnboarding"
     private let tabLayoutKey = "settings.tabLayout"
@@ -256,12 +255,6 @@ class NookSettingsService {
         }
     }
     
-    var pinnedTabsLook: PinnedTabsConfiguration {
-        didSet {
-            userDefaults.set(pinnedTabsLook, forKey: pinnedTabsLookKey)
-        }
-    }
-
     var siteSearchEntries: [SiteSearchEntry] {
         didSet {
             if let data = try? JSONEncoder().encode(siteSearchEntries) {
@@ -342,7 +335,6 @@ class NookSettingsService {
             webSearchMaxResultsKey: 5,
             webSearchContextSizeKey: "medium",
             showLinkStatusBarKey: true,
-            pinnedTabsLookKey: "large",
             didFinishOnboardingKey: false,
             tabLayoutKey: TabLayout.sidebar.rawValue,
             appearanceModeKey: AppearanceMode.system.rawValue,
@@ -431,7 +423,6 @@ class NookSettingsService {
         self.webSearchMaxResults = userDefaults.integer(forKey: webSearchMaxResultsKey)
         self.webSearchContextSize = userDefaults.string(forKey: webSearchContextSizeKey) ?? "medium"
         self.showLinkStatusBar = userDefaults.bool(forKey: showLinkStatusBarKey)
-        self.pinnedTabsLook = PinnedTabsConfiguration(rawValue: userDefaults.string(forKey: pinnedTabsLookKey) ?? "large") ?? .large
         self.tabLayout = TabLayout(rawValue: userDefaults.string(forKey: tabLayoutKey) ?? TabLayout.sidebar.rawValue) ?? .sidebar
         self.appearanceMode = AppearanceMode(rawValue: userDefaults.string(forKey: appearanceModeKey) ?? AppearanceMode.system.rawValue) ?? .system
         self.didFinishOnboarding = userDefaults.bool(forKey: didFinishOnboardingKey)

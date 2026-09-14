@@ -58,8 +58,6 @@ final class NookDragSessionManager: ObservableObject {
 
     @Published var sidebarScreenFrame: CGRect = .zero
 
-    @Published var pinnedTabsConfig: PinnedTabsConfiguration = .large
-
     var isDragging: Bool { draggedItem != nil }
 
     var isCursorInSidebar: Bool {

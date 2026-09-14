@@ -17,7 +17,6 @@ struct PinnedTabView: View {
     var action: () -> Void
 
     @EnvironmentObject var browserManager: BrowserManager
-    @Environment(\.nookSettings) var nookSettings
     @State private var isHovered: Bool = false
 
     // Stroke overlay tunables
@@ -25,11 +24,10 @@ struct PinnedTabView: View {
     private let faviconBlur: CGFloat = 30.0      // blur applied to favicon
 
     var body: some View {
-        let pinnedTabsConfiguration: PinnedTabsConfiguration = nookSettings.pinnedTabsLook
         Button(action: action) {
             ZStack {
                 ZStack {
-                    NookDesign.Radius.shape(pinnedTabsConfiguration.cornerRadius)
+                    NookDesign.Radius.shape(NookDesign.Radius.lg)
                         .fill(
                             backgroundColor
                         )
@@ -43,7 +41,7 @@ struct PinnedTabView: View {
 
                         }
                 }
-                .clipShape(NookDesign.Radius.shape(pinnedTabsConfiguration.cornerRadius))
+                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
 
 
                 HStack {
@@ -55,7 +53,7 @@ struct PinnedTabView: View {
                             .interpolation(.high)
                             .antialiased(true)
                             .scaledToFit()
-                            .frame(height: pinnedTabsConfiguration.faviconHeight)
+                            .frame(height: NookDesign.Size.essentialsFavicon)
                             .opacity(isUnloaded ? 0.5 : 1.0)
                         Spacer()
                     }
@@ -67,8 +65,8 @@ struct PinnedTabView: View {
                 // Favicon-based stroke overlay
                 if isActive {
                     faviconStrokeOverlay(
-                        corner: pinnedTabsConfiguration.cornerRadius,
-                        thickness: pinnedTabsConfiguration.strokeWidth,
+                        corner: NookDesign.Radius.lg,
+                        thickness: NookDesign.Size.essentialsStroke,
                         scale: faviconScale,
                         blur: faviconBlur
                     )
@@ -76,9 +74,9 @@ struct PinnedTabView: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: pinnedTabsConfiguration.height)
-            .frame(minWidth: pinnedTabsConfiguration.minWidth)
-            .contentShape(NookDesign.Radius.shape(pinnedTabsConfiguration.cornerRadius))
+            .frame(height: NookDesign.Size.essentialsTile)
+            .frame(minWidth: NookDesign.Size.essentialsTile)
+            .contentShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
         }
         .buttonStyle(.plain)
         .onHoverTracking { hovering in
