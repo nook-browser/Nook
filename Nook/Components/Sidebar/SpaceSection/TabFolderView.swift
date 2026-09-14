@@ -22,7 +22,6 @@ struct TabFolderView: View {
     @State private var draftName: String = ""
     @FocusState private var nameFieldFocused: Bool
 
-    @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var tabManager: TabManager
     @Environment(BrowserWindowState.self) private var windowState
     @ObservedObject private var dragSession = NookDragSessionManager.shared

@@ -116,17 +116,17 @@ struct SpaceTab: View {
             }
             .padding(.horizontal, NookDesign.Spacing.rowPadding)
             .frame(height: NookDesign.Size.row)
-            .frame(minWidth: NookDesign.Spacing.zero, maxWidth: .infinity)
+            .frame(minWidth: 0, maxWidth: .infinity)
             .background(
                 backgroundColor
             )
             .overlay {
                 if tab.isRenaming {
                     NookDesign.Radius.shape(NookDesign.Radius.md)
-                        .strokeBorder(browserManager.gradientColorManager.accentColor, lineWidth: 1)
+                        .strokeBorder(browserManager.gradientColorManager.accentColor, lineWidth: NookDesign.Size.hairlineWidth)
                 } else if isCurrentTab {
                     NookDesign.Radius.shape(NookDesign.Radius.md)
-                        .strokeBorder(NookDesign.Surface.hairline, lineWidth: 1)
+                        .strokeBorder(NookDesign.Surface.hairline, lineWidth: NookDesign.Size.hairlineWidth)
                 }
             }
             .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
@@ -151,17 +151,16 @@ struct SpaceTab: View {
         )
         .contextMenu {
             TabContextMenu(tab: tab, context: menuContext)
+                .environmentObject(browserManager)
+                .environmentObject(tabManager)
+                .environment(windowState)
         }
-        .nookElevation(isActive ? .raised : .flat)
+        .nookElevation(isCurrentTab ? .raised : .flat)
         .onAppear {
             tab.ensureFaviconLoaded()
         }
     }
-    
-    private var isActive: Bool {
-        return browserManager.currentTab(for: windowState)?.id == tab.id
-    }
-    
+
     private var isCurrentTab: Bool {
         return browserManager.currentTab(for: windowState)?.id == tab.id
     }

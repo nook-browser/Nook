@@ -29,7 +29,6 @@ enum NookDesign {
     // MARK: - Spacing
 
     enum Spacing {
-        static let zero: CGFloat = 0
         static let xxs: CGFloat = 2
         static let xs: CGFloat = 4
         static let sm: CGFloat = 6
@@ -46,7 +45,6 @@ enum NookDesign {
         static let folderIndent: CGFloat = 20
         static let sidebarTop: CGFloat = 34     // clears the traffic lights when the sidebar is on the left
         static let titleFade: CGFloat = 20      // trailing fade on long row titles
-        static let previewLift: CGFloat = 20    // vertical lift for the spaces-list hover name preview
     }
 
     // MARK: - Size
@@ -102,7 +100,6 @@ enum NookDesign {
         static let unloadedOpacity: Double = 0.55
         static let dropBorderIdle = Color.secondary.opacity(0.3)    // dashed empty-state drop target
         static let dropBorderActive = Color.primary.opacity(0.4)    // dashed drop target while dragging
-        static let previewTextOpacity: Double = 0.7                 // spaces-list hover name preview
     }
 
     // MARK: - Elevation

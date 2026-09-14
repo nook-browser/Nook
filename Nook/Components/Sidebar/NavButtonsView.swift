@@ -99,7 +99,6 @@ struct NavButtonsView: View {
 
         // Collapse thresholds: at 250pt default width all buttons fit comfortably
         // (5 buttons × 32pt + spacing ≈ 186pt, leaving ~48pt spacer in 234pt usable)
-        // width breakpoints for collapsing nav buttons into the ellipsis menu
         let navigationCollapseThreshold: CGFloat = nookSettings.showAIAssistant ? 215 : 180
         let refreshCollapseThreshold: CGFloat = nookSettings.showAIAssistant ? 200 : 165
         let aiChatCollapseThreshold: CGFloat = 195

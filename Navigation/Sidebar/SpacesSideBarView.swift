@@ -304,7 +304,7 @@ struct SpacesSideBarView: View {
 
     @ViewBuilder
     private func makeSpaceView(for space: Space, index: Int) -> some View {
-        VStack(spacing: NookDesign.Spacing.zero) {
+        VStack(spacing: 0) {
             if !windowState.isIncognito {
                 PinnedGrid(
                     width: windowState.sidebarContentWidth,

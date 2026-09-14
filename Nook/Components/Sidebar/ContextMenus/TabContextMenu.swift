@@ -27,7 +27,7 @@ struct TabContextMenu: View {
 
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var tabManager: TabManager
-    @Environment(BrowserWindowState.self) private var windowState
+    @Environment(BrowserWindowState.self) private var windowState: BrowserWindowState?
 
     var body: some View {
         Group {
@@ -86,20 +86,21 @@ struct TabContextMenu: View {
 
     @ViewBuilder
     private var addToFolderMenu: some View {
-        let spaceId = tab.spaceId ?? UUID()
-        let folders = tabManager.folders(for: spaceId)
+        if let spaceId = tab.spaceId {
+            let folders = tabManager.folders(for: spaceId)
 
-        if !folders.isEmpty {
-            Menu {
-                ForEach(folders, id: \.id) { folder in
-                    Button {
-                        tabManager.moveTabToRegularFolder(tab: tab, folderId: folder.id)
-                    } label: {
-                        Label(folder.name, systemImage: "folder.fill")
+            if !folders.isEmpty {
+                Menu {
+                    ForEach(folders, id: \.id) { folder in
+                        Button {
+                            tabManager.moveTabToRegularFolder(tab: tab, folderId: folder.id)
+                        } label: {
+                            Label(folder.name, systemImage: "folder.fill")
+                        }
                     }
+                } label: {
+                    Label("Add to Folder", systemImage: "folder.badge.plus")
                 }
-            } label: {
-                Label("Add to Folder", systemImage: "folder.badge.plus")
             }
         }
     }
@@ -181,12 +182,14 @@ struct TabContextMenu: View {
         if context != .split {
             Menu {
                 Button {
+                    guard let windowState else { return }
                     browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState)
                 } label: {
                     Label("Right", systemImage: "rectangle.righthalf.filled")
                 }
 
                 Button {
+                    guard let windowState else { return }
                     browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState)
                 } label: {
                     Label("Left", systemImage: "rectangle.lefthalf.filled")
@@ -277,13 +280,15 @@ struct TabContextMenu: View {
         }
         .keyboardShortcut("w", modifiers: .command)
 
-        let hasOtherTabs = (tabManager.tabsBySpace[tab.spaceId ?? UUID()]?.filter { $0.id != tab.id }.isEmpty == false)
-        if context == .regular || context == .spacePinned || context == .folder,
-           hasOtherTabs, !tab.isPinned {
-            Button {
-                tabManager.closeOtherTabs(tab)
-            } label: {
-                Label("Close Other Tabs", systemImage: "xmark.circle")
+        if let spaceId = tab.spaceId {
+            let hasOtherTabs = (tabManager.tabsBySpace[spaceId]?.filter { $0.id != tab.id }.isEmpty == false)
+            if context == .regular || context == .spacePinned || context == .folder,
+               hasOtherTabs, !tab.isPinned, !tab.isSpacePinned {
+                Button {
+                    tabManager.closeOtherTabs(tab)
+                } label: {
+                    Label("Close Other Tabs", systemImage: "xmark.circle")
+                }
             }
         }
 

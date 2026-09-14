@@ -155,7 +155,6 @@ struct SpaceView: View {
             ) {
                 SpaceTitle(space: space)
             }
-            .id("space-separator-top")
             .onAppear {
                 updateSpacePinnedCaches()
             }
@@ -163,7 +162,7 @@ struct SpaceView: View {
             mainContentContainer
         }
         .padding(.horizontal, NookDesign.Spacing.sidebarInset)
-        .frame(minWidth: NookDesign.Spacing.zero, maxWidth: outerWidth, alignment: .leading)
+        .frame(minWidth: 0, maxWidth: outerWidth, alignment: .leading)
         .contentShape(Rectangle())
         .coordinateSpace(name: "SpaceViewCoordinateSpace")
         .onReceive(NotificationCenter.default.publisher(for: .init("TabFoldersDidChange"))) { _ in
@@ -252,6 +251,7 @@ struct SpaceView: View {
                     ScrollView(.vertical, showsIndicators: false) {
                         VStack(spacing: NookDesign.Spacing.sectionGap) {
                             pinnedTabsSection
+                                .id("space-separator-top")
 
                             VStack(spacing: NookDesign.Spacing.sectionGap) {
                                 newTabButtonSectionWithClear
@@ -270,7 +270,7 @@ struct SpaceView: View {
                                 }
                             }
                         }
-                        .frame(minWidth: NookDesign.Spacing.zero, maxWidth: innerWidth, alignment: .leading)
+                        .frame(minWidth: 0, maxWidth: innerWidth, alignment: .leading)
                         .coordinateSpace(name: "ScrollSpace")
                     }
                     .contentShape(Rectangle())
@@ -529,7 +529,7 @@ struct SpaceView: View {
                 .conditionalWindowDrag()
                 .frame(height: NookDesign.Size.dropTail)
         }
-        .frame(minWidth: NookDesign.Spacing.zero, maxWidth: innerWidth, alignment: .leading)
+        .frame(minWidth: 0, maxWidth: innerWidth, alignment: .leading)
         .contentShape(Rectangle())
         .padding(.top, NookDesign.Spacing.rowGap)
     }

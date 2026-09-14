@@ -96,12 +96,11 @@ struct SpacesList: View {
                            let hoveredSpace = visibleSpaces.first(where: { $0.id == hoveredId }) {
                             Text(hoveredSpace.name)
                                 .font(.caption)
-                                .foregroundStyle(Color.primary)
-                                .opacity(NookDesign.Surface.previewTextOpacity)
+                                .foregroundStyle(.secondary)
                                 .lineLimit(1)
                                 .id(hoveredSpace.id)
                                 .transition(.blur.animation(NookDesign.Motion.standard))
-                                .offset(y: -NookDesign.Spacing.previewLift)
+                                .offset(y: -NookDesign.Spacing.xxl)
                         }
                     }
             }

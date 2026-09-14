@@ -17,16 +17,17 @@ struct URLBarView: View {
     var isSidebarHovered: Bool
 
     var body: some View {
+        let currentTab = browserManager.currentTab(for: windowState)
         ZStack {
             HStack(spacing: NookDesign.Spacing.sm) {
                     // URL text area — tappable to open command palette
                     Group {
-                        if browserManager.currentTab(for: windowState) != nil {
+                        if currentTab != nil {
                             HStack(spacing: NookDesign.Spacing.xs) {
-                                Image(systemName: isSecure ? "lock.fill" : "globe")
+                                Image(systemName: isSecure(for: currentTab) ? "lock.fill" : "globe")
                                     .font(.system(size: NookDesign.Size.rowGlyph, weight: .medium))
                                     .foregroundStyle(.secondary)
-                                (Text(displayHost).foregroundStyle(.primary) + Text(displayPath).foregroundStyle(.tertiary))
+                                (Text(displayHost(for: currentTab)).foregroundStyle(.primary) + Text(displayPath(for: currentTab)).foregroundStyle(.tertiary))
                                     .font(NookDesign.Font.secondary)
                                     .lineLimit(1)
                                     .truncationMode(.tail)
@@ -45,12 +46,12 @@ struct URLBarView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        let currentURL = browserManager.currentTab(for: windowState)?.url.absoluteString ?? ""
-                        windowState.commandPalette?.open(prefill: currentURL, navigateCurrentTab: true)
+                        let urlString = currentTab?.url.absoluteString ?? ""
+                        windowState.commandPalette?.open(prefill: urlString, navigateCurrentTab: true)
                     }
-                    
+
                     // Copy link button (show on hover when tab is selected)
-                    if isHovering, let currentTab = browserManager.currentTab(for: windowState) {
+                    if isHovering, let currentTab {
                         Button("Copy Link", systemImage: showCheckmark ? "checkmark" : "link") {
                             copyURLToClipboard(currentTab.url.absoluteString)
                         }
@@ -60,10 +61,9 @@ struct URLBarView: View {
                         .transition(.opacity.combined(with: .scale(scale: 0.9)))
                         .contentTransition(.symbolEffect(.replace))
                     }
-                    
+
                     // PiP button (show when video content is available or PiP is active)
-                    if let currentTab = browserManager.currentTab(for: windowState),
-                       (currentTab.hasVideoContent || currentTab.hasPiPActive) {
+                    if let currentTab, (currentTab.hasVideoContent || currentTab.hasPiPActive) {
                         Button(action: {
                             currentTab.requestPictureInPicture()
                         }) {
@@ -102,7 +102,7 @@ struct URLBarView: View {
            backgroundColor
         )
         .overlay(alignment: .bottom) {
-            PageLoadingProgressBar(tab: browserManager.currentTab(for: windowState))
+            PageLoadingProgressBar(tab: currentTab)
                 .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: NookDesign.Radius.md, bottomTrailingRadius: NookDesign.Radius.md, style: .continuous))
         }
         .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
@@ -130,18 +130,15 @@ struct URLBarView: View {
         .secondary
     }
     
-    private var displayURL: String {
-            guard let currentTab = browserManager.currentTab(for: windowState) else {
-                return ""
-            }
-            return formatURL(currentTab.url)
-        }
+    private func displayURL(for tab: Tab?) -> String {
+        guard let tab else { return "" }
+        return formatURL(tab.url)
+    }
 
-    private var currentURL: URL? { browserManager.currentTab(for: windowState)?.url }
-    private var isSecure: Bool { currentURL?.scheme == "https" }
-    private var displayHost: String { currentURL?.host ?? displayURL }
-    private var displayPath: String {
-        guard let url = currentURL, url.host != nil else { return "" }
+    private func isSecure(for tab: Tab?) -> Bool { tab?.url.scheme == "https" }
+    private func displayHost(for tab: Tab?) -> String { tab?.url.host ?? displayURL(for: tab) }
+    private func displayPath(for tab: Tab?) -> String {
+        guard let url = tab?.url, url.host != nil else { return "" }
         let path = url.path
         return path == "/" ? "" : path
     }
