@@ -18,21 +18,23 @@ struct URLBarView: View {
 
     var body: some View {
         ZStack {
-            HStack(spacing: 8) {
+            HStack(spacing: NookDesign.Spacing.sm) {
                     // URL text area — tappable to open command palette
                     Group {
                         if browserManager.currentTab(for: windowState) != nil {
-                            Text(
-                                displayURL
-                            )
-                            .font(NookDesign.Font.secondary)
-                            .foregroundStyle(textColor)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                        } else {
-                            HStack(spacing: 4) {
-                                Image(systemName: "magnifyingglass")
+                            HStack(spacing: NookDesign.Spacing.xs) {
+                                Image(systemName: isSecure ? "lock.fill" : "globe")
+                                    .font(.system(size: NookDesign.Size.rowGlyph, weight: .medium))
+                                    .foregroundStyle(.secondary)
+                                (Text(displayHost).foregroundStyle(.primary) + Text(displayPath).foregroundStyle(.tertiary))
                                     .font(NookDesign.Font.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                            }
+                        } else {
+                            HStack(spacing: NookDesign.Spacing.xs) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: NookDesign.Size.rowGlyph, weight: .medium))
                                     .foregroundStyle(textColor)
                                 Text("Search or Enter URL...")
                                     .font(NookDesign.Font.secondary)
@@ -53,7 +55,7 @@ struct URLBarView: View {
                             copyURLToClipboard(currentTab.url.absoluteString)
                         }
                         .labelStyle(.iconOnly)
-                        .buttonStyle(NookIconButtonStyle(size: 28, radius: NookDesign.Radius.lg))
+                        .buttonStyle(NookIconButtonStyle(size: NookDesign.Size.rowButton, radius: NookDesign.Radius.sm))
                         .foregroundStyle(Color.primary)
                         .transition(.opacity.combined(with: .scale(scale: 0.9)))
                         .contentTransition(.symbolEffect(.replace))
@@ -93,18 +95,17 @@ struct URLBarView: View {
                             }
                     }
                 }
-                .padding(.leading, 12)
-                .padding(.trailing, 8)
+                .padding(.horizontal, NookDesign.Spacing.rowPadding)
         }
-        .frame(maxWidth: .infinity, minHeight: 36, maxHeight: 36)
+        .frame(maxWidth: .infinity, minHeight: NookDesign.Size.urlBar, maxHeight: NookDesign.Size.urlBar)
         .background(
            backgroundColor
         )
         .overlay(alignment: .bottom) {
             PageLoadingProgressBar(tab: browserManager.currentTab(for: windowState))
-                .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: NookDesign.Radius.lg, bottomTrailingRadius: NookDesign.Radius.lg, style: .continuous))
+                .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: NookDesign.Radius.md, bottomTrailingRadius: NookDesign.Radius.md, style: .continuous))
         }
-        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
+        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         // Report the frame in the window space so we can overlay the mini palette above all content
         .background(
             GeometryReader { proxy in
@@ -135,7 +136,17 @@ struct URLBarView: View {
             }
             return formatURL(currentTab.url)
         }
-        
+
+    private var currentURL: URL? { browserManager.currentTab(for: windowState)?.url }
+    private var isSecure: Bool { currentURL?.scheme == "https" }
+    private var displayHost: String { currentURL?.host ?? displayURL }
+    private var displayPath: String {
+        guard let url = currentURL, url.host != nil else { return "" }
+        let path = url.path
+        return path == "/" ? "" : path
+    }
+
+
         private func formatURL(_ url: URL) -> String {
             guard let host = url.host else {
                 return url.absoluteString

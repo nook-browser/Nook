@@ -29,6 +29,7 @@ enum NookDesign {
     // MARK: - Spacing
 
     enum Spacing {
+        static let zero: CGFloat = 0
         static let xxs: CGFloat = 2
         static let xs: CGFloat = 4
         static let sm: CGFloat = 6
@@ -43,6 +44,8 @@ enum NookDesign {
         static let sectionGap: CGFloat = 10
         static let rowPadding: CGFloat = 8
         static let folderIndent: CGFloat = 20
+        static let sidebarTop: CGFloat = 34     // clears the traffic lights when the sidebar is on the left
+        static let titleFade: CGFloat = 20      // trailing fade on long row titles
     }
 
     // MARK: - Size
@@ -58,6 +61,8 @@ enum NookDesign {
         static let navRow: CGFloat = 28
         static let bottomBar: CGFloat = 40
         static let spaceIcon: CGFloat = 14      // switcher and header symbol
+        static let rowGlyph: CGFloat = 13       // inline glyphs in a row: audio, lock, chevron
+        static let rowButton: CGFloat = 20      // hover-only close/unload button in a row
     }
 
     // MARK: - Type

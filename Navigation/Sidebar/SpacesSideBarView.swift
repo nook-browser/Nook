@@ -59,7 +59,7 @@ struct SpacesSideBarView: View {
     @ObservedObject private var dragSession = NookDragSessionManager.shared
 
     private var mainSidebarContent: some View {
-        return VStack(spacing: 8) {
+        return VStack(spacing: NookDesign.Spacing.sectionGap) {
             // Header (window controls, nav buttons, URL bar)
             SidebarHeader(isSidebarHovered: isSidebarHovered)
                 .environmentObject(browserManager)
@@ -74,7 +74,7 @@ struct SpacesSideBarView: View {
                 Color.clear
                     .contentShape(Rectangle())
                     .conditionalWindowDrag()
-                    .frame(minHeight: 40)
+                    .frame(minHeight: NookDesign.Size.bottomBar)
                     .zIndex(0)
             }
 
@@ -88,8 +88,8 @@ struct SpacesSideBarView: View {
                 .environmentObject(browserManager)
                 .environment(windowState)
                 .environment(nookSettings)
-                .padding(.horizontal, 8)
-                .padding(.bottom, 8)
+                .padding(.horizontal, NookDesign.Spacing.sidebarInset)
+                .padding(.bottom, NookDesign.Spacing.sidebarInset)
 
             // Media controls
             MediaControlsView()
@@ -107,8 +107,8 @@ struct SpacesSideBarView: View {
             .environment(windowState)
         }
         // Extra top padding when sidebar is on the left to avoid overlapping native traffic light buttons
-        .padding(.top, nookSettings.sidebarPosition == .left ? 30 : 8)
-        .padding(.bottom, 8)
+        .padding(.top, nookSettings.sidebarPosition == .left ? NookDesign.Spacing.sidebarTop : NookDesign.Spacing.sidebarInset)
+        .padding(.bottom, NookDesign.Spacing.sidebarInset)
         .background(
             GeometryReader { geo in
                 Color.clear
@@ -187,11 +187,11 @@ struct SpacesSideBarView: View {
     }
 
     private var emptyStateView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: NookDesign.Spacing.xl) {
             Image(systemName: "square.grid.2x2")
                 .font(NookDesign.Font.hero)
                 .foregroundColor(.secondary)
-            VStack(spacing: 8) {
+            VStack(spacing: NookDesign.Spacing.md) {
                 Text("No Spaces")
                     .font(.title2)
                     .fontWeight(.semibold)
@@ -304,7 +304,7 @@ struct SpacesSideBarView: View {
 
     @ViewBuilder
     private func makeSpaceView(for space: Space, index: Int) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: NookDesign.Spacing.zero) {
             if !windowState.isIncognito {
                 PinnedGrid(
                     width: windowState.sidebarContentWidth,
@@ -315,8 +315,8 @@ struct SpacesSideBarView: View {
                 .environment(windowState)
                 .environment(windowRegistry)
                 .environment(nookSettings)
-                .padding(.horizontal, 8)
-                .padding(.bottom, 8)
+                .padding(.horizontal, NookDesign.Spacing.sidebarInset)
+                .padding(.bottom, NookDesign.Spacing.sectionGap)
                 .modifier(FallbackDropBelowEssentialsModifier())
             }
 

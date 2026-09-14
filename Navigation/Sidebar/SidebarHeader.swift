@@ -16,7 +16,7 @@ struct SidebarHeader: View {
     @State private var sidebarWidth: CGFloat = 0
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: NookDesign.Spacing.sectionGap) {
             if nookSettings.topBarAddressView {
                 windowControls
             }
@@ -37,20 +37,20 @@ struct SidebarHeader: View {
         SidebarWindowControlsView()
             .environmentObject(browserManager)
             .environment(windowState)
-            .padding(.horizontal, 8)
+            .padding(.horizontal, NookDesign.Spacing.sidebarInset)
     }
 
     private var navigationButtons: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: NookDesign.Spacing.xxs) {
             NavButtonsView(effectiveSidebarWidth: sidebarWidth)
         }
-        .padding(.horizontal, 8)
-        .frame(height: 30)
+        .padding(.horizontal, NookDesign.Spacing.sidebarInset)
+        .frame(height: NookDesign.Size.navRow)
     }
 
     private var urlBar: some View {
         URLBarView(isSidebarHovered: isSidebarHovered)
-            .padding(.horizontal, 8)
+            .padding(.horizontal, NookDesign.Spacing.sidebarInset)
     }
 }
 
@@ -61,7 +61,7 @@ struct SidebarWindowControlsView: View {
     @Environment(\.nookSettings) var nookSettings
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: NookDesign.Spacing.md) {
             Button("Toggle Sidebar", systemImage: nookSettings.sidebarPosition == .left ? "sidebar.left" : "sidebar.right") {
                 browserManager.toggleSidebar(for: windowState)
             }
@@ -80,6 +80,6 @@ struct SidebarWindowControlsView: View {
 
             Spacer()
         }
-        .frame(height: 28)
+        .frame(height: NookDesign.Size.navRow)
     }
 }

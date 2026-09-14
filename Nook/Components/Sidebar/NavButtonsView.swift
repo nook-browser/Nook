@@ -99,6 +99,7 @@ struct NavButtonsView: View {
 
         // Collapse thresholds: at 250pt default width all buttons fit comfortably
         // (5 buttons × 32pt + spacing ≈ 186pt, leaving ~48pt spacer in 234pt usable)
+        // width breakpoints for collapsing nav buttons into the ellipsis menu
         let navigationCollapseThreshold: CGFloat = nookSettings.showAIAssistant ? 215 : 180
         let refreshCollapseThreshold: CGFloat = nookSettings.showAIAssistant ? 200 : 165
         let aiChatCollapseThreshold: CGFloat = 195
@@ -107,7 +108,7 @@ struct NavButtonsView: View {
         let shouldCollapseRefresh = sidebarWidthForLayout < refreshCollapseThreshold
         let shouldCollapseAIChat = sidebarWidthForLayout < aiChatCollapseThreshold
         
-        HStack(spacing: 2) {
+        HStack(spacing: NookDesign.Spacing.xxs) {
             Button("Toggle Sidebar", systemImage: sidebarOnLeft ? "sidebar.left" : "sidebar.right") {
                 browserManager.toggleSidebar(for: windowState)
             }
@@ -126,7 +127,7 @@ struct NavButtonsView: View {
             
             Spacer()
             
-            HStack(alignment: .center, spacing: 8) {
+            HStack(alignment: .center, spacing: NookDesign.Spacing.xxs) {
                 if shouldCollapseNavigation {
                     collapsedMenu(
                         includeNavigation: true,
@@ -134,7 +135,7 @@ struct NavButtonsView: View {
                         includeAIChat: shouldCollapseAIChat && nookSettings.showAIAssistant
                     )
                 } else {
-                    HStack(alignment: .center, spacing: 8) {
+                    HStack(alignment: .center, spacing: NookDesign.Spacing.xxs) {
                         Button("Go Back", systemImage: "arrow.backward", action: goBack)
                             .labelStyle(.iconOnly)
                             .buttonStyle(NookIconButtonStyle())

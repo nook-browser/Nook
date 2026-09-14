@@ -16,8 +16,8 @@ struct SidebarHoverOverlayView: View {
     @Environment(\.nookSettings) var nookSettings
 
     private let cornerRadius: CGFloat = NookDesign.Radius.lg
-    private let horizontalInset: CGFloat = 7
-    private let verticalInset: CGFloat = 7
+    private let horizontalInset: CGFloat = NookDesign.Spacing.md
+    private let verticalInset: CGFloat = NookDesign.Spacing.md
 
     var body: some View {
         // Only render overlay plumbing when the real sidebar is collapsed
