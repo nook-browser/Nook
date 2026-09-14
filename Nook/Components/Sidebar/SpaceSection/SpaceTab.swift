@@ -30,7 +30,7 @@ struct SpaceTab: View {
             LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing)
                 .frame(width: 20)
             Color.clear
-                .frame(width: isHovering ? 24 : 0)
+                .frame(width: isHovering ? 32 : 0)
         }
     }
 
