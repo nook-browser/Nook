@@ -13,6 +13,7 @@ struct SpaceTab: View {
     var onClose: () -> Void
     var onUnload: (() -> Void)? = nil
     var onMute: () -> Void
+    var menuContext: TabMenuContext = .regular
     @State private var isHovering: Bool = false
     @State private var isCloseHovering: Bool = false
     @FocusState private var isTextFieldFocused: Bool
@@ -149,7 +150,7 @@ struct SpaceTab: View {
             }
         )
         .contextMenu {
-            Options()
+            TabContextMenu(tab: tab, context: menuContext)
         }
         .nookElevation(isActive ? .raised : .flat)
         .onAppear {
@@ -157,203 +158,6 @@ struct SpaceTab: View {
         }
     }
     
-    @ViewBuilder
-    func Options() -> some View {
-        Group {
-            addToMenuSection
-            Divider()
-            editMenuSection
-            Divider()
-            actionsMenuSection
-            Divider()
-            closeMenuSection
-        }
-    }
-
-    @ViewBuilder
-    private var addToMenuSection: some View {
-        let spaceId = tab.spaceId ?? UUID()
-        let folders = tabManager.folders(for: spaceId)
-
-        if !folders.isEmpty {
-            Menu {
-                ForEach(folders, id: \.id) { folder in
-                    Button {
-                        tabManager.moveTabToRegularFolder(tab: tab, folderId: folder.id)
-                    } label: {
-                        Label(folder.name, systemImage: "folder.fill")
-                    }
-                }
-            } label: {
-                Label("Add to Folder", systemImage: "folder.badge.plus")
-            }
-        }
-
-        if !tab.isPinned && !tab.isSpacePinned {
-            Button {
-                tabManager.pinTab(tab)
-            } label: {
-                Label("Add to Favorites", systemImage: "star.fill")
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var editMenuSection: some View {
-        Button {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(tab.url.absoluteString, forType: .string)
-        } label: {
-            Label("Copy Link", systemImage: "link")
-        }
-
-        Button {
-            let picker = NSSharingServicePicker(items: [tab.url as NSURL])
-            if let window = NSApp.keyWindow {
-                let origin = NSPoint(x: window.frame.midX, y: window.frame.midY)
-                picker.show(relativeTo: .zero, of: window.contentView ?? NSView(), preferredEdge: .minY)
-                _ = origin
-            }
-        } label: {
-            Label("Share", systemImage: "square.and.arrow.up")
-        }
-
-        Button {
-            tab.startRenaming()
-            isTextFieldFocused = true
-        } label: {
-            Label("Rename", systemImage: "character.cursor.ibeam")
-        }
-
-        if tab.displayNameOverride != nil {
-            Button {
-                tab.displayNameOverride = nil
-            } label: {
-                Label("Reset Tab Name", systemImage: "arrow.uturn.backward")
-            }
-        }
-
-        if (tab.isPinned || tab.isSpacePinned), tab.hasNavigatedAwayFromPinnedURL {
-            Button {
-                tab.resetToPinnedURL()
-            } label: {
-                Label("Reset to Pinned URL", systemImage: "arrow.uturn.backward.circle")
-            }
-        }
-
-        if (tab.isPinned || tab.isSpacePinned), tab.pinnedURL != nil {
-            Button {
-                browserManager.dialogManager.showDialog(
-                    EditPinnedURLDialog(
-                        tab: tab,
-                        onSave: { newURL in
-                            tab.pinnedURL = newURL
-                            tab.loadURL(newURL)
-                            browserManager.dialogManager.closeDialog()
-                            tabManager.debouncedPersistSnapshot()
-                        },
-                        onCancel: {
-                            browserManager.dialogManager.closeDialog()
-                        }
-                    )
-                )
-            } label: {
-                Label("Edit Pinned URL", systemImage: "pencil.circle")
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var actionsMenuSection: some View {
-        splitMenu
-        duplicateButton
-        moveToSpaceMenu
-    }
-
-    @ViewBuilder
-    private var splitMenu: some View {
-        Menu {
-            Button {
-                browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState)
-            } label: {
-                Label("Right", systemImage: "rectangle.righthalf.filled")
-            }
-
-            Button {
-                browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState)
-            } label: {
-                Label("Left", systemImage: "rectangle.lefthalf.filled")
-            }
-        } label: {
-            Label("Open in Split", systemImage: "rectangle.split.2x1")
-        }
-    }
-
-    @ViewBuilder
-    private var duplicateButton: some View {
-        Button {
-            browserManager.duplicateCurrentTab()
-        } label: {
-            Label("Duplicate", systemImage: "plus.square.on.square")
-        }
-    }
-
-    @ViewBuilder
-    private var moveToSpaceMenu: some View {
-        let spaces = tabManager.spaces
-        Menu {
-            ForEach(spaces, id: \.id) { space in
-                Button {
-                    tabManager.moveTab(tab.id, to: space.id)
-                } label: {
-                    spaceLabel(for: space)
-                }
-                .disabled(space.id == tab.spaceId)
-            }
-        } label: {
-            Label("Move to Space", systemImage: "square.grid.2x2")
-        }
-    }
-
-    @ViewBuilder
-    private func spaceLabel(for space: Space) -> some View {
-        if space.icon.isEmojiIcon {
-            Label {
-                Text(space.name)
-            } icon: {
-                Text(space.icon)
-            }
-        } else {
-            Label(space.name, systemImage: space.icon)
-        }
-    }
-
-    @ViewBuilder
-    private var closeMenuSection: some View {
-        if !tab.isPinned && !tab.isSpacePinned && tab.spaceId != nil {
-            Button {
-                tabManager.closeAllTabsBelow(tab)
-            } label: {
-                Label("Close All Below", systemImage: "arrow.down.to.line")
-            }
-        }
-
-        let hasOtherTabs = (tabManager.tabsBySpace[tab.spaceId ?? UUID()]?.filter { $0.id != tab.id }.isEmpty == false)
-        if hasOtherTabs && !tab.isPinned && !tab.isSpacePinned {
-            Button {
-                tabManager.closeOtherTabs(tab)
-            } label: {
-                Label("Close Others", systemImage: "xmark.circle")
-            }
-        }
-
-        Button(role: .destructive) {
-            onClose()
-        } label: {
-            Label("Close", systemImage: "xmark")
-        }
-    }
-
     private var isActive: Bool {
         return browserManager.currentTab(for: windowState)?.id == tab.id
     }

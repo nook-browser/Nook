@@ -326,9 +326,6 @@ struct SpacesSideBarView: View {
                 isSidebarHovered: $isSidebarHovered,
                 onActivateTab: { browserManager.selectTab($0, in: windowState) },
                 onCloseTab: { tabManager.removeTab($0.id) },
-                onPinTab: { tabManager.pinTab($0) },
-                onMoveTabUp: { tabManager.moveTabUp($0.id) },
-                onMoveTabDown: { tabManager.moveTabDown($0.id) },
                 onMuteTab: { $0.toggleMute() }
             )
             .environmentObject(browserManager)

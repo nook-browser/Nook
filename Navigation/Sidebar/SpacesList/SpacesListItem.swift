@@ -58,7 +58,15 @@ struct SpacesListItem: View {
             onHoverChange?(hovering)
         }
         .contextMenu {
-            spaceContextMenu
+            SpaceContextMenu(
+                space: space,
+                canDelete: tabManager.spaces.count > 1,
+                onEditName: nil,
+                onEditIcon: nil,
+                onOpenSettings: { browserManager.showSpaceSettings(for: space) },
+                onDeleteSpace: { tabManager.removeSpace(space.id) }
+            )
+            .environmentObject(browserManager)
         }
     }
 
@@ -73,49 +81,5 @@ struct SpacesListItem: View {
         } else {
             SpaceIconView(icon: space.icon, tint: isActive ? space.accentColor : AppColors.textTertiary)
         }
-    }
-
-    // MARK: - Context Menu
-
-    @ViewBuilder
-    private var spaceContextMenu: some View {
-        Button {
-            browserManager.showSpaceSettings(for: space)
-        } label: {
-            Label("Space Settings", systemImage: "gear")
-        }
-
-        if tabManager.spaces.count > 1 {
-            Button(role: .destructive) {
-                showDeleteConfirmation()
-            } label: {
-                Label("Delete Space", systemImage: "trash")
-            }
-        }
-    }
-
-    // MARK: - Helper Methods
-
-    private func showDeleteConfirmation() {
-        // Count both regular and space-pinned tabs
-        let regularTabsCount = tabManager.tabsBySpace[space.id]?.count ?? 0
-        let spacePinnedTabsCount = tabManager.spacePinnedTabs(for: space.id).count
-        let tabsCount = regularTabsCount + spacePinnedTabsCount
-
-        browserManager.dialogManager.showDialog(
-            SpaceDeleteConfirmationDialog(
-                spaceName: space.name,
-                spaceIcon: space.icon,
-                tabsCount: tabsCount,
-                isLastSpace: tabManager.spaces.count <= 1,
-                onDelete: {
-                    tabManager.removeSpace(space.id)
-                    browserManager.dialogManager.closeDialog()
-                },
-                onCancel: {
-                    browserManager.dialogManager.closeDialog()
-                }
-            )
-        )
     }
 }

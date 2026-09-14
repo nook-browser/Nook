@@ -119,31 +119,7 @@ struct PinnedGrid: View {
                                             urlString: tab.url.absoluteString,
                                             icon: tab.favicon,
                                             isActive: isActive,
-                                            hasDisplayNameOverride: tab.displayNameOverride != nil,
-                                            onActivate: { browserManager.selectTab(tab, in: windowState) },
-                                            onClose: { tabManager.removeTab(tab.id) },
-                                            onRemovePin: { tabManager.unpinTab(tab) },
-                                            onSplitRight: { browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState) },
-                                            onSplitLeft: { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) },
-                                            onResetName: { tab.displayNameOverride = nil },
-                                            onResetURL: { tab.resetToPinnedURL() },
-                                            onEditPinnedURL: {
-                                                browserManager.dialogManager.showDialog(
-                                                    EditPinnedURLDialog(
-                                                        tab: tab,
-                                                        onSave: { newURL in
-                                                            tab.pinnedURL = newURL
-                                                            tab.loadURL(newURL)
-                                                            browserManager.dialogManager.closeDialog()
-                                                            tabManager.debouncedPersistSnapshot()
-                                                        },
-                                                        onCancel: {
-                                                            browserManager.dialogManager.closeDialog()
-                                                        }
-                                                    )
-                                                )
-                                            },
-                                            hasNavigatedAway: tab.hasNavigatedAwayFromPinnedURL
+                                            onActivate: { browserManager.selectTab(tab, in: windowState) }
                                         )
                                         .environmentObject(browserManager)
                                         .onHoverTracking { hovering in
@@ -279,16 +255,7 @@ private struct PinnedTile: View {
     let urlString: String
     let icon: Image
     let isActive: Bool
-    var hasDisplayNameOverride: Bool = false
     let onActivate: () -> Void
-    let onClose: () -> Void
-    let onRemovePin: () -> Void
-    let onSplitRight: () -> Void
-    let onSplitLeft: () -> Void
-    var onResetName: (() -> Void)? = nil
-    var onResetURL: (() -> Void)? = nil
-    var onEditPinnedURL: (() -> Void)? = nil
-    var hasNavigatedAway: Bool = false
 
     var body: some View {
         PinnedTabView(
@@ -301,35 +268,7 @@ private struct PinnedTile: View {
         )
         .frame(maxWidth: .infinity)
         .contextMenu {
-            Button(action: onSplitRight) {
-                Label("Open in Split (Right)", systemImage: "rectangle.split.2x1")
-            }
-            Button(action: onSplitLeft) {
-                Label("Open in Split (Left)", systemImage: "rectangle.split.2x1")
-            }
-            Divider()
-            if hasDisplayNameOverride, let onResetName {
-                Button(action: onResetName) {
-                    Label("Reset Tab Name", systemImage: "arrow.uturn.backward")
-                }
-            }
-            if hasNavigatedAway, let onResetURL {
-                Button(action: onResetURL) {
-                    Label("Reset to Pinned URL", systemImage: "arrow.uturn.backward.circle")
-                }
-            }
-            if let onEditPinnedURL {
-                Button(action: onEditPinnedURL) {
-                    Label("Edit Pinned URL", systemImage: "pencil.circle")
-                }
-            }
-            Divider()
-            Button(role: .destructive, action: onClose) {
-                Label("Close tab", systemImage: "xmark")
-            }
-            Button(action: onRemovePin) {
-                Label("Remove pinned tab", systemImage: "pin.slash")
-            }
+            TabContextMenu(tab: tab, context: .essential)
         }
     }
 }

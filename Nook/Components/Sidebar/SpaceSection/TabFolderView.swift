@@ -158,20 +158,7 @@ struct TabFolderView: View {
                 // Context menu button
                 if isHovering && !isRenaming {
                     Menu {
-                        Button(action: startRenaming) {
-                            Label("Rename Folder", systemImage: "pencil")
-                        }
-                        Button(action: onAddTab) {
-                            Label("Add Tab to Folder", systemImage: "plus")
-                        }
-                        Divider()
-                        Button(action: alphabetizeTabs) {
-                            Label("Alphabetize Tabs", systemImage: "text.alignleft")
-                        }
-                        Divider()
-                        Button(role: .destructive, action: onDelete) {
-                            Label("Delete Folder", systemImage: "trash")
-                        }
+                        sharedFolderMenu
                     } label: {
                         Image(systemName: "ellipsis.circle.fill")
                     }
@@ -199,7 +186,7 @@ struct TabFolderView: View {
             }
         }
         .contextMenu {
-            folderContextMenu
+            sharedFolderMenu
         }
         .onChange(of: nameFieldFocused) { _, focused in
             // When losing focus during rename, commit
@@ -265,7 +252,8 @@ struct TabFolderView: View {
                     onActivateTab(tab)
                 },
                 onClose: { tabManager.removeTab(tab.id) },
-                onMute: { tab.toggleMute() }
+                onMute: { tab.toggleMute() },
+                menuContext: .folder
             )
             .padding(.leading, NookDesign.Spacing.folderIndent)
         }
@@ -273,81 +261,17 @@ struct TabFolderView: View {
         .offset(y: dragSession.reorderOffset(for: .folder(folder.id), at: index))
         .animation(NookDesign.Motion.spring, value: dragSession.insertionIndex[.folder(folder.id)])
         .transition(.move(edge: .top).combined(with: .opacity))
-        .contextMenu {
-            folderTabContextMenu(tab)
-        }
+
     }
 
-    private var folderContextMenu: some View {
-        VStack {
-            Button(action: startRenaming) {
-                Label("Rename Folder", systemImage: "pencil")
-            }
-            Button(action: onAddTab) {
-                Label("Add Tab to Folder", systemImage: "plus")
-            }
-            Divider()
-            Button(action: alphabetizeTabs) {
-                Label("Alphabetize Tabs", systemImage: "text.alignleft")
-            }
-            Divider()
-            Button(role: .destructive, action: onDelete) {
-                Label("Delete Folder", systemImage: "trash")
-            }
-        }
-    }
-
-    private func folderTabContextMenu(_ tab: Tab) -> some View {
-        VStack {
-            // Split view
-            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState) }
-            label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
-            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) }
-            label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
-
-            Button { browserManager.duplicateCurrentTab() }
-            label: { Label("Duplicate Tab", systemImage: "doc.on.doc") }
-
-            if tab.displayNameOverride != nil {
-                Button {
-                    tab.displayNameOverride = nil
-                } label: {
-                    Label("Reset Tab Name", systemImage: "arrow.uturn.backward")
-                }
-            }
-
-            Divider()
-            // Mute/Unmute option (show if tab has audio content OR is muted)
-            if tab.hasAudioContent || tab.isAudioMuted {
-                Button(action: { tab.toggleMute() }) {
-                    Label(tab.isAudioMuted ? "Unmute Audio" : "Mute Audio",
-                          systemImage: tab.isAudioMuted ? "speaker.wave.2" : "speaker.slash")
-                }
-                Divider()
-            }
-
-            // Unload options
-            Button(action: {
-                tabManager.unloadTab(tab)
-            }) {
-                Label("Unload Tab", systemImage: "arrow.down.circle")
-            }
-            .disabled(tab.isUnloaded)
-
-            Button(action: {
-                tabManager.unloadAllInactiveTabs()
-            }) {
-                Label("Unload All Inactive Tabs", systemImage: "arrow.down.circle.fill")
-            }
-
-            Divider()
-
-            Button(action: {
-                tabManager.removeTab(tab.id)
-            }) {
-                Label("Close Tab", systemImage: "xmark.circle")
-            }
-        }
+    private var sharedFolderMenu: some View {
+        FolderContextMenu(
+            folder: folder,
+            onRename: startRenaming,
+            onAddTab: onAddTab,
+            onAlphabetize: alphabetizeTabs,
+            onDelete: onDelete
+        )
     }
 
     private func alphabetizeTabs() {

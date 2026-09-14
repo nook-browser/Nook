@@ -64,9 +64,6 @@ struct SpaceView: View {
 
     let onActivateTab: (Tab) -> Void
     let onCloseTab: (Tab) -> Void
-    let onPinTab: (Tab) -> Void
-    let onMoveTabUp: (Tab) -> Void
-    let onMoveTabDown: (Tab) -> Void
     let onMuteTab: (Tab) -> Void
     @EnvironmentObject var splitManager: SplitViewManager
 
@@ -427,7 +424,8 @@ struct SpaceView: View {
                 action: { handleUserTabActivation(tab) },
                 onClose: { tabManager.forceRemoveTab(tab.id) },
                 onUnload: { tab.unloadWebView() },
-                onMute: { onMuteTab(tab) }
+                onMute: { onMuteTab(tab) },
+                menuContext: .spacePinned
             )
         }
         .id(tab.id)
@@ -441,43 +439,6 @@ struct SpaceView: View {
         .offset(y: dragSession.reorderOffset(for: .spacePinned(space.id), at: index))
         .animation(NookDesign.Motion.spring, value: dragSession.insertionIndex[.spacePinned(space.id)])
         .transition(.move(edge: .top).combined(with: .opacity))
-        .contextMenu {
-            pinnedTabContextMenu(tab)
-        }
-    }
-
-    private func pinnedTabContextMenu(_ tab: Tab) -> some View {
-        VStack {
-            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState) } label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
-            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) } label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
-            Divider()
-            if tab.hasNavigatedAwayFromPinnedURL {
-                Button { tab.resetToPinnedURL() } label: { Label("Reset to Pinned URL", systemImage: "arrow.uturn.backward.circle") }
-            }
-            if tab.pinnedURL != nil {
-                Button {
-                    browserManager.dialogManager.showDialog(
-                        EditPinnedURLDialog(
-                            tab: tab,
-                            onSave: { newURL in
-                                tab.pinnedURL = newURL
-                                tab.loadURL(newURL)
-                                browserManager.dialogManager.closeDialog()
-                                tabManager.debouncedPersistSnapshot()
-                            },
-                            onCancel: {
-                                browserManager.dialogManager.closeDialog()
-                            }
-                        )
-                    )
-                } label: { Label("Edit Pinned URL", systemImage: "pencil.circle") }
-            }
-            Divider()
-            Button { tabManager.unpinTabFromSpace(tab) } label: { Label("Unpin from Space", systemImage: "pin.slash") }
-            Button { onPinTab(tab) } label: { Label("Pin Globally", systemImage: "pin.circle") }
-            Divider()
-            Button { onCloseTab(tab) } label: { Label("Close tab", systemImage: "xmark") }
-        }
     }
 
     private var newTabButtonSection: some View {
@@ -656,25 +617,6 @@ struct SpaceView: View {
         .offset(y: dragSession.reorderOffset(for: .spaceRegular(space.id), at: index))
         .animation(NookDesign.Motion.spring, value: dragSession.insertionIndex[.spaceRegular(space.id)])
         .transition(.move(edge: .top).combined(with: .opacity))
-        .contextMenu {
-            regularTabContextMenu(tab)
-        }
-    }
-
-    private func regularTabContextMenu(_ tab: Tab) -> some View {
-        VStack {
-            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState) } label: { Label("Open in Split (Right)", systemImage: "rectangle.split.2x1") }
-            Button { browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState) } label: { Label("Open in Split (Left)", systemImage: "rectangle.split.2x1") }
-            Divider()
-            Button { onMoveTabUp(tab) } label: { Label("Move Up", systemImage: "arrow.up") }
-                .disabled(isFirstTab(tab))
-            Button { onMoveTabDown(tab) } label: { Label("Move Down", systemImage: "arrow.down") }
-                .disabled(isLastTab(tab))
-            Divider()
-            Button { tabManager.pinTabToSpace(tab, spaceId: space.id) } label: { Label("Pin to Space", systemImage: "pin") }
-            Button { onPinTab(tab) } label: { Label("Pin Globally", systemImage: "pin.circle") }
-            Button { onCloseTab(tab) } label: { Label("Close tab", systemImage: "xmark") }
-        }
     }
 
     private var emptyRegularTabsDropTarget: some View {
@@ -696,14 +638,6 @@ struct SpaceView: View {
         newTab.folderId = folder.id
         newTab.isSpacePinned = true
         tabManager.persistSnapshot()
-    }
-
-    private func isFirstTab(_ tab: Tab) -> Bool {
-        return tabs.first?.id == tab.id
-    }
-
-    private func isLastTab(_ tab: Tab) -> Bool {
-        return tabs.last?.id == tab.id
     }
 
     // MARK: - Scroll State
