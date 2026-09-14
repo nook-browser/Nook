@@ -21,70 +21,25 @@ struct CacheManagementView: View {
     enum ViewMode: String, CaseIterable {
         case domain = "By Domain"
         case list = "All Cache"
-        
-        var icon: String {
-            switch self {
-            case .domain: return "folder"
-            case .list: return "list.bullet"
-            }
-        }
     }
+
+    /// Minimum height for the entry list; the sheet grows from it.
+    private let entryListMinHeight: CGFloat = 260
     
     var body: some View {
         VStack(spacing: 0) {
             Form {
                 summarySection
                 filterSection
-
-                if cacheManager.isLoading {
-                    Section {
-                        HStack(spacing: NookDesign.Spacing.md) {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text("Loading cache data...")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                } else {
-                    Section("Cached Data") {
-                        switch viewMode {
-                        case .domain:
-                            ForEach(filteredDomainGroups) { group in
-                                DisclosureGroup {
-                                    ForEach(filteredCacheForGroup(group)) { cache in
-                                        CacheRowView(cache: cache) {
-                                            selectedCache = cache
-                                            showingCacheDetails = true
-                                        } onDelete: {
-                                            Task {
-                                                await cacheManager.clearSpecificCache(cache)
-                                            }
-                                        }
-                                    }
-                                } label: {
-                                    DomainCacheRowView(group: group) {
-                                        Task {
-                                            await cacheManager.clearCacheForDomain(group.domain)
-                                        }
-                                    }
-                                }
-                            }
-                        case .list:
-                            ForEach(filteredAndSortedCache) { cache in
-                                CacheRowView(cache: cache, showsDomain: true) {
-                                    selectedCache = cache
-                                    showingCacheDetails = true
-                                } onDelete: {
-                                    Task {
-                                        await cacheManager.clearSpecificCache(cache)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
             }
             .formStyle(.grouped)
+            .scrollDisabled(true)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Divider()
+
+            entryList
+                .frame(minHeight: entryListMinHeight)
 
             Divider()
 
@@ -104,6 +59,68 @@ struct CacheManagementView: View {
                 CacheDetailsView(cache: cache, cacheManager: cacheManager)
             }
         }
+    }
+
+    // MARK: - Entry List
+
+    @ViewBuilder
+    private var entryList: some View {
+        if cacheManager.isLoading {
+            VStack(spacing: NookDesign.Spacing.md) {
+                ProgressView()
+                Text("Loading cache data...")
+                    .font(NookDesign.Font.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            switch viewMode {
+            case .domain:
+                domainList
+            case .list:
+                flatList
+            }
+        }
+    }
+
+    private var domainList: some View {
+        List {
+            ForEach(filteredDomainGroups) { group in
+                DisclosureGroup {
+                    ForEach(filteredCacheForGroup(group)) { cache in
+                        CacheRowView(cache: cache) {
+                            selectedCache = cache
+                            showingCacheDetails = true
+                        } onDelete: {
+                            Task {
+                                await cacheManager.clearSpecificCache(cache)
+                            }
+                        }
+                    }
+                } label: {
+                    DomainCacheRowView(group: group) {
+                        Task {
+                            await cacheManager.clearCacheForDomain(group.domain)
+                        }
+                    }
+                }
+            }
+        }
+        .listStyle(.sidebar)
+    }
+
+    private var flatList: some View {
+        List(filteredAndSortedCache) { cache in
+            CacheRowView(cache: cache, showsDomain: true) {
+                selectedCache = cache
+                showingCacheDetails = true
+            } onDelete: {
+                Task {
+                    await cacheManager.clearSpecificCache(cache)
+                }
+            }
+        }
+        .listStyle(.inset(alternatesRowBackgrounds: true))
     }
 
     // MARK: - Summary
@@ -318,6 +335,16 @@ struct CacheRowView: View {
             Image(systemName: cache.primaryCacheType.icon)
                 .foregroundStyle(Color(cache.primaryCacheType.color))
             
+            if showsDomain {
+                Circle()
+                    .fill(cache.isStale ? Color.orange : Color.green)
+                    .frame(
+                        width: NookDesign.Size.statusDot,
+                        height: NookDesign.Size.statusDot
+                    )
+                    .help(cache.isStale ? "Stale" : "Fresh")
+            }
+
             VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
                 Text(showsDomain ? cache.displayDomain : cache.primaryCacheType.rawValue)
                 

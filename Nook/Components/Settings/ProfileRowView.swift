@@ -102,7 +102,7 @@ struct ProfileRowView: View {
                 }
             }
         }
-        .padding(NookDesign.Spacing.md)
+        .padding(NookDesign.Spacing.lg)
         .background(
             NookDesign.Radius.shape(NookDesign.Radius.md)
                 .fill(isHovering ? NookDesign.Surface.fill : Color.clear)

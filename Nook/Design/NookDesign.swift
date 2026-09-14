@@ -68,9 +68,6 @@ enum NookDesign {
         // Settings
         static let settingsChip: CGFloat = 22           // tinted icon chip in the settings sidebar
         static let settingsIcon: CGFloat = 32           // icon tile in a settings list row
-        static let settingsSidebar: CGFloat = 220       // settings sidebar column width
-        static let settingsWindowWidth: CGFloat = 780
-        static let settingsWindowHeight: CGFloat = 540
         static let statusDot: CGFloat = 8               // inline state dot in a settings row
         static let fieldNarrow: CGFloat = 100           // numeric field, inline progress bar
         static let textEditorHeight: CGFloat = 200      // multi-line editor, scrolling value box
@@ -80,8 +77,8 @@ enum NookDesign {
         static let sheetSmallHeight: CGFloat = 360
         static let sheetMediumWidth: CGFloat = 600      // record detail
         static let sheetMediumHeight: CGFloat = 500
-        static let sheetLargeWidth: CGFloat = 900       // data management browser
-        static let sheetLargeHeight: CGFloat = 700
+        static let sheetLargeWidth: CGFloat = 800       // data management browser
+        static let sheetLargeHeight: CGFloat = 600
     }
 
     // MARK: - Type

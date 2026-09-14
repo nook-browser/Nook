@@ -12,6 +12,8 @@ struct SettingsWindow: View {
     @EnvironmentObject var gradientColorManager: GradientColorManager
     @Environment(\.nookSettings) var nookSettings
 
+    private let windowSize = CGSize(width: 780, height: 540)
+
     var body: some View {
         @Bindable var settings = nookSettings
         NavigationSplitView {
@@ -21,10 +23,7 @@ struct SettingsWindow: View {
                 .environmentObject(browserManager)
                 .environmentObject(gradientColorManager)
         }
-        .frame(
-            width: NookDesign.Size.settingsWindowWidth,
-            height: NookDesign.Size.settingsWindowHeight
-        )
+        .frame(width: windowSize.width, height: windowSize.height)
         .navigationSplitViewStyle(.balanced)
     }
 }
@@ -34,6 +33,8 @@ struct SettingsWindow: View {
 private struct SettingsSidebar: View {
     @Binding var selection: SettingsTabs
     @EnvironmentObject var browserManager: BrowserManager
+
+    private let sidebarWidth: CGFloat = 220
 
     var body: some View {
         List(selection: $selection) {
@@ -52,7 +53,7 @@ private struct SettingsSidebar: View {
             }
         }
         .listStyle(.sidebar)
-        .navigationSplitViewColumnWidth(NookDesign.Size.settingsSidebar)
+        .navigationSplitViewColumnWidth(sidebarWidth)
     }
 
     private func sidebarRow(_ tab: SettingsTabs) -> some View {

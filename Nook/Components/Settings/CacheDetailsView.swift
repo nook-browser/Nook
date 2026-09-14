@@ -23,20 +23,39 @@ struct CacheDetailsView: View {
     var body: some View {
         VStack(spacing: 0) {
             Form {
-                Section("Basic Information") {
-                    LabeledContent("Domain") { Text(cache.displayDomain) }
-                    LabeledContent("Total Size") { Text(cache.sizeDescription) }
-                    LabeledContent("Primary Type") { Text(cache.primaryCacheType.rawValue) }
+                Section("Cache Details") {
+                    LabeledContent("Domain") {
+                        Text(cache.displayDomain)
+                            .textSelection(.enabled)
+                    }
+                    LabeledContent("Total Size") {
+                        Text(cache.sizeDescription)
+                            .textSelection(.enabled)
+                    }
+                    LabeledContent("Primary Type") {
+                        Text(cache.primaryCacheType.rawValue)
+                            .textSelection(.enabled)
+                    }
                     LabeledContent("Status") {
                         Text(cache.isStale ? "Stale" : "Fresh")
                             .foregroundStyle(cache.isStale ? .orange : .green)
+                            .textSelection(.enabled)
                     }
                 }
 
                 Section("Storage Breakdown") {
-                    LabeledContent("Disk Usage") { Text(cache.diskUsageDescription) }
-                    LabeledContent("Memory Usage") { Text(cache.memoryUsageDescription) }
-                    LabeledContent("Last Modified") { Text(cache.lastModifiedDescription) }
+                    LabeledContent("Disk Usage") {
+                        Text(cache.diskUsageDescription)
+                            .textSelection(.enabled)
+                    }
+                    LabeledContent("Memory Usage") {
+                        Text(cache.memoryUsageDescription)
+                            .textSelection(.enabled)
+                    }
+                    LabeledContent("Last Modified") {
+                        Text(cache.lastModifiedDescription)
+                            .textSelection(.enabled)
+                    }
 
                     LabeledContent("Disk") {
                         ProgressView(value: Double(cache.diskUsage), total: Double(cache.size))

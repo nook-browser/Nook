@@ -23,44 +23,60 @@ struct CookieDetailsView: View {
     var body: some View {
         VStack(spacing: 0) {
             Form {
-                Section("Basic Information") {
+                Section("Cookie Details") {
                     LabeledContent("Name") {
                         Text(cookie.name)
                             .font(NookDesign.Font.body.monospaced())
                             .textSelection(.enabled)
                     }
-                    LabeledContent("Domain") { Text(cookie.displayDomain) }
+                    LabeledContent("Domain") {
+                        Text(cookie.displayDomain)
+                            .textSelection(.enabled)
+                    }
                     LabeledContent("Path") {
                         Text(cookie.path)
                             .font(NookDesign.Font.body.monospaced())
                             .textSelection(.enabled)
                     }
-                    LabeledContent("Size") { Text(cookie.sizeDescription) }
+                    LabeledContent("Size") {
+                        Text(cookie.sizeDescription)
+                            .textSelection(.enabled)
+                    }
                 }
 
                 Section("Security") {
                     LabeledContent("Secure") {
                         Text(cookie.isSecure ? "Yes" : "No")
                             .foregroundStyle(cookie.isSecure ? .green : .red)
+                            .textSelection(.enabled)
                     }
                     LabeledContent("HTTP Only") {
                         Text(cookie.isHTTPOnly ? "Yes" : "No")
                             .foregroundStyle(cookie.isHTTPOnly ? .green : .orange)
+                            .textSelection(.enabled)
                     }
-                    LabeledContent("Same Site Policy") { Text(cookie.sameSitePolicy) }
+                    LabeledContent("Same Site Policy") {
+                        Text(cookie.sameSitePolicy)
+                            .textSelection(.enabled)
+                    }
                 }
 
                 Section("Expiration") {
                     LabeledContent("Type") {
                         Text(cookie.isSessionCookie ? "Session Cookie" : "Persistent Cookie")
+                            .textSelection(.enabled)
                     }
-                    LabeledContent("Expires") { Text(cookie.expirationStatus) }
+                    LabeledContent("Expires") {
+                        Text(cookie.expirationStatus)
+                            .textSelection(.enabled)
+                    }
 
                     if let expiresDate = cookie.expiresDate {
                         let isExpired = expiresDate < Date()
                         LabeledContent("Status") {
                             Text(isExpired ? "Expired" : "Valid")
                                 .foregroundStyle(isExpired ? .red : .green)
+                                .textSelection(.enabled)
                         }
                     }
                 }
