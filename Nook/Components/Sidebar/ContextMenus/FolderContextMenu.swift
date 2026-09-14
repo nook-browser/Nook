@@ -10,7 +10,7 @@ import SwiftUI
 /// Shared context menu for sidebar tab folders. Used both by the folder
 /// header's hover menu and by its right-click menu.
 struct FolderContextMenu: View {
-    @ObservedObject var folder: TabFolder
+    let folder: TabFolder
     let onRename: () -> Void
     let onAddTab: () -> Void
     let onAlphabetize: () -> Void

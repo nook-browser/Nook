@@ -75,7 +75,7 @@ struct TabContextMenu: View {
             }
         }
 
-        if context == .regular || context == .spacePinned {
+        if context == .regular || context == .spacePinned || context == .folder {
             addToFolderMenu
         }
 
@@ -172,9 +172,7 @@ struct TabContextMenu: View {
         Button {
             let picker = NSSharingServicePicker(items: [tab.url as NSURL])
             if let window = NSApp.keyWindow {
-                let origin = NSPoint(x: window.frame.midX, y: window.frame.midY)
                 picker.show(relativeTo: .zero, of: window.contentView ?? NSView(), preferredEdge: .minY)
-                _ = origin
             }
         } label: {
             Label("Share", systemImage: "square.and.arrow.up")
@@ -245,12 +243,15 @@ struct TabContextMenu: View {
             }
         }
 
-        Button {
-            tabManager.unloadTab(tab)
-        } label: {
-            Label("Unload Tab", systemImage: "moon.zzz")
+        // TabManager refuses to unload essential tabs, so the item would be inert there.
+        if context != .essential {
+            Button {
+                tabManager.unloadTab(tab)
+            } label: {
+                Label("Unload Tab", systemImage: "moon.zzz")
+            }
+            .disabled(tab.isUnloaded)
         }
-        .disabled(tab.isUnloaded)
 
         Button {
             tabManager.unloadAllInactiveTabs()
@@ -264,15 +265,21 @@ struct TabContextMenu: View {
     @ViewBuilder
     private var closeSection: some View {
         Button(role: .destructive) {
-            tabManager.removeTab(tab.id)
+            // A space-pinned row is only removed by forceRemoveTab; removeTab just
+            // deactivates it and leaves the row in place.
+            if context == .spacePinned {
+                tabManager.forceRemoveTab(tab.id)
+            } else {
+                tabManager.removeTab(tab.id)
+            }
         } label: {
             Label("Close Tab", systemImage: "xmark")
         }
         .keyboardShortcut("w", modifiers: .command)
 
         let hasOtherTabs = (tabManager.tabsBySpace[tab.spaceId ?? UUID()]?.filter { $0.id != tab.id }.isEmpty == false)
-        if (context == .regular || context == .spacePinned),
-           hasOtherTabs, !tab.isPinned, !tab.isSpacePinned {
+        if context == .regular || context == .spacePinned || context == .folder,
+           hasOtherTabs, !tab.isPinned {
             Button {
                 tabManager.closeOtherTabs(tab)
             } label: {
@@ -280,7 +287,8 @@ struct TabContextMenu: View {
             }
         }
 
-        if context == .regular, !tab.isPinned, !tab.isSpacePinned, tab.spaceId != nil {
+        if context == .regular || context == .folder,
+           !tab.isPinned, !tab.isSpacePinned, tab.spaceId != nil {
             Button {
                 tabManager.closeAllTabsBelow(tab)
             } label: {
