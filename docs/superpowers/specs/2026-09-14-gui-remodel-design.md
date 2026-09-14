@@ -119,7 +119,7 @@ Container padding: 34pt top (left position, clears traffic lights), 8pt sides, 1
 - **Separator** between pinned and regular tabs: hairline with 8pt side margins; Clear and Organize appear on hover at the trailing end in `Font.caption` `.tertiary`.
 - **New Tab row**: same geometry as a tab row, plus icon and label in `.tertiary`, hover shows fill and the ⌘T hint at the trailing end.
 - **Bottom bar**: 40pt. Menu icon button leading, space switcher centered (items 28pt square, 2pt gap), plus icon button trailing.
-- **Hover sidebar overlay** (sidebar hidden): same content, wrapped in glass at `Radius.lg` with 7pt insets, `.floating` elevation.
+- **Hover sidebar overlay** (sidebar hidden): same content, wrapped in glass at `Radius.lg` with `Spacing.md` (8pt) insets, `.floating` elevation.
 
 Context menus: three shared `@ViewBuilder` builders, `TabContextMenu`, `FolderContextMenu`, `SpaceContextMenu`, in `Nook/Components/Sidebar/ContextMenus/`. `SpaceTab`, `SplitTabRow`, `PinnedGrid` use `TabContextMenu`; `SpacesListItem` and `SpaceTitle` use `SpaceContextMenu`. Item order for tabs: Pin, Move to Space (submenu, current space checked, New Space at the bottom) / Rename, Duplicate, Copy Link, Open in Split View / Mute, Unload / Close Tab, Close Other Tabs. Every item has an SF Symbol. Menus stay native `.contextMenu`; macOS 26 renders them as glass.
 
@@ -140,7 +140,7 @@ Each phase is one commit on `main` that builds with `xcodebuild -scheme Nook -co
 
 1. **Tokens and sweep.** Add `NookDesign.swift`, replace literals, collapse button styles, delete `ConditionalModifiers`. Visual change is whatever the tokens define: continuous corners, snapped radii, 28pt icon buttons, new hover fill, elevation scale, type roles. Done 2026-09-14, commits 206859b..197ba61 on `gui-remodel`.
 2. **Surface and accent.** Gradient off, sidebar material on, `GradientColorManager` reduced to accent, gradient editor replaced by swatches, space icons to symbols with emoji fallback, `EmojiPicker` deleted. Incognito windows use a neutral gray accent. Done 2026-09-14, commits d5b2363..c2866a8 on `gui-remodel-p2`.
-3. **Sidebar and menus.** Rows, essentials, header, URL bar, nav row, bottom bar, folders, separator, new tab row rebuilt to section 5. Context menus extracted.
+3. **Sidebar and menus.** Rows, essentials, header, URL bar, nav row, bottom bar, folders, separator, new tab row rebuilt to section 5. Context menus extracted. Done 2026-09-14, commits 749ce71..1655d5b on `gui-remodel-p3`.
 4. **Glass layer.** Section 6.
 5. **Settings.** Section 7.
 
