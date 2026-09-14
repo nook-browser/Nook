@@ -1105,7 +1105,7 @@ class BrowserManager: ObservableObject {
             SpaceEditDialog(
                 space: space,
                 mode: .icon,
-                onSave: { [weak self] newName, newIcon, newProfileId in
+                onSave: { [weak self] newName, newIcon, newProfileId, newAccentHex in
                     guard let self else { return }
                     do {
                         if newIcon != space.icon {
@@ -1119,6 +1119,11 @@ class BrowserManager: ObservableObject {
                         }
                     } catch {
                         print("Failed to update space: \(error)")
+                    }
+                    if newAccentHex.caseInsensitiveCompare(space.accentHex) != .orderedSame {
+                        space.gradient = .accent(hex: newAccentHex)
+                        self.refreshGradientsForSpace(space, animate: true)
+                        self.tabManager.persistSnapshot()
                     }
                     self.closeDialog()
                 },

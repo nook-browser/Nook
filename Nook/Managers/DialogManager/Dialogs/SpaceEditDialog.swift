@@ -18,30 +18,35 @@ struct SpaceEditDialog: DialogPresentable {
     private let originalSpaceName: String
     private let originalSpaceIcon: String
     private let originalProfileId: UUID?
+    private let originalAccentHex: String
 
     @State private var spaceName: String
     @State private var spaceIcon: String
     @State private var selectedProfileId: UUID?
+    @State private var accentHex: String
 
-    private let onSaveChanges: (String, String, UUID?) -> Void
+    private let onSaveChanges: (String, String, UUID?, String) -> Void
     private let onCancelChanges: () -> Void
 
     init(
         space: Space,
         mode: Mode,
-        onSave: @escaping (String, String, UUID?) -> Void,
+        onSave: @escaping (String, String, UUID?, String) -> Void,
         onCancel: @escaping () -> Void
     ) {
         let name = MainActor.assumeIsolated { space.name }
         let icon = MainActor.assumeIsolated { space.icon }
         let profileId = MainActor.assumeIsolated { space.profileId }
+        let accent = MainActor.assumeIsolated { space.accentHex }
         self.mode = mode
         self.originalSpaceName = name
         self.originalSpaceIcon = icon
         self.originalProfileId = profileId
+        self.originalAccentHex = accent
         _spaceName = State(initialValue: name)
         _spaceIcon = State(initialValue: icon)
         _selectedProfileId = State(initialValue: profileId)
+        _accentHex = State(initialValue: accent)
         self.onSaveChanges = onSave
         self.onCancelChanges = onCancel
     }
@@ -60,6 +65,7 @@ struct SpaceEditDialog: DialogPresentable {
             spaceName: $spaceName,
             spaceIcon: $spaceIcon,
             selectedProfileId: $selectedProfileId,
+            accentHex: $accentHex,
             originalIcon: originalSpaceIcon,
             mode: mode
         )
@@ -82,7 +88,7 @@ struct SpaceEditDialog: DialogPresentable {
                     iconName: "checkmark",
                     variant: .primary,
                     action: {
-                        onSaveChanges(effectiveName, iconValue, selectedProfileId)
+                        onSaveChanges(effectiveName, iconValue, selectedProfileId, accentHex)
                     }
                 )
             ]
@@ -94,6 +100,7 @@ private struct SpaceEditContent: View {
     @Binding var spaceName: String
     @Binding var spaceIcon: String
     @Binding var selectedProfileId: UUID?
+    @Binding var accentHex: String
 
     let originalIcon: String
     let mode: SpaceEditDialog.Mode
@@ -142,6 +149,13 @@ private struct SpaceEditContent: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Accent")
+                    .font(NookDesign.Font.label)
+                    .foregroundStyle(.primary)
+                SpaceAccentPicker(selectedHex: $accentHex)
             }
 
             VStack(alignment: .leading, spacing: 10) {

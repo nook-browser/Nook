@@ -351,12 +351,13 @@ struct SpacesSideBarView: View {
     private func showSpaceCreationDialog() {
         browserManager.dialogManager.showDialog(
             SpaceCreationDialog(
-                onCreate: { name, icon, profileId in
+                onCreate: { name, icon, profileId, accentHex in
                     let finalName = name.isEmpty ? "New Space" : name
-                    let finalIcon = icon.isEmpty ? "✨" : icon
+                    let finalIcon = icon.isEmpty ? "square.grid.2x2" : icon
                     let newSpace = tabManager.createSpace(
                         name: finalName,
-                        icon: finalIcon
+                        icon: finalIcon,
+                        gradient: .accent(hex: accentHex)
                     )
 
                     // Assign profile if one was selected

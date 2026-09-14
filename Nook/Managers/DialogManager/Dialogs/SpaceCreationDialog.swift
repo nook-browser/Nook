@@ -12,12 +12,13 @@ struct SpaceCreationDialog: DialogPresentable {
     @State private var spaceName: String
     @State private var spaceIcon: String
     @State private var selectedProfileId: UUID?
+    @State private var accentHex: String = SpaceAccent.defaultHex
 
-    let onCreate: (String, String, UUID?) -> Void
+    let onCreate: (String, String, UUID?, String) -> Void
     let onCancel: () -> Void
 
     init(
-        onCreate: @escaping (String, String, UUID?) -> Void,
+        onCreate: @escaping (String, String, UUID?, String) -> Void,
         onCancel: @escaping () -> Void
     ) {
         _spaceName = State(initialValue: "")
@@ -40,7 +41,8 @@ struct SpaceCreationDialog: DialogPresentable {
         SpaceCreationContent(
             spaceName: $spaceName,
             spaceIcon: $spaceIcon,
-            selectedProfileId: $selectedProfileId
+            selectedProfileId: $selectedProfileId,
+            accentHex: $accentHex
         )
     }
 
@@ -66,7 +68,7 @@ struct SpaceCreationDialog: DialogPresentable {
 
     private func handleCreate() {
         let trimmedName = spaceName.trimmingCharacters(in: .whitespacesAndNewlines)
-        onCreate(trimmedName, spaceIcon, selectedProfileId)
+        onCreate(trimmedName, spaceIcon, selectedProfileId, accentHex)
     }
 }
 
@@ -74,6 +76,7 @@ struct SpaceCreationContent: View {
     @Binding var spaceName: String
     @Binding var spaceIcon: String
     @Binding var selectedProfileId: UUID?
+    @Binding var accentHex: String
     @StateObject private var emojiManager = EmojiPickerManager()
     @EnvironmentObject var browserManager: BrowserManager
 
@@ -116,6 +119,13 @@ struct SpaceCreationContent: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Accent")
+                    .font(NookDesign.Font.label)
+                    .foregroundStyle(.primary)
+                SpaceAccentPicker(selectedHex: $accentHex)
             }
 
             VStack(alignment: .leading, spacing: 10) {
