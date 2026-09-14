@@ -18,8 +18,6 @@ struct TabFolderView: View {
     var isRegular: Bool = false
 
     @State private var isHovering: Bool = false
-    @State private var isFolderIconAnimating: Bool = false
-    @State private var isDropTargeted: Bool = false
     @State private var isRenaming: Bool = false
     @State private var draftName: String = ""
     @FocusState private var nameFieldFocused: Bool
@@ -38,6 +36,14 @@ struct TabFolderView: View {
             .filter { $0.folderId == folder.id }
             .sorted { $0.index < $1.index }
         return tabs
+    }
+
+    private var tabCount: Int {
+        tabsInFolder.count
+    }
+
+    private var isDropTargeted: Bool {
+        dragSession.isDragging && dragSession.activeZone == .folder(folder.id)
     }
 
     var body: some View {
@@ -75,7 +81,6 @@ struct TabFolderView: View {
             dragSession.clearDrag()
             tabManager.handleDragOperation(op)
         }
-        triggerFolderAnimation()
         dragSession.pendingDrop = nil
     }
 
@@ -103,15 +108,22 @@ struct TabFolderView: View {
                 folder.isOpen.toggle()
             }
         }) {
-            HStack(spacing: 8) {
-                // Folder icon with animation
-                folderIconView
+            HStack(spacing: NookDesign.Spacing.md) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: NookDesign.Size.rowGlyph - 1, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                    .rotationEffect(.degrees(folder.isOpen ? 90 : 0))
+                    .animation(NookDesign.Motion.standard, value: folder.isOpen)
+
+                Image(systemName: folder.isOpen ? "folder.fill" : "folder")
+                    .font(.system(size: NookDesign.Size.spaceIcon, weight: .medium))
+                    .foregroundStyle(space.accentColor)
 
                 // Folder name - editable
                 if isRenaming {
                     TextField("", text: $draftName)
                         .font(NookDesign.Font.label)
-                        .foregroundStyle(AppColors.textSecondary)
+                        .foregroundStyle(.primary)
                         .textFieldStyle(PlainTextFieldStyle())
                         .autocorrectionDisabled()
                         .focused($nameFieldFocused)
@@ -130,12 +142,18 @@ struct TabFolderView: View {
                 } else {
                     Text(folder.name)
                         .font(NookDesign.Font.label)
-                        .foregroundStyle(AppColors.textSecondary)
+                        .foregroundStyle(.primary)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
 
-                Spacer()
+                Spacer(minLength: NookDesign.Spacing.xs)
+
+                if !isHovering {
+                    Text("\(tabCount)")
+                        .font(NookDesign.Font.caption)
+                        .foregroundStyle(.tertiary)
+                }
 
                 // Context menu button
                 if isHovering && !isRenaming {
@@ -156,29 +174,25 @@ struct TabFolderView: View {
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle.fill")
-                            .font(NookDesign.Font.body)
-                            .foregroundStyle(AppColors.textSecondary)
-                            .opacity(0.7)
                     }
-                    .buttonStyle(PlainButtonStyle())
+                    .buttonStyle(NookIconButtonStyle(size: NookDesign.Size.rowButton, radius: NookDesign.Radius.sm))
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 12)
-            .frame(height: 40)
+            .padding(.horizontal, NookDesign.Spacing.rowPadding)
+            .frame(height: NookDesign.Size.row)
             .frame(maxWidth: .infinity)
             .background(
-                NookDesign.Radius.shape(NookDesign.Radius.lg)
+                NookDesign.Radius.shape(NookDesign.Radius.md)
                     .fill(
                         isDropTargeted
                             ? NookDesign.Surface.fillPressed
                             : (isHovering ? NookDesign.Surface.fill : Color.clear)
                     )
             )
-            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
+            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         }
         .buttonStyle(PlainButtonStyle())
-        .contentShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
+        .contentShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         .onHoverTracking { hovering in
             withAnimation(NookDesign.Motion.quick) {
                 isHovering = hovering
@@ -195,24 +209,6 @@ struct TabFolderView: View {
         }
     }
 
-    private var folderIconView: some View {
-        Image(systemName: folder.isOpen ? "folder.fill" : "folder")
-            .font(NookDesign.Font.title)
-            .foregroundStyle(space.gradient.primaryColor)
-            .symbolEffect(.bounce, options: .speed(0.5).repeat(1), value: isFolderIconAnimating)
-            .onAppear {
-                isFolderIconAnimating = false
-            }
-            .onChange(of: isFolderIconAnimating) { _, newValue in
-                if newValue {
-                    // Reset animation after it completes
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                        isFolderIconAnimating = false
-                    }
-                }
-            }
-    }
-
     private var folderContent: some View {
         let tabs = tabsInFolder
 
@@ -221,7 +217,7 @@ struct TabFolderView: View {
             isVertical: true,
             manager: dragSession
         ) {
-            VStack(spacing: 0) {
+            VStack(spacing: NookDesign.Spacing.rowGap) {
                 ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
                     folderTabView(tab, index: index)
                         .transition(
@@ -237,16 +233,11 @@ struct TabFolderView: View {
                 }
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 4)
-        .background(
-            NookDesign.Radius.shape(NookDesign.Radius.md)
-                .fill(isDropTargeted ? NookDesign.Surface.fillPressed : (isHovering ? NookDesign.Surface.fill : Color.clear))
-        )
+        .padding(.vertical, NookDesign.Spacing.xxs)
         .onAppear {
             let zone = DropZoneID.folder(folder.id)
-            dragSession.itemCellSize[zone] = 36
-            dragSession.itemCellSpacing[zone] = 2
+            dragSession.itemCellSize[zone] = NookDesign.Size.row
+            dragSession.itemCellSpacing[zone] = NookDesign.Spacing.rowGap
             dragSession.itemCounts[zone] = tabs.count
         }
         .onDisappear {
@@ -276,7 +267,7 @@ struct TabFolderView: View {
                 onClose: { tabManager.removeTab(tab.id) },
                 onMute: { tab.toggleMute() }
             )
-            .padding(.leading, 12)
+            .padding(.leading, NookDesign.Spacing.folderIndent)
         }
         .opacity(dragSession.draggedItem?.tabId == tab.id ? 0.0 : 1.0)
         .offset(y: dragSession.reorderOffset(for: .folder(folder.id), at: index))
@@ -357,10 +348,6 @@ struct TabFolderView: View {
                 Label("Close Tab", systemImage: "xmark.circle")
             }
         }
-    }
-
-    private func triggerFolderAnimation() {
-        isFolderIconAnimating = true
     }
 
     private func alphabetizeTabs() {
