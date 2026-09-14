@@ -77,7 +77,7 @@ struct SpacesList: View {
                             
                             if index != visibleSpaces.count - 1 {
                                 Spacer()
-                                    .frame(minWidth: 1, maxWidth: 8)
+                                    .frame(minWidth: NookDesign.Size.hairlineWidth, maxWidth: NookDesign.Spacing.md)
                                     .layoutPriority(-1)
                             }
                         }
@@ -97,11 +97,11 @@ struct SpacesList: View {
                             Text(hoveredSpace.name)
                                 .font(.caption)
                                 .foregroundStyle(Color.primary)
-                                .opacity(0.7)
+                                .opacity(NookDesign.Surface.previewTextOpacity)
                                 .lineLimit(1)
                                 .id(hoveredSpace.id)
                                 .transition(.blur.animation(NookDesign.Motion.standard))
-                                .offset(y: -20)
+                                .offset(y: -NookDesign.Spacing.previewLift)
                         }
                     }
             }
@@ -122,25 +122,12 @@ enum SpacesListLayoutMode {
 
         // Measurements for NookIconButtonStyle at its default size
         let buttonSize = NookDesign.Size.iconButton
-        let minSpacing: CGFloat = 4.0
+        let minSpacing = NookDesign.Spacing.xs
 
         // Normal mode: all icons visible with minimum spacing
         let normalMinWidth = (CGFloat(spacesCount) * buttonSize) + (CGFloat(spacesCount - 1) * minSpacing)
 
-        // Compact mode: 1 active icon + (n-1) dots with minimum spacing
-        let dotSize: CGFloat = 6.0
-        let totalDots = spacesCount - 1
-        let compactMinWidth = buttonSize + (CGFloat(totalDots) * dotSize) + (CGFloat(totalDots) * minSpacing)
-
-        // Choose mode: switch to compact only when normal mode would be too cramped
-        // Stay in normal as long as we have at least minimum spacing
-        if availableWidth >= normalMinWidth {
-            return .normal
-        } else if availableWidth >= compactMinWidth {
-            return .compact
-        } else {
-            // Even compact doesn't fit perfectly, but use compact anyway
-            return .compact
-        }
+        // Choose mode: switch to compact whenever normal mode would be too cramped
+        return availableWidth >= normalMinWidth ? .normal : .compact
     }
 }

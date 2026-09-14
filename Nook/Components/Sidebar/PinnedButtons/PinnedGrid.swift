@@ -45,12 +45,12 @@ struct PinnedGrid: View {
                 isVertical: false,
                 manager: dragSession
             ) {
-                VStack(spacing: 8) {
+                VStack(spacing: NookDesign.Spacing.md) {
                     Image(systemName: "star.circle.fill")
                         .font(.title2)
                         .foregroundStyle(.secondary)
 
-                    VStack(spacing: 2) {
+                    VStack(spacing: NookDesign.Spacing.xxs) {
                         Text("Drag to add Favorites")
                             .font(NookDesign.Font.label)
                             .foregroundStyle(.secondary)
@@ -62,15 +62,15 @@ struct PinnedGrid: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .padding(.horizontal, 12)
+                .padding(.vertical, NookDesign.Spacing.xl)
+                .padding(.horizontal, NookDesign.Spacing.lg)
                 .background {
-                    NookDesign.Radius.shape(NookDesign.Radius.xl)
-                        .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
-                        .foregroundStyle(isDragging ? Color.primary.opacity(0.4) : Color.secondary.opacity(0.3))
+                    NookDesign.Radius.shape(NookDesign.Radius.lg)
+                        .strokeBorder(style: StrokeStyle(lineWidth: NookDesign.Size.hairlineWidth, dash: [NookDesign.Spacing.sm, NookDesign.Spacing.xs]))
+                        .foregroundStyle(isDragging ? NookDesign.Surface.dropBorderActive : NookDesign.Surface.dropBorderIdle)
                 }
                 .background {
-                    NookDesign.Radius.shape(NookDesign.Radius.xl)
+                    NookDesign.Radius.shape(NookDesign.Radius.lg)
                         .fill(isDragging ? NookDesign.Surface.fillPressed : Color.clear)
                 }
                 .animation(NookDesign.Motion.quick, value: isDragging)
@@ -86,7 +86,7 @@ struct PinnedGrid: View {
             }
         } else {
             ZStack { // Container to support transitions
-                VStack(spacing: 6) {
+                VStack(spacing: NookDesign.Spacing.sm) {
                     ZStack(alignment: .top) {
                         NookDropZoneHostView(
                             zoneID: .essentials,
@@ -241,7 +241,7 @@ struct PinnedGrid: View {
 
     private var essentialsPlaceholder: some View {
         NookDesign.Radius.shape(NookDesign.Radius.lg)
-            .fill(Color.primary.opacity(0.08))
+            .fill(NookDesign.Surface.fillPressed)
             .frame(minWidth: NookDesign.Size.essentialsTile, minHeight: NookDesign.Size.essentialsTile)
     }
 

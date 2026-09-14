@@ -21,7 +21,7 @@ struct SpacesListItem: View {
 
     @State private var isHovering: Bool = false
 
-    private let dotSize: CGFloat = 6
+    private let dotSize: CGFloat = NookDesign.Spacing.sm
 
     init(
         space: Space,

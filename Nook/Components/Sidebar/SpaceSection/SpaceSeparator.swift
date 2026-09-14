@@ -18,23 +18,29 @@ struct SpaceSeparator: View {
     var body: some View {
         let hasTabs = tabCount > 0
         HStack(spacing: 0) {
-            // Organize button (left side)
+            Capsule()
+                .fill(NookDesign.Surface.hairline)
+                .frame(height: NookDesign.Size.hairlineWidth)
+                .padding(.horizontal, NookDesign.Spacing.md)
+                .animation(NookDesign.Motion.quick, value: isHovering)
+
+            // Organize button (trailing side)
             if hasTabs && tabCount >= 5 && isHovering {
                 if isOrganizing {
                     ProgressView()
                         .controlSize(.mini)
-                        .padding(.horizontal, 4)
+                        .padding(.horizontal, NookDesign.Spacing.xs)
                         .transition(.blur.animation(NookDesign.Motion.quick))
                 } else if let onOrganize {
                     Button(action: onOrganize) {
-                        HStack(spacing: 4) {
+                        HStack(spacing: NookDesign.Spacing.xs) {
                             Image(systemName: "wand.and.stars")
                                 .font(NookDesign.Font.caption)
                             Text("Organize")
                                 .font(NookDesign.Font.caption)
                         }
                         .foregroundStyle(organizeColor)
-                        .padding(.horizontal, 4)
+                        .padding(.horizontal, NookDesign.Spacing.xs)
                     }
                     .buttonStyle(PlainButtonStyle())
                     .help("Organize tabs with AI")
@@ -45,22 +51,17 @@ struct SpaceSeparator: View {
                 }
             }
 
-            Capsule()
-                .fill(NookDesign.Surface.hairline)
-                .frame(height: 1)
-                .animation(NookDesign.Motion.quick, value: isHovering)
-
-            // Clear button (right side)
+            // Clear button (trailing side)
             if hasTabs && isHovering {
                 Button(action: onClear) {
-                    HStack(spacing: 7) {
+                    HStack(spacing: NookDesign.Spacing.xs) {
                         Image(systemName: "arrow.down")
                             .font(NookDesign.Font.caption)
                         Text("Clear")
                             .font(NookDesign.Font.caption)
                     }
                     .foregroundStyle(clearColor)
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, NookDesign.Spacing.xs)
                 }
                 .buttonStyle(PlainButtonStyle())
                 .help("Clear all regular tabs")
@@ -70,16 +71,16 @@ struct SpaceSeparator: View {
                 }
             }
         }
-        .frame(height: 2)
+        .frame(height: NookDesign.Size.rowGlyph + NookDesign.Spacing.xxs)
         .frame(maxWidth: .infinity)
     }
 
     private var clearColor: Color {
-        isClearHovered ? .primary : .secondary
+        isClearHovered ? .primary : .tertiary
     }
 
     private var organizeColor: Color {
-        isOrganizeHovered ? .primary : .secondary
+        isOrganizeHovered ? .primary : .tertiary
     }
 }
  

@@ -60,6 +60,7 @@ struct SpaceView: View {
     @State private var refreshTrigger: UUID = UUID()
     @State private var folderChangeCount: Int = 0
     @State private var isHovered: Bool = false
+    @State private var isNewTabHovering = false
 
     let onActivateTab: (Tab) -> Void
     let onCloseTab: (Tab) -> Void
@@ -485,16 +486,32 @@ struct SpaceView: View {
         } label: {
             HStack(spacing: NookDesign.Spacing.md) {
                 Image(systemName: "plus")
+                    .font(.system(size: NookDesign.Size.favicon, weight: .medium))
                 Text("New Tab")
-                Spacer()
+                    .font(NookDesign.Font.body)
+                Spacer(minLength: 0)
+                if isNewTabHovering {
+                    Text("⌘T")
+                        .font(NookDesign.Font.caption)
+                        .foregroundStyle(.tertiary)
+                }
             }
+            .foregroundStyle(isNewTabHovering ? .secondary : .tertiary)
+            .padding(.horizontal, NookDesign.Spacing.rowPadding)
+            .frame(height: NookDesign.Size.row)
+            .frame(maxWidth: .infinity)
+            .background(isNewTabHovering ? NookDesign.Surface.fill : Color.clear)
+            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
+            .contentShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         }
-        .buttonStyle(RectNavButtonStyle())
-        .padding(.top, NookDesign.Spacing.md)
+        .buttonStyle(.plain)
+        .onHoverTracking { hovering in
+            withAnimation(NookDesign.Motion.quick) { isNewTabHovering = hovering }
+        }
     }
 
     private var newTabButtonSectionWithClear: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: NookDesign.Spacing.xs) {
             SpaceSeparator(
                 isHovering: $isSidebarHovered,
                 onClear: {
@@ -511,8 +528,7 @@ struct SpaceView: View {
                 isOrganizing: tabOrganizerManager.isOrganizing,
                 tabCount: tabs.filter { $0.folderId == nil }.count
             )
-            .padding(.horizontal, NookDesign.Spacing.sidebarInset)
-            .padding(.top, NookDesign.Spacing.xs)
+            .padding(.horizontal, NookDesign.Spacing.md)
 
             newTabButtonSection
         }

@@ -18,9 +18,9 @@ struct SidebarBottomBar: View {
     let onMenuHover: (Bool) -> Void
     
     var body: some View {
-        HStack(alignment: .bottom, spacing: 10) {
+        HStack(alignment: .center, spacing: NookDesign.Spacing.xxs) {
             menuButton
-            
+
             // Hide spaces list in incognito windows (only one ephemeral space)
             if !windowState.isIncognito {
                 SpacesList()
@@ -28,13 +28,14 @@ struct SidebarBottomBar: View {
                     .environmentObject(browserManager)
                     .environment(windowState)
             }
-            
+
             // Hide new space button in incognito windows
             if !windowState.isIncognito {
                 newSpaceButton
             }
-        }.fixedSize(horizontal: false, vertical: true)
-        .padding(.horizontal, 8)
+        }
+        .frame(height: NookDesign.Size.bottomBar)
+        .padding(.horizontal, NookDesign.Spacing.sidebarInset)
     }
     
     private var menuButton: some View {
@@ -51,7 +52,7 @@ struct SidebarBottomBar: View {
             }
             
             DownloadIndicator()
-                .offset(x: 12, y: -12)
+                .offset(x: NookDesign.Spacing.lg, y: -NookDesign.Spacing.lg)
         }
     }
     
