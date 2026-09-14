@@ -70,20 +70,45 @@ tracked in a weak set; state only changes on transitions, not on every navigatio
 
 Default (always on, snapshots bundled): EasyList, EasyPrivacy, Peter Lowe's, uBlock filters /
 unbreak / badware / privacy / quick fixes, URLhaus. `nook-filters-default.txt` is bundle-only.
-Optional lists (AdGuard, Fanboy, regional) are downloaded on enable. Updates use conditional GET
-(ETag / If-Modified-Since) once every 24h; the first update runs right after activation.
+Optional lists (AdGuard, Fanboy, regional) are downloaded on enable. Each list is refreshed on its
+own `! Expires:` interval (uBO quick fixes: 8h, URLhaus: 12h, EasyList: 4 days; default 24h, clamped
+1h to 7d) with conditional GET (ETag / If-Modified-Since). A check for due lists runs right after
+activation and hourly. `scripts/refresh-filter-lists.sh` re-downloads the bundled snapshots; CI runs
+it before every release build.
+
+## Tracking parameter removal (`$removeparam`)
+
+WebKit cannot rewrite URLs, and SafariConverterLib drops `$removeparam` rules. `TrackingParamStripper`
+parses them from the raw filter lines (uBO privacy list, AdGuard URL Tracking Protection, unbreak) and
+`Tab.decidePolicyFor` restarts main-frame GET navigations without the matching parameters. Exempt tabs
+and back/forward navigations are left alone. Matching is host-suffix plus substring, not full ABP
+pattern semantics.
+
+## Blocked-request counts
+
+Content rule lists report nothing, so the same rules are also loaded into Brave's adblock-rust
+(`Nook/ThirdParty/AdblockRustFFI`, MPL-2.0, C API over a static library). `nook-request-stats.js`
+observes every resource URL a page tries to load (fetch, XHR, beacon, WebSocket, and DOM-inserted
+img/script/link/iframe/media via one MutationObserver), batches them, and posts to the
+`nookRequestStats` handler. `RequestStatsEngine` checks them on a serial queue and adds to
+`Tab.blockedRequestCount`, which resets on each main-frame navigation and shows in the extension
+library's Content Blocker row. The engine is serialized per rules hash so warm starts deserialize
+instead of rebuilding. Counting never blocks or delays a request.
 
 ## Known limits (WebKit)
 
-No `$redirect`, `$csp`, `$removeparam`, `$replace`, `$header`; no request counters. Scriptlets run in
-the page world from the user-script realm, so they are not blocked by page CSP.
+No `$redirect`, `$csp`, `$replace`, `$header`. Scriptlets run in the page world from the user-script
+realm, so they are not blocked by page CSP; raw `#%#` JS rules still go through a script element and
+lose on strict-CSP sites. Counts are approximate: adblock-rust and the Safari conversion can disagree
+on edge cases, and CSS background images are not observed.
 
 ## Updating dependencies
 
 - Runtime JS: follow `Resources/BUILD-advanced-blocking.md` (bump `@adguard/safari-extension`).
 - SafariConverterLib: bump the SPM requirement in the Xcode project; keep it on the same major as the
   npm package.
-- Filter list snapshots: re-download the files in `Resources/` (same names as `FilterListManager.defaultLists`).
+- Filter list snapshots: `scripts/refresh-filter-lists.sh` (keep its URL list in sync with `FilterListManager.defaultLists`).
+- adblock-rust: `Nook/ThirdParty/AdblockRustFFI/build.sh` (needs Rust; the built `.a` is committed).
 
 ## History
 

@@ -1,0 +1,19 @@
+[package]
+name = "nook_adblock"
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+publish = false
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+adblock = "0.13.3"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+opt-level = "s"
+strip = true

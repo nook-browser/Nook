@@ -27,13 +27,17 @@ final class ContentBlockerManager: NSObject {
 
     let filterListManager = FilterListManager()
     let advancedRulesEngine = AdvancedRulesEngine()
+    private(set) var trackingParamStripper = TrackingParamStripper()
+    let requestStatsEngine = RequestStatsEngine()
+    static let requestStatsHandlerName = "nookRequestStats"
 
     /// In-flight activation; startup tab loading waits on it so the first page is protected.
     private(set) var activationTask: Task<Void, Never>?
 
     private var compiledRuleLists: [WKContentRuleList] = []
     private var updateTimer: Timer?
-    private static let updateInterval: TimeInterval = 24 * 60 * 60
+    /// How often to look for due lists; each list's own `! Expires:` decides whether it is fetched.
+    private static let updateCheckInterval: TimeInterval = 60 * 60
 
     /// Webviews whose blocking has been removed (whitelisted domain, temporary disable, OAuth flow).
     private let exemptedWebViews = NSHashTable<WKWebView>.weakObjects()
@@ -168,6 +172,10 @@ final class ContentBlockerManager: NSObject {
         cbLog.info("Compile completed in \(String(format: "%.2f", CFAbsoluteTimeGetCurrent() - compileStart), privacy: .public)s")
 
         await advancedRulesEngine.build(rulesText: result.advancedRulesText, reuseSerialized: result.fromCache)
+        trackingParamStripper = await Task.detached(priority: .userInitiated) { TrackingParamStripper(rules: rules) }.value
+        // Counting engine is not needed for the first paint; build it after activation returns.
+        let hash = result.rulesHash
+        Task { [requestStatsEngine] in await requestStatsEngine.build(rules: rules, hash: hash) }
     }
 
     // MARK: - Filter List Updates
@@ -196,7 +204,7 @@ final class ContentBlockerManager: NSObject {
         isCompiling = true
         defer { isCompiling = false }
 
-        await filterListManager.downloadAllLists()
+        await filterListManager.downloadAllLists(force: true)
         await rebuild()
         applyToSharedConfiguration()
         applyToExistingWebViews()
@@ -208,17 +216,25 @@ final class ContentBlockerManager: NSObject {
     private func scheduleAutoUpdate() {
         updateTimer?.invalidate()
 
-        let lastUpdate = browserManager?.nookSettings?.adBlockerLastUpdate
-        if lastUpdate == nil || Date().timeIntervalSince(lastUpdate!) >= Self.updateInterval {
-            Task { await updateFilterLists() }
-        }
+        // Immediate check: only lists whose own expiry has elapsed are fetched (conditional GET).
+        Task { await updateFilterLists() }
 
-        updateTimer = Timer.scheduledTimer(withTimeInterval: Self.updateInterval, repeats: true) { [weak self] _ in
+        updateTimer = Timer.scheduledTimer(withTimeInterval: Self.updateCheckInterval, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 await self?.updateFilterLists()
             }
         }
-        updateTimer?.tolerance = 60 * 60
+        updateTimer?.tolerance = 15 * 60
+    }
+
+    // MARK: - Tracking parameter removal ($removeparam)
+
+    /// The URL with tracking parameters removed, or nil when nothing should change.
+    func strippedTrackingParams(for url: URL, tab: Tab) -> URL? {
+        guard isEnabled, !isExempt(tab, host: url.host) else { return nil }
+        guard let stripped = trackingParamStripper.strip(url) else { return nil }
+        cbLog.info("removeparam \(url.host ?? "-", privacy: .public): \(url.query?.count ?? 0, privacy: .public) -> \(stripped.query?.count ?? 0, privacy: .public) query chars")
+        return stripped
     }
 
     // MARK: - Per-Navigation (main frame, from Tab.decidePolicyFor)
@@ -227,6 +243,7 @@ final class ContentBlockerManager: NSObject {
         guard isEnabled else { return }
         let exempt = isExempt(tab, host: url.host)
         reconcile(webView, exempt: exempt)
+        tab.blockedRequestCount = 0
         let config = exempt ? nil : advancedRulesEngine.configUserScript(for: url)
         replaceConfigScript(in: webView.configuration.userContentController, with: config)
         cbLog.info("main frame \(url.host ?? "-", privacy: .public): exempt=\(exempt) config=\(config?.source.count ?? 0, privacy: .public)B ruleLists=\(self.compiledRuleLists.count)")
@@ -247,6 +264,7 @@ final class ContentBlockerManager: NSObject {
 
     private func configureNewController(_ controller: WKUserContentController) {
         controller.addScriptMessageHandler(self, contentWorld: .page, name: AdvancedRulesEngine.messageHandlerName)
+        controller.add(self, name: Self.requestStatsHandlerName)
         guard isEnabled else { return }
         for list in compiledRuleLists { controller.add(list) }
         // Static scripts arrive by copy from the shared configuration.
@@ -356,5 +374,29 @@ extension ContentBlockerManager: WKScriptMessageHandlerWithReply {
         let conf = advancedRulesEngine.configuration(for: pageUrl, topUrl: message.frameInfo.isMainFrame ? nil : topUrl)
         cbLog.info("frame lookup \(pageUrl.host ?? "-", privacy: .public) main=\(message.frameInfo.isMainFrame) rules=\(conf == nil ? 0 : 1, privacy: .public)")
         replyHandler(conf, nil)
+    }
+}
+
+// MARK: - Blocked-request counting (nook-request-stats.js reports observed resource URLs)
+
+extension ContentBlockerManager: WKScriptMessageHandler {
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard isEnabled, message.name == Self.requestStatsHandlerName,
+              let webView = message.webView, let tab = tab(for: webView),
+              let body = message.body as? [String: Any],
+              let raw = body["requests"] as? [[String: Any]] else { return }
+        let requests: [(url: String, type: String)] = raw.compactMap {
+            guard let u = $0["url"] as? String, let t = $0["type"] as? String else { return nil }
+            return (u, t)
+        }
+        guard !requests.isEmpty else { return }
+        let source = message.frameInfo.request.url?.absoluteString ?? webView.url?.absoluteString ?? ""
+        Task { [requestStatsEngine, weak tab] in
+            let n = await requestStatsEngine.blockedCount(of: requests, sourceURL: source)
+            if n > 0, let tab {
+                await MainActor.run { tab.blockedRequestCount += n }
+                cbLog.debug("stats: \(n, privacy: .public)/\(requests.count, privacy: .public) blocked for \(URL(string: source)?.host ?? "-", privacy: .public)")
+            }
+        }
     }
 }

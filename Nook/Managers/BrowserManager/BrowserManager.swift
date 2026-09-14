@@ -606,12 +606,22 @@ class BrowserManager: ObservableObject {
     /// according to the user's startup mode preference.
     /// Load tabs according to the user's startup mode preference.
     /// Always loads the last active tab. Called after windowState is fully configured.
+    private var startupWaitedForContentBlocker = false
+
     private func applyStartupLoadMode(for windowState: BrowserWindowState) {
-        // Content blocking must be active before the first navigation, otherwise the startup
-        // page loads without scriptlets/cosmetics. Warm activation is ~0.2s (cache hit).
-        if contentBlockerManager.isCompiling, let activation = contentBlockerManager.activationTask {
+        // Content blocking should be active before the first navigation, otherwise the startup
+        // page loads without scriptlets/cosmetics. Warm activation is ~0.3s (cache hit); a cold
+        // compile after a list change is several seconds, so the wait is capped at 2s.
+        if !startupWaitedForContentBlocker, !contentBlockerManager.isEnabled,
+           let activation = contentBlockerManager.activationTask {
+            startupWaitedForContentBlocker = true
             Task { @MainActor [weak self, weak windowState] in
-                await activation.value
+                await withTaskGroup(of: Void.self) { group in
+                    group.addTask { await activation.value }
+                    group.addTask { try? await Task.sleep(for: .seconds(2)) }
+                    await group.next()
+                    group.cancelAll()
+                }
                 guard let self, let windowState else { return }
                 self.applyStartupLoadMode(for: windowState)
             }

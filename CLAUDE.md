@@ -182,6 +182,9 @@ Located in `Nook/Managers/ContentBlockerManager/`. Full description in `docs/adb
 - **AdvancedRulesEngine**: wraps SafariConverterLib's `FilterEngine`/`WebExtension` for per-URL lookup of advanced rules (cosmetic CSS, extended CSS, scriptlets, JS) with correct exception semantics.
 - **Resources/nook-advanced-blocking.js**: AdGuard's `@adguard/safari-extension` content-script library (ExtendedCss + Scriptlets) bundled by esbuild; rebuild per `Resources/BUILD-advanced-blocking.md`. Injected in all frames at document start.
 - **Resources/*-blocker.js**: site-specific scripts (YouTube, Facebook, X), static, main frame only, hostname-guarded.
+- **TrackingParamStripper**: `$removeparam` for main-frame navigations (parsed from raw filter lines, applied in `Tab.decidePolicyFor`).
+- **RequestStatsEngine** + `Resources/nook-request-stats.js` + `Nook/ThirdParty/AdblockRustFFI`: blocked-request counts per tab via Brave's adblock-rust (C API, static lib; rebuild with `build.sh`, needs Rust).
+- Filter lists refresh on their own `! Expires:` interval; `scripts/refresh-filter-lists.sh` updates the bundled snapshots and runs in CI before each release build.
 
 **Rules for changes:**
 - Every blocker-owned user script starts with `// Nook Content Blocker` or `// Nook Content Blocker Config`; removal filters on those prefixes.

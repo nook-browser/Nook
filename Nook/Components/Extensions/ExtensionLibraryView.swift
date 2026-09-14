@@ -131,33 +131,24 @@ struct ExtensionLibraryView: View {
     private var siteSettingsSection: some View {
         VStack(spacing: 2) {
             // Content Blocker Toggle
-            if let host = currentHost {
-                SiteSettingRow(
-                    icon: "shield.checkered",
-                    iconColor: .green,
-                    title: "Content Blocker",
-                    subtitle: contentBlockerEnabled ? "Enabled" : "Disabled for this site"
-                ) {
-                    Toggle("", isOn: $contentBlockerEnabled)
-                        .toggleStyle(.switch)
-                        .controlSize(.mini)
-                        .onChange(of: contentBlockerEnabled) { _, enabled in
-                            // Use currentHost (not captured host) to always reference the active tab
-                            guard let activeHost = currentHost else { return }
-                            // Skip if the state already matches (e.g. during sync from tab switch)
-                            let isAllowed = browserManager.contentBlockerManager.isDomainAllowed(activeHost)
-                            guard (!enabled) != isAllowed else { return }
-                            browserManager.contentBlockerManager.allowDomain(activeHost, allowed: !enabled)
-                        }
-                }
-                .onAppear {
-                    contentBlockerEnabled = !browserManager.contentBlockerManager.isDomainAllowed(host)
-                }
-                .onChange(of: currentHost) { _, newHost in
-                    if let h = newHost {
-                        contentBlockerEnabled = !browserManager.contentBlockerManager.isDomainAllowed(h)
+            if let host = currentHost, let tab = currentTab {
+                ContentBlockerSiteRow(tab: tab, enabled: $contentBlockerEnabled)
+                    .onChange(of: contentBlockerEnabled) { _, enabled in
+                        // Use currentHost (not captured host) to always reference the active tab
+                        guard let activeHost = currentHost else { return }
+                        // Skip if the state already matches (e.g. during sync from tab switch)
+                        let isAllowed = browserManager.contentBlockerManager.isDomainAllowed(activeHost)
+                        guard (!enabled) != isAllowed else { return }
+                        browserManager.contentBlockerManager.allowDomain(activeHost, allowed: !enabled)
                     }
-                }
+                    .onAppear {
+                        contentBlockerEnabled = !browserManager.contentBlockerManager.isDomainAllowed(host)
+                    }
+                    .onChange(of: currentHost) { _, newHost in
+                        if let h = newHost {
+                            contentBlockerEnabled = !browserManager.contentBlockerManager.isDomainAllowed(h)
+                        }
+                    }
             }
 
             // Page Zoom
@@ -457,6 +448,26 @@ private struct ExtensionGridItem: View {
 }
 
 // MARK: - Site Setting Row
+
+/// Content blocker row; observes the tab so the blocked-request count updates live.
+private struct ContentBlockerSiteRow: View {
+    @ObservedObject var tab: Tab
+    @Binding var enabled: Bool
+
+    private var subtitle: String {
+        guard enabled else { return "Disabled for this site" }
+        let n = tab.blockedRequestCount
+        return n > 0 ? "Enabled · \(n) blocked" : "Enabled"
+    }
+
+    var body: some View {
+        SiteSettingRow(icon: "shield.checkered", iconColor: .green, title: "Content Blocker", subtitle: subtitle) {
+            Toggle("", isOn: $enabled)
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+        }
+    }
+}
 
 private struct SiteSettingRow<Control: View>: View {
     let icon: String

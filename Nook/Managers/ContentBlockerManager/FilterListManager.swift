@@ -44,12 +44,13 @@ final class FilterListManager {
     nonisolated static let defaultLists: [FilterList] = [
         FilterList(name: "EasyList", url: URL(string: "https://easylist.to/easylist/easylist.txt")!, filename: "easylist.txt", knownSizeRange: 100_000...10_000_000, category: .ads),
         FilterList(name: "EasyPrivacy", url: URL(string: "https://easylist.to/easylist/easyprivacy.txt")!, filename: "easyprivacy.txt", knownSizeRange: 50_000...5_000_000, category: .privacy),
-        FilterList(name: "Peter Lowe's", url: URL(string: "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=0")!, filename: "peter-lowes.txt", knownSizeRange: 10_000...2_000_000, category: .ads),
+        FilterList(name: "Peter Lowe's", url: URL(string: "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=0&mimetype=plaintext")!, filename: "peter-lowes.txt", knownSizeRange: 10_000...2_000_000, category: .ads),
         FilterList(name: "uBlock Filters", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters.txt")!, filename: "ublock-filters.txt", knownSizeRange: 50_000...5_000_000, category: .ads),
         FilterList(name: "uBlock Unbreak", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/unbreak.txt")!, filename: "ublock-unbreak.txt", knownSizeRange: 5_000...2_000_000, category: .ads),
         FilterList(name: "uBlock Badware", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/badware.txt")!, filename: "ublock-badware.txt", knownSizeRange: 5_000...2_000_000, category: .malware),
         FilterList(name: "uBlock Privacy", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/privacy.txt")!, filename: "ublock-privacy.txt", knownSizeRange: 5_000...2_000_000, category: .privacy),
         FilterList(name: "uBlock Quick Fixes", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/quick-fixes.txt")!, filename: "ublock-quick-fixes.txt", knownSizeRange: 1_000...2_000_000, category: .ads),
+        FilterList(name: "AdGuard URL Tracking Protection", url: URL(string: "https://filters.adtidy.org/extension/ublock/filters/17.txt")!, filename: "adguard-url-tracking.txt", knownSizeRange: 20_000...5_000_000, category: .privacy),
         FilterList(name: "Online Malicious URL Blocklist", url: URL(string: "https://malware-filter.gitlab.io/malware-filter/urlhaus-filter-online.txt")!, filename: "urlhaus-filter.txt", knownSizeRange: 10_000...5_000_000, category: .malware),
     ]
 
@@ -137,12 +138,15 @@ final class FilterListManager {
         return false
     }
 
-    /// Download all filter lists (default + enabled optional). Returns true if any list was updated.
+    /// Download filter lists (default + enabled optional) whose `! Expires:` interval has elapsed
+    /// since the last check, or all of them when `force` is set. Returns true if any list changed.
     @discardableResult
-    func downloadAllLists() async -> Bool {
+    func downloadAllLists(force: Bool = false) async -> Bool {
         var anyUpdated = false
 
-        let allLists = Self.defaultLists + enabledOptionalLists
+        let allLists = (Self.defaultLists + enabledOptionalLists).filter { force || isDue($0) }
+        guard !allLists.isEmpty else { return false }
+        Self.log.info("Checking \(allLists.count) filter list(s) for updates")
 
         await withTaskGroup(of: Bool.self) { group in
             for list in allLists {
@@ -184,6 +188,39 @@ final class FilterListManager {
         }
 
         return allLines
+    }
+
+    // MARK: - Expiry
+
+    /// Update interval from the list's own `! Expires: N days|hours` header (uBO semantics).
+    /// Defaults to 24h; clamped to 1h...7d.
+    nonisolated func updateInterval(for list: FilterList) -> TimeInterval {
+        let fallback: TimeInterval = 24 * 3600
+        guard let content = loadCachedList(list) else { return fallback }
+        for line in content.split(separator: "\n", maxSplits: 40, omittingEmptySubsequences: true) {
+            guard line.hasPrefix("!") else { if !line.hasPrefix("[") { break } else { continue } }
+            let lower = line.lowercased()
+            guard let r = lower.range(of: "expires:") else { continue }
+            let rest = lower[r.upperBound...].trimmingCharacters(in: .whitespaces)
+            let parts = rest.split(separator: " ")
+            guard parts.count >= 2, let n = Double(parts[0]) else { break }
+            let unit = parts[1]
+            let seconds: TimeInterval = unit.hasPrefix("hour") ? n * 3600 : unit.hasPrefix("day") ? n * 86400 : fallback
+            return min(max(seconds, 3600), 7 * 86400)
+        }
+        return fallback
+    }
+
+    private func checkedFile(for list: FilterList) -> URL { etagDir.appendingPathComponent(list.filename + ".checked") }
+
+    private func isDue(_ list: FilterList) -> Bool {
+        guard FileManager.default.fileExists(atPath: cacheDir.appendingPathComponent(list.filename).path) else { return true }
+        guard let stamp = try? String(contentsOf: checkedFile(for: list), encoding: .utf8), let t = TimeInterval(stamp) else { return true }
+        return Date().timeIntervalSince1970 - t >= updateInterval(for: list)
+    }
+
+    private func markChecked(_ list: FilterList) {
+        try? String(Date().timeIntervalSince1970).write(to: checkedFile(for: list), atomically: true, encoding: .utf8)
     }
 
     // MARK: - Private
@@ -235,6 +272,7 @@ final class FilterListManager {
 
             if httpResponse.statusCode == 304 {
                 Self.log.info("\(list.name): not modified")
+                markChecked(list)
                 return false
             }
 
@@ -250,7 +288,7 @@ final class FilterListManager {
             }
 
             if !validateFilterListContent(content, for: list) {
-                Self.log.warning("\(list.name): validation failed, keeping previous cached version")
+                Self.log.warning("\(list.name, privacy: .public): validation failed, keeping previous cached version")
                 return false
             }
 
@@ -271,6 +309,7 @@ final class FilterListManager {
                 try? etag.write(to: etagFile, atomically: true, encoding: .utf8)
             }
 
+            markChecked(list)
             Self.log.info("\(list.name): updated (\(data.count) bytes, hash: \(newHash.prefix(16)))")
             return true
         } catch {
@@ -295,7 +334,7 @@ final class FilterListManager {
         let looksLikeFilterList = validHeaders.contains(where: { firstNonEmpty.hasPrefix($0) })
 
         if !looksLikeFilterList {
-            Self.log.warning("Filter list '\(list.name)' has unexpected header: \(firstNonEmpty.prefix(50))")
+            Self.log.warning("Filter list '\(list.name, privacy: .public)' has unexpected header: \(firstNonEmpty.prefix(50), privacy: .public)")
             return false
         }
 

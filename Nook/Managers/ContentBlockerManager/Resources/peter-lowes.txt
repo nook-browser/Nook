@@ -1,22 +1,3 @@
-<html>
-
-<head>
-<meta name="author" value="Peter Lowe; pgl@yoyo.org">
-<meta name="description" value="Blocklist of hostnames and domains for blocking ads, trackers and others (format: adblockplus - for use with Adblock Plus)">
-<meta name="keywords" value="ad blocking, blocking ads, ad servers, trackers, ads, banners, hosts file, privacy">
-
-<link rel=alternate type="application/rss+xml" title="Blocklist of hostnames and domains for blocking ads, trackers and others (format: adblockplus - for use with Adblock Plus) (RSS - last 50 added)" href="rss/1.0/adservers.rss">
-
-<title>
-Blocklist of hostnames and domains for blocking ads, trackers and others (format: adblockplus - for use with Adblock Plus)</title>
-
-<link rel='stylesheet' href='/css/pgl.css' type='text/css'></head>
-
-<body>
-
-
-
-<p><pre>
 [Adblock Plus 1.1]
 !Blocklist for use with Adblock Plus. Use the following URL to add
 !AdBlock Plus:
@@ -32,7 +13,7 @@ Blocklist of hostnames and domains for blocking ads, trackers and others (format
 !Format:        adblockplus
 !Entries:       3559
 !Credits:       Peter Lowe - pgl@yoyo.org - pgl on github - https://pgl.yoyo.org/
-!This URL:      https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=0
+!This URL:      https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=0&mimetype=plaintext
 !Policy:        https://pgl.yoyo.org/adservers/policy.php
 !Other formats: https://pgl.yoyo.org/adservers/formats.php
 !
@@ -3595,9 +3576,3 @@ Blocklist of hostnames and domains for blocking ads, trackers and others (format
 ||zpu.samsungelectronics.com^
 ||zqtk.net^
 ||zzhc.vnet.cn^
-</pre>
-
-</body>
-
-</html>
-

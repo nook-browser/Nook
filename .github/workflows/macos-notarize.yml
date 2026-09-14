@@ -56,6 +56,9 @@ jobs:
       - name: Ensure Metal Toolchain
         run: xcodebuild -downloadComponent MetalToolchain || echo "Metal Toolchain already present or download unsupported, continuing"
 
+      - name: Refresh bundled filter lists
+        run: ./scripts/refresh-filter-lists.sh
+
       - name: Build app
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}

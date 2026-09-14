@@ -30,6 +30,8 @@ final class ContentRuleListCompiler {
         let advancedRulesText: String?
         /// True when nothing changed since the last compile (rule lists and advanced text came from cache).
         var fromCache = false
+        /// SHA-256 of the input rules; keys the caches of every engine built from them.
+        var rulesHash = ""
     }
 
     // MARK: - Cache
@@ -63,6 +65,7 @@ final class ContentRuleListCompiler {
         if var cached = await loadFromCache(hash: rulesHash, store: store) {
             cbLog.info("Cache hit: loaded \(cached.ruleLists.count) rule list(s) without recompiling")
             cached.fromCache = true
+            cached.rulesHash = rulesHash
             return cached
         }
 
@@ -127,7 +130,8 @@ final class ContentRuleListCompiler {
 
         return CompilationResult(
             ruleLists: compiled,
-            advancedRulesText: advancedText
+            advancedRulesText: advancedText,
+            rulesHash: rulesHash
         )
     }
 

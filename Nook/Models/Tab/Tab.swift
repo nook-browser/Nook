@@ -180,6 +180,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     var lastWebProcessCrashDate: Date = .distantPast
 
     @Published var canGoBack: Bool = false
+    /// Requests on the current page that the ad blocker's lists match (see RequestStatsEngine).
+    @Published var blockedRequestCount: Int = 0
     @Published var canGoForward: Bool = false
 
     // Restored navigation state from undo/session restoration (applied when web view is created)
@@ -2700,6 +2702,16 @@ extension Tab: WKNavigationDelegate {
         if let url = navigationAction.request.url,
             navigationAction.targetFrame?.isMainFrame == true
         {
+            // $removeparam: restart the navigation without tracking parameters
+            if navigationAction.navigationType != .backForward,
+               (navigationAction.request.httpMethod ?? "GET") == "GET",
+               let stripped = browserManager?.contentBlockerManager.strippedTrackingParams(for: url, tab: self)
+            {
+                decisionHandler(.cancel)
+                webView.load(URLRequest(url: stripped))
+                return
+            }
+
             // Grant extension access to this URL BEFORE navigation starts
             // so content scripts can inject at document_start
             ExtensionManager.shared.grantExtensionAccessToURL(url)

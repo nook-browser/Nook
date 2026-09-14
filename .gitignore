@@ -122,3 +122,6 @@ DerivedData/
 
 # repowise index
 .repowise/
+
+# Rust FFI build output
+Nook/ThirdParty/AdblockRustFFI/target/

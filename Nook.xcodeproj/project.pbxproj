@@ -32,6 +32,13 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
+				ThirdParty/AdblockRustFFI/Cargo.lock,
+				ThirdParty/AdblockRustFFI/Cargo.toml,
+				ThirdParty/AdblockRustFFI/README.md,
+				ThirdParty/AdblockRustFFI/build.sh,
+				ThirdParty/AdblockRustFFI/include/nook_adblock.h,
+				ThirdParty/AdblockRustFFI/lib/macos-arm64/libnook_adblock.a,
+				ThirdParty/AdblockRustFFI/src/lib.rs,
 				ThirdParty/BigUIPaging/README.md,
 				ThirdParty/MuteableWKWebView/README.md,
 			);
@@ -412,6 +419,18 @@
 				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = YES;
 				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Nook/ThirdParty/AdblockRustFFI/include",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Nook/ThirdParty/AdblockRustFFI/lib/macos-arm64",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lnook_adblock",
+				);
 				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/Nook/Supporting Files/Nook-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 			};
@@ -461,6 +480,18 @@
 				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
 				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Nook/ThirdParty/AdblockRustFFI/include",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Nook/ThirdParty/AdblockRustFFI/lib/macos-arm64",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lnook_adblock",
+				);
 				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/Nook/Supporting Files/Nook-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 			};

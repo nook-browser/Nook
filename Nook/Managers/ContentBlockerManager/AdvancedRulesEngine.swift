@@ -111,6 +111,10 @@ final class AdvancedRulesEngine {
         } else {
             log.error("nook-advanced-blocking.js missing from bundle; advanced rules disabled")
         }
+        // Request observer for blocked-request counts (already carries the marker as its first line).
+        if let stats = bundledSource("nook-request-stats") {
+            scripts.append(WKUserScript(source: stats, injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        }
 
         let siteScripts: [(resource: String, hostPattern: String)] = [
             ("facebook-sponsored-blocker", #"(^|\.)facebook\.com$"#),
