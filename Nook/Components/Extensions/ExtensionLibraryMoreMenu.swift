@@ -36,36 +36,13 @@ final class ExtensionLibraryMoreMenuController {
             }
         )
 
-        let hosting = NSHostingView(rootView: AnyView(content))
-        hosting.translatesAutoresizingMaskIntoConstraints = false
+        let hosting = NSHostingView(
+            rootView: AnyView(
+                content.nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
+            )
+        )
 
-        let visualEffect = NSVisualEffectView()
-        visualEffect.material = .hudWindow
-        visualEffect.state = .active
-        visualEffect.blendingMode = .behindWindow
-        visualEffect.wantsLayer = true
-        visualEffect.layer?.cornerRadius = NookDesign.Radius.lg
-        visualEffect.layer?.cornerCurve = .continuous
-        visualEffect.layer?.masksToBounds = true
-        visualEffect.translatesAutoresizingMaskIntoConstraints = false
-
-        let container = NSView()
-        container.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(visualEffect)
-        container.addSubview(hosting)
-
-        NSLayoutConstraint.activate([
-            visualEffect.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            visualEffect.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            visualEffect.topAnchor.constraint(equalTo: container.topAnchor),
-            visualEffect.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-            hosting.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            hosting.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            hosting.topAnchor.constraint(equalTo: container.topAnchor),
-            hosting.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-        ])
-
-        panel.contentView = container
+        panel.contentView = hosting
 
         // Position adjacent to main panel
         let fittingSize = hosting.fittingSize
@@ -118,7 +95,7 @@ final class ExtensionLibraryMoreMenuController {
         panel.hidesOnDeactivate = true
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = true
+        panel.hasShadow = false
         panel.isReleasedWhenClosed = false
         panel.level = .floating
         return panel

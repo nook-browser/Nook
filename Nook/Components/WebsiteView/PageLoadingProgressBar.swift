@@ -20,7 +20,7 @@ struct PageLoadingProgressBar: View {
             ZStack(alignment: .leading) {
                 // Track background
                 Rectangle()
-                    .fill(.ultraThinMaterial)
+                    .fill(NookDesign.Surface.fill)
                     .opacity(observer.isLoading ? 0.6 : 0)
 
                 // Progress fill

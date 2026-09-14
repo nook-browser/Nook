@@ -44,14 +44,7 @@ struct SidebarHoverOverlayView: View {
                         .environment(commandPalette)
                         .environmentObject(browserManager.gradientColorManager)
                         .frame(maxHeight: .infinity)
-                        .background{
-                            BlurEffectView(material: .sidebar, blendingMode: .withinWindow, state: .active)
-                                .clipShape(NookDesign.Radius.shape(cornerRadius))
-
-                                Rectangle()
-                                    .fill(Color.clear)
-                                    .nookGlassEffect(in: NookDesign.Radius.shape(cornerRadius))
-                        }
+                        .nookGlassEffect(in: NookDesign.Radius.shape(cornerRadius))
                         .alwaysArrowCursor()
                         .padding(nookSettings.sidebarPosition == .left ? .leading : .trailing, horizontalInset)
                         .padding(.vertical, verticalInset)

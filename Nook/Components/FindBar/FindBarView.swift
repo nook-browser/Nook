@@ -131,7 +131,6 @@ struct FindBarView: View {
                     .background(Color(.windowBackgroundColor).opacity(0.35))
                     .clipShape(Capsule())
                     .nookGlassEffect(in: Capsule())
-                    .nookElevation(.floating)
                     .padding(.trailing, 16)
                 }
                 .padding(.top, 12)

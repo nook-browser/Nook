@@ -63,6 +63,7 @@ enum NookDesign {
         static let rowButton: CGFloat = 20      // hover-only close/unload button in a row
         static let hairlineWidth: CGFloat = 1   // 1pt rule
         static let dropTail: CGFloat = 100      // empty drop target height below the last row
+        static let dialogMaxWidth: CGFloat = 500
     }
 
     // MARK: - Type
@@ -100,6 +101,7 @@ enum NookDesign {
         static let unloadedOpacity: Double = 0.55
         static let dropBorderIdle = Color.secondary.opacity(0.3)    // dashed empty-state drop target
         static let dropBorderActive = Color.primary.opacity(0.4)    // dashed drop target while dragging
+        static let scrim = Color.black.opacity(0.4)                 // modal dimming behind a dialog
     }
 
     // MARK: - Elevation

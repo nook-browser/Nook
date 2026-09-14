@@ -166,15 +166,9 @@ struct DialogCard<Content: View>: View {
 
     var body: some View {
         content
-            .padding(16)
-            .frame(maxWidth: 500, alignment: .leading)
-            .background(BlurEffectView(material: .headerView, state: .active))
-            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xl))
-            .overlay {
-                NookDesign.Radius.shape(NookDesign.Radius.xl)
-                    .stroke(.white.opacity(0.25), lineWidth: 1)
-            }
-            .nookElevation(.floating)
+            .padding(NookDesign.Spacing.xl)
+            .frame(maxWidth: NookDesign.Size.dialogMaxWidth, alignment: .leading)
+            .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.xl))
     }
 }
 

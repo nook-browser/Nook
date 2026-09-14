@@ -921,10 +921,7 @@ private struct SplitControlsOverlay: View {
                             .padding(6)
                     }
                     .buttonStyle(.plain)
-                    .background(.ultraThinMaterial)
-                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
-                    .overlay(NookDesign.Radius.shape(NookDesign.Radius.md).stroke(Color.white.opacity(0.25), lineWidth: 1))
-                    .nookElevation(.raised)
+                    .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.md))
                     .padding(.leading, 8)
 
                     Spacer()
@@ -935,10 +932,7 @@ private struct SplitControlsOverlay: View {
                             .padding(6)
                     }
                     .buttonStyle(.plain)
-                    .background(.ultraThinMaterial)
-                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
-                    .overlay(NookDesign.Radius.shape(NookDesign.Radius.md).stroke(Color.white.opacity(0.25), lineWidth: 1))
-                    .nookElevation(.raised)
+                    .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.md))
                     .padding(.trailing, 8)
                 }
                 .padding(.top, 8)

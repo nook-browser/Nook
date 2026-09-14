@@ -602,15 +602,3 @@ struct CommandPaletteView: View {
         }
     }
 }
-
-struct BackdropView: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
-        view.material = .popover
-        view.blendingMode = .withinWindow
-        view.state = .active
-        return view
-    }
-    
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) { }
-}

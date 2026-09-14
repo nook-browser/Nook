@@ -53,45 +53,15 @@ final class ExtensionLibraryPanelController {
             onDismiss: { [weak self] in self?.dismiss() }
         )
 
+        let root = AnyView(
+            content.nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
+        )
+
         if let hostingView = self.hostingView {
-            hostingView.rootView = AnyView(content)
+            hostingView.rootView = root
         } else {
-            let hosting = NSHostingView(rootView: AnyView(content))
-            hosting.translatesAutoresizingMaskIntoConstraints = false
-
-            // Add vibrancy background
-            let visualEffect = NSVisualEffectView()
-            visualEffect.material = .hudWindow
-            visualEffect.state = .active
-            visualEffect.blendingMode = .behindWindow
-            visualEffect.wantsLayer = true
-            visualEffect.layer?.cornerRadius = NookDesign.Radius.xl
-            visualEffect.layer?.cornerCurve = .continuous
-            visualEffect.layer?.masksToBounds = true
-            visualEffect.translatesAutoresizingMaskIntoConstraints = false
-
-            // Container with rounded corners and clipping
-            let container = NSView()
-            container.wantsLayer = true
-            container.layer?.cornerRadius = NookDesign.Radius.xl
-            container.layer?.cornerCurve = .continuous
-            container.layer?.masksToBounds = true
-            container.translatesAutoresizingMaskIntoConstraints = false
-            container.addSubview(visualEffect)
-            container.addSubview(hosting)
-
-            NSLayoutConstraint.activate([
-                visualEffect.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-                visualEffect.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-                visualEffect.topAnchor.constraint(equalTo: container.topAnchor),
-                visualEffect.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-                hosting.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-                hosting.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-                hosting.topAnchor.constraint(equalTo: container.topAnchor),
-                hosting.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-            ])
-
-            panel.contentView = container
+            let hosting = NSHostingView(rootView: root)
+            panel.contentView = hosting
             self.hostingView = hosting
         }
 
@@ -156,7 +126,7 @@ final class ExtensionLibraryPanelController {
         panel.hidesOnDeactivate = true
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = true
+        panel.hasShadow = false
         panel.isReleasedWhenClosed = false
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]

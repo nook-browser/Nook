@@ -39,13 +39,10 @@ struct SplitCardView: View {
         .frame(width: 237, height: 394)
         .padding(8)
         .background(
-            BlurEffectView(material: .hudWindow, state: .active)
-        )
-        .background(
             Color(currentTextColor)
                 .opacity(0.1)
         )
-        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xxl))
+        .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
         .animation(NookDesign.Motion.standard, value: currentTextColor)
     }
 }
