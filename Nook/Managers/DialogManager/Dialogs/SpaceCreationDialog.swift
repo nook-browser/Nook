@@ -121,7 +121,7 @@ struct SpaceCreationContent: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: NookDesign.Spacing.sectionGap) {
                 Text("Accent")
                     .font(NookDesign.Font.label)
                     .foregroundStyle(.primary)
