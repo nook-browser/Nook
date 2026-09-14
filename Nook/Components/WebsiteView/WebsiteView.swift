@@ -241,7 +241,7 @@ struct WebsiteView: View {
                         LinkStatusBar(
                             hoveredLink: hoveredLink,
                             isCommandPressed: isCommandPressed,
-                            accentColor: browserManager.gradientColorManager.primaryColor
+                            accentColor: browserManager.gradientColorManager.accentColor
                         )
                         .padding(10)
                         Spacer()
@@ -300,7 +300,7 @@ private struct SplitPreviewOverlay: View {
                             height: cardHeight
                         ),
                         geometry: geometry,
-                        accentColor: browserManager.gradientColorManager.displayGradient.primaryColor
+                        accentColor: browserManager.gradientColorManager.accentColor
                     )
                     Spacer()
                 }
@@ -324,7 +324,7 @@ private struct SplitPreviewOverlay: View {
                             height: cardHeight
                         ),
                         geometry: geometry,
-                        accentColor: browserManager.gradientColorManager.displayGradient.primaryColor
+                        accentColor: browserManager.gradientColorManager.accentColor
                     )
                     Spacer()
                 }
@@ -629,7 +629,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
                 let rightId = split.rightTabId(for: windowState.id)
 
                 let activeSide = split.activeSide(for: windowState.id)
-                let accent = browserManager.gradientColorManager.displayGradient.primaryNSColor
+                let accent = NSColor(browserManager.gradientColorManager.accentColor)
                 let allKnownTabs = browserManager.tabManager.allTabs()
 
                 if let lId = leftId, let leftTab = allKnownTabs.first(where: { $0.id == lId }) {

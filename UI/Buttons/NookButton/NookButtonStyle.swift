@@ -128,7 +128,7 @@ struct NookButtonStyle: ButtonStyle {
             return Color.white.mix(with: .black, by: colorScheme == .dark ? 0.8 : 0.06).opacity(0.7)
         case .primary:
             // Use accent color from gradient manager
-            return gradientColorManager.primaryColor
+            return gradientColorManager.accentColor
         }
     }
 

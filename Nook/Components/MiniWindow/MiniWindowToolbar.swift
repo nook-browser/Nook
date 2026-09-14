@@ -95,7 +95,7 @@ struct MiniWindowToolbar: View {
                                 .foregroundStyle(subduedTextColor)
                             Text("\(cleanedTargetSpaceName)")
                                 .font(NookDesign.Font.secondary)
-                                .foregroundStyle(gradientColorManager.primaryColor.opacity(0.8))
+                                .foregroundStyle(gradientColorManager.accentColor.opacity(0.8))
                         }
                         .padding(.vertical, 0)
                     }

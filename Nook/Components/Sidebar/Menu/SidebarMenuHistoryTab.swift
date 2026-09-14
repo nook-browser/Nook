@@ -52,7 +52,7 @@ struct SidebarMenuHistoryTab: View {
     private let maxResults: Int = 1000
 
     private var contrastText: Color {
-        Garnish.contrastingShade(of: gradientColorManager.primaryColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
+        Garnish.contrastingShade(of: gradientColorManager.accentColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
     }
 
     private var contrastTextSecondary: Color {
@@ -462,7 +462,7 @@ struct HistoryRowView: View {
     @State private var favicon: SwiftUI.Image = Image(systemName: "globe")
 
     private var contrastText: Color {
-        Garnish.contrastingShade(of: gradientColorManager.primaryColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
+        Garnish.contrastingShade(of: gradientColorManager.accentColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
     }
 
     var body: some View {
@@ -622,7 +622,7 @@ struct FiltersSelectView: View {
     @EnvironmentObject var gradientColorManager: GradientColorManager
 
     private var contrastText: Color {
-        Garnish.contrastingShade(of: gradientColorManager.primaryColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
+        Garnish.contrastingShade(of: gradientColorManager.accentColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
     }
 
     var body: some View {
@@ -681,7 +681,7 @@ struct FiltersSelectButton: View {
     @State private var isHovering: Bool = false
 
     private var contrastText: Color {
-        Garnish.contrastingShade(of: gradientColorManager.primaryColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
+        Garnish.contrastingShade(of: gradientColorManager.accentColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
     }
 
     var body: some View {

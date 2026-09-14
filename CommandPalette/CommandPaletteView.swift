@@ -123,7 +123,7 @@ struct CommandPaletteView: View {
                                     .textFieldStyle(.plain)
                                     .font(NookDesign.Font.heading)
                                     .foregroundColor(textFieldColor)
-                                    .tint(gradientColorManager.primaryColor)
+                                    .tint(gradientColorManager.accentColor)
                                     .overlay(alignment: .leading) {
                                         if let suffix = inlineCompletionSuffix {
                                             (Text(text).foregroundColor(.clear) + Text(suffix).foregroundColor(isDark ? .white.opacity(0.25) : .black.opacity(0.25)))
@@ -369,7 +369,7 @@ struct CommandPaletteView: View {
                         .padding(.vertical, 11)
                         .background(
                             selectedIndex == index
-                                ? gradientColorManager.primaryColor
+                                ? gradientColorManager.accentColor
                                 : isHovered
                                     ? isDark
                                         ? .white.opacity(0.05)

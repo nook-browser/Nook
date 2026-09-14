@@ -27,11 +27,14 @@ struct SpaceGradient: Codable, Hashable {
         self.opacity = max(0.0, min(1.0, opacity))
     }
 
+    /// A one-color gradient. Every space written by the app after the
+    /// Phase 2 remodel uses this shape; older multi-node data still decodes.
+    static func accent(hex: String) -> SpaceGradient {
+        SpaceGradient(angle: 0, nodes: [GradientNode(colorHex: hex, location: 0.0)], grain: 0, opacity: 1)
+    }
+
     static var `default`: SpaceGradient {
-        let hex = "#000000"
-        let n1 = GradientNode(colorHex: hex, location: 0.0)
-        let n2 = GradientNode(colorHex: hex, location: 1.0)
-        return SpaceGradient(angle: 45.0, nodes: [n1, n2], grain: 0.05, opacity: 0.6)
+        accent(hex: SpaceAccent.defaultHex)
     }
 
     static var incognito: SpaceGradient {

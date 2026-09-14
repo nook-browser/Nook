@@ -236,13 +236,13 @@ struct DialogHeader: View {
         HStack(spacing: 16) {
             ZStack {
                 Circle()
-                    .fill(gradientColorManager.primaryColor.opacity(0.1))
-                    .nookClearGlassEffect(tint: gradientColorManager.primaryColor.opacity(0.2))
+                    .fill(gradientColorManager.accentColor.opacity(0.1))
+                    .nookClearGlassEffect(tint: gradientColorManager.accentColor.opacity(0.2))
                     .frame(width: 48, height: 48)
 
                 Image(systemName: icon)
                     .font(NookDesign.Font.titleLarge)
-                    .foregroundStyle(gradientColorManager.primaryColor).frame(
+                    .foregroundStyle(gradientColorManager.accentColor).frame(
                         width: 48,
                         height: 48
                     )

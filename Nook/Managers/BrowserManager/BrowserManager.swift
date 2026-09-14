@@ -460,7 +460,7 @@ class BrowserManager: ObservableObject {
         // Only animate if this is the active window (to avoid animating all windows simultaneously)
         let isActiveWindow = windowRegistry?.activeWindow?.id == windowState.id
         if animate && isActiveWindow {
-            gradientColorManager.transition(to: newGradient, duration: 0.25, animation: .easeInOut(duration: 0.25))
+            gradientColorManager.transition(to: newGradient)
         } else {
             gradientColorManager.setImmediate(newGradient)
         }
@@ -478,7 +478,7 @@ class BrowserManager: ObservableObject {
             if windowState.currentSpaceId == space.id {
                 let isActiveWindow = windowState.id == activeWindowId
                 if animate && isActiveWindow {
-                    gradientColorManager.transition(to: space.gradient, duration: 0.25, animation: .easeInOut(duration: 0.25))
+                    gradientColorManager.transition(to: space.gradient)
                 } else {
                     gradientColorManager.setImmediate(space.gradient)
                 }

@@ -46,7 +46,7 @@ struct TabSuggestionItem: View {
                 ZStack {
                     Image(systemName: "arrow.right")
                         .font(NookDesign.Font.label)
-                        .foregroundStyle(isSelected ? gradientColorManager.primaryColor : isDark ? .white.opacity(0.5) : .black.opacity(0.5))
+                        .foregroundStyle(isSelected ? gradientColorManager.accentColor : isDark ? .white.opacity(0.5) : .black.opacity(0.5))
                         .frame(width: 16, height: 16)
                 }
                 .frame(width: 24, height: 24)

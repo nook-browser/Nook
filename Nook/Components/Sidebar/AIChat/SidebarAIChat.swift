@@ -58,7 +58,7 @@ struct SidebarAIChat: View {
     @FocusState private var isTextFieldFocused: Bool
 
     private var contrastText: Color {
-        Garnish.contrastingShade(of: gradientColorManager.primaryColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
+        Garnish.contrastingShade(of: gradientColorManager.accentColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
     }
 
     var body: some View {
@@ -476,7 +476,7 @@ struct MessageBubble: View {
     @State private var showCopied: Bool = false
 
     private var contrastText: Color {
-        Garnish.contrastingShade(of: gradientColorManager.primaryColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
+        Garnish.contrastingShade(of: gradientColorManager.accentColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
     }
 
     var body: some View {
@@ -738,7 +738,7 @@ struct CitationView: View {
     @State private var isHovered = false
 
     private var contrastText: Color {
-        Garnish.contrastingShade(of: gradientColorManager.primaryColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
+        Garnish.contrastingShade(of: gradientColorManager.accentColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
     }
 
     var body: some View {

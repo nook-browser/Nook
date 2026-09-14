@@ -19,6 +19,13 @@ public class Space: NSObject, Identifiable {
     var icon: String
     var color: NSColor
     var gradient: SpaceGradient
+
+    /// Hex of the space's accent color (the gradient's primary node).
+    var accentHex: String { gradient.primaryColorHex }
+
+    /// The space's accent color, used for its icon and switcher item.
+    var accentColor: Color { gradient.primaryColor }
+
     var activeTabId: UUID?
     var profileId: UUID?
     
