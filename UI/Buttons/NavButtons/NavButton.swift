@@ -9,7 +9,7 @@
 import SwiftUI
 
 /// Square icon button. Hover shows a fill, press shows a stronger fill and a 0.95 scale.
-/// Sizes and radii come from NookDesign; pass overrides only for the space switcher (14pt glyph) or URL bar (28).
+/// Pass size: or radius: only where a call site needs a non-default (media controls 24, URL bar and space title 28, space switcher radius lg).
 struct NookIconButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
     @State private var isHovering = false
@@ -30,6 +30,7 @@ struct NookIconButtonStyle: ButtonStyle {
             configuration.label
                 .foregroundStyle(.primary)
         }
+        .frame(width: size, height: size)
         .opacity(isEnabled ? 1.0 : 0.3)
         .contentTransition(.symbolEffect(.replace.upUp.byLayer, options: .nonRepeating))
         .scaleEffect(configuration.isPressed && isEnabled ? 0.95 : 1.0)
@@ -46,7 +47,7 @@ struct NookIconButtonStyle: ButtonStyle {
     }
 }
 
-/// Rectangular variant of NavButtonStyle that allows custom widths
+/// Rectangular, labeled variant of NookIconButtonStyle that allows custom widths
 /// Use this for buttons that need to be wider than square (e.g., "New Space" button)
 struct RectNavButtonStyle: ButtonStyle {
     @Environment(\.colorScheme) var colorScheme

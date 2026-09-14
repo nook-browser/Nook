@@ -24,9 +24,7 @@ struct TopBarView: View {
     @State private var previousTabId: UUID? = nil
 
     var body: some View {
-        let cornerRadius: CGFloat = {
-            return NookDesign.Radius.md
-        }()
+        let cornerRadius: CGFloat = NookDesign.Radius.md
 
         let currentTab = browserManager.currentTab(for: windowState)
         let hasPiPControl =

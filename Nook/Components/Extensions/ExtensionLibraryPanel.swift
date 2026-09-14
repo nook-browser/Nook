@@ -66,6 +66,7 @@ final class ExtensionLibraryPanelController {
             visualEffect.blendingMode = .behindWindow
             visualEffect.wantsLayer = true
             visualEffect.layer?.cornerRadius = NookDesign.Radius.xl
+            visualEffect.layer?.cornerCurve = .continuous
             visualEffect.layer?.masksToBounds = true
             visualEffect.translatesAutoresizingMaskIntoConstraints = false
 
@@ -73,6 +74,7 @@ final class ExtensionLibraryPanelController {
             let container = NSView()
             container.wantsLayer = true
             container.layer?.cornerRadius = NookDesign.Radius.xl
+            container.layer?.cornerCurve = .continuous
             container.layer?.masksToBounds = true
             container.translatesAutoresizingMaskIntoConstraints = false
             container.addSubview(visualEffect)

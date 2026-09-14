@@ -79,7 +79,7 @@ enum NookDesign {
     enum Motion {
         static let quick = Animation.easeOut(duration: 0.12)      // hover, press
         static let standard = Animation.smooth(duration: 0.22)    // selection, reveal, fold
-        static let spring = Animation.bouncy(duration: 0.3)       // palette, dialog, toast
+        static let spring = Animation.snappy(duration: 0.3)      // palette, dialog, toast, drag reorder, gesture-tracked motion
     }
 
     // MARK: - Surface
@@ -96,7 +96,7 @@ enum NookDesign {
     enum Elevation {
         case raised    // hairline + tight shadow: active row, tile, settings group
         case floating  // menu, palette, toast, dialog, popover
-        case none      // no shadow; for conditional elevation
+        case flat      // no shadow; for conditional elevation
     }
 }
 
@@ -106,16 +106,9 @@ private struct NookElevationModifier: ViewModifier {
     let level: NookDesign.Elevation
 
     func body(content: Content) -> some View {
-        switch level {
-        case .raised:
-            content.shadow(color: .black.opacity(0.05), radius: 2, y: 1)
-        case .floating:
-            content
-                .shadow(color: .black.opacity(0.16), radius: 32, y: 12)
-                .shadow(color: .black.opacity(0.06), radius: 2, y: 1)
-        case .none:
-            content
-        }
+        content
+            .shadow(color: .black.opacity(level == .floating ? 0.16 : 0), radius: level == .floating ? 32 : 0, y: level == .floating ? 12 : 0)
+            .shadow(color: .black.opacity(level == .flat ? 0 : level == .floating ? 0.06 : 0.05), radius: level == .flat ? 0 : 2, y: level == .flat ? 0 : 1)
     }
 }
 

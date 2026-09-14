@@ -450,6 +450,7 @@ struct KeycapLabel: View {
     var body: some View {
         Text(text.uppercased())
             .font(NookDesign.Font.caption)
+            .fontDesign(.rounded)
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
             .background(.white.opacity(0.12))
