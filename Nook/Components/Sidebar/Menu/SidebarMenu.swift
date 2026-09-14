@@ -95,7 +95,7 @@ struct SidebarMenu: View {
                     }
                 }
                 .labelStyle(.iconOnly)
-                .buttonStyle(NavButtonStyle())
+                .buttonStyle(NookIconButtonStyle())
                 .foregroundStyle(Color.primary)
                 Spacer()
             }

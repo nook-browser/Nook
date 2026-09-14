@@ -66,7 +66,7 @@ struct SidebarWindowControlsView: View {
                 browserManager.toggleSidebar(for: windowState)
             }
             .labelStyle(.iconOnly)
-            .buttonStyle(NavButtonStyle())
+            .buttonStyle(NookIconButtonStyle())
             .foregroundStyle(Color.primary)
 
             if nookSettings.showAIAssistant {
@@ -74,7 +74,7 @@ struct SidebarWindowControlsView: View {
                     browserManager.toggleAISidebar(for: windowState)
                 }
                 .labelStyle(.iconOnly)
-                .buttonStyle(NavButtonStyle())
+                .buttonStyle(NookIconButtonStyle())
                 .foregroundStyle(Color.primary)
             }
 

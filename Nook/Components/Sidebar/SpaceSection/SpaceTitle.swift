@@ -134,7 +134,7 @@ struct SpaceTitle: View {
                     .labelStyle(.iconOnly)
             }
             .menuStyle(.button)
-            .buttonStyle(NavButtonStyle(size: .small))
+            .buttonStyle(NookIconButtonStyle(size: 28))
             .opacity(isHovering ? 1.0 : 0.0)
 
         }

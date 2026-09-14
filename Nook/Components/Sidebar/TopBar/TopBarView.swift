@@ -136,7 +136,7 @@ struct TopBarView: View {
         HStack(spacing: 4) {
             Button("Go Back", systemImage: "chevron.backward", action: goBack)
                 .labelStyle(.iconOnly)
-                .buttonStyle(NavButtonStyle())
+                .buttonStyle(NookIconButtonStyle())
                 .foregroundStyle(navButtonColor)
                 .animation(
                     shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil,
@@ -157,7 +157,7 @@ struct TopBarView: View {
                 action: goForward
             )
             .labelStyle(.iconOnly)
-            .buttonStyle(NavButtonStyle())
+            .buttonStyle(NookIconButtonStyle())
             .foregroundStyle(navButtonColor)
             .animation(
                 shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil,
@@ -183,7 +183,7 @@ struct TopBarView: View {
                     .contentTransition(.symbolEffect(.replace))
             }
             .labelStyle(.iconOnly)
-            .buttonStyle(NavButtonStyle())
+            .buttonStyle(NookIconButtonStyle())
             .foregroundStyle(navButtonColor)
             .animation(
                 shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil,

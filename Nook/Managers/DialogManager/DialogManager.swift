@@ -291,15 +291,11 @@ struct DialogFooter: View {
                             iconPosition: .trailing
                         )
                     )
-                    .conditionally(if: OSVersion.supportsGlassEffect) {
-                        View in
-                        View
-                            .tint(
-                                Color("plainBackgroundColor").opacity(
-                                    colorScheme == .light ? 0.8 : 0.4
-                                )
-                            )
-                    }
+                    .tint(
+                        Color("plainBackgroundColor").opacity(
+                            colorScheme == .light ? 0.8 : 0.4
+                        )
+                    )
                     .controlSize(.extraLarge)
                     .disabled(!leftButton.isEnabled)
                     .modifier(

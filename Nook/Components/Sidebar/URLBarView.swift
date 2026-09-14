@@ -54,7 +54,7 @@ struct URLBarView: View {
                             copyURLToClipboard(currentTab.url.absoluteString)
                         }
                         .labelStyle(.iconOnly)
-                        .buttonStyle(URLBarButtonStyle())
+                        .buttonStyle(NookIconButtonStyle(size: 28, radius: NookDesign.Radius.lg))
                         .foregroundStyle(Color.primary)
                         .transition(.opacity.combined(with: .scale(scale: 0.9)))
                         .contentTransition(.symbolEffect(.replace))
@@ -173,44 +173,6 @@ struct URLBarView: View {
         // Hide toast after 2 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             windowState.isShowingCopyURLToast = false
-        }
-    }
-}
-
-// MARK: - URL Bar Button Style
-struct URLBarButtonStyle: ButtonStyle {
-    @Environment(\.colorScheme) var colorScheme
-    @Environment(\.isEnabled) var isEnabled
-    @State private var isHovering: Bool = false
-    
-    private let cornerRadius: CGFloat = 12
-    private let size: CGFloat = 28
-    private let borderInset: CGFloat = 4
-    
-    func makeBody(configuration: Configuration) -> some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(.primary.opacity(backgroundColorOpacity(isPressed: configuration.isPressed)))
-                .frame(width: size, height: size)
-            
-            configuration.label
-                .foregroundStyle(.primary)
-        }
-        .opacity(isEnabled ? 1.0 : 0.3)
-        .contentTransition(.symbolEffect(.replace.upUp.byLayer, options: .nonRepeating))
-        .scaleEffect(configuration.isPressed && isEnabled ? 0.95 : 1.0)
-        .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
-        .animation(.easeInOut(duration: 0.15), value: isHovering)
-        .onHoverTracking { hovering in
-            isHovering = hovering
-        }
-    }
-    
-    private func backgroundColorOpacity(isPressed: Bool) -> Double {
-        if (isHovering || isPressed) && isEnabled {
-            return colorScheme == .dark ? 0.2 : 0.1
-        } else {
-            return 0.0
         }
     }
 }

@@ -43,7 +43,7 @@ struct SidebarBottomBar: View {
                 onMenuTap()
             }
             .labelStyle(.iconOnly)
-            .buttonStyle(NavButtonStyle())
+            .buttonStyle(NookIconButtonStyle())
             .foregroundStyle(Color.primary)
             .onHoverTracking { isHovered in
                 isMenuButtonHovered = isHovered
@@ -77,7 +77,7 @@ struct SidebarBottomBar: View {
                 .labelStyle(.iconOnly)
         }
         .menuStyle(.button)
-        .buttonStyle(NavButtonStyle())
+        .buttonStyle(NookIconButtonStyle())
         .foregroundStyle(Color.primary)
     }
 }

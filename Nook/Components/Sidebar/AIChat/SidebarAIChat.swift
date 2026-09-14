@@ -136,7 +136,7 @@ struct SidebarAIChat: View {
                 }
             }
             .labelStyle(.iconOnly)
-            .buttonStyle(NavButtonStyle())
+            .buttonStyle(NookIconButtonStyle())
             .foregroundStyle(Color.primary)
 
             if !aiService.messages.isEmpty {
@@ -152,14 +152,14 @@ struct SidebarAIChat: View {
                 showSettingsDialog()
             }
             .labelStyle(.iconOnly)
-            .buttonStyle(NavButtonStyle())
+            .buttonStyle(NookIconButtonStyle())
             .foregroundStyle(Color.primary)
 
             Button("Clear Messages", systemImage: "trash") {
                 showClearMessagesDialog()
             }
             .labelStyle(.iconOnly)
-            .buttonStyle(NavButtonStyle())
+            .buttonStyle(NookIconButtonStyle())
             .foregroundStyle(Color.primary)
             .disabled(aiService.messages.isEmpty)
         }

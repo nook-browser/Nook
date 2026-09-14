@@ -8,60 +8,41 @@
 
 import SwiftUI
 
-struct NavButtonStyle: ButtonStyle {
-    @Environment(\.colorScheme) var colorScheme
-    @Environment(\.isEnabled) var isEnabled
-    @Environment(\.controlSize) var controlSize
-    @State private var isHovering: Bool = false
+/// Square icon button. Hover shows a fill, press shows a stronger fill and a 0.95 scale.
+/// Sizes and radii come from NookDesign; pass overrides only for the space switcher (14pt glyph) or URL bar (28).
+struct NookIconButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var isHovering = false
 
-    let overrideSize: ControlSize?
+    let size: CGFloat
+    let radius: CGFloat
 
-    init(size: ControlSize? = nil) {
-        self.overrideSize = size
+    init(size: CGFloat = NookDesign.Size.iconButton, radius: CGFloat = NookDesign.Radius.md) {
+        self.size = size
+        self.radius = radius
     }
 
     func makeBody(configuration: Configuration) -> some View {
         ZStack {
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(.primary.opacity(backgroundColorOpacity(isPressed: configuration.isPressed)))
+            NookDesign.Radius.shape(radius)
+                .fill(fill(isPressed: configuration.isPressed))
                 .frame(width: size, height: size)
-
             configuration.label
                 .foregroundStyle(.primary)
         }
         .opacity(isEnabled ? 1.0 : 0.3)
-        
         .contentTransition(.symbolEffect(.replace.upUp.byLayer, options: .nonRepeating))
         .scaleEffect(configuration.isPressed && isEnabled ? 0.95 : 1.0)
-        .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
-        .animation(.easeInOut(duration: 0.15), value: isHovering)
-        .onHoverTracking { hovering in
-            isHovering = hovering
-        }
+        .animation(NookDesign.Motion.quick, value: configuration.isPressed)
+        .animation(NookDesign.Motion.quick, value: isHovering)
+        .onHoverTracking { hovering in isHovering = hovering }
     }
-    
-    private var size: CGFloat {
-        let effectiveSize = overrideSize ?? controlSize
-        return switch effectiveSize {
-        case .mini: 24
-        case .small: 28
-        case .regular: 32
-        case .large: 40
-        case .extraLarge: 48
-        @unknown default: 32
-        }
-    }
-    
-    private var cornerRadius: CGFloat {
-        8
-    }
-    
-    private func backgroundColorOpacity(isPressed: Bool) -> Double {
-        if (isHovering || isPressed) && isEnabled {
-            return colorScheme == .dark ? 0.2 : 0.1
-        } else {
-            return 0.0
-        }
+
+    private func fill(isPressed: Bool) -> Color {
+        guard isEnabled else { return .clear }
+        if isPressed { return NookDesign.Surface.fillPressed }
+        if isHovering { return NookDesign.Surface.fill }
+        return .clear
     }
 }
 
@@ -86,8 +67,8 @@ struct RectNavButtonStyle: ButtonStyle {
             .opacity(isEnabled ? 1.0 : 0.3)
             .contentTransition(.symbolEffect(.replace.upUp.byLayer, options: .nonRepeating))
             .scaleEffect(configuration.isPressed && isEnabled ? 0.95 : 1.0)
-            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
-            .animation(.easeInOut(duration: 0.15), value: isHovering)
+            .animation(NookDesign.Motion.quick, value: configuration.isPressed)
+            .animation(NookDesign.Motion.quick, value: isHovering)
             .onHoverTracking { hovering in
                 isHovering = hovering
             }
@@ -116,7 +97,7 @@ struct RectNavButtonStyle: ButtonStyle {
     }
 
     private var cornerRadius: CGFloat {
-        8
+        NookDesign.Radius.md
     }
 
     private func backgroundColorOpacity(isPressed: Bool) -> Double {
@@ -135,7 +116,7 @@ struct RectNavButtonStyle: ButtonStyle {
         } label: {
             Image(systemName: "arrow.left")
         }
-        .buttonStyle(NavButtonStyle())
+        .buttonStyle(NookIconButtonStyle())
         .foregroundStyle(Color.primary)
 
         // With foregroundStyle
@@ -143,29 +124,26 @@ struct RectNavButtonStyle: ButtonStyle {
         } label: {
             Image(systemName: "heart.fill")
         }
-        .buttonStyle(NavButtonStyle())
+        .buttonStyle(NookIconButtonStyle())
         .foregroundStyle(.red)
 
         // Different sizes
         HStack {
             Button { } label: { Image(systemName: "star") }
-                .buttonStyle(NavButtonStyle())
+                .buttonStyle(NookIconButtonStyle(size: 24))
                 .foregroundStyle(Color.pink)
-                .controlSize(.mini)
 
             Button { } label: { Image(systemName: "star") }
-                .buttonStyle(NavButtonStyle())
+                .buttonStyle(NookIconButtonStyle(size: 28))
                 .foregroundStyle(Color.purple)
-                .controlSize(.small)
 
             Button { } label: { Image(systemName: "star") }
-                .buttonStyle(NavButtonStyle())
+                .buttonStyle(NookIconButtonStyle())
                 .foregroundStyle(Color.yellow)
 
             Button { } label: { Image(systemName: "star") }
-                .buttonStyle(NavButtonStyle())
+                .buttonStyle(NookIconButtonStyle(size: 40))
                 .foregroundStyle(Color.orange)
-                .controlSize(.large)
         }
 
         // Disabled
@@ -173,7 +151,7 @@ struct RectNavButtonStyle: ButtonStyle {
         } label: {
             Image(systemName: "trash")
         }
-        .buttonStyle(NavButtonStyle())
+        .buttonStyle(NookIconButtonStyle())
         .foregroundStyle(Color.primary)
         .disabled(true)
     }

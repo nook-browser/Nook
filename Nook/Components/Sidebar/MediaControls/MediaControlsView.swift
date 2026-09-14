@@ -99,7 +99,7 @@ struct MediaControlsView: View {
                                 }
                             }
                             .labelStyle(.iconOnly)
-                            .buttonStyle(NavButtonStyle())
+                            .buttonStyle(NookIconButtonStyle(size: 24))
                             .foregroundStyle(Color.white)
                             .help("Previous")
                             .transition(.opacity.combined(with: .scale(scale: 0.8)))
@@ -123,7 +123,7 @@ struct MediaControlsView: View {
                             }
                         }
                         .labelStyle(.iconOnly)
-                        .buttonStyle(NavButtonStyle())
+                        .buttonStyle(NookIconButtonStyle(size: 24))
                         .foregroundStyle(Color.white)
                         .help(isPlaying ? "Pause" : "Play")
 
@@ -140,7 +140,7 @@ struct MediaControlsView: View {
                             }
                         }
                         .labelStyle(.iconOnly)
-                        .buttonStyle(NavButtonStyle())
+                        .buttonStyle(NookIconButtonStyle(size: 24))
                         .foregroundStyle(Color.white)
                         .help("Next")
 
@@ -160,7 +160,7 @@ struct MediaControlsView: View {
                             }
                         }
                         .labelStyle(.iconOnly)
-                        .buttonStyle(NavButtonStyle())
+                        .buttonStyle(NookIconButtonStyle(size: 24))
                         .foregroundStyle(Color.white)
                         .help(isMuted ? "Unmute" : "Mute")
                     }
@@ -185,7 +185,6 @@ struct MediaControlsView: View {
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }
-        .controlSize(.mini)
         .animation(.easeInOut(duration: 0.25), value: hasActiveMedia)
         .animation(.easeInOut(duration: 0.2), value: shouldShowFavicon)
         .animation(.easeInOut(duration: 0.2), value: shouldShowPreviousButton)

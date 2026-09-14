@@ -112,7 +112,7 @@ struct NavButtonsView: View {
                 browserManager.toggleSidebar(for: windowState)
             }
             .labelStyle(.iconOnly)
-            .buttonStyle(NavButtonStyle())
+            .buttonStyle(NookIconButtonStyle())
             .foregroundStyle(Color.primary)
             
             if nookSettings.showAIAssistant && !shouldCollapseAIChat {
@@ -120,7 +120,7 @@ struct NavButtonsView: View {
                     browserManager.toggleAISidebar(for: windowState)
                 }
                 .labelStyle(.iconOnly)
-                .buttonStyle(NavButtonStyle())
+                .buttonStyle(NookIconButtonStyle())
                 .foregroundStyle(Color.primary)
             }
             
@@ -137,7 +137,7 @@ struct NavButtonsView: View {
                     HStack(alignment: .center, spacing: 8) {
                         Button("Go Back", systemImage: "arrow.backward", action: goBack)
                             .labelStyle(.iconOnly)
-                            .buttonStyle(NavButtonStyle())
+                            .buttonStyle(NookIconButtonStyle())
                             .foregroundStyle(Color.primary)
                             .disabled(!tabWrapper.canGoBack)
                             .contextMenu {
@@ -149,7 +149,7 @@ struct NavButtonsView: View {
                         
                         Button("Go Forward", systemImage: "arrow.forward", action: goForward)
                             .labelStyle(.iconOnly)
-                            .buttonStyle(NavButtonStyle())
+                            .buttonStyle(NookIconButtonStyle())
                             .foregroundStyle(Color.primary)
                             .disabled(!tabWrapper.canGoForward)
                             .contextMenu {
@@ -181,7 +181,7 @@ struct NavButtonsView: View {
                             .contentTransition(.symbolEffect(.replace))
                     }
                     .labelStyle(.iconOnly)
-                    .buttonStyle(NavButtonStyle())
+                    .buttonStyle(NookIconButtonStyle())
                     .foregroundStyle(Color.primary)
                 }
                 
@@ -268,7 +268,7 @@ struct NavButtonsView: View {
                 .labelStyle(.iconOnly)
             }
             .menuStyle(.button)
-            .buttonStyle(NavButtonStyle())
+            .buttonStyle(NookIconButtonStyle())
         }
     }
 }
