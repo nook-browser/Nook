@@ -22,6 +22,18 @@ struct SpaceTab: View {
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.colorScheme) var colorScheme
 
+    /// Fades the trailing edge of the title instead of truncating with an ellipsis.
+    /// On hover the clear region grows so the text ends before the close button.
+    private var titleFade: some View {
+        HStack(spacing: 0) {
+            Color.black
+            LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing)
+                .frame(width: 20)
+            Color.clear
+                .frame(width: isHovering ? 24 : 0)
+        }
+    }
+
     var body: some View {
         Button(action: {
             if isCurrentTab {
@@ -79,16 +91,25 @@ struct SpaceTab: View {
                             isTextFieldFocused = true
                         }
                 } else {
+                    // Hidden shrinkable copy sizes the row; the visible copy is laid out at
+                    // full width and faded, so long titles never widen the row.
                     Text(tab.displayName)
                         .font(NookDesign.Font.body)
-                        .foregroundStyle(textTab)
                         .lineLimit(1)
-                        .truncationMode(.tail)
+                        .hidden()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .overlay(alignment: .leading) {
+                            Text(tab.displayName)
+                                .font(NookDesign.Font.body)
+                                .foregroundStyle(textTab)
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
+                        .mask(titleFade)
                         .textSelection(.disabled) // Make text non-selectable
                 }
-                Spacer()
-
-
+            }
+            .overlay(alignment: .trailing) {
                 if isHovering {
                     // Space-pinned loaded tabs: show "-" to unload; unloaded: show "x" to remove
                     let useUnload = onUnload != nil && !tab.isUnloaded
