@@ -4,19 +4,21 @@ Deep documentation for Nook's web extension subsystem. For project-level context
 
 ## Availability
 
-All extension code requires `@available(macOS 15.4, *)` guards. Content script injection specifically requires macOS 15.5+.
+Deployment target is macOS 26.0, so WKWebExtension (15.4+) and content scripts (15.5+) are always available. No `@available` / `#available` guards are needed or wanted in extension code.
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `ExtensionManager.swift` | Core facade (~380 lines): properties, init/deinit, setup, profile stores, context identity |
+| `ExtensionManager.swift` | Core facade (~435 lines): properties, init/deinit, setup, profile stores, context identity |
 | `ExtensionManager+Installation.swift` | Install flow, persistence, Safari discovery, Chrome Web Store, enable/disable/uninstall, MV3 support |
 | `ExtensionManager+Delegate.swift` | All `WKWebExtensionControllerDelegate` methods: popup, permissions, tabs/windows, options page, native messaging |
 | `ExtensionManager+ExternallyConnectable.swift` | Bridge JS generation for `externally_connectable`, manifest patching for WebKit |
 | `ExtensionManager+Diagnostics.swift` | Background health probes, state diagnosis, popup diagnostics, testing helpers |
 | `ExtensionManager+TabNotifications.swift` | Tab adapter management, tab lifecycle notifications, action anchor tracking |
 | `NativeMessagingHandler.swift` | Standalone class: launches native host processes, stdin/stdout messaging protocol |
+| `BitwardenBiometricHandler.swift` | In-process host for Bitwarden's `.appex` `connectNative("com.8bit.bitwarden")` biometric unlock: prompts Touch ID (LocalAuthentication) and returns the symmetric key from the `Bitwarden_biometric` Keychain service, so no Bitwarden desktop app is required |
+| `InternalNativePortHandler.swift` | Small protocol for in-process native message port handlers |
 | `PopupUIDelegate.swift` | `PopupClipboardHandler` (JS↔native clipboard bridge via WKScriptMessageHandler) + `PopupUIDelegate` (WKUIDelegate for popup webviews) |
 | `ExtensionBridge.swift` | `WKWebExtensionTab` / `WKWebExtensionWindow` protocol adapters |
 | `Nook/Models/Extension/ExtensionModels.swift` | `ExtensionEntity` (SwiftData) + `InstalledExtension` runtime model |
@@ -115,6 +117,12 @@ Similarly, `connectUsing` must use the completion handler form (not `async throw
 - `copyToClipboard` — writes `msg["text"]` to `NSPasteboard.general`
 - `readFromClipboard` — reads from `NSPasteboard.general`
 - `showPopover` — routes to `extensionContext.performAction(for:)`
+
+## MV3 Worker Lifetime
+
+Background service workers terminate after ~5 minutes idle. `wakeBackgroundWorkers()` is called from `notifyTabActivated` and from `ExtensionActionView` on `NSApplication.didBecomeActiveNotification`. Do not add polling timers to keep workers alive.
+
+**Pending work** (`docs/superpowers/plans/2026-04-01-extension-tab-binding-fixes.md`): grant URL access on tab activation, guard tab notifications against nil webviews, remove popup double-load, fire URL/title property changes on tab switch. Partially applied in the working tree as of 2026-09.
 
 ## Delegate Methods (WKWebExtensionControllerDelegate)
 
