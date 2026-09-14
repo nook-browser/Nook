@@ -15,12 +15,6 @@ struct AirTrafficControlSettingsView: View {
     var body: some View {
         Form {
             Section {
-                Text("Automatically route websites to specific spaces. When you navigate to a matching domain, a new tab opens in the designated space.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Rules") {
                 if nookSettings.siteRoutingRules.isEmpty {
                     Text("No routing rules configured.")
                         .foregroundStyle(.tertiary)
@@ -30,6 +24,10 @@ struct AirTrafficControlSettingsView: View {
                     }
                     .onDelete(perform: deleteRules)
                 }
+            } header: {
+                Text("Rules")
+            } footer: {
+                Text("Automatically route websites to specific spaces. When you navigate to a matching domain, a new tab opens in the designated space.")
             }
 
             Section {
@@ -67,39 +65,8 @@ struct AirTrafficControlSettingsView: View {
         let space = browserManager.tabManager.spaces.first(where: { $0.id == rule.targetSpaceId })
         let profile = browserManager.profileManager.profiles.first(where: { $0.id == rule.targetProfileId })
 
-        return HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 4) {
-                    Text(rule.domain)
-                        .fontWeight(.medium)
-                    if let pp = rule.pathPrefix, !pp.isEmpty {
-                        Text(pp)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                HStack(spacing: 4) {
-                    if let space {
-                        Image(systemName: space.icon)
-                            .font(.caption)
-                        Text(space.name)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text("Space deleted")
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
-                    if browserManager.profileManager.profiles.count > 1, let profile {
-                        Text("(\(profile.name))")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-            }
-
-            Spacer()
-
-            Toggle("", isOn: Binding(
+        return LabeledContent {
+            Toggle("Enabled", isOn: Binding(
                 get: { rule.isEnabled },
                 set: { newValue in
                     var updated = rule
@@ -109,6 +76,34 @@ struct AirTrafficControlSettingsView: View {
             ))
             .toggleStyle(.switch)
             .labelsHidden()
+        } label: {
+            VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
+                HStack(spacing: NookDesign.Spacing.xs) {
+                    Text(rule.domain)
+                    if let pp = rule.pathPrefix, !pp.isEmpty {
+                        Text(pp)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                HStack(spacing: NookDesign.Spacing.xs) {
+                    if let space {
+                        Image(systemName: space.icon)
+                            .font(NookDesign.Font.caption)
+                        Text(space.name)
+                            .font(NookDesign.Font.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Space deleted")
+                            .font(NookDesign.Font.caption)
+                            .foregroundStyle(.red)
+                    }
+                    if browserManager.profileManager.profiles.count > 1, let profile {
+                        Text("(\(profile.name))")
+                            .font(NookDesign.Font.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
         }
         .contentShape(Rectangle())
         .onTapGesture(count: 2) {
@@ -173,7 +168,7 @@ private struct RuleEditSheet: View {
                     Section {
                         Text(error)
                             .foregroundStyle(.red)
-                            .font(.caption)
+                            .font(NookDesign.Font.caption)
                     }
                 }
             }
@@ -187,9 +182,12 @@ private struct RuleEditSheet: View {
                     .keyboardShortcut(.defaultAction)
                     .disabled(domain.trimmingCharacters(in: .whitespaces).isEmpty || selectedSpaceId == nil)
             }
-            .padding()
+            .padding(NookDesign.Spacing.xl)
         }
-        .frame(width: 400, height: 360)
+        .frame(
+            width: NookDesign.Size.sheetSmallWidth,
+            height: NookDesign.Size.sheetSmallHeight
+        )
         .onAppear {
             if let rule = existingRule {
                 domain = rule.domain

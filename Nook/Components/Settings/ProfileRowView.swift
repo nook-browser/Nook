@@ -22,44 +22,47 @@ struct ProfileRowView: View {
     @State private var isHovering: Bool = false
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: NookDesign.Spacing.lg) {
             // Icon
             ZStack {
                 NookDesign.Radius.shape(NookDesign.Radius.sm)
-                    .fill(Color(.controlBackgroundColor))
+                    .fill(NookDesign.Surface.raised)
                 Image(systemName: profile.icon)
                     .font(NookDesign.Font.heading)
             }
-            .frame(width: 32, height: 32)
+            .frame(
+                width: NookDesign.Size.settingsIcon,
+                height: NookDesign.Size.settingsIcon
+            )
 
             // Info
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
+                HStack(spacing: NookDesign.Spacing.md) {
                     Text(profile.name)
-                        .font(.headline)
+                        .font(NookDesign.Font.label)
                         .lineLimit(1)
                     if isCurrent {
                         Label("Current", systemImage: "checkmark.seal.fill")
                             .labelStyle(.titleAndIcon)
-                            .font(.caption)
+                            .font(NookDesign.Font.caption)
                             .foregroundStyle(.green)
                     }
                 }
-                HStack(spacing: 8) {
+                HStack(spacing: NookDesign.Spacing.md) {
                     Label("\(spacesCount) spaces", systemImage: "rectangle.3.group")
-                        .font(.caption)
+                        .font(NookDesign.Font.caption)
                         .foregroundStyle(.secondary)
-                    Text("•").font(.caption).foregroundStyle(.secondary)
+                    Text("•").font(NookDesign.Font.caption).foregroundStyle(.secondary)
                     Label("\(tabsCount) tabs", systemImage: "rectangle.stack")
-                        .font(.caption)
+                        .font(NookDesign.Font.caption)
                         .foregroundStyle(.secondary)
-                    Text("•").font(.caption).foregroundStyle(.secondary)
+                    Text("•").font(NookDesign.Font.caption).foregroundStyle(.secondary)
                     Label("\(pinnedCount) pinned", systemImage: "pin")
-                        .font(.caption)
+                        .font(NookDesign.Font.caption)
                         .foregroundStyle(.secondary)
-                    Text("•").font(.caption).foregroundStyle(.secondary)
+                    Text("•").font(NookDesign.Font.caption).foregroundStyle(.secondary)
                     Label(dataSizeDescription, systemImage: "internaldrive")
-                        .font(.caption)
+                        .font(NookDesign.Font.caption)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -67,7 +70,7 @@ struct ProfileRowView: View {
             Spacer()
 
             // Actions
-            HStack(spacing: 6) {
+            HStack(spacing: NookDesign.Spacing.sm) {
                 Button(action: onManageData) {
                     Label("Manage Data", systemImage: "wrench.and.screwdriver")
                         .labelStyle(.iconOnly)
@@ -99,10 +102,10 @@ struct ProfileRowView: View {
                 }
             }
         }
-        .padding(12)
+        .padding(NookDesign.Spacing.md)
         .background(
             NookDesign.Radius.shape(NookDesign.Radius.md)
-                .fill(isHovering ? Color.primary.opacity(0.04) : Color(.controlBackgroundColor))
+                .fill(isHovering ? NookDesign.Surface.fill : Color.clear)
         )
         .onHoverTracking { hovering in
             withAnimation(NookDesign.Motion.quick) { isHovering = hovering }

@@ -42,7 +42,7 @@ struct ProfilePickerView: View {
     // MARK: - Subviews
     @ViewBuilder
     private func row(for profile: Profile) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: NookDesign.Spacing.md) {
             Image(systemName: profile.icon)
                 .font(NookDesign.Font.label)
             Text(profile.name)
@@ -73,10 +73,10 @@ struct ProfilePickerView: View {
         var onSelect: ((UUID) -> Void)?
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: NookDesign.Spacing.sm) {
                 ForEach(profiles, id: \.id) { p in
                     Button(action: { select(p.id) }) {
-                        HStack(spacing: 8) {
+                        HStack(spacing: NookDesign.Spacing.md) {
                             Image(systemName: p.icon).font(NookDesign.Font.body)
                             Text(p.name).font(NookDesign.Font.body)
                             Spacer()
@@ -101,23 +101,26 @@ struct ProfilePickerView: View {
         var onSelect: ((UUID) -> Void)?
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: NookDesign.Spacing.xs) {
                 ForEach(profiles, id: \.id) { p in
                     Button(action: { select(p.id) }) {
-                        HStack(spacing: 10) {
+                        HStack(spacing: NookDesign.Spacing.sectionGap) {
                             ZStack {
                                 NookDesign.Radius.shape(NookDesign.Radius.sm)
-                                    .fill(Color(.controlBackgroundColor))
+                                    .fill(NookDesign.Surface.raised)
                                 Image(systemName: p.icon).font(NookDesign.Font.title)
                             }
-                            .frame(width: 24, height: 24)
+                            .frame(
+                                width: NookDesign.Size.settingsChip,
+                                height: NookDesign.Size.settingsChip
+                            )
                             Text(p.name).lineLimit(1)
                             Spacer()
                             if selectedProfileId == p.id { Image(systemName: "checkmark").foregroundStyle(.secondary) }
                         }
                     }
                     .buttonStyle(.plain)
-                    .padding(.vertical, 2)
+                    .padding(.vertical, NookDesign.Spacing.xxs)
                 }
             }
         }
@@ -130,13 +133,13 @@ struct ProfilePickerView: View {
 
     private struct EmptyProfilesView: View {
         var body: some View {
-            HStack(spacing: 8) {
+            HStack(spacing: NookDesign.Spacing.md) {
                 Image(systemName: "person.crop.circle")
                     .foregroundStyle(.secondary)
                 Text("No profiles available")
                     .foregroundStyle(.secondary)
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, NookDesign.Spacing.xs)
             .accessibilityLabel("No profiles available")
         }
     }

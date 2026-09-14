@@ -136,92 +136,56 @@ struct PrivacySettingsView: View {
     
     // MARK: - Cache Stats View
     
+    @ViewBuilder
     private var cacheStatsView: some View {
         let stats = cacheManager.getCacheStats()
-        
-        return VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Image(systemName: "internaldrive")
-                    .foregroundColor(.blue)
-                Text("Stored Cache")
-                    .fontWeight(.medium)
-                Spacer()
-                Text("\(stats.total)")
-                    .foregroundColor(.secondary)
-            }
-            
-            if stats.total > 0 {
-                HStack {
-                    Spacer().frame(width: 20)
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack {
-                            Text("Disk: \(formatSize(stats.diskSize))")
-                            Text("•")
-                            Text("Memory: \(formatSize(stats.memorySize))")
-                            if stats.staleCount > 0 {
-                                Text("•")
-                                Text("Stale: \(stats.staleCount)")
-                                    .foregroundColor(.orange)
-                            }
-                        }
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        
-                        Text("Total size: \(formatSize(stats.totalSize))")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
+
+        LabeledContent {
+            Text("\(stats.total)")
+                .foregroundStyle(.secondary)
+        } label: {
+            Label("Stored Cache", systemImage: "internaldrive")
+        }
+
+        if stats.total > 0 {
+            LabeledContent("Disk") { Text(formatSize(stats.diskSize)) }
+            LabeledContent("Memory") { Text(formatSize(stats.memorySize)) }
+            if stats.staleCount > 0 {
+                LabeledContent("Stale") {
+                    Text("\(stats.staleCount)")
+                        .foregroundStyle(.orange)
                 }
             }
+            LabeledContent("Total size") { Text(formatSize(stats.totalSize)) }
         }
     }
-    
+
     // MARK: - Cookie Stats View
     
+    @ViewBuilder
     private var cookieStatsView: some View {
         let stats = cookieManager.getCookieStats()
-        
-        return VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Image(systemName: "doc.on.doc")
-                    .foregroundColor(.blue)
-                Text("Stored Cookies")
-                    .fontWeight(.medium)
-                Spacer()
-                Text("\(stats.total)")
-                    .foregroundColor(.secondary)
-            }
-            
-            if stats.total > 0 {
-                HStack {
-                    Spacer().frame(width: 20)
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack {
-                            Text("Session: \(stats.session)")
-                            Text("•")
-                            Text("Persistent: \(stats.persistent)")
-                            if stats.expired > 0 {
-                                Text("•")
-                                Text("Expired: \(stats.expired)")
-                                    .foregroundColor(.orange)
-                            }
-                        }
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        
-                        Text("Total size: \(formatSize(stats.totalSize))")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
+
+        LabeledContent {
+            Text("\(stats.total)")
+                .foregroundStyle(.secondary)
+        } label: {
+            Label("Stored Cookies", systemImage: "doc.on.doc")
+        }
+
+        if stats.total > 0 {
+            LabeledContent("Session") { Text("\(stats.session)") }
+            LabeledContent("Persistent") { Text("\(stats.persistent)") }
+            if stats.expired > 0 {
+                LabeledContent("Expired") {
+                    Text("\(stats.expired)")
+                        .foregroundStyle(.orange)
                 }
             }
+            LabeledContent("Total size") { Text(formatSize(stats.totalSize)) }
         }
     }
-    
-    // MARK: - Actions
-    
+
     private func clearExpiredCookies() {
         isClearing = true
         Task {

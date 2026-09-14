@@ -34,16 +34,20 @@ struct SettingsSponsorBlockTab: View {
                                 Text(option.displayName).tag(option)
                             }
                         } label: {
-                            HStack(spacing: 8) {
-                                Circle()
-                                    .fill(sponsorBlockCategoryColor(category))
-                                    .frame(width: 8, height: 8)
-                                VStack(alignment: .leading, spacing: 1) {
+                            Label {
+                                VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
                                     Text(category.displayName)
                                     Text(category.description)
-                                        .font(.caption)
+                                        .font(NookDesign.Font.caption)
                                         .foregroundStyle(.secondary)
                                 }
+                            } icon: {
+                                Circle()
+                                    .fill(sponsorBlockCategoryColor(category))
+                                    .frame(
+                                        width: NookDesign.Size.statusDot,
+                                        height: NookDesign.Size.statusDot
+                                    )
                             }
                         }
                     }

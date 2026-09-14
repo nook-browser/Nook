@@ -32,24 +32,68 @@ struct CookieManagementView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header with stats and controls
-            headerView
-            
-            Divider()
-            
-            // Search and filter controls
-            controlsView
-            
-            Divider()
-            
-            // Main content
-            if cookieManager.isLoading {
-                loadingView
-            } else {
-                contentView
+            Form {
+                summarySection
+                filterSection
+
+                if cookieManager.isLoading {
+                    Section {
+                        HStack(spacing: NookDesign.Spacing.md) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Loading cookies...")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } else {
+                    Section("Stored Cookies") {
+                        switch viewMode {
+                        case .domain:
+                            ForEach(filteredDomainGroups) { group in
+                                DisclosureGroup {
+                                    ForEach(filteredCookiesForGroup(group)) { cookie in
+                                        CookieRowView(cookie: cookie) {
+                                            selectedCookie = cookie
+                                            showingCookieDetails = true
+                                        } onDelete: {
+                                            Task {
+                                                await cookieManager.deleteCookie(cookie)
+                                            }
+                                        }
+                                    }
+                                } label: {
+                                    DomainRowView(group: group) {
+                                        Task {
+                                            await cookieManager.deleteCookiesForDomain(group.domain)
+                                        }
+                                    }
+                                }
+                            }
+                        case .list:
+                            ForEach(filteredAndSortedCookies) { cookie in
+                                CookieRowView(cookie: cookie, showsDomain: true) {
+                                    selectedCookie = cookie
+                                    showingCookieDetails = true
+                                } onDelete: {
+                                    Task {
+                                        await cookieManager.deleteCookie(cookie)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
+            .formStyle(.grouped)
+
+            Divider()
+
+            actionBar
         }
-        .frame(minWidth: 800, minHeight: 600)
+        .frame(
+            minWidth: NookDesign.Size.sheetLargeWidth,
+            minHeight: NookDesign.Size.sheetLargeHeight
+        )
         .onAppear {
             Task {
                 await cookieManager.loadCookies()
@@ -61,233 +105,98 @@ struct CookieManagementView: View {
             }
         }
     }
-    
-    // MARK: - Header View
-    
-    private var headerView: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Cookie Management")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                
-                let stats = cookieManager.getCookieStats()
-                Text("\(stats.total) cookies • \(stats.session) session • \(stats.persistent) persistent • \(formatSize(stats.totalSize))")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            // Action buttons
-            HStack(spacing: 12) {
-                Button("Refresh") {
-                    Task {
-                        await cookieManager.loadCookies()
-                    }
-                }
-                .buttonStyle(.bordered)
-                
-                Menu("Clear Cookies") {
-                    Button("Clear Expired") {
-                        Task {
-                            await cookieManager.deleteExpiredCookies()
-                        }
-                    }
-                    
-                    Divider()
-                    
-                    Button("Clear All", role: .destructive) {
-                        Task {
-                            await cookieManager.deleteAllCookies()
-                        }
-                    }
-                }
-                .buttonStyle(.bordered)
-                
-                Button("Close") {
-                    dismiss()
-                }
-                .buttonStyle(.bordered)
-                .keyboardShortcut(.escape)
-            }
+
+    // MARK: - Summary
+
+    private var summarySection: some View {
+        let stats = cookieManager.getCookieStats()
+
+        return Section("Cookie Management") {
+            LabeledContent("Cookies") { Text("\(stats.total)") }
+            LabeledContent("Session") { Text("\(stats.session)") }
+            LabeledContent("Persistent") { Text("\(stats.persistent)") }
+            LabeledContent("Total size") { Text(formatSize(stats.totalSize)) }
         }
-        .padding()
     }
-    
-    // MARK: - Controls View
-    
-    private var controlsView: some View {
-        HStack {
-            // Search
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(.secondary)
+
+    // MARK: - Filters
+
+    private var filterSection: some View {
+        Section("Filter") {
+            LabeledContent("Search") {
                 TextField("Search cookies...", text: $searchText)
-                    .textFieldStyle(.plain)
+                    .textFieldStyle(.roundedBorder)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background(Color(NSColor.controlBackgroundColor))
-            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
-            .frame(maxWidth: 300)
-            
-            Spacer()
-            
-            // View mode toggle
-            Picker("View Mode", selection: $viewMode) {
+
+            Picker("View", selection: $viewMode) {
                 ForEach(ViewMode.allCases, id: \.self) { mode in
-                    Label(mode.rawValue, systemImage: mode.icon)
-                        .tag(mode)
+                    Text(mode.rawValue).tag(mode)
                 }
             }
             .pickerStyle(.segmented)
-            .frame(width: 200)
-            
-            // Filter
-            Picker("Filter", selection: $selectedFilter) {
+
+            Picker("Show", selection: $selectedFilter) {
                 ForEach(CookieFilter.allCases, id: \.self) { filter in
                     Text(filter.rawValue).tag(filter)
                 }
             }
-            .pickerStyle(.menu)
-            .frame(width: 120)
-            
-            // Sort
-            HStack(spacing: 4) {
-                Picker("Sort", selection: $selectedSort) {
-                    ForEach(CookieSortOption.allCases, id: \.self) { option in
-                        Text(option.displayName).tag(option)
-                    }
+
+            Picker("Sort by", selection: $selectedSort) {
+                ForEach(CookieSortOption.allCases, id: \.self) { option in
+                    Text(option.displayName).tag(option)
                 }
-                .pickerStyle(.menu)
-                .frame(width: 100)
-                
-                Button(action: { sortAscending.toggle() }) {
-                    Image(systemName: sortAscending ? "arrow.up" : "arrow.down")
-                        .font(.caption)
-                }
-                .buttonStyle(.plain)
             }
-        }
-        .padding()
-    }
-    
-    // MARK: - Content Views
-    
-    private var loadingView: some View {
-        VStack {
-            ProgressView()
-            Text("Loading cookies...")
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-    
-    @ViewBuilder
-    private var contentView: some View {
-        switch viewMode {
-        case .domain:
-            domainView
-        case .list:
-            listView
+
+            Picker("Order", selection: $sortAscending) {
+                Text("Ascending").tag(true)
+                Text("Descending").tag(false)
+            }
+            .pickerStyle(.segmented)
         }
     }
-    
-    // MARK: - Domain View
-    
-    private var domainView: some View {
-        List {
-            ForEach(filteredDomainGroups) { group in
-                DisclosureGroup {
-                    ForEach(filteredCookiesForGroup(group)) { cookie in
-                        CookieRowView(cookie: cookie) {
-                            selectedCookie = cookie
-                            showingCookieDetails = true
-                        } onDelete: {
-                            Task {
-                                await cookieManager.deleteCookie(cookie)
-                            }
-                        }
+
+    // MARK: - Action Bar
+
+    private var actionBar: some View {
+        HStack(spacing: NookDesign.Spacing.lg) {
+            Button("Refresh") {
+                Task {
+                    await cookieManager.loadCookies()
+                }
+            }
+            .buttonStyle(.bordered)
+
+            Menu("Clear Cookies") {
+                Button("Clear Expired") {
+                    Task {
+                        await cookieManager.deleteExpiredCookies()
                     }
-                } label: {
-                    DomainRowView(group: group) {
-                        Task {
-                            await cookieManager.deleteCookiesForDomain(group.domain)
-                        }
+                }
+
+                Divider()
+
+                Button("Clear All", role: .destructive) {
+                    Task {
+                        await cookieManager.deleteAllCookies()
                     }
                 }
             }
+            .buttonStyle(.bordered)
+            .fixedSize()
+
+            Spacer()
+
+            Button("Close") {
+                dismiss()
+            }
+            .buttonStyle(.bordered)
+            .keyboardShortcut(.escape)
         }
-        .listStyle(.sidebar)
+        .padding(NookDesign.Spacing.xl)
     }
-    
-    // MARK: - List View
-    
-    private var listView: some View {
-        Table(filteredAndSortedCookies) {
-            TableColumn("Name") { cookie in
-                HStack {
-                    Text(cookie.name)
-                        .font(.system(.body, design: .monospaced))
-                    Spacer()
-                }
-            }
-            .width(min: 120, ideal: 180, max: 250)
-            
-            TableColumn("Domain") { cookie in
-                Text(cookie.displayDomain)
-                    .foregroundColor(.secondary)
-            }
-            .width(min: 100, ideal: 150, max: 200)
-            
-            TableColumn("Size") { cookie in
-                Text(cookie.sizeDescription)
-                    .foregroundColor(.secondary)
-                    .font(.caption)
-            }
-            .width(60)
-            
-            TableColumn("Expires") { cookie in
-                Text(cookie.expirationStatus)
-                    .foregroundColor(cookie.isSessionCookie ? .orange : .secondary)
-                    .font(.caption)
-            }
-            .width(min: 80, ideal: 120)
-            
-            TableColumn("Secure") { cookie in
-                Image(systemName: cookie.isSecure ? "checkmark.circle.fill" : "xmark.circle")
-                    .foregroundColor(cookie.isSecure ? .green : .red)
-            }
-            .width(50)
-            
-            TableColumn("Actions") { cookie in
-                HStack {
-                    Button("Details") {
-                        selectedCookie = cookie
-                        showingCookieDetails = true
-                    }
-                    .buttonStyle(.borderless)
-                    .controlSize(.small)
-                    
-                    Button("Delete") {
-                        Task {
-                            await cookieManager.deleteCookie(cookie)
-                        }
-                    }
-                    .buttonStyle(.borderless)
-                    .controlSize(.small)
-                    .foregroundColor(.red)
-                }
-            }
-            .width(100)
-        }
-        .tableStyle(.bordered(alternatesRowBackgrounds: true))
-    }
-    
+
     // MARK: - Computed Properties
-    
+
     private var filteredDomainGroups: [DomainCookieGroup] {
         let searchFiltered = searchText.isEmpty ? cookieManager.domainGroups : 
             cookieManager.domainGroups.filter { group in
@@ -335,22 +244,22 @@ struct DomainRowView: View {
     var body: some View {
         HStack {
             Image(systemName: "globe")
-                .foregroundColor(.blue)
+                .foregroundStyle(.blue)
             
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
                 Text(group.displayDomain)
-                    .font(.headline)
+                    .font(NookDesign.Font.label)
                 
                 Text("\(group.cookieCount) cookies • \(group.totalSizeDescription)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(NookDesign.Font.caption)
+                    .foregroundStyle(.secondary)
             }
             
             Spacer()
             
             if group.hasExpiredCookies {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundColor(.orange)
+                    .foregroundStyle(.orange)
                     .help("Has expired cookies")
             }
             
@@ -359,24 +268,29 @@ struct DomainRowView: View {
             }
             .buttonStyle(.borderless)
             .controlSize(.small)
-            .foregroundColor(.red)
+            .foregroundStyle(.red)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, NookDesign.Spacing.xs)
     }
 }
 
 struct CookieRowView: View {
     let cookie: CookieInfo
+    var showsDomain: Bool = false
     let onTap: () -> Void
     let onDelete: () -> Void
     
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
                 Text(cookie.name)
-                    .font(.system(.body, design: .monospaced))
+                    .font(NookDesign.Font.body.monospaced())
                 
                 HStack {
+                    if showsDomain {
+                        Text(cookie.displayDomain)
+                        Text("•")
+                    }
                     Text(cookie.sizeDescription)
                     Text("•")
                     Text(cookie.expirationStatus)
@@ -389,8 +303,8 @@ struct CookieRowView: View {
                         Text("• HTTP Only")
                     }
                 }
-                .font(.caption)
-                .foregroundColor(.secondary)
+                .font(NookDesign.Font.caption)
+                .foregroundStyle(.secondary)
             }
             
             Spacer()
@@ -407,9 +321,9 @@ struct CookieRowView: View {
                 }
                 .buttonStyle(.borderless)
                 .controlSize(.small)
-                .foregroundColor(.red)
+                .foregroundStyle(.red)
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, NookDesign.Spacing.xxs)
     }
 }

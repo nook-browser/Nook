@@ -23,7 +23,7 @@ struct SettingsGeneralTab: View {
                     .disabled(true)
             }
 
-            Section("Performance") {
+            Section {
                 Picker("Tab Management", selection: Binding(
                     get: { nookSettings.tabManagementMode },
                     set: { nookSettings.tabManagementMode = $0 }
@@ -31,15 +31,6 @@ struct SettingsGeneralTab: View {
                     ForEach(TabManagementMode.allCases) { mode in
                         Text(mode.displayName).tag(mode)
                     }
-                }
-
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: nookSettings.tabManagementMode.icon)
-                        .foregroundStyle(.secondary)
-                        .frame(width: 16)
-                    Text(nookSettings.tabManagementMode.description)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
 
                 Picker("On Startup", selection: Binding(
@@ -51,78 +42,89 @@ struct SettingsGeneralTab: View {
                     }
                 }
 
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "power")
-                        .foregroundStyle(.secondary)
-                        .frame(width: 16)
-                    Text(nookSettings.startupLoadMode.description)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
                 Button("Unload All Inactive Tabs") {
                     tabManager.unloadAllInactiveTabs()
                 }
-            }
-
-            Section(header: Text("Search")) {
-                HStack {
-                    Picker(
-                        "Default search engine",
-                        selection: $settings.searchEngineId
-                    ) {
-                        ForEach(SearchProvider.allCases) { provider in
-                            Text(provider.displayName).tag(provider.rawValue)
-                        }
-                        ForEach(nookSettings.customSearchEngines) { engine in
-                            Text(engine.name).tag(engine.id.uuidString)
-                        }
-                    }
-
-                    Button {
-                        showingAddEngine = true
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                }
-
-                if let selected = nookSettings.customSearchEngines.first(where: { $0.id.uuidString == nookSettings.searchEngineId }) {
-                    HStack {
-                        Text(selected.name)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Button("Remove") {
-                            nookSettings.customSearchEngines.removeAll { $0.id == selected.id }
-                            nookSettings.searchEngineId = SearchProvider.google.rawValue
-                        }
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .buttonStyle(.plain)
-                    }
+            } header: {
+                Text("Performance")
+            } footer: {
+                VStack(alignment: .leading, spacing: NookDesign.Spacing.xs) {
+                    Label(
+                        nookSettings.tabManagementMode.description,
+                        systemImage: nookSettings.tabManagementMode.icon
+                    )
+                    Label(nookSettings.startupLoadMode.description, systemImage: "power")
                 }
             }
 
             Section {
-                ForEach(nookSettings.siteSearchEntries) { entry in
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(entry.color)
-                            .frame(width: 10, height: 10)
-                        Text(entry.name)
-                        Spacer()
-                        Text(entry.domain)
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                        Button {
-                            nookSettings.siteSearchEntries.removeAll { $0.id == entry.id }
-                        } label: {
-                            Image(systemName: "minus.circle.fill")
-                                .foregroundStyle(.red)
+                LabeledContent("Default search engine") {
+                    HStack(spacing: NookDesign.Spacing.md) {
+                        Picker(
+                            "Default search engine",
+                            selection: $settings.searchEngineId
+                        ) {
+                            ForEach(SearchProvider.allCases) { provider in
+                                Text(provider.displayName).tag(provider.rawValue)
+                            }
+                            ForEach(nookSettings.customSearchEngines) { engine in
+                                Text(engine.name).tag(engine.id.uuidString)
+                            }
                         }
+                        .labelsHidden()
+
+                        Button {
+                            showingAddEngine = true
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                }
+
+                if let selected = nookSettings.customSearchEngines.first(where: { $0.id.uuidString == nookSettings.searchEngineId }) {
+                    LabeledContent {
+                        Button("Remove") {
+                            nookSettings.customSearchEngines.removeAll { $0.id == selected.id }
+                            nookSettings.searchEngineId = SearchProvider.google.rawValue
+                        }
+                        .foregroundStyle(.red)
                         .buttonStyle(.plain)
+                    } label: {
+                        Text(selected.name)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("Search")
+            }
+
+            Section {
+                ForEach(nookSettings.siteSearchEntries) { entry in
+                    LabeledContent {
+                        HStack(spacing: NookDesign.Spacing.md) {
+                            Text(entry.domain)
+                                .foregroundStyle(.secondary)
+                            Button {
+                                nookSettings.siteSearchEntries.removeAll { $0.id == entry.id }
+                            } label: {
+                                Image(systemName: "minus.circle.fill")
+                                    .foregroundStyle(.red)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    } label: {
+                        Label {
+                            Text(entry.name)
+                        } icon: {
+                            Circle()
+                                .fill(entry.color)
+                                .frame(
+                                    width: NookDesign.Size.statusDot,
+                                    height: NookDesign.Size.statusDot
+                                )
+                        }
                     }
                 }
 
@@ -165,13 +167,15 @@ struct CustomSearchEngineEditor: View {
     @State private var urlTemplate: String = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: NookDesign.Spacing.xl) {
             Text("Add Custom Search Engine")
-                .font(.headline)
+                .font(NookDesign.Font.heading)
 
             Form {
-                TextField("Name (e.g. Startpage)", text: $name)
-                TextField("URL Template (use %@ for query)", text: $urlTemplate)
+                Section {
+                    TextField("Name (e.g. Startpage)", text: $name)
+                    TextField("URL Template (use %@ for query)", text: $urlTemplate)
+                }
             }
             .formStyle(.grouped)
 
@@ -191,7 +195,7 @@ struct CustomSearchEngineEditor: View {
                 .disabled(name.isEmpty || urlTemplate.isEmpty)
             }
         }
-        .padding(20)
-        .frame(width: 450)
+        .padding(NookDesign.Spacing.xxl)
+        .frame(width: NookDesign.Size.sheetSmallWidth)
     }
 }

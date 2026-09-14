@@ -14,7 +14,7 @@ struct NookCommands: Commands {
     let windowRegistry: WindowRegistry
     let shortcutManager: KeyboardShortcutManager
     let tabOrganizerManager: TabOrganizerManager
-    @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
     @Environment(\.nookSettings) var nookSettings
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
@@ -81,13 +81,8 @@ struct NookCommands: Commands {
         CommandGroup(replacing: .newItem) {}
         CommandGroup(replacing: .windowList) {}
 
-        // Replace the native Settings menu item to open our custom sidebar settings window
-        CommandGroup(replacing: .appSettings) {
-            Button("Settings...") {
-                openWindow(id: "nook-settings")
-            }
-            .keyboardShortcut(",", modifiers: .command)
-
+        // The Settings scene supplies the standard Settings… item at ⌘,
+        CommandGroup(after: .appSettings) {
             Button("Import from another Browser") {
                 browserManager.dialogManager.showDialog(
                     BrowserImportDialog(
@@ -371,7 +366,7 @@ struct NookCommands: Commands {
 
                 Button("Manage Extensions...") {
                     nookSettings.currentSettingsTab = .extensions
-                    openWindow(id: "nook-settings")
+                    openSettings()
                 }
 
                 Divider()

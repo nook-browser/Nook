@@ -77,7 +77,7 @@ struct NookApp: App {
 
 
         // macOS 26 style sidebar settings window
-        Window("Nook Settings", id: "nook-settings") {
+        Settings {
             SettingsWindow()
                 .environmentObject(browserManager)
                 .environmentObject(browserManager.tabManager)
@@ -89,7 +89,6 @@ struct NookApp: App {
                 .environment(tabOrganizerManager)
         }
         .windowResizability(.contentSize)
-        .defaultPosition(.center)
     }
 
     // MARK: - Application Lifecycle Setup

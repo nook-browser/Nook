@@ -51,19 +51,21 @@ struct SettingsAdBlockerTab: View {
 
                 Section("Default Filter Lists") {
                     ForEach(FilterListManager.defaultLists, id: \.filename) { list in
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                                .font(.caption)
-                            Text(list.name)
-                            Spacer()
+                        LabeledContent {
                             Text(list.category.rawValue)
-                                .font(.caption2)
+                                .font(NookDesign.Font.caption)
                                 .foregroundStyle(.secondary)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.secondary.opacity(0.15))
+                                .padding(.horizontal, NookDesign.Spacing.sm)
+                                .padding(.vertical, NookDesign.Spacing.xxs)
+                                .background(NookDesign.Surface.fill)
                                 .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
+                        } label: {
+                            Label {
+                                Text(list.name)
+                            } icon: {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                            }
                         }
                     }
                 }
@@ -95,7 +97,7 @@ struct SettingsAdBlockerTab: View {
 
                     Section {
                         Text("Enabling additional lists improves blocking but increases memory usage.")
-                            .font(.caption)
+                            .font(NookDesign.Font.caption)
                             .foregroundStyle(.secondary)
                     }
                 }

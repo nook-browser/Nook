@@ -22,94 +22,70 @@ struct CookieDetailsView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            headerView
-            
-            Divider()
-            
-            // Content
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Basic Info Section
-                    sectionView(title: "Basic Information") {
-                        detailRow("Name", cookie.name, isMonospace: true)
-                        detailRow("Domain", cookie.displayDomain)
-                        detailRow("Path", cookie.path, isMonospace: true)
-                        detailRow("Size", cookie.sizeDescription)
+            Form {
+                Section("Basic Information") {
+                    LabeledContent("Name") {
+                        Text(cookie.name)
+                            .font(NookDesign.Font.body.monospaced())
+                            .textSelection(.enabled)
                     }
-                    
-                    // Security Section
-                    sectionView(title: "Security") {
-                        detailRow("Secure", cookie.isSecure ? "Yes" : "No", 
-                                color: cookie.isSecure ? .green : .red)
-                        detailRow("HTTP Only", cookie.isHTTPOnly ? "Yes" : "No",
-                                color: cookie.isHTTPOnly ? .green : .orange)
-                        detailRow("Same Site Policy", cookie.sameSitePolicy)
+                    LabeledContent("Domain") { Text(cookie.displayDomain) }
+                    LabeledContent("Path") {
+                        Text(cookie.path)
+                            .font(NookDesign.Font.body.monospaced())
+                            .textSelection(.enabled)
                     }
-                    
-                    // Expiration Section
-                    sectionView(title: "Expiration") {
-                        detailRow("Type", cookie.isSessionCookie ? "Session Cookie" : "Persistent Cookie")
-                        detailRow("Expires", cookie.expirationStatus)
-                        
-                        if let expiresDate = cookie.expiresDate {
-                            let isExpired = expiresDate < Date()
-                            detailRow("Status", isExpired ? "Expired" : "Valid",
-                                    color: isExpired ? .red : .green)
-                        }
+                    LabeledContent("Size") { Text(cookie.sizeDescription) }
+                }
+
+                Section("Security") {
+                    LabeledContent("Secure") {
+                        Text(cookie.isSecure ? "Yes" : "No")
+                            .foregroundStyle(cookie.isSecure ? .green : .red)
                     }
-                    
-                    // Value Section
-                    sectionView(title: "Value") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Cookie Value:")
-                                .font(.headline)
-                            
-                            ScrollView(.horizontal, showsIndicators: true) {
-                                Text(cookie.value)
-                                    .font(.system(.body, design: .monospaced))
-                                    .textSelection(.enabled)
-                                    .padding()
-                                    .background(Color(NSColor.controlBackgroundColor))
-                                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
-                            }
-                            .frame(maxHeight: 200)
+                    LabeledContent("HTTP Only") {
+                        Text(cookie.isHTTPOnly ? "Yes" : "No")
+                            .foregroundStyle(cookie.isHTTPOnly ? .green : .orange)
+                    }
+                    LabeledContent("Same Site Policy") { Text(cookie.sameSitePolicy) }
+                }
+
+                Section("Expiration") {
+                    LabeledContent("Type") {
+                        Text(cookie.isSessionCookie ? "Session Cookie" : "Persistent Cookie")
+                    }
+                    LabeledContent("Expires") { Text(cookie.expirationStatus) }
+
+                    if let expiresDate = cookie.expiresDate {
+                        let isExpired = expiresDate < Date()
+                        LabeledContent("Status") {
+                            Text(isExpired ? "Expired" : "Valid")
+                                .foregroundStyle(isExpired ? .red : .green)
                         }
                     }
                 }
-                .padding()
+
+                Section("Value") {
+                    ScrollView(.horizontal, showsIndicators: true) {
+                        Text(cookie.value)
+                            .font(NookDesign.Font.body.monospaced())
+                            .textSelection(.enabled)
+                    }
+                    .frame(maxHeight: NookDesign.Size.textEditorHeight)
+                }
             }
-            
-            // Footer
+            .formStyle(.grouped)
+
+            Divider()
+
             footerView
         }
-        .frame(width: 600, height: 500)
+        .frame(
+            width: NookDesign.Size.sheetMediumWidth,
+            height: NookDesign.Size.sheetMediumHeight
+        )
     }
-    
-    // MARK: - Header View
-    
-    private var headerView: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Cookie Details")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                
-                Text(cookie.name)
-                    .font(.headline)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            Button("Close") {
-                dismiss()
-            }
-            .keyboardShortcut(.escape)
-        }
-        .padding()
-    }
-    
+
     // MARK: - Footer View
     
     private var footerView: some View {
@@ -136,42 +112,14 @@ struct CookieDetailsView: View {
                 }
             }
             .buttonStyle(.bordered)
-        }
-        .padding()
-    }
-    
-    // MARK: - Section View
-    
-    private func sectionView<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
-                .foregroundColor(.primary)
-            
-            VStack(alignment: .leading, spacing: 6) {
-                content()
+
+            Button("Close") {
+                dismiss()
             }
-            .padding()
-            .background(Color(NSColor.controlBackgroundColor))
-            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
+            .buttonStyle(.bordered)
+            .keyboardShortcut(.escape)
         }
-    }
-    
-    // MARK: - Detail Row
-    
-    private func detailRow(_ label: String, _ value: String, isMonospace: Bool = false, color: Color? = nil) -> some View {
-        HStack {
-            Text(label + ":")
-                .fontWeight(.medium)
-                .frame(width: 120, alignment: .leading)
-            
-            Text(value)
-                .font(isMonospace ? .system(.body, design: .monospaced) : .body)
-                .foregroundColor(color ?? .primary)
-                .textSelection(.enabled)
-            
-            Spacer()
-        }
+        .padding(NookDesign.Spacing.xl)
     }
     
     // MARK: - Helper Methods

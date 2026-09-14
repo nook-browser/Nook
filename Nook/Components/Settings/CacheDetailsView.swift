@@ -22,134 +22,70 @@ struct CacheDetailsView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            headerView
-            
-            Divider()
-            
-            // Content
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Basic Info Section
-                    sectionView(title: "Basic Information") {
-                        detailRow("Domain", cache.displayDomain)
-                        detailRow("Total Size", cache.sizeDescription)
-                        detailRow("Primary Type", cache.primaryCacheType.rawValue)
-                        detailRow("Status", cache.isStale ? "Stale" : "Fresh", 
-                                color: cache.isStale ? .orange : .green)
+            Form {
+                Section("Basic Information") {
+                    LabeledContent("Domain") { Text(cache.displayDomain) }
+                    LabeledContent("Total Size") { Text(cache.sizeDescription) }
+                    LabeledContent("Primary Type") { Text(cache.primaryCacheType.rawValue) }
+                    LabeledContent("Status") {
+                        Text(cache.isStale ? "Stale" : "Fresh")
+                            .foregroundStyle(cache.isStale ? .orange : .green)
                     }
-                    
-                    // Storage Breakdown Section
-                    sectionView(title: "Storage Breakdown") {
-                        detailRow("Disk Usage", cache.diskUsageDescription)
-                        detailRow("Memory Usage", cache.memoryUsageDescription)
-                        detailRow("Last Modified", cache.lastModifiedDescription)
-                        
-                        // Storage visualization
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Storage Distribution:")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                            
-                            HStack {
-                                // Disk usage bar
-                                VStack(alignment: .leading) {
-                                    Text("Disk")
-                                        .font(.caption2)
-                                    ProgressView(value: Double(cache.diskUsage), total: Double(cache.size))
-                                        .progressViewStyle(.linear)
-                                        .tint(.blue)
-                                }
-                                
-                                // Memory usage bar
-                                VStack(alignment: .leading) {
-                                    Text("Memory")
-                                        .font(.caption2)
-                                    ProgressView(value: Double(cache.memoryUsage), total: Double(cache.size))
-                                        .progressViewStyle(.linear)
-                                        .tint(.green)
-                                }
-                            }
+                }
+
+                Section("Storage Breakdown") {
+                    LabeledContent("Disk Usage") { Text(cache.diskUsageDescription) }
+                    LabeledContent("Memory Usage") { Text(cache.memoryUsageDescription) }
+                    LabeledContent("Last Modified") { Text(cache.lastModifiedDescription) }
+
+                    LabeledContent("Disk") {
+                        ProgressView(value: Double(cache.diskUsage), total: Double(cache.size))
+                            .progressViewStyle(.linear)
+                            .tint(.blue)
+                    }
+                    LabeledContent("Memory") {
+                        ProgressView(value: Double(cache.memoryUsage), total: Double(cache.size))
+                            .progressViewStyle(.linear)
+                            .tint(.green)
+                    }
+                }
+
+                Section("Cache Types") {
+                    ForEach(cache.cacheTypes, id: \.self) { type in
+                        Label {
+                            Text(type.rawValue)
+                        } icon: {
+                            Image(systemName: type.icon)
+                                .foregroundStyle(Color(type.color))
                         }
                     }
-                    
-                    // Cache Types Section
-                    sectionView(title: "Cache Types") {
-                        LazyVGrid(columns: [
-                            GridItem(.flexible()),
-                            GridItem(.flexible())
-                        ], spacing: 8) {
-                            ForEach(cache.cacheTypes, id: \.self) { type in
-                                HStack {
-                                    Image(systemName: type.icon)
-                                        .foregroundColor(Color(type.color))
-                                    Text(type.rawValue)
-                                        .font(.caption)
-                                    Spacer()
-                                }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color(NSColor.controlBackgroundColor))
-                                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
-                            }
-                        }
-                    }
-                    
-                    // Recommendations Section
-                    if !cacheManager.getCacheEfficiencyRecommendations().isEmpty {
-                        sectionView(title: "Recommendations") {
-                            VStack(alignment: .leading, spacing: 4) {
-                                ForEach(cacheManager.getCacheEfficiencyRecommendations(), id: \.self) { recommendation in
-                                    HStack {
-                                        Image(systemName: "lightbulb")
-                                            .foregroundColor(.yellow)
-                                        Text(recommendation)
-                                            .font(.caption)
-                                        Spacer()
-                                    }
-                                }
+                }
+
+                if !cacheManager.getCacheEfficiencyRecommendations().isEmpty {
+                    Section("Recommendations") {
+                        ForEach(cacheManager.getCacheEfficiencyRecommendations(), id: \.self) { recommendation in
+                            Label {
+                                Text(recommendation)
+                            } icon: {
+                                Image(systemName: "lightbulb")
+                                    .foregroundStyle(.yellow)
                             }
                         }
                     }
                 }
-                .padding()
             }
-            
-            // Footer
+            .formStyle(.grouped)
+
+            Divider()
+
             footerView
         }
-        .frame(width: 600, height: 500)
+        .frame(
+            width: NookDesign.Size.sheetMediumWidth,
+            height: NookDesign.Size.sheetMediumHeight
+        )
     }
-    
-    // MARK: - Header View
-    
-    private var headerView: some View {
-        HStack {
-            HStack {
-                Image(systemName: cache.primaryCacheType.icon)
-                    .foregroundColor(Color(cache.primaryCacheType.color))
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Cache Details")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                    
-                    Text(cache.displayDomain)
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                }
-            }
-            
-            Spacer()
-            
-            Button("Close") {
-                dismiss()
-            }
-            .keyboardShortcut(.escape)
-        }
-        .padding()
-    }
-    
+
     // MARK: - Footer View
     
     private var footerView: some View {
@@ -177,41 +113,14 @@ struct CacheDetailsView: View {
                 }
             }
             .buttonStyle(.bordered)
-        }
-        .padding()
-    }
-    
-    // MARK: - Section View
-    
-    private func sectionView<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
-                .foregroundColor(.primary)
-            
-            VStack(alignment: .leading, spacing: 6) {
-                content()
+
+            Button("Close") {
+                dismiss()
             }
-            .padding()
-            .background(Color(NSColor.controlBackgroundColor))
-            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
+            .buttonStyle(.bordered)
+            .keyboardShortcut(.escape)
         }
-    }
-    
-    // MARK: - Detail Row
-    
-    private func detailRow(_ label: String, _ value: String, color: Color? = nil) -> some View {
-        HStack {
-            Text(label + ":")
-                .fontWeight(.medium)
-                .frame(width: 120, alignment: .leading)
-            
-            Text(value)
-                .foregroundColor(color ?? .primary)
-                .textSelection(.enabled)
-            
-            Spacer()
-        }
+        .padding(NookDesign.Spacing.xl)
     }
     
     // MARK: - Helper Methods

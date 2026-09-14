@@ -21,7 +21,10 @@ struct SettingsWindow: View {
                 .environmentObject(browserManager)
                 .environmentObject(gradientColorManager)
         }
-        .frame(width: 780, height: 540)
+        .frame(
+            width: NookDesign.Size.settingsWindowWidth,
+            height: NookDesign.Size.settingsWindowHeight
+        )
         .navigationSplitViewStyle(.balanced)
     }
 }
@@ -49,22 +52,27 @@ private struct SettingsSidebar: View {
             }
         }
         .listStyle(.sidebar)
-        .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 240)
+        .navigationSplitViewColumnWidth(NookDesign.Size.settingsSidebar)
     }
 
     private func sidebarRow(_ tab: SettingsTabs) -> some View {
         Label {
             Text(tab.name)
+                .font(NookDesign.Font.body)
         } icon: {
             Image(systemName: tab.icon)
-                .font(NookDesign.Font.secondary)
+                .font(NookDesign.Font.caption)
                 .foregroundStyle(.white)
-                .frame(width: 24, height: 24)
+                .frame(
+                    width: NookDesign.Size.settingsChip,
+                    height: NookDesign.Size.settingsChip
+                )
                 .background(
                     NookDesign.Radius.shape(NookDesign.Radius.sm)
                         .fill(tab.iconColor.gradient)
                 )
         }
+        .frame(height: NookDesign.Size.navRow)
         .tag(tab)
     }
 }
