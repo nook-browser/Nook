@@ -143,7 +143,7 @@ struct SidebarAIChat: View {
                 Text("Ask Nook")
                     .font(NookDesign.Font.title)
                     .foregroundStyle(contrastText.opacity(0.9))
-                    .transition(.blur.animation(.smooth))
+                    .transition(.blur.animation(NookDesign.Motion.standard))
             }
 
             Spacer()
