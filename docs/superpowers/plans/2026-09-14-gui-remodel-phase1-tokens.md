@@ -4,7 +4,7 @@
 
 **Goal:** Add one token file, `NookDesign`, and replace every literal corner radius, font size, animation curve, and shadow in the UI layer with a token, so later phases restyle by editing one file.
 
-**Architecture:** `Nook/Design/NookDesign.swift` holds nested enums (Radius, Spacing, Size, Font, Motion, Surface, Elevation). The sweep is mechanical: literal in, token out, no layout or behavior change beyond continuous corners and radius snapping. Three duplicate icon button styles collapse into `NookIconButtonStyle`. Dead OS-availability helpers are deleted.
+**Architecture:** `Nook/Design/NookDesign.swift` holds nested enums (Radius, Spacing, Size, Font, Motion, Surface, Elevation). The sweep is mechanical: literal in, token out. Visual change is limited to what the tokens themselves define (continuous corners, snapped radii, the 28pt icon button, the new hover fill, elevation scale, and type roles); layout and behavior are otherwise unchanged. Three duplicate icon button styles collapse into `NookIconButtonStyle`. Dead OS-availability helpers are deleted.
 
 **Tech Stack:** Swift 5, SwiftUI, macOS 26 SDK, Xcode 26.6. No test target; verification is `grep` assertions plus a Debug build.
 
@@ -396,7 +396,8 @@ Match on size first, then weight. `design: .monospaced` variants keep their desi
 | 12, 12.5 | any | `secondary` |
 | 13 | semibold, bold | `label` |
 | 13 | regular, light | `bodyRegular` |
-| 13 | medium or unspecified | `body` |
+| 13 | medium | `body` |
+| 13 | unspecified (defaults to regular) | `body` (accepted: four sites gained medium weight) |
 | 14 | semibold, bold | `label` |
 | 14 | regular, light | `bodyRegular` |
 | 14 | medium or unspecified | `body` |
@@ -406,7 +407,7 @@ Match on size first, then weight. `design: .monospaced` variants keep their desi
 | 28, 32 | any | `display` |
 | 48 | any | `hero` |
 
-Rewrite `.font(.system(size: N, weight: .w))` → `.font(NookDesign.Font.<role>)`. If the call site is `Image(systemName:)` and the size drives the glyph size rather than text, keep the mapping anyway; the role sizes are within 1pt of the originals except 14→13 and 16→15, which is intended.
+Rewrite `.font(.system(size: N, weight: .w))` → `.font(NookDesign.Font.<role>)`. If the call site is `Image(systemName:)` and the size drives the glyph size rather than text, keep the mapping anyway; most role sizes are within 1pt of the originals; 8/10→11, 14→13, 16→15, 24/25→20, and 32→28 are larger jumps and are intended.
 
 Two hits show `size: .` (a variable, e.g. `size: fontSize`) and one shows `size: 1048576`; leave any `size:` that is not inside `.font(.system(` alone. Those are frame or image arguments, not fonts.
 
@@ -450,8 +451,8 @@ cd /Users/bain/git/Nook && grep -rnE "\.(easeInOut|easeOut|easeIn|linear|smooth|
 
 | Literal | Token |
 |---|---|
-| `.easeInOut / .easeOut / .easeIn / .linear` with duration ≤ 0.15 | `NookDesign.Motion.quick` |
-| `.easeInOut / .easeOut / .easeIn / .linear` with duration > 0.15, or `.smooth(...)` | `NookDesign.Motion.standard` |
+| `.easeInOut / .easeOut / .easeIn / .linear / .smooth` with duration ≤ 0.15 | `NookDesign.Motion.quick` |
+| `.easeInOut / .easeOut / .easeIn / .linear / .smooth` with duration > 0.15 | `NookDesign.Motion.standard` |
 | `.spring(...)`, `.bouncy(...)`, `.snappy(...)`, `.interactiveSpring(...)`, `.interpolatingSpring(...)` | `NookDesign.Motion.spring` |
 | bare `.easeInOut` / `.easeOut` / `.easeIn` / `.linear` / `.spring` / `.smooth` with no parentheses | same rule by family: ease → `standard`, spring → `spring` |
 
@@ -531,18 +532,18 @@ AI-assisted: implemented with Claude Code."
 - [ ] **Step 1: Full literal audit**
 
 ```bash
-cd /Users/bain/git/Nook && S="Navigation Nook/Components UI CommandPalette Nook/Managers/DialogManager"; X='Nook/Components/ColorPicker/|EmojiPicker.swift|NookDesign.swift'; \
-echo "radius: $(grep -rnE 'cornerRadius: ?[0-9]|\.cornerRadius\([0-9]' --include='*.swift' $S | grep -vE "$X" | wc -l)"; \
-echo "font:   $(grep -rnE '\.font\(\.system\(size: ?[0-9]' --include='*.swift' $S | grep -vE "$X" | wc -l)"; \
-echo "anim:   $(grep -rnE '\.(easeInOut|easeOut|easeIn|smooth|spring|bouncy|snappy)\(' --include='*.swift' $S | grep -vE "$X" | wc -l)"; \
-echo "shadow: $(grep -rnE '\.shadow\(' --include='*.swift' $S | grep -vE "$X" | wc -l)"
+cd /Users/bain/git/Nook && S=(Navigation Nook/Components UI CommandPalette Nook/Managers/DialogManager); X='Nook/Components/ColorPicker/|EmojiPicker.swift|NookDesign.swift'; \
+echo "radius: $(grep -rnE 'cornerRadius: ?[0-9]|\.cornerRadius\([0-9]' --include='*.swift' "${S[@]}" | grep -vE "$X" | wc -l)"; \
+echo "font:   $(grep -rnE '\.font\(\.system\(size: ?[0-9]' --include='*.swift' "${S[@]}" | grep -vE "$X" | wc -l)"; \
+echo "anim:   $(grep -rnE '\.(easeInOut|easeOut|easeIn|smooth|spring|bouncy|snappy)\(' --include='*.swift' "${S[@]}" | grep -vE "$X" | wc -l)"; \
+echo "shadow: $(grep -rnE '\.shadow\(' --include='*.swift' "${S[@]}" | grep -vE "$X" | wc -l)"
 ```
 
 Expected: all four counts are `0`.
 
 - [ ] **Step 2: Build and run the manual checklist**
 
-Run the build command, then open the app from `build/Build/Products/Debug/Nook.app` and check: light and dark appearance; sidebar left and right; top bar address mode on and off; two windows on the same space; drag a tab between spaces and into a folder; hide the sidebar and use the hover overlay; open a split view; open the command palette, a dialog, and a toast. Expected: everything works as before, corners are continuous, nothing is visibly larger or smaller than before by more than a pixel or two.
+Run the build command, then open the app from `build/Build/Products/Debug/Nook.app` and check: light and dark appearance; sidebar left and right; top bar address mode on and off; two windows on the same space; drag a tab between spaces and into a folder; hide the sidebar and use the hover overlay; open a split view; open the command palette, a dialog, and a toast. Expected: everything works as before. Corners are continuous, icon buttons are 28pt, hover fills are subtler, dialogs and toasts carry a larger soft shadow, tab rows show a shadow only when active. Look specifically at: hover state clearing when you click a tab, dark-mode hover fill on nav buttons, mini-window button shadows, drag-reorder overshoot.
 
 - [ ] **Step 3: Record**
 

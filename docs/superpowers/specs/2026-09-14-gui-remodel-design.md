@@ -59,7 +59,7 @@ enum NookDesign {
     enum Motion {
         static let quick = Animation.easeOut(duration: 0.12)      // hover, press
         static let standard = Animation.smooth(duration: 0.22)    // selection, reveal, fold
-        static let spring = Animation.bouncy(duration: 0.3)       // palette, dialog, toast
+        static let spring = Animation.snappy(duration: 0.3)       // palette, dialog, toast, drag reorder, gesture-tracked motion
     }
     enum Surface {
         static let fill = Color.primary.opacity(0.045)      // hover, URL bar, tile idle
@@ -68,8 +68,9 @@ enum NookDesign {
         static let raised = Color(nsColor: .controlBackgroundColor)  // active row, active tile
         // sidebar surface is BlurEffectView(material: .sidebar), not a Color
     }
-    enum Elevation {  // View modifier .nookElevation(_:)
-        case raised    // hairline + shadow(0.05, r2, y1)
+    enum Elevation {  // View modifier .nookElevation(_:), branch-free so identity is stable
+        case flat      // no shadow; for conditional elevation (isActive ? .raised : .flat)
+        case raised    // shadow(0.05, r2, y1)
         case floating  // shadow(0.16, r32, y12) + shadow(0.06, r2, y1)
     }
 }
@@ -137,7 +138,7 @@ Context menus: three shared `@ViewBuilder` builders, `TabContextMenu`, `FolderCo
 
 Each phase is one commit on `main` that builds with `xcodebuild -scheme Nook -configuration Debug -arch arm64` and passes the manual checklist below.
 
-1. **Tokens and sweep.** Add `NookDesign.swift`, replace literals, collapse button styles, delete `ConditionalModifiers`. Visual change limited to continuous corners and snapped radii.
+1. **Tokens and sweep.** Add `NookDesign.swift`, replace literals, collapse button styles, delete `ConditionalModifiers`. Visual change is whatever the tokens define: continuous corners, snapped radii, 28pt icon buttons, new hover fill, elevation scale, type roles. Done 2026-09-14, commits 206859b..197ba61 on `gui-remodel`.
 2. **Surface and accent.** Gradient off, sidebar material on, `GradientColorManager` reduced to accent, gradient editor replaced by swatches, space icons to symbols with emoji fallback, `EmojiPicker` deleted.
 3. **Sidebar and menus.** Rows, essentials, header, URL bar, nav row, bottom bar, folders, separator, new tab row rebuilt to section 5. Context menus extracted.
 4. **Glass layer.** Section 6.
