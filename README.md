@@ -8,22 +8,20 @@
 </div>
 
 <p align="center">
-  <a href="https://www.apple.com/macos/"><img src="https://img.shields.io/badge/macOS-15.5+-blue" alt="macOS 15.5+"></a>
-  <a href="https://swift.org/"><img src="https://img.shields.io/badge/Swift-6-orange" alt="Swift"></a>
+  <a href="https://www.apple.com/macos/"><img src="https://img.shields.io/badge/macOS-26.0+-blue" alt="macOS 26.0+"></a>
+  <a href="https://swift.org/"><img src="https://img.shields.io/badge/Swift-5-orange" alt="Swift"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-green" alt="GPL-3.0"></a>
-  <a href="https://github.com/nook-browser/Nook/pulls"><img src="https://img.shields.io/github/issues-pr/nook-browser/Nook" alt="Open pull requests"></a>
-  <a href="https://github.com/nook-browser/Nook/issues"><img src="https://img.shields.io/github/issues/nook-browser/Nook" alt="Open issues"></a>
-  <a href="https://github.com/nook-browser/Nook/graphs/contributors"><img src="https://img.shields.io/github/contributors/nook-browser/Nook" alt="Contributors"></a>
-  <a href="https://deepwiki.com/nook-browser/Nook"><img src="https://deepwiki.com/badge.svg" alt="DeepWiki"></a>
-  <a href=""><img src="https://img.shields.io/coderabbit/prs/github/nook-browser/Nook?utm_source=oss&utm_medium=github&utm_campaign=nook-browser%2FNook&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews" alt="CodeRabbit Pull Request Reviews"></a>
+  <a href="https://github.com/l984-451/Nook/pulls"><img src="https://img.shields.io/github/issues-pr/l984-451/Nook" alt="Open pull requests"></a>
+  <a href="https://github.com/l984-451/Nook/issues"><img src="https://img.shields.io/github/issues/l984-451/Nook" alt="Open issues"></a>
+  <a href="https://github.com/l984-451/Nook/graphs/contributors"><img src="https://img.shields.io/github/contributors/l984-451/Nook" alt="Contributors"></a>
+  <a href="https://deepwiki.com/l984-451/Nook"><img src="https://deepwiki.com/badge.svg" alt="DeepWiki"></a>
+  <a href=""><img src="https://img.shields.io/coderabbit/prs/github/l984-451/Nook?utm_source=oss&utm_medium=github&utm_campaign=l984-451%2FNook&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews" alt="CodeRabbit Pull Request Reviews"></a>
 </p>
 
 
 <p align="center">
-  <a href="https://github.com/nook-browser/nook/releases/download/v1.0.5/Nook-v1.0.5.dmg"><img src="https://img.shields.io/badge/Download%20for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS"></a>
+  <a href="https://github.com/l984-451/Nook/releases/latest"><img src="https://img.shields.io/badge/Download%20for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS"></a>
 </p>
-
-> **Looking for the dev branch?** [Click here](https://github.com/nook-browser/Nook/tree/dev)
 
 ## Features  
 
@@ -39,21 +37,20 @@
 ## Getting Started  
 
 ### Download
-[![Download for macOS](https://img.shields.io/badge/Download%20for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/nook-browser/nook/releases/download/v1.0.2/Nook-v1.0.2.dmg)
+[![Download for macOS](https://img.shields.io/badge/Download%20for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/l984-451/Nook/releases/latest)
 
 ### or, Build from Source
 
 #### Prerequisites  
-- macOS 15.5+
+- macOS 26.0+ (Apple Silicon)
+- Xcode 26.6+
 - [Xcode](https://developer.apple.com/xcode/) (to build from source)
 ```bash
 
-git clone https://github.com/nook-browser/Nook.git
+git clone https://github.com/l984-451/Nook.git
 cd Nook
 open Nook.xcodeproj
 ```
-
-Some obj-c libraries may not play nice with Intel Macs, though there should technically be full interoperability. You can use any number of resources to debug. You will also need to delete a couple lines of code for *older* versions of macOS than Tahoe (26.0).
 
 You’ll need to set your personal Development Team in Signing to build locally.
 
@@ -130,11 +127,11 @@ Nook follows a manager-based architecture where:
 
 ## Star History
 
-<a href="https://www.star-history.com/#nook-browser/nook&type=date&legend=bottom-right">
+<a href="https://www.star-history.com/#l984-451/Nook&type=date&legend=bottom-right">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nook-browser/nook&type=date&theme=dark&legend=bottom-right" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nook-browser/nook&type=date&legend=bottom-right" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=nook-browser/nook&type=date&legend=bottom-right" width="600" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=l984-451/Nook&type=date&theme=dark&legend=bottom-right" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=l984-451/Nook&type=date&legend=bottom-right" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=l984-451/Nook&type=date&legend=bottom-right" width="600" />
  </picture>
 </a>
 

@@ -16,22 +16,17 @@ Please be respectful to maintainers and disclose AI assistance.
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/Nook.git
+   git clone https://github.com/l984-451/Nook.git
    cd Nook
    ```
 
-2. **Switch to the dev branch**
-   ```bash
-   git checkout dev
-   ```
-
-3. **Open in Xcode**
+2. **Open in Xcode**
    ```bash
    open Nook.xcodeproj
    ```
 
-4. **Build and run**
-   - Select your target device/simulator
+3. **Build and run**
+   - Set your Development Team under Signing & Capabilities
    - Press `Cmd + R` to build and run
 
 ## 📝 Code Style & Standards
@@ -44,9 +39,8 @@ Please be respectful to maintainers and disclose AI assistance.
 
 ### Compatibility & OS Versions
 
-- **Maintain backward compatibility**: The current minimum deployment target is macOS 15.5
-- **New features requiring newer OS versions** should use `@available` or `#if available` checks to preserve compatibility
-- **Discuss before raising minimum version**: If a feature would significantly benefit from raising the minimum OS version, open an issue to discuss the trade-offs before implementation
+- **Minimum deployment target is macOS 26.0.** Nook tracks the current macOS release and does not support older systems; do not add `#available` guards for versions below the deployment target.
+- **New features requiring a newer OS** than the deployment target should use `#available` checks until the target is raised.
 
 ## 📋 Pull Request Process
 
@@ -58,12 +52,10 @@ Please be respectful to maintainers and disclose AI assistance.
 
 ### Creating Pull Requests
 
-**IMPORTANT**: All development work must be done on the `dev` branch:
-
-1. **Create your branch from `dev`**, not `main`:
+1. **Create your branch from `main`**:
    ```bash
-   git checkout dev
-   git pull origin dev
+   git checkout main
+   git pull origin main
    git checkout -b feature/your-feature-name
    ```
 
@@ -74,7 +66,7 @@ Please be respectful to maintainers and disclose AI assistance.
    git push origin feature/your-feature-name
    ```
 
-4. **Open a Pull Request to the `dev` branch**, not `main`
+4. **Open a Pull Request to `main`**
    - Provide a clear description of the changes
    - Reference any related issues
    - Include screenshots or videos for UI changes
