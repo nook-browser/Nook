@@ -39,7 +39,7 @@ struct SpaceSeparator: View {
                             Text("Organize")
                                 .font(NookDesign.Font.caption)
                         }
-                        .foregroundStyle(organizeColor)
+                        .foregroundStyle(isOrganizeHovered ? .primary : .tertiary)
                         .padding(.horizontal, NookDesign.Spacing.xs)
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -60,7 +60,7 @@ struct SpaceSeparator: View {
                         Text("Clear")
                             .font(NookDesign.Font.caption)
                     }
-                    .foregroundStyle(clearColor)
+                    .foregroundStyle(isClearHovered ? .primary : .tertiary)
                     .padding(.horizontal, NookDesign.Spacing.xs)
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -73,14 +73,6 @@ struct SpaceSeparator: View {
         }
         .frame(height: NookDesign.Size.rowGlyph + NookDesign.Spacing.xxs)
         .frame(maxWidth: .infinity)
-    }
-
-    private var clearColor: Color {
-        isClearHovered ? .primary : .tertiary
-    }
-
-    private var organizeColor: Color {
-        isOrganizeHovered ? .primary : .tertiary
     }
 }
  
