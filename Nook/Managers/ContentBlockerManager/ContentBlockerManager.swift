@@ -252,12 +252,15 @@ final class ContentBlockerManager: NSObject {
     /// Swap the main-frame configuration script. It must precede the runtime script, so it goes first.
     private func replaceConfigScript(in ucc: WKUserContentController, with script: WKUserScript?) {
         let marker = AdvancedRulesEngine.configScriptMarker
-        let existing = ucc.userScripts
-        let hadConfig = existing.contains { $0.source.hasPrefix(marker) }
+        // `userScripts` is bridged lazily from WebKit's NSArray; evaluate everything we need from it
+        // BEFORE removeAllUserScripts(), or the stale proxy traps on the next index read (Release-only crash).
+        let all = ucc.userScripts
+        let others = all.filter { !$0.source.hasPrefix(marker) }
+        let hadConfig = others.count != all.count
         guard hadConfig || script != nil else { return }
         ucc.removeAllUserScripts()
         if let script { ucc.addUserScript(script) }
-        existing.filter { !$0.source.hasPrefix(marker) }.forEach { ucc.addUserScript($0) }
+        others.forEach { ucc.addUserScript($0) }
     }
 
     // MARK: - New controllers (from BrowserConfiguration.freshUserContentController)
@@ -336,8 +339,9 @@ final class ContentBlockerManager: NSObject {
 
     private func removeOwnScripts(from ucc: WKUserContentController) {
         let markers = [AdvancedRulesEngine.scriptMarker, AdvancedRulesEngine.configScriptMarker]
-        let remaining = ucc.userScripts.filter { script in !markers.contains { script.source.hasPrefix($0) } }
-        guard remaining.count != ucc.userScripts.count else { return }
+        let all = ucc.userScripts
+        let remaining = all.filter { script in !markers.contains { script.source.hasPrefix($0) } }
+        guard remaining.count != all.count else { return }
         ucc.removeAllUserScripts()
         remaining.forEach { ucc.addUserScript($0) }
     }
