@@ -20,19 +20,6 @@ struct SettingsAppearanceTab: View {
                 }
             }
             Picker(
-                "Background Material",
-                selection: $settings
-                    .currentMaterialRaw
-            ) {
-                ForEach(materials, id: \.value.rawValue) {
-                    material in
-                    Text(material.name).tag(
-                        material.value.rawValue
-                    )
-                }
-            }
-            Toggle("Liquid Glass", isOn: .constant(true))
-            Picker(
                 "Sidebar Position",
                 selection: $settings
                     .sidebarPosition

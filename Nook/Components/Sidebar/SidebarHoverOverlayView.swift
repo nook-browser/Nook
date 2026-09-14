@@ -45,12 +45,7 @@ struct SidebarHoverOverlayView: View {
                         .environmentObject(browserManager.gradientColorManager)
                         .frame(maxHeight: .infinity)
                         .background{
-                            
-                            
-                            SpaceGradientBackgroundView()
-                                .environmentObject(browserManager)
-                                .environmentObject(browserManager.gradientColorManager)
-                                .environment(windowState)
+                            BlurEffectView(material: .sidebar, blendingMode: .behindWindow, state: .active)
                                 .clipShape(NookDesign.Radius.shape(cornerRadius))
 
                                 Rectangle()

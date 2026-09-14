@@ -6,7 +6,6 @@
 //  Updated by Aether Aurelia on 15/11/2025.
 //
 
-import AppKit
 import SwiftUI
 
 
@@ -14,7 +13,6 @@ import SwiftUI
 @Observable
 class NookSettingsService {
     private let userDefaults = UserDefaults.standard
-    private let materialKey = "settings.currentMaterialRaw"
     private let searchEngineKey = "settings.searchEngine"
     private let tabUnloadTimeoutKey = "settings.tabUnloadTimeout"
     private let tabManagementModeKey = "settings.tabManagementMode"
@@ -56,20 +54,6 @@ class NookSettingsService {
     private let siteRoutingRulesKey = "settings.siteRoutingRules"
 
     var currentSettingsTab: SettingsTabs = .general
-
-    var currentMaterialRaw: Int {
-        didSet {
-            userDefaults.set(currentMaterialRaw, forKey: materialKey)
-        }
-    }
-
-    var currentMaterial: NSVisualEffectView.Material {
-        get {
-            NSVisualEffectView.Material(rawValue: currentMaterialRaw)
-                ?? .selection
-        }
-        set { currentMaterialRaw = newValue.rawValue }
-    }
 
     var searchEngineId: String {
         didSet {
@@ -338,7 +322,6 @@ class NookSettingsService {
     init() {
         // Register default values
         userDefaults.register(defaults: [
-            materialKey: NSVisualEffectView.Material.hudWindow.rawValue,
             searchEngineKey: SearchProvider.google.rawValue,
             tabManagementModeKey: TabManagementMode.standard.rawValue,
             blockXSTKey: false,
@@ -371,7 +354,6 @@ class NookSettingsService {
 
         // Initialize properties from UserDefaults
         // This will use the registered defaults if no value is set
-        self.currentMaterialRaw = userDefaults.integer(forKey: materialKey)
 
         // searchEngineId: backward compatible — existing "google" string still works
         self.searchEngineId = userDefaults.string(forKey: searchEngineKey) ?? SearchProvider.google.rawValue
@@ -604,31 +586,6 @@ extension EnvironmentValues {
         get { self[NookSettingsServiceKey.self] }
         set { self[NookSettingsServiceKey.self] = newValue }
     }
-}
-
-
-import AppKit
-import Foundation
-
-public let materials: [(name: String, value: NSVisualEffectView.Material)] = [
-    ("titlebar", .titlebar),
-    ("menu", .menu),
-    ("popover", .popover),
-    ("sidebar", .sidebar),
-    ("headerView", .headerView),
-    ("sheet", .sheet),
-    ("windowBackground", .windowBackground),
-    ("Arc", .hudWindow),
-    ("fullScreenUI", .fullScreenUI),
-    ("toolTip", .toolTip),
-    ("contentBackground", .contentBackground),
-    ("underWindowBackground", .underWindowBackground),
-    ("underPageBackground", .underPageBackground),
-]
-
-public func nameForMaterial(_ material: NSVisualEffectView.Material) -> String {
-    materials.first(where: { $0.value == material })?.name
-        ?? "raw(\(material.rawValue))"
 }
 
 // MARK: - Tab Layout

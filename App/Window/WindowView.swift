@@ -174,16 +174,10 @@ struct WindowView: View {
 
     @ViewBuilder
     private func WindowBackground() -> some View {
-        ZStack {
-            
-            BlurEffectView(material: nookSettings.currentMaterial, state: .followsWindowActiveState)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            SpaceGradientBackgroundView()
-
-
-        }
-        .backgroundDraggable()
-        .environment(windowState)
+        BlurEffectView(material: .sidebar, blendingMode: .behindWindow, state: .followsWindowActiveState)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .backgroundDraggable()
+            .environment(windowState)
     }
 
     @ViewBuilder
