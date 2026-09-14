@@ -50,7 +50,6 @@ private struct SplitHalfTab: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var splitManager: SplitViewManager
     @Environment(BrowserWindowState.self) private var windowState
-    @Environment(\.colorScheme) var colorScheme
     @ObservedObject private var dragSession = NookDragSessionManager.shared
 
     var body: some View {
@@ -84,9 +83,8 @@ private struct SplitHalfTab: View {
                                     .background(
                                         isCloseHovering
                                             ? (isActive
-                                                ? AppColors
-                                                    .controlBackgroundHoverLight
-                                                : AppColors.controlBackgroundActive)
+                                                ? NookDesign.Surface.fill
+                                                : NookDesign.Surface.fillPressed)
                                             : Color.clear
                                     )
                                     .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
@@ -130,18 +128,15 @@ private struct SplitHalfTab: View {
 
     private var backgroundColor: Color {
         if isActive {
-            return colorScheme == .dark
-                ? AppColors.spaceTabActiveLight : AppColors.spaceTabActiveDark
+            return NookDesign.Surface.raised
         } else if isHovering {
-            return colorScheme == .dark
-                ? AppColors.spaceTabHoverLight : AppColors.spaceTabHoverDark
+            return NookDesign.Surface.fill
         } else {
             return Color.clear
         }
     }
     private var textTab: Color {
-        return colorScheme == .dark
-            ? AppColors.spaceTabTextLight : AppColors.spaceTabTextDark
+        .primary
     }
 
 }

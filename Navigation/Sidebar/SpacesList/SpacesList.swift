@@ -96,7 +96,7 @@ struct SpacesList: View {
                            let hoveredSpace = visibleSpaces.first(where: { $0.id == hoveredId }) {
                             Text(hoveredSpace.name)
                                 .font(.caption)
-                                .foregroundStyle(previewTextColor)
+                                .foregroundStyle(Color.primary)
                                 .opacity(0.7)
                                 .lineLimit(1)
                                 .id(hoveredSpace.id)
@@ -108,11 +108,6 @@ struct SpacesList: View {
             .animation(NookDesign.Motion.standard, value: visibleSpaces.count)
     }
 
-    private var previewTextColor: Color {
-        browserManager.gradientColorManager.isDark
-            ? AppColors.spaceTabTextDark
-            : AppColors.spaceTabTextLight
-    }
 
 }
 

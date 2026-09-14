@@ -12,12 +12,9 @@ struct TabSuggestionItem: View {
     var isSelected: Bool = false
     
     @State private var isHovered: Bool = false
-    @Environment(\.colorScheme) var colorScheme
     @EnvironmentObject var gradientColorManager: GradientColorManager
-    
+
     var body: some View {
-        let isDark = colorScheme == .dark
-        
         HStack(alignment: .center, spacing: 0) {
             HStack(spacing: 9) {
                 ZStack {
@@ -34,7 +31,7 @@ struct TabSuggestionItem: View {
                 )
                 Text(tab.name)
                     .font(NookDesign.Font.label)
-                    .foregroundStyle(isSelected ? .white : isDark ? .white.opacity(0.6) : .black.opacity(0.8))
+                    .foregroundStyle(isSelected ? .white : .primary)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -42,15 +39,15 @@ struct TabSuggestionItem: View {
             HStack(spacing: 10) {
                 Text("Switch to Tab")
                     .font(NookDesign.Font.secondary)
-                    .foregroundStyle(isSelected ? .white : isDark ? .white.opacity(0.3) : .black.opacity(0.3))
+                    .foregroundStyle(isSelected ? .white : .secondary)
                 ZStack {
                     Image(systemName: "arrow.right")
                         .font(NookDesign.Font.label)
-                        .foregroundStyle(isSelected ? gradientColorManager.accentColor : isDark ? .white.opacity(0.5) : .black.opacity(0.5))
+                        .foregroundStyle(isSelected ? gradientColorManager.accentColor : .secondary)
                         .frame(width: 16, height: 16)
                 }
                 .frame(width: 24, height: 24)
-                .background(isSelected ? .white : isDark ? .white.opacity(0.05) : .black.opacity(0.05))
+                .background(isSelected ? .white : NookDesign.Surface.fill)
                 .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
 
             }

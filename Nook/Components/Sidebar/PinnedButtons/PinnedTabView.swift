@@ -17,7 +17,6 @@ struct PinnedTabView: View {
     var action: () -> Void
 
     @EnvironmentObject var browserManager: BrowserManager
-    @Environment(\.colorScheme) var colorScheme
     @Environment(\.nookSettings) var nookSettings
     @State private var isHovered: Bool = false
 
@@ -89,13 +88,7 @@ struct PinnedTabView: View {
     
     //MARK: - Colors
     private var backgroundColor: Color {
-        if isActive {
-            return colorScheme == .dark ? AppColors.pinnedTabActiveLight : AppColors.pinnedTabActiveDark
-        } else if isHovered {
-            return colorScheme == .dark ? AppColors.pinnedTabHoverLight : AppColors.pinnedTabHoverDark
-        } else {
-            return colorScheme == .dark ? AppColors.pinnedTabIdleLight : AppColors.pinnedTabIdleDark
-        }
+        isActive ? NookDesign.Surface.raised : (isHovered ? NookDesign.Surface.fillPressed : NookDesign.Surface.fill)
     }
 
     // MARK: - Favicon stroke overlay

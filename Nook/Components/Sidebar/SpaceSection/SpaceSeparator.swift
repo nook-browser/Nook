@@ -12,10 +12,8 @@ struct SpaceSeparator: View {
     let onOrganize: (() -> Void)?
     let isOrganizing: Bool
     let tabCount: Int
-    @EnvironmentObject var browserManager: BrowserManager
     @State private var isClearHovered: Bool = false
     @State private var isOrganizeHovered: Bool = false
-    @Environment(\.colorScheme) var colorScheme
 
     var body: some View {
         let hasTabs = tabCount > 0
@@ -48,7 +46,7 @@ struct SpaceSeparator: View {
             }
 
             Capsule()
-                .fill(colorScheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.15))
+                .fill(NookDesign.Surface.hairline)
                 .frame(height: 1)
                 .animation(NookDesign.Motion.quick, value: isHovering)
 
@@ -77,17 +75,11 @@ struct SpaceSeparator: View {
     }
 
     private var clearColor: Color {
-        if isClearHovered {
-            return browserManager.gradientColorManager.isDark ? Color.black.opacity(0.85) : Color.white
-        }
-        return browserManager.gradientColorManager.isDark ? Color.black.opacity(0.3) : Color.white.opacity(0.3)
+        isClearHovered ? .primary : .secondary
     }
 
     private var organizeColor: Color {
-        if isOrganizeHovered {
-            return browserManager.gradientColorManager.isDark ? Color.black.opacity(0.85) : Color.white
-        }
-        return browserManager.gradientColorManager.isDark ? Color.black.opacity(0.3) : Color.white.opacity(0.3)
+        isOrganizeHovered ? .primary : .secondary
     }
 }
  

@@ -18,7 +18,6 @@ struct SidebarResizeView: View {
     @StateObject private var dragLockManager = DragLockManager.shared
     @State private var dragSessionID: String = UUID().uuidString
     @State private var hoverTask: Task<Void, Never>?
-    @Environment(\.colorScheme) var colorScheme
 
     private let minWidth: CGFloat = 180
     private let maxWidth: CGFloat = 520
@@ -40,7 +39,7 @@ struct SidebarResizeView: View {
         ZStack {
             if isHovering || isResizing {
                 Capsule()
-                    .fill(colorScheme == .dark  ? .white.opacity(0.45) : .black.opacity(0.45))
+                    .fill(NookDesign.Surface.hairline)
                     .frame(width: 4)
                     .frame(maxHeight: .infinity)
                     .offset(x: indicatorOffset)

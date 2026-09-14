@@ -14,12 +14,10 @@ struct HistorySuggestionItem: View {
     
     @State private var isHovered: Bool = false
     @State private var resolvedFavicon: SwiftUI.Image? = nil
-    @Environment(\.colorScheme) var colorScheme
-    
+
     // Color configuration
     private var colors: ColorConfig {
         ColorConfig(
-            isDark: colorScheme == .dark,
             isSelected: isSelected,
             isHovered: isHovered
         )
@@ -104,22 +102,21 @@ struct HistorySuggestionItem: View {
 
 // MARK: - Colors simplified
 private struct ColorConfig {
-    let isDark: Bool
     let isSelected: Bool
     let isHovered: Bool
-    
+
     var titleColor: Color {
         if isSelected {
             return .white
         }
-        return isDark ? .white : .black
+        return .primary
     }
-    
+
     var urlColor: Color {
         if isSelected {
             return .white.opacity(0.5)
         }
-        return isDark ? .white.opacity(0.3) : .black.opacity(0.3)
+        return .secondary
     }
     
     var faviconColor: Color {

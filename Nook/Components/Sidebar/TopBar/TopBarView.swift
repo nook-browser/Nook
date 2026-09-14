@@ -323,8 +323,7 @@ struct TopBarView: View {
         }
 
         // Fallback
-        return browserManager.gradientColorManager.isDark
-            ? Color.white.opacity(0.9) : Color.black.opacity(0.8)
+        return .primary
     }
 
     // URL bar background color - slightly adjusted for visual distinction
@@ -364,14 +363,8 @@ struct TopBarView: View {
                 )
             }
         }
-        // Fallback to original AppColors when no webview color available
-        if isHovering {
-            return browserManager.gradientColorManager.isDark
-                ? AppColors.pinnedTabHoverDark : AppColors.pinnedTabHoverLight
-        } else {
-            return browserManager.gradientColorManager.isDark
-                ? AppColors.pinnedTabIdleDark : AppColors.pinnedTabIdleLight
-        }
+        // Fallback to a surface token when no webview color available
+        return isHovering ? NookDesign.Surface.fillPressed : NookDesign.Surface.fill
     }
 
     // Text color for URL bar - ensures proper contrast
@@ -390,8 +383,7 @@ struct TopBarView: View {
                 ? Color.white.opacity(0.55) : Color.black.opacity(0.8)
         }
         // Fallback to original text color logic
-        return browserManager.gradientColorManager.isDark
-            ? AppColors.spaceTabTextDark : AppColors.spaceTabTextLight
+        return .primary
     }
 
     // Bottom border color - lighter when dark, darker when light

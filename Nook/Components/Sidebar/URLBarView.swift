@@ -12,7 +12,6 @@ struct URLBarView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.nookSettings) var nookSettings
-    @Environment(\.colorScheme) var colorScheme
     @State private var isHovering: Bool = false
     @State private var showCheckmark: Bool = false
     var isSidebarHovered: Bool
@@ -124,14 +123,10 @@ struct URLBarView: View {
     }
     
     private var backgroundColor: Color {
-        if isHovering {
-            return colorScheme == .dark ? AppColors.pinnedTabHoverLight : AppColors.pinnedTabHoverDark
-        } else {
-            return colorScheme == .dark ? AppColors.pinnedTabIdleLight : AppColors.pinnedTabIdleDark
-        }
+        isHovering ? NookDesign.Surface.fillPressed : NookDesign.Surface.fill
     }
     private var textColor: Color {
-        return colorScheme == .dark ? AppColors.iconActiveLight : AppColors.iconActiveDark
+        .secondary
     }
     
     private var displayURL: String {

@@ -35,7 +35,6 @@ extension AnyTransition {
 }
 
 struct CircularProgressView: View {
-    @Environment(\.colorScheme) var colorScheme
     let progress: Double
 
     var body: some View {
@@ -45,19 +44,19 @@ struct CircularProgressView: View {
                 .frame(width: 20, height: 20)
             Image(systemName: "arrow.down")
                 .font(NookDesign.Font.caption)
-                .foregroundStyle(Color(hex: colorScheme == .dark ? "FFFFFF" : "0F2B1F"))
+                .foregroundStyle(Color.primary)
                 .frame(width: 20, height: 20)
 
             Circle()
                 .stroke(
-                    Color(hex: colorScheme == .dark ? "FFFFFF" : "0F2B1F").opacity(0.4),
+                    Color.secondary.opacity(0.4),
                     lineWidth: 4
                 )
                 .frame(width: 20, height: 20)
             Circle()
                 .trim(from: 0, to: progress)
                 .stroke(
-                    Color(hex: colorScheme == .dark ? "FFFFFF" : "0F2B1F"),
+                    Color.primary,
                     style: StrokeStyle(
                         lineWidth: 3,
                         lineCap: .round

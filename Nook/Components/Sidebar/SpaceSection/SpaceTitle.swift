@@ -3,7 +3,6 @@ import SwiftUI
 struct SpaceTitle: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var tabManager: TabManager
-    @Environment(\.colorScheme) var colorScheme
 
     let space: Space
     var iconSize: CGFloat = 12
@@ -153,13 +152,13 @@ struct SpaceTitle: View {
 
     private var hoverColor: Color {
         if isHovering || isDropHovering {
-            return colorScheme == .dark ? AppColors.spaceTabHoverLight : AppColors.spaceTabHoverDark
+            return NookDesign.Surface.fill
         } else {
             return .clear
         }
     }
     private var textColor: Color {
-        return colorScheme == .dark ? AppColors.sidebarTextLight : AppColors.sidebarTextDark
+        .primary
     }
 
     private var canDeleteSpace: Bool {

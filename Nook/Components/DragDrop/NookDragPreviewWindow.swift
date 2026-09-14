@@ -162,8 +162,6 @@ private struct NookMorphingPreview: View {
     let sidebarWidth: CGFloat
     let pinnedConfig: PinnedTabsConfiguration
 
-    @Environment(\.colorScheme) var colorScheme
-
     private let sidebarHorizontalPadding: CGFloat = 16
 
     private var effectiveWidth: CGFloat {
@@ -201,7 +199,7 @@ private struct NookMorphingPreview: View {
         case .ghost:
             return Color(nsColor: .windowBackgroundColor).opacity(0.95)
         case .pinnedTile:
-            return colorScheme == .dark ? AppColors.pinnedTabIdleLight : AppColors.pinnedTabIdleDark
+            return NookDesign.Surface.fill
         case .tabRow:
             return Color(nsColor: .controlBackgroundColor).opacity(0.95)
         }

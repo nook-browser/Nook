@@ -16,7 +16,6 @@ struct PinnedGrid: View {
     @EnvironmentObject var tabManager: TabManager
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(WindowRegistry.self) private var windowRegistry
-    @Environment(\.colorScheme) var colorScheme
     @Environment(\.nookSettings) var nookSettings
     @ObservedObject private var dragSession = NookDragSessionManager.shared
 
@@ -73,10 +72,7 @@ struct PinnedGrid: View {
                 }
                 .background {
                     NookDesign.Radius.shape(NookDesign.Radius.xl)
-                        .fill(isDragging
-                            ? (colorScheme == .dark ? AppColors.pinnedTabHoverLight : AppColors.pinnedTabHoverDark)
-                            : Color.clear
-                        )
+                        .fill(isDragging ? NookDesign.Surface.fillPressed : Color.clear)
                 }
                 .animation(NookDesign.Motion.quick, value: isDragging)
             }

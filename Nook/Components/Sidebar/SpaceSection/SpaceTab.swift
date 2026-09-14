@@ -20,7 +20,6 @@ struct SpaceTab: View {
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var tabManager: TabManager
     @Environment(BrowserWindowState.self) private var windowState
-    @Environment(\.colorScheme) var colorScheme
 
     /// Fades the trailing edge of the title instead of truncating with an ellipsis.
     /// On hover the clear region grows so the text ends before the close button.
@@ -59,7 +58,7 @@ struct SpaceTab: View {
                     }) {
                         ZStack {
                             NookDesign.Radius.shape(NookDesign.Radius.sm)
-                                .fill(isSpeakerHovering ? (isCurrentTab ? AppColors.controlBackgroundHoverLight : AppColors.controlBackgroundActive) : AppColors.controlBackgroundHoverLight.opacity(0))
+                                .fill(isSpeakerHovering ? (isCurrentTab ? NookDesign.Surface.fill : NookDesign.Surface.fillPressed) : NookDesign.Surface.fill.opacity(0))
                                 .frame(width: 22, height: 22)
                                 .animation(NookDesign.Motion.quick, value: isSpeakerHovering)
                             Image(systemName: tab.isAudioMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
@@ -118,7 +117,7 @@ struct SpaceTab: View {
                             .font(NookDesign.Font.secondary)
                             .foregroundColor(textTab)
                             .frame(width: 24, height: 24)
-                            .background(isCloseHovering ? (isCurrentTab ? AppColors.controlBackgroundHoverLight : AppColors.controlBackgroundActive) : Color.clear)
+                            .background(isCloseHovering ? (isCurrentTab ? NookDesign.Surface.fill : NookDesign.Surface.fillPressed) : Color.clear)
                             .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -367,15 +366,15 @@ struct SpaceTab: View {
     }
     private var backgroundColor: Color {
         if isCurrentTab {
-            return colorScheme == .dark ? AppColors.spaceTabActiveLight : AppColors.spaceTabActiveDark
+            return NookDesign.Surface.raised
         } else if isHovering {
-            return colorScheme == .dark ? AppColors.spaceTabHoverLight : AppColors.spaceTabHoverDark
+            return NookDesign.Surface.fill
         } else {
             return Color.clear
         }
     }
     private var textTab: Color {
-        return colorScheme == .dark ? AppColors.spaceTabTextLight : AppColors.spaceTabTextDark
+        .primary
     }
 
 }
