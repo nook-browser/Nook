@@ -236,7 +236,7 @@ Leave the `.contextMenu` on its call site alone (Task 3 retargets it).
 In `Nook/Components/Sidebar/SidebarHoverOverlayView.swift`, inside the `.background { ... }` block, replace the `SpaceGradientBackgroundView()` element and its three modifiers (`.environmentObject(browserManager)`, `.environmentObject(browserManager.gradientColorManager)`, `.environment(windowState)`) with:
 
 ```swift
-                            BlurEffectView(material: .sidebar, blendingMode: .behindWindow, state: .active)
+                            BlurEffectView(material: .sidebar, blendingMode: .withinWindow, state: .active)
                                 .clipShape(NookDesign.Radius.shape(cornerRadius))
 ```
 
@@ -669,7 +669,7 @@ struct SpaceIconPicker: View {
 
 Pattern at each site: delete `@StateObject private var emojiManager = EmojiPickerManager()`, every `.background(EmojiPickerAnchor(manager: emojiManager))`, every `.onChange(of: emojiManager.selectedEmoji) { ... }`, every `emojiManager.toggle()` / `emojiManager.selectedEmoji = ...`; add `@State private var showIconPicker = false`; present the picker with `.popover(isPresented: $showIconPicker) { SpaceIconPicker(selected: <current>, onPick: { ... ; showIconPicker = false }) }`.
 
-- `SpacesListItem.swift`: `spaceIcon` becomes
+- `SpacesListItem.swift` (note: `Color.tertiary` does not exist; use `.tertiary` as a `ShapeStyle` for shapes and `AppColors.textTertiary` where a `Color` is required): `spaceIcon` becomes
   ```swift
     @ViewBuilder
     private var spaceIcon: some View {

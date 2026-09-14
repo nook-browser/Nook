@@ -139,7 +139,7 @@ Context menus: three shared `@ViewBuilder` builders, `TabContextMenu`, `FolderCo
 Each phase is one commit on `main` that builds with `xcodebuild -scheme Nook -configuration Debug -arch arm64` and passes the manual checklist below.
 
 1. **Tokens and sweep.** Add `NookDesign.swift`, replace literals, collapse button styles, delete `ConditionalModifiers`. Visual change is whatever the tokens define: continuous corners, snapped radii, 28pt icon buttons, new hover fill, elevation scale, type roles. Done 2026-09-14, commits 206859b..197ba61 on `gui-remodel`.
-2. **Surface and accent.** Gradient off, sidebar material on, `GradientColorManager` reduced to accent, gradient editor replaced by swatches, space icons to symbols with emoji fallback, `EmojiPicker` deleted.
+2. **Surface and accent.** Gradient off, sidebar material on, `GradientColorManager` reduced to accent, gradient editor replaced by swatches, space icons to symbols with emoji fallback, `EmojiPicker` deleted. Incognito windows use a neutral gray accent. Done 2026-09-14, commits d5b2363..c2866a8 on `gui-remodel-p2`.
 3. **Sidebar and menus.** Rows, essentials, header, URL bar, nav row, bottom bar, folders, separator, new tab row rebuilt to section 5. Context menus extracted.
 4. **Glass layer.** Section 6.
 5. **Settings.** Section 7.
