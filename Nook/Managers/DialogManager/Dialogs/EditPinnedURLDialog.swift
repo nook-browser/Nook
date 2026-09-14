@@ -45,12 +45,12 @@ struct EditPinnedURLDialog: DialogPresentable {
     func dialogContent() -> some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("This is the URL that opens when you reset this pinned tab.")
-                .font(.system(size: 13, weight: .medium))
+                .font(NookDesign.Font.body)
                 .foregroundStyle(.secondary)
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("URL")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(NookDesign.Font.body)
 
                 NookTextField(
                     text: $urlText,

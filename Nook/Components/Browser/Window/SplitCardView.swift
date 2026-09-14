@@ -21,10 +21,10 @@ struct SplitCardView: View {
         ZStack {
             VStack(spacing: 12) {
                 Image(systemName: icon)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(NookDesign.Font.heading)
                     .foregroundStyle(currentTextColor)
                 Text(text)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(NookDesign.Font.secondary)
                     .lineLimit(1)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(currentTextColor)

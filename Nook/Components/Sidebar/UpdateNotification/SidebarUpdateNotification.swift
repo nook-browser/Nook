@@ -45,7 +45,7 @@ struct SidebarUpdateNotification: View {
             VStack(spacing: 0) {
                 VStack(spacing: 0) {
                     Text("New version of Nook available")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(NookDesign.Font.secondary)
                         .foregroundColor(.black)
                         .offset(y: isExpanded ? -25 : 0)
                         .zIndex(2)
@@ -55,7 +55,7 @@ struct SidebarUpdateNotification: View {
                             installUpdate(wasDownloaded: availability.isDownloaded)
                         }) {
                             Text("Restart and Update")
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(NookDesign.Font.secondary)
                                 .foregroundColor(.black)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)

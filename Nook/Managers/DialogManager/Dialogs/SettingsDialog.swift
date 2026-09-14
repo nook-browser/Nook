@@ -45,7 +45,7 @@ struct SettingsDialog: DialogPresentable {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Theme")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(NookDesign.Font.body)
                 Picker("Theme", selection: $theme) {
                     Text("Light").tag("light")
                     Text("Dark").tag("dark")
@@ -56,11 +56,11 @@ struct SettingsDialog: DialogPresentable {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Font Size")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(NookDesign.Font.body)
                 HStack {
                     Slider(value: $fontSize, in: 12...20, step: 1)
                     Text("\(Int(fontSize))")
-                        .font(.system(size: 12))
+                        .font(NookDesign.Font.secondary)
                         .foregroundColor(.secondary)
                 }
             }

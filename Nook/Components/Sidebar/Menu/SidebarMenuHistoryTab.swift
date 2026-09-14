@@ -68,12 +68,12 @@ struct SidebarMenuHistoryTab: View {
             HStack(spacing: 3) {
                 HStack {
                     Image(systemName: "magnifyingglass")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(NookDesign.Font.title)
                         .foregroundStyle(contrastTextTertiary)
                         .frame(width: 16, height: 16)
                     TextField("Search history...", text: $text)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(NookDesign.Font.secondary)
                         .foregroundColor(contrastTextTertiary)
                         .focused($isSearchFocused)
                         .onChange(of: text) { _, _ in
@@ -86,7 +86,7 @@ struct SidebarMenuHistoryTab: View {
                             loadHistory()
                         }) {
                             Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 12))
+                                .font(NookDesign.Font.secondary)
                                 .foregroundColor(.secondary)
                         }
                         .buttonStyle(.plain)
@@ -113,13 +113,13 @@ struct SidebarMenuHistoryTab: View {
                 } label: {
                     HStack(alignment: .center, spacing: 4) {
                         Image(systemName: "line.horizontal.3.decrease.circle")
-                            .font(.system(size: 16, weight: .regular))
+                            .font(NookDesign.Font.title)
                             .foregroundStyle(
                                 isShowingFilters
                                     ? Color(hex: "1E1E1E") : contrastTextSecondary
                             )
                         Text("Filters")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(NookDesign.Font.body)
                             .foregroundStyle(
                                 isShowingFilters
                                     ? Color(hex: "1E1E1E") : contrastTextSecondary
@@ -149,7 +149,7 @@ struct SidebarMenuHistoryTab: View {
                             ProgressView()
                                 .scaleEffect(0.8)
                             Text("Loading history...")
-                                .font(.system(size: 12))
+                                .font(NookDesign.Font.secondary)
                                 .foregroundColor(AppColors.textSecondary)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -157,21 +157,21 @@ struct SidebarMenuHistoryTab: View {
                     } else if groupedHistoryEntries.isEmpty {
                         VStack(spacing: 8) {
                             Image(systemName: "clock")
-                                .font(.system(size: 24))
+                                .font(NookDesign.Font.titleLarge)
                                 .foregroundColor(AppColors.textTertiary)
 
                             Text(
                                 text.isEmpty
                                     ? "No history yet" : "No results found"
                             )
-                            .font(.system(size: 14))
+                            .font(NookDesign.Font.body)
                             .foregroundColor(AppColors.textSecondary)
 
                             if text.isEmpty {
                                 Text(
                                     "Visit some websites to see your history here"
                                 )
-                                .font(.system(size: 12))
+                                .font(NookDesign.Font.secondary)
                                 .foregroundColor(AppColors.textTertiary)
                                 .multilineTextAlignment(.center)
                             }
@@ -225,7 +225,7 @@ struct SidebarMenuHistoryTab: View {
                                 ProgressView()
                                     .scaleEffect(0.8)
                                 Text("Loading more...")
-                                    .font(.system(size: 12))
+                                    .font(NookDesign.Font.secondary)
                                     .foregroundColor(AppColors.textSecondary)
                             }
                             .frame(maxWidth: .infinity)
@@ -482,14 +482,14 @@ struct HistoryRowView: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(entry.displayTitle)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(NookDesign.Font.body)
                     .foregroundColor(contrastText.opacity(0.7))
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .minimumScaleFactor(0.85)
 
                 Text(entry.url.host ?? "")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(NookDesign.Font.secondary)
                     .foregroundColor(contrastText.opacity(0.55))
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -502,7 +502,7 @@ struct HistoryRowView: View {
                 HStack(spacing: 2) {
                     Button(action: onDelete) {
                         Image(systemName: "trash")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(NookDesign.Font.label)
                             .foregroundColor(contrastText.opacity(0.6))
                             .frame(width: 16, height: 16)
                     }
@@ -520,7 +520,7 @@ struct HistoryRowView: View {
                     // Open in a new tab
                     Button(action: onDelete) {
                         Image(systemName: "arrow.uturn.backward")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(NookDesign.Font.label)
                             .foregroundColor(contrastText.opacity(0.6))
                             .frame(width: 16, height: 16)
                     }
@@ -629,7 +629,7 @@ struct FiltersSelectView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("When was the tab closed?")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(NookDesign.Font.secondary)
                     .foregroundStyle(contrastText.opacity(0.6))
                 Spacer()
             }
@@ -689,7 +689,7 @@ struct FiltersSelectButton: View {
             action()
         } label: {
             Text(text)
-                .font(.system(size: 14, weight: .medium))
+                .font(NookDesign.Font.body)
                 .foregroundStyle(
                     isActive ? Color(hex: "1E1E1E") : contrastText.opacity(0.5)
                 )

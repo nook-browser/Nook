@@ -51,7 +51,7 @@ struct BasicAuthDialog: DialogPresentable {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("User name")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(NookDesign.Font.label)
                     .foregroundStyle(.primary)
                 NookTextField(
                     text: $model.username,
@@ -62,7 +62,7 @@ struct BasicAuthDialog: DialogPresentable {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Password")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(NookDesign.Font.label)
                     .foregroundStyle(.primary)
                 SecureField("Enter password", text: $model.password)
                     .textFieldStyle(PlainTextFieldStyle())

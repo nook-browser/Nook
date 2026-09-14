@@ -291,7 +291,7 @@ struct SpaceView: View {
                                     scrollToTop(proxy: proxy)
                                 } label: {
                                     Image(systemName: "chevron.up")
-                                        .font(.system(size: 12, weight: .medium))
+                                        .font(NookDesign.Font.secondary)
                                         .foregroundColor(.gray)
                                         .frame(width: 24, height: 24)
                                         .background(Color.white.opacity(0.9))
@@ -320,7 +320,7 @@ struct SpaceView: View {
                                     scrollToActiveTab(proxy: proxy)
                                 } label: {
                                     Image(systemName: "chevron.down")
-                                        .font(.system(size: 12, weight: .medium))
+                                        .font(NookDesign.Font.secondary)
                                         .foregroundColor(.gray)
                                         .frame(width: 24, height: 24)
                                         .background(Color.white.opacity(0.9))

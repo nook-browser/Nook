@@ -54,11 +54,11 @@ struct PinnedGrid: View {
 
                     VStack(spacing: 2) {
                         Text("Drag to add Favorites")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(NookDesign.Font.label)
                             .foregroundStyle(.secondary)
 
                         Text("Favorites keep your most\nused sites and apps close")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(NookDesign.Font.secondary)
                             .foregroundStyle(.tertiary)
                             .multilineTextAlignment(.center)
                     }

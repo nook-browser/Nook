@@ -78,7 +78,7 @@ struct ExtensionLibraryView: View {
     private var extensionsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("EXTENSIONS")
-                .font(.system(size: 11, weight: .semibold))
+                .font(NookDesign.Font.captionStrong)
                 .foregroundStyle(.secondary.opacity(0.6))
                 .tracking(0.4)
                 .padding(.horizontal, 4)
@@ -108,11 +108,11 @@ struct ExtensionLibraryView: View {
                             .frame(width: 34, height: 34)
                             .overlay {
                                 Image(systemName: "plus")
-                                    .font(.system(size: 16, weight: .medium))
+                                    .font(NookDesign.Font.title)
                                     .foregroundStyle(.secondary.opacity(0.3))
                             }
                         Text("Add New")
-                            .font(.system(size: 10, weight: .medium))
+                            .font(NookDesign.Font.caption)
                             .foregroundStyle(.secondary.opacity(0.3))
                     }
                 }
@@ -164,7 +164,7 @@ struct ExtensionLibraryView: View {
                             zoomOut()
                         } label: {
                             Image(systemName: "minus")
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(NookDesign.Font.captionStrong)
                                 .frame(width: 22, height: 22)
                                 .background(.secondary.opacity(0.1))
                                 .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
@@ -172,7 +172,7 @@ struct ExtensionLibraryView: View {
                         .buttonStyle(.plain)
 
                         Text("\(browserManager.zoomManager.currentZoomPercentage)%")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(NookDesign.Font.secondary)
                             .monospacedDigit()
                             .foregroundStyle(.secondary)
                             .frame(minWidth: 36)
@@ -181,7 +181,7 @@ struct ExtensionLibraryView: View {
                             zoomIn()
                         } label: {
                             Image(systemName: "plus")
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(NookDesign.Font.captionStrong)
                                 .frame(width: 22, height: 22)
                                 .background(.secondary.opacity(0.1))
                                 .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
@@ -200,10 +200,10 @@ struct ExtensionLibraryView: View {
         HStack {
             HStack(spacing: 5) {
                 Image(systemName: currentTab?.url.scheme == "https" ? "lock.fill" : "lock.open.fill")
-                    .font(.system(size: 10))
+                    .font(NookDesign.Font.caption)
                     .foregroundStyle(.secondary.opacity(0.5))
                 Text(currentHost ?? "No site loaded")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(NookDesign.Font.secondary)
                     .foregroundStyle(.secondary.opacity(0.5))
             }
 
@@ -223,7 +223,7 @@ struct ExtensionLibraryView: View {
                 }
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.system(size: 13, weight: .medium))
+                    .font(NookDesign.Font.body)
                     .foregroundStyle(.secondary.opacity(0.5))
                     .frame(width: 26, height: 26)
                     .background(.secondary.opacity(0.08))
@@ -265,11 +265,11 @@ private struct MuteButton: View {
         } label: {
             VStack(spacing: 5) {
                 Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                    .font(.system(size: 15))
+                    .font(NookDesign.Font.title)
                     .frame(width: 28, height: 28)
                     .contentTransition(.symbolEffect(.replace))
                 Text(isMuted ? "Unmute" : "Mute")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(NookDesign.Font.caption)
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
@@ -312,12 +312,12 @@ private struct CopyButton: View {
         } label: {
             VStack(spacing: 5) {
                 Image(systemName: showCheckmark ? "checkmark" : icon)
-                    .font(.system(size: 15))
+                    .font(NookDesign.Font.title)
                     .foregroundStyle(showCheckmark ? .green : .primary)
                     .frame(width: 28, height: 28)
                     .contentTransition(.symbolEffect(.replace))
                 Text(showCheckmark ? "Copied!" : label)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(NookDesign.Font.caption)
                     .foregroundStyle(showCheckmark ? .green : .secondary)
             }
             .frame(maxWidth: .infinity)
@@ -362,7 +362,7 @@ private struct ExtensionGridItem: View {
                                 .scaledToFit()
                         } else {
                             Image(systemName: "puzzlepiece.extension")
-                                .font(.system(size: 16))
+                                .font(NookDesign.Font.title)
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -372,7 +372,7 @@ private struct ExtensionGridItem: View {
 
                     if let badge = badgeText, !badge.isEmpty {
                         Text(badge)
-                            .font(.system(size: 9, weight: .bold))
+                            .font(NookDesign.Font.micro)
                             .foregroundStyle(.white)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
@@ -384,7 +384,7 @@ private struct ExtensionGridItem: View {
                 }
 
                 Text(ext.name)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(NookDesign.Font.caption)
                     .foregroundStyle(.secondary.opacity(0.7))
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -398,7 +398,7 @@ private struct ExtensionGridItem: View {
             .overlay(alignment: .topTrailing) {
                 if isPinned {
                     Image(systemName: "pin.fill")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(NookDesign.Font.caption)
                         .foregroundStyle(Color.blue.opacity(0.8))
                         .rotationEffect(.degrees(45))
                         .padding(4)
@@ -481,7 +481,7 @@ private struct SiteSettingRow<Control: View>: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 13))
+                .font(NookDesign.Font.body)
                 .foregroundStyle(iconColor)
                 .frame(width: 28, height: 28)
                 .background(iconColor.opacity(0.12))
@@ -489,10 +489,10 @@ private struct SiteSettingRow<Control: View>: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(NookDesign.Font.body)
                 if let subtitle {
                     Text(subtitle)
-                        .font(.system(size: 11))
+                        .font(NookDesign.Font.caption)
                         .foregroundStyle(.secondary.opacity(0.6))
                 }
             }

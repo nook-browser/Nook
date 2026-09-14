@@ -263,13 +263,13 @@ private struct NookMorphingPreview: View {
                         .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
                 } else {
                     Image(systemName: "globe")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(NookDesign.Font.body)
                         .foregroundColor(.secondary)
                 }
 
                 if style.showTitle {
                     Text(title)
-                        .font(.system(size: style == .ghost ? 11 : 13, weight: .medium))
+                        .font(style == .ghost ? NookDesign.Font.caption : NookDesign.Font.body)
                         .foregroundColor(style == .ghost ? .secondary : .primary)
                         .lineLimit(1)
                     Spacer(minLength: 0)

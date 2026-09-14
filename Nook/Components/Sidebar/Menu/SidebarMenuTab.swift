@@ -19,14 +19,14 @@ struct SidebarMenuTab: View {
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: isActive ? activeImage : image)
-                .font(.system(size: 20, weight: .semibold))
+                .font(NookDesign.Font.titleLarge)
                 .foregroundStyle(isActive ? .green : .white)
                 .symbolRenderingMode(.hierarchical)
                 .symbolEffect(.wiggle, value: shouldWiggle)
                 .contentTransition(.symbolEffect(.replace.magic(fallback: .downUp.byLayer), options: .nonRepeating))
 
             Text(title)
-                .font(.system(size: 12, weight: .semibold))
+                .font(NookDesign.Font.secondary)
                 .foregroundStyle(.white)
         }
         .frame(height: 80)

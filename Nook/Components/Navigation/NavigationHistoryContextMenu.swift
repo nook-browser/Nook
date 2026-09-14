@@ -30,20 +30,20 @@ struct NavigationHistoryContextMenu: View {
                         HStack(spacing: 8) {
                             // Directional icon
                             Image(systemName: historyType == .back ? "arrow.backward" : "arrow.forward")
-                                .font(.system(size: 10, weight: .medium))
+                                .font(NookDesign.Font.caption)
                                 .foregroundColor(.secondary)
                                 .frame(width: 12)
 
                             // Title and URL
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(item.title)
-                                    .font(.system(size: 13, weight: .medium))
+                                    .font(NookDesign.Font.body)
                                     .foregroundColor(.primary)
                                     .lineLimit(1)
 
                                 if let url = item.url {
                                     Text(urlDisplayString(url))
-                                        .font(.system(size: 11))
+                                        .font(NookDesign.Font.caption)
                                         .foregroundColor(.secondary)
                                         .lineLimit(1)
                                 }

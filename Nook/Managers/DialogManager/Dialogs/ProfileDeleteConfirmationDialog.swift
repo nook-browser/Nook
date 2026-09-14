@@ -29,9 +29,9 @@ struct ProfileDeleteConfirmationDialog: DialogPresentable {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Image(systemName: profileIcon)
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(NookDesign.Font.titleLarge)
                 Text(profileName)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(NookDesign.Font.title)
             }
             .padding(.bottom, 4)
 

@@ -43,13 +43,13 @@ struct NookTextField: View {
         HStack(spacing: 12) {
             if let iconName = iconName {
                 Image(systemName: iconName)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(NookDesign.Font.body)
                     .foregroundStyle(iconColor)
                     .frame(width: 16, height: 16)
             }
             
             TextField(placeholder, text: $text)
-                .font(.system(size: 14, weight: .regular))
+                .font(NookDesign.Font.bodyRegular)
                 .foregroundStyle(textColor)
                 .textFieldStyle(PlainTextFieldStyle())
         }

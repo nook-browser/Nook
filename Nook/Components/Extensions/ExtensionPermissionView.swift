@@ -29,7 +29,7 @@ struct ExtensionPermissionView: View {
                         .scaledToFit()
                         .frame(width: 64, height: 64)
                     Image(systemName: "arrow.left")
-                        .font(.system(size: 28, weight: .medium))
+                        .font(NookDesign.Font.display)
                         .foregroundColor(.secondary)
                     Image(nsImage: extensionLogo)
                         .resizable()
@@ -43,16 +43,16 @@ struct ExtensionPermissionView: View {
             Text(isRuntimeRequest
                  ? "\"\(extensionName)\" wants additional permissions"
                  : "Add the \"\(extensionName)\" extension to Nook?")
-                .font(.system(size: 16, weight: .semibold))
+                .font(NookDesign.Font.title)
             
             Text("It can:")
-                .font(.system(size: 14, weight: .semibold))
+                .font(NookDesign.Font.label)
                 .foregroundColor(.secondary)
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(requestedPermissions, id: \.self) { permission in
                     let message = getPermissionDescription(permission)
                     Text("•  \(message)")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(NookDesign.Font.label)
                         .foregroundStyle(.secondary)
                 }
             }

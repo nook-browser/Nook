@@ -95,13 +95,13 @@ struct CommandPaletteView: View {
                                 )
                                 .id(activeSiteSearch != nil ? "magnifyingglass" : isLikelyURL(text) ? "globe" : "magnifyingglass")
                                 .transition(.blur(intensity: 2, scale: 0.6).animation(.smooth(duration: 0.3)))
-                                .font(.system(size: 14, weight: .regular))
+                                .font(NookDesign.Font.bodyRegular)
                                 .foregroundStyle(isDark ? .white : .black)
                                 .frame(width: 15)
 
                                 if let site = activeSiteSearch {
                                     Text(site.name)
-                                        .font(.system(size: 13, weight: .semibold))
+                                        .font(NookDesign.Font.label)
                                         .foregroundStyle(Garnish.contrastingShade(of: site.color, targetRatio: 4.5, blendStyle: .strong) ?? .white)
                                         .padding(.horizontal, 10)
                                         .padding(.vertical, 4)
@@ -121,13 +121,13 @@ struct CommandPaletteView: View {
                                         text: $text
                                     )
                                     .textFieldStyle(.plain)
-                                    .font(.system(size: 18, weight: .medium))
+                                    .font(NookDesign.Font.heading)
                                     .foregroundColor(textFieldColor)
                                     .tint(gradientColorManager.primaryColor)
                                     .overlay(alignment: .leading) {
                                         if let suffix = inlineCompletionSuffix {
                                             (Text(text).foregroundColor(.clear) + Text(suffix).foregroundColor(isDark ? .white.opacity(0.25) : .black.opacity(0.25)))
-                                                .font(.system(size: 18, weight: .medium))
+                                                .font(NookDesign.Font.heading)
                                                 .lineLimit(1)
                                                 .allowsHitTesting(false)
                                         }
@@ -211,11 +211,11 @@ struct CommandPaletteView: View {
                                     if activeSiteSearch == nil, let match = siteSearchMatch {
                                         HStack(spacing: 6) {
                                             Text("Search \(match.name)")
-                                                .font(.system(size: 14, weight: .medium))
+                                                .font(NookDesign.Font.body)
                                                 .foregroundStyle(isDark ? .white.opacity(0.3) : .black.opacity(0.3))
 
                                             Text("Tab")
-                                                .font(.system(size: 11, weight: .medium))
+                                                .font(NookDesign.Font.caption)
                                                 .foregroundStyle(isDark ? .white.opacity(0.4) : .black.opacity(0.4))
                                                 .padding(.horizontal, 6)
                                                 .padding(.vertical, 2)
@@ -378,7 +378,7 @@ struct CommandPaletteView: View {
                         .clipShape(
                             NookDesign.Radius.shape(NookDesign.Radius.sm)
                         )
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(NookDesign.Font.label)
                         .foregroundStyle(.white)
                         .contentShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
                         .onHoverTracking { hovering in

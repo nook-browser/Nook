@@ -40,17 +40,17 @@ struct HistorySuggestionItem: View {
             
             HStack(spacing: 4) {
                 Text(entry.displayTitle)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(NookDesign.Font.label)
                     .foregroundStyle(colors.titleColor)
                     .lineLimit(1)
                     .truncationMode(.tail)
                 
                 Text("-")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(NookDesign.Font.label)
                     .foregroundStyle(colors.urlColor)
                 
                 Text(entry.displayURL)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(NookDesign.Font.label)
                     .foregroundStyle(colors.urlColor)
                     .lineLimit(1)
                     .truncationMode(.tail)

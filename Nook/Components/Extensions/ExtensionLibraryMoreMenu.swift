@@ -206,13 +206,13 @@ private struct MoreMenuView: View {
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: "trash.fill")
-                            .font(.system(size: 12))
+                            .font(NookDesign.Font.secondary)
                             .foregroundStyle(.red.opacity(0.9))
                             .frame(width: 26, height: 26)
                             .background(.red.opacity(0.08))
                             .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
                         Text("Clear All Site Data")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(NookDesign.Font.body)
                             .foregroundStyle(.red.opacity(0.9))
                         Spacer()
                     }
@@ -300,19 +300,19 @@ private struct MoreMenuItem: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 12))
+                .font(NookDesign.Font.secondary)
                 .foregroundStyle(iconColor)
                 .frame(width: 26, height: 26)
                 .background(iconColor.opacity(0.12))
                 .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
 
             Text(label)
-                .font(.system(size: 13, weight: .medium))
+                .font(NookDesign.Font.body)
 
             Spacer()
 
             Text(detail)
-                .font(.system(size: 11, weight: .medium))
+                .font(NookDesign.Font.caption)
                 .foregroundStyle(.secondary.opacity(0.4))
         }
         .padding(.horizontal, 10)

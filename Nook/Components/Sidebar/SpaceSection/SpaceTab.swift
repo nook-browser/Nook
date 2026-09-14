@@ -52,7 +52,7 @@ struct SpaceTab: View {
                                 .animation(.easeInOut(duration: 0.05), value: isSpeakerHovering)
                             Image(systemName: tab.isAudioMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                                 .contentTransition(.symbolEffect(.replace))
-                                .font(.system(size: 12, weight: .medium))
+                                .font(NookDesign.Font.secondary)
                                 .foregroundColor(tab.isAudioMuted ? AppColors.textSecondary : textTab)
                         }
                     }
@@ -65,7 +65,7 @@ struct SpaceTab: View {
                 
                 if tab.isRenaming {
                     TextField("", text: $tab.editingName)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(NookDesign.Font.body)
                         .foregroundStyle(tab.isUnloaded ? AppColors.textSecondary : textTab)
                         .textFieldStyle(.plain)
                         .onSubmit {
@@ -80,7 +80,7 @@ struct SpaceTab: View {
                         }
                 } else {
                     Text(tab.displayName)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(NookDesign.Font.body)
                         .foregroundStyle(textTab)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -94,7 +94,7 @@ struct SpaceTab: View {
                     let useUnload = onUnload != nil && !tab.isUnloaded
                     Button(action: useUnload ? onUnload! : onClose) {
                         Image(systemName: useUnload ? "minus" : "xmark")
-                            .font(.system(size: 12, weight: .heavy))
+                            .font(NookDesign.Font.secondary)
                             .foregroundColor(textTab)
                             .frame(width: 24, height: 24)
                             .background(isCloseHovering ? (isCurrentTab ? AppColors.controlBackgroundHoverLight : AppColors.controlBackgroundActive) : Color.clear)

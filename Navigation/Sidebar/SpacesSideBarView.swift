@@ -189,7 +189,7 @@ struct SpacesSideBarView: View {
     private var emptyStateView: some View {
         VStack(spacing: 16) {
             Image(systemName: "square.grid.2x2")
-                .font(.system(size: 48))
+                .font(NookDesign.Font.hero)
                 .foregroundColor(.secondary)
             VStack(spacing: 8) {
                 Text("No Spaces")

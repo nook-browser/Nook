@@ -58,7 +58,7 @@ struct ExtensionActionButton: View {
 
                 if let badge = badgeText, !badge.isEmpty {
                     Text(badge)
-                        .font(.system(size: 8, weight: .bold))
+                        .font(NookDesign.Font.micro)
                         .foregroundStyle(.white)
                         .padding(.horizontal, 3)
                         .padding(.vertical, 1)

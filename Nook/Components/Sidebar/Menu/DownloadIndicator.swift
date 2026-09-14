@@ -44,7 +44,7 @@ struct CircularProgressView: View {
                 .fill(.clear)
                 .frame(width: 20, height: 20)
             Image(systemName: "arrow.down")
-                .font(.system(size: 10, weight: .bold))
+                .font(NookDesign.Font.caption)
                 .foregroundStyle(Color(hex: colorScheme == .dark ? "FFFFFF" : "0F2B1F"))
                 .frame(width: 20, height: 20)
 

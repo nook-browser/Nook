@@ -14,7 +14,7 @@ struct TabClosureToast: View {
         ToastView {
             HStack(spacing: 8) {
                 Image(systemName: "arrow.counterclockwise")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(NookDesign.Font.secondary)
                     .foregroundStyle(.white)
                     .frame(width: 14, height: 14)
                     .padding(4)
@@ -27,11 +27,11 @@ struct TabClosureToast: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(browserManager.tabClosureToastCount) tab\(browserManager.tabClosureToastCount > 1 ? "s" : "") closed")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(NookDesign.Font.secondary)
                         .foregroundStyle(.white)
 
                     Text("Press ⌘Z to undo")
-                        .font(.system(size: 10))
+                        .font(NookDesign.Font.caption)
                         .foregroundStyle(.white.opacity(0.8))
                 }
             }

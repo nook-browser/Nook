@@ -60,7 +60,7 @@ struct ToastContent: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 12, weight: .medium))
+                .font(NookDesign.Font.secondary)
                 .foregroundStyle(iconForeground)
                 .frame(width: 14, height: 14)
                 .padding(4)
@@ -72,7 +72,7 @@ struct ToastContent: View {
                 }
 
             Text(text)
-                .font(.system(size: 12, weight: .medium))
+                .font(NookDesign.Font.secondary)
                 .foregroundStyle(textForeground)
         }
     }
@@ -87,7 +87,7 @@ struct ToastContentWithSubtitle: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 12, weight: .medium))
+                .font(NookDesign.Font.secondary)
                 .foregroundStyle(.white)
                 .frame(width: 14, height: 14)
                 .padding(4)
@@ -100,10 +100,10 @@ struct ToastContentWithSubtitle: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(NookDesign.Font.secondary)
                     .foregroundStyle(.white)
                 Text(subtitle)
-                    .font(.system(size: 10))
+                    .font(NookDesign.Font.caption)
                     .foregroundStyle(.white.opacity(0.8))
             }
         }

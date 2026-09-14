@@ -22,11 +22,11 @@ struct EmptyWebsiteView: View {
 
                 VStack(spacing: 16) {
                     Image(systemName: "moon.stars")
-                        .font(.system(size: 32, weight: .medium))
+                        .font(NookDesign.Font.display)
                         .blendMode(.overlay)
 
                     Text("Ah, peace.")
-                        .font(.system(size: 16, weight: .medium))
+                        .font(NookDesign.Font.title)
                         .foregroundColor(colorScheme == .dark ? .white.opacity(0.7) : .black.opacity(0.6))
                 }
             }

@@ -269,7 +269,7 @@ struct PeekOverlayView: View {
         var body: some View {
             Button(action: action) {
                 Image(systemName: icon)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(NookDesign.Font.label)
                     .foregroundStyle(disabled ? Color.gray : color)
                     .frame(width: 32, height: 32)
                     .background(

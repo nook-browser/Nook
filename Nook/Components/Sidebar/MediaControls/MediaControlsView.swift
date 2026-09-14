@@ -14,7 +14,7 @@ private struct MediaControlsTabTitle: View {
 
     var body: some View {
         Text(tab.name)
-            .font(.system(size: 12, weight: .medium))
+            .font(NookDesign.Font.secondary)
             .foregroundStyle(Color.white)
             .padding(.top, 4)
             .lineLimit(1)

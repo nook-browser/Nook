@@ -51,7 +51,7 @@ struct ProfileRenameDialog: DialogPresentable {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("New Name")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(NookDesign.Font.body)
 
                 NookTextField(
                     text: $profileName,
@@ -69,7 +69,7 @@ struct ProfileRenameDialog: DialogPresentable {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Profile Icon")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(NookDesign.Font.body)
 
                 SimpleIconPicker(selectedIcon: $profileIcon)
                     .frame(maxHeight: 200)

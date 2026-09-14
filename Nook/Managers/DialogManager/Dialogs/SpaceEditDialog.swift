@@ -105,7 +105,7 @@ private struct SpaceEditContent: View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Space Name")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(NookDesign.Font.label)
                     .foregroundStyle(.primary)
 
                 NookTextField(
@@ -118,7 +118,7 @@ private struct SpaceEditContent: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("Space Icon")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(NookDesign.Font.label)
                     .foregroundStyle(.primary)
 
                 HStack(spacing: 12) {
@@ -138,7 +138,7 @@ private struct SpaceEditContent: View {
                     .buttonStyle(PlainButtonStyle())
 
                     Text("Choose an icon to represent this space")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(NookDesign.Font.secondary)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
@@ -146,7 +146,7 @@ private struct SpaceEditContent: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("Profile")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(NookDesign.Font.label)
                     .foregroundStyle(.primary)
 
                 Picker(
@@ -215,10 +215,10 @@ private struct SpaceIconView: View {
         Group {
             if isEmoji(icon) {
                 Text(icon)
-                    .font(.system(size: 18))
+                    .font(NookDesign.Font.heading)
             } else {
                 Image(systemName: icon)
-                    .font(.system(size: 18, weight: .medium))
+                    .font(NookDesign.Font.heading)
             }
         }
         .frame(width: 20, height: 20)

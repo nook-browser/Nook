@@ -70,7 +70,7 @@ private struct SplitHalfTab: View {
                             .frame(width: 18, height: 18)
                             .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
                         Text(tab.displayName)
-                            .font(.system(size: 13, weight: .medium))
+                            .font(NookDesign.Font.body)
                             .foregroundStyle(textTab)
                             .lineLimit(1)
                             .truncationMode(.tail)
@@ -78,7 +78,7 @@ private struct SplitHalfTab: View {
                         if isHovering {
                             Button(action: onClose) {
                                 Image(systemName: "xmark")
-                                    .font(.system(size: 12, weight: .bold))
+                                    .font(NookDesign.Font.secondary)
                                     .foregroundColor(textTab)
                                     .frame(width: 24, height: 24)
                                     .background(

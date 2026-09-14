@@ -42,7 +42,7 @@ struct ProfileCreationDialog: DialogPresentable {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Profile Name")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(NookDesign.Font.label)
                     .foregroundStyle(.primary)
 
                 NookTextField(
@@ -55,12 +55,12 @@ struct ProfileCreationDialog: DialogPresentable {
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("Profile Icon")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(NookDesign.Font.label)
                     .foregroundStyle(.primary)
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Choose an icon to represent this profile")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(NookDesign.Font.secondary)
                         .foregroundStyle(.secondary)
 
                     SimpleIconPicker(selectedIcon: $profileIcon)
@@ -139,7 +139,7 @@ struct SimpleIconPicker: View {
                             .frame(width: 48, height: 48)
 
                         Image(systemName: icon)
-                            .font(.system(size: 18, weight: .medium))
+                            .font(NookDesign.Font.heading)
                             .foregroundStyle(selectedIcon == icon ? Color.accentColor : Color.primary)
                             .scaleEffect(selectedIcon == icon ? 1.1 : 1.0)
                     }

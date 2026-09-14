@@ -33,7 +33,7 @@ struct TabSuggestionItem: View {
                     NookDesign.Radius.shape(NookDesign.Radius.xs)
                 )
                 Text(tab.name)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(NookDesign.Font.label)
                     .foregroundStyle(isSelected ? .white : isDark ? .white.opacity(0.6) : .black.opacity(0.8))
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -41,11 +41,11 @@ struct TabSuggestionItem: View {
             Spacer()
             HStack(spacing: 10) {
                 Text("Switch to Tab")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(NookDesign.Font.secondary)
                     .foregroundStyle(isSelected ? .white : isDark ? .white.opacity(0.3) : .black.opacity(0.3))
                 ZStack {
                     Image(systemName: "arrow.right")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(NookDesign.Font.label)
                         .foregroundStyle(isSelected ? gradientColorManager.primaryColor : isDark ? .white.opacity(0.5) : .black.opacity(0.5))
                         .frame(width: 16, height: 16)
                 }

@@ -20,7 +20,7 @@ struct ShortcutConflictToast: View {
             HStack(spacing: 10) {
                 // Keyboard icon
                 Image(systemName: "keyboard")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(NookDesign.Font.body)
                     .foregroundStyle(.white)
                     .frame(width: 18, height: 18)
                     .padding(5)
@@ -35,23 +35,23 @@ struct ShortcutConflictToast: View {
                     // Title: shortcut key used by website
                     HStack(spacing: 4) {
                         Text(conflictInfo.keyCombination.displayString)
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(NookDesign.Font.secondary)
                             .foregroundStyle(.white)
                         Text("used by")
-                            .font(.system(size: 11))
+                            .font(NookDesign.Font.caption)
                             .foregroundStyle(.white.opacity(0.8))
                         Text(conflictInfo.websiteName)
-                            .font(.system(size: 12, weight: .medium))
+                            .font(NookDesign.Font.secondary)
                             .foregroundStyle(.white)
                     }
                     
                     // Subtitle: press again for Nook
                     HStack(spacing: 4) {
                         Text("Press again for")
-                            .font(.system(size: 11))
+                            .font(NookDesign.Font.caption)
                             .foregroundStyle(.white.opacity(0.7))
                         Text(conflictInfo.nookActionName)
-                            .font(.system(size: 11, weight: .medium))
+                            .font(NookDesign.Font.caption)
                             .foregroundStyle(.white.opacity(0.9))
                     }
                 }

@@ -67,7 +67,7 @@ struct SpaceTitle: View {
 
             if isRenaming {
                 TextField("", text: $draftName)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(NookDesign.Font.label)
                     .foregroundStyle(textColor)
                     .textFieldStyle(PlainTextFieldStyle())
                     .autocorrectionDisabled()
@@ -87,7 +87,7 @@ struct SpaceTitle: View {
             } else {
                 HStack(spacing: 6) {
                     Text(space.name)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(NookDesign.Font.label)
                         .foregroundStyle(textColor)
                         .lineLimit(1)
                         .truncationMode(.tail)

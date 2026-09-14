@@ -335,11 +335,11 @@ struct ProfilesSettingsView: View {
                 Group {
                     if isEmoji(space.icon) {
                         Text(space.icon)
-                            .font(.system(size: 14))
+                            .font(NookDesign.Font.body)
                             .frame(width: 24, height: 24)
                     } else {
                         Image(systemName: space.icon)
-                            .font(.system(size: 14))
+                            .font(NookDesign.Font.body)
                             .foregroundStyle(AppColors.textSecondary)
                             .frame(width: 24, height: 24)
                     }
@@ -813,7 +813,7 @@ struct ExtensionsSettingsView: View {
                 Section {
                     VStack(spacing: 12) {
                         Image(systemName: "puzzlepiece.extension")
-                            .font(.system(size: 48))
+                            .font(NookDesign.Font.hero)
                             .foregroundColor(.secondary)
                         Text("No Extensions Installed")
                             .font(.title2)
@@ -916,7 +916,7 @@ struct SafariExtensionRowView: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: "safari")
-                .font(.system(size: 20))
+                .font(NookDesign.Font.titleLarge)
                 .foregroundColor(.blue)
                 .frame(width: 32, height: 32)
 

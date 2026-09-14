@@ -70,7 +70,7 @@ struct MiniWindowToolbar: View {
             Spacer(minLength: 12)
             VStack(spacing: 2) {
                 Text(hostLabel)
-                    .font(.system(size: 15, weight: .regular))
+                    .font(NookDesign.Font.title)
                     .foregroundStyle(primaryTextColor)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -87,14 +87,14 @@ struct MiniWindowToolbar: View {
             Button(action: adoptAction) {
                     HStack(spacing: 5) {
                         Text("\u{2318} O") // ⌘O as symbols
-                            .font(.system(size: 14, weight: .bold))
+                            .font(NookDesign.Font.label)
                             .foregroundStyle(subtleTextColor)
                         HStack(spacing: 0) {
                             Text("move into ")
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(NookDesign.Font.secondary)
                                 .foregroundStyle(subduedTextColor)
                             Text("\(cleanedTargetSpaceName)")
-                                .font(.system(size: 12, weight: .bold))
+                                .font(NookDesign.Font.secondary)
                                 .foregroundStyle(gradientColorManager.primaryColor.opacity(0.8))
                         }
                         .padding(.vertical, 0)
@@ -138,11 +138,11 @@ struct MiniWindowToolbar: View {
                 .frame(width: 20, height: 20)
                 .overlay(
                     Image(systemName: "person.fill")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(NookDesign.Font.captionStrong)
                         .foregroundStyle(primaryTextColor)
                 )
             Text(session.originName)
-                .font(.system(size: 12, weight: .semibold))
+                .font(NookDesign.Font.secondary)
                 .foregroundStyle(subduedTextColor)
         }
         .padding(.horizontal, 6)

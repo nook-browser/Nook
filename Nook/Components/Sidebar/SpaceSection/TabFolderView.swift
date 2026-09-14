@@ -110,7 +110,7 @@ struct TabFolderView: View {
                 // Folder name - editable
                 if isRenaming {
                     TextField("", text: $draftName)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(NookDesign.Font.label)
                         .foregroundStyle(AppColors.textSecondary)
                         .textFieldStyle(PlainTextFieldStyle())
                         .autocorrectionDisabled()
@@ -129,7 +129,7 @@ struct TabFolderView: View {
                         }
                 } else {
                     Text(folder.name)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(NookDesign.Font.label)
                         .foregroundStyle(AppColors.textSecondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -156,7 +156,7 @@ struct TabFolderView: View {
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle.fill")
-                            .font(.system(size: 14))
+                            .font(NookDesign.Font.body)
                             .foregroundStyle(AppColors.textSecondary)
                             .opacity(0.7)
                     }
@@ -197,7 +197,7 @@ struct TabFolderView: View {
 
     private var folderIconView: some View {
         Image(systemName: folder.isOpen ? "folder.fill" : "folder")
-            .font(.system(size: 16, weight: .medium))
+            .font(NookDesign.Font.title)
             .foregroundStyle(space.gradient.primaryColor)
             .symbolEffect(.bounce, options: .speed(0.5).repeat(1), value: isFolderIconAnimating)
             .onAppear {

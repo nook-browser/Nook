@@ -197,7 +197,7 @@ struct TopBarView: View {
             if browserManager.currentTab(for: windowState) != nil {
                 // URL text area — tappable to open command palette
                 Text(displayURL)
-                    .font(.system(size: 13, weight: .medium, design: .default))
+                    .font(NookDesign.Font.body)
                     .foregroundStyle(urlBarTextColor)
                     .tracking(-0.1)
                     .lineLimit(1)
@@ -516,7 +516,7 @@ struct TopBarView: View {
                 systemName: browserManager.currentTabHasPiPActive()
                     ? "pip.exit" : "pip.enter"
             )
-            .font(.system(size: 12, weight: .medium))
+            .font(NookDesign.Font.secondary)
             .foregroundStyle(urlBarTextColor)
             .animation(
                 shouldAnimateColorChange ? .easeInOut(duration: 0.3) : nil,
@@ -547,7 +547,7 @@ struct ChatButton: View {
                 Image(systemName: "message.fill")
                 Text("Chat")
             }
-            .font(.system(size: 13, weight: .medium))
+            .font(NookDesign.Font.body)
             .foregroundStyle(navButtonColor)
             .padding(.horizontal, 9)
             .padding(.vertical, 6)

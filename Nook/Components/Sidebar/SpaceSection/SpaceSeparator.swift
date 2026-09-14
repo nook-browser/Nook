@@ -31,9 +31,9 @@ struct SpaceSeparator: View {
                     Button(action: onOrganize) {
                         HStack(spacing: 4) {
                             Image(systemName: "wand.and.stars")
-                                .font(.system(size: 9, weight: .bold))
+                                .font(NookDesign.Font.caption)
                             Text("Organize")
-                                .font(.system(size: 10, weight: .bold))
+                                .font(NookDesign.Font.caption)
                         }
                         .foregroundStyle(organizeColor)
                         .padding(.horizontal, 4)
@@ -57,9 +57,9 @@ struct SpaceSeparator: View {
                 Button(action: onClear) {
                     HStack(spacing: 7) {
                         Image(systemName: "arrow.down")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(NookDesign.Font.caption)
                         Text("Clear")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(NookDesign.Font.caption)
                     }
                     .foregroundStyle(clearColor)
                     .padding(.horizontal, 4)

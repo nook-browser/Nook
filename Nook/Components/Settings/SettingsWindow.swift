@@ -57,7 +57,7 @@ private struct SettingsSidebar: View {
             Text(tab.name)
         } icon: {
             Image(systemName: tab.icon)
-                .font(.system(size: 12))
+                .font(NookDesign.Font.secondary)
                 .foregroundStyle(.white)
                 .frame(width: 24, height: 24)
                 .background(

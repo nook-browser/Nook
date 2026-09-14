@@ -81,7 +81,7 @@ struct SpaceCreationContent: View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Space Name")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(NookDesign.Font.label)
                     .foregroundStyle(.primary)
 
                 NookTextField(
@@ -94,7 +94,7 @@ struct SpaceCreationContent: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("Space Icon")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(NookDesign.Font.label)
                     .foregroundStyle(.primary)
 
                 HStack(spacing: 12) {
@@ -112,7 +112,7 @@ struct SpaceCreationContent: View {
                     .buttonStyle(PlainButtonStyle())
 
                     Text("Choose an icon to represent this space")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(NookDesign.Font.secondary)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
@@ -120,7 +120,7 @@ struct SpaceCreationContent: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("Profile")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(NookDesign.Font.label)
                     .foregroundStyle(.primary)
 
                 Picker(
@@ -177,13 +177,13 @@ private struct SpaceCreationIconPreview: View {
     var body: some View {
         if icon.isEmpty {
             Image(systemName: "square.grid.2x2")
-                .font(.system(size: 14, weight: .medium))
+                .font(NookDesign.Font.body)
         } else if isEmoji(icon) {
             Text(icon)
-                .font(.system(size: 14))
+                .font(NookDesign.Font.body)
         } else {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .medium))
+                .font(NookDesign.Font.body)
         }
     }
 

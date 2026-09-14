@@ -62,7 +62,7 @@ struct SidebarMenuHoverDownloads: View {
 
             if prioritizedDownloads.isEmpty {
                 Text("No downloads")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(NookDesign.Font.secondary)
                     .foregroundColor(.secondary)
                     .padding(.vertical, 20)
             }
@@ -190,14 +190,14 @@ struct SidebarMenuHoverDownloadItem: View {
                     .foregroundColor(.primary)
             } else {
                 Image(systemName: "doc")
-                    .font(.system(size: 20))
+                    .font(NookDesign.Font.titleLarge)
                     .frame(width: 32, height: 32)
                     .foregroundColor(.primary)
             }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(download.suggestedFilename)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(NookDesign.Font.label)
                     .foregroundStyle(.white.opacity(0.8))
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -207,11 +207,11 @@ struct SidebarMenuHoverDownloadItem: View {
                         Text(
                             "\(download.formattedDownloadedSize)/\(download.formattedFileSize) • \(download.formattedTimeRemaining)"
                         )
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(NookDesign.Font.secondary)
                         .foregroundStyle(.white.opacity(0.5))
                     } else {
                         Text(statusText)
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(NookDesign.Font.secondary)
                             .foregroundStyle(.white.opacity(0.5))
                     }
 

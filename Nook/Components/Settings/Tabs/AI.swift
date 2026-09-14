@@ -45,9 +45,9 @@ struct SettingsAITab: View {
                 )) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Tab Organizer")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(NookDesign.Font.body)
                         Text("Uses a small on-device AI model to group, rename, sort, and deduplicate tabs")
-                            .font(.system(size: 11))
+                            .font(NookDesign.Font.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -58,41 +58,41 @@ struct SettingsAITab: View {
                             ProgressView(value: progress)
                                 .frame(maxWidth: .infinity)
                             Text("\(Int(progress * 100))%")
-                                .font(.system(size: 11, design: .monospaced))
+                                .font(NookDesign.Font.caption.monospaced())
                                 .foregroundStyle(.secondary)
                         }
                         Text("Downloading model (~350 MB)...")
-                            .font(.system(size: 11))
+                            .font(NookDesign.Font.caption)
                             .foregroundStyle(.secondary)
                     } else if case .loading = tabOrganizerManager.engine.status {
                         HStack(spacing: 8) {
                             ProgressView().controlSize(.small)
                             Text("Loading model...")
-                                .font(.system(size: 11))
+                                .font(NookDesign.Font.caption)
                                 .foregroundStyle(.secondary)
                         }
                     } else if case .error(let message) = tabOrganizerManager.engine.status {
                         HStack(spacing: 8) {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundStyle(.orange)
-                                .font(.system(size: 12))
+                                .font(NookDesign.Font.secondary)
                             Text(message)
-                                .font(.system(size: 11))
+                                .font(NookDesign.Font.caption)
                                 .foregroundStyle(.secondary)
                         }
                         Button("Retry Download") {
                             Task { try? await tabOrganizerManager.engine.ensureDownloaded() }
                         }
-                        .font(.system(size: 11))
+                        .font(NookDesign.Font.caption)
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                     } else if nookSettings.tabOrganizerModelDownloaded {
                         HStack(spacing: 6) {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundStyle(.green)
-                                .font(.system(size: 12))
+                                .font(NookDesign.Font.secondary)
                             Text("Model ready")
-                                .font(.system(size: 11))
+                                .font(NookDesign.Font.caption)
                                 .foregroundStyle(.secondary)
                             Spacer()
                             Button("Delete Model") {
@@ -101,7 +101,7 @@ struct SettingsAITab: View {
                                 nookSettings.tabOrganizerModelDownloaded = false
                                 nookSettings.tabOrganizerEnabled = false
                             }
-                            .font(.system(size: 11))
+                            .font(NookDesign.Font.caption)
                             .buttonStyle(.bordered)
                             .controlSize(.small)
                         }
@@ -112,7 +112,7 @@ struct SettingsAITab: View {
             } footer: {
                 if nookSettings.tabOrganizerEnabled {
                     Text("Right-click a space or press \u{2318}\u{21E7}\u{2325}O to organize tabs")
-                        .font(.system(size: 11))
+                        .font(NookDesign.Font.caption)
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -177,16 +177,16 @@ struct SettingsAITab: View {
                 if configService.models.isEmpty {
                     Text("No models added. Add a model by ID or fetch from a provider.")
                         .foregroundStyle(.secondary)
-                        .font(.system(size: 12))
+                        .font(NookDesign.Font.secondary)
                 }
 
                 ForEach(configService.models) { model in
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(model.displayName)
-                                .font(.system(size: 12, weight: .medium))
+                                .font(NookDesign.Font.secondary)
                             Text(model.id)
-                                .font(.system(size: 10, design: .monospaced))
+                                .font(NookDesign.Font.caption.monospaced())
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
@@ -194,12 +194,12 @@ struct SettingsAITab: View {
                         if configService.config.activeModelId == model.id {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundStyle(Color.accentColor)
-                                .font(.system(size: 14))
+                                .font(NookDesign.Font.body)
                         }
 
                         Button(action: { configService.setActiveModel(model.id) }) {
                             Text(configService.config.activeModelId == model.id ? "Active" : "Use")
-                                .font(.system(size: 11))
+                                .font(NookDesign.Font.caption)
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
@@ -209,7 +209,7 @@ struct SettingsAITab: View {
                             configService.removeModel(model.id, providerId: model.providerId)
                         }) {
                             Image(systemName: "trash")
-                                .font(.system(size: 11))
+                                .font(NookDesign.Font.caption)
                                 .foregroundStyle(.red)
                         }
                         .buttonStyle(.borderless)
@@ -220,7 +220,7 @@ struct SettingsAITab: View {
                 HStack {
                     TextField("Add model by ID (e.g., gpt-4o)", text: $addModelId)
                         .textFieldStyle(.roundedBorder)
-                        .font(.system(size: 12))
+                        .font(NookDesign.Font.secondary)
                     Button("Add") {
                         guard !addModelId.isEmpty,
                               let providerId = configService.config.activeProviderId else { return }
@@ -238,7 +238,7 @@ struct SettingsAITab: View {
                         HStack {
                             TextField("Search models...", text: $openRouterSearch)
                                 .textFieldStyle(.roundedBorder)
-                                .font(.system(size: 12))
+                                .font(NookDesign.Font.secondary)
                             Button("Fetch") {
                                 Task {
                                     await configService.fetchOpenRouterModels(search: openRouterSearch.isEmpty ? nil : openRouterSearch)
@@ -253,7 +253,7 @@ struct SettingsAITab: View {
                             HStack {
                                 ProgressView().scaleEffect(0.7)
                                 Text("Loading models...")
-                                    .font(.system(size: 12))
+                                    .font(NookDesign.Font.secondary)
                                     .foregroundStyle(.secondary)
                             }
                         }
@@ -277,7 +277,7 @@ struct SettingsAITab: View {
                             HStack {
                                 ProgressView().scaleEffect(0.7)
                                 Text("Loading models...")
-                                    .font(.system(size: 12))
+                                    .font(NookDesign.Font.secondary)
                                     .foregroundStyle(.secondary)
                             }
                         }
@@ -297,7 +297,7 @@ struct SettingsAITab: View {
                         Text("Temperature")
                         Spacer()
                         Text(String(format: "%.1f", configService.generationConfig.temperature))
-                            .font(.system(size: 12, design: .monospaced))
+                            .font(NookDesign.Font.secondary.monospaced())
                             .foregroundStyle(.secondary)
                     }
                     Slider(
@@ -313,7 +313,7 @@ struct SettingsAITab: View {
                         step: 0.1
                     )
                     Text("Lower = more focused, Higher = more creative")
-                        .font(.system(size: 11))
+                        .font(NookDesign.Font.caption)
                         .foregroundStyle(.secondary)
                 }
 
@@ -343,7 +343,7 @@ struct SettingsAITab: View {
                             config.systemPrompt = AIGenerationConfig.defaultSystemPrompt
                             configService.generationConfig = config
                         }
-                        .font(.system(size: 11))
+                        .font(NookDesign.Font.caption)
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                     }
@@ -355,7 +355,7 @@ struct SettingsAITab: View {
                             configService.generationConfig = config
                         }
                     ))
-                    .font(.system(size: 12))
+                    .font(NookDesign.Font.secondary)
                     .frame(height: 200)
                     .border(.quaternary)
                 }
@@ -456,10 +456,10 @@ struct SettingsAITab: View {
                     )) {
                         VStack(alignment: .leading, spacing: 1) {
                             Text(toolName)
-                                .font(.system(size: 12, weight: .medium))
+                                .font(NookDesign.Font.secondary)
                             if let tool = BrowserTools.toolsByName[toolName] {
                                 Text(tool.description)
-                                    .font(.system(size: 10))
+                                    .font(NookDesign.Font.caption)
                                     .foregroundStyle(.secondary)
                             }
                         }
@@ -472,10 +472,10 @@ struct SettingsAITab: View {
                 if configService.mcpServers.isEmpty && !showAddMCPServer {
                     VStack(spacing: 8) {
                         Image(systemName: "puzzlepiece.extension")
-                            .font(.system(size: 24))
+                            .font(NookDesign.Font.titleLarge)
                             .foregroundStyle(.secondary)
                         Text("No MCP servers configured")
-                            .font(.system(size: 13))
+                            .font(NookDesign.Font.body)
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity)
@@ -507,11 +507,11 @@ struct SettingsAITab: View {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text(provider.displayName)
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(NookDesign.Font.label)
 
                         if configService.config.activeProviderId == provider.id {
                             Text("Active")
-                                .font(.system(size: 10, weight: .medium))
+                                .font(NookDesign.Font.caption)
                                 .foregroundStyle(.green)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
@@ -520,7 +520,7 @@ struct SettingsAITab: View {
                     }
 
                     Text(provider.providerType.displayName)
-                        .font(.system(size: 11))
+                        .font(NookDesign.Font.caption)
                         .foregroundStyle(.secondary)
                 }
 
@@ -539,7 +539,7 @@ struct SettingsAITab: View {
                     Button("Use") {
                         configService.setActiveProvider(provider.id)
                     }
-                    .font(.system(size: 11))
+                    .font(NookDesign.Font.caption)
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                 }
@@ -555,13 +555,13 @@ struct SettingsAITab: View {
                         }
                     ))
                     .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 12))
+                    .font(NookDesign.Font.secondary)
 
                     if !provider.apiKey.isEmpty {
                         Button("Test") {
                             testConnection(provider)
                         }
-                        .font(.system(size: 11))
+                        .font(NookDesign.Font.caption)
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                         .disabled(testingConnection)
@@ -579,12 +579,12 @@ struct SettingsAITab: View {
                     }
                 ))
                 .textFieldStyle(.roundedBorder)
-                .font(.system(size: 12))
+                .font(NookDesign.Font.secondary)
             }
 
             if let result = connectionTestResult {
                 Text(result)
-                    .font(.system(size: 11))
+                    .font(NookDesign.Font.caption)
                     .foregroundStyle(result.contains("Success") ? .green : .red)
             }
         }
@@ -598,15 +598,15 @@ struct SettingsAITab: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(model.displayName)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(NookDesign.Font.secondary)
                 Text(model.id)
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(NookDesign.Font.caption.monospaced())
                     .foregroundStyle(.secondary)
             }
             Spacer()
             if alreadyAdded {
                 Text("Added")
-                    .font(.system(size: 11))
+                    .font(NookDesign.Font.caption)
                     .foregroundStyle(.secondary)
             } else {
                 Button("Add") {
@@ -627,16 +627,16 @@ struct SettingsAITab: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(server.name)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(NookDesign.Font.label)
 
                     switch server.transport {
                     case .stdio(let cmd, let args):
                         Text("\(cmd) \(args.joined(separator: " "))")
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(NookDesign.Font.caption.monospaced())
                             .foregroundStyle(.secondary)
                     case .sse(let url):
                         Text(url)
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(NookDesign.Font.caption.monospaced())
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -648,7 +648,7 @@ struct SettingsAITab: View {
                         .fill(stateColor(state))
                         .frame(width: 6, height: 6)
                     Text(state.displayName)
-                        .font(.system(size: 10))
+                        .font(NookDesign.Font.caption)
                         .foregroundStyle(.secondary)
                 }
 
@@ -668,7 +668,7 @@ struct SettingsAITab: View {
 
                 Button(action: { mcpManager.reconnectServer(server) }) {
                     Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 11))
+                        .font(NookDesign.Font.caption)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -678,7 +678,7 @@ struct SettingsAITab: View {
                     mcpManager.disconnectServer(server.id)
                 }) {
                     Image(systemName: "trash")
-                        .font(.system(size: 11))
+                        .font(NookDesign.Font.caption)
                         .foregroundStyle(.red)
                 }
                 .buttonStyle(.borderless)
@@ -689,18 +689,18 @@ struct SettingsAITab: View {
                 if !tools.isEmpty {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Discovered Tools (\(tools.count))")
-                            .font(.system(size: 10, weight: .medium))
+                            .font(NookDesign.Font.caption)
                             .foregroundStyle(.secondary)
 
                         ForEach(tools) { tool in
                             HStack(spacing: 4) {
                                 Image(systemName: "wrench.and.screwdriver")
-                                    .font(.system(size: 9))
+                                    .font(NookDesign.Font.caption)
                                     .foregroundStyle(.secondary)
                                 Text(tool.name)
-                                    .font(.system(size: 10, design: .monospaced))
+                                    .font(NookDesign.Font.caption.monospaced())
                                 Text("- \(tool.description)")
-                                    .font(.system(size: 10))
+                                    .font(NookDesign.Font.caption)
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
                             }

@@ -26,17 +26,17 @@ struct URLBarView: View {
                             Text(
                                 displayURL
                             )
-                            .font(.system(size: 12, weight: .medium, design: .default))
+                            .font(NookDesign.Font.secondary)
                             .foregroundStyle(textColor)
                             .lineLimit(1)
                             .truncationMode(.tail)
                         } else {
                             HStack(spacing: 4) {
                                 Image(systemName: "magnifyingglass")
-                                    .font(.system(size: 12))
+                                    .font(NookDesign.Font.secondary)
                                     .foregroundStyle(textColor)
                                 Text("Search or Enter URL...")
-                                    .font(.system(size: 12, weight: .medium, design: .default))
+                                    .font(NookDesign.Font.secondary)
                                     .foregroundStyle(textColor)
                             }
                         }
@@ -67,7 +67,7 @@ struct URLBarView: View {
                             currentTab.requestPictureInPicture()
                         }) {
                             Image(systemName: currentTab.hasPiPActive ? "pip.exit" : "pip.enter")
-                                .font(.system(size: 12))
+                                .font(NookDesign.Font.secondary)
                                 .foregroundStyle(textColor.opacity(currentTab.hasPiPActive ? 1.0 : 0.7))
                         }
                         .buttonStyle(.plain)

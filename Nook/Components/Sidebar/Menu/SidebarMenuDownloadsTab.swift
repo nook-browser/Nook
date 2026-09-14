@@ -30,12 +30,12 @@ struct SidebarMenuDownloadsTab: View {
         VStack {
             HStack {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(NookDesign.Font.title)
                     .foregroundStyle(.white.opacity(0.3))
                     .frame(width: 16, height: 16)
                 TextField("Search downloads...", text: $text)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(NookDesign.Font.secondary)
                     .foregroundColor(.white.opacity(0.3))
                     .focused($isSearchFocused)
 
@@ -44,7 +44,7 @@ struct SidebarMenuDownloadsTab: View {
                         text = ""
                     }) {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 12))
+                            .font(NookDesign.Font.secondary)
                             .foregroundColor(.secondary)
                     }
                     .buttonStyle(.plain)
@@ -69,13 +69,13 @@ struct SidebarMenuDownloadsTab: View {
                     if filteredDownloads.isEmpty && !text.isEmpty {
                         VStack(spacing: 8) {
                             Image(systemName: "magnifyingglass")
-                                .font(.system(size: 24))
+                                .font(NookDesign.Font.titleLarge)
                                 .foregroundColor(.secondary)
                             Text("No downloads found")
-                                .font(.system(size: 14, weight: .medium))
+                                .font(NookDesign.Font.body)
                                 .foregroundColor(.secondary)
                             Text("Try searching with a different term")
-                                .font(.system(size: 12))
+                                .font(NookDesign.Font.secondary)
                                 .foregroundColor(.secondary)
                         }
                         .padding(.vertical, 40)
@@ -114,13 +114,13 @@ struct DownloadItem: View {
                 .frame(width: 24, height: 24)
             VStack(alignment: .leading, spacing: 1) {
                 Text(download.suggestedFilename)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(NookDesign.Font.body)
                     .foregroundStyle(.white.opacity(0.7))
                     .lineLimit(1)
                     .truncationMode(.tail)
 
                 Text(download.originalURL.absoluteString)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(NookDesign.Font.secondary)
                     .foregroundStyle(.white.opacity(0.55))
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -145,7 +145,7 @@ struct DownloadItem: View {
                 } label: {
                     Button {} label: {
                         Image(systemName: "ellipsis")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(NookDesign.Font.label)
                             .foregroundColor(.white.opacity(0.6))
                             .frame(width: 16, height: 16)
                     }

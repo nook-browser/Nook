@@ -14,7 +14,7 @@ struct CopyURLToast: View {
         ToastView {
             HStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(NookDesign.Font.secondary)
                     .foregroundStyle(.white)
                     .frame(width: 14, height: 14)
                     .padding(4)
@@ -26,7 +26,7 @@ struct CopyURLToast: View {
                     }
 
                 Text("Copied Current URL")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(NookDesign.Font.secondary)
                     .foregroundStyle(.white)
             }
         }

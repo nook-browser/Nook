@@ -23,7 +23,7 @@ struct LinkStatusBar: View {
         // Show the view if we have a link to display (current or last shown)
         if let link = displayedLink, !link.isEmpty {
             Text(displayText(for: link))
-                .font(.system(size: 12, weight: .medium))
+                .font(NookDesign.Font.secondary)
                 .foregroundColor(textColor)
                 .lineLimit(1)
                 .padding(.horizontal, 7)
@@ -919,7 +919,7 @@ private struct SplitControlsOverlay: View {
                 HStack {
                     Button(action: { closeSide(.left) }) {
                         Image(systemName: "xmark")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(NookDesign.Font.caption)
                             .padding(6)
                     }
                     .buttonStyle(.plain)
@@ -933,7 +933,7 @@ private struct SplitControlsOverlay: View {
 
                     Button(action: { closeSide(.right) }) {
                         Image(systemName: "xmark")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(NookDesign.Font.caption)
                             .padding(6)
                     }
                     .buttonStyle(.plain)

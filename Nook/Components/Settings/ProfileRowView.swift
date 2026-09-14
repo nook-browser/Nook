@@ -28,7 +28,7 @@ struct ProfileRowView: View {
                 NookDesign.Radius.shape(NookDesign.Radius.sm)
                     .fill(Color(.controlBackgroundColor))
                 Image(systemName: profile.icon)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(NookDesign.Font.heading)
             }
             .frame(width: 32, height: 32)
 

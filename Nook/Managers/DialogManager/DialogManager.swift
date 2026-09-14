@@ -84,10 +84,10 @@ class DialogManager {
                                 y: 1
                             )
                         Text("Quit Nook?")
-                            .font(.system(size: 18, weight: .bold))
+                            .font(NookDesign.Font.heading)
                             .foregroundStyle(AppColors.textPrimary)
                         Text("You may lose unsaved work in your tabs.")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(NookDesign.Font.label)
                             .foregroundStyle(AppColors.textSecondary)
                     }
                     .padding(10)
@@ -245,7 +245,7 @@ struct DialogHeader: View {
                     .frame(width: 48, height: 48)
 
                 Image(systemName: icon)
-                    .font(.system(size: 25, weight: .semibold))
+                    .font(NookDesign.Font.titleLarge)
                     .foregroundStyle(gradientColorManager.primaryColor).frame(
                         width: 48,
                         height: 48
@@ -254,12 +254,12 @@ struct DialogHeader: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(NookDesign.Font.heading)
                     .foregroundStyle(.primary)
 
                 if let subtitle = subtitle {
                     Text(subtitle)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(NookDesign.Font.body)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -427,7 +427,7 @@ struct DialogButtonStyle: ButtonStyle {
             }
 
             configuration.label
-                .font(.system(size: 13, weight: .medium))
+                .font(NookDesign.Font.body)
 
             if iconPosition == .trailing, let icon = icon {
                 icon
@@ -453,7 +453,7 @@ struct KeycapLabel: View {
 
     var body: some View {
         Text(text.uppercased())
-            .font(.system(size: 10, weight: .semibold, design: .rounded))
+            .font(NookDesign.Font.caption)
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
             .background(.white.opacity(0.12))

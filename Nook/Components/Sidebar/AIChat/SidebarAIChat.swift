@@ -141,7 +141,7 @@ struct SidebarAIChat: View {
 
             if !aiService.messages.isEmpty {
                 Text("Ask Nook")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(NookDesign.Font.title)
                     .foregroundStyle(contrastText.opacity(0.9))
                     .transition(.blur.animation(.smooth))
             }
@@ -172,7 +172,7 @@ struct SidebarAIChat: View {
         VStack(spacing: 8) {
             TextField("Ask about this page...", text: $messageText, axis: .vertical)
                 .textFieldStyle(.plain)
-                .font(.system(size: 13, weight: .medium))
+                .font(NookDesign.Font.body)
                 .foregroundColor(contrastText.opacity(0.9))
                 .lineLimit(1...4)
                 .focused($isTextFieldFocused)
@@ -192,7 +192,7 @@ struct SidebarAIChat: View {
 
                 Button(action: sendMessage) {
                     Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 24))
+                        .font(NookDesign.Font.titleLarge)
                         .foregroundStyle(messageText.isEmpty ? contrastText.opacity(0.3) : contrastText.opacity(0.9))
                 }
                 .buttonStyle(.plain)
@@ -255,10 +255,10 @@ struct SidebarAIChat: View {
         .popover(isPresented: $showAddModelPopover, arrowEdge: .top) {
             VStack(spacing: 8) {
                 Text("Add Model by ID")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(NookDesign.Font.secondary)
                 TextField("Model ID (e.g. gpt-4o)", text: $newModelId)
                     .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 12))
+                    .font(NookDesign.Font.secondary)
                     .frame(width: 200)
                 HStack {
                     Button("Cancel") {
@@ -293,7 +293,7 @@ struct SidebarAIChat: View {
             }
         }) {
             Image(systemName: configService.generationConfig.webSearchEnabled ? "globe.americas.fill" : "globe")
-                .font(.system(size: 14, weight: .medium))
+                .font(NookDesign.Font.body)
                 .foregroundStyle(configService.generationConfig.webSearchEnabled ? .green : contrastText.opacity(0.5))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(
@@ -311,21 +311,21 @@ struct SidebarAIChat: View {
     private var apiKeyRequiredView: some View {
         VStack(spacing: 12) {
             Image(systemName: "key.fill")
-                .font(.system(size: 32))
+                .font(NookDesign.Font.display)
                 .foregroundStyle(contrastText.opacity(0.3))
 
             Text("API Key Required")
-                .font(.system(size: 14, weight: .semibold))
+                .font(NookDesign.Font.label)
                 .foregroundStyle(contrastText.opacity(0.8))
 
             Text("Add your API key to start chatting")
-                .font(.system(size: 12))
+                .font(NookDesign.Font.secondary)
                 .foregroundStyle(contrastText.opacity(0.6))
                 .multilineTextAlignment(.center)
 
             Button(action: { showSettingsDialog() }) {
                 Text("Add API Key")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(NookDesign.Font.secondary)
                     .foregroundColor(.black)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
@@ -344,26 +344,26 @@ struct SidebarAIChat: View {
             let supportsWebSearch = configService.activeProviderType == .openRouter || configService.activeProviderType == .gemini
 
             Image(systemName: webSearchEnabled && supportsWebSearch ? "globe" : "sparkle")
-                .font(.system(size: 32))
+                .font(NookDesign.Font.display)
                 .foregroundStyle(webSearchEnabled && supportsWebSearch ? .green.opacity(0.6) : contrastText.opacity(0.3))
 
             Text("Ask Nook")
-                .font(.system(size: 14, weight: .semibold))
+                .font(NookDesign.Font.label)
                 .foregroundStyle(contrastText.opacity(0.8))
 
             if webSearchEnabled && supportsWebSearch {
                 VStack(spacing: 6) {
                     Text("Questions about this page, or just curious? I'm here.")
-                        .font(.system(size: 12))
+                        .font(NookDesign.Font.secondary)
                         .foregroundStyle(contrastText.opacity(0.6))
                         .multilineTextAlignment(.center)
 
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 10))
+                            .font(NookDesign.Font.caption)
                             .foregroundStyle(.green.opacity(0.7))
                         Text("Web search enabled")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(NookDesign.Font.caption)
                             .foregroundStyle(.green.opacity(0.7))
                     }
                     .padding(.horizontal, 10)
@@ -373,7 +373,7 @@ struct SidebarAIChat: View {
                 }
             } else {
                 Text("Questions about this page, or just curious? I'm here.")
-                    .font(.system(size: 12))
+                    .font(NookDesign.Font.secondary)
                     .foregroundStyle(contrastText.opacity(0.6))
                     .multilineTextAlignment(.center)
             }
@@ -389,16 +389,16 @@ struct SidebarAIChat: View {
             VStack(alignment: .leading, spacing: 2) {
                 if let toolName = aiService.currentToolName {
                     Text("Using \(toolName)...")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(NookDesign.Font.secondary)
                         .foregroundStyle(.purple.opacity(0.8))
                 } else {
                     Text("Thinking...")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(NookDesign.Font.secondary)
                         .foregroundStyle(contrastText.opacity(0.5))
                 }
                 if configService.generationConfig.webSearchEnabled && !aiService.isExecutingTools {
                     Text("Searching the web...")
-                        .font(.system(size: 10))
+                        .font(NookDesign.Font.caption)
                         .foregroundStyle(contrastText.opacity(0.4))
                 }
             }
@@ -491,12 +491,12 @@ struct MessageBubble: View {
                         if message.usedWebSearch {
                             HStack(spacing: 4) {
                                 Image(systemName: "globe")
-                                    .font(.system(size: 10, weight: .medium))
+                                    .font(NookDesign.Font.caption)
                                 Text("Web Search")
-                                    .font(.system(size: 10, weight: .medium))
+                                    .font(NookDesign.Font.caption)
                                 if !message.citations.isEmpty {
                                     Text("• \(message.citations.count) \(message.citations.count == 1 ? "source" : "sources")")
-                                        .font(.system(size: 9, weight: .regular))
+                                        .font(NookDesign.Font.caption)
                                 }
                             }
                             .foregroundStyle(contrastText.opacity(0.5))
@@ -526,7 +526,7 @@ struct MessageBubble: View {
                                     .padding(.horizontal, 12)
 
                                 Text("Sources")
-                                    .font(.system(size: 10, weight: .semibold))
+                                    .font(NookDesign.Font.caption)
                                     .foregroundStyle(contrastText.opacity(0.5))
                                     .padding(.horizontal, 12)
 
@@ -555,7 +555,7 @@ struct MessageBubble: View {
                                 }
                             }) {
                                 Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
-                                    .font(.system(size: 11, weight: .medium))
+                                    .font(NookDesign.Font.caption)
                                     .foregroundStyle(contrastText.opacity(0.8))
                                     .frame(width: 28, height: 28)
                                     .background(
@@ -574,7 +574,7 @@ struct MessageBubble: View {
                     }
                 } else {
                     Text(message.content)
-                        .font(.system(size: 13, weight: .regular))
+                        .font(NookDesign.Font.bodyRegular)
                         .foregroundStyle(.black)
                         .textSelection(.enabled)
                         .padding(.horizontal, 12)
@@ -663,7 +663,7 @@ struct MessageBubble: View {
 
     private func paragraphView(_ text: String) -> some View {
         Text(parseInlineMarkdown(text))
-            .font(.system(size: 13, weight: .regular))
+            .font(NookDesign.Font.bodyRegular)
             .lineSpacing(4)
             .foregroundStyle(contrastText.opacity(0.9))
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -672,11 +672,11 @@ struct MessageBubble: View {
     private func bulletView(_ text: String) -> some View {
         HStack(alignment: .top, spacing: 6) {
             Text("•")
-                .font(.system(size: 13, weight: .medium))
+                .font(NookDesign.Font.body)
                 .foregroundStyle(contrastText.opacity(0.7))
                 .padding(.top, 1)
             Text(parseInlineMarkdown(text))
-                .font(.system(size: 13, weight: .regular))
+                .font(NookDesign.Font.bodyRegular)
                 .lineSpacing(4)
                 .foregroundStyle(contrastText.opacity(0.9))
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -686,11 +686,11 @@ struct MessageBubble: View {
     private func numberedView(_ text: String) -> some View {
         HStack(alignment: .top, spacing: 6) {
             Text("•")
-                .font(.system(size: 13, weight: .medium))
+                .font(NookDesign.Font.body)
                 .foregroundStyle(contrastText.opacity(0.7))
                 .padding(.top, 1)
             Text(parseInlineMarkdown(text))
-                .font(.system(size: 13, weight: .regular))
+                .font(NookDesign.Font.bodyRegular)
                 .lineSpacing(4)
                 .foregroundStyle(contrastText.opacity(0.9))
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -701,7 +701,7 @@ struct MessageBubble: View {
         VStack(alignment: .leading, spacing: 4) {
             if !language.isEmpty {
                 Text(language)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(NookDesign.Font.caption)
                     .foregroundStyle(contrastText.opacity(0.5))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 2)
@@ -709,7 +709,7 @@ struct MessageBubble: View {
                     .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
             }
             Text(code)
-                .font(.system(size: 12, design: .monospaced))
+                .font(NookDesign.Font.secondary.monospaced())
                 .foregroundStyle(contrastText.opacity(0.9))
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -749,18 +749,18 @@ struct CitationView: View {
         }) {
             HStack(spacing: 6) {
                 Image(systemName: "link")
-                    .font(.system(size: 9, weight: .medium))
+                    .font(NookDesign.Font.caption)
                     .foregroundStyle(contrastText.opacity(0.4))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(citation.domain)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(NookDesign.Font.caption)
                         .foregroundStyle(contrastText.opacity(isHovered ? 0.9 : 0.7))
                         .lineLimit(1)
 
                     if let title = citation.title, !title.isEmpty {
                         Text(title)
-                            .font(.system(size: 10, weight: .regular))
+                            .font(NookDesign.Font.caption)
                             .foregroundStyle(contrastText.opacity(0.5))
                             .lineLimit(1)
                     }
@@ -769,7 +769,7 @@ struct CitationView: View {
                 Spacer()
 
                 Image(systemName: "arrow.up.forward")
-                    .font(.system(size: 9, weight: .medium))
+                    .font(NookDesign.Font.caption)
                     .foregroundStyle(contrastText.opacity(isHovered ? 0.6 : 0.4))
             }
             .padding(.horizontal, 8)

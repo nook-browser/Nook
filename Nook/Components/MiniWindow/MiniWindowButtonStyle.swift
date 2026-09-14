@@ -10,7 +10,7 @@ import SwiftUI
 struct MiniWindowPrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 12.5, weight: .semibold))
+            .font(NookDesign.Font.secondary)
             .foregroundStyle(.white)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
@@ -50,7 +50,7 @@ struct MiniWindowPrimaryButtonStyle: ButtonStyle {
 struct MiniWindowSuccessButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 12.5, weight: .semibold))
+            .font(NookDesign.Font.secondary)
             .foregroundStyle(.white)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
@@ -90,7 +90,7 @@ struct MiniWindowSuccessButtonStyle: ButtonStyle {
 struct MiniWindowErrorButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 12.5, weight: .semibold))
+            .font(NookDesign.Font.secondary)
             .foregroundStyle(.white)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)

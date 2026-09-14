@@ -28,21 +28,21 @@ struct CommandPaletteSuggestionView: View {
             if let secondary = secondaryText, !secondary.isEmpty {
                 HStack(spacing: 6) {
                     Text(text)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(NookDesign.Font.body)
                         .lineLimit(1)
                         .truncationMode(.tail)
                     Text("-")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(NookDesign.Font.body)
                         .foregroundStyle(.white.opacity(0.35))
                     Text(secondary)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(NookDesign.Font.body)
                         .foregroundStyle(.white.opacity(0.5))
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
             } else {
                 Text(text)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(NookDesign.Font.body)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -52,11 +52,11 @@ struct CommandPaletteSuggestionView: View {
             if isTabSuggestion {
                 HStack(spacing: 6) {
                     Text("Switch to Tab")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(NookDesign.Font.secondary)
                         .foregroundStyle(.white.opacity(0.5))
                     
                     Image(systemName: "arrow.right")
-                        .font(.system(size: 8, weight: .medium))
+                        .font(NookDesign.Font.caption)
                         .foregroundStyle(.white.opacity(0.5))
                 }
             }

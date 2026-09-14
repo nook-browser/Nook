@@ -27,7 +27,7 @@ struct ZoomPopupView: View {
                 resetHideTimer()
             }) {
                 Image(systemName: "minus")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(NookDesign.Font.secondary)
                     .foregroundColor(.white)
                     .frame(width: 28, height: 28)
                     .background(
@@ -48,7 +48,7 @@ struct ZoomPopupView: View {
                 resetHideTimer()
             }) {
                 Text(zoomManager.getZoomPercentageDisplay())
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(NookDesign.Font.label)
                     .foregroundColor(.white)
                     .frame(minWidth: 50, maxHeight: 28)
                     .padding(.horizontal, 8)
@@ -69,7 +69,7 @@ struct ZoomPopupView: View {
                 resetHideTimer()
             }) {
                 Image(systemName: "plus")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(NookDesign.Font.secondary)
                     .foregroundColor(.white)
                     .frame(width: 28, height: 28)
                     .background(

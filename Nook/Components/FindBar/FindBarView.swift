@@ -31,11 +31,11 @@ struct FindBarView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "magnifyingglass")
                                 .foregroundColor(.secondary)
-                                .font(.system(size: 13))
+                                .font(NookDesign.Font.body)
 
                             TextField("Find in page", text: $findManager.searchText)
                                 .textFieldStyle(.plain)
-                                .font(.system(size: 13))
+                                .font(NookDesign.Font.body)
                                 .frame(width: 160)
                                 .focused($isTextFieldFocused)
                                 .onSubmit {
@@ -74,7 +74,7 @@ struct FindBarView: View {
                                 findManager.findPrevious()
                             }) {
                                 Image(systemName: "chevron.up")
-                                    .font(.system(size: 11, weight: .medium))
+                                    .font(NookDesign.Font.caption)
                                     .frame(width: 22, height: 22)
                                     .background(isUpButtonHovered ? Color.secondary.opacity(0.2) : Color.clear)
                                     .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
@@ -91,7 +91,7 @@ struct FindBarView: View {
                                 findManager.findNext()
                             }) {
                                 Image(systemName: "chevron.down")
-                                    .font(.system(size: 11, weight: .medium))
+                                    .font(NookDesign.Font.caption)
                                     .frame(width: 22, height: 22)
                                     .background(isDownButtonHovered ? Color.secondary.opacity(0.2) : Color.clear)
                                     .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
@@ -113,7 +113,7 @@ struct FindBarView: View {
                             findManager.hideFindBar()
                         }) {
                             Image(systemName: "xmark")
-                                .font(.system(size: 11, weight: .medium))
+                                .font(NookDesign.Font.caption)
                                 .frame(width: 22, height: 22)
                                 .background(isCloseButtonHovered ? Color.secondary.opacity(0.2) : Color.clear)
                                 .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))

@@ -16,7 +16,7 @@ import SwiftUI
         // Expanded notification view
         HStack(spacing: 12) {
             Image(systemName: "arrow.down.circle.dotted")
-                .font(.system(size: 16, weight: .semibold))
+                .font(NookDesign.Font.title)
                 .foregroundColor(.white)
                 .frame(width: 32, height: 32)
                 .background(Color.blue.opacity(0.8))
@@ -24,19 +24,19 @@ import SwiftUI
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("A new version of Nook is available!")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(NookDesign.Font.label)
                     .foregroundStyle(.white.opacity(0.9))
                     .lineLimit(1)
 
                 Text("Click to restart and update")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(NookDesign.Font.secondary)
                     .foregroundStyle(.white.opacity(0.7))
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
             Button(action: {}) {
                 Text("Restart and Update")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(NookDesign.Font.secondary)
                     .foregroundColor(.white)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
@@ -63,10 +63,10 @@ import SwiftUI
         Button(action: {}) {
             HStack(spacing: 8) {
                 Image(systemName: "arrow.down.circle.dotted")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(NookDesign.Font.secondary)
                     .foregroundColor(.white)
                 Text("Restart and Update")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(NookDesign.Font.secondary)
                     .foregroundColor(.white)
             }
             .padding(.horizontal, 12)
