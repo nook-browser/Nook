@@ -114,6 +114,10 @@ extension TabsController {
         guard let spaceID = window.spaceID else { return }
         setProfile(source.space(spaceID)?.profileID, of: window)
         window.selectedItemBySpace[spaceID] = itemID
+        var recent = window.recentItemsBySpace[spaceID, default: []]
+        recent.removeAll { $0 == itemID }
+        recent.append(itemID)
+        window.recentItemsBySpace[spaceID] = recent.suffix(Self.recentLimit)
 
         if let session = ensureSession(for: itemID) {
             session.loadWebViewIfNeeded()
@@ -264,9 +268,15 @@ extension TabsController {
         }
     }
 
-    /// Before items disappear, every window selecting one moves to its neighbor in display order.
+    static let recentLimit = 30
+
+    /// Before items disappear (or a pinned tab's page ends), every window selecting one returns
+    /// to the item it selected before, else the next item in display order, else the previous.
     private func moveSelectionOff(_ ids: Set<UUID>) {
         for window in allWindows {
+            for space in window.recentItemsBySpace.keys {
+                window.recentItemsBySpace[space]?.removeAll { ids.contains($0) }
+            }
             if let split = window.split, ids.contains(split.leftItemID) || ids.contains(split.rightItemID) {
                 window.split = nil
             }
@@ -278,7 +288,16 @@ extension TabsController {
             }
             let order = displayOrder(in: window)
             let index = order.firstIndex(of: selected) ?? 0
-            let candidates = order[(index + 1)...].filter { !ids.contains($0) } + order[..<index].reversed().filter { !ids.contains($0) }
+            // Recent items stay eligible inside collapsed folders; ones moved to another space do not.
+            let source = tree(owner(of: window))
+            let recent = (window.recentItemsBySpace[spaceID] ?? []).reversed().filter { id in
+                guard let item = source.item(id), !item.isFolder else { return false }
+                let itemSpace = source.spaceID(of: id)
+                return itemSpace == spaceID || (itemSpace == nil && source.profileID(of: id) == source.space(spaceID)?.profileID)
+            }
+            let candidates = recent
+                + order[(index + 1)...].filter { !ids.contains($0) }
+                + order[..<index].reversed().filter { !ids.contains($0) }
             for (space, item) in window.selectedItemBySpace where ids.contains(item) {
                 window.selectedItemBySpace[space] = nil
             }

@@ -104,6 +104,10 @@ class BrowserWindowState {
     /// The selected item per space in this window.
     var selectedItemBySpace: [UUID: UUID] = [:]
 
+    /// Items this window selected in each space, most recent last. Closing the selected item
+    /// returns to the one before it. In memory only.
+    var recentItemsBySpace: [UUID: [UUID]] = [:]
+
     /// The selected item in the current space. There is no global current tab.
     var selectedItemID: UUID? {
         spaceID.flatMap { selectedItemBySpace[$0] }
