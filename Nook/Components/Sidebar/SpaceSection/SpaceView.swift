@@ -32,19 +32,6 @@ struct SpaceView: View {
         self._isSidebarHovered = isSidebarHovered
     }
 
-    /// Temporary: the pre-rebuild call in `SpacesSideBarView`. The closures are unused; rows act
-    /// through `TabsController`. Delete in task Z.
-    init(
-        space: Space,
-        isActive: Bool,
-        isSidebarHovered: Binding<Bool>,
-        onActivateTab: @escaping (Tab) -> Void,
-        onCloseTab: @escaping (Tab) -> Void,
-        onMuteTab: @escaping (Tab) -> Void
-    ) {
-        self.init(spaceID: space.id, isActive: isActive, isSidebarHovered: isSidebarHovered)
-    }
-
     private var tabs: TabsController { browserManager.tabs }
 
     private var outerWidth: CGFloat {

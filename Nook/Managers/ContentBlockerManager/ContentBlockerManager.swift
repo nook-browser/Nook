@@ -468,17 +468,3 @@ extension ContentBlockerManager: WKScriptMessageHandler {
         }
     }
 }
-
-// MARK: - Legacy Tab (task Z deletes)
-
-extension ContentBlockerManager {
-    func strippedTrackingParams(for url: URL, tab: Tab) -> URL? {
-        strippedTrackingParams(for: url, exempt: isExempt(itemID: tab.id, isOAuthFlow: tab.isOAuthFlow, host: url.host))
-    }
-
-    func setupContentBlockerScripts(for url: URL, in webView: WKWebView, tab: Tab) {
-        guard isEnabled else { return }
-        tab.blockedRequestCount = 0
-        setupContentBlockerScripts(for: url, in: webView, exempt: isExempt(itemID: tab.id, isOAuthFlow: tab.isOAuthFlow, host: url.host))
-    }
-}

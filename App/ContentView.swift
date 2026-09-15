@@ -11,7 +11,6 @@ import AppKit
 
 struct ContentView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var tabManager: TabManager
     @Environment(WindowRegistry.self) private var windowRegistry
     @State private var defaultWindowState = BrowserWindowState()
     @State private var commandPalette = CommandPalette()
@@ -34,8 +33,6 @@ struct ContentView: View {
             .background(WindowFocusBridge(windowState: windowState, windowRegistry: windowRegistry))
             .frame(minWidth: 470, minHeight: 382)
             .onAppear {
-                // Set TabManager reference for computed properties
-                windowState.tabManager = tabManager
                 // Set CommandPalette reference for global shortcuts
                 windowState.commandPalette = commandPalette
                 // Register this window state with the registry

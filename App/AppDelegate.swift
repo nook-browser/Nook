@@ -28,7 +28,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "AppTermination")
 
     // TEMPORARY: Reference to BrowserManager for coordinating browser operations
-    // TODO: Replace with direct access to independent managers (TabManager, etc.)
+    // TODO: Replace with direct access to independent managers (TabsController, etc.)
     weak var browserManager: BrowserManager?
 
     // Window registry for accessing active window state
@@ -101,9 +101,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         // Called on the main queue (per NSWorkspace notification delivery), so MainActor access is safe.
         MainActor.assumeIsolated {
             guard let manager = browserManager else { return }
-            for tab in manager.tabManager.allTabs() {
-                tab.webProcessCrashCount = 0
-                tab.lastWebProcessCrashDate = .distantPast
+            for session in manager.tabs.sessions {
+                session.webProcessCrashCount = 0
+                session.lastWebProcessCrashDate = .distantPast
             }
         }
     }
@@ -137,18 +137,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             MainActor.assumeIsolated {
                 switch event.buttonNumber {
                 case 2:  // Middle mouse button
-                    if let hoveredId = manager.hoveredPinnedTabId,
-                       let tab = manager.tabManager.allTabs().first(where: { $0.id == hoveredId }),
-                       tab.pinnedURL != nil {
-                        tab.resetToPinnedURL()
+                    if let hoveredId = manager.hoveredPinnedTabId, manager.tabs.item(hoveredId)?.url != nil {
+                        manager.tabs.resetToHome(hoveredId)
                     } else {
                         registry.activeWindow?.commandPalette?.open()
                     }
                 case 3:  // Back button
                     guard
                         let windowState = registry.activeWindow,
-                        let currentTab = manager.currentTab(for: windowState),
-                        let webView = manager.getWebView(for: currentTab.id, in: windowState.id)
+                        let itemID = windowState.selectedItemID,
+                        let webView = manager.getWebView(for: itemID, in: windowState.id)
                     else {
                         return
                     }
@@ -156,8 +154,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
                 case 4:  // Forward button
                     guard
                         let windowState = registry.activeWindow,
-                        let currentTab = manager.currentTab(for: windowState),
-                        let webView = manager.getWebView(for: currentTab.id, in: windowState.id)
+                        let itemID = windowState.selectedItemID,
+                        let webView = manager.getWebView(for: itemID, in: windowState.id)
                     else {
                         return
                     }
@@ -180,13 +178,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     /// Saves tab state and SwiftData synchronously, then lets the app quit.
     ///
     /// Every quit path (Cmd+Q with or without the warning, Dock, logout, restart) comes
-    /// through here, so this is the one place that guarantees the final save. Tabs are not
-    /// torn down first: removing them would make the final snapshot delete them, and the
-    /// WebContent processes exit with the app anyway.
+    /// through here, so this is the one place that guarantees the final save. Pages are not
+    /// closed first: the WebContent processes exit with the app anyway.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let start = CFAbsoluteTimeGetCurrent()
         if let manager = browserManager {
-            manager.tabManager.persistFinalSnapshotBlocking()
             manager.tabs.flushSync()
             do {
                 try manager.modelContext.save()
@@ -245,7 +241,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         }
         Task { @MainActor in
             // Air Traffic Control — route to designated space if a rule matches
-            if manager.siteRoutingManager.applyRoute(url: url, from: nil as Tab?) {
+            if manager.siteRoutingManager.applyRoute(url: url, from: nil as PageSession?) {
                 return
             }
             manager.presentExternalURL(url)

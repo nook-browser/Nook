@@ -18,9 +18,6 @@ import WebKit
 final class TabsController {
     enum Placement { case newTab, background, replaceCurrent }
 
-    /// Interim guard while TabManager still owns tab persistence: nothing is written until task Z sets this.
-    static var isAuthoritative = false
-
     static let homeURL = URL(string: "https://www.google.com")!
     static let undoLimit = 100
 
@@ -41,6 +38,7 @@ final class TabsController {
 
     @ObservationIgnored private let store: TabStore
     @ObservationIgnored private(set) var undoStack: [Change] = []
+    @ObservationIgnored private var isTerminating = false
     @ObservationIgnored private let profileManager: ProfileManager
     @ObservationIgnored weak var browserManager: BrowserManager?
     @ObservationIgnored let log = Logger(subsystem: "com.baingurley.nook", category: "Tabs")
@@ -125,12 +123,14 @@ final class TabsController {
     // MARK: - Save and Undo
 
     func save() {
-        guard Self.isAuthoritative else { return }
         store.save(tree, device)
     }
 
+    /// Writes now, with every regular window's current frame. Called at quit; windows closing
+    /// afterwards keep their records so they all reopen.
     func flushSync() {
-        guard Self.isAuthoritative else { return }
+        isTerminating = true
+        for window in regularWindows { mirror(window) }
         store.save(tree, device)
         store.flush()
     }
@@ -509,9 +509,9 @@ final class TabsController {
         profileManager.persistProfiles()
     }
 
-    func deleteAppProfile(_ profileID: UUID) {
-        guard let profile = profileManager.profiles.first(where: { $0.id == profileID }) else { return }
-        _ = profileManager.deleteProfile(profile)
+    func deleteAppProfile(_ profileID: UUID) -> Bool {
+        guard let profile = profileManager.profiles.first(where: { $0.id == profileID }) else { return false }
+        return profileManager.deleteProfile(profile)
     }
 
     // MARK: - Windows
@@ -560,9 +560,15 @@ final class TabsController {
             return
         }
         let others = regularWindows.filter { $0.id != window.id }
-        guard !others.isEmpty else { return }
+        guard !isTerminating, !others.isEmpty else { return }
         device.windows.removeAll { $0.id == window.id }
         save()
+    }
+
+    /// Saved window records no open regular window has claimed; the app opens a window for each.
+    func unclaimedWindowRecords() -> [WindowRecord] {
+        let open = Set(regularWindows.map(\.id))
+        return device.windows.filter { !open.contains($0.id) }
     }
 
     /// Copies a regular window's selection into DeviceState.windows.

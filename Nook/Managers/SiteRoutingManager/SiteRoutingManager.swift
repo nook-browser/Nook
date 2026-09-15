@@ -63,12 +63,6 @@ class SiteRoutingManager {
         return true
     }
 
-    /// Old-model entry point still called by `Tab`; removed with `Tab` in task Z.
-    func applyRoute(url: URL, from sourceTab: Tab?) -> Bool {
-        if sourceTab?.resolveProfile()?.isEphemeral == true { return false }
-        return applyRoute(url: url, from: sourceTab.flatMap { browserManager?.tabs.session(for: $0.id) })
-    }
-
     // MARK: - CRUD
 
     func addRule(_ rule: SiteRoutingRule) {

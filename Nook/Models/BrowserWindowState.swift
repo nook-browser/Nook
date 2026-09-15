@@ -17,18 +17,6 @@ class BrowserWindowState {
     /// Unique identifier for this window instance
     let id: UUID
 
-    /// Currently active tab in this window
-    var currentTabId: UUID?
-
-    /// Currently active space in this window
-    var currentSpaceId: UUID?
-
-    /// Currently active profile in this window
-    var currentProfileId: UUID?
-
-    /// Active tab for each space in this window (spaceId -> tabId)
-    var activeTabForSpace: [UUID: UUID] = [:]
-
     /// Sidebar width for this window
     var sidebarWidth: CGFloat = 250
 
@@ -93,10 +81,6 @@ class BrowserWindowState {
     /// Reference to the actual NSWindow for this window state
     var window: NSWindow?
 
-    /// Reference to TabManager for computed properties
-    /// Set by BrowserManager during window registration
-    weak var tabManager: TabManager?
-
     /// Reference to this window's CommandPalette for global shortcuts
     weak var commandPalette: CommandPalette?
 
@@ -109,24 +93,18 @@ class BrowserWindowState {
     /// Only set when isIncognito is true
     var ephemeralProfile: Profile?
     
-    /// Ephemeral spaces created in this incognito session
-    var ephemeralSpaces: [Space] = []
-    
-    /// Ephemeral tabs created in this incognito session
-    var ephemeralTabs: [Tab] = []
-    
     /// Whether the download warning has been shown in this incognito session
     var hasShownDownloadWarning: Bool = false
     
     // MARK: - Tab Model (TabsController)
 
-    /// The space this window shows. Replaces `currentSpaceId`.
+    /// The space this window shows.
     var spaceID: UUID?
 
-    /// The selected item per space in this window. Replaces `activeTabForSpace`.
+    /// The selected item per space in this window.
     var selectedItemBySpace: [UUID: UUID] = [:]
 
-    /// The selected item in the current space. Replaces `currentTabId`.
+    /// The selected item in the current space. There is no global current tab.
     var selectedItemID: UUID? {
         spaceID.flatMap { selectedItemBySpace[$0] }
     }
@@ -134,7 +112,7 @@ class BrowserWindowState {
     /// The split pair shown in this window, if any.
     var split: SplitRecord?
 
-    /// The profile whose favorites and data store this window uses. Replaces `currentProfileId`.
+    /// The profile whose favorites and data store this window uses (its space's profile).
     var profileID: UUID?
 
     /// A private window's in-memory tree: one profile record for the ephemeral profile and one
@@ -144,24 +122,8 @@ class BrowserWindowState {
     /// Live pages of a private window, by item id.
     var privateSessions: [UUID: PageSession] = [:]
 
-    /// Computed property: the actual Space object for this window's current space
-    var currentSpace: Space? {
-        guard let spaceId = currentSpaceId else { return nil }
-        // Check ephemeral spaces first for incognito windows
-        if isIncognito {
-            return ephemeralSpaces.first { $0.id == spaceId }
-        }
-        guard let tabManager = tabManager else { return nil }
-        return tabManager.spaces.first { $0.id == spaceId }
-    }
-
-    /// Computed property: gradient for the current space (dark for incognito)
-    var gradient: SpaceGradient {
-        if isIncognito {
-            return SpaceGradient.incognito
-        }
-        return currentSpace?.gradient ?? .default
-    }
+    /// A private window's reopen-closed history, newest last. Memory only.
+    var privateClosed: [ClosedEntry] = []
 
     init(id: UUID = UUID()) {
         self.id = id

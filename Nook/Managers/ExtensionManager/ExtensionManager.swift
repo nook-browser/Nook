@@ -39,8 +39,6 @@ final class ExtensionManager: NSObject, ObservableObject,
     /// Items the controller has been told about via didOpenTab. Other tab events are only
     /// forwarded for these, so private and never-loaded pages stay invisible to extensions.
     var openedTabIDs: Set<UUID> = []
-    /// Legacy: BrowserManager still bumps this until task Z. Nothing reads it.
-    var tabCacheGeneration: UInt = 0
     /// One adapter per regular window, by BrowserWindowState id.
     var windowAdapters: [UUID: ExtensionWindowAdapter] = [:]
     weak var browserManagerRef: BrowserManager?

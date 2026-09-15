@@ -192,16 +192,15 @@ struct TabContextMenu: View {
         }
 
         if context != .split, let windowState, let selected = tabs.selectedItemID(in: windowState), selected != itemID {
-            // ponytail: SplitViewManager's UUID entry point; the Tab-based enterSplit(with:) moves to T3.
             Menu {
                 Button {
-                    browserManager.splitManager.enterSplit(leftTabId: selected, rightTabId: itemID, for: windowState.id)
+                    browserManager.splitManager.enterSplit(with: itemID, placeOn: .right, in: windowState)
                 } label: {
                     Label("Right", systemImage: "rectangle.righthalf.filled")
                 }
 
                 Button {
-                    browserManager.splitManager.enterSplit(leftTabId: itemID, rightTabId: selected, for: windowState.id)
+                    browserManager.splitManager.enterSplit(with: itemID, placeOn: .left, in: windowState)
                 } label: {
                     Label("Left", systemImage: "rectangle.lefthalf.filled")
                 }

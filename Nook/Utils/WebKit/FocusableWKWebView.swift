@@ -7,8 +7,6 @@ import UniformTypeIdentifiers
 @MainActor
 final class FocusableWKWebView: WKWebView {
     weak var owningSession: PageSession?
-    /// Legacy back-reference still set by `Tab`; removed in task Z.
-    weak var owningTab: Tab?
     var contextMenuBridge: WebContextMenuBridge?
     nonisolated private static let imageContentTypes: [UTType] = [
         .jpeg, .png, .gif, .bmp, .tiff, .webP, .heic, .heif

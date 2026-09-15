@@ -146,11 +146,6 @@ class WebViewCoordinator {
         }
     }
 
-    /// Removes the item's pool entries without cleaning the views (legacy `Tab` callers do that).
-    func removeEntries(for itemID: UUID) -> [UUID: WKWebView] {
-        webViewsByItemAndWindow.removeValue(forKey: itemID) ?? [:]
-    }
-
     // MARK: - Window Cleanup
 
     /// A window closed: its views go. A primary passes to another window's clone when one

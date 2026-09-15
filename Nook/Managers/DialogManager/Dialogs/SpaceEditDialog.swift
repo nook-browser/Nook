@@ -39,18 +39,6 @@ struct SpaceEditDialog: DialogPresentable {
                   mode: mode, onSave: onSave, onCancel: onCancel)
     }
 
-    /// Old-model initializer kept for BrowserManager.showSpaceSettings(for:) until task Z.
-    init(
-        space: Space,
-        mode: Mode,
-        onSave: @escaping (String, String, UUID?, String) -> Void,
-        onCancel: @escaping () -> Void
-    ) {
-        let values = MainActor.assumeIsolated { (space.name, space.icon, space.profileId, space.accentHex) }
-        self.init(name: values.0, icon: values.1, profileId: values.2, accentHex: values.3,
-                  mode: mode, onSave: onSave, onCancel: onCancel)
-    }
-
     private init(
         name: String,
         icon: String,

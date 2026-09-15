@@ -263,24 +263,3 @@ final class AuthenticationManager: NSObject {
         manager.dialogManager.showDialog(dialog)
     }
 }
-
-// MARK: - Legacy Tab (task Z deletes)
-
-extension AuthenticationManager {
-    func handleAuthenticationChallenge(
-        _ challenge: URLAuthenticationChallenge,
-        for tab: Tab,
-        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
-    ) -> Bool {
-        guard let session = tab.browserManager?.tabs.session(for: tab.id) else { return false }
-        return handleAuthenticationChallenge(challenge, for: session, completionHandler: completionHandler)
-    }
-
-    func beginIdentityFlow(_ request: IdentityRequest, from tab: Tab) {
-        guard let session = tab.browserManager?.tabs.session(for: tab.id) else {
-            tab.finishIdentityFlow(requestId: request.requestId, with: .failure(.fallbackUnavailable))
-            return
-        }
-        beginIdentityFlow(request, from: session)
-    }
-}

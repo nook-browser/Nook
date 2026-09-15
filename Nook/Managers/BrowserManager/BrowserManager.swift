@@ -393,8 +393,7 @@ class BrowserManager: ObservableObject {
     weak var appDelegate: AppDelegate?
 
     var modelContext: ModelContext
-    var tabManager: TabManager
-    /// The new tab model. Loaded here; not authoritative until task Z (see TabsController.isAuthoritative).
+    /// The tab model: tree, device state, window selection and live pages.
     let tabs: TabsController
     var profileManager: ProfileManager
     var dialogManager: DialogManager
@@ -437,73 +436,16 @@ class BrowserManager: ObservableObject {
     var isSwitchingProfile: Bool = false
     private var cancellables: Set<AnyCancellable> = []
 
-    /// DEPRECATED: Audio enforcement is an antipattern - should be managed per-window
-    private func enforceExclusiveAudio(
-        for tab: Tab, activeWindowId: UUID, desiredMuteState: Bool? = nil
-    ) {
-        guard let coordinator = webViewCoordinator else { return }
-        let clones = coordinator.getAllWebViews(for: tab.id)
-        for webView in clones {
-            // Find which window this webView belongs to
-            // For now, assume the webView in the active window gets the active mute state
-            // This needs proper window tracking in WebViewCoordinator
-            webView.isMuted = true
-            webView.evaluateJavaScript(
-                "document.querySelectorAll('video,audio').forEach(function(el){try{el.pause();}catch(e){}});",
-                completionHandler: { _, _ in })
-        }
-    }
-
-    /// Updates the gradient for a window, animating the transition if requested
-    private func updateGradient(
-        for windowState: BrowserWindowState, to newGradient: SpaceGradient, animate: Bool
-    ) {
-        // Skip gradient updates for incognito windows - they use their own dark gradient
-        guard !windowState.isIncognito else { return }
-        // Only animate if this is the active window (to avoid animating all windows simultaneously)
-        let isActiveWindow = windowRegistry?.activeWindow?.id == windowState.id
-        if animate && isActiveWindow {
-            gradientColorManager.transition(to: newGradient)
-        } else {
-            gradientColorManager.setImmediate(newGradient)
-        }
-    }
-
-    /// Updates gradients for all windows using the specified space
-    func refreshGradientsForSpace(_ space: Space, animate: Bool) {
-        guard let windowRegistry = windowRegistry else { return }
-        let activeWindowId = windowRegistry.activeWindow?.id
-        
-        // Update gradients for all windows using this space (skip incognito)
-        for (_, windowState) in windowRegistry.windows {
-            // Skip incognito windows
-            guard !windowState.isIncognito else { continue }
-            if windowState.currentSpaceId == space.id {
-                let isActiveWindow = windowState.id == activeWindowId
-                if animate && isActiveWindow {
-                    gradientColorManager.transition(to: space.gradient)
-                } else {
-                    gradientColorManager.setImmediate(space.gradient)
-                }
-            }
-        }
-    }
-
     private func adoptProfileIfNeeded(
         for windowState: BrowserWindowState, context: ProfileSwitchContext
     ) {
-        guard let targetProfileId = windowState.currentProfileId else { return }
+        guard let targetProfileId = windowState.profileID else { return }
         guard !isSwitchingProfile else { return }
         guard currentProfile?.id != targetProfileId else { return }
         guard let targetProfile = profileManager.profiles.first(where: { $0.id == targetProfileId })
         else { return }
         Task { [weak self] in
             await self?.switchToProfile(targetProfile, context: context, in: windowState)
-            await MainActor.run {
-                if let activeId = self?.windowRegistry?.activeWindow?.id, activeId == windowState.id {
-                    self?.windowRegistry?.activeWindow?.currentProfileId = targetProfileId
-                }
-            }
         }
     }
 
@@ -519,7 +461,6 @@ class BrowserManager: ObservableObject {
         self.currentProfile = initialProfile
         self.tabs = TabsController(profileManager: self.profileManager)
 
-        self.tabManager = TabManager(browserManager: nil, context: modelContext)
         // settingsManager will be injected from NookApp
         self.dialogManager = DialogManager()
         self.downloadManager = DownloadManager.shared
@@ -541,8 +482,6 @@ class BrowserManager: ObservableObject {
         self.splitManager.browserManager = self
         self.splitManager.windowRegistry = self.windowRegistry
         // Note: settingsManager will be injected later, so we skip initialization here
-        self.tabManager.browserManager = self
-        self.tabManager.reattachBrowserManager(self)
         self.tabs.browserManager = self
         if let mgr = self.extensionManager {
             // Attach extension manager BEFORE any WKWebView is created so content scripts can inject
@@ -553,11 +492,7 @@ class BrowserManager: ObservableObject {
                 .receive(on: RunLoop.main)
                 .assign(to: &$isExtensionPopupActive)
         }
-        if let g = self.tabManager.currentSpace?.gradient {
-            self.gradientColorManager.setImmediate(g)
-        } else {
-            self.gradientColorManager.setImmediate(.default)
-        }
+        self.gradientColorManager.setImmediate(.default)
         self.contentBlockerManager.attach(browserManager: self)
         self.sponsorBlockManager.browserManager = self
         // Note: tracking protection will be configured after settingsManager injection
@@ -599,18 +534,14 @@ class BrowserManager: ObservableObject {
 
     }
 
-    // objectWillChange forwarding removed — TabManager and PeekManager are now
-    // injected directly as @EnvironmentObject where needed, so views subscribe
-    // to their changes independently instead of cascading through BrowserManager.
-    
-    /// Apply startup tab loading for a newly registered window.
-    /// Sets the window's current tab/space from persisted state and loads tabs
-    /// according to the user's startup mode preference.
-    /// Load tabs according to the user's startup mode preference.
-    /// Always loads the last active tab. Called after windowState is fully configured.
+    // MARK: - Startup Loading
+
     private var startupWaitedForContentBlocker = false
     private var startupWarmTasks: [UUID: Task<Void, Never>] = [:]
 
+    /// Loads a newly registered window's selected page. With "Last Tab, Favorites & Space" the
+    /// space's other tabs-section pages then warm one at a time; pinned tabs and favorites load
+    /// when selected.
     private func applyStartupLoadMode(for windowState: BrowserWindowState) {
         // Content blocking should be active before the first navigation, otherwise the startup
         // page loads without scriptlets/cosmetics. Warm activation is ~0.3s (cache hit); a cold
@@ -628,59 +559,36 @@ class BrowserManager: ObservableObject {
             return
         }
 
-        let activeSpace = tabManager.currentSpace ?? tabManager.spaces.first
-
-        // Always load the last active tab so the user sees content immediately.
-        // Try currentTab first, fall back to first tab in active space.
-        let activeTab: Tab? = {
-            if let tab = tabManager.currentTab { return tab }
-            if let tabId = windowState.currentTabId {
-                return tabManager.tabById(tabId) ?? tabManager.allTabs().first(where: { $0.id == tabId })
-            }
-            return activeSpace.flatMap { tabManager.tabs(in: $0).first }
-        }()
-
-        if let activeTab {
-            windowState.currentTabId = activeTab.id
-            if activeTab.isUnloaded {
-                // Pre-create the coordinator webview so the compositor can show it
-                // without creating a separate display webview on first render.
-                preloadTabInCoordinator(activeTab, windowId: windowState.id)
-            }
+        let selected = windowState.selectedItemID
+        if let selected {
+            tabs.select(selected, in: windowState)
+        } else {
+            windowState.refreshCompositor()
         }
 
-        // Paint the active page first. Warm one page at a time, without a launch burst.
-        let startupMode = nookSettings?.startupLoadMode ?? .favoritesAndSpace
-        var warmTabs: [Tab] = []
-        if startupMode != .nothing {
-            warmTabs = tabManager.essentialTabs(for: windowState.currentProfileId)
-            if startupMode == .favoritesAndSpace, let space = activeSpace {
-                warmTabs += tabManager.tabs(in: space)
-            }
-        }
-        var seen = Set<UUID>()
-        let warmIDs = warmTabs.filter { $0.id != activeTab?.id && seen.insert($0.id).inserted }.map(\.id)
+        guard nookSettings?.startupLoadMode == .favoritesAndSpace, let spaceID = windowState.spaceID else { return }
+        let warmIDs = tabs.rows(space: spaceID)
+            .filter { $0.section == .tabs && !$0.item.isFolder && $0.item.id != selected }
+            .map(\.item.id)
         startupWarmTasks[windowState.id]?.cancel()
         startupWarmTasks[windowState.id] = Task { @MainActor [weak self, weak windowState] in
             defer { if let windowState { self?.startupWarmTasks[windowState.id] = nil } }
             // Wait for the visible page before competing for WebKit and network resources.
-            if let view = activeTab?.existingWebView,
+            if let view = selected.flatMap({ self?.tabs.session(for: $0)?.webView }),
                !(await Self.waitForStartupNavigation(view)) { return }
             for id in warmIDs {
                 do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
                 guard !Task.isCancelled, let self, let windowState,
                       self.windowRegistry?.windows[windowState.id] != nil,
                       self.compositorManager.allowsBackgroundWarming,
-                      let tab = self.tabManager.tabById(id) else { return }
-                guard tab.isUnloaded else { continue }
-                self.preloadTabInCoordinator(tab, windowId: windowState.id)
-                if let view = tab.existingWebView,
+                      self.tabs.item(id) != nil,
+                      let session = self.tabs.ensureSession(for: id) else { return }
+                guard session.isUnloaded else { continue }
+                self.compositorManager.load(session)
+                if let view = session.webView,
                    !(await Self.waitForStartupNavigation(view)) { return }
             }
         }
-
-        // Refresh compositor to show the current tab
-        windowState.refreshCompositor()
     }
 
     /// Abort speculative warming after a slow page; other tabs remain available on demand.
@@ -693,24 +601,6 @@ class BrowserManager: ObservableObject {
         let finished = await TaskDeadline.wait(for: completion, timeout: .seconds(10))
         completion.cancel()
         return finished
-    }
-
-    /// Pre-create a tab's display webview in the coordinator pool so the compositor
-    /// can show it immediately without an extra round-trip load when the tab is selected.
-    /// Also calls loadWebViewIfNeeded() so isUnloaded returns false (compositor guard).
-    private func preloadTabInCoordinator(_ tab: Tab, windowId: UUID) {
-        guard let coordinator = webViewCoordinator else {
-            // Fallback: just ensure _webView exists for the isUnloaded guard
-            tab.loadWebViewIfNeeded()
-            return
-        }
-        // Only pre-create if not already in the coordinator pool for this window
-        guard coordinator.getWebView(for: tab.id, in: windowId) == nil else { return }
-        // Create the display webview in the coordinator pool (loads URL in background)
-        let webView = coordinator.createWebView(for: tab, in: windowId)
-        // Assign as primary so tab.isUnloaded returns false (compositor guard)
-        if tab.existingWebView == nil { tab.assignWebViewToWindow(webView, windowId: windowId) }
-        compositorManager.markTabAccessed(tab.id)
     }
 
     // MARK: - Profile Switching
@@ -760,14 +650,18 @@ class BrowserManager: ObservableObject {
                     self.isTransitioningProfile = false
                 }
                 self.currentProfile = profile
-                self.windowRegistry?.activeWindow?.currentProfileId = profile.id
                 // Switch data stores for cookie/cache
                 self.cookieManager.switchDataStore(profile.dataStore, profileId: profile.id)
                 self.cacheManager.switchDataStore(profile.dataStore, profileId: profile.id)
                 // Update history filtering
                 self.historyManager.switchProfile(profile.id)
-                // TabManager awareness (updates currentTab/currentSpace visibility)
-                self.tabManager.handleProfileSwitch()
+                // A window's profile follows its space: an explicit switch shows that profile's first space.
+                if context == .userInitiated || context == .recovery,
+                   let window = windowState ?? self.windowRegistry?.activeWindow, !window.isIncognito,
+                   window.profileID != profile.id,
+                   let space = self.tabs.spaces(inProfile: profile.id).first {
+                    self.tabs.setSpace(space.id, in: window)
+                }
             }
 
             if animateTransition {
@@ -916,146 +810,9 @@ class BrowserManager: ObservableObject {
         if findManager.isFindBarVisible {
             findManager.hideFindBar()
         } else {
-            findManager.showFindBar(for: currentTabForActiveWindow())
+            findManager.showFindBar(for: tabs.activeWindowSession)
         }
     }
-
-    func updateFindManagerCurrentTab() {
-        // Update the current tab for find manager
-        findManager.updateCurrentTab(currentTabForActiveWindow())
-    }
-
-    // MARK: - Tab Management (delegates to TabManager)
-    func createNewTab() {
-        _ = tabManager.createNewTab()
-    }
-
-    /// Create a new tab and set it as active in the specified window
-    func createNewTab(in windowState: BrowserWindowState, url: String = "https://www.google.com") {
-        // Handle incognito windows - create ephemeral tabs
-        if windowState.isIncognito, let profile = windowState.ephemeralProfile {
-            let template = nookSettings?.resolvedSearchEngineTemplate ?? SearchProvider.google.queryTemplate
-            let normalizedURL = normalizeURL(url, queryTemplate: template)
-            guard let resolvedUrl = URL(string: normalizedURL) else { return }
-
-            let newTab = tabManager.createEphemeralTab(
-                url: resolvedUrl,
-                in: windowState,
-                profile: profile
-            )
-            selectTab(newTab, in: windowState)
-            return
-        }
-
-        let targetSpace =
-            windowState.currentSpaceId.flatMap { id in
-                tabManager.spaces.first(where: { $0.id == id })
-            }
-            ?? windowState.currentProfileId.flatMap { pid in
-                tabManager.spaces.first(where: { $0.profileId == pid })
-            }
-        let newTab = tabManager.createNewTab(url: url, in: targetSpace)
-        selectTab(newTab, in: windowState)
-    }
-
-    /// The incognito window that owns `tab`, when it is a private tab. Tabs opened from a
-    /// private tab must go back into that window, never into a persisted space.
-    func incognitoWindow(containing tab: Tab?) -> BrowserWindowState? {
-        guard let tab else { return nil }
-        return windowRegistry?.windows.values.first { window in
-            window.isIncognito && window.ephemeralTabs.contains { $0.id == tab.id }
-        }
-    }
-
-    func duplicateCurrentTab() {
-        guard let currentTab = currentTabForActiveWindow() else { return }
-        duplicateTab(currentTab)
-    }
-
-    /// Opens a copy of `tab` and selects it. A loose regular tab gets its copy directly below it;
-    /// other tabs get a regular copy in their space (or the window's space for favorites).
-    /// Private tabs are copied inside their own incognito window.
-    func duplicateTab(_ tab: Tab) {
-        if let window = incognitoWindow(containing: tab) {
-            guard let profile = window.ephemeralProfile else { return }
-            let copy = tabManager.createEphemeralTab(url: tab.url, in: window, profile: profile)
-            selectTab(copy, in: window)
-            return
-        }
-
-        let activeWindow = windowRegistry?.activeWindow
-        let targetSpace =
-            tab.spaceId.flatMap { id in tabManager.spaces.first(where: { $0.id == id }) }
-            ?? activeWindow?.currentSpaceId.flatMap { id in tabManager.spaces.first(where: { $0.id == id }) }
-            ?? tabManager.currentSpace
-        guard let targetSpace else { return }
-
-        let newTab = Tab(
-            url: tab.url,
-            name: tab.name,
-            favicon: "globe",  // Will be updated by fetchAndSetFavicon
-            spaceId: targetSpace.id,
-            index: 0,
-            browserManager: self
-        )
-        tabManager.addTab(newTab)
-
-        // Regular buckets are kept in index order, so the source's position plus one is right below it.
-        if tab.spaceId == targetSpace.id, tab.folderId == nil, !tab.isSpacePinned, !tab.isPinned,
-           let sourcePosition = tabManager.tabs(in: targetSpace).filter({ $0.id != newTab.id }).firstIndex(where: { $0.id == tab.id }) {
-            tabManager.reorderRegular(newTab, in: targetSpace.id, to: sourcePosition + 1)
-        }
-
-        if let activeWindow {
-            selectTab(newTab, in: activeWindow)
-        } else {
-            selectTab(newTab)
-        }
-    }
-
-    func closeCurrentTab() {
-        if let activeWindow = windowRegistry?.activeWindow,
-            activeWindow.isCommandPaletteVisible
-        {
-            return
-        }
-        // Close tab in the active window
-        if let activeWindow = windowRegistry?.activeWindow,
-            let currentTab = currentTab(for: activeWindow)
-        {
-            // Handle ephemeral tabs in incognito windows
-            if activeWindow.isIncognito {
-                // Clean up WebView
-                currentTab.performComprehensiveWebViewCleanup()
-                
-                // Remove from ephemeral tabs
-                if let index = activeWindow.ephemeralTabs.firstIndex(where: { $0.id == currentTab.id }) {
-                    activeWindow.ephemeralTabs.remove(at: index)
-                    
-                    // Select another tab or create new one
-                    if let nextTab = activeWindow.ephemeralTabs.first {
-                        selectTab(nextTab, in: activeWindow)
-                    } else {
-                        // All tabs closed - create a new ephemeral tab
-                        if let profile = activeWindow.ephemeralProfile {
-                            let template = nookSettings?.resolvedSearchEngineTemplate ?? SearchProvider.google.queryTemplate
-                            let normalizedURL = normalizeURL("https://www.google.com", queryTemplate: template)
-                            if let url = URL(string: normalizedURL) {
-                                let newTab = tabManager.createEphemeralTab(url: url, in: activeWindow, profile: profile)
-                                selectTab(newTab, in: activeWindow)
-                            }
-                        }
-                    }
-                }
-            } else {
-                tabManager.removeTab(currentTab.id)
-            }
-        } else {
-            // Fallback to global current tab for backward compatibility
-            tabManager.closeActiveTab()
-        }
-    }
-
 
     // MARK: - Dialog Methods
 
@@ -1086,9 +843,9 @@ class BrowserManager: ObservableObject {
 
     // MARK: - Space Settings
 
-    /// Opens Space Settings for the current space, or a notice when there is none.
+    /// Opens Space Settings for the active window's space, or a notice when there is none.
     func showSpaceSettings() {
-        guard let space = tabManager.currentSpace else {
+        guard let spaceID = windowRegistry?.activeWindow?.spaceID, tabs.space(spaceID) != nil else {
             dialogManager.showDialog {
                 StandardDialog(
                     header: {
@@ -1110,42 +867,7 @@ class BrowserManager: ObservableObject {
             }
             return
         }
-        showSpaceSettings(for: space)
-    }
-
-    /// The single presentation path for the space edit dialog (name, icon, profile).
-    func showSpaceSettings(for space: Space) {
-        dialogManager.showDialog(
-            SpaceEditDialog(
-                space: space,
-                mode: .icon,
-                onSave: { [weak self] newName, newIcon, newProfileId, newAccentHex in
-                    guard let self else { return }
-                    do {
-                        if newIcon != space.icon {
-                            try self.tabManager.updateSpaceIcon(spaceId: space.id, icon: newIcon)
-                        }
-                        if newName != space.name {
-                            try self.tabManager.renameSpace(spaceId: space.id, newName: newName)
-                        }
-                        if newProfileId != space.profileId, let profileId = newProfileId {
-                            self.tabManager.assign(spaceId: space.id, toProfile: profileId)
-                        }
-                    } catch {
-                        print("Failed to update space: \(error)")
-                    }
-                    if newAccentHex.caseInsensitiveCompare(space.accentHex) != .orderedSame {
-                        space.gradient = .accent(hex: newAccentHex)
-                        self.refreshGradientsForSpace(space, animate: true)
-                        self.tabManager.persistSnapshot()
-                    }
-                    self.closeDialog()
-                },
-                onCancel: { [weak self] in
-                    self?.closeDialog()
-                }
-            )
-        )
+        SpaceEditDialog.present(spaceID: spaceID, tabs: tabs, dialogManager: dialogManager)
     }
 
     func closeDialog() {
@@ -1567,8 +1289,6 @@ class BrowserManager: ObservableObject {
             #endif
             currentProfile = profileManager.profiles.first
         }
-        // Ensure spaces have profile assignments
-        tabManager.validateTabProfileAssignments()
     }
 
     func recoverFromProfileError(_ error: Error, profile: Profile?) {
@@ -1607,7 +1327,10 @@ class BrowserManager: ObservableObject {
     }
 
     // MARK: - Profile Deletion Coordinator
-    func deleteProfile(_ profile: Profile) {
+
+    /// The one profile delete path: the current profile moves to `heir`, the profile's data is
+    /// cleared, TabsController moves its spaces and favorites to `heir` and removes the app profile.
+    func deleteProfile(_ profile: Profile, heir: Profile) {
         // Avoid deleting the last profile
         guard profileManager.profiles.count > 1 else {
             dialogManager.showDialog {
@@ -1635,21 +1358,11 @@ class BrowserManager: ObservableObject {
             return
         }
         Task { @MainActor in
-            // Choose replacement if current is being deleted
             if self.currentProfile?.id == profile.id {
-                if let replacement = self.profileManager.profiles.first(where: {
-                    $0.id != profile.id
-                }) {
-                    await self.switchToProfile(replacement)
-                }
+                await self.switchToProfile(heir)
             }
-
-            // Cleanup references and data
-            self.tabManager.cleanupProfileReferences(profile.id)
             await profile.clearAllData()
-
-            // Delete from manager
-            let ok = self.profileManager.deleteProfile(profile)
+            let ok = self.tabs.deleteProfile(profile.id, heir: heir.id)
             if !ok {
                 self.dialogManager.showDialog {
                     StandardDialog(
@@ -1684,45 +1397,26 @@ class BrowserManager: ObservableObject {
 
     // MARK: - Window State Management
 
-    /// Register a new window state
-    /// TEMPORARY: Setup window state with initial values
-    /// This will be removed once we eliminate duplicate global state
+    /// A window registered: sidebar chrome from the active globals, then its space, selection and
+    /// split from TabsController (an unclaimed saved window record when there is one), then its
+    /// selected page. The first regular window also reopens the other saved windows.
     func setupWindowState(_ windowState: BrowserWindowState) {
-        // Set TabManager reference for computed properties
-        windowState.tabManager = tabManager
-
-        // Initialize window state with current global state for backward compatibility
         windowState.sidebarWidth = sidebarWidth
         windowState.sidebarContentWidth = max(sidebarWidth - 16, 0)
         windowState.isSidebarVisible = isSidebarVisible
         windowState.savedSidebarWidth = savedSidebarWidth
         windowState.isCommandPaletteVisible = false
-
         // NSWindow reference is set by WindowFocusBridge.attach in ContentView
         windowState.urlBarFrame = urlBarFrame
-        windowState.currentProfileId = currentProfile?.id
 
-        // Always set the current space and last active tab
-        windowState.currentSpaceId = tabManager.currentSpace?.id
-        windowState.currentTabId = tabManager.currentTab?.id
-
-        // Set gradient from current space immediately to avoid showing default blue
-        if let spaceId = windowState.currentSpaceId,
-            let space = tabManager.spaces.first(where: { $0.id == spaceId })
-        {
-            windowState.currentProfileId = space.profileId ?? currentProfile?.id
-            gradientColorManager.setImmediate(space.gradient)
-        } else {
-            gradientColorManager.setImmediate(.default)
-        }
-
-        // New tab model: window space, profile and selection (loads no pages).
         tabs.attach(window: windowState)
-
-        // Apply startup tab loading mode
+        guard !windowState.isIncognito else { return }
+        if windowRegistry?.activeWindow == nil || windowRegistry?.activeWindow?.id == windowState.id {
+            adoptProfileIfNeeded(for: windowState, context: .windowActivation)
+        }
         applyStartupLoadMode(for: windowState)
+        restoreSavedWindows()
     }
-
 
     /// Set the active window state (called when a window gains focus)
     /// NOTE: This is called BY the WindowRegistry callback, so we don't call setActive again
@@ -1734,415 +1428,38 @@ class BrowserManager: ObservableObject {
         sidebarContentWidth = windowState.sidebarContentWidth
         isSidebarVisible = windowState.isSidebarVisible
         urlBarFrame = windowState.urlBarFrame
-        // windowState.gradient is the incognito accent for incognito windows
-        gradientColorManager.setImmediate(windowState.gradient)
-        splitManager.refreshPublishedState(for: windowState.id)
+        // Regular windows get their space accent from WindowView; private windows keep their own look.
+        if windowState.isIncognito {
+            gradientColorManager.setImmediate(.incognito)
+        }
         isCommandPaletteVisible = windowState.isCommandPaletteVisible
-        if windowState.currentProfileId == nil {
-            windowState.currentProfileId = currentProfile?.id
-        }
         adoptProfileIfNeeded(for: windowState, context: .windowActivation)
+    }
 
-        // Extensions resolve tabs.query({active: true, currentWindow: true}) from the focused
-        // window's current tab, so switching windows must switch their active tab too.
-        if let tab = currentTab(for: windowState) {
-            ExtensionManager.shared.notifyTabActivated(newTab: tab, previous: nil)
-        } else {
-            ExtensionManager.shared.tabCacheGeneration &+= 1
-        }
+    /// A window's space moved it to another profile. The active window adopts that profile
+    /// (data stores, history, cookies), as the old space switch did.
+    func windowProfileChanged(_ windowState: BrowserWindowState) {
+        guard !windowState.isIncognito, windowRegistry?.activeWindow?.id == windowState.id else { return }
+        adoptProfileIfNeeded(for: windowState, context: .spaceChange)
     }
 
     // MARK: - Window-Aware Tab Operations
 
-    /// Get the current tab for a specific window
-    func currentTab(for windowState: BrowserWindowState) -> Tab? {
-        // Check ephemeral tabs first for incognito windows
-        if windowState.isIncognito {
-            return windowState.ephemeralTabs.first { $0.id == windowState.currentTabId }
-        }
-        
-        guard let tabId = windowState.currentTabId else { return nil }
-        return tabManager.allTabs().first { $0.id == tabId }
-    }
-
-    /// Select a tab in the active window (convenience method for sidebar clicks)
-    func selectTab(_ tab: Tab) {
-        guard let activeWindow = windowRegistry?.activeWindow else {
-            #if DEBUG
-            print("⚠️ [BrowserManager] No active window for tab selection")
-            #endif
-            return
-        }
-        selectTab(tab, in: activeWindow)
-    }
-
-    /// Select a tab in a specific window
-    func selectTab(_ tab: Tab, in windowState: BrowserWindowState) {
-        windowState.currentTabId = tab.id
-
-        // Update active side in split view if applicable
-        splitManager.updateActiveSide(for: tab.id, in: windowState.id)
-
-        // Update space if the tab belongs to a different space
-        if let spaceId = tab.spaceId, windowState.currentSpaceId != spaceId {
-            windowState.currentSpaceId = spaceId
-        }
-
-        // Remember this tab as active for the current space in this window
-        if let currentSpaceId = windowState.currentSpaceId {
-            windowState.activeTabForSpace[currentSpaceId] = tab.id
-        }
-
-        if let spaceId = windowState.currentSpaceId,
-            let space = tabManager.spaces.first(where: { $0.id == spaceId })
-        {
-            updateGradient(for: windowState, to: space.gradient, animate: true)
-            windowState.currentProfileId = space.profileId ?? currentProfile?.id
-        } else if windowState.currentSpaceId == nil {
-            updateGradient(for: windowState, to: .default, animate: false)
-            windowState.currentProfileId = currentProfile?.id
-        }
-
-        // Note: No need to track tab display ownership - each window shows its own current tab
-
-        // Load the tab in compositor if needed (reloads unloaded tabs)
-        compositorManager.loadTab(tab)
-
-        // Update tab visibility in compositor
-        compositorManager.updateTabVisibility(currentTabId: tab.id)
-
-        // Check media state using native WebKit API
-        tab.checkMediaState()
-
-        // Notify extensions about tab activation
-        ExtensionManager.shared.notifyTabActivated(newTab: tab, previous: nil)
-
-        // Update find manager with new current tab
-        updateFindManagerCurrentTab()
-
-        // Refresh compositor for this window
-        windowState.refreshCompositor()
-
-        // DISABLED: Exclusive audio enforcement - use standard browser behavior instead
-        // enforceExclusiveAudio(for: tab, activeWindowId: windowState.id)
-
-        #if DEBUG
-        print("🪟 [BrowserManager] Selected tab \(tab.name) in window \(windowState.id)")
-        #endif
-
-        // Update global tab state for the active window
-        if windowRegistry?.activeWindow?.id == windowState.id {
-            // Only update the global state, don't trigger UI operations again
-            tabManager.updateActiveTabState(tab)
-        }
-    }
-
-    /// Get tabs that should be displayed in a specific window
-    func tabsForDisplay(in windowState: BrowserWindowState) -> [Tab] {
-        // For incognito windows, return ephemeral tabs directly
-        if windowState.isIncognito {
-            return windowState.ephemeralTabs
-        }
-        
-        #if DEBUG
-        print("🔍 tabsForDisplay called for window \(windowState.id.uuidString.prefix(8))...")
-        #endif
-
-        // Get tabs for the window's current space
-        let currentSpace = windowState.currentSpaceId.flatMap { id in
-            tabManager.spaces.first(where: { $0.id == id })
-        }
-
-        #if DEBUG
-        print("   - windowState.currentSpaceId: \(windowState.currentSpaceId?.uuidString ?? "nil")")
-        print(
-            "   - resolved currentSpace: \(currentSpace?.name ?? "nil") (id: \(currentSpace?.id.uuidString.prefix(8) ?? "nil"))"
-        )
-        #endif
-
-        let profileId =
-            windowState.currentProfileId ?? currentSpace?.profileId ?? currentProfile?.id
-        let essentials = profileId.flatMap { tabManager.essentialTabs(for: $0) } ?? []
-        let spacePinned = currentSpace.map { tabManager.spacePinnedTabs(for: $0.id) } ?? []
-        let regularTabs = currentSpace.map { tabManager.tabs(in: $0) } ?? []
-
-        #if DEBUG
-        print("   - essentials: \(essentials.count) tabs")
-        print("   - spacePinned: \(spacePinned.count) tabs")
-        print("   - regularTabs: \(regularTabs.count) tabs")
-
-        print("   - spacePinned tabs details:")
-        for tab in spacePinned {
-            print(
-                "     * \(tab.name) (id: \(tab.id.uuidString.prefix(8))..., folderId: \(tab.folderId?.uuidString.prefix(8) ?? "nil"))"
-            )
-        }
-        #endif
-
-        let result = essentials + spacePinned + regularTabs
-        #if DEBUG
-        print("   - TOTAL tabsForDisplay: \(result.count)")
-        #endif
-
-        return result
-    }
-
-    /// Check if a tab is frozen (being displayed in another window)
-    /// Note: This is no longer needed since each window shows its own current tab independently
-    func isCurrentTabFrozen(in windowState: BrowserWindowState) -> Bool {
-        return false  // Always false since windows are independent
-    }
-
-    /// Refresh compositor for a specific window
-    func refreshCompositor(for windowState: BrowserWindowState) {
-        windowState.refreshCompositor()
-    }
-
-/// DEPRECATED: Use WebViewCoordinator.getWebView() directly via environment
+    /// DEPRECATED: Use WebViewCoordinator.getWebView() directly via environment
     func getWebView(for tabId: UUID, in windowId: UUID) -> WKWebView? {
-        // Check ephemeral tabs first for incognito windows
-        if let windowState = windowRegistry?.windows[windowId],
-           windowState.isIncognito {
-            return webViewCoordinator?.getWebView(for: tabId, in: windowId)
-        }
-        return webViewCoordinator?.getWebView(for: tabId, in: windowId)
-    }
-
-    /// DEPRECATED: Use WebViewCoordinator directly
-    func createWebView(for tabId: UUID, in windowId: UUID) -> WKWebView {
-        // Check ephemeral tabs first for incognito windows
-        if let windowState = windowRegistry?.windows[windowId],
-           windowState.isIncognito,
-           let tab = windowState.ephemeralTabs.first(where: { $0.id == tabId }),
-           let coordinator = webViewCoordinator {
-            return coordinator.createWebView(for: tab, in: windowId)
-        }
-        
-        guard let tab = tabManager.allTabs().first(where: { $0.id == tabId }),
-              let coordinator = webViewCoordinator else {
-            fatalError("Tab or WebViewCoordinator not found")
-        }
-        return coordinator.createWebView(for: tab, in: windowId)
-    }
-
-    /// DEPRECATED: This should not go through BrowserManager
-    func syncTabAcrossWindows(_ tabId: UUID) {
-        guard let tab = tabManager.allTabs().first(where: { $0.id == tabId }),
-              let webViewCoordinator = webViewCoordinator else { return }
-
-        webViewCoordinator.syncTab(tabId, to: tab.url)
+        webViewCoordinator?.getWebView(for: tabId, in: windowId)
     }
 
     func navigateTabAcrossWindows(_ tabId: UUID, to url: URL) {
         webViewCoordinator?.syncTab(tabId, to: url)
     }
 
-    func reloadTabAcrossWindows(_ tabId: UUID) {
-        webViewCoordinator?.reloadTab(tabId)
-    }
-
     func setMuteState(_ muted: Bool, for tabId: UUID, originatingWindowId: UUID?) {
         webViewCoordinator?.setMuteState(muted, for: tabId, excludingWindow: originatingWindowId)
     }
 
-    /// Set active space for a specific window
-    func setActiveSpace(_ space: Space, in windowState: BrowserWindowState) {
-        let isActiveWindow = windowRegistry?.activeWindow?.id == windowState.id
-        if isActiveWindow {
-            tabManager.setActiveSpace(space)
-        }
-
-        // Update the window's current space
-        windowState.currentSpaceId = space.id
-        windowState.currentProfileId = space.profileId ?? currentProfile?.id
-        updateGradient(for: windowState, to: space.gradient, animate: true)
-
-        // Get the active tab for this space
-        let spacePinned = tabManager.spacePinnedTabs(for: space.id)
-        let regularTabs = tabManager.tabs(in: space)
-        let profileEssentials =
-            (space.profileId ?? currentProfile?.id).flatMap { tabManager.essentialTabs(for: $0) }
-            ?? []
-        let allTabsForSpace = profileEssentials + spacePinned + regularTabs
-
-        // Find the active tab for this space - prioritize window-specific memory
-        var targetTab: Tab?
-
-        // First, try to use the window-specific active tab for this space
-        if let windowActiveTabId = windowState.activeTabForSpace[space.id] {
-            targetTab = allTabsForSpace.first { $0.id == windowActiveTabId }
-        }
-
-        // If no window-specific tab found, try the global space active tab
-        if targetTab == nil, let globalActiveId = space.activeTabId {
-            targetTab = allTabsForSpace.first { $0.id == globalActiveId }
-        }
-
-        // Fallback to first available tab in the space
-        if targetTab == nil {
-            targetTab = allTabsForSpace.first
-        }
-
-        // Set the active tab for this window
-        if let tab = targetTab {
-            selectTab(tab, in: windowState)
-        }
-
-        if isActiveWindow {
-            adoptProfileIfNeeded(for: windowState, context: .spaceChange)
-        }
-
-        #if DEBUG
-        print(
-            "🪟 [BrowserManager] Set active space \(space.name) for window \(windowState.id), active tab: \(targetTab?.name ?? "none")"
-        )
-        #endif
-    }
-
-    /// Validate and fix window states after tab/space mutations
-    func validateWindowStates() {
-        for (_, windowState) in windowRegistry?.windows ?? [:] {
-            var needsUpdate = false
-
-            // Check if current tab still exists
-            if let currentTabId = windowState.currentTabId {
-                if tabManager.allTabs().first(where: { $0.id == currentTabId }) == nil {
-                    windowState.currentTabId = nil
-                    needsUpdate = true
-                }
-            }
-
-            // Check if current space still exists
-            if let currentSpaceId = windowState.currentSpaceId {
-                if tabManager.spaces.first(where: { $0.id == currentSpaceId }) == nil {
-                    windowState.currentSpaceId = tabManager.spaces.first?.id
-                    needsUpdate = true
-                }
-            }
-
-            // If no current tab, try TabManager's current tab (if loaded), but only when it
-            // belongs to this window's space or that space's favorites. Another window's tab
-            // from a different space or profile would not match this window's sidebar.
-            // Don't search for fallbacks — if TabManager set currentTab to nil,
-            // all tabs are unloaded and we should show the empty state.
-            if windowState.currentTabId == nil {
-                let windowSpace = windowState.currentSpaceId.flatMap { id in tabManager.spaces.first(where: { $0.id == id }) }
-                if let managerCurrentTab = tabManager.currentTab, !managerCurrentTab.isUnloaded,
-                   let windowSpace,
-                   managerCurrentTab.spaceId == windowSpace.id
-                    || tabManager.essentialTabs(for: windowSpace.profileId).contains(where: { $0.id == managerCurrentTab.id }) {
-                    windowState.currentTabId = managerCurrentTab.id
-                    #if DEBUG
-                    print(
-                        "🔧 [validateWindowStates] Using TabManager's current tab: \(managerCurrentTab.name)"
-                    )
-                    #endif
-                }
-                needsUpdate = true
-            }
-
-            // If no current space, use the first available space
-            if windowState.currentSpaceId == nil {
-                windowState.currentSpaceId = tabManager.spaces.first?.id
-                needsUpdate = true
-            }
-
-            if let spaceId = windowState.currentSpaceId,
-                let space = tabManager.spaces.first(where: { $0.id == spaceId })
-            {
-                updateGradient(for: windowState, to: space.gradient, animate: false)
-                windowState.currentProfileId = space.profileId ?? currentProfile?.id
-            } else if windowState.currentSpaceId == nil {
-                updateGradient(for: windowState, to: .default, animate: false)
-                windowState.currentProfileId = currentProfile?.id
-            }
-
-            if needsUpdate {
-                windowState.refreshCompositor()
-            }
-        }
-
-        // Note: No need to clean up tab display owners since they're no longer used
-    }
-
-    // MARK: - Keyboard Shortcut Support Methods
-
-    /// Select the next tab in the active window
-    func selectNextTabInActiveWindow() {
-        guard let activeWindow = windowRegistry?.activeWindow else { return }
-        let currentTabs = tabsForDisplay(in: activeWindow)
-        guard let currentTab = currentTab(for: activeWindow),
-            let currentIndex = currentTabs.firstIndex(where: { $0.id == currentTab.id })
-        else { return }
-
-        let nextIndex = (currentIndex + 1) % currentTabs.count
-        if let nextTab = currentTabs[safe: nextIndex] {
-            selectTab(nextTab, in: activeWindow)
-        }
-    }
-
-    /// Select the previous tab in the active window
-    func selectPreviousTabInActiveWindow() {
-        guard let activeWindow = windowRegistry?.activeWindow else { return }
-        let currentTabs = tabsForDisplay(in: activeWindow)
-        guard let currentTab = currentTab(for: activeWindow),
-            let currentIndex = currentTabs.firstIndex(where: { $0.id == currentTab.id })
-        else { return }
-
-        let previousIndex = currentIndex > 0 ? currentIndex - 1 : currentTabs.count - 1
-        if let previousTab = currentTabs[safe: previousIndex] {
-            selectTab(previousTab, in: activeWindow)
-        }
-    }
-
-    /// Select tab by index in the active window
-    func selectTabByIndexInActiveWindow(_ index: Int) {
-        guard let activeWindow = windowRegistry?.activeWindow else { return }
-        let currentTabs = tabsForDisplay(in: activeWindow)
-        guard currentTabs.indices.contains(index) else { return }
-
-        let tab = currentTabs[index]
-        selectTab(tab, in: activeWindow)
-    }
-
-    /// Select the last tab in the active window
-    func selectLastTabInActiveWindow() {
-        guard let activeWindow = windowRegistry?.activeWindow else { return }
-        let currentTabs = tabsForDisplay(in: activeWindow)
-        guard let lastTab = currentTabs.last else { return }
-
-        selectTab(lastTab, in: activeWindow)
-    }
-
-    /// Select the next space in the active window
-    func selectNextSpaceInActiveWindow() {
-        guard let activeWindow = windowRegistry?.activeWindow,
-            let currentSpaceId = activeWindow.currentSpaceId,
-            let currentSpaceIndex = tabManager.spaces.firstIndex(where: { $0.id == currentSpaceId })
-        else { return }
-
-        let nextIndex = (currentSpaceIndex + 1) % tabManager.spaces.count
-        if let nextSpace = tabManager.spaces[safe: nextIndex] {
-            setActiveSpace(nextSpace, in: activeWindow)
-        }
-    }
-
-    /// Select the previous space in the active window
-    func selectPreviousSpaceInActiveWindow() {
-        guard let activeWindow = windowRegistry?.activeWindow,
-            let currentSpaceId = activeWindow.currentSpaceId,
-            let currentSpaceIndex = tabManager.spaces.firstIndex(where: { $0.id == currentSpaceId })
-        else { return }
-
-        let previousIndex =
-            currentSpaceIndex > 0 ? currentSpaceIndex - 1 : tabManager.spaces.count - 1
-        if let previousSpace = tabManager.spaces[safe: previousIndex] {
-            setActiveSpace(previousSpace, in: activeWindow)
-        }
-    }
-
-    /// Create a new window
-    func createNewWindow() {
+    /// Opens a regular window. `frame` places a window restored from DeviceState.windows.
+    func createNewWindow(frame: NSRect? = nil) {
         guard let windowRegistry = windowRegistry,
               let webViewCoordinator = webViewCoordinator else {
             #if DEBUG
@@ -2158,11 +1475,25 @@ class BrowserManager: ObservableObject {
             defer: false
         )
 
-        let contentView = ContentView()
+        let contentView = windowContent(ContentView(), windowRegistry: windowRegistry, webViewCoordinator: webViewCoordinator)
+
+        newWindow.contentView = NSHostingView(rootView: contentView)
+        newWindow.title = "Nook"
+        newWindow.minSize = NSSize(width: 470, height: 382)
+        newWindow.contentMinSize = NSSize(width: 470, height: 382)
+        if let frame {
+            newWindow.setFrame(frame, display: false)
+        } else {
+            newWindow.center()
+        }
+        newWindow.makeKeyAndOrderFront(nil)
+    }
+
+    private func windowContent(_ content: ContentView, windowRegistry: WindowRegistry, webViewCoordinator: WebViewCoordinator) -> some View {
+        content
             .background(BackgroundWindowModifier())
             .ignoresSafeArea(.all)
             .environmentObject(self)
-            .environmentObject(tabManager)
             .environment(tabs)
             .environment(windowRegistry)
             .environment(webViewCoordinator)
@@ -2173,20 +1504,21 @@ class BrowserManager: ObservableObject {
             .environment(keyboardShortcutManager)
             .environment(mcpManager)
             .environment(tabOrganizerManager)
+    }
 
-        newWindow.contentView = NSHostingView(rootView: contentView)
-        newWindow.title = "Nook"
-        newWindow.minSize = NSSize(width: 470, height: 382)
-        newWindow.contentMinSize = NSSize(width: 470, height: 382)
-        newWindow.center()
-        newWindow.makeKeyAndOrderFront(nil)
+    /// Opens every saved window record no open window has claimed, once per launch.
+    private var didRestoreSavedWindows = false
+
+    private func restoreSavedWindows() {
+        guard !didRestoreSavedWindows else { return }
+        didRestoreSavedWindows = true
+        for record in tabs.unclaimedWindowRecords() {
+            createNewWindow(frame: record.frame.map(NSRectFromString))
+        }
     }
 
     // MARK: - Incognito Window
-    
-    /// Active incognito window IDs
-    @Published private var incognitoWindows: Set<UUID> = []
-    
+
     /// Create a new incognito/private browsing window
     func createIncognitoWindow() {
         guard let windowRegistry = windowRegistry,
@@ -2199,27 +1531,8 @@ class BrowserManager: ObservableObject {
 
         let windowState = BrowserWindowState()
         windowState.isIncognito = true
-        
-        // Create ephemeral profile for this window
-        let ephemeralProfile = profileManager.createEphemeralProfile(for: windowState.id)
-        windowState.ephemeralProfile = ephemeralProfile
-        windowState.currentProfileId = ephemeralProfile.id
-        
-        // Create default ephemeral space
-        let ephemeralSpace = Space(
-            id: UUID(),
-            name: "Incognito",
-            icon: "eye.slash",
-            profileId: ephemeralProfile.id
-        )
-        ephemeralSpace.isEphemeral = true
-        windowState.ephemeralSpaces.append(ephemeralSpace)
-        windowState.currentSpaceId = ephemeralSpace.id
-        
-        // Track as incognito window
-        incognitoWindows.insert(windowState.id)
-        
-        // Create the NSWindow (similar to createNewWindow but with incognito title)
+        windowState.ephemeralProfile = profileManager.createEphemeralProfile(for: windowState.id)
+
         let newWindow = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
@@ -2227,112 +1540,31 @@ class BrowserManager: ObservableObject {
             defer: false
         )
 
-        let contentView = ContentView(windowState: windowState)
-            .background(BackgroundWindowModifier())
-            .ignoresSafeArea(.all)
-            .environmentObject(self)
-            .environmentObject(tabManager)
-            .environment(tabs)
-            .environment(windowRegistry)
-            .environment(webViewCoordinator)
-            .environmentObject(gradientColorManager)
-            .environment(\.nookSettings, nookSettings ?? NookSettingsService())
-            .environment(aiService)
-            .environment(aiConfigService)
-            .environment(keyboardShortcutManager)
-            .environment(mcpManager)
-            .environment(tabOrganizerManager)
+        let contentView = windowContent(ContentView(windowState: windowState), windowRegistry: windowRegistry, webViewCoordinator: webViewCoordinator)
 
         newWindow.contentView = NSHostingView(rootView: contentView)
         newWindow.title = "Incognito - Nook"
         newWindow.minSize = NSSize(width: 470, height: 382)
         newWindow.contentMinSize = NSSize(width: 470, height: 382)
         newWindow.center()
-        
+
         windowState.window = newWindow
-        
-        // Register the window
+
+        // Registration gives the window its private tree (TabsController.attach).
         windowRegistry.register(windowState)
         windowRegistry.setActive(windowState)
-        
-        // Set tabManager reference only (don't call full setupWindowState - it would overwrite ephemeral state)
-        windowState.tabManager = tabManager
-        
-        // Create initial ephemeral tab
-        createNewTab(in: windowState)
-        
+        tabs.open(url: TabsController.homeURL, in: windowState, placement: .newTab)
+
         newWindow.makeKeyAndOrderFront(nil)
-        
-        #if DEBUG
-        print("🔒 [BrowserManager] Created incognito window: \(windowState.id)")
-        #endif
     }
-    
-    /// Close an incognito window and clean up all ephemeral data
-    /// This method ensures complete destruction of the incognito session with no memory leaks
+
+    /// Destroys a closed incognito window's ephemeral profile and data store. Its pages were
+    /// already ended by TabsController.detach.
     func closeIncognitoWindow(_ windowState: BrowserWindowState) async {
         guard windowState.isIncognito else { return }
-        
-        #if DEBUG
-        print("🔒 [BrowserManager] Closing incognito window: \(windowState.id)")
-        #endif
-        
-        // Step 1: Clean up all clone WebViews for ephemeral tabs from WebViewCoordinator
-        // This is critical - clone WebViews hold references to the data store
-        if let coordinator = webViewCoordinator {
-            for tab in windowState.ephemeralTabs {
-                coordinator.removeAllWebViews(for: tab)
-            }
-        }
-        
-        // Step 2: Clean up main WebViews for ephemeral tabs
-        for tab in windowState.ephemeralTabs {
-            tab.performComprehensiveWebViewCleanup()
-        }
-        
-        // Step 3: Stop tracking this window BEFORE removing profile
-        // This prevents any concurrent access to ephemeral data
-        incognitoWindows.remove(windowState.id)
-        
-        // Step 4: Clear all ephemeral references from window state
-        // This breaks retain cycles BEFORE profile destruction
-        let ephemeralTabs = windowState.ephemeralTabs
-        let ephemeralSpaces = windowState.ephemeralSpaces
-        windowState.ephemeralTabs.removeAll()
-        windowState.ephemeralSpaces.removeAll()
-        windowState.currentTabId = nil
-        
-        // Step 5: Remove ephemeral profile (triggers data store destruction)
-        // This is done last to ensure all references are cleared first
         await profileManager.removeEphemeralProfile(for: windowState.id)
-        
-        // Step 6: Final cleanup of window state
         windowState.ephemeralProfile = nil
-        windowState.currentSpaceId = nil
-        
-        // Step 7: Force a memory warning to encourage garbage collection
-        // This helps ensure the data store is released
-        #if DEBUG
-        print("🔒 [BrowserManager] Incognito window closed. Ephemeral tabs: \(ephemeralTabs.count), spaces: \(ephemeralSpaces.count)")
-        #endif
-        
-        #if DEBUG
-        print("🔒 [BrowserManager] Incognito window fully closed and cleaned up: \(windowState.id)")
-        #endif
-    }
-    
-    /// Check if a tab can be dragged to a target window (block cross-window for incognito)
-    func canDragTab(_ tab: Tab, toWindow targetWindow: BrowserWindowState) -> Bool {
-        let sourceIsIncognito = tab.isEphemeral
-        let targetIsIncognito = targetWindow.isIncognito
-        
-        // Block dragging between incognito and normal windows
-        return sourceIsIncognito == targetIsIncognito
-    }
-    
-    /// Check if a window is an incognito window
-    func isIncognitoWindow(_ windowId: UUID) -> Bool {
-        return incognitoWindows.contains(windowId)
+        windowState.spaceID = nil
     }
 
     /// Close the active window
@@ -2393,14 +1625,8 @@ class BrowserManager: ObservableObject {
     }
 
     func undoCloseTab() {
-        tabManager.undoCloseTab()
-    }
-
-    /// Expand all folders in the sidebar
-    func expandAllFoldersInSidebar() {
-        // TODO: Implement folder expansion
-        // This would need to be handled by the sidebar component
-        toggleSidebar()
+        guard let window = windowRegistry?.activeWindow else { return }
+        tabs.reopenLastClosed(in: window)
     }
 }
 

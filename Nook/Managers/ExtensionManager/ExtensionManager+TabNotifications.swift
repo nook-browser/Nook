@@ -90,15 +90,6 @@ extension ExtensionManager {
         extensionController?.didCloseWindow(adapter)
     }
 
-    // MARK: - Legacy Tab Entry Points
-
-    // Called by Tab/TabManager until task Z deletes them. Extensions follow PageSession now
-    // (see ExtensionManager+PageSessionHooks.swift), so these do nothing.
-    func notifyTabOpened(_ tab: Tab) {}
-    func notifyTabActivated(newTab: Tab, previous: Tab?) {}
-    func notifyTabClosed(_ tab: Tab) {}
-    func notifyTabPropertiesChanged(_ tab: Tab, properties: WKWebExtension.TabChangedProperties) {}
-
     /// Give each loaded extension explicit access to `url`, but only when that extension's
     /// granted match patterns already cover it. Some WebKit builds did not treat a granted
     /// pattern as access to a URL (content scripts skipped, `tabs.query` without URLs), so

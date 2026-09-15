@@ -75,18 +75,7 @@ final class SplitViewManager: ObservableObject {
         }
     }
 
-    /// The active side follows the window's selection; kept for callers that report selection.
-    func updateActiveSide(for itemID: UUID, in windowId: UUID) {}
-
     // MARK: - Entering and Leaving
-
-    /// Shows `leftTabId` and `rightTabId` side by side in the window.
-    func enterSplit(leftTabId: UUID, rightTabId: UUID, for windowId: UUID) {
-        guard leftTabId != rightTabId, let window = window(windowId) else { return }
-        window.split = SplitRecord(leftItemID: leftTabId, rightItemID: rightTabId, fraction: 0.5)
-        loadPanes(of: window)
-        window.refreshCompositor()
-    }
 
     /// Puts `itemID` on `side`. Outside a split it pairs with the window's selection, which stays
     /// selected; inside a split it replaces that pane and becomes the selection.

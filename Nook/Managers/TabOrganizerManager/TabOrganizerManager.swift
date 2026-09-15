@@ -147,12 +147,6 @@ final class TabOrganizerManager {
         isOrganizing = false
     }
 
-    /// Old-model entry point for sidebar callers that still hold a `Space`; removed in task Z.
-    func organizeTabs(in space: Space, using tabManager: TabManager) async {
-        guard let tabs = tabManager.browserManager?.tabs else { return }
-        await organizeTabs(in: space.id, using: tabs)
-    }
-
     // MARK: - Undo
 
     /// Reverts the last organization: folders it created go away, moved and renamed tabs go back,

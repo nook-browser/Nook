@@ -55,11 +55,6 @@ final class PeekManager: ObservableObject {
         }
     }
 
-    /// Old-model entry point still called by `Tab`; removed with `Tab` in task Z.
-    func presentExternalURL(_ url: URL, from tab: Tab?) {
-        presentExternalURL(url, from: tab.flatMap { browserManager?.tabs.session(for: $0.id) })
-    }
-
     func dismissPeek() {
         guard isActive else { return }
 
@@ -84,7 +79,8 @@ final class PeekManager: ObservableObject {
         }
         // The adopted page is selected; pair it with the page the window showed before.
         if let previous, previous != itemID {
-            browserManager.splitManager.enterSplit(leftTabId: previous, rightTabId: itemID, for: window.id)
+            browserManager.tabs.select(previous, in: window)
+            browserManager.splitManager.enterSplit(with: itemID, placeOn: .right, in: window)
         }
         dismissPeek()
     }

@@ -17,8 +17,7 @@ final class FaviconCache: @unchecked Sendable {
     static let maxMemoryEntries = 200
 
     private struct Entry {
-        /// nil for entries stored through the legacy `Tab.cacheFavicon(_:for:)` SwiftUI path.
-        let nsImage: NSImage?
+        let nsImage: NSImage
         let image: SwiftUI.Image
     }
 
@@ -44,7 +43,7 @@ final class FaviconCache: @unchecked Sendable {
         lock.withLock { memory[key]?.nsImage }
     }
 
-    /// Memory cache only, as a SwiftUI image (includes legacy SwiftUI-only entries).
+    /// Memory cache only, as a SwiftUI image.
     func swiftUIImage(for key: String) -> SwiftUI.Image? {
         lock.withLock { memory[key]?.image }
     }
@@ -87,11 +86,6 @@ final class FaviconCache: @unchecked Sendable {
         queue.async(flags: .barrier) {
             try? png.write(to: url)
         }
-    }
-
-    /// Memory-only store of a SwiftUI image. Kept for the old `Tab` statics until task Z.
-    func storeSwiftUIImage(_ image: SwiftUI.Image, for key: String) {
-        insert(Entry(nsImage: nil, image: image), for: key)
     }
 
     // MARK: - Maintenance

@@ -26,11 +26,6 @@ struct SpaceTitle: View {
         self.isDropHovering = isDropHovering
     }
 
-    /// Old-model initializer kept for SpaceView (T1) until it stops rendering the title.
-    init(space: Space) {
-        self.init(spaceID: MainActor.assumeIsolated { space.id })
-    }
-
     var body: some View {
         if let space = tabs.space(spaceID) {
             content(space)

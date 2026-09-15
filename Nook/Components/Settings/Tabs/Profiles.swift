@@ -190,13 +190,7 @@ struct ProfilesSettingsView: View {
                     return
                 }
                 browserManager.dialogManager.closeDialog()
-                Task { @MainActor in
-                    if browserManager.currentProfile?.id == profile.id {
-                        await browserManager.switchToProfile(heir)
-                    }
-                    await profile.clearAllData()
-                    tabs.deleteProfile(profile.id, heir: heir.id)
-                }
+                browserManager.deleteProfile(profile, heir: heir)
             },
             onCancel: { browserManager.dialogManager.closeDialog() }
         )

@@ -34,7 +34,7 @@ class WindowRegistry {
     @ObservationIgnored
     var onWindowClose: ((UUID) -> Void)?
 
-    /// Callback for post-registration setup (e.g., setting TabManager reference)
+    /// Callback for post-registration setup (BrowserManager.setupWindowState)
     @ObservationIgnored
     var onWindowRegister: ((BrowserWindowState) -> Void)?
 
