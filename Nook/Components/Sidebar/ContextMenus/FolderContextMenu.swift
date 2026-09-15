@@ -5,33 +5,60 @@
 //  Created by Claude on 2026-09-14.
 //
 
+import NookTabsCore
 import SwiftUI
 
-/// Shared context menu for sidebar tab folders. Used both by the folder
+/// Shared context menu for sidebar folders. Used both by the folder
 /// header's hover menu and by its right-click menu.
 struct FolderContextMenu: View {
-    let folder: TabFolder
+    let itemID: UUID
     let onRename: () -> Void
-    let onAddTab: () -> Void
-    let onAlphabetize: () -> Void
-    let onDelete: () -> Void
+
+    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserWindowState.self) private var windowState: BrowserWindowState?
+
+    private var tabs: TabsController { browserManager.tabs }
 
     var body: some View {
         Group {
             Button(action: onRename) {
                 Label("Rename Folder", systemImage: "pencil")
             }
-            Button(action: onAddTab) {
+            Button {
+                guard let windowState else { return }
+                tabs.open(url: TabsController.homeURL, in: windowState, placement: .newTab, parent: .folder(itemID: itemID))
+            } label: {
                 Label("Add Tab to Folder", systemImage: "plus")
             }
+            Button {
+                tabs.createFolder(title: "New Folder", in: .folder(itemID: itemID), after: nil)
+            } label: {
+                Label("New Folder Inside", systemImage: "folder.badge.plus")
+            }
             Divider()
-            Button(action: onAlphabetize) {
+            Button(action: alphabetize) {
                 Label("Alphabetize Tabs", systemImage: "textformat.abc")
             }
             Divider()
-            Button(role: .destructive, action: onDelete) {
+            Button(role: .destructive) {
+                tabs.close(itemID)
+            } label: {
                 Label("Delete Folder", systemImage: "trash")
             }
+        }
+    }
+
+    /// Folders first, then tabs, each by title.
+    private func alphabetize() {
+        let parent = Parent.folder(itemID: itemID)
+        let sorted = tabs.children(of: parent).sorted {
+            if $0.isFolder != $1.isFolder { return $0.isFolder }
+            return tabs.title(for: $0).localizedCaseInsensitiveCompare(tabs.title(for: $1)) == .orderedAscending
+        }
+        var previous: UUID?
+        for child in sorted {
+            tabs.move(child.id, to: parent, after: previous)
+            previous = child.id
         }
     }
 }

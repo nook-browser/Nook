@@ -125,7 +125,7 @@ private struct NookDragPreviewContent: View {
         ZStack {
             if manager.draggedItem != nil {
                 NookMorphingPreview(
-                    tab: manager.draggedTab,
+                    icon: manager.draggedIcon,
                     title: manager.draggedItem?.title ?? "",
                     style: currentStyle,
                     sidebarWidth: manager.sidebarScreenFrame.width
@@ -142,9 +142,9 @@ private struct NookDragPreviewContent: View {
         }
 
         switch manager.activeZone {
-        case .essentials:
+        case .favorites:
             return .pinnedTile
-        case .spacePinned, .spaceRegular, .folder:
+        case .section, .target:
             return .tabRow
         case nil:
             return .ghost
@@ -155,7 +155,7 @@ private struct NookDragPreviewContent: View {
 // MARK: - Morphing Preview
 
 private struct NookMorphingPreview: View {
-    let tab: Tab?
+    let icon: Image?
     let title: String
     let style: NookPreviewStyle
     let sidebarWidth: CGFloat
@@ -219,8 +219,8 @@ private struct NookMorphingPreview: View {
             NookDesign.Radius.shape(NookDesign.Radius.lg)
                 .fill(backgroundColor)
 
-            if let tab = tab {
-                tab.favicon
+            if let icon {
+                icon
                     .resizable()
                     .interpolation(.high)
                     .antialiased(true)
@@ -251,8 +251,8 @@ private struct NookMorphingPreview: View {
             }
 
             HStack(spacing: 8) {
-                if let tab = tab {
-                    tab.favicon
+                if let icon {
+                    icon
                         .resizable()
                         .scaledToFit()
                         .frame(width: 16, height: 16)

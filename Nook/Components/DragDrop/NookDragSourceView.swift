@@ -11,16 +11,14 @@ import AppKit
 @MainActor
 final class NookDragSourceCoordinator: NSObject, NSDraggingSource {
     var item: NookDragItem
-    var tab: Tab?
+    var icon: Image?
     var zoneID: DropZoneID
-    var index: Int
     let manager: NookDragSessionManager
 
-    init(item: NookDragItem, tab: Tab?, zoneID: DropZoneID, index: Int, manager: NookDragSessionManager) {
+    init(item: NookDragItem, icon: Image?, zoneID: DropZoneID, manager: NookDragSessionManager) {
         self.item = item
-        self.tab = tab
+        self.icon = icon
         self.zoneID = zoneID
-        self.index = index
         self.manager = manager
     }
 
@@ -61,7 +59,7 @@ final class NookDragSourceNSView: NSView {
     }
 
     func initiateDrag(with event: NSEvent) {
-        guard let coordinator = coordinator, let tab = coordinator.tab else { return }
+        guard let coordinator = coordinator else { return }
 
         // Capture screen position from the event for preview window positioning
         let screenPoint: NSPoint
@@ -73,9 +71,8 @@ final class NookDragSourceNSView: NSView {
 
         coordinator.manager.beginDrag(
             item: coordinator.item,
-            tab: tab,
+            icon: coordinator.icon,
             from: coordinator.zoneID,
-            at: coordinator.index,
             cursorScreenPoint: screenPoint
         )
 
@@ -101,9 +98,8 @@ final class NookDragSourceNSView: NSView {
 
 private struct DragSourceAnchor: NSViewRepresentable {
     let item: NookDragItem
-    let tab: Tab?
+    let icon: Image?
     let zoneID: DropZoneID
-    let index: Int
     let manager: NookDragSessionManager
 
     func makeNSView(context: Context) -> NookDragSourceNSView {
@@ -115,9 +111,8 @@ private struct DragSourceAnchor: NSViewRepresentable {
 
     func updateNSView(_ nsView: NookDragSourceNSView, context: Context) {
         context.coordinator.item = item
-        context.coordinator.tab = tab
+        context.coordinator.icon = icon
         context.coordinator.zoneID = zoneID
-        context.coordinator.index = index
     }
 
     static func dismantleNSView(_ nsView: NookDragSourceNSView, coordinator: NookDragSourceCoordinator) {
@@ -125,7 +120,7 @@ private struct DragSourceAnchor: NSViewRepresentable {
     }
 
     func makeCoordinator() -> NookDragSourceCoordinator {
-        NookDragSourceCoordinator(item: item, tab: tab, zoneID: zoneID, index: index, manager: manager)
+        NookDragSourceCoordinator(item: item, icon: icon, zoneID: zoneID, manager: manager)
     }
 }
 
@@ -133,9 +128,8 @@ private struct DragSourceAnchor: NSViewRepresentable {
 
 struct NookDragSourceView<Content: View>: View {
     let item: NookDragItem
-    let tab: Tab?
+    let icon: Image?
     let zoneID: DropZoneID
-    let index: Int
     let manager: NookDragSessionManager
     @ViewBuilder let content: () -> Content
 
@@ -144,9 +138,8 @@ struct NookDragSourceView<Content: View>: View {
             .background(
                 DragSourceAnchor(
                     item: item,
-                    tab: tab,
+                    icon: icon,
                     zoneID: zoneID,
-                    index: index,
                     manager: manager
                 )
             )

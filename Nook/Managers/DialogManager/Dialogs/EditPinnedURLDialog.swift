@@ -2,7 +2,7 @@
 //  EditPinnedURLDialog.swift
 //  Nook
 //
-//  Dialog to edit the pinned "home" URL of a pinned tab.
+//  Dialog to edit the home URL of a pinned tab or favorite.
 //
 
 import SwiftUI
@@ -10,25 +10,22 @@ import SwiftUI
 struct EditPinnedURLDialog: DialogPresentable {
     let originalURL: String
     let tabDisplayName: String
-    let tabFavicon: SwiftUI.Image
 
     @State private var urlText: String
 
     let onSave: (URL) -> Void
     let onCancel: () -> Void
 
+    /// `url` is the tab's current home URL; `title` names the tab in the header.
     init(
-        tab: Tab,
+        url: URL,
+        title: String,
         onSave: @escaping (URL) -> Void,
         onCancel: @escaping () -> Void
     ) {
-        let url = MainActor.assumeIsolated { tab.pinnedURL?.absoluteString ?? tab.url.absoluteString }
-        let name = MainActor.assumeIsolated { tab.displayName }
-        let icon = MainActor.assumeIsolated { tab.favicon }
-        self.originalURL = url
-        self.tabDisplayName = name
-        self.tabFavicon = icon
-        _urlText = State(initialValue: url)
+        self.originalURL = url.absoluteString
+        self.tabDisplayName = title
+        _urlText = State(initialValue: url.absoluteString)
         self.onSave = onSave
         self.onCancel = onCancel
     }
@@ -36,7 +33,7 @@ struct EditPinnedURLDialog: DialogPresentable {
     func dialogHeader() -> DialogHeader {
         DialogHeader(
             icon: "link",
-            title: "Edit Pinned URL",
+            title: "Edit Home URL",
             subtitle: tabDisplayName
         )
     }
@@ -44,7 +41,7 @@ struct EditPinnedURLDialog: DialogPresentable {
     @ViewBuilder
     func dialogContent() -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("This is the URL that opens when you reset this pinned tab.")
+            Text("This is the page that opens when you reset this tab or open it after closing its page.")
                 .font(NookDesign.Font.body)
                 .foregroundStyle(.secondary)
 
