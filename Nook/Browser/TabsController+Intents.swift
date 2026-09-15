@@ -114,6 +114,7 @@ extension TabsController {
         guard let spaceID = window.spaceID else { return }
         setProfile(source.space(spaceID)?.profileID, of: window)
         window.selectedItemBySpace[spaceID] = itemID
+        window.emptiedSpaces.remove(spaceID)
         var recent = window.recentItemsBySpace[spaceID, default: []]
         recent.removeAll { $0 == itemID }
         recent.append(itemID)
@@ -167,7 +168,7 @@ extension TabsController {
         let order = displayOrder(in: window)
         if let remembered = window.selectedItemBySpace[spaceID], order.contains(remembered) {
             select(remembered, in: window)
-        } else if let first = order.first {
+        } else if !window.emptiedSpaces.contains(spaceID), let first = order.first {
             select(first, in: window)
         } else {
             window.selectedItemBySpace[spaceID] = nil
@@ -338,6 +339,7 @@ extension TabsController {
                 select(next, in: window)
             } else {
                 window.selectedItemBySpace[spaceID] = nil
+                window.emptiedSpaces.insert(spaceID)
                 mirror(window)
                 window.refreshCompositor()
             }

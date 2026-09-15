@@ -108,6 +108,10 @@ class BrowserWindowState {
     /// returns to the one before it. In memory only.
     var recentItemsBySpace: [UUID: [UUID]] = [:]
 
+    /// Spaces whose last open tab was closed in this window. Returning to one shows the empty
+    /// space instead of selecting its first tab. In memory only.
+    var emptiedSpaces: Set<UUID> = []
+
     /// The selected item in the current space. There is no global current tab.
     var selectedItemID: UUID? {
         spaceID.flatMap { selectedItemBySpace[$0] }
