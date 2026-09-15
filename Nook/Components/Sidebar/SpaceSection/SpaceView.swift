@@ -90,17 +90,19 @@ struct SpaceView: View {
                     ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                         rowView(row, zone: zone, split: split, isDropTarget: position == DropPosition(zone: zone, index: index, placement: .into))
                             .padding(.leading, CGFloat(row.depth) * NookDesign.Spacing.folderIndent)
+                            // The line is indented to the level the drop lands at (dropDepth), so a
+                            // line that puts the item inside a folder is always drawn inside it.
                             .overlay(alignment: .top) {
                                 if position == DropPosition(zone: zone, index: index, placement: .before) {
                                     dropLine.offset(y: -NookDesign.Spacing.rowGap)
-                                        .padding(.leading, CGFloat(row.depth) * NookDesign.Spacing.folderIndent)
+                                        .padding(.leading, dropLineIndent)
                                 }
                             }
                             .overlay(alignment: .bottom) {
                                 if position == DropPosition(zone: zone, index: index, placement: .after)
                                     || (index == rows.count - 1 && position == DropPosition(zone: zone, index: rows.count, placement: .before)) {
                                     dropLine.offset(y: NookDesign.Spacing.rowGap)
-                                        .padding(.leading, position?.placement == .after ? CGFloat(row.depth) * NookDesign.Spacing.folderIndent : 0)
+                                        .padding(.leading, dropLineIndent)
                                 }
                             }
                     }
@@ -124,6 +126,11 @@ struct SpaceView: View {
                 }
             }
         }
+    }
+
+    /// Leading inset of a drop line. The overlay spans the row including its depth padding.
+    private var dropLineIndent: CGFloat {
+        CGFloat(dragSession.dropDepth) * NookDesign.Spacing.folderIndent
     }
 
     private var dropLine: some View {
