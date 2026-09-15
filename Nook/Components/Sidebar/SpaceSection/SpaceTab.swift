@@ -5,21 +5,26 @@
 //  Created by Maciek Bagiński on 30/07/2025.
 //
 
+import NookTabsCore
 import SwiftUI
 
+/// One tab row in the sidebar outline.
 struct SpaceTab: View {
-    @ObservedObject var tab: Tab
-    var action: () -> Void
-    var onClose: () -> Void
-    var onUnload: (() -> Void)? = nil
-    var onMute: () -> Void
-    var menuContext: TabMenuContext = .regular
+    let item: Item
+    var menuContext: TabMenuContext = .sidebar
+
     @State private var isHovering: Bool = false
     @State private var isCloseHovering: Bool = false
+    @State private var draftName: String = ""
     @FocusState private var isTextFieldFocused: Bool
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var tabManager: TabManager
     @Environment(BrowserWindowState.self) private var windowState
+    private let renameState = SidebarRenameState.shared
+
+    private var tabs: TabsController { browserManager.tabs }
+    private var session: PageSession? { tabs.session(for: item.id) }
+    private var isRenaming: Bool { renameState.itemID == item.id }
+    private var isUnloaded: Bool { session?.isUnloaded ?? true }
 
     /// Fades the trailing edge of the title instead of truncating with an ellipsis.
     /// On hover the clear region grows so the text ends before the close button.
@@ -34,81 +39,85 @@ struct SpaceTab: View {
     }
 
     var body: some View {
+        let title = tabs.title(for: item)
         Button(action: {
             if isCurrentTab {
-                tab.startRenaming()
-                isTextFieldFocused = true
+                startRename(title)
             } else {
-                if tab.isRenaming {
-                    tab.saveRename()
-                }
-                action()
+                if isRenaming { commitRename() }
+                tabs.select(item.id, in: windowState)
             }
         }) {
             HStack(spacing: NookDesign.Spacing.md) {
-                tab.favicon
-                    .resizable()
-                    .scaledToFit()
+                ItemFavicon(item: item, session: session)
                     .frame(width: NookDesign.Size.favicon, height: NookDesign.Size.favicon)
                     .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
-                if tab.hasAudioContent || tab.hasPlayingAudio || tab.isAudioMuted {
-                    Button(action: onMute) {
-                        Image(systemName: tab.isAudioMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                if let session, session.hasAudioContent || session.hasPlayingAudio || session.isAudioMuted {
+                    Button(action: { session.toggleMute() }) {
+                        Image(systemName: session.isAudioMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                             .contentTransition(.symbolEffect(.replace))
                             .font(.system(size: NookDesign.Size.rowGlyph, weight: .medium))
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
-                    .help(tab.isAudioMuted ? "Unmute" : "Mute")
+                    .help(session.isAudioMuted ? "Unmute" : "Mute")
                 }
-                
-                if tab.isRenaming {
-                    TextField("", text: $tab.editingName)
+
+                if isRenaming {
+                    TextField("", text: $draftName)
                         .font(NookDesign.Font.body)
-                        .foregroundStyle(tab.isUnloaded ? AppColors.textSecondary : textTab)
+                        .foregroundStyle(isUnloaded ? .secondary : .primary)
                         .textFieldStyle(.plain)
-                        .onSubmit {
-                            tab.saveRename()
-                        }
-                        .onExitCommand {
-                            tab.cancelRename()
-                        }
+                        .onSubmit { commitRename() }
+                        .onExitCommand { renameState.itemID = nil }
                         .focused($isTextFieldFocused)
                         .onAppear {
+                            if draftName.isEmpty { draftName = title }
                             isTextFieldFocused = true
                         }
                 } else {
                     // Hidden shrinkable copy sizes the row; the visible copy is laid out at
                     // full width and faded, so long titles never widen the row.
-                    Text(tab.displayName)
+                    Text(title)
                         .font(NookDesign.Font.body)
                         .lineLimit(1)
                         .hidden()
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .overlay(alignment: .leading) {
-                            Text(tab.displayName)
+                            Text(title)
                                 .font(NookDesign.Font.body)
-                                .foregroundStyle(textTab)
+                                .foregroundStyle(.primary)
                                 .lineLimit(1)
                                 .fixedSize(horizontal: true, vertical: false)
                         }
                         .mask(titleFade)
-                        .textSelection(.disabled) // Make text non-selectable
+                        .textSelection(.disabled)
+                }
+
+                if tabs.hasLeftHome(item.id) && !isHovering {
+                    Circle()
+                        .fill(.tertiary)
+                        .frame(width: NookDesign.Size.statusDot, height: NookDesign.Size.statusDot)
+                        .help("Navigated away from this tab's home page")
                 }
             }
             .overlay(alignment: .trailing) {
                 if isHovering {
-                    // Space-pinned loaded tabs: show "-" to unload; unloaded: show "x" to remove
-                    let useUnload = onUnload != nil && !tab.isUnloaded
-                    Button(action: useUnload ? onUnload! : onClose) {
+                    // Synced loaded tabs: "-" unloads the page; unloaded synced tabs: "x" removes the item;
+                    // tabs section: "x" closes.
+                    let useUnload = tabs.isSynced(item.id) && !isUnloaded
+                    Button(action: {
+                        if useUnload { tabs.unload(item.id) } else { tabs.removeFromSidebar(item.id) }
+                    }) {
                         Image(systemName: useUnload ? "minus" : "xmark")
                             .font(NookDesign.Font.secondary)
-                            .foregroundColor(textTab)
+                            .foregroundColor(.primary)
                             .frame(width: NookDesign.Size.rowButton, height: NookDesign.Size.rowButton)
                             .background(isCloseHovering ? NookDesign.Surface.fillPressed : Color.clear)
                             .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
                     }
                     .buttonStyle(PlainButtonStyle())
+                    .help(useUnload ? "Unload" : "Close")
                     .onHoverTracking { hovering in
                         isCloseHovering = hovering
                     }
@@ -117,11 +126,9 @@ struct SpaceTab: View {
             .padding(.horizontal, NookDesign.Spacing.rowPadding)
             .frame(height: NookDesign.Size.row)
             .frame(minWidth: 0, maxWidth: .infinity)
-            .background(
-                backgroundColor
-            )
+            .background(backgroundColor)
             .overlay {
-                if tab.isRenaming {
+                if isRenaming {
                     NookDesign.Radius.shape(NookDesign.Radius.md)
                         .strokeBorder(browserManager.gradientColorManager.accentColor, lineWidth: NookDesign.Size.hairlineWidth)
                 } else if isCurrentTab {
@@ -130,7 +137,7 @@ struct SpaceTab: View {
                 }
             }
             .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
-            .opacity(tab.isUnloaded ? NookDesign.Surface.unloadedOpacity : 1)
+            .opacity(isUnloaded ? NookDesign.Surface.unloadedOpacity : 1)
         }
         .buttonStyle(PlainButtonStyle())
         .onHoverTracking { hovering in
@@ -138,32 +145,24 @@ struct SpaceTab: View {
                 isHovering = hovering
             }
         }
-        .background(
-            Group {
-                if tab.isRenaming {
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            tab.saveRename()
-                        }
-                }
-            }
-        )
+        .onChange(of: isTextFieldFocused) { _, focused in
+            if isRenaming && !focused { commitRename() }
+        }
+        .onChange(of: isRenaming) { _, renaming in
+            if renaming { draftName = title }
+        }
         .contextMenu {
-            TabContextMenu(tab: tab, context: menuContext)
+            TabContextMenu(itemID: item.id, context: menuContext)
                 .environmentObject(browserManager)
-                .environmentObject(tabManager)
                 .environment(windowState)
         }
         .nookElevation(isCurrentTab ? .raised : .flat)
-        .onAppear {
-            tab.ensureFaviconLoaded()
-        }
     }
 
     private var isCurrentTab: Bool {
-        return browserManager.currentTab(for: windowState)?.id == tab.id
+        tabs.selectedItemID(in: windowState) == item.id
     }
+
     private var backgroundColor: Color {
         if isCurrentTab {
             return NookDesign.Surface.raised
@@ -173,8 +172,21 @@ struct SpaceTab: View {
             return Color.clear
         }
     }
-    private var textTab: Color {
-        .primary
+
+    private func startRename(_ title: String) {
+        draftName = title
+        renameState.itemID = item.id
+        isTextFieldFocused = true
     }
 
+    /// Empty input clears the custom title.
+    private func commitRename() {
+        guard isRenaming else { return }
+        let name = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
+        renameState.itemID = nil
+        isTextFieldFocused = false
+        if name != tabs.title(for: item) || name.isEmpty {
+            tabs.rename(item.id, name.isEmpty ? nil : name)
+        }
+    }
 }

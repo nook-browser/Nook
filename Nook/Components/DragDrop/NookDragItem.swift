@@ -5,6 +5,7 @@
 
 import Foundation
 import AppKit
+import NookTabsCore
 import UniformTypeIdentifiers
 
 extension UTType {
@@ -17,34 +18,20 @@ extension NSPasteboard.PasteboardType {
 
 // MARK: - Drop Zone Identity
 
+/// A place a dragged item can land.
 enum DropZoneID: Hashable {
-    case essentials
-    case spacePinned(UUID)
-    case spaceRegular(UUID)
-    case folder(UUID)
-
-    var asDragContainer: TabDragManager.DragContainer {
-        switch self {
-        case .essentials: return .essentials
-        case .spacePinned(let id): return .spacePinned(id)
-        case .spaceRegular(let id): return .spaceRegular(id)
-        case .folder(let id): return .folder(id)
-        }
-    }
-
-    var spaceId: UUID? {
-        switch self {
-        case .essentials: return nil
-        case .spacePinned(let id): return id
-        case .spaceRegular(let id): return id
-        case .folder: return nil
-        }
-    }
+    /// A profile's favorites grid.
+    case favorites(profileID: UUID)
+    /// The rows of a sidebar section (`.pinned` or `.tabs`).
+    case section(Parent)
+    /// A target without rows (space title, space switcher) that receives the item as a whole.
+    case target(Parent)
 }
 
 // MARK: - Drag Item
 
 struct NookDragItem: Codable, Equatable {
+    /// The dragged `Item` id (name kept for existing pasteboard readers).
     let tabId: UUID
     var title: String
     var urlString: String

@@ -7,22 +7,32 @@
 import SwiftUI
 @preconcurrency import AppKit
 import Combine
+import NookTabsCore
 
-// MARK: - Pending Drop
+// MARK: - Drop Position
 
-struct PendingDrop: Equatable {
-    let item: NookDragItem
-    let sourceZone: DropZoneID
-    let sourceIndex: Int
-    let targetZone: DropZoneID
-    let targetIndex: Int
+/// Where a drop would land inside a zone.
+struct DropPosition: Equatable {
+    enum Placement: Equatable { case before, after, into }
+    let zone: DropZoneID
+    /// Row or tile index. For rows, `before`/`after`/`into` refer to the row at `index`;
+    /// `index == rows.count` with `.before` means below every row.
+    let index: Int
+    let placement: Placement
 }
 
-struct PendingReorder: Equatable {
-    let item: NookDragItem
-    let zone: DropZoneID
-    let fromIndex: Int
-    let toIndex: Int
+/// How a zone lays out its items, so a pointer position maps to a `DropPosition`.
+enum DropLayout {
+    /// A target without rows.
+    case none
+    /// Uniform sidebar rows: `Size.row` tall, `Spacing.rowGap` apart.
+    case rows([Row])
+    /// The favorites grid.
+    case grid(count: Int, columns: Int)
+}
+
+extension Notification.Name {
+    static let tabDragDidEnd = Notification.Name("tabDragDidEnd")
 }
 
 // MARK: - Drag Session Manager
@@ -32,9 +42,9 @@ final class NookDragSessionManager: ObservableObject {
     static let shared = NookDragSessionManager()
 
     @Published var draggedItem: NookDragItem?
-    @Published var draggedTab: Tab?
+    /// Favicon shown by the drag preview.
+    @Published var draggedIcon: Image?
     @Published var sourceZone: DropZoneID?
-    @Published var sourceIndex: Int?
 
     @Published var activeZone: DropZoneID?
     var isOutsideWindow: Bool = false
@@ -45,16 +55,7 @@ final class NookDragSessionManager: ObservableObject {
     /// Only consumed by NookDragPreviewWindow — avoids triggering objectWillChange on every mouse move.
     let cursorScreenLocationSubject = PassthroughSubject<NSPoint, Never>()
 
-    @Published var insertionIndex: [DropZoneID: Int] = [:]
-
-    @Published var pendingDrop: PendingDrop?
-    @Published var pendingReorder: PendingReorder?
-
-    var zoneFrames: [DropZoneID: CGRect] = [:]
-    var itemCellSize: [DropZoneID: CGFloat] = [:]
-    var itemCellSpacing: [DropZoneID: CGFloat] = [:]
-    var itemCounts: [DropZoneID: Int] = [:]
-    var gridColumnCount: [DropZoneID: Int] = [:]
+    @Published var dropPosition: DropPosition?
 
     @Published var sidebarScreenFrame: CGRect = .zero
 
@@ -68,12 +69,8 @@ final class NookDragSessionManager: ObservableObject {
 
     var isSidebarReorder: Bool {
         guard isDragging, let source = sourceZone, activeZone == source else { return false }
-        switch source {
-        case .spaceRegular, .spacePinned, .folder:
-            return true
-        case .essentials:
-            return false
-        }
+        if case .section = source { return true }
+        return false
     }
 
     private var previewWindow: NookDragPreviewWindow?
@@ -185,7 +182,7 @@ final class NookDragSessionManager: ObservableObject {
 
     // MARK: - Drag Lifecycle
 
-    func beginDrag(item: NookDragItem, tab: Tab, from zone: DropZoneID, at index: Int, cursorScreenPoint: NSPoint) {
+    func beginDrag(item: NookDragItem, icon: Image?, from zone: DropZoneID, cursorScreenPoint: NSPoint) {
         ensurePreviewWindow()
 
         // Set cursor position BEFORE draggedItem so the preview window
@@ -193,14 +190,11 @@ final class NookDragSessionManager: ObservableObject {
         _updateCursorScreenPosition(cursorScreenPoint)
 
         draggedItem = item
-        draggedTab = tab
+        draggedIcon = icon
         sourceZone = zone
-        sourceIndex = index
         activeZone = zone
         isOutsideWindow = false
-        pendingDrop = nil
-        pendingReorder = nil
-        insertionIndex = [zone: index]
+        dropPosition = nil
     }
 
     nonisolated func updateCursorScreenPosition(_ screenPoint: NSPoint) {
@@ -243,91 +237,48 @@ final class NookDragSessionManager: ObservableObject {
     func cursorExitedZone(_ zone: DropZoneID) {
         guard isDragging, activeZone == zone else { return }
         activeZone = nil
-        insertionIndex[zone] = nil
+        if dropPosition?.zone == zone { dropPosition = nil }
     }
 
-    func updateInsertionIndex(for zone: DropZoneID, localPoint: CGPoint, isVertical: Bool) {
+    func updateDropPosition(for zone: DropZoneID, layout: DropLayout, localPoint: CGPoint, zoneWidth: CGFloat) {
         guard isDragging else { return }
-
-        let cellSize = itemCellSize[zone] ?? 36
-        let spacing = itemCellSpacing[zone] ?? 2
-        let count = itemCounts[zone] ?? 0
-
-        var idx: Int
-
-        if let cols = gridColumnCount[zone], cols > 0 {
-            // Grid layout (essentials): compute row + column from 2D position
-            // Use actual zone width divided by column count for column width
-            let zoneWidth = zoneFrames[zone]?.width ?? CGFloat(cols) * (cellSize + spacing)
-            let colWidth = zoneWidth / CGFloat(cols)
-            let rowHeight = cellSize + spacing
-            let col = min(max(0, Int(localPoint.x / colWidth)), cols - 1)
-            let row = max(0, Int(localPoint.y / rowHeight))
-            idx = row * cols + col
-        } else {
-            // Linear layout (vertical or horizontal)
-            let offset = isVertical ? localPoint.y : localPoint.x
-            let step = cellSize + spacing
-            if step > 0 {
-                idx = Int(round(offset / step))
-            } else {
-                idx = 0
-            }
-        }
-
-        // Clamp
-        if sourceZone == zone {
-            idx = max(0, min(idx, count - 1))
-        } else {
-            idx = max(0, min(idx, count))
-        }
-
-        let oldIdx = insertionIndex[zone]
-        if oldIdx != idx {
-            insertionIndex[zone] = idx
+        let position = Self.position(in: zone, layout: layout, point: localPoint, width: zoneWidth)
+        if position != dropPosition {
+            dropPosition = position
             hapticFeedback(.alignment)
         }
     }
 
+    /// Maps a point (top-left origin, zone-local) to a drop position.
+    static func position(in zone: DropZoneID, layout: DropLayout, point: CGPoint, width: CGFloat) -> DropPosition {
+        switch layout {
+        case .none:
+            return DropPosition(zone: zone, index: 0, placement: .before)
+        case .grid(let count, let columns):
+            let cols = max(1, columns)
+            let rowHeight = NookDesign.Size.essentialsTile + NookDesign.Spacing.sm
+            let colWidth = max(1, width / CGFloat(cols))
+            let col = min(max(0, Int((point.x / colWidth).rounded())), cols)
+            let row = max(0, Int(point.y / rowHeight))
+            return DropPosition(zone: zone, index: min(max(0, row * cols + col), count), placement: .before)
+        case .rows(let rows):
+            let step = NookDesign.Size.row + NookDesign.Spacing.rowGap
+            guard !rows.isEmpty, point.y < CGFloat(rows.count) * step else {
+                return DropPosition(zone: zone, index: rows.count, placement: .before)
+            }
+            let index = max(0, Int(point.y / step))
+            let fraction = (point.y - CGFloat(index) * step) / NookDesign.Size.row
+            let placement: DropPosition.Placement
+            if rows[index].item.isFolder {
+                placement = fraction < 1.0 / 3 ? .before : (fraction > 2.0 / 3 ? .after : .into)
+            } else {
+                placement = fraction < 0.5 ? .before : .after
+            }
+            return DropPosition(zone: zone, index: index, placement: placement)
+        }
+    }
+
     // MARK: - Drop
-
-    func completeDrop(targetZone: DropZoneID, targetIndex: Int) {
-        guard let item = draggedItem, let source = sourceZone else {
-            return
-        }
-
-        if source != targetZone {
-            pendingDrop = PendingDrop(
-                item: item,
-                sourceZone: source,
-                sourceIndex: sourceIndex ?? 0,
-                targetZone: targetZone,
-                targetIndex: targetIndex
-            )
-            hapticFeedback(.generic)
-            // Don't clearDrag here — handler will clear inside withAnimation
-            // so the visual state resets in the same transaction as the data change
-        } else {
-            hapticFeedback(.generic)
-            clearDrag()
-        }
-    }
-
-    func completeReorder() {
-        if let item = draggedItem,
-           let zone = sourceZone,
-           let from = sourceIndex,
-           let to = insertionIndex[zone],
-           from != to {
-            pendingReorder = PendingReorder(item: item, zone: zone, fromIndex: from, toIndex: to)
-            hapticFeedback(.generic)
-            // Don't clearDrag here — handler will clear inside withAnimation
-            // so the visual state resets in the same transaction as the data change
-        } else {
-            hapticFeedback(.generic)
-            clearDrag()
-        }
-    }
 
     func cancelDrag() {
         clearDrag()
@@ -336,12 +287,11 @@ final class NookDragSessionManager: ObservableObject {
 
     func clearDrag() {
         draggedItem = nil
-        draggedTab = nil
+        draggedIcon = nil
         sourceZone = nil
-        sourceIndex = nil
         activeZone = nil
         isOutsideWindow = false
-        insertionIndex = [:]
+        dropPosition = nil
     }
 
     // MARK: - Haptics
@@ -350,54 +300,4 @@ final class NookDragSessionManager: ObservableObject {
         NSHapticFeedbackManager.defaultPerformer.perform(pattern, performanceTime: .now)
     }
 
-    // MARK: - Live Reorder Offsets
-
-    func reorderOffset(for zone: DropZoneID, at index: Int) -> CGFloat {
-        guard isDragging, sourceZone == zone, activeZone == zone else { return 0 }
-        guard let from = sourceIndex, let to = insertionIndex[zone] else { return 0 }
-        guard from != to else { return 0 }
-
-        let cellSize = itemCellSize[zone] ?? 36
-        let spacing = itemCellSpacing[zone] ?? 2
-        let step = cellSize + spacing
-
-        // The dragged item is at `from`, it should visually move to `to`.
-        // All items between from and to need to shift by one step in the opposite direction.
-        if from < to {
-            // Dragging down: items from+1 to `to` shift up
-            if index > from && index <= to {
-                return -step
-            }
-        } else {
-            // Dragging up: items `to` to from-1 shift down
-            if index >= to && index < from {
-                return step
-            }
-        }
-        return 0
-    }
-
-    // MARK: - Bridge to TabManager
-
-    func makeDragOperation(from drop: PendingDrop, tab: Tab) -> DragOperation {
-        DragOperation(
-            tab: tab,
-            fromContainer: drop.sourceZone.asDragContainer,
-            fromIndex: drop.sourceIndex,
-            toContainer: drop.targetZone.asDragContainer,
-            toIndex: drop.targetIndex,
-            toSpaceId: drop.targetZone.spaceId
-        )
-    }
-
-    func makeDragOperation(from reorder: PendingReorder, tab: Tab) -> DragOperation {
-        DragOperation(
-            tab: tab,
-            fromContainer: reorder.zone.asDragContainer,
-            fromIndex: reorder.fromIndex,
-            toContainer: reorder.zone.asDragContainer,
-            toIndex: reorder.toIndex,
-            toSpaceId: reorder.zone.spaceId
-        )
-    }
 }

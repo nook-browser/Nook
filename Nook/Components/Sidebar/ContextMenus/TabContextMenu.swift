@@ -6,124 +6,134 @@
 //
 
 import AppKit
+import NookTabsCore
 import SwiftUI
 
-/// Where a tab row lives in the sidebar. Decides which items the shared tab
-/// context menu shows.
+/// Which view shows the tab. The item's section (favorites, pinned, tabs) comes from the tree.
 enum TabMenuContext {
-    case regular
-    case spacePinned
-    case folder
-    case essential
+    /// A row in the sidebar outline.
+    case sidebar
+    /// A favorites tile.
+    case favorite
+    /// One half of the split row.
     case split
 }
 
-/// The one context menu every sidebar tab row uses. Replaces the inline menus
-/// that used to live in `SpaceTab`, `SpaceView`, `TabFolderView`, `PinnedGrid`
-/// and `SplitTabRow`.
+/// The one context menu every sidebar tab row and favorites tile uses.
 struct TabContextMenu: View {
-    @ObservedObject var tab: Tab
+    let itemID: UUID
     let context: TabMenuContext
 
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var tabManager: TabManager
     @Environment(BrowserWindowState.self) private var windowState: BrowserWindowState?
 
+    private var tabs: TabsController { browserManager.tabs }
+
     var body: some View {
-        Group {
-            placementSection
-            Divider()
-            editSection
-            Divider()
-            stateSection
-            Divider()
-            closeSection
+        if let item = tabs.item(itemID) {
+            let section = tabs.section(of: itemID)
+            Group {
+                placementSection(item, section: section)
+                Divider()
+                editSection(item, section: section)
+                Divider()
+                stateSection(item)
+                Divider()
+                closeSection(item, section: section)
+            }
         }
+    }
+
+    private var spaceID: UUID? {
+        tabs.spaceID(of: itemID) ?? windowState?.spaceID
     }
 
     // MARK: - Section 1: Placement
 
     @ViewBuilder
-    private var placementSection: some View {
-        if context == .regular, let spaceId = tab.spaceId {
+    private func placementSection(_ item: Item, section: Parent?) -> some View {
+        if case .tabs = section, let spaceID {
             Button {
-                tabManager.pinTabToSpace(tab, spaceId: spaceId)
+                tabs.pin(itemID, to: .pinned(spaceID: spaceID))
             } label: {
                 Label("Pin to Space", systemImage: "pin")
             }
         }
 
-        if context == .spacePinned {
+        if case .pinned = section {
             Button {
-                tabManager.unpinTabFromSpace(tab)
+                tabs.unpin(itemID)
             } label: {
                 Label("Unpin from Space", systemImage: "pin.slash")
             }
         }
 
-        if context == .essential {
+        if case .favorites = section {
             Button {
-                tabManager.unpinTab(tab)
+                tabs.unpin(itemID)
             } label: {
                 Label("Remove from Favorites", systemImage: "star.slash")
             }
-        } else if !tab.isPinned {
+        } else if let profileID = tabs.profileID(of: itemID) {
             Button {
-                tabManager.pinTab(tab)
+                tabs.pin(itemID, to: .favorites(profileID: profileID))
             } label: {
                 Label("Add to Favorites", systemImage: "star")
             }
         }
 
-        if context == .regular || context == .spacePinned || context == .folder {
-            addToFolderMenu
+        if context != .favorite, let spaceID {
+            addToFolderMenu(item, spaceID: spaceID)
         }
 
-        if context != .essential {
+        if context != .favorite {
             moveToSpaceMenu
         }
     }
 
     @ViewBuilder
-    private var addToFolderMenu: some View {
-        if let spaceId = tab.spaceId {
-            let folders = tabManager.folders(for: spaceId)
-
-            if !folders.isEmpty {
-                Menu {
-                    ForEach(folders, id: \.id) { folder in
-                        Button {
-                            tabManager.moveTabToFolder(tab: tab, folderId: folder.id)
-                        } label: {
-                            Label(folder.name, systemImage: "folder.fill")
-                        }
+    private func addToFolderMenu(_ item: Item, spaceID: UUID) -> some View {
+        let folders = tabs.folders(inSpace: spaceID)
+        if !folders.isEmpty {
+            Menu {
+                ForEach(folders, id: \.item.id) { folder in
+                    Button {
+                        tabs.move(itemID, to: .folder(itemID: folder.item.id), after: tabs.children(of: .folder(itemID: folder.item.id)).last?.id)
+                    } label: {
+                        Label(String(repeating: "   ", count: folder.depth) + folder.item.displayTitle, systemImage: "folder.fill")
                     }
-                } label: {
-                    Label("Add to Folder", systemImage: "folder.badge.plus")
+                    .disabled(item.parent == .folder(itemID: folder.item.id))
                 }
+            } label: {
+                Label("Add to Folder", systemImage: "folder.badge.plus")
             }
         }
     }
 
     @ViewBuilder
     private var moveToSpaceMenu: some View {
-        let spaces = tabManager.spaces
-        Menu {
-            ForEach(spaces, id: \.id) { space in
-                Button {
-                    tabManager.moveTab(tab.id, to: space.id)
-                } label: {
-                    spaceLabel(for: space)
+        let current = tabs.spaceID(of: itemID)
+        let spaces = windowState?.privateTree != nil
+            ? (windowState?.profileID.map { tabs.spaces(inProfile: $0) } ?? [])
+            : tabs.orderedSpaces
+        if spaces.count > 1 {
+            Menu {
+                ForEach(spaces) { space in
+                    Button {
+                        tabs.move(itemID, to: .tabs(spaceID: space.id), after: nil)
+                    } label: {
+                        spaceLabel(for: space)
+                    }
+                    .disabled(space.id == current)
                 }
-                .disabled(space.id == tab.spaceId)
+            } label: {
+                Label("Move to Space", systemImage: "arrow.right.square")
             }
-        } label: {
-            Label("Move to Space", systemImage: "arrow.right.square")
         }
     }
 
     @ViewBuilder
-    private func spaceLabel(for space: Space) -> some View {
+    private func spaceLabel(for space: SpaceRecord) -> some View {
         if space.icon.isEmojiIcon {
             Label {
                 Text(space.name)
@@ -138,60 +148,60 @@ struct TabContextMenu: View {
     // MARK: - Section 2: Edit
 
     @ViewBuilder
-    private var editSection: some View {
-        // Rename needs the row's inline text field, which only the list-style
-        // rows render.
-        if context == .regular || context == .spacePinned || context == .folder {
+    private func editSection(_ item: Item, section: Parent?) -> some View {
+        // Rename needs the row's inline text field, which only outline rows render.
+        if context == .sidebar {
             Button {
-                tab.startRenaming()
+                SidebarRenameState.shared.itemID = itemID
             } label: {
                 Label("Rename", systemImage: "pencil")
             }
         }
 
-        if tab.displayNameOverride != nil {
+        if let custom = item.customTitle, !custom.isEmpty {
             Button {
-                tab.displayNameOverride = nil
-                tabManager.debouncedPersistSnapshot()
+                tabs.rename(itemID, nil)
             } label: {
                 Label("Reset Tab Name", systemImage: "arrow.uturn.backward")
             }
         }
 
         Button {
-            browserManager.duplicateTab(tab)
+            guard let windowState else { return }
+            tabs.duplicate(itemID, in: windowState)
         } label: {
             Label("Duplicate", systemImage: "plus.square.on.square")
         }
 
-        Button {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(tab.url.absoluteString, forType: .string)
-        } label: {
-            Label("Copy Link", systemImage: "link")
-        }
-
-        Button {
-            let picker = NSSharingServicePicker(items: [tab.url as NSURL])
-            if let window = NSApp.keyWindow {
-                picker.show(relativeTo: .zero, of: window.contentView ?? NSView(), preferredEdge: .minY)
+        if let url = tabs.currentURL(for: item) {
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(url.absoluteString, forType: .string)
+            } label: {
+                Label("Copy Link", systemImage: "link")
             }
-        } label: {
-            Label("Share", systemImage: "square.and.arrow.up")
+
+            Button {
+                let picker = NSSharingServicePicker(items: [url as NSURL])
+                if let window = NSApp.keyWindow {
+                    picker.show(relativeTo: .zero, of: window.contentView ?? NSView(), preferredEdge: .minY)
+                }
+            } label: {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
         }
 
-        if context != .split {
+        if context != .split, let windowState, let selected = tabs.selectedItemID(in: windowState), selected != itemID {
+            // ponytail: SplitViewManager's UUID entry point; the Tab-based enterSplit(with:) moves to T3.
             Menu {
                 Button {
-                    guard let windowState else { return }
-                    browserManager.splitManager.enterSplit(with: tab, placeOn: .right, in: windowState)
+                    browserManager.splitManager.enterSplit(leftTabId: selected, rightTabId: itemID, for: windowState.id)
                 } label: {
                     Label("Right", systemImage: "rectangle.righthalf.filled")
                 }
 
                 Button {
-                    guard let windowState else { return }
-                    browserManager.splitManager.enterSplit(with: tab, placeOn: .left, in: windowState)
+                    browserManager.splitManager.enterSplit(leftTabId: itemID, rightTabId: selected, for: windowState.id)
                 } label: {
                     Label("Left", systemImage: "rectangle.lefthalf.filled")
                 }
@@ -200,65 +210,71 @@ struct TabContextMenu: View {
             }
         }
 
-        if context == .spacePinned || context == .essential {
-            if tab.hasNavigatedAwayFromPinnedURL {
+        if tabs.isSynced(itemID) {
+            if tabs.hasLeftHome(itemID) {
                 Button {
-                    tab.resetToPinnedURL()
+                    tabs.resetToHome(itemID)
                 } label: {
-                    Label("Reset to Pinned URL", systemImage: "arrow.counterclockwise")
+                    Label("Reset to Home Page", systemImage: "arrow.counterclockwise")
+                }
+
+                Button {
+                    tabs.setHomeToCurrent(itemID)
+                } label: {
+                    Label("Set Current Page as Home", systemImage: "house")
                 }
             }
 
-            if tab.pinnedURL != nil {
-                Button {
-                    browserManager.dialogManager.showDialog(
-                        EditPinnedURLDialog(
-                            tab: tab,
-                            onSave: { newURL in
-                                tab.pinnedURL = newURL
-                                tab.loadURL(newURL)
-                                browserManager.dialogManager.closeDialog()
-                                tabManager.debouncedPersistSnapshot()
-                            },
-                            onCancel: {
-                                browserManager.dialogManager.closeDialog()
-                            }
-                        )
-                    )
-                } label: {
-                    Label("Edit Pinned URL", systemImage: "link.badge.plus")
-                }
+            Button {
+                editHomeURL(item)
+            } label: {
+                Label("Edit Home URL", systemImage: "link.badge.plus")
             }
         }
+    }
+
+    private func editHomeURL(_ item: Item) {
+        guard let home = item.url else { return }
+        let dialogs = browserManager.dialogManager
+        dialogs.showDialog(
+            EditPinnedURLDialog(
+                url: home,
+                title: tabs.title(for: item),
+                onSave: { newURL in
+                    tabs.setHome(itemID, url: newURL)
+                    tabs.resetToHome(itemID)
+                    dialogs.closeDialog()
+                },
+                onCancel: { dialogs.closeDialog() }
+            )
+        )
     }
 
     // MARK: - Section 3: State
 
     @ViewBuilder
-    private var stateSection: some View {
-        if tab.hasAudioContent || tab.isAudioMuted {
+    private func stateSection(_ item: Item) -> some View {
+        let session = tabs.session(for: itemID)
+        if let session, session.hasAudioContent || session.isAudioMuted {
             Button {
-                tab.toggleMute()
+                session.toggleMute()
             } label: {
                 Label(
-                    tab.isAudioMuted ? "Unmute" : "Mute",
-                    systemImage: tab.isAudioMuted ? "speaker.wave.2" : "speaker.slash"
+                    session.isAudioMuted ? "Unmute" : "Mute",
+                    systemImage: session.isAudioMuted ? "speaker.wave.2" : "speaker.slash"
                 )
             }
         }
 
-        // TabManager refuses to unload essential tabs, so the item would be inert there.
-        if context != .essential {
-            Button {
-                tabManager.unloadTabMovingSelection(tab)
-            } label: {
-                Label("Unload Tab", systemImage: "moon.zzz")
-            }
-            .disabled(tab.isUnloaded)
+        Button {
+            tabs.unload(itemID)
+        } label: {
+            Label("Unload Tab", systemImage: "moon.zzz")
         }
+        .disabled(session?.isUnloaded ?? true)
 
         Button {
-            tabManager.unloadAllInactiveTabs()
+            tabs.unloadAllHidden()
         } label: {
             Label("Unload All Inactive Tabs", systemImage: "moon.zzz.fill")
         }
@@ -267,38 +283,39 @@ struct TabContextMenu: View {
     // MARK: - Section 4: Close
 
     @ViewBuilder
-    private var closeSection: some View {
+    private func closeSection(_ item: Item, section: Parent?) -> some View {
         Button(role: .destructive) {
-            // A space-pinned row (including one inside a pinned folder) is only removed by
-            // forceRemoveTab; removeTab just deactivates it and leaves the row in place.
-            if context == .spacePinned || context == .folder {
-                tabManager.forceRemoveTab(tab.id)
-            } else {
-                tabManager.removeTab(tab.id)
-            }
+            tabs.close(itemID)
         } label: {
             Label("Close Tab", systemImage: "xmark")
         }
         .keyboardShortcut("w", modifiers: .command)
 
-        if let spaceId = tab.spaceId {
-            let hasOtherTabs = (tabManager.tabsBySpace[spaceId]?.filter { $0.id != tab.id }.isEmpty == false)
-            if context == .regular || context == .spacePinned || context == .folder,
-               hasOtherTabs, !tab.isPinned, !tab.isSpacePinned {
+        if case .pinned = section {
+            Button(role: .destructive) {
+                tabs.removeFromSidebar(itemID)
+            } label: {
+                Label("Remove from Space", systemImage: "trash")
+            }
+        }
+
+        // Close others / below apply to the tabs section, where closing removes items.
+        if context == .sidebar, case .tabs = section {
+            let siblings = tabs.children(of: item.parent).filter { !$0.isFolder }
+            if siblings.contains(where: { $0.id != itemID }) {
                 Button {
-                    tabManager.closeOtherTabs(tab)
+                    tabs.close(siblings.map(\.id).filter { $0 != itemID })
                 } label: {
                     Label("Close Other Tabs", systemImage: "xmark.circle")
                 }
             }
-        }
 
-        if context == .regular || context == .folder,
-           !tab.isPinned, !tab.isSpacePinned, tab.spaceId != nil {
-            Button {
-                tabManager.closeAllTabsBelow(tab)
-            } label: {
-                Label("Close All Below", systemImage: "arrow.down.to.line")
+            if let position = siblings.firstIndex(where: { $0.id == itemID }), position + 1 < siblings.count {
+                Button {
+                    tabs.close(siblings[(position + 1)...].map(\.id))
+                } label: {
+                    Label("Close All Below", systemImage: "arrow.down.to.line")
+                }
             }
         }
     }

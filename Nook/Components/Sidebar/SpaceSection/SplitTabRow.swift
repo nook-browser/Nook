@@ -1,37 +1,21 @@
+import NookTabsCore
 import SwiftUI
 
+/// The window's split pair shown as one sidebar row (from `BrowserWindowState.split`).
 struct SplitTabRow: View {
-    let left: Tab
-    let right: Tab
-    let spaceId: UUID
-
-    let onActivate: (Tab) -> Void
-    let onClose: (Tab) -> Void
-
-    @EnvironmentObject var browserManager: BrowserManager
-    @Environment(BrowserWindowState.self) private var windowState
-    @ObservedObject private var dragSession = NookDragSessionManager.shared
+    let left: Item
+    let right: Item
+    /// The drop zone the halves drag from.
+    let zoneID: DropZoneID
 
     var body: some View {
         HStack(spacing: 0) {
-            SplitHalfTab(
-                tab: left,
-                side: .left,
-                spaceId: spaceId,
-                onActivate: { onActivate(left) },
-                onClose: { onClose(left) }
-            )
+            SplitHalfTab(item: left, zoneID: zoneID)
             Rectangle()
                 .fill(NookDesign.Surface.hairline)
                 .frame(width: NookDesign.Size.hairlineWidth)
                 .padding(.vertical, NookDesign.Spacing.sm)
-            SplitHalfTab(
-                tab: right,
-                side: .right,
-                spaceId: spaceId,
-                onActivate: { onActivate(right) },
-                onClose: { onClose(right) }
-            )
+            SplitHalfTab(item: right, zoneID: zoneID)
         }
         .frame(height: NookDesign.Size.row)
         .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
@@ -39,80 +23,69 @@ struct SplitTabRow: View {
 }
 
 private struct SplitHalfTab: View {
-    @ObservedObject var tab: Tab
-    let side: SplitViewManager.Side
-    let spaceId: UUID
-    let onActivate: () -> Void
-    let onClose: () -> Void
+    let item: Item
+    let zoneID: DropZoneID
 
     @State private var isHovering: Bool = false
     @State private var isCloseHovering: Bool = false
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var splitManager: SplitViewManager
-    @EnvironmentObject var tabManager: TabManager
     @Environment(BrowserWindowState.self) private var windowState
     @ObservedObject private var dragSession = NookDragSessionManager.shared
 
+    private var tabs: TabsController { browserManager.tabs }
+
     var body: some View {
+        let title = tabs.title(for: item)
+        let session = tabs.session(for: item.id)
         NookDragSourceView(
-            item: NookDragItem(tabId: tab.id, title: tab.displayName, urlString: tab.url.absoluteString),
-            tab: tab,
-            zoneID: .spaceRegular(tab.spaceId ?? spaceId),
-            index: tab.index,
+            item: NookDragItem(tabId: item.id, title: title, urlString: tabs.currentURL(for: item)?.absoluteString ?? ""),
+            icon: session?.favicon,
+            zoneID: zoneID,
             manager: dragSession
         ) {
-            ZStack {
-                Button(action: onActivate) {
-                    HStack(spacing: NookDesign.Spacing.md) {
-                        tab.favicon
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: NookDesign.Size.favicon, height: NookDesign.Size.favicon)
-                            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
-                        Text(tab.displayName)
-                            .font(NookDesign.Font.body)
-                            .foregroundStyle(textTab)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                        Spacer(minLength: NookDesign.Spacing.xs)
-                        if isHovering {
-                            Button(action: onClose) {
-                                Image(systemName: "xmark")
-                                    .font(NookDesign.Font.secondary)
-                                    .foregroundColor(textTab)
-                                    .frame(width: NookDesign.Size.rowButton, height: NookDesign.Size.rowButton)
-                                    .background(
-                                        isCloseHovering
-                                            ? NookDesign.Surface.fillPressed
-                                            : Color.clear
-                                    )
-                                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            .onHoverTracking { state in
-                                isCloseHovering = state
-                            }
+            Button(action: { tabs.select(item.id, in: windowState) }) {
+                HStack(spacing: NookDesign.Spacing.md) {
+                    ItemFavicon(item: item, session: session)
+                        .frame(width: NookDesign.Size.favicon, height: NookDesign.Size.favicon)
+                        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
+                    Text(title)
+                        .font(NookDesign.Font.body)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Spacer(minLength: NookDesign.Spacing.xs)
+                    if isHovering {
+                        Button(action: { tabs.close(item.id) }) {
+                            Image(systemName: "xmark")
+                                .font(NookDesign.Font.secondary)
+                                .foregroundColor(.primary)
+                                .frame(width: NookDesign.Size.rowButton, height: NookDesign.Size.rowButton)
+                                .background(isCloseHovering ? NookDesign.Surface.fillPressed : Color.clear)
+                                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .onHoverTracking { state in
+                            isCloseHovering = state
                         }
                     }
-                    .padding(.horizontal, NookDesign.Spacing.rowPadding)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(PlainButtonStyle())
-                .onHoverTracking { hovering in
-                    withAnimation(NookDesign.Motion.quick) {
-                        isHovering = hovering
-                    }
-                }
-                .contextMenu {
-                    TabContextMenu(tab: tab, context: .split)
-                        .environmentObject(browserManager)
-                        .environmentObject(tabManager)
-                        .environment(windowState)
+                .padding(.horizontal, NookDesign.Spacing.rowPadding)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PlainButtonStyle())
+            .onHoverTracking { hovering in
+                withAnimation(NookDesign.Motion.quick) {
+                    isHovering = hovering
                 }
             }
+            .contextMenu {
+                TabContextMenu(itemID: item.id, context: .split)
+                    .environmentObject(browserManager)
+                    .environment(windowState)
+            }
         }
-        .opacity(dragSession.draggedItem?.tabId == tab.id ? 0 : 1.0)
+        .opacity(dragSession.draggedItem?.tabId == item.id ? NookDesign.Surface.unloadedOpacity : 1)
         .background(backgroundColor)
         .overlay {
             if isActive {
@@ -123,7 +96,7 @@ private struct SplitHalfTab: View {
     }
 
     private var isActive: Bool {
-        browserManager.currentTab(for: windowState)?.id == tab.id
+        tabs.selectedItemID(in: windowState) == item.id
     }
 
     private var backgroundColor: Color {
@@ -135,8 +108,4 @@ private struct SplitHalfTab: View {
             return Color.clear
         }
     }
-    private var textTab: Color {
-        .primary
-    }
-
 }
