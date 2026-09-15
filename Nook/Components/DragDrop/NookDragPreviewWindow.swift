@@ -129,10 +129,10 @@ private struct NookDragPreviewContent: View {
                     title: manager.draggedItem?.title ?? "",
                     style: currentStyle,
                     sidebarWidth: manager.sidebarScreenFrame.width,
-                    isIntoFolder: currentStyle == .tabRow && manager.dropPosition?.placement == .into
+                    folderDepth: currentStyle == .tabRow && manager.dropPosition != nil ? manager.dropDepth : 0
                 )
                 .animation(morphSpring, value: currentStyle)
-                .animation(morphSpring, value: manager.dropPosition?.placement == .into)
+                .animation(morphSpring, value: manager.dropDepth)
             }
         }
         .frame(width: NookDragPreviewWindow.previewSize.width, height: NookDragPreviewWindow.previewSize.height)
@@ -161,12 +161,14 @@ private struct NookMorphingPreview: View {
     let title: String
     let style: NookPreviewStyle
     let sidebarWidth: CGFloat
-    /// Hovering the middle of a folder row: the row narrows from the leading edge so the
-    /// folder's icon and name show beside it.
-    let isIntoFolder: Bool
+    /// Folder levels the drop lands inside. Inside a folder the row narrows from the leading
+    /// edge so the folder shows beside it, a little more for each deeper level.
+    let folderDepth: Int
 
     private let sidebarHorizontalPadding: CGFloat = 16
-    private let intoFolderWidthFraction: CGFloat = 0.55
+    private let insideFolderWidthFraction: CGFloat = 0.55
+    private let perLevelWidthFraction: CGFloat = 0.08
+    private let minimumWidthFraction: CGFloat = 0.3
 
     private var effectiveWidth: CGFloat {
         switch style {
@@ -298,6 +300,8 @@ private struct NookMorphingPreview: View {
     }
 
     private var rowWidth: CGFloat {
-        isIntoFolder ? effectiveWidth * intoFolderWidthFraction : effectiveWidth
+        guard folderDepth > 0 else { return effectiveWidth }
+        let fraction = insideFolderWidthFraction - CGFloat(folderDepth - 1) * perLevelWidthFraction
+        return effectiveWidth * max(minimumWidthFraction, fraction)
     }
 }

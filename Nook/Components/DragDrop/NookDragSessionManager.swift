@@ -56,6 +56,8 @@ final class NookDragSessionManager: ObservableObject {
     let cursorScreenLocationSubject = PassthroughSubject<NSPoint, Never>()
 
     @Published var dropPosition: DropPosition?
+    /// Folder levels the current drop lands inside: 0 at a section root, 1 inside a folder.
+    @Published var dropDepth = 0
 
     @Published var sidebarScreenFrame: CGRect = .zero
 
@@ -195,6 +197,7 @@ final class NookDragSessionManager: ObservableObject {
         activeZone = zone
         isOutsideWindow = false
         dropPosition = nil
+        dropDepth = 0
     }
 
     nonisolated func updateCursorScreenPosition(_ screenPoint: NSPoint) {
@@ -237,7 +240,10 @@ final class NookDragSessionManager: ObservableObject {
     func cursorExitedZone(_ zone: DropZoneID) {
         guard isDragging, activeZone == zone else { return }
         activeZone = nil
-        if dropPosition?.zone == zone { dropPosition = nil }
+        if dropPosition?.zone == zone {
+            dropPosition = nil
+            dropDepth = 0
+        }
     }
 
     func updateDropPosition(for zone: DropZoneID, layout: DropLayout, localPoint: CGPoint, zoneWidth: CGFloat) {
@@ -245,6 +251,7 @@ final class NookDragSessionManager: ObservableObject {
         let position = Self.position(in: zone, layout: layout, point: localPoint, width: zoneWidth)
         if position != dropPosition {
             dropPosition = position
+            dropDepth = Self.depth(of: position, layout: layout)
             hapticFeedback(.alignment)
         }
     }
@@ -278,6 +285,21 @@ final class NookDragSessionManager: ObservableObject {
         }
     }
 
+    /// The level a drop lands at, matching `TabsController.drop(_:at:section:rows:)`: into a
+    /// folder is one below it; before a row is that row's level; after an open folder's header is
+    /// its first child's level; the end of a section is its root.
+    static func depth(of position: DropPosition, layout: DropLayout) -> Int {
+        guard case .rows(let rows) = layout, position.index < rows.count else { return 0 }
+        let row = rows[position.index]
+        switch position.placement {
+        case .into: return row.depth + 1
+        case .before: return row.depth
+        case .after:
+            let next = position.index + 1
+            return next < rows.count && rows[next].depth > row.depth ? rows[next].depth : row.depth
+        }
+    }
+
     // MARK: - Drop
 
     func cancelDrag() {
@@ -292,6 +314,7 @@ final class NookDragSessionManager: ObservableObject {
         activeZone = nil
         isOutsideWindow = false
         dropPosition = nil
+        dropDepth = 0
     }
 
     // MARK: - Haptics
