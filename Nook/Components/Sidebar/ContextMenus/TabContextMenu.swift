@@ -84,6 +84,12 @@ struct TabContextMenu: View {
 
         if context != .favorite, let spaceID {
             addToFolderMenu(item, spaceID: spaceID)
+
+            Button {
+                tabs.createFolderForRename(in: item.parent, after: itemID)
+            } label: {
+                Label("New Folder", systemImage: "folder.badge.plus")
+            }
         }
 
         if context != .favorite {

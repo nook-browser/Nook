@@ -231,7 +231,7 @@ struct SpacesSideBarView: View {
 
             Button {
                 if let spaceID = windowState.spaceID {
-                    tabs.createFolder(title: "New Folder", in: .pinned(spaceID: spaceID), after: nil)
+                    tabs.createFolderForRename(in: .tabs(spaceID: spaceID), after: nil)
                 }
             } label: {
                 Label("New Folder", systemImage: "folder.badge.plus")

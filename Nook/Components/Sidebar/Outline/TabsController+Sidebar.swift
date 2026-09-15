@@ -93,6 +93,15 @@ final class SidebarRenameState {
     var itemID: UUID?
 }
 
+extension TabsController {
+    /// Creates "New Folder" under `parent` after `after` and starts renaming it inline.
+    func createFolderForRename(in parent: Parent, after: UUID?) {
+        guard let folderID = createFolder(title: "New Folder", in: parent, after: after) else { return }
+        if case .folder(let outer) = parent { openFolder(outer) }
+        SidebarRenameState.shared.itemID = folderID
+    }
+}
+
 // MARK: - Favicon
 
 /// A row or tile favicon: the live page's, else the cached one for the item's host, else a globe.

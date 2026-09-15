@@ -65,7 +65,7 @@ struct SidebarBottomBar: View {
             
             Button("New Folder", systemImage: "folder.badge.plus") {
                 if let spaceID = windowState.spaceID {
-                    tabs.createFolder(title: "New Folder", in: .pinned(spaceID: spaceID), after: nil)
+                    tabs.createFolderForRename(in: .tabs(spaceID: spaceID), after: nil)
                 }
             }
             

@@ -30,8 +30,15 @@ struct FolderContextMenu: View {
             } label: {
                 Label("Add Tab to Folder", systemImage: "plus")
             }
+            if let item = tabs.item(itemID) {
+                Button {
+                    tabs.createFolderForRename(in: item.parent, after: itemID)
+                } label: {
+                    Label("New Folder", systemImage: "folder.badge.plus")
+                }
+            }
             Button {
-                tabs.createFolder(title: "New Folder", in: .folder(itemID: itemID), after: nil)
+                tabs.createFolderForRename(in: .folder(itemID: itemID), after: nil)
             } label: {
                 Label("New Folder Inside", systemImage: "folder.badge.plus")
             }
