@@ -6,12 +6,11 @@
 //  Observes WKWebView.estimatedProgress + isLoading via KVO.
 //
 
-import Combine
 import SwiftUI
 import WebKit
 
 struct PageLoadingProgressBar: View {
-    let tab: Tab?
+    let session: PageSession?
 
     @StateObject private var observer = WebViewLoadingObserver()
 
@@ -39,17 +38,12 @@ struct PageLoadingProgressBar: View {
         }
         .frame(height: 2.5)
         .animation(NookDesign.Motion.quick, value: observer.isLoading)
-        .onChange(of: tab?.id) { _, _ in
-            observer.attach(to: tab?.existingWebView)
+        // Observation tracks the session's web view, so a view created later attaches too.
+        .onChange(of: session?.webView) { _, webView in
+            observer.attach(to: webView)
         }
         .onAppear {
-            observer.attach(to: tab?.existingWebView)
-        }
-        // React to tab's objectWillChange (fires when webview is created) instead of polling
-        .onReceive(tab?.objectWillChange.eraseToAnyPublisher() ?? Empty().eraseToAnyPublisher()) { _ in
-            if observer.webView == nil, let wv = tab?.existingWebView {
-                observer.attach(to: wv)
-            }
+            observer.attach(to: session?.webView)
         }
         .allowsHitTesting(false)
     }

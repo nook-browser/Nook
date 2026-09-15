@@ -59,14 +59,14 @@ final class ContentBlockerManager: NSObject {
         return false
     }
 
-    func disableTemporarily(for tab: Tab, duration: TimeInterval) {
-        temporarilyDisabledTabs[tab.id] = Date().addingTimeInterval(duration)
-        reconcileAndReload(tab)
-        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self, weak tab] in
-            guard let self, let tab else { return }
-            if let exp = self.temporarilyDisabledTabs[tab.id], exp <= Date() {
-                self.temporarilyDisabledTabs.removeValue(forKey: tab.id)
-                self.reconcileAndReload(tab)
+    func disableTemporarily(for session: PageSession, duration: TimeInterval) {
+        temporarilyDisabledTabs[session.itemID] = Date().addingTimeInterval(duration)
+        reconcileAndReload(session)
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self, weak session] in
+            guard let self, let session else { return }
+            if let exp = self.temporarilyDisabledTabs[session.itemID], exp <= Date() {
+                self.temporarilyDisabledTabs.removeValue(forKey: session.itemID)
+                self.reconcileAndReload(session)
             }
         }
     }
@@ -77,9 +77,9 @@ final class ContentBlockerManager: NSObject {
         browserManager?.nookSettings?.adBlockerWhitelist = Array(allowedDomains)
 
         guard let bm = browserManager else { return }
-        for tab in bm.tabManager.allTabs() {
-            guard let h = tab.existingWebView?.url?.host?.lowercased(), h == norm || h.hasSuffix("." + norm) else { continue }
-            reconcileAndReload(tab)
+        for session in bm.tabs.sessions {
+            guard let h = session.webView?.url?.host?.lowercased(), h == norm || h.hasSuffix("." + norm) else { continue }
+            reconcileAndReload(session)
         }
     }
 
@@ -89,17 +89,21 @@ final class ContentBlockerManager: NSObject {
         return allowedDomains.contains { h == $0 || h.hasSuffix("." + $0) }
     }
 
-    private func isExempt(_ tab: Tab, host: String?) -> Bool {
-        !isEnabled || isTemporarilyDisabled(tabId: tab.id) || isDomainAllowed(host) || tab.isOAuthFlow
+    private func isExempt(itemID: UUID, isOAuthFlow: Bool, host: String?) -> Bool {
+        !isEnabled || isTemporarilyDisabled(tabId: itemID) || isDomainAllowed(host) || isOAuthFlow
     }
 
-    func shouldApplyBlocking(to tab: Tab) -> Bool {
-        !isExempt(tab, host: tab.existingWebView?.url?.host)
+    private func isExempt(_ session: PageSession, host: String?) -> Bool {
+        isExempt(itemID: session.itemID, isOAuthFlow: session.isOAuthFlow, host: host)
     }
 
-    private func reconcileAndReload(_ tab: Tab) {
-        guard let wv = tab.existingWebView else { return }
-        reconcile(wv, exempt: !shouldApplyBlocking(to: tab))
+    func shouldApplyBlocking(to session: PageSession) -> Bool {
+        !isExempt(session, host: session.webView?.url?.host)
+    }
+
+    private func reconcileAndReload(_ session: PageSession) {
+        guard let wv = session.webView else { return }
+        reconcile(wv, exempt: !shouldApplyBlocking(to: session))
         wv.reloadFromOrigin()
     }
 
@@ -202,13 +206,13 @@ final class ContentBlockerManager: NSObject {
             }
         } else {
             requestStatsEngine.unload()
-            browserManager?.tabManager.allTabs().forEach { $0.blockedRequestCount = 0 }
+            browserManager?.tabs.sessions.forEach { $0.blockedRequestCount = 0 }
         }
         guard isEnabled else { return }
         syncRequestStatsScript(in: BrowserConfiguration.shared.webViewConfiguration.userContentController)
         guard let bm = browserManager else { return }
-        for tab in bm.tabManager.allTabs() {
-            guard let wv = tab.existingWebView, !exemptedWebViews.contains(wv) else { continue }
+        for session in bm.tabs.sessions {
+            guard let wv = session.webView, !exemptedWebViews.contains(wv) else { continue }
             syncRequestStatsScript(in: wv.configuration.userContentController)
         }
     }
@@ -279,20 +283,27 @@ final class ContentBlockerManager: NSObject {
     // MARK: - Tracking parameter removal ($removeparam)
 
     /// The URL with tracking parameters removed, or nil when nothing should change.
-    func strippedTrackingParams(for url: URL, tab: Tab) -> URL? {
-        guard isEnabled, !isExempt(tab, host: url.host) else { return nil }
+    func strippedTrackingParams(for url: URL, tab session: PageSession) -> URL? {
+        strippedTrackingParams(for: url, exempt: isExempt(session, host: url.host))
+    }
+
+    private func strippedTrackingParams(for url: URL, exempt: Bool) -> URL? {
+        guard isEnabled, !exempt else { return nil }
         guard let stripped = trackingParamStripper.strip(url) else { return nil }
         cbLog.info("removeparam \(url.host ?? "-", privacy: .public): \(url.query?.count ?? 0, privacy: .public) -> \(stripped.query?.count ?? 0, privacy: .public) query chars")
         return stripped
     }
 
-    // MARK: - Per-Navigation (main frame, from Tab.decidePolicyFor)
+    // MARK: - Per-Navigation (main frame, from PageSession.decidePolicyFor)
 
-    func setupContentBlockerScripts(for url: URL, in webView: WKWebView, tab: Tab) {
+    func setupContentBlockerScripts(for url: URL, in webView: WKWebView, tab session: PageSession) {
         guard isEnabled else { return }
-        let exempt = isExempt(tab, host: url.host)
+        session.blockedRequestCount = 0
+        setupContentBlockerScripts(for: url, in: webView, exempt: isExempt(session, host: url.host))
+    }
+
+    private func setupContentBlockerScripts(for url: URL, in webView: WKWebView, exempt: Bool) {
         reconcile(webView, exempt: exempt)
-        tab.blockedRequestCount = 0
         let config = exempt ? nil : advancedRulesEngine.configUserScript(for: url)
         replaceConfigScript(in: webView.configuration.userContentController, with: config)
         cbLog.info("main frame \(url.host ?? "-", privacy: .public): exempt=\(exempt) config=\(config?.source.count ?? 0, privacy: .public)B ruleLists=\(self.compiledRuleLists.count)")
@@ -367,16 +378,16 @@ final class ContentBlockerManager: NSObject {
 
     private func applyToExistingWebViews() {
         guard let bm = browserManager else { return }
-        for tab in bm.tabManager.allTabs() {
-            guard let wv = tab.existingWebView else { continue }
-            if shouldApplyBlocking(to: tab) { applyBlocking(to: wv) } else { removeBlocking(from: wv) }
+        for session in bm.tabs.sessions {
+            guard let wv = session.webView else { continue }
+            if shouldApplyBlocking(to: session) { applyBlocking(to: wv) } else { removeBlocking(from: wv) }
         }
     }
 
     private func removeFromExistingWebViews() {
         guard let bm = browserManager else { return }
-        for tab in bm.tabManager.allTabs() {
-            guard let wv = tab.existingWebView else { continue }
+        for session in bm.tabs.sessions {
+            guard let wv = session.webView else { continue }
             removeBlocking(from: wv)
         }
         exemptedWebViews.removeAllObjects()
@@ -398,8 +409,8 @@ final class ContentBlockerManager: NSObject {
         remaining.forEach { ucc.addUserScript($0) }
     }
 
-    private func tab(for webView: WKWebView) -> Tab? {
-        browserManager?.tabManager.allTabs().first { $0.existingWebView === webView }
+    private func session(for webView: WKWebView) -> PageSession? {
+        browserManager?.tabs.session(for: webView)
     }
 }
 
@@ -421,8 +432,8 @@ extension ContentBlockerManager: WKScriptMessageHandlerWithReply {
         }
 
         let topUrl = webView.url
-        if let tab = tab(for: webView) {
-            if isExempt(tab, host: topUrl?.host) { replyHandler(nil, nil); return }
+        if let session = session(for: webView) {
+            if isExempt(session, host: topUrl?.host) { replyHandler(nil, nil); return }
         } else if isDomainAllowed(topUrl?.host) {
             replyHandler(nil, nil); return
         }
@@ -439,7 +450,7 @@ extension ContentBlockerManager: WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard isEnabled, message.name == Self.requestStatsHandlerName,
               let token = requestStatsToken,
-              let webView = message.webView, let tab = tab(for: webView),
+              let webView = message.webView, let session = session(for: webView),
               let body = message.body as? [String: Any], body["token"] as? String == token,
               let raw = body["requests"] as? [[String: Any]] else { return }
         let requests: [(url: String, type: String)] = raw.compactMap {
@@ -448,12 +459,26 @@ extension ContentBlockerManager: WKScriptMessageHandler {
         }
         guard !requests.isEmpty else { return }
         let source = message.frameInfo.request.url?.absoluteString ?? webView.url?.absoluteString ?? ""
-        Task { [requestStatsEngine, weak tab] in
+        Task { [requestStatsEngine, weak session] in
             let n = await requestStatsEngine.blockedCount(of: requests, sourceURL: source)
-            if n > 0, let tab {
-                await MainActor.run { tab.blockedRequestCount += n }
+            if n > 0, let session {
+                await MainActor.run { session.blockedRequestCount += n }
                 cbLog.debug("stats: \(n, privacy: .public)/\(requests.count, privacy: .public) blocked for \(URL(string: source)?.host ?? "-", privacy: .public)")
             }
         }
+    }
+}
+
+// MARK: - Legacy Tab (task Z deletes)
+
+extension ContentBlockerManager {
+    func strippedTrackingParams(for url: URL, tab: Tab) -> URL? {
+        strippedTrackingParams(for: url, exempt: isExempt(itemID: tab.id, isOAuthFlow: tab.isOAuthFlow, host: url.host))
+    }
+
+    func setupContentBlockerScripts(for url: URL, in webView: WKWebView, tab: Tab) {
+        guard isEnabled else { return }
+        tab.blockedRequestCount = 0
+        setupContentBlockerScripts(for: url, in: webView, exempt: isExempt(itemID: tab.id, isOAuthFlow: tab.isOAuthFlow, host: url.host))
     }
 }

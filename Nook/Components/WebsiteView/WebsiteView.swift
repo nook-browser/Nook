@@ -196,11 +196,10 @@ struct WebsiteView: View {
 
     var body: some View {
         // Read observable properties directly so SwiftUI tracks changes
-        let _ = windowState.currentTabId
         let _ = windowState.compositorVersion
         ZStack() {
             Group {
-                if browserManager.currentTab(for: windowState) != nil {
+                if browserManager.tabs.selectedSession(in: windowState) != nil {
                     GeometryReader { proxy in
                         TabCompositorWrapper(
                             browserManager: browserManager,
@@ -212,7 +211,7 @@ struct WebsiteView: View {
                             rightId: splitManager.rightTabId(for: windowState.id),
                             windowState: windowState,
                             compositorVersion: windowState.compositorVersion,
-                            currentTabId: windowState.currentTabId
+                            currentTabId: windowState.selectedItemID
                         )
                         .coordinateSpace(name: dragCoordinateSpace)
                         .background(shouldShowSplit ? Color.clear : Color(nsColor: .windowBackgroundColor))
@@ -500,9 +499,9 @@ struct TabCompositorWrapper: NSViewRepresentable {
             coord?.lastSize = newSize
         }
 
-        // Set up link hover callbacks for current tab
-        if let currentTab = browserManager.currentTab(for: windowState) {
-            setupHoverCallbacks(for: currentTab)
+        // Set up link hover callbacks for the selected page
+        if let session = browserManager.tabs.selectedSession(in: windowState) {
+            setupHoverCallbacks(for: session)
         }
         
         return containerView
@@ -511,7 +510,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
     func updateNSView(_ nsView: NSView, context: Context) {
         // Only rebuild compositor when meaningful inputs change
         let size = nsView.bounds.size
-        let currentId = browserManager.currentTab(for: windowState)?.id
+        let currentId = windowState.selectedItemID
         let compositorVersion = windowState.compositorVersion
         let needsRebuild =
             context.coordinator.lastIsSplit != isSplit ||
@@ -555,10 +554,10 @@ struct TabCompositorWrapper: NSViewRepresentable {
             }
         }
         
-        // Mark current tab as accessed (resets unload timer)
-        if let currentTab = browserManager.currentTab(for: windowState) {
-            browserManager.compositorManager.markTabAccessed(currentTab.id)
-            setupHoverCallbacks(for: currentTab)
+        // Mark the selected page as accessed (resets its unload timer)
+        if let session = browserManager.tabs.selectedSession(in: windowState) {
+            browserManager.compositorManager.markTabAccessed(session.itemID)
+            setupHoverCallbacks(for: session)
         }
     }
 
@@ -571,7 +570,8 @@ struct TabCompositorWrapper: NSViewRepresentable {
         // already correctly positioned. Removing a WKWebView from its superview
         // disconnects its GPU video surface, causing black flashes during playback.
 
-        let allTabs = browserManager.tabsForDisplay(in: windowState)
+        let tabs = browserManager.tabs
+        let selected = tabs.selectedSession(in: windowState)
         let split = browserManager.splitManager
         let splitState = split.getSplitState(for: windowState.id)
 
@@ -582,15 +582,14 @@ struct TabCompositorWrapper: NSViewRepresentable {
 
         if splitState.isPreviewActive {
             // Preview mode: show current tab at full size
-            let previewTab = browserManager.currentTab(for: windowState) ?? allTabs.first
-            if let currentTab = previewTab, !currentTab.isUnloaded {
-                let desired = webView(for: currentTab, windowId: windowState.id)
+            if let session = selected, !session.isUnloaded {
+                let desired = webView(for: session, windowId: windowState.id)
                 setSingleWebView(desired, in: containerView, replacing: contentSubviews)
             } else {
                 removeContentViews(contentSubviews)
             }
         } else {
-            let currentId = browserManager.currentTab(for: windowState)?.id
+            let currentId = selected?.itemID
             let leftId = split.leftTabId(for: windowState.id)
             let rightId = split.rightTabId(for: windowState.id)
             let isCurrentPane = (currentId != nil) && (currentId == leftId || currentId == rightId)
@@ -601,8 +600,8 @@ struct TabCompositorWrapper: NSViewRepresentable {
                 removeContentViews(contentSubviews)
 
                 // Auto-heal if one side is missing (tab closed etc.)
-                let leftResolved = split.resolveTab(leftId)
-                let rightResolved = split.resolveTab(rightId)
+                let leftResolved = leftId.flatMap { tabs.item($0) }
+                let rightResolved = rightId.flatMap { tabs.item($0) }
                 if leftResolved == nil && rightResolved == nil {
                     browserManager.splitManager.exitSplit(keep: .left, for: windowState.id)
                 } else if leftResolved == nil, let _ = rightResolved {
@@ -630,10 +629,9 @@ struct TabCompositorWrapper: NSViewRepresentable {
 
                 let activeSide = split.activeSide(for: windowState.id)
                 let accent = browserManager.gradientColorManager.accentNSColor
-                let allKnownTabs = browserManager.tabManager.allTabs()
 
-                if let lId = leftId, let leftTab = allKnownTabs.first(where: { $0.id == lId }) {
-                    let lWeb = webView(for: leftTab, windowId: windowState.id)
+                if let lId = leftId, let leftSession = tabs.ensureSession(for: lId) {
+                    let lWeb = webView(for: leftSession, windowId: windowState.id)
                     let pane = makePaneContainer(frame: leftRect, isActive: (activeSide == .left), accent: accent, side: .left)
                     containerView.addSubview(pane)
                     lWeb.frame = pane.bounds
@@ -642,8 +640,8 @@ struct TabCompositorWrapper: NSViewRepresentable {
                     pane.addSubview(lWeb)
                 }
 
-                if let rId = rightId, let rightTab = allKnownTabs.first(where: { $0.id == rId }) {
-                    let rWeb = webView(for: rightTab, windowId: windowState.id)
+                if let rId = rightId, let rightSession = tabs.ensureSession(for: rId) {
+                    let rWeb = webView(for: rightSession, windowId: windowState.id)
                     let pane = makePaneContainer(frame: rightRect, isActive: (activeSide == .right), accent: accent, side: .right)
                     containerView.addSubview(pane)
                     rWeb.frame = pane.bounds
@@ -653,9 +651,8 @@ struct TabCompositorWrapper: NSViewRepresentable {
                 }
             } else {
                 // Single tab (most common path during video playback)
-                let activeTab = browserManager.currentTab(for: windowState) ?? allTabs.first
-                if let currentTab = activeTab, !currentTab.isUnloaded {
-                    let desired = webView(for: currentTab, windowId: windowState.id)
+                if let session = selected, !session.isUnloaded {
+                    let desired = webView(for: session, windowId: windowState.id)
                     setSingleWebView(desired, in: containerView, replacing: contentSubviews)
                 } else {
                     removeContentViews(contentSubviews)
@@ -797,9 +794,9 @@ struct TabCompositorWrapper: NSViewRepresentable {
         return path
     }
 
-    private func setupHoverCallbacks(for tab: Tab) {
+    private func setupHoverCallbacks(for session: PageSession) {
         // Set up link hover callback
-        tab.onLinkHover = { [self] href in
+        session.onLinkHover = { [self] href in
             DispatchQueue.main.async {
                 self.hoveredLink = href
                 if let href = href {
@@ -808,22 +805,17 @@ struct TabCompositorWrapper: NSViewRepresentable {
         }
         
         // Set up command hover callback
-        tab.onCommandHover = { [self] href in
+        session.onCommandHover = { [self] href in
             DispatchQueue.main.async {
                 self.isCommandPressed = href != nil
             }
         }
     }
 
-    private func webView(for tab: Tab, windowId: UUID) -> WKWebView {
-        // Use the new smart WebView assignment system
-        // This ensures only ONE WebView per tab in single-window mode
-        if let coordinator = browserManager.webViewCoordinator {
-            return coordinator.getOrCreateWebView(for: tab, in: windowId, tabManager: browserManager.tabManager)
-        }
-
-        // Fallback to old behavior (should never happen)
-        return browserManager.createWebView(for: tab.id, in: windowId)
+    private func webView(for session: PageSession, windowId: UUID) -> WKWebView {
+        // One view per window: the session's primary in the first window, clones elsewhere.
+        guard let coordinator = browserManager.webViewCoordinator else { return session.activeWebView }
+        return coordinator.createWebView(for: session, in: windowId)
     }
 
 
@@ -834,7 +826,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
 private extension WebsiteView {
     var shouldShowSplit: Bool {
         guard splitManager.isSplit(for: windowState.id) else { return false }
-        guard let current = browserManager.currentTab(for: windowState)?.id else { return false }
+        guard let current = windowState.selectedItemID else { return false }
         return current == splitManager.leftTabId(for: windowState.id) || current == splitManager.rightTabId(for: windowState.id)
     }
 }

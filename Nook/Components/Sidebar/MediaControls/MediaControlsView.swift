@@ -8,12 +8,12 @@
 import SwiftUI
 
 /// Reactive title display that re-renders when the tab's name changes.
-/// Uses @ObservedObject so it subscribes to the Tab's objectWillChange publisher.
+/// Observation tracks the session's title.
 private struct MediaControlsTabTitle: View {
-    @ObservedObject var tab: Tab
+    let tab: PageSession
 
     var body: some View {
-        Text(tab.name)
+        Text(tab.title)
             .font(NookDesign.Font.secondary)
             .foregroundStyle(Color.white)
             .padding(.top, 4)
@@ -29,7 +29,7 @@ struct MediaControlsView: View {
     @Environment(WindowRegistry.self) private var windowRegistry
     @Environment(\.scenePhase) private var scenePhase
     @State private var hasActiveMedia: Bool = false
-    @State private var activeMediaTab: Tab?
+    @State private var activeMediaTab: PageSession?
     @State private var isHovering: Bool = false
     @State private var overrideIsPlaying: Bool? = nil
     @State private var overrideIsMuted: Bool? = nil
@@ -196,12 +196,15 @@ struct MediaControlsView: View {
             }
             updateMediaState()
         }
-        // Trigger when spaces change (tabs added/removed)
-        .onChange(of: browserManager.tabManager.spaces) { _, _ in
+        // Trigger when pages open or close, or any page starts or stops playing
+        .onChange(of: browserManager.tabs.sessions.count) { _, _ in
+            updateMediaState()
+        }
+        .onChange(of: browserManager.tabs.sessions.contains { $0.hasPlayingAudio || $0.hasPlayingVideo }) { _, _ in
             updateMediaState()
         }
         // Trigger when user switches tabs
-        .onChange(of: windowState.currentTabId) { _, _ in
+        .onChange(of: windowState.selectedItemID) { _, _ in
             updateMediaState()
         }
         // Trigger when app becomes active (user switches back to app)
@@ -214,11 +217,6 @@ struct MediaControlsView: View {
         .onChange(of: windowState.sidebarWidth) { _, _ in
             // SwiftUI automatically recomputes shouldShowFavicon and shouldShowPreviousButton
             // when windowState.sidebarWidth changes, so no explicit update needed
-        }
-        // Slower fallback timer (10 seconds) - catches edge cases where events don't fire
-        // Tab's JavaScript already checks every 5 seconds, so this is just a safety net
-        .onReceive(Timer.publish(every: 10.0, on: .main, in: .common).autoconnect()) { _ in
-            updateMediaState()
         }
     }
 
@@ -245,11 +243,11 @@ struct MediaControlsView: View {
             }
             let foundTab = manager.findActiveMediaTab()
 
-            var resolvedTab: Tab? = foundTab
+            var resolvedTab: PageSession? = foundTab
 
             if resolvedTab == nil, let current = activeMediaTab,
-               let refreshed = browserManager.tabManager.allTabs().first(where: { $0.id == current.id }) {
-                let isCurrentWindowTab = windowState.currentTabId == refreshed.id
+               let refreshed = browserManager.tabs.session(for: current.itemID) {
+                let isCurrentWindowTab = windowState.selectedItemID == refreshed.itemID
                 if !isCurrentWindowTab {
                     resolvedTab = refreshed
                 }
@@ -258,7 +256,7 @@ struct MediaControlsView: View {
             // IMPORTANT: Media controls only show for BACKGROUND tabs with playing media
             // This is by design - if the user can see the video/player, they don't need sidebar controls
             if let candidate = resolvedTab,
-               windowState.currentTabId == candidate.id {
+               windowState.selectedItemID == candidate.itemID {
                 resolvedTab = nil
             }
 
@@ -268,7 +266,7 @@ struct MediaControlsView: View {
                 hasActiveMedia = hasMedia
             }
 
-            if activeMediaTab?.id != resolvedTab?.id {
+            if activeMediaTab?.itemID != resolvedTab?.itemID {
                 activeMediaTab = resolvedTab
             }
 

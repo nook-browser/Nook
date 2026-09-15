@@ -77,8 +77,7 @@ final class SplitDropCaptureView: NSView {
             NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
             return false
         }
-        let all = bm.tabManager.allTabs()
-        guard let tab = all.first(where: { $0.id == id }) else {
+        guard bm.tabs.item(id) != nil else {
             sm.updateDragLocation(nil, for: windowId)
             sm.endPreview(cancel: false, for: windowId)
             NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
@@ -99,12 +98,12 @@ final class SplitDropCaptureView: NSView {
         if sm.isSplit(for: windowId) {
             let leftId = sm.leftTabId(for: windowId)
             let rightId = sm.rightTabId(for: windowId)
-            if (dropSide == .left && leftId == tab.id) || (dropSide == .right && rightId == tab.id) {
+            if (dropSide == .left && leftId == id) || (dropSide == .right && rightId == id) {
                 return true
             }
         }
         if let windowState = bm.windowRegistry?.windows[windowId] {
-            sm.enterSplit(with: tab, placeOn: dropSide, in: windowState)
+            sm.enterSplit(with: id, placeOn: dropSide, in: windowState)
         }
         // Cancel any in-progress sidebar/tab drag to prevent unintended reorder/removal
         DispatchQueue.main.async {

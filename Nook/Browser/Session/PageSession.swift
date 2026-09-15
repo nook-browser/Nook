@@ -280,10 +280,13 @@ final class PageSession: NSObject, Identifiable {
         if let adopted {
             primaryWebView = adopted
         } else {
-            primaryWebView = FocusableWKWebView(frame: .zero, configuration: configuration)
+            let created = FocusableWKWebView(frame: .zero, configuration: configuration)
+            created.contextMenuBridge = WebContextMenuBridge(session: self, configuration: configuration)
+            primaryWebView = created
         }
 
         guard let webView = primaryWebView else { return }
+        (webView as? FocusableWKWebView)?.owningSession = self
         webView.navigationDelegate = self
         webView.uiDelegate = self
         webView.allowsBackForwardNavigationGestures = true
@@ -341,6 +344,8 @@ final class PageSession: NSObject, Identifiable {
     /// Installs a WebKit-created popup view as this session's primary view. WebKit drives the
     /// popup's first navigation.
     func installPopupWebView(_ webView: FocusableWKWebView) {
+        webView.owningSession = self
+        webView.contextMenuBridge = WebContextMenuBridge(session: self, configuration: webView.configuration)
         webView.navigationDelegate = self
         webView.uiDelegate = self
         webView.allowsBackForwardNavigationGestures = true

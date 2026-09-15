@@ -12,9 +12,6 @@ import WebKit
 @MainActor
 @Observable
 class WebViewCoordinator {
-    /// Window-specific web views: tabId -> windowId -> WKWebView
-    private var webViewsByTabAndWindow: [UUID: [UUID: WKWebView]] = [:]
-
     /// Prevent recursive sync calls
     private var isSyncingTab: Set<UUID> = []
 
@@ -64,124 +61,68 @@ class WebViewCoordinator {
 
     // MARK: - WebView Pool Management
 
-    func getWebView(for tabId: UUID, in windowId: UUID) -> WKWebView? {
-        return webViewsByTabAndWindow[tabId]?[windowId]
+    /// Web views by item id, then window id. The first window to show a page holds the
+    /// session's primary view; other windows get clones. A live view never moves between windows.
+    private var webViewsByItemAndWindow: [UUID: [UUID: WKWebView]] = [:]
+
+    func getWebView(for itemID: UUID, in windowId: UUID) -> WKWebView? {
+        webViewsByItemAndWindow[itemID]?[windowId]
     }
 
-    func getAllWebViews(for tabId: UUID) -> [WKWebView] {
-        guard let windowWebViews = webViewsByTabAndWindow[tabId] else { return [] }
-        return Array(windowWebViews.values)
+    func getAllWebViews(for itemID: UUID) -> [WKWebView] {
+        webViewsByItemAndWindow[itemID].map { Array($0.values) } ?? []
     }
 
-    func setWebView(_ webView: WKWebView, for tabId: UUID, in windowId: UUID) {
-        if webViewsByTabAndWindow[tabId] == nil {
-            webViewsByTabAndWindow[tabId] = [:]
+    func setWebView(_ webView: WKWebView, for itemID: UUID, in windowId: UUID) {
+        webViewsByItemAndWindow[itemID, default: [:]][windowId] = webView
+    }
+
+    /// The view `windowId` shows for `session`: its existing one, else the session's primary
+    /// when no other window shows the page, else a clone.
+    func createWebView(for session: PageSession, in windowId: UUID) -> WKWebView {
+        if let existing = getWebView(for: session.itemID, in: windowId) { return existing }
+        if let otherWindow = webViewsByItemAndWindow[session.itemID]?.keys.first {
+            return createClone(for: session, in: windowId, copyFrom: getWebView(for: session.itemID, in: otherWindow))
         }
-        webViewsByTabAndWindow[tabId]?[windowId] = webView
-    }
-
-    // MARK: - Smart WebView Assignment (Memory Optimization)
-    
-    /// Gets or creates a WebView for the specified tab and window.
-    /// Implements smart assignment to prevent duplicate WebViews:
-    /// - If no window is displaying this tab yet, creates a "primary" WebView
-    /// - If another window is already displaying this tab, creates a "clone" WebView
-    /// - Returns existing WebView if this window already has one
-    func getOrCreateWebView(for tab: Tab, in windowId: UUID, tabManager: TabManager) -> WKWebView {
-        let tabId = tab.id
-
-        // Check if this window already has a WebView for this tab
-        if let existing = getWebView(for: tabId, in: windowId) {
-            return existing
-        }
-
-        // Check if another window already has this tab displayed
-        let allWindowsForTab = webViewsByTabAndWindow[tabId] ?? [:]
-        let otherWindows = allWindowsForTab.filter { $0.key != windowId }
-
-        if otherWindows.isEmpty {
-            // This is the FIRST window to display this tab
-            // Create the "primary" WebView and assign it to this tab
-            let primaryWebView = createPrimaryWebView(for: tab, in: windowId)
-
-            // Assign this WebView as the tab's primary
-            tab.assignWebViewToWindow(primaryWebView, windowId: windowId)
-
-            return primaryWebView
-        } else {
-            // Another window is already displaying this tab
-            // Create a "clone" WebView for this window
-            let cloneWebView = createCloneWebView(for: tab, in: windowId, primaryWindowId: otherWindows.first!.key)
-
-            return cloneWebView
-        }
-    }
-    
-    /// Creates the "primary" WebView - the first WebView for a tab
-    /// This WebView is owned by the tab and is the "source of truth"
-    private func createPrimaryWebView(for tab: Tab, in windowId: UUID) -> WKWebView {
-        // Adopt the tab's fully configured view, including restored navigation and popup state.
+        // Adopt the session's configured view, including restored navigation and popup state.
         // Selection may already have created it; never start a second navigation for assignment.
-        tab.loadWebViewIfNeeded()
-        let webView = tab.existingWebView
-            ?? createWebViewInternal(for: tab, in: windowId, isPrimary: true)
-        setWebView(webView, for: tab.id, in: windowId)
-        return webView
+        session.loadWebViewIfNeeded()
+        let primary = session.webView ?? createClone(for: session, in: windowId, copyFrom: nil)
+        setWebView(primary, for: session.itemID, in: windowId)
+        session.assignWebView(primary, toWindow: windowId)
+        return primary
     }
-    
-    /// Creates a "clone" WebView - additional WebViews for multi-window display
-    /// These share the configuration but are separate instances
-    private func createCloneWebView(for tab: Tab, in windowId: UUID, primaryWindowId: UUID) -> WKWebView {
-        let tabId = tab.id
 
-        // Get the primary WebView to copy configuration
-        let primaryWebView = getWebView(for: tabId, in: primaryWindowId)
-
-        // Create clone with shared configuration
-        return createWebViewInternal(for: tab, in: windowId, isPrimary: false, copyFrom: primaryWebView)
-    }
-    
-    /// Internal method to create a WebView with proper configuration
-    private func createWebViewInternal(for tab: Tab, in windowId: UUID, isPrimary: Bool, copyFrom: WKWebView? = nil) -> WKWebView {
-        let tabId = tab.id
-        
-        // Derive config from shared config or existing webview to preserve
-        // process pool + extension controller (fresh configs break content script injection)
+    private func createClone(for session: PageSession, in windowId: UUID, copyFrom source: WKWebView?) -> WKWebView {
+        // Derive the config from an existing view or the profile's shared config to keep the
+        // process pool and extension controller (fresh configs break content script injection).
         let configuration: WKWebViewConfiguration
-        if let sourceWebView = copyFrom ?? tab.existingWebView {
-            // .configuration returns a copy — preserves process pool, extension controller, etc.
+        if let sourceWebView = source ?? session.webView {
             configuration = sourceWebView.configuration
+        } else if let profile = session.profile {
+            configuration = BrowserConfiguration.shared.webViewConfiguration(for: profile)
         } else {
-            let resolvedProfile = tab.resolveProfile()
-            if let profile = resolvedProfile {
-                configuration = BrowserConfiguration.shared.webViewConfiguration(for: profile)
-            } else {
-                configuration = BrowserConfiguration.shared.webViewConfiguration.copy() as! WKWebViewConfiguration
-            }
+            configuration = BrowserConfiguration.shared.webViewConfiguration.copy() as! WKWebViewConfiguration
         }
-        // Fresh user content controller per webview to avoid cross-tab handler conflicts
-        // (preserves shared scripts like extension bridge polyfills)
+        // Fresh user content controller per view: handlers are keyed by name.
         configuration.userContentController = BrowserConfiguration.shared.freshUserContentController()
 
         let newWebView = FocusableWKWebView(frame: .zero, configuration: configuration)
-        newWebView.navigationDelegate = tab
-        newWebView.uiDelegate = tab
+        newWebView.navigationDelegate = session
+        newWebView.uiDelegate = session
         newWebView.allowsBackForwardNavigationGestures = true
         newWebView.allowsMagnification = true
-        newWebView.owningTab = tab
-        newWebView.contextMenuBridge = WebContextMenuBridge(tab: tab, configuration: configuration)
-        // Same handlers, user agent and preferences as the primary: a clone is promoted
-        // to primary when its window outlives the primary's window.
-        tab.configureTabWebView(newWebView)
+        newWebView.owningSession = session
+        newWebView.contextMenuBridge = WebContextMenuBridge(session: session, configuration: configuration)
+        // Same handlers, user agent and preferences as the primary: a clone is promoted to
+        // primary when its window outlives the primary's window.
+        session.configure(newWebView)
+        session.setupThemeColorObserver(for: newWebView)
+        session.setupNavigationStateObservers(for: newWebView)
 
-        tab.setupThemeColorObserver(for: newWebView)
-        tab.setupNavigationStateObservers(for: newWebView)
-
-        Tab.loadPage(tab.url, in: newWebView)
-        newWebView.isMuted = tab.isAudioMuted
-        
-        setWebView(newWebView, for: tabId, in: windowId)
-
+        PageSession.loadPage(session.url, in: newWebView)
+        newWebView.isMuted = session.isAudioMuted
+        setWebView(newWebView, for: session.itemID, in: windowId)
         return newWebView
     }
 
@@ -197,140 +138,86 @@ class WebViewCoordinator {
         }
     }
 
-    func removeAllWebViews(for tab: Tab) {
-        guard let entries = webViewsByTabAndWindow.removeValue(forKey: tab.id) else { return }
-        for (_, webView) in entries {
-            tab.cleanupCloneWebView(webView)
+    func removeAllWebViews(for session: PageSession) {
+        guard let entries = webViewsByItemAndWindow.removeValue(forKey: session.itemID) else { return }
+        for webView in entries.values {
+            session.cleanupClone(webView)
             removeWebViewFromContainers(webView)
         }
     }
 
+    /// Removes the item's pool entries without cleaning the views (legacy `Tab` callers do that).
+    func removeEntries(for itemID: UUID) -> [UUID: WKWebView] {
+        webViewsByItemAndWindow.removeValue(forKey: itemID) ?? [:]
+    }
+
     // MARK: - Window Cleanup
 
-    func cleanupWindow(_ windowId: UUID, tabManager: TabManager) {
-        let webViewsToCleanup = webViewsByTabAndWindow.compactMap {
-            (tabId, windowWebViews) -> (UUID, WKWebView)? in
-            guard let webView = windowWebViews[windowId] else { return nil }
-            return (tabId, webView)
+    /// A window closed: its views go. A primary passes to another window's clone when one
+    /// exists, else the page unloads.
+    func cleanupWindow(_ windowId: UUID, tabs: TabsController) {
+        let closing = webViewsByItemAndWindow.compactMap { itemID, views in
+            views[windowId].map { (itemID, $0) }
         }
-
-        // Build a lookup dictionary once instead of calling allTabs().first(where:) per webview.
-        // Tolerate a tab listed in two containers rather than trapping on window close.
-        let allTabsMap = Dictionary(tabManager.allTabs().map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-
-        for (tabId, webView) in webViewsToCleanup {
-            webViewsByTabAndWindow[tabId]?.removeValue(forKey: windowId)
-            if webViewsByTabAndWindow[tabId]?.isEmpty == true {
-                webViewsByTabAndWindow.removeValue(forKey: tabId)
+        for (itemID, webView) in closing {
+            webViewsByItemAndWindow[itemID]?.removeValue(forKey: windowId)
+            if webViewsByItemAndWindow[itemID]?.isEmpty == true {
+                webViewsByItemAndWindow.removeValue(forKey: itemID)
             }
-            if let tab = allTabsMap[tabId] {
-                if tab.existingWebView === webView {
-                    if let replacement = webViewsByTabAndWindow[tabId]?.first {
-                        tab.assignWebViewToWindow(replacement.value, windowId: replacement.key)
-                        tab.cleanupCloneWebView(webView)
+            if let session = tabs.session(for: itemID) {
+                if session.webView === webView {
+                    if let replacement = webViewsByItemAndWindow[itemID]?.first {
+                        session.assignWebView(replacement.value, toWindow: replacement.key)
+                        session.cleanupClone(webView)
                     } else {
-                        tab.unloadWebView()
+                        session.unload()
                     }
                 } else {
-                    tab.cleanupCloneWebView(webView)
+                    session.cleanupClone(webView)
                 }
             } else {
-                performFallbackWebViewCleanup(webView, tabId: tabId)
+                Self.detachOrphan(webView, itemID: itemID)
             }
             removeWebViewFromContainers(webView)
         }
         removeCompositorContainerView(for: windowId)
     }
 
-    func cleanupAllWebViews(tabManager: TabManager) {
-        let allTabsMap = Dictionary(tabManager.allTabs().map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let entries = webViewsByTabAndWindow
-        webViewsByTabAndWindow.removeAll()
-        for (tabId, windowWebViews) in entries {
-            for webView in windowWebViews.values {
-                if let tab = allTabsMap[tabId] {
-                    tab.cleanupCloneWebView(webView)
-                } else {
-                    performFallbackWebViewCleanup(webView, tabId: tabId)
-                }
-            }
-        }
-        for tab in allTabsMap.values { tab.unloadWebView() }
-        compositorContainerViews.removeAll()
-    }
-
-    // MARK: - WebView Creation & Cross-Window Sync
-
-    /// Create a new web view for a specific tab in a specific window
-    func createWebView(for tab: Tab, in windowId: UUID) -> WKWebView {
-        if let existing = getWebView(for: tab.id, in: windowId) { return existing }
-        if let otherWindow = webViewsByTabAndWindow[tab.id]?.keys.first {
-            return createCloneWebView(for: tab, in: windowId, primaryWindowId: otherWindow)
-        }
-        let primary = createPrimaryWebView(for: tab, in: windowId)
-        tab.assignWebViewToWindow(primary, windowId: windowId)
-        return primary
-    }
-
-    // MARK: - Private Helpers
-
-    private func performFallbackWebViewCleanup(_ webView: WKWebView, tabId: UUID) {
-        // Stop loading
+    /// Cleanup for a view whose session is gone.
+    static func detachOrphan(_ webView: WKWebView, itemID: UUID) {
         webView.stopLoading()
-
-        // Remove all message handlers
         let controller = webView.configuration.userContentController
-        let allMessageHandlers = [
-            "linkHover",
-            "commandHover",
-            "commandClick",
-            "pipStateChange",
-            "mediaStateChange_\(tabId.uuidString)",
-            "backgroundColor_\(tabId.uuidString)",
-            "historyStateDidChange",
-            "NookIdentity",
-            "nookShortcutDetect",
+        let handlerNames = [
+            "linkHover", "commandHover", "commandClick", "pipStateChange",
+            "mediaStateChange_\(itemID.uuidString)", "backgroundColor_\(itemID.uuidString)",
+            "historyStateDidChange", "NookIdentity", "nookShortcutDetect",
         ]
-
-        for handlerName in allMessageHandlers {
-            controller.removeScriptMessageHandler(forName: handlerName)
+        for name in handlerNames {
+            controller.removeScriptMessageHandler(forName: name)
         }
-
-        // MEMORY LEAK FIX: Detach contextMenuBridge
-        if let focusableWebView = webView as? FocusableWKWebView {
-            focusableWebView.contextMenuBridge?.detach()
-            focusableWebView.contextMenuBridge = nil
+        if let focusable = webView as? FocusableWKWebView {
+            focusable.contextMenuBridge?.detach()
+            focusable.contextMenuBridge = nil
         }
-
-        // Clear delegates
         webView.navigationDelegate = nil
         webView.uiDelegate = nil
-
-        // Remove from view hierarchy
         webView.removeFromSuperview()
     }
 
     // MARK: - Cross-Window Sync
 
-    /// Sync a tab's URL across all windows displaying it
-    func syncTab(_ tabId: UUID, to url: URL) {
-        // Prevent recursive sync calls
-        guard !isSyncingTab.contains(tabId) else {
-            return
-        }
+    /// Loads `url` in every window's view of the item that shows something else.
+    func syncTab(_ itemID: UUID, to url: URL) {
+        guard !isSyncingTab.contains(itemID) else { return }
+        isSyncingTab.insert(itemID)
+        defer { isSyncingTab.remove(itemID) }
 
-        isSyncingTab.insert(tabId)
-        defer { isSyncingTab.remove(tabId) }
-
-        // Get all web views for this tab across all windows
-        let allWebViews = getAllWebViews(for: tabId)
-
-        for webView in allWebViews {
+        for webView in getAllWebViews(for: itemID) {
             // Sync the URL if it's different. WebKit canonicalizes the URL it reports
             // (a bare host gains "/"), so compare canonical forms: a raw mismatch would
             // start a second navigation in the view that is already loading it.
             if Self.canonical(webView.url) != Self.canonical(url) {
-                Tab.loadPage(url, in: webView)
+                PageSession.loadPage(url, in: webView)
             }
         }
     }
@@ -350,21 +237,11 @@ class WebViewCoordinator {
         return components.string ?? url.absoluteString
     }
 
-    /// Reload a tab across all windows displaying it
-    func reloadTab(_ tabId: UUID) {
-        let allWebViews = getAllWebViews(for: tabId)
-        for webView in allWebViews {
-            webView.reload()
-        }
+    func reloadTab(_ itemID: UUID) {
+        getAllWebViews(for: itemID).forEach { $0.reload() }
     }
 
-    /// Set mute state for a tab across all windows
-    func setMuteState(_ muted: Bool, for tabId: UUID, excludingWindow originatingWindowId: UUID?) {
-        guard let windowWebViews = webViewsByTabAndWindow[tabId] else { return }
-
-        for (_, webView) in windowWebViews {
-            // Simple: just set all webviews to the same mute state
-            webView.isMuted = muted
-        }
+    func setMuteState(_ muted: Bool, for itemID: UUID, excludingWindow originatingWindowId: UUID?) {
+        getAllWebViews(for: itemID).forEach { $0.isMuted = muted }
     }
 }

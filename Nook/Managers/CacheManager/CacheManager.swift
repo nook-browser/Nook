@@ -176,7 +176,7 @@ class CacheManager: ObservableObject {
         await loadCacheData() // Refresh the list
         
         // Also clear favicon cache
-        Tab.clearFaviconCache()
+        FaviconCache.shared.clear()
     }
     
     func clearSpecificCache(_ cache: CacheInfo) async {
@@ -194,12 +194,12 @@ class CacheManager: ObservableObject {
     func clearFaviconCache() {
         // Favicon cache is global by design (shared across profiles for better reuse)
         // Only diagnostics include the current profile context.
-        Tab.clearFaviconCache()
+        FaviconCache.shared.clear()
     }
     
     func getFaviconCacheStats() -> (count: Int, domains: [String]) {
-        let stats = Tab.getFaviconCacheStats()
-        return stats
+        let domains = FaviconCache.shared.memoryKeys
+        return (domains.count, domains)
     }
     
     func searchCache(_ query: String) -> [CacheInfo] {

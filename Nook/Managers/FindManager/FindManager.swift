@@ -16,10 +16,10 @@ class FindManager: ObservableObject {
     @Published var currentMatchIndex: Int = 0
     @Published var isSearching: Bool = false
     
-    var currentTab: Tab?
+    var currentSession: PageSession?
     
-    func showFindBar(for tab: Tab? = nil) {
-        currentTab = tab
+    func showFindBar(for session: PageSession? = nil) {
+        currentSession = session
         isFindBarVisible = true
         searchText = ""
         matchCount = 0
@@ -28,8 +28,8 @@ class FindManager: ObservableObject {
 
     func hideFindBar() {
         // Clear highlights from current tab before hiding
-        if let tab = currentTab {
-            tab.clearFindInPage()
+        if let session = currentSession {
+            session.clearFindInPage()
         }
 
         isFindBarVisible = false
@@ -38,17 +38,17 @@ class FindManager: ObservableObject {
             self?.searchText = ""
             self?.matchCount = 0
             self?.currentMatchIndex = 0
-            self?.currentTab = nil
+            self?.currentSession = nil
         }
     }
     
-    func search(for text: String, in tab: Tab?) {
-        guard let tab = tab else {
+    func search(for text: String, in session: PageSession?) {
+        guard let session else {
             clearSearch()
             return
         }
 
-        currentTab = tab
+        currentSession = session
         searchText = text
         isSearching = true
 
@@ -58,7 +58,7 @@ class FindManager: ObservableObject {
         }
 
         // Use JavaScript-based find functionality
-        tab.findInPage(text) { [weak self] result in
+        session.findInPage(text) { [weak self] result in
             DispatchQueue.main.async {
                 self?.isSearching = false
                 switch result {
@@ -74,8 +74,8 @@ class FindManager: ObservableObject {
     }
 
     func findNext() {
-        guard let tab = currentTab, !searchText.isEmpty else { return }
-        tab.findNextInPage { [weak self] result in
+        guard let session = currentSession, !searchText.isEmpty else { return }
+        session.findNextInPage { [weak self] result in
             DispatchQueue.main.async {
                 switch result {
                 case .success(let (matchCount, currentIndex)):
@@ -89,8 +89,8 @@ class FindManager: ObservableObject {
     }
 
     func findPrevious() {
-        guard let tab = currentTab, !searchText.isEmpty else { return }
-        tab.findPreviousInPage { [weak self] result in
+        guard let session = currentSession, !searchText.isEmpty else { return }
+        session.findPreviousInPage { [weak self] result in
             DispatchQueue.main.async {
                 switch result {
                 case .success(let (matchCount, currentIndex)):
@@ -104,18 +104,18 @@ class FindManager: ObservableObject {
     }
     
     func clearSearch() {
-        guard let tab = currentTab else { return }
-        tab.clearFindInPage()
+        guard let session = currentSession else { return }
+        session.clearFindInPage()
         searchText = ""
         matchCount = 0
         currentMatchIndex = 0
     }
     
-    func updateCurrentTab(_ tab: Tab?) {
-        currentTab = tab
+    func updateCurrentSession(_ session: PageSession?) {
+        currentSession = session
         if isFindBarVisible && !searchText.isEmpty {
             // Re-search in the new tab
-            search(for: searchText, in: tab)
+            search(for: searchText, in: session)
         }
     }
 }

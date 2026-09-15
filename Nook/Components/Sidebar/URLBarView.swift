@@ -17,17 +17,17 @@ struct URLBarView: View {
     var isSidebarHovered: Bool
 
     var body: some View {
-        let currentTab = browserManager.currentTab(for: windowState)
+        let session = browserManager.tabs.selectedSession(in: windowState)
         ZStack {
             HStack(spacing: NookDesign.Spacing.sm) {
                     // URL text area — tappable to open command palette
                     Group {
-                        if currentTab != nil {
+                        if session != nil {
                             HStack(spacing: NookDesign.Spacing.xs) {
-                                Image(systemName: isSecure(for: currentTab) ? "lock.fill" : "globe")
+                                Image(systemName: isSecure(for: session) ? "lock.fill" : "globe")
                                     .font(.system(size: NookDesign.Size.rowGlyph, weight: .medium))
                                     .foregroundStyle(.secondary)
-                                (Text(displayHost(for: currentTab)).foregroundStyle(.primary) + Text(displayPath(for: currentTab)).foregroundStyle(.tertiary))
+                                (Text(displayHost(for: session)).foregroundStyle(.primary) + Text(displayPath(for: session)).foregroundStyle(.tertiary))
                                     .font(NookDesign.Font.secondary)
                                     .lineLimit(1)
                                     .truncationMode(.tail)
@@ -46,14 +46,14 @@ struct URLBarView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        let urlString = currentTab?.url.absoluteString ?? ""
+                        let urlString = session?.url.absoluteString ?? ""
                         windowState.commandPalette?.open(prefill: urlString, navigateCurrentTab: true)
                     }
 
                     // Copy link button (show on hover when tab is selected)
-                    if isHovering, let currentTab {
+                    if isHovering, let session {
                         Button("Copy Link", systemImage: showCheckmark ? "checkmark" : "link") {
-                            copyURLToClipboard(currentTab.url.absoluteString)
+                            copyURLToClipboard(session.url.absoluteString)
                         }
                         .labelStyle(.iconOnly)
                         .buttonStyle(NookIconButtonStyle(size: NookDesign.Size.rowButton, radius: NookDesign.Radius.sm))
@@ -63,16 +63,16 @@ struct URLBarView: View {
                     }
 
                     // PiP button (show when video content is available or PiP is active)
-                    if let currentTab, (currentTab.hasVideoContent || currentTab.hasPiPActive) {
+                    if let session, (session.hasVideoContent || session.hasPiPActive) {
                         Button(action: {
-                            currentTab.requestPictureInPicture()
+                            session.requestPictureInPicture()
                         }) {
-                            Image(systemName: currentTab.hasPiPActive ? "pip.exit" : "pip.enter")
+                            Image(systemName: session.hasPiPActive ? "pip.exit" : "pip.enter")
                                 .font(NookDesign.Font.secondary)
-                                .foregroundStyle(textColor.opacity(currentTab.hasPiPActive ? 1.0 : 0.7))
+                                .foregroundStyle(textColor.opacity(session.hasPiPActive ? 1.0 : 0.7))
                         }
                         .buttonStyle(.plain)
-                        .help(currentTab.hasPiPActive ? "Exit Picture in Picture" : "Enter Picture in Picture")
+                        .help(session.hasPiPActive ? "Exit Picture in Picture" : "Enter Picture in Picture")
                     }
                     
                     // Pinned extension buttons + library button
@@ -102,7 +102,7 @@ struct URLBarView: View {
            backgroundColor
         )
         .overlay(alignment: .bottom) {
-            PageLoadingProgressBar(tab: currentTab)
+            PageLoadingProgressBar(session: session)
                 .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: NookDesign.Radius.md, bottomTrailingRadius: NookDesign.Radius.md, style: .continuous))
         }
         .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
@@ -130,15 +130,15 @@ struct URLBarView: View {
         .secondary
     }
     
-    private func displayURL(for tab: Tab?) -> String {
-        guard let tab else { return "" }
-        return formatURL(tab.url)
+    private func displayURL(for session: PageSession?) -> String {
+        guard let session else { return "" }
+        return formatURL(session.url)
     }
 
-    private func isSecure(for tab: Tab?) -> Bool { tab?.url.scheme == "https" }
-    private func displayHost(for tab: Tab?) -> String { tab?.url.host ?? displayURL(for: tab) }
-    private func displayPath(for tab: Tab?) -> String {
-        guard let url = tab?.url, url.host != nil else { return "" }
+    private func isSecure(for session: PageSession?) -> Bool { session?.url.scheme == "https" }
+    private func displayHost(for session: PageSession?) -> String { session?.url.host ?? displayURL(for: session) }
+    private func displayPath(for session: PageSession?) -> String {
+        guard let url = session?.url, url.host != nil else { return "" }
         let path = url.path
         return path == "/" ? "" : path
     }

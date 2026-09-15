@@ -9,11 +9,19 @@ import WebKit
 
 @MainActor
 final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
-    private weak var tab: Tab?
+    private weak var session: PageSession?
     private weak var userContentController: WKUserContentController?
 
-    init(tab: Tab, configuration: WKWebViewConfiguration) {
-        self.tab = tab
+    /// Legacy owner still created by `Tab`; removed in task Z.
+    private weak var legacyTab: Tab?
+
+    convenience init(tab: Tab, configuration: WKWebViewConfiguration) {
+        self.init(session: nil, configuration: configuration)
+        legacyTab = tab
+    }
+
+    init(session: PageSession?, configuration: WKWebViewConfiguration) {
+        self.session = session
         let controller = configuration.userContentController
         self.userContentController = controller
         super.init()
@@ -30,11 +38,13 @@ final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.name == Self.handlerName else { return }
         guard let dictionary = message.body as? [String: Any] else {
-            tab?.deliverContextMenuPayload(nil)
+            session?.deliverContextMenuPayload(nil)
+            legacyTab?.deliverContextMenuPayload(nil)
             return
         }
         let payload = WebContextMenuPayload(dictionary: dictionary)
-        tab?.deliverContextMenuPayload(payload)
+        session?.deliverContextMenuPayload(payload)
+        legacyTab?.deliverContextMenuPayload(payload)
     }
 
     private static let handlerName = "contextMenuPayload"

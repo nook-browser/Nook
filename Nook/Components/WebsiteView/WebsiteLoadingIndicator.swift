@@ -35,7 +35,7 @@ struct WebsiteLoadingIndicator: View {
     }
     
     private var indicatorWidth: CGFloat {
-        switch browserManager.currentTab(for: windowState)?.loadingState {
+        switch browserManager.tabs.selectedSession(in: windowState)?.loadingState {
         case .idle:
             return 50
         case .didStartProvisionalNavigation:
