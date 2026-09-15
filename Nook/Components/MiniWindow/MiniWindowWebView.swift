@@ -8,6 +8,27 @@
 import SwiftUI
 import WebKit
 
+/// Keeps the page's fixed content clear of the window's glass toolbar while the
+/// page itself scrolls underneath it. Synced in `layout()` so it survives resize,
+/// full screen and toolbar changes without an observer.
+final class TitlebarInsetWebView: WKWebView {
+    override func layout() {
+        super.layout()
+        // After adopt this view lives in a browser window, which has no toolbar to clear.
+        guard let window = window as? MiniBrowserWindow, bounds.height > 0 else {
+            if obscuredContentInsets.top != 0 { obscuredContentInsets = NSEdgeInsetsZero }
+            return
+        }
+        // How far this view reaches up under the titlebar and toolbar. WebKit throws on
+        // negative insets or insets taller than the view, both possible mid-layout.
+        let overlap = convert(bounds, to: nil).maxY - window.contentLayoutRect.maxY
+        let inset = min(max(0, overlap), bounds.height - 1)
+        if obscuredContentInsets.top != inset {
+            obscuredContentInsets = NSEdgeInsets(top: inset, left: 0, bottom: 0, right: 0)
+        }
+    }
+}
+
 struct MiniWindowWebView: NSViewRepresentable {
     @ObservedObject var session: MiniWindowSession
 
@@ -23,16 +44,15 @@ struct MiniWindowWebView: NSViewRepresentable {
             configuration = BrowserConfiguration.shared.cacheOptimizedWebViewConfiguration()
         }
 
-        let webView = WKWebView(frame: .zero, configuration: configuration)
+        let webView = TitlebarInsetWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
         webView.allowsMagnification = true
 
-        context.coordinator.installProgressObservation(on: webView)
-        context.coordinator.installThemeColorExtraction(on: webView)
         context.coordinator.installAuthDetectionScript(on: webView)
         context.coordinator.loadInitialURLIfNeeded(on: webView)
+        session.webView = webView
 
         return webView
     }
@@ -46,7 +66,6 @@ struct MiniWindowWebView: NSViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, WKScriptMessageHandler {
         var session: MiniWindowSession
-        private var progressObservation: NSKeyValueObservation?
         private var didLoadInitialURL = false
 
         /// Weak reference to the webView so we can clean up message handlers in deinit
@@ -65,79 +84,6 @@ struct MiniWindowWebView: NSViewRepresentable {
                 webView?.configuration.userContentController
                     .removeScriptMessageHandler(forName: "authCompletion")
             }
-        }
-
-        func installProgressObservation(on webView: WKWebView) {
-            progressObservation = webView.observe(\.estimatedProgress, options: [.new]) { [weak self] _, change in
-                guard let progress = change.newValue else { return }
-                DispatchQueue.main.async {
-                    self?.session.updateProgress(progress)
-                }
-            }
-        }
-
-        private func extractThemeColor(from webView: WKWebView) {
-            webView.evaluateJavaScript(WKWebView.themeColorExtractionScript) { [weak self] result, error in
-                guard let self else { return }
-                if let error {
-                }
-
-                var hexString = (result as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
-                if hexString?.isEmpty == true { hexString = nil }
-
-                DispatchQueue.main.async {
-                    self.session.updateToolbarColor(hexString: hexString)
-                }
-            }
-        }
-        
-        private func topRightPixelRect(for webView: WKWebView) -> CGRect? {
-            let bounds = webView.bounds
-            guard bounds.width >= 1, bounds.height >= 1 else { return nil }
-            
-            // Sample the top-rightmost pixel
-            let sampleX = bounds.maxX - 1
-            let sampleY: CGFloat
-            if webView.isFlipped {
-                // In flipped coordinates, minY is at the top
-                sampleY = bounds.minY
-            } else {
-                // In non-flipped coordinates, maxY is at the top
-                sampleY = bounds.maxY - 1
-            }
-            
-            return CGRect(x: sampleX, y: sampleY, width: 1, height: 1)
-        }
-        
-        private func extractToolbarColor(from webView: WKWebView) {
-            guard let sampleRect = topRightPixelRect(for: webView) else {
-                return
-            }
-            
-            let configuration = WKSnapshotConfiguration()
-            configuration.rect = sampleRect
-            configuration.afterScreenUpdates = true
-            configuration.snapshotWidth = 1
-            
-            webView.takeSnapshot(with: configuration) { [weak self] image, error in
-                guard let self = self else { return }
-                
-                if let color = image?.singlePixelColor {
-                    DispatchQueue.main.async {
-                        self.session.updateToolbarColor(fromPixelColor: color)
-                    }
-                }
-            }
-        }
-        
-        func installThemeColorExtraction(on webView: WKWebView) {
-            // Use shared theme color extraction script
-            let script = WKUserScript(
-                source: WKWebView.themeColorExtractionScript,
-                injectionTime: .atDocumentEnd,
-                forMainFrameOnly: true
-            )
-            webView.configuration.userContentController.addUserScript(script)
         }
 
         func installAuthDetectionScript(on webView: WKWebView) {
@@ -286,17 +232,10 @@ struct MiniWindowWebView: NSViewRepresentable {
 @MainActor
 extension MiniWindowWebView.Coordinator: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-        session.updateLoading(isLoading: true)
         session.updateNavigationState(url: webView.url, title: nil)
-        session.updateToolbarColor(hexString: nil)
-    }
-
-    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
-        session.updateLoading(isLoading: true)
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        session.updateLoading(isLoading: false)
         session.updateNavigationState(url: webView.url, title: nil)
         
         // Check if this is an OAuth completion URL
@@ -312,22 +251,6 @@ extension MiniWindowWebView.Coordinator: WKNavigationDelegate {
                 }
             }
         }
-
-        extractThemeColor(from: webView)
-        
-        // Extract top-right pixel color for toolbar (lightweight - only if URL changed)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self, weak webView] in
-            guard let self = self, let webView = webView else { return }
-            self.extractToolbarColor(from: webView)
-        }
-    }
-
-    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        session.updateLoading(isLoading: false)
-    }
-
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        session.updateLoading(isLoading: false)
     }
 }
 

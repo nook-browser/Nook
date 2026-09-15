@@ -1381,9 +1381,11 @@ class TabManager: ObservableObject {
             setTabs(incrementedTabs, for: sid)
         }
 
+        // A handed-over web view has already loaded, so its title KVO will not fire again.
+        let loadedTitle = existingWebView?.title.flatMap { $0.isEmpty ? nil : $0 }
         let newTab = Tab(
             url: validURL,
-            name: "New Tab",
+            name: loadedTitle ?? "New Tab",
             favicon: "globe",
             spaceId: sid,
             index: 0, // New tabs get index 0 to appear at top
