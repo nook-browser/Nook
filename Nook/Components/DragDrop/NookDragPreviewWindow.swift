@@ -128,9 +128,11 @@ private struct NookDragPreviewContent: View {
                     icon: manager.draggedIcon,
                     title: manager.draggedItem?.title ?? "",
                     style: currentStyle,
-                    sidebarWidth: manager.sidebarScreenFrame.width
+                    sidebarWidth: manager.sidebarScreenFrame.width,
+                    isIntoFolder: currentStyle == .tabRow && manager.dropPosition?.placement == .into
                 )
                 .animation(morphSpring, value: currentStyle)
+                .animation(morphSpring, value: manager.dropPosition?.placement == .into)
             }
         }
         .frame(width: NookDragPreviewWindow.previewSize.width, height: NookDragPreviewWindow.previewSize.height)
@@ -159,8 +161,12 @@ private struct NookMorphingPreview: View {
     let title: String
     let style: NookPreviewStyle
     let sidebarWidth: CGFloat
+    /// Hovering the middle of a folder row: the row narrows from the leading edge so the
+    /// folder's icon and name show beside it.
+    let isIntoFolder: Bool
 
     private let sidebarHorizontalPadding: CGFloat = 16
+    private let intoFolderWidthFraction: CGFloat = 0.55
 
     private var effectiveWidth: CGFloat {
         switch style {
@@ -278,7 +284,7 @@ private struct NookMorphingPreview: View {
                 Spacer(minLength: 0)
             }
         }
-        .frame(width: effectiveWidth, height: effectiveHeight)
+        .frame(width: rowWidth, height: effectiveHeight)
         .background(
             NookDesign.Radius.shape(effectiveCornerRadius)
                 .fill(backgroundColor)
@@ -287,5 +293,11 @@ private struct NookMorphingPreview: View {
             NookDesign.Radius.shape(effectiveCornerRadius)
                 .stroke(Color.primary.opacity(0.1), lineWidth: 1)
         )
+        // Keep the trailing edge where the full row's was, revealing the folder on the left.
+        .offset(x: (effectiveWidth - rowWidth) / 2)
+    }
+
+    private var rowWidth: CGFloat {
+        isIntoFolder ? effectiveWidth * intoFolderWidthFraction : effectiveWidth
     }
 }

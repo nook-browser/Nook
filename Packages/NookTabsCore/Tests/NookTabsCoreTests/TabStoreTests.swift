@@ -139,6 +139,15 @@ struct TabStoreTests {
         #expect(onDisk.profiles.isEmpty, "read-only store must not write")
     }
 
+    @Test func closedEntryDecodesWithoutEndedPage() throws {
+        var entry = ClosedEntry(items: [], section: .tabs(spaceID: UUID()), closedAt: fixedNow, endedPage: OpenPage(url: url("page"), title: "Page"))
+        var json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(entry)) as! [String: Any]
+        #expect(json["endedPage"] != nil)
+        json["endedPage"] = nil
+        entry = try JSONDecoder().decode(ClosedEntry.self, from: JSONSerialization.data(withJSONObject: json))
+        #expect(entry.endedPage == nil)
+    }
+
     @Test func keepsSevenBackupFolders() throws {
         let dir = tempDirectory()
         let (tree, device, _) = sample()

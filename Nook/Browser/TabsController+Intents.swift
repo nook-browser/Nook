@@ -208,8 +208,21 @@ extension TabsController {
         let source = tree(owner)
         guard let item = source.item(itemID) else { return }
         if !item.isFolder, source.scope(of: itemID) == .synced {
+            // The page it showed, so Reopen Closed Tab can bring it back in place.
+            var page = session(for: itemID).map { OpenPage(url: $0.url, title: $0.title) }
+            if page == nil, case .main = owner { page = device.openPages[itemID] }
             moveSelectionOff([itemID])
             endSession(itemID)
+            if let page, let section = source.section(of: itemID) {
+                let entry = ClosedEntry(items: [item], section: section, closedAt: Date(), endedPage: page)
+                switch owner {
+                case .main:
+                    recordClosed(entry)
+                case .privateWindow(let window):
+                    window.privateClosed.append(entry)
+                    if window.privateClosed.count > DeviceState.closedLimit { window.privateClosed.removeFirst() }
+                }
+            }
             save()
             return
         }
@@ -255,6 +268,18 @@ extension TabsController {
         let isPrivate = window.privateTree != nil
         guard let entry = isPrivate ? window.privateClosed.last : device.closed.last,
               let fallbackSpace = window.spaceID ?? tree(owner).orderedSpaces.first?.id else { return }
+        // A pinned tab or favorite whose page was closed: reopen that page on the same item.
+        if let page = entry.endedPage, let root = entry.items.first, tree(owner).item(root.id) != nil {
+            if isPrivate {
+                window.privateClosed.removeLast()
+            } else {
+                dropLastClosed()
+                setOpenPage(root.id, page)
+            }
+            select(root.id, in: window)
+            save()
+            return
+        }
         guard perform(owner, "reopen", { try $0.reopen(entry, fallback: .tabs(spaceID: fallbackSpace)) }) != nil else { return }
         if isPrivate {
             window.privateClosed.removeLast()
@@ -262,6 +287,8 @@ extension TabsController {
             dropLastClosed()
         }
         let restored = entry.items.map(\.id)
+        // Older entries for the same items (a page close, then a delete) must not restore them twice.
+        if !isPrivate { dropClosed(containing: Set(restored)) }
         for folder in entry.items where folder.isFolder { openFolder(folder.id) }
         if let firstTab = restored.first(where: { tree(owner).item($0)?.isFolder == false }) {
             select(firstTab, in: window)
