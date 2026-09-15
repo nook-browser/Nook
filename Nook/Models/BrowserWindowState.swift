@@ -79,7 +79,26 @@ class BrowserWindowState {
     var compositorVersion: Int = 0
 
     /// Reference to the actual NSWindow for this window state
-    var window: NSWindow?
+    var window: NSWindow? {
+        didSet { applyPendingFrame() }
+    }
+
+    /// Saved frame (`NSStringFromRect`) to apply once the NSWindow exists.
+    @ObservationIgnored var pendingFrame: String?
+
+    /// Applies `pendingFrame` after the window's own setup, which restores the autosaved frame
+    /// asynchronously and would otherwise overwrite the saved one.
+    func applyPendingFrame() {
+        guard let frame = pendingFrame, let nsWindow = window else { return }
+        pendingFrame = nil
+        let rect = NSRectFromString(frame)
+        guard rect.width > 0, rect.height > 0 else { return }
+        DispatchQueue.main.async {
+            DispatchQueue.main.async {
+                nsWindow.setFrame(rect, display: true)
+            }
+        }
+    }
 
     /// Reference to this window's CommandPalette for global shortcuts
     weak var commandPalette: CommandPalette?

@@ -584,6 +584,8 @@ final class TabsController {
             window.spaceID = record.spaceID.flatMap { tree.space($0)?.id }
             window.selectedItemBySpace = record.selectedItemBySpace.filter { tree.item($0.value) != nil }
             window.split = record.split
+            window.pendingFrame = record.frame
+            window.applyPendingFrame()
             device.windows[index].id = window.id
         }
         if window.spaceID == nil {
