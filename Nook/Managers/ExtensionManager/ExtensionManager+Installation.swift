@@ -368,8 +368,8 @@ extension ExtensionManager {
 
         // Tabs that navigated before this extension loaded missed their URL grants.
         if let bm = browserManagerRef {
-            for tab in bm.tabManager.pinnedTabs + bm.tabManager.tabs where openedTabIDs.contains(tab.id) {
-                grantExtensionAccessToURL(tab.url)
+            for session in bm.tabs.sessions where openedTabIDs.contains(session.itemID) {
+                grantExtensionAccessToURL(session.url)
             }
         }
 

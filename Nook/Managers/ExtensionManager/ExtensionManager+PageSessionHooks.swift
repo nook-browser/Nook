@@ -2,20 +2,63 @@
 //  ExtensionManager+PageSessionHooks.swift
 //  Nook
 //
-//  Extension notifications TabsController and PageSession call. Owned by foundation until
-//  track T4 implements them against ExtensionTabAdapter keyed by item id.
-//  `wakeBackgroundWorkers()` already lives in ExtensionManager+TabNotifications.swift.
+//  Extension notifications TabsController and PageSession call. Adapters are keyed by item
+//  id (ExtensionManager+TabNotifications.swift). Private sessions are never reported.
 //
 
 import Foundation
 import WebKit
 
 extension ExtensionManager {
-    func notifyTabOpened(_ session: PageSession) {}
+    /// Called once a session has a web view, before it loads, so content scripts can resolve it.
+    func notifyTabOpened(_ session: PageSession) {
+        guard !session.isPrivate, let controller = extensionController,
+              !openedTabIDs.contains(session.itemID),
+              let adapter = adapter(for: session.itemID)
+        else { return }
+        // The window must be known to the controller before its tab.
+        _ = adapter.hostWindow.flatMap { windowAdapter(for: $0) }
+        openedTabIDs.insert(session.itemID)
+        controller.didOpenTab(adapter)
+    }
 
-    func notifyTabActivated(new: PageSession, previous: PageSession?) {}
+    func notifyTabActivated(new: PageSession, previous: PageSession?) {
+        guard let controller = extensionController else { return }
+        let oldAdapter = previous.flatMap { $0.isPrivate ? nil : openedAdapter(for: $0.itemID) }
+        guard !new.isPrivate, let newAdapter = openedAdapter(for: new.itemID) else {
+            // Switching to a private or unopened page: just deselect the previous one.
+            if let oldAdapter { controller.didDeselectTabs([oldAdapter]) }
+            return
+        }
+        controller.didActivateTab(newAdapter, previousActiveTab: oldAdapter)
+        controller.didSelectTabs([newAdapter])
+        if let oldAdapter, oldAdapter != newAdapter { controller.didDeselectTabs([oldAdapter]) }
 
-    func notifyTabClosed(itemID: UUID) {}
+        // Wake MV3 background workers so they update badge counts and autofill state for the
+        // newly active tab.
+        wakeBackgroundWorkers()
 
-    func notifyTabPropertiesChanged(_ session: PageSession, properties: WKWebExtension.TabChangedProperties) {}
+        grantExtensionAccessToURL(new.url)
+
+        // Background workers re-evaluate the page (autofill detection, badge text,
+        // declarativeContent rules).
+        controller.didChangeTabProperties([.URL, .title], for: newAdapter)
+    }
+
+    /// The item's page ended (item closed, pinned page closed, private window closed).
+    func notifyTabClosed(itemID: UUID) {
+        defer {
+            tabAdapters[itemID] = nil
+            openedTabIDs.remove(itemID)
+        }
+        guard let controller = extensionController, let adapter = openedAdapter(for: itemID) else { return }
+        controller.didCloseTab(adapter, windowIsClosing: false)
+    }
+
+    func notifyTabPropertiesChanged(_ session: PageSession, properties: WKWebExtension.TabChangedProperties) {
+        guard !session.isPrivate, let controller = extensionController,
+              let adapter = openedAdapter(for: session.itemID)
+        else { return }
+        controller.didChangeTabProperties(properties, for: adapter)
+    }
 }

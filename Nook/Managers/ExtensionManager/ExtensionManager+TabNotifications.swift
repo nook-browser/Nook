@@ -12,44 +12,92 @@ import WebKit
 
 extension ExtensionManager {
 
-    // MARK: - Controller event notifications for tabs
+    // MARK: - Adapters
 
-    func adapter(for tab: Tab, browserManager: BrowserManager)
-        -> ExtensionTabAdapter
-    {
-        if let existing = tabAdapters[tab.id] {
-            return existing
-        }
-        let created = ExtensionTabAdapter(
-            tab: tab,
-            browserManager: browserManager
-        )
-        tabAdapters[tab.id] = created
-        Self.logger.debug("Created tab adapter for '\(tab.name, privacy: .public)'")
+    /// Adapter for a tab item extensions may see; nil for folders, unknown ids and private items.
+    func adapter(for itemID: UUID) -> ExtensionTabAdapter? {
+        if let existing = tabAdapters[itemID] { return existing }
+        guard let bm = browserManagerRef, let item = bm.tabs.item(itemID), !item.isFolder,
+              bm.tabs.session(for: itemID)?.isPrivate != true,
+              !(bm.windowRegistry?.allWindows ?? []).contains(where: { $0.privateTree?.item(itemID) != nil })
+        else { return nil }
+        // ponytail: adapters for items closed without ever loading stay cached (a few bytes each);
+        // prune against the tree if that ever shows up.
+        let created = ExtensionTabAdapter(itemID: itemID, browserManager: bm)
+        tabAdapters[itemID] = created
         return created
     }
 
-    /// Adapter for exposing a tab to extensions, or nil for private tabs, which extensions never see.
-    func stableAdapter(for tab: Tab) -> ExtensionTabAdapter? {
-        guard let bm = browserManagerRef, !tab.isEphemeral else { return nil }
-        return adapter(for: tab, browserManager: bm)
-    }
-
-    func notifyTabOpened(_ tab: Tab) {
-        guard let controller = extensionController,
-              !openedTabIDs.contains(tab.id),
-              let a = stableAdapter(for: tab)
-        else { return }
-        openedTabIDs.insert(tab.id)
-        controller.didOpenTab(a)
-        tabCacheGeneration &+= 1
-    }
-
     /// Adapter for a tab the controller already knows about; nil for private or unopened tabs.
-    private func openedAdapter(for tab: Tab) -> ExtensionTabAdapter? {
-        guard openedTabIDs.contains(tab.id), let bm = browserManagerRef else { return nil }
-        return adapter(for: tab, browserManager: bm)
+    func openedAdapter(for itemID: UUID) -> ExtensionTabAdapter? {
+        openedTabIDs.contains(itemID) ? adapter(for: itemID) : nil
     }
+
+    /// Adapter for a regular window, created (and announced to the controller) on first use.
+    /// nil for private windows, which extensions never see.
+    func windowAdapter(for window: BrowserWindowState) -> ExtensionWindowAdapter? {
+        guard window.privateTree == nil, !window.isIncognito else { return nil }
+        if let existing = windowAdapters[window.id] { return existing }
+        guard let bm = browserManagerRef else { return nil }
+        let created = ExtensionWindowAdapter(window: window, browserManager: bm)
+        windowAdapters[window.id] = created
+        extensionController?.didOpenWindow(created)
+        return created
+    }
+
+    /// Regular windows, focused first.
+    var openWindowAdapters: [ExtensionWindowAdapter] {
+        guard let registry = browserManagerRef?.windowRegistry else { return [] }
+        let active = registry.activeWindow
+        let ordered = (active.map { [$0] } ?? []) + registry.allWindows.filter { $0 !== active }
+        return ordered.compactMap { windowAdapter(for: $0) }
+    }
+
+    // MARK: - Window Events
+
+    /// Window focus and close come from AppKit notifications; the tab model has no window hooks.
+    func observeWindowEvents() {
+        let center = NotificationCenter.default
+        center.addObserver(forName: NSWindow.didBecomeMainNotification, object: nil, queue: .main) { [weak self] note in
+            let nsWindow = note.object as? NSWindow
+            MainActor.assumeIsolated { self?.windowBecameMain(nsWindow) }
+        }
+        center.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { [weak self] note in
+            let nsWindow = note.object as? NSWindow
+            MainActor.assumeIsolated { self?.windowWillClose(nsWindow) }
+        }
+    }
+
+    private func windowBecameMain(_ nsWindow: NSWindow?) {
+        guard let nsWindow, let controller = extensionController, let bm = browserManagerRef,
+              let window = bm.windowRegistry?.allWindows.first(where: { $0.window === nsWindow })
+        else { return }
+        // A private window focused: tabs.query({active: true}) has no answer, as before.
+        guard let adapter = windowAdapter(for: window) else { return }
+        controller.didFocusWindow(adapter)
+        // Extensions resolve the active tab from the focused window, so switching windows
+        // switches the active tab too.
+        if let session = bm.tabs.selectedSession(in: window) {
+            notifyTabActivated(new: session, previous: nil)
+        }
+    }
+
+    private func windowWillClose(_ nsWindow: NSWindow?) {
+        guard let nsWindow,
+              let adapter = windowAdapters.values.first(where: { $0.state?.window === nsWindow })
+        else { return }
+        windowAdapters[adapter.windowID] = nil
+        extensionController?.didCloseWindow(adapter)
+    }
+
+    // MARK: - Legacy Tab Entry Points
+
+    // Called by Tab/TabManager until task Z deletes them. Extensions follow PageSession now
+    // (see ExtensionManager+PageSessionHooks.swift), so these do nothing.
+    func notifyTabOpened(_ tab: Tab) {}
+    func notifyTabActivated(newTab: Tab, previous: Tab?) {}
+    func notifyTabClosed(_ tab: Tab) {}
+    func notifyTabPropertiesChanged(_ tab: Tab, properties: WKWebExtension.TabChangedProperties) {}
 
     /// Give each loaded extension explicit access to `url`, but only when that extension's
     /// granted match patterns already cover it. Some WebKit builds did not treat a granted
@@ -84,50 +132,6 @@ extension ExtensionManager {
                 ctx.setPermissionStatus(.grantedExplicitly, for: originPattern)
             }
         }
-    }
-
-    func notifyTabActivated(newTab: Tab, previous: Tab?) {
-        guard let controller = extensionController else { return }
-        let oldA = previous.flatMap { openedAdapter(for: $0) }
-        guard let newA = openedAdapter(for: newTab) else {
-            // Switching to a private or unloaded tab: just deselect the previous one.
-            if let oldA { controller.didDeselectTabs([oldA]) }
-            tabCacheGeneration &+= 1
-            return
-        }
-        controller.didActivateTab(newA, previousActiveTab: oldA)
-        controller.didSelectTabs([newA])
-        if let oldA { controller.didDeselectTabs([oldA]) }
-
-        // Wake MV3 background workers on tab switch so they can update
-        // badge counts and autofill state for the newly active tab.
-        wakeBackgroundWorkers()
-
-        grantExtensionAccessToURL(newTab.url)
-
-        // Fire property changes so background workers re-evaluate the page
-        // (autofill detection, badge text, declarativeContent rules).
-        controller.didChangeTabProperties([.URL, .title], for: newA)
-        tabCacheGeneration &+= 1
-    }
-
-    func notifyTabClosed(_ tab: Tab) {
-        defer {
-            tabAdapters[tab.id] = nil
-            openedTabIDs.remove(tab.id)
-            tabCacheGeneration &+= 1
-        }
-        guard let controller = extensionController, let a = openedAdapter(for: tab) else { return }
-        controller.didCloseTab(a, windowIsClosing: false)
-    }
-
-    func notifyTabPropertiesChanged(
-        _ tab: Tab,
-        properties: WKWebExtension.TabChangedProperties
-    ) {
-        guard let controller = extensionController, let a = openedAdapter(for: tab) else { return }
-        controller.didChangeTabProperties(properties, for: a)
-        tabCacheGeneration &+= 1
     }
 
     // MARK: - Extension Command Forwarding

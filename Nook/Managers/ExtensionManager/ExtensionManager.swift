@@ -34,14 +34,15 @@ final class ExtensionManager: NSObject, ObservableObject,
     var anchorObserverTokens: [String: [Any]] = [:]
     // Keep options windows alive per extension id
     var optionsWindows: [String: NSWindow] = [:]
-    // Stable adapters for tabs/windows used when notifying controller events
+    /// Stable tab adapters by item id; they resolve the page session on each call.
     var tabAdapters: [UUID: ExtensionTabAdapter] = [:]
-    /// Tabs the controller has been told about via didOpenTab. Other tab events are only
-    /// forwarded for these, so private and never-loaded tabs stay invisible to extensions.
+    /// Items the controller has been told about via didOpenTab. Other tab events are only
+    /// forwarded for these, so private and never-loaded pages stay invisible to extensions.
     var openedTabIDs: Set<UUID> = []
-    /// Incremented on any tab change; lets ExtensionWindowAdapter cache query results.
+    /// Legacy: BrowserManager still bumps this until task Z. Nothing reads it.
     var tabCacheGeneration: UInt = 0
-    internal var windowAdapter: ExtensionWindowAdapter?
+    /// One adapter per regular window, by BrowserWindowState id.
+    var windowAdapters: [UUID: ExtensionWindowAdapter] = [:]
     weak var browserManagerRef: BrowserManager?
     // UI delegate for popup context menus and navigation
     var popupUIDelegate: PopupUIDelegate?
@@ -181,39 +182,27 @@ final class ExtensionManager: NSObject, ObservableObject,
 
     /// Connect the browser manager so we can expose tabs/windows and present UI.
     func attach(browserManager: BrowserManager) {
+        let isFirstAttach = browserManagerRef == nil
         self.browserManagerRef = browserManager
-        // Ensure a stable window adapter and notify controller about the window
-        if let controller = extensionController {
-            let adapter =
-                self.windowAdapter
-                ?? ExtensionWindowAdapter(browserManager: browserManager)
-            self.windowAdapter = adapter
+        guard let controller = extensionController else { return }
+        if isFirstAttach { observeWindowEvents() }
 
-            // Important: Notify about window FIRST
-            controller.didOpenWindow(adapter)
+        // Windows first, then only pages that already have web views. Pages without one
+        // report themselves through notifyTabOpened when their view is created; registering
+        // a tab with a nil web view caches stale state and breaks chrome.runtime messaging.
+        let windows = openWindowAdapters
+        let sessions = browserManager.tabs.sessions.filter { !$0.isPrivate && !$0.isUnloaded }
+        for session in sessions { notifyTabOpened(session) }
+
+        if let focused = browserManager.windowRegistry?.activeWindow,
+           let adapter = windowAdapter(for: focused) {
             controller.didFocusWindow(adapter)
-
-            // Only notify about tabs that already have webviews.
-            // Tabs without webviews (deferred for extension loading) will
-            // self-register via notifyTabOpened() when their webview is created.
-            // Registering tabs with nil webviews causes the controller to cache
-            // stale state, breaking chrome.runtime messaging.
-            let allTabs =
-                browserManager.tabManager.pinnedTabs
-                + browserManager.tabManager.tabs
-            for tab in allTabs where !tab.isUnloaded {
-                notifyTabOpened(tab)
+            if let session = browserManager.tabs.selectedSession(in: focused), !session.isUnloaded {
+                notifyTabActivated(new: session, previous: nil)
             }
-
-            // Notify about current active tab only if it has a webview
-            if let currentTab = browserManager.currentTabForActiveWindow(),
-               !currentTab.isUnloaded {
-                notifyTabActivated(newTab: currentTab, previous: nil)
-            }
-
-            Self.logger.info("Attached to browser manager with \(allTabs.count) tabs")
-
         }
+
+        Self.logger.info("Attached to browser manager with \(windows.count) windows, \(sessions.count) open pages")
     }
 
     // MARK: - NSPopoverDelegate

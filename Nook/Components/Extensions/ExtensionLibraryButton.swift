@@ -29,7 +29,7 @@ struct ExtensionLibraryButton: View {
                 panelController.dismiss()
             }
         }
-        .onChange(of: browserManager.currentTab(for: windowState)?.id) { _, _ in
+        .onChange(of: windowState.selectedItemID) { _, _ in
             if panelController.isVisible {
                 panelController.dismiss()
                 windowState.isExtensionLibraryVisible = false
