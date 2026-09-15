@@ -2,45 +2,13 @@
 //  TabOrganizationApplier.swift
 //  Nook
 //
-//  Maps TabOrganizationPlan actions to TabManager API calls
-//  with snapshot/undo support.
+//  Maps TabOrganizationPlan actions to TabsController intents
+//  and returns the Change that undoes them.
 //
 
 import Foundation
+import NookTabsCore
 import OSLog
-
-// MARK: - TabSnapshot
-
-/// Captures the state of tabs before an organization operation,
-/// enabling full undo of grouping, renaming, duplicate removal, and sorting.
-struct TabSnapshot {
-
-    struct TabState {
-        let tabId: UUID
-        let spaceId: UUID?
-        let folderId: UUID?
-        let index: Int
-        let isPinned: Bool
-        let isSpacePinned: Bool
-        let displayNameOverride: String?
-    }
-
-    struct ClosedTabState {
-        let tabId: UUID
-        let url: URL
-        let name: String
-        let spaceId: UUID?
-        let folderId: UUID?
-        let index: Int
-        let isPinned: Bool
-        let isSpacePinned: Bool
-        let displayNameOverride: String?
-    }
-
-    let tabStates: [TabState]
-    let createdFolderIds: [UUID]
-    let closedTabs: [ClosedTabState]
-}
 
 // MARK: - AcceptedChanges
 
@@ -54,10 +22,8 @@ struct AcceptedChanges {
 
 // MARK: - TabOrganizationApplier
 
-/// Stateless applier that translates a ``TabOrganizationPlan`` into
-/// ``TabManager`` mutations with snapshot-based undo.
-///
-/// All methods are `@MainActor` because they mutate `Tab` and `TabManager` state.
+/// Stateless applier that turns a ``TabOrganizationPlan`` into `TabsController` intents and
+/// returns the `Change` that reverts all of them.
 @MainActor
 enum TabOrganizationApplier {
 
@@ -66,185 +32,80 @@ enum TabOrganizationApplier {
         category: "TabOrganizationApplier"
     )
 
-    // MARK: - Snapshot
-
-    /// Capture the current state of the provided tabs so it can be restored later.
-    static func snapshot(tabs: [Tab]) -> TabSnapshot {
-        let states = tabs.map { tab in
-            TabSnapshot.TabState(
-                tabId: tab.id,
-                spaceId: tab.spaceId,
-                folderId: tab.folderId,
-                index: tab.index,
-                isPinned: tab.isPinned,
-                isSpacePinned: tab.isSpacePinned,
-                displayNameOverride: tab.displayNameOverride
-            )
-        }
-        return TabSnapshot(tabStates: states, createdFolderIds: [], closedTabs: [])
-    }
-
     // MARK: - Apply
 
     /// Execute accepted changes from the organization plan.
     ///
     /// - Parameters:
     ///   - plan: The parsed LLM organization plan.
-    ///   - accepted: Which plan items the user accepted in the preview sheet.
-    ///   - tabMapping: 1-based prompt indices to actual `Tab` objects.
-    ///   - spaceId: The space these tabs belong to.
-    ///   - tabManager: The tab manager to mutate.
-    /// - Returns: A ``TabSnapshot`` that can be passed to ``undo`` to revert all changes.
+    ///   - accepted: Which plan items were accepted.
+    ///   - tabMapping: 1-based prompt indices to item ids.
+    ///   - spaceID: The space whose tabs section is organized.
+    ///   - tabs: The controller to run intents on.
+    /// - Returns: The combined undo change, for `TabsController.apply(_:)`.
     static func apply(
         plan: TabOrganizationPlan,
         accepted: AcceptedChanges,
-        tabMapping: [Int: Tab],
-        spaceId: UUID,
-        tabManager: TabManager
-    ) -> TabSnapshot {
-        // 1. Snapshot all mapped tabs before any mutations
-        let allTabs = Array(tabMapping.values)
-        let preSnapshot = snapshot(tabs: allTabs)
+        tabMapping: [Int: UUID],
+        spaceID: UUID,
+        tabs: TabsController
+    ) -> Change {
+        let before = tabs.tree
+        let section = Parent.tabs(spaceID: spaceID)
 
-        var closedTabs: [TabSnapshot.ClosedTabState] = []
-        var createdFolderIds: [UUID] = []
-
-        // 2. Apply groups — create regular folders and move tabs into them
+        // 1. Groups: folders at the top of the tabs section, in plan order, holding their tabs in order.
+        var lastFolder: UUID?
         for group in plan.groups where accepted.acceptedGroupIds.contains(group.id) {
-            let folder = tabManager.createRegularFolder(for: spaceId, name: group.name)
-            createdFolderIds.append(folder.id)
-            log.debug("Created regular folder '\(group.name)' for \(group.tabs.count) tabs")
-
-            for tabIndex in group.tabs {
-                guard let tab = tabMapping[tabIndex] else { continue }
-                tabManager.moveTabToFolder(tab: tab, folderId: folder.id)
+            guard let folderID = tabs.createFolder(title: group.name, in: section, after: lastFolder) else { continue }
+            lastFolder = folderID
+            log.debug("Created folder '\(group.name)' for \(group.tabs.count) tabs")
+            var lastTab: UUID?
+            for index in group.tabs {
+                guard let itemID = tabMapping[index] else { continue }
+                tabs.move(itemID, to: .folder(itemID: folderID), after: lastTab)
+                lastTab = itemID
             }
         }
 
-        // 3. Apply renames — set displayNameOverride on each tab
+        // 2. Renames
         for rename in plan.renames where accepted.acceptedRenameIds.contains(rename.id) {
-            guard let tab = tabMapping[rename.tab] else {
+            guard let itemID = tabMapping[rename.tab] else {
                 log.warning("Rename: no tab at index \(rename.tab)")
                 continue
             }
-            tab.displayNameOverride = rename.name
-            log.debug("Renamed tab \(rename.tab) to '\(rename.name)'")
+            tabs.rename(itemID, rename.name)
         }
 
-        // 4. Apply duplicate removal — unpin if needed, then remove
-        for dupSet in plan.duplicates where accepted.acceptedDuplicateIds.contains(dupSet.id) {
-            for tabIndex in dupSet.close {
-                guard let tab = tabMapping[tabIndex] else {
-                    log.warning("Duplicate close: no tab at index \(tabIndex)")
-                    continue
-                }
-
-                // Record state for undo before removal
-                closedTabs.append(TabSnapshot.ClosedTabState(
-                    tabId: tab.id,
-                    url: tab.url,
-                    name: tab.name,
-                    spaceId: tab.spaceId,
-                    folderId: tab.folderId,
-                    index: tab.index,
-                    isPinned: tab.isPinned,
-                    isSpacePinned: tab.isSpacePinned,
-                    displayNameOverride: tab.displayNameOverride
-                ))
-
-                // Unpin before removing to ensure clean removal
-                if tab.isPinned {
-                    tabManager.unpinTab(tab)
-                } else if tab.isSpacePinned {
-                    tabManager.unpinTabFromSpace(tab)
-                }
-
-                tabManager.removeTab(tab.id)
-                log.debug("Removed duplicate tab \(tabIndex) (id: \(tab.id))")
-            }
+        // 3. Duplicates
+        for duplicates in plan.duplicates where accepted.acceptedDuplicateIds.contains(duplicates.id) {
+            let ids = duplicates.close.compactMap { tabMapping[$0] }
+            tabs.close(ids)
+            log.debug("Closed \(ids.count) duplicate tabs")
         }
 
-        // 5. Apply sort order — only if groups didn't already reorder
+        // 4. Sort order, only when groups did not already reorder: sorted tabs go to the top in order.
         if accepted.applySortOrder, let sortOrder = plan.sort, !sortOrder.isEmpty, plan.groups.isEmpty {
-            for (newIndex, tabPromptIndex) in sortOrder.enumerated() {
-                guard let tab = tabMapping[tabPromptIndex] else {
-                    log.warning("Sort: no tab at index \(tabPromptIndex)")
-                    continue
-                }
-                tab.index = newIndex
+            var previous: UUID?
+            for index in sortOrder {
+                guard let itemID = tabMapping[index], tabs.item(itemID) != nil else { continue }
+                tabs.move(itemID, to: section, after: previous)
+                previous = itemID
             }
             log.debug("Applied sort order for \(sortOrder.count) tabs")
-            tabManager.persistSnapshot()
         }
 
-        // Build final snapshot with created folders and closed tabs info
-        // Persist all changes at once
-        tabManager.persistSnapshot()
-
-        return TabSnapshot(
-            tabStates: preSnapshot.tabStates,
-            createdFolderIds: createdFolderIds,
-            closedTabs: closedTabs
-        )
+        return undoChange(from: before, to: tabs.tree)
     }
 
-    // MARK: - Undo
-
-    /// Restore the tab state captured by a previous ``apply`` call.
-    ///
-    /// - Parameters:
-    ///   - snapshot: The snapshot returned by ``apply``.
-    ///   - spaceId: The space being restored.
-    ///   - tabManager: The tab manager to mutate.
-    static func undo(
-        snapshot: TabSnapshot,
-        spaceId: UUID,
-        tabManager: TabManager
-    ) {
-        // 1. Delete folders that were created during apply
-        for folderId in snapshot.createdFolderIds {
-            tabManager.deleteFolder(folderId)
-            log.debug("Undo: deleted folder \(folderId)")
+    /// The change that turns `after` back into `before`: every item that differs, with its old
+    /// value (nil for items the organizer created). Intents keep their own changes internal, so
+    /// the organizer diffs the tree instead.
+    static func undoChange(from before: TabTree, to after: TabTree) -> Change {
+        var change = Change()
+        for id in Set(before.items.keys).union(after.items.keys) where before.items[id] != after.items[id] {
+            // updateValue keeps an explicit nil ("did not exist"); subscript assignment would drop the key.
+            change.items.updateValue(before.items[id], forKey: id)
         }
-
-        // 2. Restore tab states (position, pins, displayNameOverride)
-        let allCurrentTabs = tabManager.allTabs()
-        let tabLookup = Dictionary(allCurrentTabs.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-
-        for state in snapshot.tabStates {
-            guard let tab = tabLookup[state.tabId] else {
-                log.debug("Undo: tab \(state.tabId) not found, may have been closed")
-                continue
-            }
-
-            tab.spaceId = state.spaceId
-            tab.folderId = state.folderId
-            tab.index = state.index
-            tab.isPinned = state.isPinned
-            tab.isSpacePinned = state.isSpacePinned
-            tab.displayNameOverride = state.displayNameOverride
-        }
-
-        // 3. Recreate closed tabs (duplicates that were removed)
-        for closed in snapshot.closedTabs {
-            let tab = Tab(
-                id: closed.tabId,
-                url: closed.url,
-                name: closed.name,
-                spaceId: closed.spaceId,
-                index: closed.index
-            )
-            tab.isPinned = closed.isPinned
-            tab.isSpacePinned = closed.isSpacePinned
-            tab.folderId = closed.folderId
-            tab.displayNameOverride = closed.displayNameOverride
-
-            tabManager.addTab(tab)
-            log.debug("Undo: recreated tab '\(closed.name)' (\(closed.tabId))")
-        }
-
-        // 4. Persist the restored state
-        tabManager.persistSnapshot()
-        log.info("Undo complete: restored \(snapshot.tabStates.count) tabs, recreated \(snapshot.closedTabs.count) closed tabs, deleted \(snapshot.createdFolderIds.count) folders")
+        return change
     }
 }
