@@ -7,6 +7,7 @@
 
 import AppKit
 import Foundation
+import NookTabsCore
 import os
 import SwiftData
 import SwiftUI
@@ -168,26 +169,15 @@ extension ExtensionManager {
         _ controller: WKWebExtensionController,
         focusedWindowFor extensionContext: WKWebExtensionContext
     ) -> (any WKWebExtensionWindow)? {
-        guard let bm = browserManagerRef else {
-            return nil
-        }
-        if windowAdapter == nil {
-            windowAdapter = ExtensionWindowAdapter(browserManager: bm)
-        }
-        return windowAdapter
+        // nil while a private window is focused.
+        browserManagerRef?.windowRegistry?.activeWindow.flatMap { windowAdapter(for: $0) }
     }
 
     func webExtensionController(
         _ controller: WKWebExtensionController,
         openWindowsFor extensionContext: WKWebExtensionContext
     ) -> [any WKWebExtensionWindow] {
-        guard let bm = browserManagerRef else {
-            return []
-        }
-        if windowAdapter == nil {
-            windowAdapter = ExtensionWindowAdapter(browserManager: bm)
-        }
-        return windowAdapter != nil ? [windowAdapter!] : []
+        openWindowAdapters
     }
 
     // MARK: - Permission prompting helper (invoked by delegate when needed)
@@ -326,6 +316,20 @@ extension ExtensionManager {
     }
 
     // MARK: - Opening tabs/windows requested by extensions
+
+    /// The regular window an extension request targets: the window it names, else the focused
+    /// regular window, else any regular window.
+    private func targetWindow(_ requested: (any WKWebExtensionWindow)?) -> BrowserWindowState? {
+        if let adapter = requested as? ExtensionWindowAdapter, let state = adapter.state { return state }
+        guard let registry = browserManagerRef?.windowRegistry else { return nil }
+        if let active = registry.activeWindow, windowAdapter(for: active) != nil { return active }
+        return registry.allWindows.first { windowAdapter(for: $0) != nil }
+    }
+
+    private static func noWindowError() -> NSError {
+        NSError(domain: "ExtensionManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "No browser window available"])
+    }
+
     func webExtensionController(
         _ controller: WKWebExtensionController,
         openNewTabUsing configuration: WKWebExtension.TabConfiguration,
@@ -333,79 +337,31 @@ extension ExtensionManager {
         completionHandler:
             @escaping ((any WKWebExtensionTab)?, (any Error)?) -> Void
     ) {
-        Self.logger.debug("   URL: \(configuration.url?.absoluteString ?? "nil")")
-        Self.logger.debug("   Should be active: \(configuration.shouldBeActive)")
-        Self.logger.debug("   Should be pinned: \(configuration.shouldBePinned)")
-
-        guard let bm = browserManagerRef else {
-            Self.logger.error("Browser manager reference is nil")
-            completionHandler(
-                nil,
-                NSError(
-                    domain: "ExtensionManager",
-                    code: 1,
-                    userInfo: [
-                        NSLocalizedDescriptionKey:
-                            "Browser manager not available"
-                    ]
-                )
-            )
+        guard let bm = browserManagerRef, let window = targetWindow(configuration.window),
+              let spaceID = window.spaceID
+        else {
+            completionHandler(nil, Self.noWindowError())
+            return
+        }
+        let url = configuration.url ?? TabsController.homeURL
+        let parent: Parent? = configuration.shouldBePinned ? .pinned(spaceID: spaceID) : nil
+        guard let itemID = bm.tabs.open(
+            url: url, in: window, placement: configuration.shouldBeActive ? .newTab : .background, parent: parent)
+        else {
+            completionHandler(nil, NSError(domain: "ExtensionManager", code: 2, userInfo: [NSLocalizedDescriptionKey: "Could not open tab"]))
             return
         }
 
-        // Special handling for extension page URLs (options, popup, etc.): use the extension's configuration
-        if let url = configuration.url,
-            url.scheme?.lowercased() == "safari-web-extension"
-                || url.scheme?.lowercased() == "webkit-extension",
-            let controller = extensionController,
-            let resolvedContext = controller.extensionContext(for: url)
-        {
-            let space = bm.tabManager.currentSpace
-            let newTab = bm.tabManager.createNewTab(
-                url: url.absoluteString,
-                in: space
-            )
-            let cfg =
-                resolvedContext.webViewConfiguration
-                ?? BrowserConfiguration.shared.webViewConfiguration
-            newTab.applyWebViewConfigurationOverride(cfg)
-            if configuration.shouldBePinned { bm.tabManager.pinTab(newTab) }
-            if configuration.shouldBeActive {
-                bm.tabManager.setActiveTab(newTab)
-            }
-            let tabAdapter = self.stableAdapter(for: newTab)
-            completionHandler(tabAdapter, nil)
-            return
+        // Extension pages (options, popup) load with the extension's configuration.
+        if let scheme = url.scheme?.lowercased(), scheme == "safari-web-extension" || scheme == "webkit-extension",
+           let resolvedContext = controller.extensionContext(for: url),
+           let session = bm.tabs.session(for: itemID) {
+            session.applyConfigurationOverride(
+                resolvedContext.webViewConfiguration ?? BrowserConfiguration.shared.webViewConfiguration)
         }
-
-        let targetURL = configuration.url
-        if let url = targetURL {
-            let space = bm.tabManager.currentSpace
-            let newTab = bm.tabManager.createNewTab(
-                url: url.absoluteString,
-                in: space
-            )
-            if configuration.shouldBePinned { bm.tabManager.pinTab(newTab) }
-            if configuration.shouldBeActive {
-                bm.tabManager.setActiveTab(newTab)
-            }
-            Self.logger.info("Created new tab: \(newTab.name)")
-
-            // Return the created tab adapter to the extension
-            let tabAdapter = self.stableAdapter(for: newTab)
-            completionHandler(tabAdapter, nil)
-            return
-        }
-        // No URL specified — create a blank tab
-        Self.logger.debug("⚠️ No URL specified, creating blank tab")
-        let space = bm.tabManager.currentSpace
-        let newTab = bm.tabManager.createNewTab(in: space)
-        if configuration.shouldBeActive { bm.tabManager.setActiveTab(newTab) }
-        Self.logger.info("Created blank tab: \(newTab.name)")
-
-        // Return the created tab adapter to the extension
-        let tabAdapter = self.stableAdapter(for: newTab)
-        completionHandler(tabAdapter, nil)
+        if configuration.shouldBeMuted { bm.tabs.session(for: itemID)?.setMuted(true) }
+        Self.logger.info("Extension opened tab \(url.absoluteString, privacy: .public)")
+        completionHandler(adapter(for: itemID), nil)
     }
 
     func webExtensionController(
@@ -415,64 +371,37 @@ extension ExtensionManager {
         completionHandler:
             @escaping ((any WKWebExtensionWindow)?, (any Error)?) -> Void
     ) {
-        Self.logger.debug("   Tab URLs: \(configuration.tabURLs.map { $0.absoluteString })")
+        guard let bm = browserManagerRef, let window = targetWindow(nil) else {
+            completionHandler(nil, Self.noWindowError())
+            return
+        }
+        let tabs = bm.tabs
 
-        guard let bm = browserManagerRef else {
-            completionHandler(
-                nil,
-                NSError(
-                    domain: "ExtensionManager",
-                    code: 1,
-                    userInfo: [
-                        NSLocalizedDescriptionKey:
-                            "Browser manager not available"
-                    ]
-                )
-            )
+        // OAuth flows from extensions open as a tab so they share the page's data store;
+        // mini windows use separate stores, which breaks the flow.
+        if let firstURL = configuration.tabURLs.first, OAuthDetector.isLikelyOAuthPopupURL(firstURL) {
+            tabs.open(url: firstURL, in: window, placement: .newTab)
+            completionHandler(windowAdapter(for: window), nil)
             return
         }
 
-        // OAuth flows from extensions should open in tabs to share the same data store
-        // Miniwindows use separate data stores which breaks OAuth flows
-        if let firstURL = configuration.tabURLs.first,
-            OAuthDetector.isLikelyOAuthPopupURL(firstURL)
-        {
-            Self.logger.debug(
-                "🔐 [DELEGATE] Extension OAuth window detected, opening in new tab: \(firstURL.absoluteString)"
-            )
-            // Create a new tab in the current space with the same profile/data store
-            let newTab = bm.tabManager.createNewTab(
-                url: firstURL.absoluteString,
-                in: bm.tabManager.currentSpace
-            )
-            bm.tabManager.setActiveTab(newTab)
-
-            // Return a dummy window adapter for OAuth flows
-            if windowAdapter == nil {
-                windowAdapter = ExtensionWindowAdapter(browserManager: bm)
-            }
-            completionHandler(windowAdapter, nil)
+        // An extension window is emulated as a new space in the focused window.
+        guard let profileID = window.profileID ?? window.spaceID.flatMap({ tabs.space($0)?.profileID }),
+              let spaceID = tabs.createSpace(profileID: profileID, name: "Window", icon: "macwindow",
+                                             accentHex: "#7C7C7C", after: window.spaceID)
+        else {
+            completionHandler(nil, NSError(domain: "ExtensionManager", code: 3, userInfo: [NSLocalizedDescriptionKey: "Could not create window"]))
             return
         }
-
-        // For regular extension windows, create a new space to emulate a separate window in our UI
-        let newSpace = bm.tabManager.createSpace(name: "Window")
-        if let firstURL = configuration.tabURLs.first {
-            _ = bm.tabManager.createNewTab(
-                url: firstURL.absoluteString,
-                in: newSpace
-            )
-        } else {
-            _ = bm.tabManager.createNewTab(in: newSpace)
+        tabs.setSpace(spaceID, in: window)
+        let urls = configuration.tabURLs.isEmpty ? [TabsController.homeURL] : configuration.tabURLs
+        // Each tab opens at the top, so open in reverse and select the first URL last.
+        for url in urls.dropFirst().reversed() {
+            tabs.open(url: url, in: window, placement: .background)
         }
-        bm.tabManager.setActiveSpace(newSpace)
-
-        // Return the window adapter
-        if windowAdapter == nil {
-            windowAdapter = ExtensionWindowAdapter(browserManager: bm)
-        }
-        Self.logger.info("Created new window (space): \(newSpace.name)")
-        completionHandler(windowAdapter, nil)
+        tabs.open(url: urls[0], in: window, placement: .newTab)
+        Self.logger.info("Extension opened window as space with \(urls.count) tabs")
+        completionHandler(windowAdapter(for: window), nil)
     }
 
     // MARK: - Native Messaging Support
@@ -495,9 +424,8 @@ extension ExtensionManager {
                 // When isSafariApi=true and chrome.browserAction.openPopup() is unavailable,
                 // Bitwarden sends this to open its action popup.
                 Self.logger.info("[NativeMessaging] Intercepting showPopover for '\(extensionContext.webExtension.displayName ?? "?", privacy: .public)'")
-                let tab = browserManagerRef?.currentTabForActiveWindow()
-                let adapter: ExtensionTabAdapter? = tab.flatMap { stableAdapter(for: $0) }
-                extensionContext.performAction(for: adapter)
+                let session = browserManagerRef?.tabs.activeWindowSession
+                extensionContext.performAction(for: session.flatMap { adapter(for: $0.itemID) })
                 replyHandler(["success": true], nil)
                 return
 
@@ -683,9 +611,8 @@ extension ExtensionManager {
                     port.sendMessage(["command": command, "text": text] as [String: Any]) { _ in }
 
                 case "showPopover":
-                    let tab = self?.browserManagerRef?.currentTabForActiveWindow()
-                    let adapter: ExtensionTabAdapter? = tab.flatMap { self?.stableAdapter(for: $0) }
-                    extensionContext.performAction(for: adapter)
+                    let session = self?.browserManagerRef?.tabs.activeWindowSession
+                    extensionContext.performAction(for: session.flatMap { self?.adapter(for: $0.itemID) })
                     port.sendMessage(["command": command, "success": true] as [String: Any]) { _ in }
 
                 default:

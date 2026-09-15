@@ -32,8 +32,8 @@ struct ExtensionActionButton: View {
     @State private var badgeText: String?
     @State private var badgeRefreshId: UUID = UUID()
 
-    private var currentTab: Tab? {
-        browserManager.currentTab(for: windowState)
+    private var currentSession: PageSession? {
+        browserManager.tabs.selectedSession(in: windowState)
     }
 
     var body: some View {
@@ -88,10 +88,10 @@ struct ExtensionActionButton: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             wakeAndRefreshBadge()
         }
-        .onChange(of: currentTab?.url) { _, _ in
+        .onChange(of: currentSession?.url) { _, _ in
             refreshBadge()
         }
-        .onChange(of: currentTab?.loadingState) { _, newState in
+        .onChange(of: currentSession?.loadingState) { _, newState in
             if newState == .didFinish {
                 // Small delay to let extension background process the tab update
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -116,8 +116,7 @@ struct ExtensionActionButton: View {
             badgeText = nil
             return
         }
-        let tab = currentTab
-        let adapter: ExtensionTabAdapter? = tab.flatMap { ExtensionManager.shared.stableAdapter(for: $0) }
+        let adapter = currentSession.flatMap { ExtensionManager.shared.adapter(for: $0.itemID) }
         let action = ctx.action(for: adapter)
         badgeText = action?.badgeText
     }
@@ -132,8 +131,8 @@ struct ExtensionActionButton: View {
             return
         }
 
-        let tab = browserManager.currentTab(for: windowState)
-        let adapter: ExtensionTabAdapter? = tab.flatMap { ExtensionManager.shared.stableAdapter(for: $0) }
+        let session = currentSession
+        let adapter = session.flatMap { ExtensionManager.shared.adapter(for: $0.itemID) }
 
         // No permission grants here: required permissions were granted at load, site access
         // follows the extension's approved patterns, and activeTab is granted by WebKit on click.
@@ -150,11 +149,11 @@ struct ExtensionActionButton: View {
                 } catch {
                     Self.logger.error("Background wake failed: \(error.localizedDescription, privacy: .public)")
                 }
-                Self.logger.info("Calling performAction (tab=\(tab?.name ?? "nil", privacy: .public), adapter=\(adapter != nil ? "yes" : "nil", privacy: .public))")
+                Self.logger.info("Calling performAction (tab=\(session?.title ?? "nil", privacy: .public), adapter=\(adapter != nil ? "yes" : "nil", privacy: .public))")
                 extensionContext.performAction(for: adapter)
             }
         } else {
-            Self.logger.info("Calling performAction (tab=\(tab?.name ?? "nil", privacy: .public), adapter=\(adapter != nil ? "yes" : "nil", privacy: .public))")
+            Self.logger.info("Calling performAction (tab=\(session?.title ?? "nil", privacy: .public), adapter=\(adapter != nil ? "yes" : "nil", privacy: .public))")
             extensionContext.performAction(for: adapter)
         }
     }

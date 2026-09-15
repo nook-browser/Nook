@@ -18,8 +18,8 @@ struct ExtensionLibraryView: View {
 
     private let logger = Logger(subsystem: "com.nook.browser", category: "ExtensionLibrary")
 
-    private var currentTab: Tab? {
-        browserManager.currentTab(for: windowState)
+    private var currentTab: PageSession? {
+        browserManager.tabs.selectedSession(in: windowState)
     }
 
     private var currentHost: String? {
@@ -61,7 +61,7 @@ struct ExtensionLibraryView: View {
             .disabled(currentTab == nil)
 
             CopyButton(icon: "doc.on.doc", label: "Copy Title") {
-                guard let title = currentTab?.name else { return false }
+                guard let title = currentTab?.title else { return false }
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(title, forType: .string)
                 return true
@@ -132,7 +132,7 @@ struct ExtensionLibraryView: View {
         VStack(spacing: 2) {
             // Content Blocker Toggle
             if let host = currentHost, let tab = currentTab {
-                ContentBlockerSiteRow(tab: tab, enabled: $contentBlockerEnabled)
+                ContentBlockerSiteRow(session: tab, enabled: $contentBlockerEnabled)
                     .onChange(of: contentBlockerEnabled) { _, enabled in
                         // Use currentHost (not captured host) to always reference the active tab
                         guard let activeHost = currentHost else { return }
@@ -240,19 +240,19 @@ struct ExtensionLibraryView: View {
 
     private func zoomIn() {
         guard let tab = currentTab, let webView = tab.webView else { return }
-        browserManager.zoomManager.zoomIn(for: webView, domain: tab.url.host, tabId: tab.id)
+        browserManager.zoomManager.zoomIn(for: webView, domain: tab.url.host, tabId: tab.itemID)
     }
 
     private func zoomOut() {
         guard let tab = currentTab, let webView = tab.webView else { return }
-        browserManager.zoomManager.zoomOut(for: webView, domain: tab.url.host, tabId: tab.id)
+        browserManager.zoomManager.zoomOut(for: webView, domain: tab.url.host, tabId: tab.itemID)
     }
 }
 
 // MARK: - Mute Button (reactive to tab state)
 
 private struct MuteButton: View {
-    let tab: Tab?
+    let tab: PageSession?
 
     @State private var isMuted = false
     @State private var isHovering = false
@@ -342,8 +342,8 @@ private struct ExtensionGridItem: View {
     @State private var isHovering = false
     @State private var badgeText: String?
 
-    private var currentTab: Tab? {
-        browserManager.currentTab(for: windowState)
+    private var currentTab: PageSession? {
+        browserManager.tabs.selectedSession(in: windowState)
     }
 
     var body: some View {
@@ -433,7 +433,7 @@ private struct ExtensionGridItem: View {
             }
         }
 
-        let adapter: ExtensionTabAdapter? = currentTab.flatMap { ExtensionManager.shared.stableAdapter(for: $0) }
+        let adapter = currentTab.flatMap { ExtensionManager.shared.adapter(for: $0.itemID) }
         ctx.performAction(for: adapter)
     }
 
@@ -442,7 +442,7 @@ private struct ExtensionGridItem: View {
             badgeText = nil
             return
         }
-        let adapter: ExtensionTabAdapter? = currentTab.flatMap { ExtensionManager.shared.stableAdapter(for: $0) }
+        let adapter = currentTab.flatMap { ExtensionManager.shared.adapter(for: $0.itemID) }
         badgeText = ctx.action(for: adapter)?.badgeText
     }
 }
@@ -452,13 +452,13 @@ private struct ExtensionGridItem: View {
 /// Content blocker row; observes the tab so the blocked-request count updates live.
 private struct ContentBlockerSiteRow: View {
     @Environment(\.nookSettings) var nookSettings
-    @ObservedObject var tab: Tab
+    let session: PageSession
     @Binding var enabled: Bool
 
     private var subtitle: String {
         guard enabled else { return "Disabled for this site" }
         guard nookSettings.detailedBlockingCountsEnabled else { return "Enabled" }
-        let n = tab.blockedRequestCount
+        let n = session.blockedRequestCount
         return n > 0 ? "Enabled · \(n) blocked" : "Enabled"
     }
 

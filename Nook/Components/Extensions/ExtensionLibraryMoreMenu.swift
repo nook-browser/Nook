@@ -130,7 +130,7 @@ private struct MoreMenuView: View {
     @State private var hasSiteData: Bool = false
 
     private var currentHost: String? {
-        browserManager.currentTab(for: windowState)?.url.host
+        browserManager.tabs.selectedSession(in: windowState)?.url.host
     }
 
     var body: some View {
@@ -211,8 +211,7 @@ private struct MoreMenuView: View {
 
     private func loadSiteInfo() {
         guard let host = currentHost,
-              let tab = browserManager.currentTab(for: windowState),
-              let webView = tab.webView else { return }
+              let webView = browserManager.tabs.selectedSession(in: windowState)?.webView else { return }
 
         // Load cookie count using async API
         let dataStore = webView.configuration.websiteDataStore
