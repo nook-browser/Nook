@@ -3,6 +3,7 @@
 //  Nook
 //
 
+import NookTabsCore
 import SwiftUI
 
 struct AirTrafficControlSettingsView: View {
@@ -62,7 +63,7 @@ struct AirTrafficControlSettingsView: View {
     }
 
     private func ruleRow(_ rule: SiteRoutingRule) -> some View {
-        let space = browserManager.tabManager.spaces.first(where: { $0.id == rule.targetSpaceId })
+        let space = browserManager.tabs.space(rule.targetSpaceId)
         let profile = browserManager.profileManager.profiles.first(where: { $0.id == rule.targetProfileId })
 
         return LabeledContent {
@@ -199,23 +200,16 @@ private struct RuleEditSheet: View {
         }
         .onChange(of: selectedSpaceId) { _, newValue in
             if let spaceId = newValue,
-               let space = browserManager.tabManager.spaces.first(where: { $0.id == spaceId }) {
-                selectedProfileId = space.profileId ?? browserManager.profileManager.profiles.first?.id
+               let space = browserManager.tabs.space(spaceId) {
+                selectedProfileId = space.profileID
             }
         }
     }
 
-    private var groupedSpaces: [(profileName: String, spaces: [Space])] {
-        let profiles = browserManager.profileManager.profiles.filter { !$0.isEphemeral }
-        var result = profiles.map { profile in
-            let spaces = browserManager.tabManager.spaces.filter { $0.profileId == profile.id }
-            return (profileName: profile.name, spaces: spaces)
+    private var groupedSpaces: [(profileName: String, spaces: [SpaceRecord])] {
+        browserManager.profileManager.profiles.filter { !$0.isEphemeral }.map { profile in
+            (profileName: profile.name, spaces: browserManager.tabs.spaces(inProfile: profile.id))
         }
-        let unassigned = browserManager.tabManager.spaces.filter { $0.profileId == nil && !$0.isEphemeral }
-        if !unassigned.isEmpty {
-            result.append((profileName: "Unassigned", spaces: unassigned))
-        }
-        return result
     }
 
     private func save() {

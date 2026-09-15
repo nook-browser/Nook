@@ -5,23 +5,19 @@
 //  Small indicator showing a space's assigned profile.
 //
 
+import NookTabsCore
 import SwiftUI
 
 struct SpaceProfileBadge: View {
     @EnvironmentObject var browserManager: BrowserManager
 
-    let space: Space
+    let space: SpaceRecord
     var size: Size = .normal // .compact for tiny dots/icons
 
     enum Size { case compact, normal }
 
     private var assignedProfile: Profile? {
-        if let id = space.profileId {
-            return browserManager.profileManager.profiles.first(where: { $0.id == id })
-        } else {
-            // If no profile assigned, show the default profile
-            return browserManager.profileManager.profiles.first
-        }
+        browserManager.profileManager.profiles.first(where: { $0.id == space.profileID })
     }
 
     private var isCurrentProfile: Bool {

@@ -6,14 +6,15 @@
 //  Refactored by Aether on 15/11/2025.
 //
 
+import NookTabsCore
 import SwiftUI
 
 struct SpacesListItem: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var tabManager: TabManager
+    @Environment(TabsController.self) private var tabs
     @Environment(BrowserWindowState.self) private var windowState
 
-    let space: Space
+    let space: SpaceRecord
     let isActive: Bool
     let compact: Bool
     let isFaded: Bool
@@ -24,7 +25,7 @@ struct SpacesListItem: View {
     private let dotSize: CGFloat = NookDesign.Spacing.sm
 
     init(
-        space: Space,
+        space: SpaceRecord,
         isActive: Bool,
         compact: Bool,
         isFaded: Bool,
@@ -41,7 +42,7 @@ struct SpacesListItem: View {
         Button {
             NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
             withAnimation(NookDesign.Motion.standard) {
-                browserManager.setActiveSpace(space, in: windowState)
+                tabs.setSpace(space.id, in: windowState)
             }
         } label: {
             spaceIcon
@@ -60,11 +61,13 @@ struct SpacesListItem: View {
         .contextMenu {
             SpaceContextMenu(
                 space: space,
-                canDelete: tabManager.spaces.count > 1,
+                canDelete: tabs.switchableSpaces(for: windowState).count > 1,
                 onEditName: nil,
                 onEditIcon: nil,
-                onOpenSettings: { browserManager.showSpaceSettings(for: space) },
-                onDeleteSpace: { tabManager.removeSpace(space.id) }
+                onOpenSettings: {
+                    SpaceEditDialog.present(spaceID: space.id, tabs: tabs, dialogManager: browserManager.dialogManager)
+                },
+                onDeleteSpace: { tabs.deleteSpace(space.id) }
             )
             .environmentObject(browserManager)
         }

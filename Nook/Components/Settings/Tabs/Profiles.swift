@@ -5,10 +5,12 @@
 //  Created by Maciek Bagiński on 03/08/2025.
 //
 
+import NookTabsCore
 import SwiftUI
 
 struct ProfilesSettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @Environment(TabsController.self) private var tabs
     @State private var profileToRename: Profile? = nil
     @State private var profileToDelete: Profile? = nil
 
@@ -78,14 +80,14 @@ struct ProfilesSettingsView: View {
                     Spacer()
                 }
 
-                if browserManager.tabManager.spaces.isEmpty {
+                if tabs.orderedSpaces.isEmpty {
                     Label(
                         "No spaces yet. Create a space to assign profiles.",
                         systemImage: "rectangle.3.group"
                     )
                     .foregroundStyle(.secondary)
                 } else {
-                    ForEach(browserManager.tabManager.spaces, id: \.id) { space in
+                    ForEach(tabs.orderedSpaces) { space in
                         SpaceAssignmentRowView(space: space)
                     }
                 }
@@ -97,32 +99,15 @@ struct ProfilesSettingsView: View {
     // MARK: - Helpers
 
     private func spacesCount(for profile: Profile) -> Int {
-        browserManager.tabManager.spaces.filter { $0.profileId == profile.id }
-            .count
+        tabs.spaces(inProfile: profile.id).count
     }
 
     private func tabsCount(for profile: Profile) -> Int {
-        let spaceIds = Set(
-            browserManager.tabManager.spaces.filter {
-                $0.profileId == profile.id
-            }.map { $0.id }
-        )
-        return browserManager.tabManager.allTabs().filter { tab in
-            if let sid = tab.spaceId { return spaceIds.contains(sid) }
-            return false
-        }.count
+        tabs.items(inProfile: profile.id).count
     }
 
     private func pinnedCount(for profile: Profile) -> Int {
-        // Count space‑pinned tabs in spaces assigned to this profile
-        let spaceIds = browserManager.tabManager.spaces
-            .filter { $0.profileId == profile.id }
-            .map { $0.id }
-        var total = 0
-        for sid in spaceIds {
-            total += browserManager.tabManager.spacePinnedTabs(for: sid).count
-        }
-        return total
+        tabs.spaces(inProfile: profile.id).reduce(0) { $0 + tabs.tabCount(under: .pinned(spaceID: $1.id)) }
     }
 
     // MARK: - Actions
@@ -143,11 +128,10 @@ struct ProfilesSettingsView: View {
                     let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
                     guard !trimmed.isEmpty else { return }
                     let safeIcon = icon.isEmpty ? "person.crop.circle" : icon
-                    let created = browserManager.profileManager.createProfile(
-                        name: trimmed,
-                        icon: safeIcon
-                    )
-                    Task { await browserManager.switchToProfile(created) }
+                    let createdID = tabs.createProfile(name: trimmed, icon: safeIcon)
+                    if let created = browserManager.profileManager.profiles.first(where: { $0.id == createdID }) {
+                        Task { await browserManager.switchToProfile(created) }
+                    }
                     browserManager.dialogManager.closeDialog()
                 },
                 onCancel: {
@@ -177,9 +161,7 @@ struct ProfilesSettingsView: View {
                         browserManager.dialogManager.closeDialog()
                         return
                     }
-                    target.name = newName
-                    target.icon = newIcon
-                    browserManager.profileManager.persistProfiles()
+                    tabs.updateProfile(target.id, name: newName, icon: newIcon)
                     browserManager.dialogManager.closeDialog()
                 },
                 onCancel: {
@@ -202,11 +184,19 @@ struct ProfilesSettingsView: View {
             tabsCount: stats.tabs,
             isLastProfile: isLast,
             onDelete: {
-                guard browserManager.profileManager.profiles.count > 1 else {
+                let heir = browserManager.profileManager.profiles.first { $0.id != profile.id }
+                guard let heir else {
                     browserManager.dialogManager.closeDialog()
                     return
                 }
-                browserManager.deleteProfile(profile)
+                browserManager.dialogManager.closeDialog()
+                Task { @MainActor in
+                    if browserManager.currentProfile?.id == profile.id {
+                        await browserManager.switchToProfile(heir)
+                    }
+                    await profile.clearAllData()
+                    tabs.deleteProfile(profile.id, heir: heir.id)
+                }
             },
             onCancel: { browserManager.dialogManager.closeDialog() }
         )
@@ -245,21 +235,15 @@ struct ProfilesSettingsView: View {
 
     private func assignAllSpacesToCurrentProfile() {
         guard let pid = browserManager.currentProfile?.id else { return }
-        for sp in browserManager.tabManager.spaces {
-            browserManager.tabManager.assign(spaceId: sp.id, toProfile: pid)
+        for space in tabs.orderedSpaces {
+            tabs.moveSpaceToEnd(space.id, ofProfile: pid)
         }
     }
 
     private func resetAllSpaceAssignments() {
-        guard
-            let defaultProfileId = browserManager.profileManager.profiles.first?
-                .id
-        else { return }
-        for sp in browserManager.tabManager.spaces {
-            browserManager.tabManager.assign(
-                spaceId: sp.id,
-                toProfile: defaultProfileId
-            )
+        guard let defaultProfileId = browserManager.profileManager.profiles.first?.id else { return }
+        for space in tabs.orderedSpaces {
+            tabs.moveSpaceToEnd(space.id, ofProfile: defaultProfileId)
         }
     }
 }
@@ -268,11 +252,12 @@ struct ProfilesSettingsView: View {
 
 private struct SpaceAssignmentRowView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    let space: Space
+    @Environment(TabsController.self) private var tabs
+    let space: SpaceRecord
     @State private var showDeleteConfirmation = false
 
     private var canDelete: Bool {
-        browserManager.tabManager.spaces.count > 1
+        tabs.orderedSpaces.count > 1
     }
 
     var body: some View {
@@ -327,8 +312,7 @@ private struct SpaceAssignmentRowView: View {
                 // Use compact picker inside menu
                 let binding = Binding<UUID>(
                     get: {
-                        space.profileId ?? browserManager.profileManager
-                            .profiles.first?.id ?? UUID()
+                        space.profileID
                     },
                     set: { newId in assign(space: space, to: newId) }
                 )
@@ -362,29 +346,22 @@ private struct SpaceAssignmentRowView: View {
         .alert("Delete \"\(space.name)\"?", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) {
-                browserManager.tabManager.removeSpace(space.id)
+                tabs.deleteSpace(space.id)
             }
         } message: {
-            let tabCount = (browserManager.tabManager.tabsBySpace[space.id]?.count ?? 0)
+            let tabCount = tabs.tabCount(inSpace: space.id)
             Text("This will close \(tabCount) tab\(tabCount == 1 ? "" : "s") in this space.")
         }
     }
 
     private var currentProfileName: String {
-        if let pid = space.profileId,
-            let p = browserManager.profileManager.profiles.first(where: {
-                $0.id == pid
-            })
-        {
-            return p.name
-        }
-        // If no profile assigned, show the default profile name
-        return browserManager.profileManager.profiles.first?.name
+        browserManager.profileManager.profiles.first { $0.id == space.profileID }?.name
+            ?? browserManager.profileManager.profiles.first?.name
             ?? "Default"
     }
 
-    private func assign(space: Space, to id: UUID) {
-        browserManager.tabManager.assign(spaceId: space.id, toProfile: id)
+    private func assign(space: SpaceRecord, to id: UUID) {
+        tabs.moveSpaceToEnd(space.id, ofProfile: id)
     }
 }
 

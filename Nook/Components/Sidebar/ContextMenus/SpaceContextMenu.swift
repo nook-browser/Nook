@@ -5,13 +5,14 @@
 //  Created by Aether on 15/11/2025.
 //
 
+import NookTabsCore
 import SwiftUI
 
 /// Shared context menu for spaces (used in SpaceTitle and SpacesList)
 struct SpaceContextMenu: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var tabManager: TabManager
-    let space: Space
+    @Environment(TabsController.self) private var tabs
+    let space: SpaceRecord
     let canDelete: Bool
     let onEditName: (() -> Void)?
     let onEditIcon: (() -> Void)?
@@ -22,15 +23,11 @@ struct SpaceContextMenu: View {
         Group {
             // Profile picker
             Picker(
-                currentProfileName,
-                systemImage: currentProfileIcon,
+                currentProfile?.name ?? "Default",
+                systemImage: currentProfile?.icon ?? "person.circle",
                 selection: Binding(
-                    get: {
-                        space.profileId ?? browserManager.profileManager.profiles.first?.id ?? UUID()
-                    },
-                    set: { newProfileId in
-                        tabManager.assign(spaceId: space.id, toProfile: newProfileId)
-                    }
+                    get: { space.profileID },
+                    set: { tabs.moveSpaceToEnd(space.id, ofProfile: $0) }
                 )
             ) {
                 ForEach(browserManager.profileManager.profiles, id: \.id) { profile in
@@ -81,17 +78,12 @@ struct SpaceContextMenu: View {
     // MARK: - Helper Methods
 
     private func showDeleteConfirmation() {
-        // Count both regular and space-pinned tabs
-        let regularTabsCount = tabManager.tabsBySpace[space.id]?.count ?? 0
-        let spacePinnedTabsCount = tabManager.spacePinnedTabs(for: space.id).count
-        let tabsCount = regularTabsCount + spacePinnedTabsCount
-
         browserManager.dialogManager.showDialog(
             SpaceDeleteConfirmationDialog(
                 spaceName: space.name,
                 spaceIcon: space.icon,
-                tabsCount: tabsCount,
-                isLastSpace: tabManager.spaces.count <= 1,
+                tabsCount: tabs.tabCount(inSpace: space.id),
+                isLastSpace: !canDelete,
                 onDelete: {
                     onDeleteSpace()
                     browserManager.dialogManager.closeDialog()
@@ -105,21 +97,8 @@ struct SpaceContextMenu: View {
 
     // MARK: - Helper Properties
 
-    private var currentProfileName: String {
-        guard let profileId = space.profileId,
-              let profile = browserManager.profileManager.profiles.first(where: { $0.id == profileId })
-        else {
-            return browserManager.profileManager.profiles.first?.name ?? "Default"
-        }
-        return profile.name
-    }
-
-    private var currentProfileIcon: String {
-        guard let profileId = space.profileId,
-              let profile = browserManager.profileManager.profiles.first(where: { $0.id == profileId })
-        else {
-            return browserManager.profileManager.profiles.first?.icon ?? "person.circle"
-        }
-        return profile.icon
+    private var currentProfile: Profile? {
+        let profiles = browserManager.profileManager.profiles
+        return profiles.first { $0.id == space.profileID } ?? profiles.first
     }
 }

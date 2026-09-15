@@ -11,7 +11,7 @@ import SwiftUI
 /// Main window view that orchestrates the browser UI layout
 struct WindowView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var tabManager: TabManager
+    @Environment(TabsController.self) private var tabs
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(CommandPalette.self) private var commandPalette
     @Environment(WindowRegistry.self) private var windowRegistry
@@ -26,9 +26,11 @@ struct WindowView: View {
             WindowBackground()
                 .contextMenu {
                     Button("Space Settings...") {
-                        browserManager.showSpaceSettings()
+                        if let spaceID = windowState.spaceID {
+                            SpaceEditDialog.present(spaceID: spaceID, tabs: tabs, dialogManager: browserManager.dialogManager)
+                        }
                     }
-                    .disabled(tabManager.currentSpace == nil)
+                    .disabled(windowState.spaceID.flatMap { tabs.space($0) } == nil)
                 }
 
             SidebarWebViewStack()
@@ -113,6 +115,7 @@ struct WindowView: View {
             hoverSidebarManager.windowRegistry = windowRegistry
             hoverSidebarManager.nookSettings = nookSettings
             hoverSidebarManager.start()
+            applyAccent(spaceAccentHex, animate: false)
         }
         .onDisappear {
             hoverSidebarManager.stop()
@@ -139,20 +142,15 @@ struct WindowView: View {
                 windowState.isShowingShortcutConflictToast = false
             }
         }
+        // The app-wide accent follows the active window's space.
+        .onChange(of: spaceAccentHex) { _, hex in applyAccent(hex, animate: true) }
+        .onChange(of: windowRegistry.activeWindowId) { _, _ in applyAccent(spaceAccentHex, animate: false) }
         // Handle organize tabs notification from keyboard shortcut manager
         .onReceive(NotificationCenter.default.publisher(for: .organizeTabsRequested)) { _ in
-            guard windowRegistry.activeWindow?.id == windowState.id else { return }
-            let targetSpace =
-                windowState.currentSpaceId.flatMap { id in
-                    browserManager.tabManager.spaces.first(where: { $0.id == id })
-                } ?? browserManager.tabManager.currentSpace
-            if let space = targetSpace {
-                Task {
-                    await tabOrganizerManager.organizeTabs(
-                        in: space,
-                        using: browserManager.tabManager
-                    )
-                }
+            guard windowRegistry.activeWindow?.id == windowState.id,
+                  let spaceID = windowState.spaceID else { return }
+            Task {
+                await tabOrganizerManager.organizeTabs(in: spaceID, using: tabs)
             }
         }
         .environmentObject(browserManager)
@@ -160,6 +158,22 @@ struct WindowView: View {
         .environmentObject(browserManager.splitManager)
         .environmentObject(hoverSidebarManager)
         .preferredColorScheme(resolvedColorScheme)
+    }
+
+    /// Accent of the space this window shows; nil for private windows, which keep their own look.
+    private var spaceAccentHex: String? {
+        guard !windowState.isIncognito, let spaceID = windowState.spaceID else { return nil }
+        return tabs.space(spaceID)?.accentHex
+    }
+
+    private func applyAccent(_ hex: String?, animate: Bool) {
+        guard let hex, windowRegistry.activeWindowId == windowState.id else { return }
+        let gradient = SpaceGradient.accent(hex: hex)
+        if animate {
+            browserManager.gradientColorManager.transition(to: gradient)
+        } else {
+            browserManager.gradientColorManager.setImmediate(gradient)
+        }
     }
 
     private var resolvedColorScheme: ColorScheme? {
