@@ -189,6 +189,8 @@ struct WindowView: View {
     @ViewBuilder
     private func WindowBackground() -> some View {
         BlurEffectView(material: .sidebar, blendingMode: .behindWindow, state: .followsWindowActiveState)
+            // Private windows tint all chrome so they are never mistaken for a regular window.
+            .overlay(windowState.isIncognito ? NookDesign.Surface.privateTint : Color.clear)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .backgroundDraggable()
             .environment(windowState)

@@ -117,6 +117,7 @@ enum NookDesign {
         static let dropBorderIdle = Color.secondary.opacity(0.3)    // dashed empty-state drop target
         static let dropBorderActive = Color.primary.opacity(0.4)    // dashed drop target while dragging
         static let scrim = Color.black.opacity(0.4)                 // modal dimming behind a dialog
+        static let privateTint = Color(red: 0.36, green: 0.22, blue: 0.62).opacity(0.38) // private window chrome
     }
 
     // MARK: - Elevation
