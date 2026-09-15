@@ -205,6 +205,7 @@ struct SidebarMenuHistoryTab: View {
                                     HistoryRowView(
                                         entry: entry,
                                         onTap: { openInCurrentTab(entry.url) },
+                                        onOpenInNewTab: { openInNewTab(entry.url) },
                                         onDelete: { deleteEntry(entry) }
                                     )
                                     .onAppear {
@@ -398,6 +399,11 @@ struct SidebarMenuHistoryTab: View {
         browserManager.tabs.open(url: url, in: window, placement: window.selectedItemID == nil ? .newTab : .replaceCurrent)
     }
 
+    private func openInNewTab(_ url: URL) {
+        guard let window = browserManager.windowRegistry?.activeWindow else { return }
+        browserManager.tabs.open(url: url, in: window, placement: .newTab)
+    }
+
     private func deleteEntry(_ entry: HistoryEntry) {
         browserManager.historyManager.deleteHistoryEntry(entry.id)
         historyEntries.removeAll { $0.id == entry.id }
@@ -426,6 +432,7 @@ struct SidebarMenuHistoryTab: View {
 struct HistoryRowView: View {
     let entry: HistoryEntry
     let onTap: () -> Void
+    let onOpenInNewTab: () -> Void
     let onDelete: () -> Void
 
     @EnvironmentObject var gradientColorManager: GradientColorManager
@@ -535,7 +542,7 @@ struct HistoryRowView: View {
         .contextMenu {
             Button("Open") { onTap() }
             Button("Open in New Tab") {
-                onTap()
+                onOpenInNewTab()
             }
             Divider()
             Button("Remove from History") { onDelete() }
