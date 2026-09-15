@@ -76,6 +76,7 @@ private struct WindowFocusBridge: NSViewRepresentable {
         let windowRegistry: WindowRegistry
         private weak var window: NSWindow?
         private var keyObserver: Any?
+        private var closeObserver: Any?
 
         init(windowState: BrowserWindowState, windowRegistry: WindowRegistry) {
             self.windowState = windowState
@@ -105,6 +106,19 @@ private struct WindowFocusBridge: NSViewRepresentable {
                 }
             }
 
+            // onDisappear does not fire for windows Nook creates itself (they outlive close),
+            // so a closed window would stay registered and reopen on the next launch.
+            closeObserver = NotificationCenter.default.addObserver(
+                forName: NSWindow.willCloseNotification,
+                object: window,
+                queue: .main
+            ) { [weak self] _ in
+                guard let self else { return }
+                MainActor.assumeIsolated {
+                    self.windowRegistry.unregister(self.windowState.id)
+                }
+            }
+
             if window.isKeyWindow {
                 Task { @MainActor in
                     windowRegistry.setActive(windowState)
@@ -116,6 +130,10 @@ private struct WindowFocusBridge: NSViewRepresentable {
             if let observer = keyObserver {
                 NotificationCenter.default.removeObserver(observer)
                 keyObserver = nil
+            }
+            if let observer = closeObserver {
+                NotificationCenter.default.removeObserver(observer)
+                closeObserver = nil
             }
             window = nil
         }

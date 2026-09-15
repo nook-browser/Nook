@@ -50,6 +50,8 @@ class WindowRegistry {
 
     /// Unregister a window when it closes
     func unregister(_ id: UUID) {
+        // Both the window's close notification and SwiftUI's onDisappear call this.
+        guard windows[id] != nil else { return }
         // Call cleanup callback if set
         onWindowClose?(id)
 
