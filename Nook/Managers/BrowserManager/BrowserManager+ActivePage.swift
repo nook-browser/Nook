@@ -11,7 +11,7 @@ extension BrowserManager {
     // MARK: - Cookie Management Methods
 
     func clearCurrentPageCookies() {
-        guard let currentTab = currentTabForActiveWindow(),
+        guard let currentTab = tabs.activeWindowSession,
             let host = currentTab.url.host
         else { return }
 
@@ -35,7 +35,7 @@ extension BrowserManager {
     // MARK: - Cache Management
 
     func clearCurrentPageCache() {
-        guard let currentTab = currentTabForActiveWindow(),
+        guard let currentTab = tabs.activeWindowSession,
             let host = currentTab.url.host
         else { return }
 
@@ -46,14 +46,14 @@ extension BrowserManager {
 
     /// Clears site cache for current page excluding cookies, then reloads from origin.
     func hardReloadCurrentPage() {
-        guard let currentTab = currentTabForActiveWindow(),
+        guard let currentTab = tabs.activeWindowSession,
             let host = currentTab.url.host,
             let activeWindowId = windowRegistry?.activeWindow?.id
         else { return }
         Task { @MainActor in
             await cacheManager.clearCacheForDomainExcludingCookies(host)
             // Use the WebView that's actually visible in the current window
-            if let webView = getWebView(for: currentTab.id, in: activeWindowId) {
+            if let webView = getWebView(for: currentTab.itemID, in: activeWindowId) {
                 webView.reloadFromOrigin()
             } else {
                 // Fallback to the tab's default webView
@@ -88,53 +88,44 @@ extension BrowserManager {
 
     // MARK: - Window-Aware Tab Operations for Commands
 
-    /// Get the current tab for the active window (used by keyboard shortcuts)
-    func currentTabForActiveWindow() -> Tab? {
-        if let activeWindow = windowRegistry?.activeWindow {
-            return currentTab(for: activeWindow)
-        }
-        // Fallback to global current tab for backward compatibility
-        return tabManager.currentTab
-    }
-
     /// Refresh the current tab in the active window
     func refreshCurrentTabInActiveWindow() {
-        currentTabForActiveWindow()?.refresh()
+        tabs.activeWindowSession?.refresh()
     }
 
     /// Toggle mute for the current tab in the active window
     func toggleMuteCurrentTabInActiveWindow() {
-        currentTabForActiveWindow()?.toggleMute()
+        tabs.activeWindowSession?.toggleMute()
     }
 
     /// Request picture-in-picture for the current tab in the active window
     func requestPiPForCurrentTabInActiveWindow() {
-        currentTabForActiveWindow()?.requestPictureInPicture()
+        tabs.activeWindowSession?.requestPictureInPicture()
     }
 
     /// Check if the current tab in the active window has video content
     func currentTabHasVideoContent() -> Bool {
-        return currentTabForActiveWindow()?.hasVideoContent ?? false
+        return tabs.activeWindowSession?.hasVideoContent ?? false
     }
 
     /// Check if the current tab in the active window has PiP active
     func currentTabHasPiPActive() -> Bool {
-        return currentTabForActiveWindow()?.hasPiPActive ?? false
+        return tabs.activeWindowSession?.hasPiPActive ?? false
     }
 
     /// Check if the current tab in the active window is muted
     func currentTabIsMuted() -> Bool {
-        return currentTabForActiveWindow()?.isAudioMuted ?? false
+        return tabs.activeWindowSession?.isAudioMuted ?? false
     }
 
     /// Check if the current tab in the active window has audio content
     func currentTabHasAudioContent() -> Bool {
-        return currentTabForActiveWindow()?.hasAudioContent ?? false
+        return tabs.activeWindowSession?.hasAudioContent ?? false
     }
 
     // MARK: - URL Utilities
     func copyCurrentURL() {
-        if let url = currentTabForActiveWindow()?.url.absoluteString {
+        if let url = tabs.activeWindowSession?.url.absoluteString {
             #if DEBUG
             print("Attempting to copy URL: \(url)")
             #endif
@@ -165,7 +156,7 @@ extension BrowserManager {
 
     // MARK: - Web Inspector
     func openWebInspector() {
-        guard let currentTab = currentTabForActiveWindow() else {
+        guard let currentTab = tabs.activeWindowSession else {
             #if DEBUG
             print("No current tab to inspect")
             #endif
@@ -196,42 +187,42 @@ extension BrowserManager {
     /// Zoom in for the current tab
     func zoomInCurrentTab() {
         guard let windowState = windowRegistry?.activeWindow,
-            let currentTab = currentTabForActiveWindow(),
-            let webView = getWebView(for: currentTab.id, in: windowState.id)
+            let currentTab = tabs.activeWindowSession,
+            let webView = getWebView(for: currentTab.itemID, in: windowState.id)
         else {
             return
         }
 
         let domain = currentTab.url.host ?? currentTab.url.absoluteString
-        zoomManager.zoomIn(for: webView, domain: domain, tabId: currentTab.id)
+        zoomManager.zoomIn(for: webView, domain: domain, tabId: currentTab.itemID)
         showZoomPopupFeedback()
     }
 
     /// Zoom out for the current tab
     func zoomOutCurrentTab() {
         guard let windowState = windowRegistry?.activeWindow,
-            let currentTab = currentTabForActiveWindow(),
-            let webView = getWebView(for: currentTab.id, in: windowState.id)
+            let currentTab = tabs.activeWindowSession,
+            let webView = getWebView(for: currentTab.itemID, in: windowState.id)
         else {
             return
         }
 
         let domain = currentTab.url.host ?? currentTab.url.absoluteString
-        zoomManager.zoomOut(for: webView, domain: domain, tabId: currentTab.id)
+        zoomManager.zoomOut(for: webView, domain: domain, tabId: currentTab.itemID)
         showZoomPopupFeedback()
     }
 
     /// Reset zoom to 100% for the current tab
     func resetZoomCurrentTab() {
         guard let windowState = windowRegistry?.activeWindow,
-            let currentTab = currentTabForActiveWindow(),
-            let webView = getWebView(for: currentTab.id, in: windowState.id)
+            let currentTab = tabs.activeWindowSession,
+            let webView = getWebView(for: currentTab.itemID, in: windowState.id)
         else {
             return
         }
 
         let domain = currentTab.url.host ?? currentTab.url.absoluteString
-        zoomManager.resetZoom(for: webView, domain: domain, tabId: currentTab.id)
+        zoomManager.resetZoom(for: webView, domain: domain, tabId: currentTab.itemID)
         showZoomPopupFeedback()
     }
 
@@ -250,10 +241,10 @@ extension BrowserManager {
     func applyZoomLevel(_ zoomLevel: Double, to tabId: UUID? = nil) {
         guard let windowState = windowRegistry?.activeWindow else { return }
 
-        let targetTabId = tabId ?? (currentTabForActiveWindow()?.id)
+        let targetTabId = tabId ?? (tabs.activeWindowSession?.itemID)
         guard let tabId = targetTabId,
             let webView = getWebView(for: tabId, in: windowState.id),
-            let tab = tabManager.tabs.first(where: { $0.id == tabId })
+            let tab = tabs.session(for: tabId)
         else {
             return
         }
@@ -266,7 +257,7 @@ extension BrowserManager {
     func loadZoomForTab(_ tabId: UUID) {
         guard let windowState = windowRegistry?.activeWindow,
             let webView = getWebView(for: tabId, in: windowState.id),
-            let tab = tabManager.tabs.first(where: { $0.id == tabId }),
+            let tab = tabs.session(for: tabId),
             let domain = tab.url.host
         else {
             return

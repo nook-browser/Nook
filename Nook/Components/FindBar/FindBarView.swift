@@ -42,7 +42,7 @@ struct FindBarView: View {
                                     findManager.findNext()
                                 }
                                 .onChange(of: findManager.searchText) { _, newValue in
-                                    findManager.search(for: newValue, in: findManager.currentTab)
+                                    findManager.search(for: newValue, in: findManager.currentSession)
                                 }
                         }
 

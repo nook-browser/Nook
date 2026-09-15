@@ -18,7 +18,7 @@ final class MediaControlsManager {
 
     /// Cached active media tab to avoid iterating all tabs on every query.
     /// Set when media is found playing; cleared when the tab stops playing or is deallocated.
-    private weak var _cachedActiveMediaTab: Tab?
+    private weak var _cachedActiveMediaTab: PageSession?
 
     /// List of media host domains that support media controls
     /// Add new domains here to expand support to other platforms
@@ -43,7 +43,7 @@ final class MediaControlsManager {
 
     /// Find the first tab with actively playing media (prioritize tabs with playing media).
     /// Uses a cached weak reference to avoid iterating all tabs when possible.
-    func findActiveMediaTab() -> Tab? {
+    func findActiveMediaTab() -> PageSession? {
         // Fast path: check if the cached tab is still actively playing media
         if let cached = _cachedActiveMediaTab,
            isMediaHostURL(cached.url),
@@ -57,7 +57,7 @@ final class MediaControlsManager {
         guard let browserManager = browserManager else {
             return nil
         }
-        let allTabs = browserManager.tabManager.allTabs()
+        let allTabs = browserManager.tabs.sessions
 
         for tab in allTabs {
             let isMediaHost = isMediaHostURL(tab.url)
@@ -75,11 +75,11 @@ final class MediaControlsManager {
 
     /// Refresh a tab's title by reading document.title directly from the webview.
     /// Ensures the tab name stays in sync even if KVO misses a YouTube SPA title change.
-    func refreshTitle(for tab: Tab) async {
+    func refreshTitle(for tab: PageSession) async {
         let webViews = resolveWebViews(for: tab)
         for webView in webViews {
             if let title = try? await webView.evaluateJavaScript("document.title") as? String,
-               !title.isEmpty, title != tab.name {
+               !title.isEmpty, title != tab.title {
                 tab.updateTitle(title)
                 break
             }
@@ -92,17 +92,17 @@ final class MediaControlsManager {
         return mediaHosts.contains(where: { host.contains($0) })
     }
 
-    private func resolveWebViews(for tab: Tab) -> [WKWebView] {
+    private func resolveWebViews(for tab: PageSession) -> [WKWebView] {
         var webViews: [WKWebView] = []
 
         if let browserManager = browserManager {
             if let windowId = windowState?.id,
-               let windowWebView = browserManager.getWebView(for: tab.id, in: windowId) {
+               let windowWebView = browserManager.getWebView(for: tab.itemID, in: windowId) {
                 webViews.append(windowWebView)
             }
 
             if let coordinator = browserManager.webViewCoordinator {
-                let additional = coordinator.getAllWebViews(for: tab.id)
+                let additional = coordinator.getAllWebViews(for: tab.itemID)
                 for candidate in additional where !webViews.contains(where: { $0 === candidate }) {
                     webViews.append(candidate)
                 }
@@ -119,7 +119,7 @@ final class MediaControlsManager {
     }
 
     @discardableResult
-    private func executeMediaScript(for tab: Tab, script: String, description: String) async -> (handled: Bool, payload: Any?) {
+    private func executeMediaScript(for tab: PageSession, script: String, description: String) async -> (handled: Bool, payload: Any?) {
         let webViews = resolveWebViews(for: tab)
         var handled = false
         var payload: Any?
@@ -159,7 +159,7 @@ final class MediaControlsManager {
     // MARK: - Media Controls
 
     /// Toggle play/pause on media player
-    func playPause(tab explicitTab: Tab? = nil) async -> Bool? {
+    func playPause(tab explicitTab: PageSession? = nil) async -> Bool? {
         guard let tab = explicitTab ?? findActiveMediaTab() else { return nil }
 
         let script = """
@@ -214,7 +214,7 @@ final class MediaControlsManager {
     }
 
     /// Skip to next video
-    func next(tab explicitTab: Tab? = nil) async {
+    func next(tab explicitTab: PageSession? = nil) async {
         guard let tab = explicitTab ?? findActiveMediaTab() else { return }
 
         let script = """
@@ -248,7 +248,7 @@ final class MediaControlsManager {
     }
 
     /// Skip to previous video
-    func previous(tab explicitTab: Tab? = nil) async {
+    func previous(tab explicitTab: PageSession? = nil) async {
         guard let tab = explicitTab ?? findActiveMediaTab() else { return }
 
         let script = """
@@ -282,7 +282,7 @@ final class MediaControlsManager {
     }
 
     /// Toggle mute state
-    func toggleMute(tab explicitTab: Tab? = nil) async -> Bool? {
+    func toggleMute(tab explicitTab: PageSession? = nil) async -> Bool? {
         guard let tab = explicitTab ?? findActiveMediaTab() else { return nil }
 
         let newMutedState = !(tab.isAudioMuted)
@@ -291,14 +291,14 @@ final class MediaControlsManager {
         if let browserManager = browserManager,
            let windowId = windowState?.id,
            windowRegistry?.activeWindow?.id != windowId {
-            browserManager.setMuteState(newMutedState, for: tab.id, originatingWindowId: windowId)
+            browserManager.setMuteState(newMutedState, for: tab.itemID, originatingWindowId: windowId)
         }
 
         return newMutedState
     }
 
     /// Get current playback state
-    func isPlaying(tab explicitTab: Tab? = nil) async -> Bool {
+    func isPlaying(tab explicitTab: PageSession? = nil) async -> Bool {
         guard let tab = explicitTab ?? findActiveMediaTab() else { return false }
 
         let script = """
