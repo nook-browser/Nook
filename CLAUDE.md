@@ -9,7 +9,7 @@ Nook is a fast, minimal macOS browser with sidebar-first design. Built with Swif
 **Fork status**: This repo (`origin` = `l984-451/Nook`) started as a fork of `nook-browser/Nook`, which went dormant in March 2026. As of September 2026 it is a standalone solo project: the `upstream` remote is removed, upstream's PR-base workflow is deleted, and nothing is merged back. Treat this repo as the only source of truth.
 
 - **Minimum macOS**: 26.0 (Tahoe), Apple Silicon. Raised from 15.5 in September 2026; every `@available` / `#available` guard below 26 was removed at the same time. Do not add guards for versions below the deployment target.
-- **Local toolchain**: Xcode 26.6 (SDK 26.5) at `/Applications/Xcode.app`. Xcode 27 is not installed yet; install it before starting macOS 27 API work.
+- **Local toolchain**: Xcode 27.0 (27A266a, SDK 27.0) at `/Applications/Xcode.app`, installed September 2026; Xcode 16.4 stays at `/Applications/Xcode-16.4.0.app`. Xcode 27 ships without the Metal Toolchain (see Metal below). The deployment target is still 26.0, so macOS 27 APIs need the wrapper pattern in Key Patterns.
 - **Swift language mode**: 5 (`SWIFT_VERSION = 5.0`). Swift 6 strict concurrency is not enabled; see `ASSESSMENT.md` for the warning inventory that would become errors.
 - **Bundle ID**: `com.baingurley.nook`
 - **Current Version**: 1.2.1 (build 121). Tags up to `v1.2.0` exist locally; the last published GitHub release is `v1.0.7`.
@@ -237,6 +237,8 @@ The passkey entitlement (`web-browser.public-key-credential`) was requested and 
 - **WKWebView.configuration returns a copy**: `webView.configuration.preferences.setValue(...)` modifies a discarded copy. Use the base config before webview creation, or access `userContentController` (which IS shared).
 - **`WKUserContentController.userScripts` is lazily bridged**: it is a proxy over WebKit's NSArray. Evaluate everything you need from it (filter, count) before calling `removeAllUserScripts()`; touching the old array afterwards traps in Release builds only (`WKNSArray objectAtIndex:` SIGTRAP). Debug builds hide this.
 - **Verifying a build**: there is no test target. Build unsigned Debug, launch `build/Build/Products/Debug/Nook.app`, and stream logs with `/usr/bin/log stream --level info --predicate 'subsystem == "com.baingurley.nook"'` (`log` alone is a zsh builtin). Always also run the Release configuration before installing or shipping; optimizer-only crashes exist (see above).
+- **External link testing**: `open <url>` goes to whichever Nook LaunchServices picks (usually `/Applications/Nook.app`, launched alongside a running Debug build), and two copies share the SwiftData tab store. Quit the installed app first and target the build: `open -a "$PWD/build/Build/Products/Debug/Nook.app" <url>`. System Events keystrokes go to the frontmost app, so set Nook `frontmost` before sending one.
+- **One `@NSApplicationDelegateAdaptor`**: only `NookApp` declares it. A second declaration (a `Commands` struct had one until September 2026) makes SwiftUI create a second `AppDelegate`: AppKit calls the first, `NookApp` wires `browserManager` into the second, and external links, quit persistence, MCP shutdown and Sparkle callbacks break without an error. Elsewhere, reach the delegate through `browserManager.appDelegate`.
 - **MV3 service workers die after ~5 min idle**: extension badge/tab state can vanish. `ExtensionManager.wakeBackgroundWorkers()` is called on tab activation and on `NSApplication.didBecomeActiveNotification`. Do not add a polling timer for this.
 
 ## Dependencies
