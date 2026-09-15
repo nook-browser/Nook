@@ -461,7 +461,14 @@ class KeyboardShortcutManager {
             case .newTab:
                 self.windowRegistry?.activeWindow?.commandPalette?.open()
             case .closeTab:
-                if let window, !window.isCommandPaletteVisible { tabs.closeSelected(in: window) }
+                if let window, !window.isCommandPaletteVisible {
+                    // With no tab open (the empty space), Cmd+W closes the window.
+                    if window.selectedItemID == nil {
+                        window.window?.performClose(nil)
+                    } else {
+                        tabs.closeSelected(in: window)
+                    }
+                }
             case .undoCloseTab:
                 if let window { tabs.reopenLastClosed(in: window) }
             case .nextTab:
