@@ -1474,6 +1474,9 @@ class BrowserManager: ObservableObject {
             backing: .buffered,
             defer: false
         )
+        // ARC owns this window. AppKit's default release on close over-releases it and crashes
+        // in the next autorelease pool drain.
+        newWindow.isReleasedWhenClosed = false
 
         let contentView = windowContent(ContentView(), windowRegistry: windowRegistry, webViewCoordinator: webViewCoordinator)
 
@@ -1539,6 +1542,9 @@ class BrowserManager: ObservableObject {
             backing: .buffered,
             defer: false
         )
+        // ARC owns this window. AppKit's default release on close over-releases it and crashes
+        // in the next autorelease pool drain.
+        newWindow.isReleasedWhenClosed = false
 
         let contentView = windowContent(ContentView(windowState: windowState), windowRegistry: windowRegistry, webViewCoordinator: webViewCoordinator)
 
