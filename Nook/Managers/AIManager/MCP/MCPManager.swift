@@ -34,20 +34,24 @@ class MCPManager {
         allTools.removeAll()
     }
 
-    /// Synchronous version for app termination when async is not available
+    /// Termination: stops MCP child processes without blocking quit.
+    ///
+    /// The old version ran `stopAll()` on the main actor while blocking the main thread, so the
+    /// task never started during termination and quit always waited out its 5 second deadline.
+    /// Clients are actors, so they disconnect off the main thread here; quit waits at most one
+    /// second, and returns at once when no server is connected.
     func stopAllSync() {
+        let running = Array(clients.values)
+        clients.removeAll()
+        guard !running.isEmpty else { return }
         let semaphore = DispatchSemaphore(value: 0)
-        Task {
-            await stopAll()
+        Task.detached {
+            await withTaskGroup(of: Void.self) { group in
+                for client in running { group.addTask { await client.disconnect() } }
+            }
             semaphore.signal()
         }
-        let deadline = Date().addingTimeInterval(5)
-        while Date() < deadline {
-            if semaphore.wait(timeout: .now()) == .success {
-                return
-            }
-            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.01))
-        }
+        _ = semaphore.wait(timeout: .now() + 1)
     }
 
     // MARK: - Server Management
