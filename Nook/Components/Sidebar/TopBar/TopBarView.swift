@@ -224,8 +224,9 @@ struct TopBarView: View {
         }
     }
 
+    /// Nil while another window holds the page: its controls stay inert until Move Here.
     private var session: PageSession? {
-        browserManager.tabs.selectedSession(in: windowState)
+        browserManager.tabs.controllableSession(in: windowState)
     }
 
     /// This window's own view of the page, so a clone navigates in its window.

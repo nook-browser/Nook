@@ -333,8 +333,17 @@ final class TabsController {
         window.selectedItemID.flatMap { session(for: $0) }
     }
 
+    /// The active window's selected page, when that window holds the live page. Commands never
+    /// reach a page another window holds; the user moves it first.
     var activeWindowSession: PageSession? {
-        browserManager?.windowRegistry?.activeWindow.flatMap { selectedSession(in: $0) }
+        browserManager?.windowRegistry?.activeWindow.flatMap { controllableSession(in: $0) }
+    }
+
+    /// The window's selected page for actions (navigation, reload, find, zoom): nil while another
+    /// window holds it. Display code uses `selectedSession(in:)`.
+    func controllableSession(in window: BrowserWindowState) -> PageSession? {
+        guard let session = selectedSession(in: window), !isPageShownElsewhere(session.itemID, from: window) else { return nil }
+        return session
     }
 
     /// Favorites of the window's profile, then the tabs of its space in sidebar order.

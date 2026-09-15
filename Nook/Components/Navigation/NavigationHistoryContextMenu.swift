@@ -73,7 +73,7 @@ struct NavigationHistoryContextMenu: View {
     }
 
     private func loadHistoryItemsFresh() -> [NavigationHistoryContextMenuItem] {
-        guard let tab = browserManager.tabs.selectedSession(in: windowState),
+        guard let tab = browserManager.tabs.controllableSession(in: windowState),
               // Use assignedWebView as fallback to avoid triggering lazy initialization
               let webView = browserManager.webViewCoordinator?.getWebView(for: tab.itemID, in: windowState.id) ?? tab.assignedWebView else {
             return []
@@ -106,7 +106,7 @@ struct NavigationHistoryContextMenu: View {
     }
 
     private func navigateToHistoryItem(_ item: NavigationHistoryContextMenuItem) {
-        guard let tab = browserManager.tabs.selectedSession(in: windowState),
+        guard let tab = browserManager.tabs.controllableSession(in: windowState),
               // Use assignedWebView as fallback to avoid triggering lazy initialization
               let webView = browserManager.webViewCoordinator?.getWebView(for: tab.itemID, in: windowState.id) ?? tab.assignedWebView else { return }
 

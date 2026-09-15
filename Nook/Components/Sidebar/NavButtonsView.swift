@@ -118,8 +118,9 @@ struct NavButtonsView: View {
         )
     }
 
+    /// Nil while another window holds the page: its controls stay inert until Move Here.
     private var session: PageSession? {
-        browserManager.tabs.selectedSession(in: windowState)
+        browserManager.tabs.controllableSession(in: windowState)
     }
 
     private var canGoBack: Bool { session?.canGoBack ?? false }

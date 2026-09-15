@@ -30,7 +30,7 @@ struct PageElsewhereView: View {
                         .lineLimit(1)
                 }
                 HStack(spacing: NookDesign.Spacing.sm) {
-                    Button("Show Here", action: onShowHere)
+                    Button("Move Here", action: onShowHere)
                         .buttonStyle(.borderedProminent)
                     Button("Go to Window", action: onGoToWindow)
                         .buttonStyle(.bordered)

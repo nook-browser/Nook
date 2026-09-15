@@ -450,7 +450,8 @@ struct CommandPaletteView: View {
         case .history(let historyEntry):
             open(historyEntry.url)
         case .url, .search:
-            if commandPalette.shouldNavigateCurrentTab, let session = browserManager.tabs.selectedSession(in: windowState) {
+            // A page another window holds is not navigated from here; the text opens a new tab.
+            if commandPalette.shouldNavigateCurrentTab, let session = browserManager.tabs.controllableSession(in: windowState) {
                 session.navigate(to: suggestion.text)
             } else {
                 // Normalize the URL/search query first, then create the tab with
