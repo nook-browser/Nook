@@ -90,9 +90,14 @@ class BrowserToolExecutor {
 
     // MARK: - Tool Implementations
 
+    private func tabTitle(_ itemID: UUID, in tabs: TabsController) -> String {
+        if let custom = tabs.item(itemID)?.customTitle, !custom.isEmpty { return custom }
+        return tabs.session(for: itemID)?.title ?? tabs.item(itemID)?.displayTitle ?? ""
+    }
+
     private func getWebView(browserManager: BrowserManager, windowState: BrowserWindowState) -> WKWebView? {
-        guard let currentTab = browserManager.currentTab(for: windowState) else { return nil }
-        return browserManager.getWebView(for: currentTab.id, in: windowState.id)
+        guard let itemID = windowState.selectedItemID else { return nil }
+        return browserManager.getWebView(for: itemID, in: windowState.id)
     }
 
     private func executeNavigateToURL(_ args: [String: Any], browserManager: BrowserManager, windowState: BrowserWindowState) async throws -> String {
@@ -103,18 +108,9 @@ class BrowserToolExecutor {
 
         let newTab = args["newTab"] as? Bool ?? false
 
-        if newTab {
-            browserManager.createNewTab(in: windowState)
-            // Give the new tab a moment to initialize
-            try await Task.sleep(nanoseconds: 100_000_000)
-        }
-
-        guard let webView = getWebView(browserManager: browserManager, windowState: windowState) else {
+        guard browserManager.tabs.open(url: url, in: windowState, placement: newTab ? .newTab : .replaceCurrent) != nil else {
             return "No active tab"
         }
-
-        let request = URLRequest(url: url)
-        webView.load(request)
 
         return "Navigated to \(urlString)\(newTab ? " in new tab" : "")"
     }
@@ -410,19 +406,19 @@ class BrowserToolExecutor {
     }
 
     private func executeGetTabList(browserManager: BrowserManager, windowState: BrowserWindowState) -> String {
-        guard let tabManager = windowState.tabManager,
-              let space = windowState.currentSpace else {
+        let controller = browserManager.tabs
+        let order = controller.displayOrder(in: windowState)
+        guard !order.isEmpty else {
             return "No tabs available"
         }
 
-        let tabs = tabManager.tabs(in: space)
         var tabList: [[String: Any]] = []
-        for (index, tab) in tabs.enumerated() {
+        for (index, itemID) in order.enumerated() {
             tabList.append([
                 "index": index,
-                "title": tab.name,
-                "url": tab.url.absoluteString,
-                "isActive": tab.id == windowState.currentTabId
+                "title": tabTitle(itemID, in: controller),
+                "url": (controller.session(for: itemID)?.url ?? controller.item(itemID)?.url)?.absoluteString ?? "",
+                "isActive": itemID == windowState.selectedItemID
             ])
         }
 
@@ -435,35 +431,27 @@ class BrowserToolExecutor {
             return "Missing index parameter"
         }
 
-        guard let tabManager = windowState.tabManager,
-              let space = windowState.currentSpace else {
+        let controller = browserManager.tabs
+        let order = controller.displayOrder(in: windowState)
+        guard !order.isEmpty else {
             return "No tabs available"
         }
-
-        let tabs = tabManager.tabs(in: space)
-        guard index >= 0, index < tabs.count else {
-            return "Tab index \(index) out of range (0-\(tabs.count - 1))"
+        guard order.indices.contains(index) else {
+            return "Tab index \(index) out of range (0-\(order.count - 1))"
         }
 
-        let tab = tabs[index]
-        tabManager.setActiveTab(tab)
-        return "Switched to tab: \(tab.name)"
+        controller.select(index: index, in: windowState)
+        return "Switched to tab: \(tabTitle(order[index], in: controller))"
     }
 
     private func executeCreateTab(_ args: [String: Any], browserManager: BrowserManager, windowState: BrowserWindowState) throws -> String {
-        browserManager.createNewTab(in: windowState)
-
         if let urlString = args["url"] as? String,
            let url = URL(string: urlString) {
-            // Load URL in the new tab after a brief delay for initialization
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 200_000_000)
-                if let webView = self.getWebView(browserManager: browserManager, windowState: windowState) {
-                    webView.load(URLRequest(url: url))
-                }
-            }
+            browserManager.tabs.open(url: url, in: windowState, placement: .newTab)
             return "Created new tab with URL: \(urlString)"
         }
+
+        browserManager.tabs.open(url: TabsController.homeURL, in: windowState, placement: .newTab)
 
         return "Created new empty tab"
     }

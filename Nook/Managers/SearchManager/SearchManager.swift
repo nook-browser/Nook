@@ -18,10 +18,19 @@ class SearchManager {
     private let session = URLSession.shared
     private var searchTask: Task<Void, Never>?
     private var searchGeneration = UUID()
-    private weak var tabManager: TabManager?
+    private weak var tabs: TabsController?
+    private weak var window: BrowserWindowState?
     private weak var historyManager: HistoryManager?
     private var currentProfileId: UUID?
     
+    /// An open tab the palette can switch to, captured when the query ran.
+    struct TabMatch {
+        let itemID: UUID
+        let title: String
+        let url: URL
+        let favicon: SwiftUI.Image
+    }
+
     struct SearchSuggestion: Identifiable, Equatable {
         let id = UUID()
         let text: String
@@ -30,7 +39,7 @@ class SearchManager {
         enum SuggestionType {
             case search
             case url
-            case tab(Tab)
+            case tab(TabMatch)
             case history(HistoryEntry)
         }
         
@@ -39,7 +48,7 @@ class SearchManager {
             case (.search, .search), (.url, .url):
                 return lhs.text == rhs.text
             case (.tab(let lhsTab), .tab(let rhsTab)):
-                return lhs.text == rhs.text && lhsTab.id == rhsTab.id
+                return lhs.text == rhs.text && lhsTab.itemID == rhsTab.itemID
             case (.history(let lhsHistory), .history(let rhsHistory)):
                 return lhs.text == rhs.text && lhsHistory.id == rhsHistory.id
             default:
@@ -48,12 +57,11 @@ class SearchManager {
         }
     }
     
-    func setTabManager(_ tabManager: TabManager?) {
-        self.tabManager = tabManager
-        // Hop to MainActor to update profile context safely
-        Task { @MainActor in
-            self.updateProfileContext()
-        }
+    /// The controller and window whose profile's tabs the palette searches.
+    func setTabs(_ tabs: TabsController?, window: BrowserWindowState?) {
+        self.tabs = tabs
+        self.window = window
+        updateProfileContext()
     }
     
     func setHistoryManager(_ historyManager: HistoryManager?) {
@@ -61,8 +69,7 @@ class SearchManager {
     }
 
     @MainActor func updateProfileContext() {
-        let pid = tabManager?.browserManager?.currentProfile?.id
-        currentProfileId = pid
+        currentProfileId = window?.profileID
     }
     
     @MainActor func searchSuggestions(for query: String) {
@@ -93,58 +100,40 @@ class SearchManager {
             async let web = self.fetchWebSuggestions(for: query)
             let history = Array(await self.searchHistory(for: query).prefix(2))
             guard !Task.isCancelled, self.searchGeneration == generation,
-                  self.tabManager?.browserManager?.currentProfile?.id == profile else { return }
+                  self.window?.profileID == profile else { return }
             self.updateSuggestionsIfNeeded(Array((urlRows + carriedWeb + history + tabs).prefix(5)))
             let webSuggestions = await web
             guard !Task.isCancelled, self.searchGeneration == generation,
-                  self.tabManager?.browserManager?.currentProfile?.id == profile else { return }
+                  self.window?.profileID == profile else { return }
             self.updateSuggestionsIfNeeded(Array((urlRows + webSuggestions + history + tabs).prefix(5)))
             self.isLoading = false
         }
     }
 
     @MainActor private func searchTabs(for query: String) -> [SearchSuggestion] {
-        guard let tabManager = tabManager else { return [] }
-        
+        guard let tabs, let profileID = window?.profileID else { return [] }
         let lowercaseQuery = query.lowercased()
-        var matchingTabs: [SearchSuggestion] = []
-        // Use TabManager's profile-aware access (handles fallback internally)
-        let allTabs: [Tab] = tabManager.allTabsForCurrentProfile()
-        
-        for tab in allTabs {
-            let nameMatch = tab.name.lowercased().contains(lowercaseQuery)
-            let urlMatch = tab.url.absoluteString.lowercased().contains(lowercaseQuery)
-            let hostMatch = tab.url.host?.lowercased().contains(lowercaseQuery) ?? false
-            
-            if nameMatch || urlMatch || hostMatch {
-                let suggestion = SearchSuggestion(
-                    text: tab.name,
-                    type: .tab(tab)
-                )
-                matchingTabs.append(suggestion)
-            }
+        let matches: [TabMatch] = tabs.items(inProfile: profileID).compactMap { item in
+            let session = tabs.session(for: item.id)
+            guard let url = session?.url ?? tabs.device.openPages[item.id]?.url ?? item.url else { return nil }
+            let title = item.customTitle.flatMap { $0.isEmpty ? nil : $0 } ?? session?.title ?? item.displayTitle
+            guard title.lowercased().contains(lowercaseQuery)
+                    || url.absoluteString.lowercased().contains(lowercaseQuery) else { return nil }
+            let favicon = session?.favicon
+                ?? url.host.flatMap { FaviconCache.shared.swiftUIImage(for: $0) }
+                ?? SwiftUI.Image(systemName: "globe")
+            return TabMatch(itemID: item.id, title: title, url: url, favicon: favicon)
         }
-        
-        // Sort by relevance (name matches first, then URL matches)
-        let sortedTabs = matchingTabs.sorted { (lhs: SearchSuggestion, rhs: SearchSuggestion) -> Bool in
-            if case .tab(let lhsTab) = lhs.type, case .tab(let rhsTab) = rhs.type {
-                let lhsNameMatch = lhsTab.name.lowercased().contains(lowercaseQuery)
-                let rhsNameMatch = rhsTab.name.lowercased().contains(lowercaseQuery)
-                
-                if lhsNameMatch && !rhsNameMatch {
-                    return true
-                } else if !lhsNameMatch && rhsNameMatch {
-                    return false
-                } else {
-                    return lhsTab.name.count < rhsTab.name.count
-                }
-            }
-            return false
+        // Title matches first, then shorter titles.
+        let sorted = matches.sorted { lhs, rhs in
+            let lhsTitle = lhs.title.lowercased().contains(lowercaseQuery)
+            let rhsTitle = rhs.title.lowercased().contains(lowercaseQuery)
+            if lhsTitle != rhsTitle { return lhsTitle }
+            return lhs.title.count < rhs.title.count
         }
-        
-        return Array(sortedTabs.prefix(3)) // Limit to 3 tab suggestions
+        return sorted.prefix(3).map { SearchSuggestion(text: $0.title, type: .tab($0)) }
     }
-    
+
     @MainActor private func searchHistory(for query: String) async -> [SearchSuggestion] {
         guard let historyManager = historyManager else { return [] }
         
