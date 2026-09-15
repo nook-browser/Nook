@@ -5,8 +5,9 @@
 //  Created by Jonathan Caudill on 12/09/2024.
 //
 
-import SwiftUI
 import Foundation
+import NookTabsCore
+import SwiftUI
 
 /// Represents the state of a single browser window, allowing multiple windows
 /// to have independent tab selections and UI states while sharing the same tab data.
@@ -117,6 +118,32 @@ class BrowserWindowState {
     /// Whether the download warning has been shown in this incognito session
     var hasShownDownloadWarning: Bool = false
     
+    // MARK: - Tab Model (TabsController)
+
+    /// The space this window shows. Replaces `currentSpaceId`.
+    var spaceID: UUID?
+
+    /// The selected item per space in this window. Replaces `activeTabForSpace`.
+    var selectedItemBySpace: [UUID: UUID] = [:]
+
+    /// The selected item in the current space. Replaces `currentTabId`.
+    var selectedItemID: UUID? {
+        spaceID.flatMap { selectedItemBySpace[$0] }
+    }
+
+    /// The split pair shown in this window, if any.
+    var split: SplitRecord?
+
+    /// The profile whose favorites and data store this window uses. Replaces `currentProfileId`.
+    var profileID: UUID?
+
+    /// A private window's in-memory tree: one profile record for the ephemeral profile and one
+    /// space. Never saved. nil for regular windows.
+    var privateTree: TabTree?
+
+    /// Live pages of a private window, by item id.
+    var privateSessions: [UUID: PageSession] = [:]
+
     /// Computed property: the actual Space object for this window's current space
     var currentSpace: Space? {
         guard let spaceId = currentSpaceId else { return nil }

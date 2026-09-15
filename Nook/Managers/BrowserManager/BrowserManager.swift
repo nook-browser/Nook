@@ -394,6 +394,8 @@ class BrowserManager: ObservableObject {
 
     var modelContext: ModelContext
     var tabManager: TabManager
+    /// The new tab model. Loaded here; not authoritative until task Z (see TabsController.isAuthoritative).
+    let tabs: TabsController
     var profileManager: ProfileManager
     var dialogManager: DialogManager
     var downloadManager: DownloadManager
@@ -515,6 +517,7 @@ class BrowserManager: ObservableObject {
         self.profileManager.ensureDefaultProfile()
         let initialProfile = self.profileManager.profiles.first
         self.currentProfile = initialProfile
+        self.tabs = TabsController(profileManager: self.profileManager)
 
         self.tabManager = TabManager(browserManager: nil, context: modelContext)
         // settingsManager will be injected from NookApp
@@ -540,6 +543,7 @@ class BrowserManager: ObservableObject {
         // Note: settingsManager will be injected later, so we skip initialization here
         self.tabManager.browserManager = self
         self.tabManager.reattachBrowserManager(self)
+        self.tabs.browserManager = self
         if let mgr = self.extensionManager {
             // Attach extension manager BEFORE any WKWebView is created so content scripts can inject
             mgr.attach(browserManager: self)
