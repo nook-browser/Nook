@@ -69,12 +69,6 @@ final class NookDragSessionManager: ObservableObject {
                cursorScreenLocation.x <= sidebarScreenFrame.maxX
     }
 
-    var isSidebarReorder: Bool {
-        guard isDragging, let source = sourceZone, activeZone == source else { return false }
-        if case .section = source { return true }
-        return false
-    }
-
     private var previewWindow: NookDragPreviewWindow?
 
     private func ensurePreviewWindow() {

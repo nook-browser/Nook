@@ -77,7 +77,10 @@ class NookDragPreviewWindow: NSWindow {
 
         let windowSize = Self.previewSize
 
-        if manager.isSidebarReorder && manager.isCursorInSidebar {
+        var overFavorites = false
+        if case .favorites = manager.activeZone { overFavorites = true }
+        // A row preview lines up with the sidebar rows wherever it shows over the sidebar.
+        if manager.isCursorInSidebar && !manager.isOutsideWindow && !overFavorites {
             let sidebarFrame = manager.sidebarScreenFrame
             let centerX = sidebarFrame.midX
             let origin = NSPoint(
@@ -138,18 +141,16 @@ private struct NookDragPreviewContent: View {
         .frame(width: NookDragPreviewWindow.previewSize.width, height: NookDragPreviewWindow.previewSize.height)
     }
 
+    /// Tile over the favorites grid, row anywhere else over the sidebar (including gaps between
+    /// drop zones), and the window-shaped ghost only once the cursor leaves the sidebar.
     private var currentStyle: NookPreviewStyle {
-        if manager.isSidebarReorder {
-            return manager.isCursorInSidebar ? .tabRow : .ghost
-        }
-
         switch manager.activeZone {
         case .favorites:
             return .pinnedTile
         case .section, .target:
             return .tabRow
         case nil:
-            return .ghost
+            return manager.isCursorInSidebar && !manager.isOutsideWindow ? .tabRow : .ghost
         }
     }
 }
