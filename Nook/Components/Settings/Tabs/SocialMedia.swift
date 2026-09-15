@@ -14,9 +14,9 @@ struct SettingsSocialMediaTab: View {
         @Bindable var settings = nookSettings
         Form {
             Section {
-                Toggle("Image download button", isOn: $settings.socialImageDownload)
+                Toggle("Download button", isOn: $settings.socialImageDownload)
             } footer: {
-                Text("Shows a download button on photos on Instagram, Facebook, and VSCO, and saves the largest size the page offers to Downloads. Applies when one of these pages next loads.")
+                Text("Shows a download button on photos and videos on Instagram, Facebook, and VSCO, and saves the largest size the page offers to Downloads. Applies when one of these pages next loads.")
             }
         }
         .formStyle(.grouped)

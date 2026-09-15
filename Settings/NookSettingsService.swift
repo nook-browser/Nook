@@ -342,7 +342,7 @@ class NookSettingsService {
         didSet { userDefaults.set(youTubeNoHoverPreview, forKey: youTubeNoHoverPreviewKey) }
     }
 
-    /// Download button over photos on Instagram, Facebook, and VSCO.
+    /// Download button over photos and videos on Instagram, Facebook, and VSCO.
     var socialImageDownload: Bool {
         didSet { userDefaults.set(socialImageDownload, forKey: socialImageDownloadKey) }
     }

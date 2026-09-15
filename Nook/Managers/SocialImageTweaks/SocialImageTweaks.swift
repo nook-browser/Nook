@@ -11,8 +11,9 @@ import WebKit
 
 private let socialLog = Logger(subsystem: "com.baingurley.nook", category: "SocialImageTweaks")
 
-/// Download button over photos on Instagram, Facebook, and VSCO. The page script picks the largest
-/// srcset candidate; the app saves it through the same WKDownload path as the image context menu.
+/// Download button over photos and videos on Instagram, Facebook, and VSCO. The isolated script picks the
+/// largest srcset candidate, or asks a page-world script for the MP4 in React's data; the app saves it
+/// through the same WKDownload path as the image context menu.
 @MainActor
 enum SocialImageTweaks {
     private static let marker = "// Nook Social Image Download"
@@ -21,15 +22,19 @@ enum SocialImageTweaks {
     private static let siteDomains = ["instagram.com", "facebook.com", "vsco.co"]
     private static let imageDomains = ["cdninstagram.com", "fbcdn.net", "vsco.co"]
 
-    private static let source: String? = {
-        guard let url = Bundle.main.url(forResource: "social-image-download", withExtension: "js"),
-              let script = try? String(contentsOf: url, encoding: .utf8)
+    private static let script = bundled("social-image-download")
+    /// Page world: reads video URLs from React props, which the isolated world cannot see.
+    private static let pageScript = bundled("social-video-source")
+
+    private static func bundled(_ name: String) -> String? {
+        guard let url = Bundle.main.url(forResource: name, withExtension: "js"),
+              let source = try? String(contentsOf: url, encoding: .utf8)
         else {
-            socialLog.warning("Failed to load social-image-download.js from bundle")
+            socialLog.warning("Failed to load \(name, privacy: .public).js from bundle")
             return nil
         }
-        return "\(marker)\n\(script)"
-    }()
+        return "\(marker)\n\(source)"
+    }
 
     /// Main-frame navigation hook, next to YouTubeTweaks. The script checks the hostname itself, so once
     /// installed it stays for the tab's life: leaving and returning to these sites rebuilds nothing.
@@ -40,9 +45,10 @@ enum SocialImageTweaks {
         let installed = all.contains { $0.source.hasPrefix(marker) }
 
         if settings.socialImageDownload {
-            guard !installed, let source, matches(url.host, siteDomains) else { return }
+            guard !installed, let script, let pageScript, matches(url.host, siteDomains) else { return }
             ucc.add(Handler.shared, contentWorld: world, name: handlerName)
-            ucc.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: world))
+            ucc.addUserScript(WKUserScript(source: pageScript, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .page))
+            ucc.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: world))
         } else if installed {
             let others = all.filter { !$0.source.hasPrefix(marker) }
             ucc.removeAllUserScripts()
@@ -68,7 +74,7 @@ enum SocialImageTweaks {
                   SocialImageTweaks.matches(url.host, SocialImageTweaks.imageDomains),
                   let webView = message.webView as? FocusableWKWebView
             else { return }
-            socialLog.debug("Downloading \(url.absoluteString, privacy: .public)")
+            socialLog.debug("Downloading \(url.absoluteString, privacy: .public) (\(body["note"] as? String ?? "image", privacy: .public))")
             webView.downloadImage(from: url)
         }
     }
