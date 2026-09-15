@@ -16,7 +16,8 @@ Deployment target is macOS 26.0, so WKWebExtension (15.4+) and content scripts (
 | `ExtensionManager+Delegate.swift` | All `WKWebExtensionControllerDelegate` methods: popup, permissions, tabs/windows, options page, native messaging |
 | `ExtensionManager+ExternallyConnectable.swift` | `externally_connectable` polyfill and bridge content scripts, manifest patching for WebKit |
 | `ExtensionManager+Diagnostics.swift` | Debug-only background health probes and per-navigation state diagnosis |
-| `ExtensionManager+TabNotifications.swift` | Tab adapters, lifecycle notifications (opened tabs only), scoped URL grants, action anchors |
+| `ExtensionManager+TabNotifications.swift` | Tab and window adapters, AppKit window focus/close observation, scoped URL grants, action anchors |
+| `ExtensionManager+PageSessionHooks.swift` | Tab events `TabsController` and `PageSession` call: opened, activated, closed, moved, properties changed |
 | `NativeMessagingHandler.swift` | Host manifest lookup with `allowed_origins` enforcement, host process I/O, single-shot and port modes |
 | `BitwardenBiometricHandler.swift` | In-process host for Bitwarden's `.appex` `connectNative("com.8bit.bitwarden")` biometric unlock: prompts Touch ID (LocalAuthentication) and returns the symmetric key from the `Bitwarden_biometric` Keychain service, so no Bitwarden desktop app is required |
 | `InternalNativePortHandler.swift` | Small protocol for in-process native message port handlers |
@@ -78,20 +79,22 @@ Trust: the background sees these on `runtime.onMessage` as if from its own conte
 
 ## Extension Bridge (ExtensionBridge.swift)
 
-- **`ExtensionWindowAdapter`** implements `WKWebExtensionWindow`: exposes active tab, tab list, window state (minimized/maximized/fullscreen), focus/close operations, privacy status.
-- **`ExtensionTabAdapter`** implements `WKWebExtensionTab`: exposes url, title, selection state, loading, pinned, muted, audio state. Returns `tab.assignedWebView` (does NOT trigger lazy init). Stable adapters cached in `tabAdapters` dictionary by `Tab.id`.
+- **`ExtensionWindowAdapter`** implements `WKWebExtensionWindow` for one regular `BrowserWindowState` (`windowAdapters`, keyed by window id, announced with `didOpenWindow` on first use). Its tab list is `TabsController.displayOrder(in:)` (favorites, then the space's rows); its active tab is the window's selection.
+- **`ExtensionTabAdapter`** implements `WKWebExtensionTab` for one sidebar item (`tabAdapters`, keyed by item id). It resolves the `PageSession` on each call, so an unloaded item still answers url and title from the tree. `isPinned` is true for pinned tabs and favorites. `loadURL` and `reload` on an unloaded item create its session through `TabsController.ensureSession(for:)` without selecting it. `webView` returns the session's existing view and never creates one.
 
 ## Tab <> Extension Notification
 
-Tab notifies the extension system after webview creation:
+`PageSession.loadWebViewIfNeeded()` announces the page before its first load:
 ```
-Tab.setupWebView()
-  -> ExtensionManager.shared.notifyTabOpened(tab)  // controller.didOpenTab(adapter), records openedTabIDs
-  -> If active: notifyTabActivated()                // controller.didActivateTab(adapter)
-  -> tab.didNotifyOpenToExtensions = true
+PageSession.loadWebViewIfNeeded()
+  -> ExtensionManager.shared.notifyTabOpened(session)  // controller.didOpenTab(adapter), records openedTabIDs
+  -> If it is the active window's page: notifyTabActivated(new:previous:)
+  -> didNotifyOpenToExtensions = true                   // reset by unload(), so a reloaded page announces again
 ```
 
-Activation, property-change, and close events are forwarded only for tabs in `openedTabIDs`. Private tabs are never opened: `stableAdapter(for:)` returns nil for them.
+`TabsController` sends the rest: `notifyTabActivated` from `select`, `notifyTabClosed(itemID:)` from `endSession` (item closed, pinned page closed), `notifyTabMoved` from `move` (reorder, folder, another space, and `[.pinned]` when the item crosses between the tabs section and pinned/favorites). Window focus and close come from `NSWindow.didBecomeMain` / `willClose` observers in `observeWindowEvents()`; focusing a window activates its selected page.
+
+Activation, move, property-change and close events are forwarded only for items in `openedTabIDs`. Private items never get an adapter (`adapter(for:)` returns nil for anything in a private window's tree), so they are never opened.
 
 ## Permission Model
 
@@ -104,8 +107,8 @@ Activation, property-change, and close events are forwarded only for tabs in `op
 
 - Extensions are **global**: one controller, one install and enabled state, one storage namespace for all profiles. `WKWebExtensionController.configuration` returns a copy, so the data store cannot be swapped per profile after init; there is no per-profile switching.
 - Extension pages use `WKWebsiteDataStore(forIdentifier: controllerIdentifier)`. `chrome.storage` is keyed by context `uniqueIdentifier` under the controller identifier.
-- **Private (ephemeral) profiles get no controller** (`BrowserConfiguration.webViewConfiguration(for:)` and `Tab.setupWebView`), so no content scripts, no tab visibility, no events. `ExtensionWindowAdapter.isPrivate` is always false.
-- One `ExtensionWindowAdapter` represents all windows. `tabs.query` sees every non-private tab across spaces; the active tab is the focused window's current tab (`BrowserManager.setActiveWindowState` notifies extensions on window focus). With a private window focused there is no active tab. Per-window adapters are deliberately not implemented: Nook spaces are shared across windows and the same tab can show in several, which has no Chrome equivalent.
+- **Private (ephemeral) profiles get no controller** (`BrowserConfiguration.webViewConfiguration(for:)` and `PageSession` setup), so no content scripts, no tab visibility, no events. Private windows get no window adapter, so `ExtensionWindowAdapter.isPrivate` is always false.
+- One `ExtensionWindowAdapter` per regular window. A window lists the tabs it can show (its profile's favorites and its space's tabs); the same item can appear in two windows on the same space, and its host window is the focused window when that window lists it. With a private window focused there is no active tab.
 
 ## Native Messaging
 

@@ -70,8 +70,8 @@ The app uses ~30 specialized **Managers**, one per feature domain, coordinated t
 
 | Manager | Location | Responsibility |
 |---------|----------|----------------|
-| **BrowserManager** | `Nook/Managers/BrowserManager/` | Central coordinator (~2900 lines). Aggregates all other managers. Being refactored toward independent injection. |
-| **TabManager** | `Nook/Managers/TabManager/` | Tab lifecycle (~3000 lines), persistence via `PersistenceActor`, spaces, folders, pins. `Tab` itself is ~3950 lines in `Nook/Models/Tab/Tab.swift`. |
+| **BrowserManager** | `Nook/Managers/BrowserManager/` | Central coordinator (~1700 lines). Aggregates all other managers, window setup and startup loading, profile switching. Being refactored toward independent injection. |
+| **TabsController** | `Nook/Browser/` | The tab model (see Tab Model below): tree, device state, window selection, live `PageSession`s, every tab/folder/space/profile intent. `browserManager.tabs`, also injected with `.environment(tabs)`. |
 | **ProfileManager** | `Nook/Managers/ProfileManager/` | Profile lifecycle, ephemeral/incognito profiles with non-persistent `WKWebsiteDataStore` |
 | **ExtensionManager** | `Nook/Managers/ExtensionManager/` | WKWebExtension integration (12 files). Singleton, global across profiles, disabled in private tabs. See [Extension CLAUDE.md](Nook/Managers/ExtensionManager/CLAUDE.md) |
 | **ContentBlockerManager** | `Nook/Managers/ContentBlockerManager/` | Ad/tracker blocking. See Content Blocker System below and `docs/adblocker-architecture.md` |
@@ -90,7 +90,6 @@ The app uses ~30 specialized **Managers**, one per feature domain, coordinated t
 | **TabOrganizerManager/** | On-device LLM tab grouping via MLX. `LocalLLMEngine` owns model download, load, idle unload, and memory-pressure response. Apple Silicon only. |
 | **DialogManager/** | Modal dialogs: profile creation, space editing, basic auth, settings, import, confirmations |
 | **DownloadManager/** | File downloads via `WKDownloadDelegate` |
-| **DragManager/** | `TabDragManager` and `DragLockManager`. Legacy; still referenced by 2 files. New code uses `Nook/Components/DragDrop/` (see below) |
 | **FindManager/** | In-page find/search |
 | **HistoryManager/** | Browsing history, SwiftData persistence |
 | **ImportManager/** | Browser import from Safari, Arc, and Dia |
@@ -110,9 +109,10 @@ The app uses ~30 specialized **Managers**, one per feature domain, coordinated t
 
 ### State Management
 
-- **`@Observable`** (Swift Observation): `Profile`, `Space`, `Tab`, `BrowserWindowState`, `WebViewCoordinator`, `WindowRegistry`, `AIService`
-- **`@Published` / `ObservableObject`** (Combine): `BrowserManager`, `Tab` (dual: uses both patterns, `loadingState` is `@Published`), `ExtensionManager`, `NookDragSessionManager`, `PeekManager`
-- **SwiftData**: `SpaceEntity`, `ProfileEntity`, `TabEntity`, `FolderEntity`, `HistoryEntity`, `ExtensionEntity`, `TabsStateEntity`
+- **`@Observable`** (Swift Observation): `TabsController`, `PageSession`, `Profile`, `BrowserWindowState`, `WebViewCoordinator`, `WindowRegistry`, `AIService`
+- **`@Published` / `ObservableObject`** (Combine): `BrowserManager`, `ExtensionManager`, `NookDragSessionManager`, `PeekManager`
+- **JSON files**: tabs, folders, spaces and window state (`TabStore`, see Tab Model)
+- **SwiftData**: `ProfileEntity` (profile names and order), `HistoryEntity`, `ExtensionEntity`. `SpaceEntity`, `TabEntity`, `FolderEntity`, `TabsStateEntity` in `Nook/Models/Legacy/LegacyTabEntities.swift` are unused tables that stay in `Persistence.schema`: removing a model would change the schema of the store that also holds history and extensions.
 - **UserDefaults**: `NookSettingsService` (all app settings)
 - All state is `@MainActor` confined.
 
@@ -158,17 +158,31 @@ The September 2026 remodel (spec: `docs/superpowers/specs/2026-09-14-gui-remodel
 - **Glass only on layers that float over content**: command palette, toasts, hover sidebar overlay, find bar, dialog cards, extension panels, split drop card. `nookGlassEffect(in:)` in `View+GlassEffect.swift` is the only entry point and already includes `.floating` elevation. The sidebar itself is `BlurEffectView(material: .sidebar)` in `WindowView`, and rows are `Surface` fills; never glass on glass.
 - **Space color is an accent only.** `space.accentColor` tints the space icon, the active switcher item, and folder icons. Persisted as a one-node `SpaceGradient`; old multi-node data still decodes. Space icons are SF Symbol names rendered through `SpaceIconView`, with a text fallback for pre-remodel emoji values.
 - **Row geometry**: `Size.row` (32) tall, `Radius.md`, `Spacing.rowPadding` sides, `Spacing.rowGap` between rows. The drag session's `itemCellSize` / `itemCellSpacing` caches must equal these.
-- **Context menus** are the three shared builders in `Nook/Components/Sidebar/ContextMenus/` (`TabContextMenu(tab:context:)`, `FolderContextMenu`, `SpaceContextMenu`). Do not add inline `.contextMenu` bodies to rows.
+- **Context menus** are the three shared builders in `Nook/Components/Sidebar/ContextMenus/` (`TabContextMenu(itemID:context:)`, `FolderContextMenu`, `SpaceContextMenu`). Do not add inline `.contextMenu` bodies to rows.
 - **Settings** are a `Settings` scene, one file per tab under `Nook/Components/Settings/Tabs/`, every tab a grouped `Form`; large entry lists (cache, cookies) stay in a virtualized `List` under the Form.
+
+## Tab Model
+
+Spec: `docs/superpowers/specs/2026-09-15-tab-model-rebuild-design.md`. Replaced `TabManager`, `Tab`, `TabFolder` and `Space` in September 2026.
+
+- **`NookTabsCore`** (`Packages/NookTabsCore`, Foundation only, `swift test` there): `ProfileRecord`, `SpaceRecord`, `Item` (tab or folder) with one `Parent` (`.favorites(profileID)`, `.pinned(spaceID)`, `.tabs(spaceID)`, `.folder(itemID)`), `OrderKey` string ordering, `TabTree` (every edit returns an undo `Change`; rules: parent exists, no cycles, folder depth 5, favorites hold tabs only; the loader repairs instead of throwing), `visibleRows` / `dropTarget`, `DeviceState` (open folders, open pages of pinned tabs, window records, reopen history capped at 50), `TabStore`.
+- **Scope rule**: an item's scope comes from its section. Favorites and pinned (with their folders) are `.synced`: `url` is the home URL, the live page's URL goes to `DeviceState.openPages`, closing ends the page but keeps the item, and a row shows a dot when the page left home. The tabs section is `.device`: `url` is the last committed URL and closing removes the item. `TabsController.remove(_:)` deletes any item outright. Moving between sections moves the whole subtree across scopes.
+- **Storage**: `~/Library/Application Support/com.baingurley.nook/Tabs/structure.json` (profiles, spaces, synced items with 30-day tombstones) and `device.json` (tabs-section items and `DeviceState`), each with `formatVersion`. Saves coalesce for 500 ms and write atomically; `flushSync()` runs in `applicationShouldTerminate`. After a good load both files are copied to `Tabs/Backups/<yyyy-MM-dd>/` (7 days kept). A file that fails to decode loads the newest backup; with no usable backup the app runs **read-only** (`TabsController.isReadOnly`, an alert names the reason, nothing is written that session). Missing files mean first launch: one profile record per existing `ProfileEntity` (same UUID, so data stores keep cookies), one space and one tab each.
+- **`TabsController`** (`Nook/Browser/TabsController*.swift`): `@MainActor @Observable`. Views and managers call its intents (`open`, `select`, `close`, `remove`, `move`, `drop`, `pin`, `unpin`, `setSpace`, `reopenLastClosed`, space/profile/folder intents, `apply(_:)` for the tab organizer's undo); tree errors are logged under the `Tabs` category and change nothing. There is no global current tab: read `window.selectedItemID` / `tabs.selectedSession(in:)`, or `tabs.activeWindowSession` for the focused window.
+- **`PageSession`** (`Nook/Browser/Session/PageSession*.swift`): one live page per open item (web view, navigation, media, find, scripts, UI delegate). Sessions exist only for items something opened (selection, split panes, startup warming, adopted Peek or popup views, extensions); `unload()` releases views and keeps the session, `tearDown()` ends it. It reports back through `pageCommitted` / `pageTitleChanged`. `FocusableWKWebView.owningSession` points back to it.
+- **Windows**: `BrowserWindowState` holds `spaceID`, `selectedItemBySpace`, `split` and `profileID` (always the space's profile), mirrored into `DeviceState.windows`. `BrowserManager.setupWindowState` calls `tabs.attach(window:)` (claims an unclaimed saved record), loads only the selected page (with "Last Tab, Favorites & Space" the space's tabs-section pages then warm one at a time), and the first window reopens the other saved windows. Window close calls `tabs.detach(window:)`; quit keeps every record. A space change in the active window adopts that space's profile (`BrowserManager.windowProfileChanged`).
+- **Private windows** keep their own in-memory `privateTree`, `privateSessions` and `privateClosed` on `BrowserWindowState`. Nothing from them reaches the JSON files or extensions.
+- **Unloading**: `TabCompositorManager` unloads pages no window shows (idle timeout, loaded-page budget, memory pressure, backgrounding). `TabsController.isVisibleInAnyWindow(_:)` covers every window's selection and both split panes.
 
 ## Drag-and-Drop System
 
-The unified drag-drop system in `Nook/Components/DragDrop/` replaces the older `TabDragManager`:
+`Nook/Components/DragDrop/`. Drag sources carry item ids; drop zones call `TabsController.drop(...)` with the section's displayed rows.
 
 | File | Purpose |
 |------|---------|
 | `NookDragSessionManager.swift` | Singleton coordinator: active drag state, cursor position, zone geometry, insertion indices, preview window |
-| `NookDragItem.swift` | Draggable item model + `DropZoneID` enum (`.essentials`, `.spacePinned(UUID)`, `.spaceRegular(UUID)`, `.folder(UUID)`) |
+| `NookDragItem.swift` | Draggable item model + `DropZoneID` enum (`.favorites(profileID:)`, `.section(Parent)`, `.target(Parent)`) |
+| `DragLockManager.swift` | Keeps one drag at a time |
 | `NookDragSourceView.swift` | `NSView`-based drag source, weak-registered with manager |
 | `NookDropZoneHostView.swift` | Drop zone target management |
 | `NookDragPreviewWindow.swift` | Floating preview window following cursor during drag |
@@ -198,7 +212,7 @@ Located in `Nook/Managers/ContentBlockerManager/`. Full description in `docs/adb
 - **AdvancedRulesEngine**: wraps SafariConverterLib's `FilterEngine`/`WebExtension` for per-URL lookup of advanced rules (cosmetic CSS, extended CSS, scriptlets, JS) with correct exception semantics.
 - **Resources/nook-advanced-blocking.js**: AdGuard's `@adguard/safari-extension` content-script library (ExtendedCss + Scriptlets) bundled by esbuild; rebuild per `Resources/BUILD-advanced-blocking.md`. Injected in all frames at document start.
 - **Resources/*-blocker.js**: site-specific scripts (YouTube, Facebook, X), static, main frame only, hostname-guarded.
-- **TrackingParamStripper**: `$removeparam` for main-frame navigations (parsed from raw filter lines, applied in `Tab.decidePolicyFor`).
+- **TrackingParamStripper**: `$removeparam` for main-frame navigations (parsed from raw filter lines, applied in `PageSession.decidePolicyFor`).
 - **RequestStatsEngine** + `Resources/nook-request-stats.js` + `Nook/ThirdParty/AdblockRustFFI`: blocked-request counts per tab via Brave's adblock-rust (C API, static lib; rebuild with `build.sh`, needs Rust).
 - Filter lists refresh on their own `! Expires:` interval; `scripts/refresh-filter-lists.sh` updates the bundled snapshots and runs in CI before each release build.
 
@@ -225,22 +239,20 @@ The passkey entitlement (`web-browser.public-key-credential`) was requested and 
 
 ## Key Patterns
 
-- **Lazy WebView**: `Tab.webView` is lazily initialized on first access. Tabs exist without loaded webviews to save memory. When changing the active tab (e.g., after data load), call `loadWebViewIfNeeded()` before refreshing the compositor; the compositor skips unloaded tabs.
-- **Multi-window webviews**: Same tab in multiple windows gets separate webview instances via `WebViewCoordinator`. Primary window owns the "real" webview; others get clones.
+- **Pages load on selection**: items have no page until `TabsController.select` (or warming, split panes, an extension) creates a `PageSession` and calls `loadWebViewIfNeeded()`. Go through the intents; do not create sessions or web views directly.
+- **Multi-window webviews**: `WebViewCoordinator` pools views by item id and window id. The first window to show a page holds the session's primary view; other windows get clones, and a primary passes to a clone when its window closes.
 - **Profile data isolation**: Each `Profile` owns a unique `WKWebsiteDataStore`. Ephemeral profiles use `.nonPersistent()` stores destroyed on window close.
-- **Atomic persistence**: `TabManager` uses a Swift `actor` (`PersistenceActor`) for coalesced, atomic snapshot writes with backup recovery. `persistSnapshot()` is debounced at 100ms via `debouncedPersistSnapshot()` for most mutations; only critical paths (app quit, startup) use immediate persistence.
-- **Tab reattach timing**: `TabManager.reattachBrowserManager()` MUST be synchronous. If async (wrapped in `Task`), tabs won't have `browserManager` set when `setupWindowState` runs, causing webviews to fail creation (profile resolves to nil).
-- **Startup tab loading**: `setupWindowState()` → `applyStartupLoadMode()` runs when each window registers via `onWindowRegister`. Always loads the last active tab regardless of startup mode setting. The `.tabManagerDidLoadInitialData` notification fires during `TabManager.init()` before observers exist; do not rely on it.
-- **Favicon cache**: Global LRU cache (200 max) with persistent disk cache at `~/Library/Caches/FaviconCache/{host}.png`. Disk I/O runs on `faviconCacheQueue` (background). Favicons are restored from disk cache during `toRuntime()` for instant display on startup. Network fetches are deferred via `ensureFaviconLoaded()` until the tab becomes visible (`.onAppear`) or active (`loadWebViewIfNeeded`).
+- **Startup tab loading**: `setupWindowState()` → `applyStartupLoadMode()` runs when each window registers via `onWindowRegister`, after waiting up to 2 s for the content blocker. Windows that registered before `NookApp` set the callback are set up retroactively.
+- **Favicon cache**: `FaviconCache.shared` (`Nook/Browser/FaviconCache.swift`): LRU memory cache (200) plus a disk cache at `~/Library/Caches/FaviconCache/{host}.png`, disk I/O on a background queue. Rows show a cached favicon by host without a page; network fetches wait for `ensureFaviconLoaded()` on a live session.
 - **New-OS API wrappers**: When adopting a macOS 27 API before the deployment target moves to 27, gate it behind a small `View` extension or helper with an `#available(macOS 27, *)` fallback (`Nook/Extensions/View+GlassEffect.swift` is the shape; its own guards were removed once 26 became the minimum). Remove the guards when the target is raised.
 - **Hover detection**: Use NSTrackingArea-based hover (see `HoverSidebarManager`), not SwiftUI `.onHover`, which misfires with overlapping AppKit-hosted views.
-- **File-system-synced groups**: Xcode uses filesystem-synchronized groups; new files in a directory are automatically included in the build.
+- **File-system-synced groups**: Xcode uses filesystem-synchronized groups; new files in a directory are automatically included in the build. Exception: `Navigation/` compiles only the files listed in its membership exception set in `project.pbxproj`, so put new sidebar files under `Nook/Components/` or add them to that list.
 - **WebContent sandbox**: WKWebView's WebContent processes are sandboxed by Apple. They cannot access the system pasteboard, launchservicesd, or RunningBoard. Clipboard operations must route through the app process. `WebContent[PID]` sandbox log messages are normal.
 - **WKWebView.configuration returns a copy**: `webView.configuration.preferences.setValue(...)` modifies a discarded copy. Use the base config before webview creation, or access `userContentController` (which IS shared).
 - **`WKUserContentController.userScripts` is lazily bridged**: it is a proxy over WebKit's NSArray. Evaluate everything you need from it (filter, count) before calling `removeAllUserScripts()`; touching the old array afterwards traps in Release builds only (`WKNSArray objectAtIndex:` SIGTRAP). Debug builds hide this.
 - **Verifying a build**: there is no test target. Build unsigned Debug, launch `build/Build/Products/Debug/Nook.app`, and stream logs with `/usr/bin/log stream --level info --predicate 'subsystem == "com.baingurley.nook"'` (`log` alone is a zsh builtin). Always also run the Release configuration before installing or shipping; optimizer-only crashes exist (see above).
 - **Site tweaks on obfuscated sites** (Facebook, Instagram): do not guess markup. Add a temporary right-click listener that posts `elementsFromPoint`, computed `pointer-events`, and React expando keys to the tweak's message handler, log them with `Logger.notice` (`.debug` never reaches `log show`), have the user right-click signed in, read `log show`, then remove the probe.
-- **External link testing**: `open <url>` goes to whichever Nook LaunchServices picks (usually `/Applications/Nook.app`, launched alongside a running Debug build), and two copies share the SwiftData tab store. Quit the installed app first and target the build: `open -a "$PWD/build/Build/Products/Debug/Nook.app" <url>`. System Events keystrokes go to the frontmost app, so set Nook `frontmost` before sending one.
+- **External link testing**: `open <url>` goes to whichever Nook LaunchServices picks (usually `/Applications/Nook.app`, launched alongside a running Debug build), and two copies share the `Tabs/` JSON files and the SwiftData store. Quit the installed app first and target the build: `open -a "$PWD/build/Build/Products/Debug/Nook.app" <url>`. System Events keystrokes go to the frontmost app, so set Nook `frontmost` before sending one.
 - **One `@NSApplicationDelegateAdaptor`**: only `NookApp` declares it. A second declaration (a `Commands` struct had one until September 2026) makes SwiftUI create a second `AppDelegate`: AppKit calls the first, `NookApp` wires `browserManager` into the second, and external links, quit persistence, MCP shutdown and Sparkle callbacks break without an error. Elsewhere, reach the delegate through `browserManager.appDelegate`.
 - **MV3 service workers die after ~5 min idle**: extension badge/tab state can vanish. `ExtensionManager.wakeBackgroundWorkers()` is called on tab activation and on `NSApplication.didBecomeActiveNotification`. Do not add a polling timer for this.
 
@@ -252,7 +264,7 @@ The passkey entitlement (`web-browser.public-key-credential`) was requested and 
 |---------|---------|---------|--------|
 | **Sparkle** | Sparkle | Auto-updates (notarized DMG distribution) | AppDelegate, BrowserManager |
 | **Garnish** | Garnish | Color contrast/mixing utilities | CommandPalette, NookButtonStyle, SidebarAIChat, SidebarMenuHistoryTab |
-| **FaviconFinder** | FaviconFinder | Fetches favicon URLs | Tab, CommandPalette suggestions, SidebarMenuHistoryTab |
+| **FaviconFinder** | FaviconFinder | Fetches favicon URLs | PageSession, CommandPalette suggestions, SidebarMenuHistoryTab |
 | **mlx-swift-lm** | MLXLLM | On-device LLM inference (Apple Silicon only) | LocalLLMEngine → TabOrganizerManager |
 | **SafariConverterLib** | ContentBlockerConverter | Converts AdGuard/uBlock filter rules to Safari format | AdvancedBlockingEngine, ContentRuleListCompiler |
 
