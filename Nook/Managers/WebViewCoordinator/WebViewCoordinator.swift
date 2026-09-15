@@ -61,8 +61,8 @@ class WebViewCoordinator {
 
     // MARK: - WebView Pool Management
 
-    /// Web views by item id, then window id. The first window to show a page holds the
-    /// session's primary view; other windows get clones. A live view never moves between windows.
+    /// Web views by item id, then window id. A page has one live view, held by the window that
+    /// owns it (`TabsController.pageOwnerWindow(of:)`); other windows show a placeholder.
     private var webViewsByItemAndWindow: [UUID: [UUID: WKWebView]] = [:]
 
     func getWebView(for itemID: UUID, in windowId: UUID) -> WKWebView? {
@@ -77,18 +77,24 @@ class WebViewCoordinator {
         webViewsByItemAndWindow[itemID, default: [:]][windowId] = webView
     }
 
-    /// The view `windowId` shows for `session`: its existing one, else the session's primary
-    /// when no other window shows the page, else a clone.
+    /// The live view for `session`, assigned to `windowId`. When another window held it, the
+    /// same view moves here (adding it to this window's container removes it from the other),
+    /// so the page keeps its state and runs in one process.
     func createWebView(for session: PageSession, in windowId: UUID) -> WKWebView {
-        if let existing = getWebView(for: session.itemID, in: windowId) { return existing }
-        if let otherWindow = webViewsByItemAndWindow[session.itemID]?.keys.first {
-            return createClone(for: session, in: windowId, copyFrom: getWebView(for: session.itemID, in: otherWindow))
+        if let existing = getWebView(for: session.itemID, in: windowId), existing === session.webView {
+            return existing
         }
         // Adopt the session's configured view, including restored navigation and popup state.
         // Selection may already have created it; never start a second navigation for assignment.
         session.loadWebViewIfNeeded()
         let primary = session.webView ?? createClone(for: session, in: windowId, copyFrom: nil)
-        setWebView(primary, for: session.itemID, in: windowId)
+        for (otherWindow, view) in webViewsByItemAndWindow[session.itemID] ?? [:] where view !== primary {
+            // Views from before single ownership, or a stale entry: release them.
+            session.cleanupClone(view)
+            removeWebViewFromContainers(view)
+            webViewsByItemAndWindow[session.itemID]?.removeValue(forKey: otherWindow)
+        }
+        webViewsByItemAndWindow[session.itemID] = [windowId: primary]
         session.assignWebView(primary, toWindow: windowId)
         return primary
     }
@@ -148,8 +154,8 @@ class WebViewCoordinator {
 
     // MARK: - Window Cleanup
 
-    /// A window closed: its views go. A primary passes to another window's clone when one
-    /// exists, else the page unloads.
+    /// A window closed: its views go. A live page another window still shows moves there on
+    /// that window's next compositor pass; otherwise the page unloads.
     func cleanupWindow(_ windowId: UUID, tabs: TabsController) {
         let closing = webViewsByItemAndWindow.compactMap { itemID, views in
             views[windowId].map { (itemID, $0) }
@@ -159,11 +165,15 @@ class WebViewCoordinator {
             if webViewsByItemAndWindow[itemID]?.isEmpty == true {
                 webViewsByItemAndWindow.removeValue(forKey: itemID)
             }
+            removeWebViewFromContainers(webView)
             if let session = tabs.session(for: itemID) {
                 if session.webView === webView {
-                    if let replacement = webViewsByItemAndWindow[itemID]?.first {
-                        session.assignWebView(replacement.value, toWindow: replacement.key)
-                        session.cleanupClone(webView)
+                    let stillShown = tabs.regularWindows.contains { window in
+                        window.id != windowId && (window.selectedItemID == itemID
+                            || window.split?.leftItemID == itemID || window.split?.rightItemID == itemID)
+                    } || tabs.privateWindows.contains { $0.id != windowId && $0.selectedItemID == itemID }
+                    if stillShown {
+                        tabs.refreshWindows(showing: itemID)
                     } else {
                         session.unload()
                     }
@@ -173,7 +183,6 @@ class WebViewCoordinator {
             } else {
                 Self.detachOrphan(webView, itemID: itemID)
             }
-            removeWebViewFromContainers(webView)
         }
         removeCompositorContainerView(for: windowId)
     }

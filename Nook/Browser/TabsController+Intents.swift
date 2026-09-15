@@ -115,6 +115,8 @@ extension TabsController {
         setProfile(source.space(spaceID)?.profileID, of: window)
         window.selectedItemBySpace[spaceID] = itemID
         window.emptiedSpaces.remove(spaceID)
+        // The latest window to select a page takes its live view; others show a placeholder.
+        takeControl(itemID, in: window)
         var recent = window.recentItemsBySpace[spaceID, default: []]
         recent.removeAll { $0 == itemID }
         recent.append(itemID)

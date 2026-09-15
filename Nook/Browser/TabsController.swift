@@ -33,6 +33,9 @@ final class TabsController {
 
     /// Sessions for items in the main tree, by item id. Private sessions live on their window.
     private var liveSessions: [UUID: PageSession] = [:]
+    /// The window that last selected or claimed each page. A page has one live view; other
+    /// windows showing the same item show a placeholder instead. In memory only.
+    private var pageOwners: [UUID: UUID] = [:]
     /// Open folders of private windows, kept apart so their ids never reach device.json.
     private var privateOpenFolders: Set<UUID> = []
 
@@ -426,6 +429,38 @@ final class TabsController {
         guard source.item(itemID) != nil else { return false }
         if let spaceID = source.spaceID(of: itemID) { return spaceID == window.spaceID }
         return source.profileID(of: itemID) == (window.profileID ?? window.spaceID.flatMap { source.space($0)?.profileID })
+    }
+
+    // MARK: - Page Ownership
+
+    private func shows(_ itemID: UUID, in window: BrowserWindowState) -> Bool {
+        window.selectedItemID == itemID || window.split?.leftItemID == itemID || window.split?.rightItemID == itemID
+    }
+
+    /// The window that shows the item's live page: the last window to select or claim it while
+    /// still showing it, else the active window if it shows it, else any window showing it.
+    func pageOwnerWindow(of itemID: UUID) -> BrowserWindowState? {
+        let showing = allWindows.filter { shows(itemID, in: $0) }
+        if let id = pageOwners[itemID], let owner = showing.first(where: { $0.id == id }) { return owner }
+        let activeID = browserManager?.windowRegistry?.activeWindowId
+        return showing.first(where: { $0.id == activeID }) ?? showing.first
+    }
+
+    /// True when `window` shows the item but another window holds its live page.
+    func isPageShownElsewhere(_ itemID: UUID, from window: BrowserWindowState) -> Bool {
+        guard let owner = pageOwnerWindow(of: itemID) else { return false }
+        return owner.id != window.id
+    }
+
+    /// Moves the item's live page to `window`.
+    func takeControl(_ itemID: UUID, in window: BrowserWindowState) {
+        pageOwners[itemID] = window.id
+        refreshWindows(showing: itemID)
+    }
+
+    /// Brings forward the window holding the item's live page.
+    func showOwnerWindow(of itemID: UUID) {
+        pageOwnerWindow(of: itemID)?.window?.makeKeyAndOrderFront(nil)
     }
 
     func refreshWindows(showing itemID: UUID) {

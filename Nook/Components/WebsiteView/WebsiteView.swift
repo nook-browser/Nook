@@ -583,8 +583,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
         if splitState.isPreviewActive {
             // Preview mode: show current tab at full size
             if let session = selected, !session.isUnloaded {
-                let desired = webView(for: session, windowId: windowState.id)
-                setSingleWebView(desired, in: containerView, replacing: contentSubviews)
+                setSingleWebView(pageView(for: session, reusing: contentSubviews), in: containerView, replacing: contentSubviews)
             } else {
                 removeContentViews(contentSubviews)
             }
@@ -631,7 +630,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
                 let accent = browserManager.gradientColorManager.accentNSColor
 
                 if let lId = leftId, let leftSession = tabs.ensureSession(for: lId) {
-                    let lWeb = webView(for: leftSession, windowId: windowState.id)
+                    let lWeb = pageView(for: leftSession, reusing: [])
                     let pane = makePaneContainer(frame: leftRect, isActive: (activeSide == .left), accent: accent, side: .left)
                     containerView.addSubview(pane)
                     lWeb.frame = pane.bounds
@@ -641,7 +640,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
                 }
 
                 if let rId = rightId, let rightSession = tabs.ensureSession(for: rId) {
-                    let rWeb = webView(for: rightSession, windowId: windowState.id)
+                    let rWeb = pageView(for: rightSession, reusing: [])
                     let pane = makePaneContainer(frame: rightRect, isActive: (activeSide == .right), accent: accent, side: .right)
                     containerView.addSubview(pane)
                     rWeb.frame = pane.bounds
@@ -652,8 +651,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
             } else {
                 // Single tab (most common path during video playback)
                 if let session = selected, !session.isUnloaded {
-                    let desired = webView(for: session, windowId: windowState.id)
-                    setSingleWebView(desired, in: containerView, replacing: contentSubviews)
+                    setSingleWebView(pageView(for: session, reusing: contentSubviews), in: containerView, replacing: contentSubviews)
                 } else {
                     removeContentViews(contentSubviews)
                 }
@@ -687,7 +685,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
     /// Sets a single webview as the only content in the container without removing it
     /// if it's already the sole content subview. This prevents GPU video surface
     /// disconnection that causes black flashes during playback.
-    private func setSingleWebView(_ desired: WKWebView, in containerView: NSView, replacing contentSubviews: [NSView]) {
+    private func setSingleWebView(_ desired: NSView, in containerView: NSView, replacing contentSubviews: [NSView]) {
         let isAlreadyCorrect = contentSubviews.count == 1 && contentSubviews.first === desired
 
         if !isAlreadyCorrect {
@@ -810,6 +808,25 @@ struct TabCompositorWrapper: NSViewRepresentable {
                 self.isCommandPressed = href != nil
             }
         }
+    }
+
+    /// The session's live view when this window holds it, else the "Open in another window"
+    /// placeholder (reused from `existing` when it already stands in for this item).
+    private func pageView(for session: PageSession, reusing existing: [NSView]) -> NSView {
+        let tabs = browserManager.tabs
+        guard tabs.isPageShownElsewhere(session.itemID, from: windowState) else {
+            return webView(for: session, windowId: windowState.id)
+        }
+        if let host = existing.compactMap({ $0 as? PageElsewhereHostView }).first(where: { $0.itemID == session.itemID }) {
+            return host
+        }
+        let itemID = session.itemID
+        let window = windowState
+        return PageElsewhereHostView(itemID: itemID, rootView: PageElsewhereView(
+            title: session.title,
+            onShowHere: { tabs.takeControl(itemID, in: window) },
+            onGoToWindow: { tabs.showOwnerWindow(of: itemID) }
+        ))
     }
 
     private func webView(for session: PageSession, windowId: UUID) -> WKWebView {
