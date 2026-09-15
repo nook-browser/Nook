@@ -394,11 +394,8 @@ struct SidebarMenuHistoryTab: View {
     }
 
     private func openInCurrentTab(_ url: URL) {
-        if let currentTab = browserManager.tabManager.currentTab {
-            currentTab.loadURL(url)
-        } else {
-            _ = browserManager.tabManager.createNewTab(url: url.absoluteString)
-        }
+        guard let window = browserManager.windowRegistry?.activeWindow else { return }
+        browserManager.tabs.open(url: url, in: window, placement: window.selectedItemID == nil ? .newTab : .replaceCurrent)
     }
 
     private func deleteEntry(_ entry: HistoryEntry) {
