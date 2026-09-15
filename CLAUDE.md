@@ -85,6 +85,7 @@ The app uses ~30 specialized **Managers**, one per feature domain, coordinated t
 | **AIManager/** | AI chat: providers (Gemini, OpenRouter, Ollama, OpenAI-compatible), MCP client/server, browser tool execution |
 | **SiteRoutingManager/** | "Air Traffic Control": rules (domain + optional path prefix → target space + profile) stored in `NookSettingsService.siteRoutingRules`. Guards run in `decidePolicyFor`, `createWebViewWith` (popups), and `AppDelegate` external URL handling. Longest path-prefix wins. |
 | **SponsorBlockManager/** | Built-in SponsorBlock: queries `sponsor.ajay.app` by hashed video ID, skips segments via `youtube-sponsorblock.js` |
+| **YouTubeTweaks/** | Stateless `YouTubeTweaks.apply` in `decidePolicyFor`: one document-start script in its own content world carrying CSS (hide Shorts, hide home shelves, `--ytd-rich-grid-items-per-row` override) and frame thumbnails (swaps `i.ytimg.com` thumbnails for the video's `hq1-3.jpg` stills). Settings live under Tweaks > YouTube (`SettingsTabs.youTube`, `Tabs/YouTube.swift`). |
 | **TabOrganizerManager/** | On-device LLM tab grouping via MLX. `LocalLLMEngine` owns model download, load, idle unload, and memory-pressure response. Apple Silicon only. |
 | **DialogManager/** | Modal dialogs: profile creation, space editing, basic auth, settings, import, confirmations |
 | **DownloadManager/** | File downloads via `WKDownloadDelegate` |
@@ -131,7 +132,7 @@ NookApp.swift          — @main entry, WindowGroup scene, environment injection
 | `App/` | Entry point (`NookApp.swift`), `AppDelegate`, `ContentView`, window management, `NookCommands` |
 | `Nook/Managers/` | ~30 feature managers (business logic) |
 | `Nook/Models/` | Data models and SwiftData entities |
-| `Nook/Components/` | SwiftUI views. `Settings/` holds `SettingsWindow` (NavigationSplitView sidebar) and the `SettingsTabs` enum in `SettingsUtils.swift` (11 tabs: general, appearance, ai, privacy, adBlocker, sponsorBlock, airTrafficControl, profiles, shortcuts, extensions, advanced) |
+| `Nook/Components/` | SwiftUI views. `Settings/` holds `SettingsWindow` (NavigationSplitView sidebar) and the `SettingsTabs` enum in `SettingsUtils.swift` (11 tabs: general, appearance, ai, privacy, adBlocker, airTrafficControl, profiles, shortcuts, extensions, advanced, plus youTube under the sidebar's "Tweaks" section, which holds per-site tweaks and SponsorBlock) |
 | `Nook/Protocols/` | Protocol definitions (e.g., `TabListDataSource`) |
 | `Nook/Adapters/` | External API adapters (`TabListAdapter`) |
 | `Nook/Design/` | `NookDesign.swift`: the design token file (see Design System below) |

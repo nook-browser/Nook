@@ -2700,6 +2700,9 @@ extension Tab: WKNavigationDelegate {
 
             // Inject SponsorBlock script (independent of content blocker)
             browserManager?.sponsorBlockManager.injectScriptIfNeeded(for: url, in: webView)
+            if let settings = browserManager?.nookSettings {
+                YouTubeTweaks.apply(for: url, in: webView, settings: settings)
+            }
         }
 
         // Check for Option+click to trigger Peek for any link

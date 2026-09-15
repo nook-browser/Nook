@@ -13,7 +13,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
     case ai
     case privacy
     case adBlocker
-    case sponsorBlock
+    case youTube
     case airTrafficControl
     case profiles
     case shortcuts
@@ -27,7 +27,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
         case .ai: return "AI"
         case .privacy: return "Privacy"
         case .adBlocker: return "Ad Blocker"
-        case .sponsorBlock: return "SponsorBlock"
+        case .youTube: return "YouTube"
         case .airTrafficControl: return "Air Traffic Control"
         case .profiles: return "Profiles"
         case .shortcuts: return "Shortcuts"
@@ -43,7 +43,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
         case .ai: return "sparkles"
         case .privacy: return "lock.shield"
         case .adBlocker: return "shield.lefthalf.filled"
-        case .sponsorBlock: return "forward.end.alt"
+        case .youTube: return "play.rectangle"
         case .airTrafficControl: return "arrow.triangle.branch"
         case .profiles: return "person.crop.circle"
         case .shortcuts: return "keyboard"
@@ -59,7 +59,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
         case .ai: return .purple
         case .privacy: return .blue
         case .adBlocker: return .green
-        case .sponsorBlock: return .orange
+        case .youTube: return .red
         case .airTrafficControl: return .mint
         case .profiles: return .cyan
         case .shortcuts: return .indigo
@@ -68,16 +68,17 @@ enum SettingsTabs: String, Hashable, CaseIterable {
         }
     }
 
-    /// Sidebar groups, separated by visual spacing. Each inner array is one group.
-    static var sidebarGroups: [[SettingsTabs]] {
-        var groups: [[SettingsTabs]] = [
-            [.general, .appearance],
-            [.ai],
-            [.privacy, .adBlocker, .sponsorBlock, .airTrafficControl],
-            [.profiles, .shortcuts, .extensions],
+    /// Sidebar groups, separated by visual spacing. A titled group gets a section header.
+    static var sidebarGroups: [(title: String?, tabs: [SettingsTabs])] {
+        var groups: [(title: String?, tabs: [SettingsTabs])] = [
+            (nil, [.general, .appearance]),
+            (nil, [.ai]),
+            (nil, [.privacy, .adBlocker, .airTrafficControl]),
+            (nil, [.profiles, .shortcuts, .extensions]),
+            ("Tweaks", [.youTube]),
         ]
         #if DEBUG
-        groups.append([.advanced])
+        groups.append((nil, [.advanced]))
         #endif
         return groups
     }

@@ -51,6 +51,11 @@ class NookSettingsService {
     private let sponsorBlockEnabledKey = "settings.sponsorBlockEnabled"
     private let sponsorBlockCategoryOptionsKey = "settings.sponsorBlockCategoryOptions"
     private let siteRoutingRulesKey = "settings.siteRoutingRules"
+    private let youTubeHideShortsKey = "settings.youTubeHideShorts"
+    private let youTubeHiddenHomeSectionsKey = "settings.youTubeHiddenHomeSections"
+    private let youTubeVideosPerRowKey = "settings.youTubeVideosPerRow"
+    private let youTubeFrameThumbnailsKey = "settings.youTubeFrameThumbnails"
+    private let youTubeNoHoverPreviewKey = "settings.youTubeNoHoverPreview"
 
     var currentSettingsTab: SettingsTabs = .general
 
@@ -312,6 +317,30 @@ class NookSettingsService {
         }
     }
 
+    var youTubeHideShorts: Bool {
+        didSet { userDefaults.set(youTubeHideShorts, forKey: youTubeHideShortsKey) }
+    }
+
+    /// `YouTubeHomeSection` raw values.
+    var youTubeHiddenHomeSections: [String] {
+        didSet { userDefaults.set(youTubeHiddenHomeSections, forKey: youTubeHiddenHomeSectionsKey) }
+    }
+
+    /// 0 leaves YouTube's automatic layout; otherwise `YouTubeTweaks.videosPerRowRange`.
+    var youTubeVideosPerRow: Int {
+        didSet { userDefaults.set(youTubeVideosPerRow, forKey: youTubeVideosPerRowKey) }
+    }
+
+    /// Replace video thumbnails with a frame from the video.
+    var youTubeFrameThumbnails: Bool {
+        didSet { userDefaults.set(youTubeFrameThumbnails, forKey: youTubeFrameThumbnailsKey) }
+    }
+
+    /// Stop YouTube playing a video preview when the pointer rests on a card.
+    var youTubeNoHoverPreview: Bool {
+        didSet { userDefaults.set(youTubeNoHoverPreview, forKey: youTubeNoHoverPreviewKey) }
+    }
+
     init() {
         // Register default values
         userDefaults.register(defaults: [
@@ -436,6 +465,11 @@ class NookSettingsService {
         } else {
             self.sponsorBlockCategoryOptions = SponsorBlockCategory.defaultCategoryOptions
         }
+        self.youTubeHideShorts = userDefaults.bool(forKey: youTubeHideShortsKey)
+        self.youTubeHiddenHomeSections = userDefaults.stringArray(forKey: youTubeHiddenHomeSectionsKey) ?? []
+        self.youTubeVideosPerRow = userDefaults.integer(forKey: youTubeVideosPerRowKey)
+        self.youTubeFrameThumbnails = userDefaults.bool(forKey: youTubeFrameThumbnailsKey)
+        self.youTubeNoHoverPreview = userDefaults.bool(forKey: youTubeNoHoverPreviewKey)
 
         if let data = userDefaults.data(forKey: siteSearchEntriesKey),
            let decoded = try? JSONDecoder().decode([SiteSearchEntry].self, from: data) {

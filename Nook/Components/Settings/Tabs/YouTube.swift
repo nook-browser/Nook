@@ -1,5 +1,5 @@
 //
-//  SponsorBlock.swift
+//  YouTube.swift
 //  Nook
 //
 //  Created by Claude on 26/03/2026.
@@ -7,12 +7,40 @@
 
 import SwiftUI
 
-struct SettingsSponsorBlockTab: View {
+struct SettingsYouTubeTab: View {
     @Environment(\.nookSettings) var nookSettings
 
     var body: some View {
         @Bindable var settings = nookSettings
         Form {
+            Section {
+                Picker("Videos per row", selection: $settings.youTubeVideosPerRow) {
+                    Text("Automatic").tag(0)
+                    ForEach(YouTubeTweaks.videosPerRowRange, id: \.self) { count in
+                        Text("\(count)").tag(count)
+                    }
+                }
+                Toggle("Frame thumbnails", isOn: $settings.youTubeFrameThumbnails)
+                Toggle("Disable hover previews", isOn: $settings.youTubeNoHoverPreview)
+            } header: {
+                Text("Layout")
+            } footer: {
+                Text("Videos per row applies to Home, Subscriptions, and channel pages. Frame thumbnails show a still from the video instead of the uploader's thumbnail. Changes apply when a YouTube page next loads.")
+            }
+
+            Section("Hide") {
+                Toggle("Shorts", isOn: $settings.youTubeHideShorts)
+                ForEach(YouTubeHomeSection.allCases) { section in
+                    Toggle("Home: \(section.displayName)", isOn: Binding(
+                        get: { nookSettings.youTubeHiddenHomeSections.contains(section.rawValue) },
+                        set: { hidden in
+                            nookSettings.youTubeHiddenHomeSections.removeAll { $0 == section.rawValue }
+                            if hidden { nookSettings.youTubeHiddenHomeSections.append(section.rawValue) }
+                        }
+                    ))
+                }
+            }
+
             Section {
                 Toggle("SponsorBlock", isOn: $settings.sponsorBlockEnabled)
             } footer: {

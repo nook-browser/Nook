@@ -38,9 +38,9 @@ private struct SettingsSidebar: View {
 
     var body: some View {
         List(selection: $selection) {
-            ForEach(Array(SettingsTabs.sidebarGroups.enumerated()), id: \.offset) { index, group in
+            ForEach(Array(SettingsTabs.sidebarGroups.enumerated()), id: \.offset) { _, group in
                 Section {
-                    ForEach(group, id: \.self) { tab in
+                    ForEach(group.tabs, id: \.self) { tab in
                         if tab == .extensions {
                             if browserManager.extensionManager != nil {
                                 sidebarRow(tab)
@@ -48,6 +48,10 @@ private struct SettingsSidebar: View {
                         } else {
                             sidebarRow(tab)
                         }
+                    }
+                } header: {
+                    if let title = group.title {
+                        Text(title)
                     }
                 }
             }
@@ -97,8 +101,8 @@ private struct SettingsDetailPane: View {
                 PrivacySettingsView()
             case .adBlocker:
                 SettingsAdBlockerTab()
-            case .sponsorBlock:
-                SettingsSponsorBlockTab()
+            case .youTube:
+                SettingsYouTubeTab()
             case .airTrafficControl:
                 AirTrafficControlSettingsView()
             case .profiles:
