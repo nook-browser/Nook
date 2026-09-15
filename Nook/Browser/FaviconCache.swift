@@ -1,0 +1,153 @@
+//
+//  FaviconCache.swift
+//  Nook
+//
+//  Global favicon cache, shared across profiles by design to raise the hit rate and avoid
+//  duplicate downloads. Memory LRU of 200 entries plus a disk cache at
+//  ~/Library/Caches/FaviconCache/{host}.png that survives relaunch. Disk I/O runs on a
+//  background queue.
+//
+
+import AppKit
+import SwiftUI
+
+final class FaviconCache: @unchecked Sendable {
+    static let shared = FaviconCache()
+
+    static let maxMemoryEntries = 200
+
+    private struct Entry {
+        /// nil for entries stored through the legacy `Tab.cacheFavicon(_:for:)` SwiftUI path.
+        let nsImage: NSImage?
+        let image: SwiftUI.Image
+    }
+
+    private var memory: [String: Entry] = [:]
+    /// Insertion order for LRU eviction.
+    private var order: [String] = []
+    private let lock = NSLock()
+    private let queue = DispatchQueue(label: "favicon.cache", attributes: .concurrent)
+
+    let directory: URL = {
+        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        let dir = caches.appendingPathComponent("FaviconCache")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }()
+
+    private init() {}
+
+    // MARK: - Lookup
+
+    /// Memory cache only, synchronous.
+    func image(for key: String) -> NSImage? {
+        lock.withLock { memory[key]?.nsImage }
+    }
+
+    /// Memory cache only, as a SwiftUI image (includes legacy SwiftUI-only entries).
+    func swiftUIImage(for key: String) -> SwiftUI.Image? {
+        lock.withLock { memory[key]?.image }
+    }
+
+    /// Memory first, then disk off the main thread. A disk hit is promoted to memory.
+    func cachedImage(for key: String) async -> NSImage? {
+        if let hit = image(for: key) { return hit }
+        return await withCheckedContinuation { continuation in
+            queue.async {
+                let image = self.readFromDisk(key)
+                if let image { self.insert(Entry(nsImage: image, image: SwiftUI.Image(nsImage: image)), for: key) }
+                continuation.resume(returning: image)
+            }
+        }
+    }
+
+    /// Synchronous disk read with promotion to memory. For startup restore of a few visible rows.
+    func imageFromDiskSync(for key: String) -> NSImage? {
+        guard let image = readFromDisk(key) else { return nil }
+        insert(Entry(nsImage: image, image: SwiftUI.Image(nsImage: image)), for: key)
+        return image
+    }
+
+    // MARK: - Store
+
+    /// Stores in memory and writes a PNG to disk.
+    func store(_ image: NSImage, for key: String) {
+        store(image, for: key, toDisk: true)
+    }
+
+    func store(_ image: NSImage, for key: String, toDisk: Bool) {
+        insert(Entry(nsImage: image, image: SwiftUI.Image(nsImage: image)), for: key)
+        guard toDisk else { return }
+        // PNG encoding is CPU work, not I/O; do it on the caller.
+        guard let tiff = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiff),
+              let png = bitmap.representation(using: .png, properties: [:])
+        else { return }
+        let url = fileURL(key)
+        queue.async(flags: .barrier) {
+            try? png.write(to: url)
+        }
+    }
+
+    /// Memory-only store of a SwiftUI image. Kept for the old `Tab` statics until task Z.
+    func storeSwiftUIImage(_ image: SwiftUI.Image, for key: String) {
+        insert(Entry(nsImage: nil, image: image), for: key)
+    }
+
+    // MARK: - Maintenance
+
+    func clear() {
+        lock.withLock {
+            memory.removeAll()
+            order.removeAll()
+        }
+        let dir = directory
+        queue.async(flags: .barrier) {
+            try? FileManager.default.removeItem(at: dir)
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        }
+    }
+
+    /// Entry counts in memory and on disk.
+    func stats() -> (memory: Int, disk: Int) {
+        let memoryCount = lock.withLock { memory.count }
+        let diskCount = (try? FileManager.default.contentsOfDirectory(atPath: directory.path).count) ?? 0
+        return (memoryCount, diskCount)
+    }
+
+    /// Keys currently in memory.
+    var memoryKeys: [String] {
+        lock.withLock { Array(memory.keys) }
+    }
+
+    // MARK: - Private
+
+    private func insert(_ entry: Entry, for key: String) {
+        var evicted: [String] = []
+        lock.withLock {
+            memory[key] = entry
+            order.removeAll { $0 == key }
+            order.append(key)
+            if memory.count > Self.maxMemoryEntries {
+                let count = memory.count - Self.maxMemoryEntries + 20
+                evicted = Array(order.prefix(count))
+                for old in evicted { memory.removeValue(forKey: old) }
+                order.removeFirst(min(count, order.count))
+            }
+        }
+        guard !evicted.isEmpty else { return }
+        let urls = evicted.map(fileURL)
+        queue.async(flags: .barrier) {
+            for url in urls { try? FileManager.default.removeItem(at: url) }
+        }
+    }
+
+    private func fileURL(_ key: String) -> URL {
+        directory.appendingPathComponent("\(key).png")
+    }
+
+    private func readFromDisk(_ key: String) -> NSImage? {
+        guard let data = try? Data(contentsOf: fileURL(key)) else { return nil }
+        return NSImage(data: data)
+    }
+}

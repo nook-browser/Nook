@@ -95,15 +95,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
 
     // MARK: - Favicon Cache
-    // Global favicon cache shared across profiles by design to increase hit rate
-    // and reduce duplicate downloads. Favicons are cached persistently to survive app restarts.
-    private static var faviconCache: [String: SwiftUI.Image] = [:]
-    /// MEMORY LEAK FIX: Track insertion order for proper LRU eviction
-    private static var faviconCacheOrder: [String] = []
-    private static let faviconCacheMaxSize = 200
-    private static let faviconCacheQueue = DispatchQueue(
-        label: "favicon.cache", attributes: .concurrent)
-    private static let faviconCacheLock = NSLock()
+    // Storage lives in FaviconCache (global, shared across profiles, persisted to disk).
 
     /// Whether a real favicon has been successfully loaded (prevents redundant fetches)
     private var hasFavicon: Bool = false
@@ -112,14 +104,6 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     /// Number of failed fetch attempts for the current URL host (caps retries)
     private var faviconFetchAttempts: Int = 0
     private static let maxFaviconRetries = 3
-
-    // Persistent cache storage
-    private static let faviconCacheDirectory: URL = {
-        let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-        let faviconDir = cacheDir.appendingPathComponent("FaviconCache")
-        try? FileManager.default.createDirectory(at: faviconDir, withIntermediateDirectories: true)
-        return faviconDir
-    }()
 
     // MARK: - Loading State
     enum LoadingState: Equatable {
@@ -1843,8 +1827,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         // Try FaviconFinder (parses HTML <link> tags, then falls back to /favicon.ico)
         if let nsImage = await Self.fetchFaviconImage(for: url) {
             let swiftUIImage = SwiftUI.Image(nsImage: nsImage)
-            Self.cacheFavicon(swiftUIImage, for: cacheKey)
-            Self.saveFaviconToDisk(nsImage, for: cacheKey)
+            FaviconCache.shared.store(nsImage, for: cacheKey)
 
             await MainActor.run {
                 self.favicon = swiftUIImage
@@ -1858,8 +1841,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         if let rootFaviconURL = URL(string: "/favicon.ico", relativeTo: url)?.absoluteURL,
            let nsImage = await Self.downloadImage(from: rootFaviconURL) {
             let swiftUIImage = SwiftUI.Image(nsImage: nsImage)
-            Self.cacheFavicon(swiftUIImage, for: cacheKey)
-            Self.saveFaviconToDisk(nsImage, for: cacheKey)
+            FaviconCache.shared.store(nsImage, for: cacheKey)
 
             await MainActor.run {
                 self.favicon = swiftUIImage
@@ -1901,37 +1883,21 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         }
     }
 
-    // MARK: - Favicon Cache Management
+    // MARK: - Favicon Cache Management (forwards to FaviconCache)
     /// Check the in-memory LRU cache (fast path, lock-protected).
     static func getMemoryCachedFavicon(for key: String) -> SwiftUI.Image? {
-        faviconCacheLock.lock()
-        defer { faviconCacheLock.unlock() }
-        return faviconCache[key]
+        FaviconCache.shared.swiftUIImage(for: key)
     }
 
-    /// Asynchronously load a favicon from the disk cache on `faviconCacheQueue`.
-    /// On hit, promotes to the in-memory cache before returning.
+    /// Load a favicon from memory, then the disk cache off the main thread.
     static func getDiskCachedFavicon(for key: String) async -> SwiftUI.Image? {
-        return await withCheckedContinuation { continuation in
-            faviconCacheQueue.async {
-                let image = loadFaviconFromDisk(for: key)
-                if let image = image {
-                    // Promote to memory cache under the lock
-                    faviconCacheLock.lock()
-                    faviconCache[key] = image
-                    faviconCacheLock.unlock()
-                }
-                continuation.resume(returning: image)
-            }
-        }
+        await FaviconCache.shared.cachedImage(for: key).map { SwiftUI.Image(nsImage: $0) }
     }
 
     /// Synchronous memory-only lookup. External callers that cannot await
     /// use this; disk-backed lookup is available via getDiskCachedFavicon().
     static func getCachedFavicon(for key: String) -> SwiftUI.Image? {
-        faviconCacheLock.lock()
-        defer { faviconCacheLock.unlock() }
-        return faviconCache[key]
+        FaviconCache.shared.swiftUIImage(for: key)
     }
 
     /// Restore favicon from cache (memory then disk) synchronously.
@@ -1948,101 +1914,25 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         }
 
         // Sync disk read — acceptable during startup for a small number of pinned tabs
-        if let diskCached = Self.loadFaviconFromDisk(for: cacheKey) {
-            // Promote to memory cache
-            Self.cacheFavicon(diskCached, for: cacheKey)
-            self.favicon = diskCached
+        if let diskCached = FaviconCache.shared.imageFromDiskSync(for: cacheKey) {
+            self.favicon = SwiftUI.Image(nsImage: diskCached)
             self.hasFavicon = true
         }
         // If not in cache, hasFavicon stays false → ensureFaviconLoaded() will fetch from network
     }
 
     static func cacheFavicon(_ favicon: SwiftUI.Image, for key: String) {
-        faviconCacheLock.lock()
-
-        faviconCache[key] = favicon
-
-        // MEMORY LEAK FIX: Maintain insertion order for proper LRU eviction
-        faviconCacheOrder.removeAll { $0 == key }
-        faviconCacheOrder.append(key)
-
-        // Evict oldest entries when cache exceeds max size
-        var keysToEvict: [String] = []
-        if faviconCache.count > faviconCacheMaxSize {
-            let evictCount = faviconCache.count - faviconCacheMaxSize + 20
-            keysToEvict = Array(faviconCacheOrder.prefix(evictCount))
-            for keyToRemove in keysToEvict {
-                faviconCache.removeValue(forKey: keyToRemove)
-            }
-            faviconCacheOrder.removeFirst(min(evictCount, faviconCacheOrder.count))
-        }
-
-        faviconCacheLock.unlock()
-
-        // Disk eviction happens off main thread
-        if !keysToEvict.isEmpty {
-            faviconCacheQueue.async(flags: .barrier) {
-                for keyToRemove in keysToEvict {
-                    removeFaviconFromDisk(for: keyToRemove)
-                }
-            }
-        }
+        FaviconCache.shared.storeSwiftUIImage(favicon, for: key)
     }
 
     // MARK: - Cache Management
     static func clearFaviconCache() {
-        faviconCacheLock.lock()
-        faviconCache.removeAll()
-        faviconCacheLock.unlock()
-        faviconCacheQueue.async(flags: .barrier) {
-            clearAllFaviconCacheFromDisk()
-        }
+        FaviconCache.shared.clear()
     }
 
     static func getFaviconCacheStats() -> (count: Int, domains: [String]) {
-        faviconCacheLock.lock()
-        defer { faviconCacheLock.unlock() }
-        return (faviconCache.count, Array(faviconCache.keys))
-    }
-
-    // MARK: - Persistent Storage Helpers
-    /// Saves favicon PNG to disk on `faviconCacheQueue` (barrier write).
-    private static func saveFaviconToDisk(_ nsImage: NSImage, for key: String) {
-        // Prepare the PNG data on the calling thread (image rendering is CPU-bound, not I/O)
-        guard let tiffData = nsImage.tiffRepresentation,
-              let bitmapRep = NSBitmapImageRep(data: tiffData),
-              let pngData = bitmapRep.representation(using: .png, properties: [:])
-        else { return }
-
-        faviconCacheQueue.async(flags: .barrier) {
-            let fileURL = faviconCacheDirectory.appendingPathComponent("\(key).png")
-            try? pngData.write(to: fileURL)
-        }
-    }
-
-    /// Loads favicon from disk. Called from `faviconCacheQueue` — NOT from main thread.
-    private static func loadFaviconFromDisk(for key: String) -> SwiftUI.Image? {
-        let fileURL = faviconCacheDirectory.appendingPathComponent("\(key).png")
-
-        guard let imageData = try? Data(contentsOf: fileURL),
-            let nsImage = NSImage(data: imageData)
-        else {
-            return nil
-        }
-
-        return SwiftUI.Image(nsImage: nsImage)
-    }
-
-    /// Removes a single cached favicon from disk. Called from `faviconCacheQueue` (barrier).
-    private static func removeFaviconFromDisk(for key: String) {
-        let fileURL = faviconCacheDirectory.appendingPathComponent("\(key).png")
-        try? FileManager.default.removeItem(at: fileURL)
-    }
-
-    private static func clearAllFaviconCacheFromDisk() {
-        try? FileManager.default.removeItem(at: faviconCacheDirectory)
-        try? FileManager.default.createDirectory(
-            at: faviconCacheDirectory, withIntermediateDirectories: true)
+        let keys = FaviconCache.shared.memoryKeys
+        return (keys.count, keys)
     }
 }
 
