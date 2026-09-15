@@ -33,7 +33,7 @@ struct EditPinnedURLDialog: DialogPresentable {
     func dialogHeader() -> DialogHeader {
         DialogHeader(
             icon: "link",
-            title: "Edit Home URL",
+            title: "Edit Pinned URL",
             subtitle: tabDisplayName
         )
     }
@@ -41,7 +41,7 @@ struct EditPinnedURLDialog: DialogPresentable {
     @ViewBuilder
     func dialogContent() -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("This is the page that opens when you reset this tab or open it after closing its page.")
+            Text("The page this tab opens after you close it or reset it.")
                 .font(NookDesign.Font.body)
                 .foregroundStyle(.secondary)
 

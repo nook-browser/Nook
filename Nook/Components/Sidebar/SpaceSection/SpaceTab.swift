@@ -98,7 +98,7 @@ struct SpaceTab: View {
                     Circle()
                         .fill(.tertiary)
                         .frame(width: NookDesign.Size.statusDot, height: NookDesign.Size.statusDot)
-                        .help("Navigated away from this tab's home page")
+                        .help("Navigated away from the pinned URL")
                 }
             }
             .overlay(alignment: .trailing) {

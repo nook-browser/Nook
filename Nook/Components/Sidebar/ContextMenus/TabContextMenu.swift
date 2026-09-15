@@ -214,20 +214,20 @@ struct TabContextMenu: View {
                 Button {
                     tabs.resetToHome(itemID)
                 } label: {
-                    Label("Reset to Home Page", systemImage: "arrow.counterclockwise")
+                    Label("Reset to Pinned URL", systemImage: "arrow.counterclockwise")
                 }
 
                 Button {
                     tabs.setHomeToCurrent(itemID)
                 } label: {
-                    Label("Set Current Page as Home", systemImage: "house")
+                    Label("Replace Pinned URL with Current", systemImage: "pin")
                 }
             }
 
             Button {
                 editHomeURL(item)
             } label: {
-                Label("Edit Home URL", systemImage: "link.badge.plus")
+                Label("Edit Pinned URL", systemImage: "link.badge.plus")
             }
         }
     }
