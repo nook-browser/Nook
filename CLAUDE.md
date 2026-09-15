@@ -43,11 +43,11 @@ xcodebuild -scheme Nook -configuration Debug -arch arm64 -derivedDataPath build 
 xcodebuild -scheme Nook -configuration Release -arch arm64 -derivedDataPath build
 ```
 
-**There is no test target.** `xcodebuild test -scheme Nook` fails. Verification is a build plus manual run.
+**There is no test target.** `xcodebuild test -scheme Nook` fails. Verification is a build plus manual run. If the working tree holds someone else's uncommitted edits, verify committed work in a detached worktree (`git worktree add --detach /tmp/x HEAD`) with its own `-derivedDataPath` instead of building the dirty tree.
 
 **Signing**: Set your Development Team in Xcode Signing settings. Team IDs in the project: `ZHB786H6YN` (Bain Gurley, local) and `96M8ZZRJK6` (CI). `Nook/Nook-CI.entitlements` is a reduced entitlements file used for the CI build step because push and autofill require provisioning profiles; the full `Nook/Nook.entitlements` is applied during re-signing.
 
-**Metal**: Two shaders (`Onboarding/Components/ViewTransition.metal`, `Nook/Utils/Shaders/BarycentricShaders.metal`). Xcode 26+ needs the Metal Toolchain component: `xcodebuild -downloadComponent MetalToolchain`.
+**Metal**: One shader (`Onboarding/Components/ViewTransition.metal`). Xcode 26+ needs the Metal Toolchain component: `xcodebuild -downloadComponent MetalToolchain`.
 
 **No SPM resolve needed**: Xcode resolves packages automatically on open. The `build/` directory holds package checkouts and is large (MLX).
 
@@ -102,7 +102,7 @@ The app uses ~30 specialized **Managers**, one per feature domain, coordinated t
 | **CacheManager**, **CookieManager** | Web cache and cookie storage/clearing |
 | **AuthenticationManager** | HTTP Basic auth dialogs |
 | **MediaControlsManager** | Audio/media integration |
-| **GradientColorManager** | Space gradient colors |
+| **GradientColorManager** | Publishes the active space's `accentColor` / `accentNSColor` (name predates the September 2026 remodel; there is no gradient any more) |
 | **HoverSidebarManager** | Sidebar hover interactions (NSTrackingArea-based, not SwiftUI `.onHover`) |
 | **ExternalMiniWindowManager** | Mini browser windows |
 
@@ -134,16 +134,30 @@ NookApp.swift          — @main entry, WindowGroup scene, environment injection
 | `Nook/Components/` | SwiftUI views. `Settings/` holds `SettingsWindow` (NavigationSplitView sidebar) and the `SettingsTabs` enum in `SettingsUtils.swift` (11 tabs: general, appearance, ai, privacy, adBlocker, sponsorBlock, airTrafficControl, profiles, shortcuts, extensions, advanced) |
 | `Nook/Protocols/` | Protocol definitions (e.g., `TabListDataSource`) |
 | `Nook/Adapters/` | External API adapters (`TabListAdapter`) |
-| `Nook/Extensions/` | Swift extensions, including `View+GlassEffect.swift` |
-| `Nook/Utils/` | Utilities, WebKit extensions, Metal shaders, `WebStoreInjector.js` (Chrome Web Store install button) |
+| `Nook/Design/` | `NookDesign.swift`: the design token file (see Design System below) |
+| `Nook/Extensions/` | Swift extensions, including `View+GlassEffect.swift`, the only Liquid Glass entry point |
+| `Nook/Utils/` | Utilities, WebKit extensions, `WebStoreInjector.js` (Chrome Web Store install button) |
 | `Nook/ThirdParty/` | Embedded dependencies |
 | `Settings/` | `NookSettingsService`: `@Observable` settings backed by UserDefaults |
 | `CommandPalette/` | Command palette UI |
 | `UI/` | Shared UI components |
 | `Navigation/` | Sidebar structure (header, bottom bar, spaces list, context menus) |
 | `Onboarding/` | 4 stages: Hello → TabLayout → Import (`SafariImportFlow`) → Final. Metal-shader transitions. |
-| `docs/` | `adblocker-architecture.md`; `superpowers/specs/` and `superpowers/plans/` (design specs and implementation plans for ATC, settings sidebar, extension library panel, local LLM organizer, extension tab binding) |
+| `docs/` | `adblocker-architecture.md`; `gui-remodel-next-moves.md`; `superpowers/specs/` and `superpowers/plans/` (design specs and implementation plans, including the September 2026 GUI remodel spec `2026-09-14-gui-remodel-design.md` and its five phase plans) |
 | `ASSESSMENT.md` | Build and warning audit snapshot from 2026-03-20. Numbers are stale; the category breakdown is still useful. |
+
+## Design System
+
+The September 2026 remodel (spec: `docs/superpowers/specs/2026-09-14-gui-remodel-design.md`) put every visual value in one file, `Nook/Design/NookDesign.swift`. Rules:
+
+- **No literals in the UI layer.** Radii, spacing, sizes, fonts, animation curves, shadows, and fills come from `NookDesign.Radius / Spacing / Size / Font / Motion / Surface / Elevation`. Text colors are `.primary / .secondary / .tertiary`. When nothing fits, add a token with a comment saying what it is for; do not mint a token just to hide a number from a grep (a window's fixed size belongs in a `private let` in its view). `spacing: 0` and `lineWidth: 1` may stay literal.
+- **Corners are continuous.** Build shapes with `NookDesign.Radius.shape(_:)`; CALayer corners get `cornerCurve = .continuous`.
+- **Elevation, not shadows.** `.nookElevation(.flat / .raised / .floating)`. The modifier is branch-free so view identity is stable and shadows animate; use `isActive ? .raised : .flat` for conditional elevation.
+- **Glass only on layers that float over content**: command palette, toasts, hover sidebar overlay, find bar, dialog cards, extension panels, split drop card. `nookGlassEffect(in:)` in `View+GlassEffect.swift` is the only entry point and already includes `.floating` elevation. The sidebar itself is `BlurEffectView(material: .sidebar)` in `WindowView`, and rows are `Surface` fills; never glass on glass.
+- **Space color is an accent only.** `space.accentColor` tints the space icon, the active switcher item, and folder icons. Persisted as a one-node `SpaceGradient`; old multi-node data still decodes. Space icons are SF Symbol names rendered through `SpaceIconView`, with a text fallback for pre-remodel emoji values.
+- **Row geometry**: `Size.row` (32) tall, `Radius.md`, `Spacing.rowPadding` sides, `Spacing.rowGap` between rows. The drag session's `itemCellSize` / `itemCellSpacing` caches must equal these.
+- **Context menus** are the three shared builders in `Nook/Components/Sidebar/ContextMenus/` (`TabContextMenu(tab:context:)`, `FolderContextMenu`, `SpaceContextMenu`). Do not add inline `.contextMenu` bodies to rows.
+- **Settings** are a `Settings` scene, one file per tab under `Nook/Components/Settings/Tabs/`, every tab a grouped `Form`; large entry lists (cache, cookies) stay in a virtualized `List` under the Form.
 
 ## Drag-and-Drop System
 
