@@ -49,13 +49,10 @@ struct SpaceSwitcherTitle: View {
 
     private func label(_ space: SpaceRecord) -> some View {
         let isDropTarget = dragSession.isDragging && dragSession.activeZone == .target(.pinned(spaceID: space.id))
-        return HStack(spacing: NookDesign.Spacing.sm) {
-            SpaceIconView(icon: space.icon, size: NookDesign.Size.spaceIcon, tint: space.accentColor)
-            Text(space.name)
-                .font(NookDesign.Font.title)
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-        }
+        return Text(space.name)
+            .font(NookDesign.Font.title)
+            .foregroundStyle(.primary)
+            .lineLimit(1)
         .padding(.horizontal, NookDesign.Spacing.sm)
         .frame(height: NookDesign.Size.row)
         .background(
