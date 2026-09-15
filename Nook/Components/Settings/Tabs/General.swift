@@ -9,7 +9,7 @@ import SwiftUI
 
 struct SettingsGeneralTab: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var tabManager: TabManager
+    @Environment(TabsController.self) private var tabs
     @Environment(\.nookSettings) var nookSettings
     @State private var showingAddSite = false
     @State private var showingAddEngine = false
@@ -43,7 +43,7 @@ struct SettingsGeneralTab: View {
                 }
 
                 Button("Unload All Inactive Tabs") {
-                    tabManager.unloadAllInactiveTabs()
+                    tabs.unloadAllHidden()
                 }
             } header: {
                 Text("Performance")
