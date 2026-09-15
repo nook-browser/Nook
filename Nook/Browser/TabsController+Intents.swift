@@ -290,14 +290,20 @@ extension TabsController {
             let index = order.firstIndex(of: selected) ?? 0
             // Recent items stay eligible inside collapsed folders; ones moved to another space do not.
             let source = tree(owner(of: window))
+            // Only open tabs qualify: every tab in the tabs section, and pinned tabs or favorites
+            // whose page is still open. With none left the window shows the empty space.
+            let isOpen: (UUID) -> Bool = { id in
+                // A pinned page left open at quit has a saved open page but no session yet.
+                source.scope(of: id) == .device || self.session(for: id) != nil || self.device.openPages[id] != nil
+            }
             let recent = (window.recentItemsBySpace[spaceID] ?? []).reversed().filter { id in
-                guard let item = source.item(id), !item.isFolder else { return false }
+                guard let item = source.item(id), !item.isFolder, isOpen(id) else { return false }
                 let itemSpace = source.spaceID(of: id)
                 return itemSpace == spaceID || (itemSpace == nil && source.profileID(of: id) == source.space(spaceID)?.profileID)
             }
             let candidates = recent
-                + order[(index + 1)...].filter { !ids.contains($0) }
-                + order[..<index].reversed().filter { !ids.contains($0) }
+                + order[(index + 1)...].filter { !ids.contains($0) && isOpen($0) }
+                + order[..<index].reversed().filter { !ids.contains($0) && isOpen($0) }
             for (space, item) in window.selectedItemBySpace where ids.contains(item) {
                 window.selectedItemBySpace[space] = nil
             }
