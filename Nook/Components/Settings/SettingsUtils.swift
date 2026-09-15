@@ -14,6 +14,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
     case privacy
     case adBlocker
     case youTube
+    case socialMedia
     case airTrafficControl
     case profiles
     case shortcuts
@@ -28,6 +29,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
         case .privacy: return "Privacy"
         case .adBlocker: return "Ad Blocker"
         case .youTube: return "YouTube"
+        case .socialMedia: return "Social Media"
         case .airTrafficControl: return "Air Traffic Control"
         case .profiles: return "Profiles"
         case .shortcuts: return "Shortcuts"
@@ -44,6 +46,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
         case .privacy: return "lock.shield"
         case .adBlocker: return "shield.lefthalf.filled"
         case .youTube: return "play.rectangle"
+        case .socialMedia: return "photo.on.rectangle"
         case .airTrafficControl: return "arrow.triangle.branch"
         case .profiles: return "person.crop.circle"
         case .shortcuts: return "keyboard"
@@ -60,6 +63,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
         case .privacy: return .blue
         case .adBlocker: return .green
         case .youTube: return .red
+        case .socialMedia: return .pink
         case .airTrafficControl: return .mint
         case .profiles: return .cyan
         case .shortcuts: return .indigo
@@ -75,7 +79,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
             (nil, [.ai]),
             (nil, [.privacy, .adBlocker, .airTrafficControl]),
             (nil, [.profiles, .shortcuts, .extensions]),
-            ("Tweaks", [.youTube]),
+            ("Tweaks", [.youTube, .socialMedia]),
         ]
         #if DEBUG
         groups.append((nil, [.advanced]))

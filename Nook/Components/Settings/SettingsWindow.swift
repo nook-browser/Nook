@@ -103,6 +103,8 @@ private struct SettingsDetailPane: View {
                 SettingsAdBlockerTab()
             case .youTube:
                 SettingsYouTubeTab()
+            case .socialMedia:
+                SettingsSocialMediaTab()
             case .airTrafficControl:
                 AirTrafficControlSettingsView()
             case .profiles:

@@ -56,6 +56,7 @@ class NookSettingsService {
     private let youTubeVideosPerRowKey = "settings.youTubeVideosPerRow"
     private let youTubeFrameThumbnailsKey = "settings.youTubeFrameThumbnails"
     private let youTubeNoHoverPreviewKey = "settings.youTubeNoHoverPreview"
+    private let socialImageDownloadKey = "settings.socialImageDownload"
 
     var currentSettingsTab: SettingsTabs = .general
 
@@ -341,6 +342,11 @@ class NookSettingsService {
         didSet { userDefaults.set(youTubeNoHoverPreview, forKey: youTubeNoHoverPreviewKey) }
     }
 
+    /// Download button over photos on Instagram, Facebook, and VSCO.
+    var socialImageDownload: Bool {
+        didSet { userDefaults.set(socialImageDownload, forKey: socialImageDownloadKey) }
+    }
+
     init() {
         // Register default values
         userDefaults.register(defaults: [
@@ -470,6 +476,7 @@ class NookSettingsService {
         self.youTubeVideosPerRow = userDefaults.integer(forKey: youTubeVideosPerRowKey)
         self.youTubeFrameThumbnails = userDefaults.bool(forKey: youTubeFrameThumbnailsKey)
         self.youTubeNoHoverPreview = userDefaults.bool(forKey: youTubeNoHoverPreviewKey)
+        self.socialImageDownload = userDefaults.bool(forKey: socialImageDownloadKey)
 
         if let data = userDefaults.data(forKey: siteSearchEntriesKey),
            let decoded = try? JSONDecoder().decode([SiteSearchEntry].self, from: data) {

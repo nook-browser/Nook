@@ -2702,6 +2702,7 @@ extension Tab: WKNavigationDelegate {
             browserManager?.sponsorBlockManager.injectScriptIfNeeded(for: url, in: webView)
             if let settings = browserManager?.nookSettings {
                 YouTubeTweaks.apply(for: url, in: webView, settings: settings)
+                SocialImageTweaks.apply(for: url, in: webView, settings: settings)
             }
         }
 
