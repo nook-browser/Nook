@@ -89,20 +89,22 @@ final class ExternalMiniWindowManager {
 
     func present(url: URL, authCompletionHandler: ((Bool, URL?) -> Void)? = nil) {
         guard let browserManager else { return }
-        let profile = browserManager.currentProfile
+        let window = browserManager.windowRegistry?.activeWindow
+        let profile = window.flatMap { window in
+            window.isIncognito
+                ? window.ephemeralProfile
+                : browserManager.profileManager.profiles.first { $0.id == window.profileID }
+        } ?? browserManager.currentProfile
         let session = MiniWindowSession(
             url: url,
             profile: profile,
             originName: profile?.name ?? "Default",
             targetSpaceResolver: { [weak browserManager] in
-                // Try to get the current space, or fall back to the first available space
-                if let currentSpace = browserManager?.tabManager.currentSpace {
-                    return currentSpace.name
-                } else if let firstSpace = browserManager?.tabManager.spaces.first {
-                    return firstSpace.name
-                } else {
-                    return "Current Space"
-                }
+                guard let browserManager else { return "Current Space" }
+                let tabs = browserManager.tabs
+                let space = browserManager.windowRegistry?.activeWindow?.spaceID.flatMap { tabs.space($0) }
+                    ?? tabs.orderedSpaces.first
+                return space?.name ?? "Current Space"
             },
             adoptHandler: { [weak self] session in
                 self?.adopt(session: session)
@@ -126,20 +128,18 @@ final class ExternalMiniWindowManager {
     }
 
     private func adopt(session: MiniWindowSession) {
-        guard let browserManager else { return }
-        let tabManager = browserManager.tabManager
-        let targetSpace = tabManager.currentSpace ?? tabManager.spaces.first
+        guard let browserManager, let window = browserManager.windowRegistry?.activeWindow else { return }
+        let tabs = browserManager.tabs
 
-        // The live page carries its profile's data store; only reuse it when the target
+        // The live page carries its profile's data store; only reuse it when the window's
         // space uses the same profile, otherwise reload in the space's own profile.
-        let sameProfile = targetSpace?.profileId == nil || targetSpace?.profileId == session.profile?.id
-        let newTab = tabManager.createNewTabWithWebView(
-            url: session.currentURL.absoluteString,
-            in: targetSpace,
-            existingWebView: sameProfile ? session.webView : nil
-        )
-        // selectTab updates the window's current tab; tabManager.setActiveTab alone does not.
-        browserManager.selectTab(newTab)
+        let windowProfileID = window.isIncognito ? window.ephemeralProfile?.id : window.profileID
+        if let webView = session.webView, windowProfileID == session.profile?.id {
+            tabs.adopt(webView: webView, url: session.currentURL, title: webView.title ?? session.currentURL.host ?? "",
+                       in: window, placement: .newTab)
+        } else {
+            tabs.open(url: session.currentURL, in: window, placement: .newTab)
+        }
 
         sessions[session.id]?.controller.close()
         sessions[session.id] = nil

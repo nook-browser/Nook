@@ -23,7 +23,7 @@ final class PeekManager: ObservableObject {
         self.browserManager = browserManager
     }
 
-    func presentExternalURL(_ url: URL, from tab: Tab?) {
+    func presentExternalURL(_ url: URL, from source: PageSession?) {
         guard browserManager != nil else { return }
 
         // Don't show Peek if already showing this URL
@@ -35,17 +35,17 @@ final class PeekManager: ObservableObject {
         let windowId = windowRegistry?.activeWindow?.id ?? UUID()
         let session = PeekSession(
             targetURL: url,
-            sourceTabId: tab?.id,
-            sourceURL: tab?.url,
+            sourceTabId: source?.itemID,
+            sourceURL: source?.url,
             windowId: windowId,
-            sourceProfileId: tab?.resolveProfile()?.id
+            sourceProfileId: source?.profile?.id
         )
 
         // Create WebView FIRST, then activate
         currentSession = session
         let peekWebView = createWebView()
         self.webView = peekWebView
-        
+
         // Defer activation to avoid runloop-mode reentrancy from WebKit delegates
         RunLoop.current.perform { [weak self] in
             MainActor.assumeIsolated {
@@ -53,6 +53,11 @@ final class PeekManager: ObservableObject {
                 NotificationCenter.default.post(name: .peekDidActivate, object: self)
             }
         }
+    }
+
+    /// Old-model entry point still called by `Tab`; removed with `Tab` in task Z.
+    func presentExternalURL(_ url: URL, from tab: Tab?) {
+        presentExternalURL(url, from: tab.flatMap { browserManager?.tabs.session(for: $0.id) })
     }
 
     func dismissPeek() {
@@ -71,73 +76,38 @@ final class PeekManager: ObservableObject {
     func moveToSplitView() {
         guard let session = currentSession,
               let browserManager,
-              let windowState = windowRegistry?.activeWindow else { return }
-
-        // A private window's tabs are ephemeral and must never land in a persisted space.
-        if let window = windowRegistry?.activeWindow, window.isIncognito {
-            if let profile = window.ephemeralProfile {
-                let newTab = browserManager.tabManager.createEphemeralTab(url: session.currentURL, in: window, profile: profile)
-                browserManager.selectTab(newTab, in: window)
-            }
+              let window = windowRegistry?.activeWindow else { return }
+        let previous = window.selectedItemID
+        guard let itemID = adoptPeekPage(session, in: window, browserManager: browserManager) else {
             dismissPeek()
             return
         }
-
-        // Try to get the WebView from coordinator, fall back to creating new WebView if not ready
-        let extractedWebView = webViewCoordinator?.webView
-
-        // Create a new tab with the existing WebView (or create new one if coordinator not ready)
-        let newTab: Tab
-        if let webView = extractedWebView {
-            newTab = browserManager.tabManager.createNewTabWithWebView(
-                url: session.currentURL.absoluteString,
-                in: browserManager.tabManager.currentSpace,
-                existingWebView: webView
-            )
-        } else {
-            // Fallback: create new tab with fresh WebView if coordinator not available yet
-            newTab = browserManager.tabManager.createNewTab(
-                url: session.currentURL.absoluteString,
-                in: browserManager.tabManager.currentSpace
-            )
+        // The adopted page is selected; pair it with the page the window showed before.
+        if let previous, previous != itemID {
+            browserManager.splitManager.enterSplit(leftTabId: previous, rightTabId: itemID, for: window.id)
         }
-
-        // Enter split view with the new tab using current active window state
-        browserManager.splitManager.enterSplit(with: newTab, placeOn: .right, in: windowState)
-
-        // Activate the new tab using BrowserManager to update window UI state
-        browserManager.selectTab(newTab)
         dismissPeek()
     }
 
     func moveToNewTab() {
         guard let session = currentSession,
               let browserManager,
-              let coordinator = webViewCoordinator else { return }
-
-        // A private window's tabs are ephemeral and must never land in a persisted space.
-        if let window = windowRegistry?.activeWindow, window.isIncognito {
-            if let profile = window.ephemeralProfile {
-                let newTab = browserManager.tabManager.createEphemeralTab(url: session.currentURL, in: window, profile: profile)
-                browserManager.selectTab(newTab, in: window)
-            }
-            dismissPeek()
-            return
-        }
-
-        // Extract the WebView from the Peek coordinator for transfer
-        let extractedWebView = coordinator.webView
-
-        // Create a new tab with the existing WebView
-        let newTab = browserManager.tabManager.createNewTabWithWebView(
-            url: session.currentURL.absoluteString,
-            in: browserManager.tabManager.currentSpace,
-            existingWebView: extractedWebView
-        )
-
-        // Activate via BrowserManager to ensure full UI updates
-        browserManager.selectTab(newTab)
+              let window = windowRegistry?.activeWindow else { return }
+        adoptPeekPage(session, in: window, browserManager: browserManager)
         dismissPeek()
+    }
+
+    /// Turns the Peek page into a selected tab of `window`. The Peek web view moves over when it
+    /// exists. A private window opens the URL fresh in its own tree: the Peek view runs on a
+    /// persistent data store and must not become a private page.
+    @discardableResult
+    private func adoptPeekPage(_ session: PeekSession, in window: BrowserWindowState, browserManager: BrowserManager) -> UUID? {
+        let tabs = browserManager.tabs
+        if !window.isIncognito, let webView = webViewCoordinator?.webView {
+            return tabs.adopt(webView: webView, url: session.currentURL, title: webView.title ?? session.currentURL.host ?? "",
+                              in: window, placement: .newTab)
+        }
+        return tabs.open(url: session.currentURL, in: window, placement: .newTab)
     }
 
     // MARK: - WebView Management

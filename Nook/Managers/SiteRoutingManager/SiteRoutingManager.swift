@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import NookTabsCore
 import OSLog
 
 @MainActor
@@ -37,49 +38,35 @@ class SiteRoutingManager {
         return rules.first(where: { $0.pathPrefix == nil || $0.pathPrefix?.isEmpty == true })
     }
 
-    func applyRoute(url: URL, from sourceTab: Tab?) -> Bool {
-        guard let browserManager else { return false }
+    /// Opens `url` as a new tab in the rule's target space, in the window showing `session`
+    /// (or the active window for external URLs). Private windows never route.
+    func applyRoute(url: URL, from session: PageSession?) -> Bool {
+        guard let browserManager, session?.isPrivate != true else { return false }
+        let tabs = browserManager.tabs
+        guard let window = session.flatMap({ tabs.window(for: $0) }) ?? browserManager.windowRegistry?.activeWindow,
+              !window.isIncognito,
+              let rule = resolve(url: url)
+        else { return false }
 
-        // Don't route in incognito/ephemeral windows
-        if let tab = sourceTab, tab.resolveProfile()?.isEphemeral == true {
+        guard let target = tabs.space(rule.targetSpaceId) else {
+            logger.debug("Route skipped: target space no longer exists for rule \(rule.id)")
             return false
         }
-        // For external URLs (no source tab), check if active window is incognito
-        if sourceTab == nil,
-           let activeWindow = browserManager.windowRegistry?.activeWindow,
-           activeWindow.isIncognito {
-            return false
-        }
+        guard window.spaceID != target.id else { return false }
 
-        guard let rule = resolve(url: url) else { return false }
+        logger.info("Route matched: \(url.absoluteString, privacy: .public) → space '\(target.name, privacy: .public)'")
 
-        let tabManager = browserManager.tabManager
-
-        guard let targetSpace = tabManager.spaces.first(where: { $0.id == rule.targetSpaceId }),
-              browserManager.profileManager.profiles.first(where: { $0.id == rule.targetProfileId }) != nil
-        else {
-            logger.debug("Route skipped: target space or profile no longer exists for rule \(rule.id)")
-            return false
-        }
-
-        if tabManager.currentSpace?.id == targetSpace.id {
-            return false
-        }
-
-        logger.info("Route matched: \(url.absoluteString, privacy: .public) → space '\(targetSpace.name, privacy: .public)'")
-
+        // Deferred: callers are WebKit policy callbacks. Selecting the new tab shows its space.
         Task { @MainActor in
-            if let currentProfile = browserManager.currentProfile,
-               currentProfile.id != rule.targetProfileId,
-               let targetProfile = browserManager.profileManager.profiles.first(where: { $0.id == rule.targetProfileId }) {
-                await browserManager.switchToProfile(targetProfile, context: .spaceChange)
-            }
-
-            tabManager.setActiveSpace(targetSpace)
-            let _ = tabManager.createNewTab(url: url.absoluteString, in: targetSpace)
+            tabs.open(url: url, in: window, placement: .newTab, parent: .tabs(spaceID: target.id))
         }
-
         return true
+    }
+
+    /// Old-model entry point still called by `Tab`; removed with `Tab` in task Z.
+    func applyRoute(url: URL, from sourceTab: Tab?) -> Bool {
+        if sourceTab?.resolveProfile()?.isEphemeral == true { return false }
+        return applyRoute(url: url, from: sourceTab.flatMap { browserManager?.tabs.session(for: $0.id) })
     }
 
     // MARK: - CRUD
