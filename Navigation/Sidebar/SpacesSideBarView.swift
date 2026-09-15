@@ -61,6 +61,13 @@ struct SpacesSideBarView: View {
 
     private var mainSidebarContent: some View {
         return VStack(spacing: NookDesign.Spacing.sectionGap) {
+            // Space title: shares the traffic-light row on the left, its own row on the right.
+            if nookSettings.sidebarPosition != .left {
+                spaceSwitcherTitle
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, NookDesign.Spacing.sidebarInset)
+            }
+
             // Header (window controls, nav buttons, URL bar)
             SidebarHeader(isSidebarHovered: isSidebarHovered)
                 .environmentObject(browserManager)
@@ -109,6 +116,13 @@ struct SpacesSideBarView: View {
         }
         // Extra top padding when sidebar is on the left to avoid overlapping native traffic light buttons
         .padding(.top, nookSettings.sidebarPosition == .left ? NookDesign.Spacing.sidebarTop : NookDesign.Spacing.sidebarInset)
+        .overlay(alignment: .topLeading) {
+            if nookSettings.sidebarPosition == .left {
+                spaceSwitcherTitle
+                    .frame(height: NookDesign.Spacing.sidebarTop)
+                    .padding(.leading, NookDesign.Spacing.trafficLights)
+            }
+        }
         .padding(.bottom, NookDesign.Spacing.sidebarInset)
         .background(
             GeometryReader { geo in
@@ -311,10 +325,6 @@ struct SpacesSideBarView: View {
                 .padding(.bottom, NookDesign.Spacing.sectionGap)
             }
 
-            spaceTitle(space.id)
-                .padding(.horizontal, NookDesign.Spacing.sidebarInset)
-                .padding(.bottom, NookDesign.Spacing.xs)
-
             SpaceView(
                 spaceID: space.id,
                 isActive: windowState.spaceID == space.id,
@@ -334,17 +344,10 @@ struct SpacesSideBarView: View {
         .tag(index)
     }
 
-    /// The space title doubles as a drop target that pins the dragged tab into the space.
-    private func spaceTitle(_ spaceID: UUID) -> some View {
-        let pinned = Parent.pinned(spaceID: spaceID)
-        let zone = DropZoneID.target(pinned)
-        return NookDropZoneHostView(zoneID: zone, manager: dragSession, onDrop: { itemID in
-            withAnimation(NookDesign.Motion.spring) {
-                tabs.pin(itemID, to: pinned)
-            }
-        }) {
-            SpaceTitle(spaceID: spaceID, isDropHovering: dragSession.isDragging && dragSession.activeZone == zone)
-        }
+    private var spaceSwitcherTitle: some View {
+        SpaceSwitcherTitle(onNewSpace: showSpaceCreationDialog)
+            .environmentObject(browserManager)
+            .environment(windowState)
     }
 
     // MARK: - Dialogs

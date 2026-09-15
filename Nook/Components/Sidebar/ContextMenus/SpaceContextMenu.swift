@@ -8,7 +8,7 @@
 import NookTabsCore
 import SwiftUI
 
-/// Shared context menu for spaces (used in SpaceTitle and SpacesList)
+/// Shared context menu for spaces (used in SpacesList)
 struct SpaceContextMenu: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(TabsController.self) private var tabs
@@ -37,7 +37,7 @@ struct SpaceContextMenu: View {
 
             Divider()
 
-            // Rename (optional - only available for SpaceTitle)
+            // Rename (optional)
             if let onEditName = onEditName {
                 Button {
                     onEditName()
@@ -46,7 +46,7 @@ struct SpaceContextMenu: View {
                 }
             }
 
-            // Change icon (optional - only available for SpaceTitle)
+            // Change icon (optional)
             if let onEditIcon = onEditIcon {
                 Button {
                     onEditIcon()
