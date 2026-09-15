@@ -1468,22 +1468,9 @@ class BrowserManager: ObservableObject {
             return
         }
 
-        let newWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
-        // ARC owns this window. AppKit's default release on close over-releases it and crashes
-        // in the next autorelease pool drain.
-        newWindow.isReleasedWhenClosed = false
-
+        let newWindow = makeBrowserNSWindow(title: "Nook")
         let contentView = windowContent(ContentView(), windowRegistry: windowRegistry, webViewCoordinator: webViewCoordinator)
-
         newWindow.contentView = NSHostingView(rootView: contentView)
-        newWindow.title = "Nook"
-        newWindow.minSize = NSSize(width: 470, height: 382)
-        newWindow.contentMinSize = NSSize(width: 470, height: 382)
         if let frame {
             newWindow.setFrame(frame, display: false)
         } else {
@@ -1507,6 +1494,27 @@ class BrowserManager: ObservableObject {
             .environment(keyboardShortcutManager)
             .environment(mcpManager)
             .environment(tabOrganizerManager)
+    }
+
+    /// A browser window created in code, styled like the SwiftUI main window up front so the
+    /// first frame already has the hidden, transparent title bar.
+    private func makeBrowserNSWindow(title: String) -> NSWindow {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        // ARC owns this window. AppKit's default release on close over-releases it and crashes
+        // in the next autorelease pool drain.
+        window.isReleasedWhenClosed = false
+        window.title = title
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.backgroundColor = .clear
+        window.minSize = NSSize(width: 470, height: 382)
+        window.contentMinSize = NSSize(width: 470, height: 382)
+        return window
     }
 
     /// Opens every saved window record no open window has claimed, once per launch.
@@ -1536,30 +1544,19 @@ class BrowserManager: ObservableObject {
         windowState.isIncognito = true
         windowState.ephemeralProfile = profileManager.createEphemeralProfile(for: windowState.id)
 
-        let newWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
-        // ARC owns this window. AppKit's default release on close over-releases it and crashes
-        // in the next autorelease pool drain.
-        newWindow.isReleasedWhenClosed = false
+        // Registration gives the window its private tree (TabsController.attach). It must happen
+        // before the hosting view exists: the sidebar's first render otherwise sees no private
+        // tree, pages through the regular spaces, and keeps showing them.
+        windowRegistry.register(windowState)
+        tabs.open(url: TabsController.homeURL, in: windowState, placement: .newTab)
 
+        let newWindow = makeBrowserNSWindow(title: "Private - Nook")
         let contentView = windowContent(ContentView(windowState: windowState), windowRegistry: windowRegistry, webViewCoordinator: webViewCoordinator)
-
         newWindow.contentView = NSHostingView(rootView: contentView)
-        newWindow.title = "Incognito - Nook"
-        newWindow.minSize = NSSize(width: 470, height: 382)
-        newWindow.contentMinSize = NSSize(width: 470, height: 382)
         newWindow.center()
 
         windowState.window = newWindow
-
-        // Registration gives the window its private tree (TabsController.attach).
-        windowRegistry.register(windowState)
         windowRegistry.setActive(windowState)
-        tabs.open(url: TabsController.homeURL, in: windowState, placement: .newTab)
 
         newWindow.makeKeyAndOrderFront(nil)
     }

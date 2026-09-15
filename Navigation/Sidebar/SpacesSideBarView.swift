@@ -160,7 +160,8 @@ struct SpacesSideBarView: View {
         }
         .pageViewStyle(.scroll)
         .contentShape(Rectangle())
-        .id(activeTabRefreshTrigger)
+        // Pages are cached hosting views keyed by index; a different set of spaces needs new pages.
+        .id("\(activeTabRefreshTrigger)|\(spaces.map(\.id.uuidString).joined(separator: ","))")
         .onAppear {
             if let targetIndex = spaces.firstIndex(where: { $0.id == windowState.spaceID }) {
                 activeSpaceIndex = targetIndex
