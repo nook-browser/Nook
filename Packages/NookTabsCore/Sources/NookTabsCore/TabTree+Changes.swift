@@ -144,7 +144,7 @@ extension TabTree {
         var change = Change()
         let siblings = orderedSpaces(in: profileID)
         let order = key(after: after, among: siblings) ?? renumberSpaces(siblings, insertingAfter: after, change: &change, now: now)
-        record(&change, space: Space(id: id, profileID: profileID, name: name, icon: icon, accentHex: accentHex, order: order, modifiedAt: now))
+        record(&change, space: SpaceRecord(id: id, profileID: profileID, name: name, icon: icon, accentHex: accentHex, order: order, modifiedAt: now))
         return change
     }
 
@@ -200,7 +200,7 @@ extension TabTree {
     public mutating func createProfile(id: UUID = UUID(), name: String, icon: String, now: Date = Date()) -> Change {
         var change = Change()
         let order = OrderKey.between(orderedProfiles.last?.order, nil) ?? OrderKey.sequence(count: orderedProfiles.count + 1).last!
-        record(&change, profile: Profile(id: id, name: name, icon: icon, order: order, modifiedAt: now))
+        record(&change, profile: ProfileRecord(id: id, name: name, icon: icon, order: order, modifiedAt: now))
         return change
     }
 
@@ -266,12 +266,12 @@ extension TabTree {
         items[item.id] = item
     }
 
-    private mutating func record(_ change: inout Change, space: Space) {
+    private mutating func record(_ change: inout Change, space: SpaceRecord) {
         if change.spaces[space.id] == nil { change.spaces[space.id] = .some(spaces[space.id]) }
         spaces[space.id] = space
     }
 
-    private mutating func record(_ change: inout Change, profile: Profile) {
+    private mutating func record(_ change: inout Change, profile: ProfileRecord) {
         if change.profiles[profile.id] == nil { change.profiles[profile.id] = .some(profiles[profile.id]) }
         profiles[profile.id] = profile
     }
@@ -309,14 +309,14 @@ extension TabTree {
         return keys[index]
     }
 
-    private func key(after: UUID?, among siblings: [Space]) -> OrderKey? {
+    private func key(after: UUID?, among siblings: [SpaceRecord]) -> OrderKey? {
         let index = after.flatMap { a in siblings.firstIndex(where: { $0.id == a }) }.map { $0 + 1 } ?? 0
         let lower = index > 0 ? siblings[index - 1].order : nil
         let upper = index < siblings.count ? siblings[index].order : nil
         return OrderKey.between(lower, upper)
     }
 
-    private mutating func renumberSpaces(_ siblings: [Space], insertingAfter after: UUID?, change: inout Change, now: Date) -> OrderKey {
+    private mutating func renumberSpaces(_ siblings: [SpaceRecord], insertingAfter after: UUID?, change: inout Change, now: Date) -> OrderKey {
         let index = after.flatMap { a in siblings.firstIndex(where: { $0.id == a }) }.map { $0 + 1 } ?? 0
         let keys = OrderKey.sequence(count: siblings.count + 1)
         var k = 0

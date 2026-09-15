@@ -1,6 +1,6 @@
 import Foundation
 
-public struct Profile: Identifiable, Codable, Hashable, Sendable {
+public struct ProfileRecord: Identifiable, Codable, Hashable, Sendable {
     public let id: UUID
     public var name: String
     public var icon: String
@@ -18,7 +18,7 @@ public struct Profile: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
-public struct Space: Identifiable, Codable, Hashable, Sendable {
+public struct SpaceRecord: Identifiable, Codable, Hashable, Sendable {
     public let id: UUID
     public var profileID: UUID
     public var name: String
@@ -107,7 +107,7 @@ public enum Scope: Hashable, Sendable {
 }
 
 /// The two sidebar sections of a space.
-public enum Section: String, Codable, Hashable, Sendable {
+public enum SidebarSection: String, Codable, Hashable, Sendable {
     case pinned
     case tabs
 
@@ -123,7 +123,7 @@ public struct Row: Hashable, Sendable, Identifiable {
     public let item: Item
     /// Number of folders the item sits inside.
     public let depth: Int
-    public let section: Section
+    public let section: SidebarSection
     public var id: UUID { item.id }
 }
 

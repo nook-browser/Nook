@@ -21,7 +21,7 @@ The current model stores a tab's location twice (one of four buckets plus `isPin
 Local Swift package at `Packages/NookTabsCore`. Imports Foundation only. No AppKit, WebKit or SwiftData.
 
 ```swift
-public struct Profile: Identifiable, Codable, Hashable {
+public struct ProfileRecord: Identifiable, Codable, Hashable {
     public let id: UUID
     public var name: String
     public var icon: String
@@ -30,7 +30,7 @@ public struct Profile: Identifiable, Codable, Hashable {
     public var deletedAt: Date?
 }
 
-public struct Space: Identifiable, Codable, Hashable {
+public struct SpaceRecord: Identifiable, Codable, Hashable {
     public let id: UUID
     public var profileID: UUID
     public var name: String

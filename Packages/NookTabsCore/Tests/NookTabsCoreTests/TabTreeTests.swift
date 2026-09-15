@@ -103,7 +103,7 @@ struct TabTreeTests {
         try! f.tree.reopen(closedA, fallback: .tabs(spaceID: f.spaceB), now: fixedNow)
         #expect(f.tree.item(a)?.parent == tabs)
 
-        // Space deleted since: the fallback parent.
+        // SpaceRecord deleted since: the fallback parent.
         let pinnedTab = f.tab("p", in: .pinned(spaceID: f.spaceB))
         let closedP = try! f.tree.close(pinnedTab, now: fixedNow).closed
         _ = try! f.tree.deleteSpace(f.spaceB, now: fixedNow)

@@ -7,11 +7,11 @@ import Foundation
 public struct TabTree: Codable, Equatable, Sendable {
     public static let maxFolderDepth = 5
 
-    public internal(set) var profiles: [UUID: Profile]
-    public internal(set) var spaces: [UUID: Space]
+    public internal(set) var profiles: [UUID: ProfileRecord]
+    public internal(set) var spaces: [UUID: SpaceRecord]
     public internal(set) var items: [UUID: Item]
 
-    public init(profiles: [Profile] = [], spaces: [Space] = [], items: [Item] = []) {
+    public init(profiles: [ProfileRecord] = [], spaces: [SpaceRecord] = [], items: [Item] = []) {
         self.profiles = Dictionary(profiles.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         self.spaces = Dictionary(spaces.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         self.items = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
@@ -19,12 +19,12 @@ public struct TabTree: Codable, Equatable, Sendable {
 
     // MARK: - Lookup
 
-    public func profile(_ id: UUID) -> Profile? {
+    public func profile(_ id: UUID) -> ProfileRecord? {
         guard let p = profiles[id], p.deletedAt == nil else { return nil }
         return p
     }
 
-    public func space(_ id: UUID) -> Space? {
+    public func space(_ id: UUID) -> SpaceRecord? {
         guard let s = spaces[id], s.deletedAt == nil else { return nil }
         return s
     }
@@ -34,16 +34,16 @@ public struct TabTree: Codable, Equatable, Sendable {
         return i
     }
 
-    public var orderedProfiles: [Profile] {
+    public var orderedProfiles: [ProfileRecord] {
         profiles.values.filter { $0.deletedAt == nil }.sorted(by: Self.sortKey)
     }
 
-    public func orderedSpaces(in profileID: UUID) -> [Space] {
+    public func orderedSpaces(in profileID: UUID) -> [SpaceRecord] {
         spaces.values.filter { $0.deletedAt == nil && $0.profileID == profileID }.sorted(by: Self.sortKey)
     }
 
     /// Every live space, grouped by profile order.
-    public var orderedSpaces: [Space] {
+    public var orderedSpaces: [SpaceRecord] {
         orderedProfiles.flatMap { orderedSpaces(in: $0.id) }
     }
 
@@ -146,6 +146,6 @@ protocol Orderable {
     var order: OrderKey { get }
 }
 
-extension Profile: Orderable {}
-extension Space: Orderable {}
+extension ProfileRecord: Orderable {}
+extension SpaceRecord: Orderable {}
 extension Item: Orderable {}

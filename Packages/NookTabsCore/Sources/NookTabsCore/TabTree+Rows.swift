@@ -6,7 +6,7 @@ extension TabTree {
     public func visibleRows(space spaceID: UUID, openFolders: Set<UUID>) -> [Row] {
         let groups = childrenByParent()
         var rows: [Row] = []
-        func walk(_ parent: Parent, depth: Int, section: Section) {
+        func walk(_ parent: Parent, depth: Int, section: SidebarSection) {
             for child in groups[parent] ?? [] {
                 rows.append(Row(item: child, depth: depth, section: section))
                 if child.isFolder, openFolders.contains(child.id) {

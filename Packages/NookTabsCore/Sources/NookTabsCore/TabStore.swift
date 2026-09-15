@@ -27,8 +27,8 @@ public final class TabStore: @unchecked Sendable {
 
     struct StructureFile: Codable {
         var formatVersion = 1
-        var profiles: [Profile]
-        var spaces: [Space]
+        var profiles: [ProfileRecord]
+        var spaces: [SpaceRecord]
         var items: [Item]
     }
 

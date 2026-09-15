@@ -3,8 +3,8 @@ import Foundation
 /// The records a change touched, with their values before it. nil means the record did not exist.
 /// Applying a `Change` restores those values and returns the change that redoes it.
 public struct Change: Codable, Equatable, Sendable {
-    public var profiles: [UUID: Profile?] = [:]
-    public var spaces: [UUID: Space?] = [:]
+    public var profiles: [UUID: ProfileRecord?] = [:]
+    public var spaces: [UUID: SpaceRecord?] = [:]
     public var items: [UUID: Item?] = [:]
 
     public init() {}
