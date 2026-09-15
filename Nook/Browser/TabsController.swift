@@ -66,6 +66,10 @@ final class TabsController {
         case .loaded, .restoredFromBackup:
             tree = loaded.tree
             device = loaded.device
+            // Every app profile owns a data store; give any without a record one under its id.
+            for profile in profileManager.profiles where tree.profile(profile.id) == nil {
+                tree.createProfile(id: profile.id, name: profile.name, icon: profile.icon)
+            }
         }
         log.info("Tabs loaded: \(String(describing: loaded.outcome), privacy: .public), \(self.tree.items.count) items")
         if case .readOnly(let reason) = loaded.outcome {
@@ -483,6 +487,13 @@ final class TabsController {
     func recordClosed(_ entry: ClosedEntry) {
         device.pushClosed(entry)
         save()
+    }
+
+    /// Removes reopen entries holding any of `ids` (items that are back in the tree).
+    func dropClosed(containing ids: Set<UUID>) {
+        let count = device.closed.count
+        device.closed.removeAll { entry in entry.items.contains { ids.contains($0.id) } }
+        if device.closed.count != count { save() }
     }
 
     func dropLastClosed() {

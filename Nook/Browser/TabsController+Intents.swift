@@ -198,7 +198,7 @@ extension TabsController {
     // MARK: - Close
 
     /// A pinned or favorite tab ends its page and keeps the item. Anything in the tabs section,
-    /// and any folder, closes the item and its subtree into the reopen history.
+    /// and any folder, is removed into the reopen history.
     func close(_ itemID: UUID) {
         guard let owner = owner(ofItem: itemID) else { return }
         let source = tree(owner)
@@ -209,18 +209,29 @@ extension TabsController {
             save()
             return
         }
-        let ids = source.subtree(of: itemID)
+        remove(itemID)
+    }
+
+    /// Deletes an item and its subtree from the sidebar, pinned tabs and favorites included.
+    /// Pages end; reopening the closed entry puts it back in its place.
+    func remove(_ itemID: UUID) {
+        guard let owner = owner(ofItem: itemID) else { return }
+        let ids = tree(owner).subtree(of: itemID)
         moveSelectionOff(Set(ids))
         var closedEntry: ClosedEntry?
-        let change = perform(owner, "close") { tree in
+        let change = perform(owner, "remove") { tree in
             let result = try tree.close(itemID)
             closedEntry = result.closed
             return result.change
         }
-        guard change != nil else { return }
+        guard change != nil, let closedEntry else { return }
         for id in ids { endSession(id) }
-        if case .main = owner, let closedEntry {
+        switch owner {
+        case .main:
             recordClosed(closedEntry)
+        case .privateWindow(let window):
+            window.privateClosed.append(closedEntry)
+            if window.privateClosed.count > DeviceState.closedLimit { window.privateClosed.removeFirst() }
         }
     }
 
@@ -233,15 +244,22 @@ extension TabsController {
         close(selected)
     }
 
-    /// Restores the newest closed entry and selects it. Private windows keep no history.
+    /// Restores the newest closed entry and selects it. A private window reopens from its own
+    /// in-memory history.
     func reopenLastClosed(in window: BrowserWindowState) {
-        guard window.privateTree == nil, let entry = device.closed.last,
-              let fallbackSpace = window.spaceID ?? tree.orderedSpaces.first?.id else { return }
-        guard perform(.main, "reopen", { try $0.reopen(entry, fallback: .tabs(spaceID: fallbackSpace)) }) != nil else { return }
-        dropLastClosed()
+        let owner = owner(of: window)
+        let isPrivate = window.privateTree != nil
+        guard let entry = isPrivate ? window.privateClosed.last : device.closed.last,
+              let fallbackSpace = window.spaceID ?? tree(owner).orderedSpaces.first?.id else { return }
+        guard perform(owner, "reopen", { try $0.reopen(entry, fallback: .tabs(spaceID: fallbackSpace)) }) != nil else { return }
+        if isPrivate {
+            window.privateClosed.removeLast()
+        } else {
+            dropLastClosed()
+        }
         let restored = entry.items.map(\.id)
         for folder in entry.items where folder.isFolder { openFolder(folder.id) }
-        if let firstTab = restored.first(where: { tree.item($0)?.isFolder == false }) {
+        if let firstTab = restored.first(where: { tree(owner).item($0)?.isFolder == false }) {
             select(firstTab, in: window)
         }
     }
@@ -281,9 +299,16 @@ extension TabsController {
         let current = session(for: itemID)
         let wasSynced = tree(owner).scope(of: itemID) == .synced
         let currentURL = current?.url ?? (wasSynced ? device.openPages[itemID]?.url : nil)
+        // Extensions see the move against the window list the tab was in.
+        // ponytail: only the moved item is reported, not tabs inside a moved folder.
+        let oldWindow = regularWindows.first { displayOrder(in: $0).contains(itemID) }
+        let oldIndex = oldWindow.flatMap { displayOrder(in: $0).firstIndex(of: itemID) }
         guard perform(owner, "move", { try $0.move(itemID, to: parent, after: after, currentURL: currentURL) }) != nil else { return }
         guard case .main = owner else { return }
         let isSynced = tree.scope(of: itemID) == .synced
+        if current != nil {
+            ExtensionManager.shared.notifyTabMoved(itemID: itemID, from: oldIndex, in: oldWindow, pinnedChanged: wasSynced != isSynced)
+        }
         if wasSynced, !isSynced {
             for id in tree.subtree(of: itemID) { setOpenPage(id, nil) }
         } else if !wasSynced, isSynced {
@@ -521,6 +546,9 @@ extension TabsController {
         moveSelectionOff(Set(change.items.compactMap { id, value in value == nil || value?.deletedAt != nil ? id : nil }))
         perform(.main, "apply", undoable: false) { tree in tree.apply(change) }
         for id in before where tree.item(id) == nil { endSession(id) }
+        // Items the change brought back must not also reopen from the history.
+        let restored = Set(change.items.keys.filter { !before.contains($0) && tree.item($0) != nil })
+        dropClosed(containing: restored)
         for window in regularWindows { window.refreshCompositor() }
         save()
     }

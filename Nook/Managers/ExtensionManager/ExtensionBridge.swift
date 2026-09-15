@@ -238,8 +238,14 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
     }
 
     func reload(fromOrigin: Bool, for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
+        // An unloaded page reloads by loading its saved URL, without selecting the tab.
         guard let webView = session?.webView else {
-            completionHandler(error(1, "No webview"))
+            guard let page = tabs.ensureSession(for: itemID) else {
+                completionHandler(error(1, "No webview"))
+                return
+            }
+            page.refresh()
+            completionHandler(nil)
             return
         }
         if fromOrigin {
@@ -251,13 +257,17 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
     }
 
     func loadURL(_ url: URL, for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
-        // An item without a live page has nothing to navigate; the contract has no way to
-        // start a session without selecting the tab.
-        guard let session else {
+        // An unloaded tab gets a page (not selected) that loads `url` directly.
+        guard let page = tabs.ensureSession(for: itemID) else {
             completionHandler(error(3, "Tab is not loaded"))
             return
         }
-        session.load(url)
+        if page.isUnloaded {
+            page.url = url
+            page.loadWebViewIfNeeded()
+        } else {
+            page.load(url)
+        }
         completionHandler(nil)
     }
 

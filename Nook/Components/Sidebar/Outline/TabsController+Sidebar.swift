@@ -45,14 +45,6 @@ extension TabsController {
         move(itemID, to: .favorites(profileID: profileID), after: after)
     }
 
-    /// Deletes an item from the sidebar. The contract has no delete intent for synced items
-    /// (`close` only ends their page), so a pinned item moves to the tabs section first and then
-    /// closes into the reopen history.
-    func removeFromSidebar(_ itemID: UUID) {
-        if isSynced(itemID) { unpin(itemID) }
-        close(itemID)
-    }
-
     // MARK: - Reads
 
     /// Every folder in a space's pinned and tabs sections, depth first, with its depth.

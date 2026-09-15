@@ -85,10 +85,12 @@ extension BrowserManager {
 
     // MARK: - Helpers
 
-    /// A regular window: intents need one to pick the main tree. Imports never go to a private window.
+    /// A regular window: intents need one to pick the main tree. Imports never go to a private
+    /// window. Onboarding imports run before any browser window registers; an unregistered window
+    /// state still targets the main tree, and background opens never select in it.
     private var importWindow: BrowserWindowState? {
         if let active = windowRegistry?.activeWindow, !active.isIncognito { return active }
-        return tabs.regularWindows.first
+        return tabs.regularWindows.first ?? BrowserWindowState()
     }
 
     private func importProfileID(_ window: BrowserWindowState) -> UUID? {

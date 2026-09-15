@@ -292,7 +292,7 @@ struct TabContextMenu: View {
 
         if case .pinned = section {
             Button(role: .destructive) {
-                tabs.removeFromSidebar(itemID)
+                tabs.remove(itemID)
             } label: {
                 Label("Remove from Space", systemImage: "trash")
             }

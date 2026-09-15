@@ -107,7 +107,7 @@ struct SpaceTab: View {
                     // tabs section: "x" closes.
                     let useUnload = tabs.isSynced(item.id) && !isUnloaded
                     Button(action: {
-                        if useUnload { tabs.unload(item.id) } else { tabs.removeFromSidebar(item.id) }
+                        if useUnload { tabs.unload(item.id) } else { tabs.remove(item.id) }
                     }) {
                         Image(systemName: useUnload ? "minus" : "xmark")
                             .font(NookDesign.Font.secondary)

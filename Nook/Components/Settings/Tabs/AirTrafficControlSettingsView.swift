@@ -64,7 +64,9 @@ struct AirTrafficControlSettingsView: View {
 
     private func ruleRow(_ rule: SiteRoutingRule) -> some View {
         let space = browserManager.tabs.space(rule.targetSpaceId)
-        let profile = browserManager.profileManager.profiles.first(where: { $0.id == rule.targetProfileId })
+        // Routing opens in the space's current profile; the stored profile id is only a fallback label.
+        let profileID = space?.profileID ?? rule.targetProfileId
+        let profile = browserManager.profileManager.profiles.first(where: { $0.id == profileID })
 
         return LabeledContent {
             Toggle("Enabled", isOn: Binding(

@@ -386,6 +386,8 @@ final class PageSession: NSObject, Identifiable {
         // saved URL through the normal setup path.
         isPopupHost = false
         primaryWindowId = nil
+        // The next view announces itself again (activation included).
+        didNotifyOpenToExtensions = false
         stopNativeAudioMonitoring()
         profileAwaitCancellable?.cancel()
         profileAwaitCancellable = nil

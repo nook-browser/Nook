@@ -317,7 +317,7 @@ enum WebContextMenuItem {
         case .pageReload:
             webView.reload()
         case .pageCopyAddress:
-            if let url = payload.pageURL ?? webView.contextMenuSession?.url {
+            if let url = payload.pageURL ?? webView.owningSession?.url {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(url.absoluteString, forType: .string)
             }
@@ -374,16 +374,10 @@ final class HandlerMenuItem: NSMenuItem {
 }
 
 extension FocusableWKWebView {
-    /// The page session showing this view.
-    // ponytail: scans sessions per call; task Z swaps this for T3's `owningSession` back-reference.
-    fileprivate var contextMenuSession: PageSession? {
-        (NSApp.delegate as? AppDelegate)?.browserManager?.tabs.session(for: self)
-    }
-
     /// Opens `url` in the background in the owning page's window and space. A private page's
     /// window is private, so the link stays in that window's in-memory tree.
     func openLinkInNewTab(_ url: URL) {
-        guard let session = contextMenuSession, let tabs = session.browserManager?.tabs,
+        guard let session = owningSession, let tabs = session.browserManager?.tabs,
               let window = tabs.window(for: session) else { return }
         let parent = tabs.spaceID(of: session.itemID).map { Parent.tabs(spaceID: $0) }
         tabs.open(url: url, in: window, placement: .background, parent: parent)

@@ -55,6 +55,18 @@ extension ExtensionManager {
         controller.didCloseTab(adapter, windowIsClosing: false)
     }
 
+    /// An opened tab moved in the sidebar: reorder, folder, pin, unpin or another space.
+    /// `oldIndex` is its place in `oldWindow`'s tab list before the move.
+    func notifyTabMoved(itemID: UUID, from oldIndex: Int?, in oldWindow: BrowserWindowState?, pinnedChanged: Bool) {
+        guard let controller = extensionController, let adapter = openedAdapter(for: itemID) else { return }
+        if let oldIndex {
+            controller.didMoveTab(adapter, from: oldIndex, in: oldWindow.flatMap { windowAdapter(for: $0) })
+        }
+        if pinnedChanged {
+            controller.didChangeTabProperties([.pinned], for: adapter)
+        }
+    }
+
     func notifyTabPropertiesChanged(_ session: PageSession, properties: WKWebExtension.TabChangedProperties) {
         guard !session.isPrivate, let controller = extensionController,
               let adapter = openedAdapter(for: session.itemID)
