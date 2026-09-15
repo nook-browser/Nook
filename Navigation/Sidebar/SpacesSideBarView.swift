@@ -7,13 +7,14 @@
 //
 
 import AppKit
+import NookTabsCore
 import SwiftUI
 import UniformTypeIdentifiers
 import Sparkle
 
 struct SpacesSideBarView: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var tabManager: TabManager
+    @Environment(TabsController.self) private var tabs
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(WindowRegistry.self) private var windowRegistry
     @Environment(\.nookSettings) var nookSettings
@@ -140,9 +141,7 @@ struct SpacesSideBarView: View {
     // MARK: - Spaces Page View
 
     private var spacesPageView: some View {
-        let spaces = windowState.isIncognito
-            ? windowState.ephemeralSpaces
-            : tabManager.spaces
+        let spaces = tabs.switchableSpaces(for: windowState)
 
         return Group {
             if spaces.isEmpty {
@@ -153,30 +152,27 @@ struct SpacesSideBarView: View {
         }
     }
 
-    private func spacesContent(spaces: [Space]) -> some View {
+    private func spacesContent(spaces: [SpaceRecord]) -> some View {
         PageView(selection: $activeSpaceIndex) {
             ForEach(spaces.indices, id: \.self) { index in
-                if index >= 0 && index < spaces.count {
-                    makeSpaceView(for: spaces[index], index: index)
-                } else {
-                    EmptyView()
-                }
+                makeSpaceView(for: spaces[index], index: index)
             }
         }
         .pageViewStyle(.scroll)
         .contentShape(Rectangle())
         .id(activeTabRefreshTrigger)
         .onAppear {
-            if let targetIndex = spaces.firstIndex(where: { $0.id == windowState.currentSpaceId }) {
+            if let targetIndex = spaces.firstIndex(where: { $0.id == windowState.spaceID }) {
                 activeSpaceIndex = targetIndex
+            } else {
+                tabs.setSpace(spaces[0].id, in: windowState)
             }
-            browserManager.setActiveSpace(spaces[0], in: windowState)
         }
         .onChange(of: activeSpaceIndex) { _, newIndex in
             handleSpaceIndexChange(newIndex, spaces: spaces)
         }
-        .onChange(of: windowState.currentSpaceId) { _, _ in
-            if let targetIndex = spaces.firstIndex(where: { $0.id == windowState.currentSpaceId }) {
+        .onChange(of: windowState.spaceID) { _, _ in
+            if let targetIndex = spaces.firstIndex(where: { $0.id == windowState.spaceID }) {
                 activeSpaceIndex = targetIndex
             }
             activeTabRefreshTrigger.toggle()
@@ -185,6 +181,7 @@ struct SpacesSideBarView: View {
             activeTabRefreshTrigger.toggle()
         }
     }
+
 
     private var emptyStateView: some View {
         VStack(spacing: NookDesign.Spacing.xl) {
@@ -233,8 +230,8 @@ struct SpacesSideBarView: View {
             }
 
             Button {
-                if let currentSpace = tabManager.currentSpace {
-                    tabManager.createFolder(for: currentSpace.id)
+                if let spaceID = windowState.spaceID {
+                    tabs.createFolder(title: "New Folder", in: .pinned(spaceID: spaceID), after: nil)
                 }
             } label: {
                 Label("New Folder", systemImage: "folder.badge.plus")
@@ -291,45 +288,38 @@ struct SpacesSideBarView: View {
         }
     }
 
-    private func handleSpaceIndexChange(_ newIndex: Int, spaces: [Space]) {
-        guard newIndex >= 0 && newIndex < spaces.count else {
-            return
-        }
-
-        let space = spaces[newIndex]
-
-        // Activate the space (haptic fires during the swipe at 15% offset in PlatformPageView)
-        browserManager.setActiveSpace(space, in: windowState)
+    private func handleSpaceIndexChange(_ newIndex: Int, spaces: [SpaceRecord]) {
+        guard spaces.indices.contains(newIndex), spaces[newIndex].id != windowState.spaceID else { return }
+        // Haptic fires during swipe at 15% offset in PlatformPageView
+        tabs.setSpace(spaces[newIndex].id, in: windowState)
     }
 
     @ViewBuilder
-    private func makeSpaceView(for space: Space, index: Int) -> some View {
+    private func makeSpaceView(for space: SpaceRecord, index: Int) -> some View {
         VStack(spacing: 0) {
             if !windowState.isIncognito {
                 PinnedGrid(
                     width: windowState.sidebarContentWidth,
-                    profileId: space.profileId ?? browserManager.currentProfile?.id
+                    profileId: space.profileID
                 )
                 .environmentObject(browserManager)
-                .environmentObject(tabManager)
                 .environment(windowState)
                 .environment(windowRegistry)
                 .environment(nookSettings)
                 .padding(.horizontal, NookDesign.Spacing.sidebarInset)
                 .padding(.bottom, NookDesign.Spacing.sectionGap)
-                .modifier(FallbackDropBelowEssentialsModifier())
             }
 
+            spaceTitle(space.id)
+                .padding(.horizontal, NookDesign.Spacing.sidebarInset)
+                .padding(.bottom, NookDesign.Spacing.xs)
+
             SpaceView(
-                space: space,
-                isActive: windowState.currentSpaceId == space.id,
-                isSidebarHovered: $isSidebarHovered,
-                onActivateTab: { browserManager.selectTab($0, in: windowState) },
-                onCloseTab: { tabManager.removeTab($0.id) },
-                onMuteTab: { $0.toggleMute() }
+                spaceID: space.id,
+                isActive: windowState.spaceID == space.id,
+                isSidebarHovered: $isSidebarHovered
             )
             .environmentObject(browserManager)
-            .environmentObject(tabManager)
             .environment(windowState)
             .environment(windowRegistry)
             .environment(commandPalette)
@@ -343,29 +333,36 @@ struct SpacesSideBarView: View {
         .tag(index)
     }
 
+    /// The space title doubles as a drop target that pins the dragged tab into the space.
+    private func spaceTitle(_ spaceID: UUID) -> some View {
+        let pinned = Parent.pinned(spaceID: spaceID)
+        let zone = DropZoneID.target(pinned)
+        return NookDropZoneHostView(zoneID: zone, manager: dragSession, onDrop: { itemID in
+            withAnimation(NookDesign.Motion.spring) {
+                tabs.pin(itemID, to: pinned)
+            }
+        }) {
+            SpaceTitle(spaceID: spaceID, isDropHovering: dragSession.isDragging && dragSession.activeZone == zone)
+        }
+    }
+
     // MARK: - Dialogs
 
     private func showSpaceCreationDialog() {
         browserManager.dialogManager.showDialog(
             SpaceCreationDialog(
                 onCreate: { name, icon, profileId, accentHex in
-                    let finalName = name.isEmpty ? "New Space" : name
-                    let finalIcon = icon.isEmpty ? "square.grid.2x2" : icon
-                    let newSpace = tabManager.createSpace(
-                        name: finalName,
-                        icon: finalIcon,
-                        gradient: .accent(hex: accentHex)
-                    )
-
-                    // Assign profile if one was selected
-                    if let profileId = profileId {
-                        tabManager.assign(spaceId: newSpace.id, toProfile: profileId)
+                    let profileID = profileId ?? windowState.profileID ?? browserManager.profileManager.profiles.first?.id
+                    if let profileID,
+                       let spaceID = tabs.createSpace(
+                           profileID: profileID,
+                           name: name.isEmpty ? "New Space" : name,
+                           icon: icon.isEmpty ? "square.grid.2x2" : icon,
+                           accentHex: accentHex,
+                           after: tabs.spaces(inProfile: profileID).last?.id
+                       ) {
+                        tabs.setSpace(spaceID, in: windowState)
                     }
-
-                    if let targetIndex = tabManager.spaces.firstIndex(where: { $0.id == newSpace.id }) {
-                        activeSpaceIndex = targetIndex
-                    }
-
                     browserManager.dialogManager.closeDialog()
                 },
                 onCancel: {
@@ -375,23 +372,6 @@ struct SpacesSideBarView: View {
         )
     }
 
-    private func resolveCurrentSpace() -> Space? {
-        // For incognito windows, use ephemeral spaces
-        if windowState.isIncognito {
-            if let currentId = windowState.currentSpaceId {
-                return windowState.ephemeralSpaces.first { $0.id == currentId }
-            }
-            return windowState.ephemeralSpaces.first
-        }
-        
-        if let current = tabManager.currentSpace {
-            return current
-        }
-        if let currentId = windowState.currentSpaceId {
-            return tabManager.spaces.first { $0.id == currentId }
-        }
-        return tabManager.spaces.first
-    }
 
     // MARK: - Computed Properties
 

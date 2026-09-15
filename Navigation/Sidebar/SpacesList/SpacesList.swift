@@ -6,11 +6,12 @@
 //  Refactored by Aether on 15/11/2025.
 //
 
+import NookTabsCore
 import SwiftUI
 
 struct SpacesList: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var tabManager: TabManager
+    @Environment(TabsController.self) private var tabs
     @Environment(BrowserWindowState.self) private var windowState
     @State private var availableWidth: CGFloat = 0
     @State private var hoveredSpaceId: UUID?
@@ -18,20 +19,14 @@ struct SpacesList: View {
     @State private var isHoveringList: Bool = false
 
     private var layoutMode: SpacesListLayoutMode {
-        let spaces = windowState.isIncognito
-            ? windowState.ephemeralSpaces
-            : tabManager.spaces
-        return SpacesListLayoutMode.determine(
-            spacesCount: spaces.count,
+        SpacesListLayoutMode.determine(
+            spacesCount: visibleSpaces.count,
             availableWidth: availableWidth
         )
     }
 
-    private var visibleSpaces: [Space] {
-        if windowState.isIncognito {
-            return windowState.ephemeralSpaces
-        }
-        return tabManager.spaces
+    private var visibleSpaces: [SpaceRecord] {
+        tabs.switchableSpaces(for: windowState)
     }
 
     var body: some View {
@@ -46,7 +41,7 @@ struct SpacesList: View {
                         ForEach(Array(visibleSpaces.enumerated()), id: \.element.id) { index, space in
                             SpacesListItem(
                                 space: space,
-                                isActive: windowState.currentSpaceId == space.id,
+                                isActive: windowState.spaceID == space.id,
                                 compact: layoutMode == .compact,
                                 isFaded: false,
                                 onHoverChange: { isHovering in
@@ -92,7 +87,7 @@ struct SpacesList: View {
                     .overlay(alignment: .top) {
                         if showPreview,
                            let hoveredId = hoveredSpaceId,
-                           hoveredId != windowState.currentSpaceId,
+                           hoveredId != windowState.spaceID,
                            let hoveredSpace = visibleSpaces.first(where: { $0.id == hoveredId }) {
                             Text(hoveredSpace.name)
                                 .font(.caption)

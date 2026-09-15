@@ -5,12 +5,13 @@
 //  Created by Aether on 15/11/2025.
 //
 
+import NookTabsCore
 import SwiftUI
 
 /// Bottom bar of the sidebar containing menu button, spaces list, and new space button
 struct SidebarBottomBar: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var tabManager: TabManager
+    @Environment(TabsController.self) private var tabs
     @Environment(BrowserWindowState.self) private var windowState
     @Binding var isMenuButtonHovered: Bool
     let onMenuTap: () -> Void
@@ -63,8 +64,8 @@ struct SidebarBottomBar: View {
             }
             
             Button("New Folder", systemImage: "folder.badge.plus") {
-                if let currentSpace = tabManager.currentSpace {
-                    tabManager.createFolder(for: currentSpace.id)
+                if let spaceID = windowState.spaceID {
+                    tabs.createFolder(title: "New Folder", in: .pinned(spaceID: spaceID), after: nil)
                 }
             }
             

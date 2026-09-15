@@ -6,6 +6,7 @@
 //
 
 import AppKit
+import NookTabsCore
 import SwiftUI
 
 struct SpaceEditDialog: DialogPresentable {
@@ -29,15 +30,36 @@ struct SpaceEditDialog: DialogPresentable {
     private let onCancelChanges: () -> Void
 
     init(
+        space: SpaceRecord,
+        mode: Mode,
+        onSave: @escaping (String, String, UUID?, String) -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        self.init(name: space.name, icon: space.icon, profileId: space.profileID, accentHex: space.accentHex,
+                  mode: mode, onSave: onSave, onCancel: onCancel)
+    }
+
+    /// Old-model initializer kept for BrowserManager.showSpaceSettings(for:) until task Z.
+    init(
         space: Space,
         mode: Mode,
         onSave: @escaping (String, String, UUID?, String) -> Void,
         onCancel: @escaping () -> Void
     ) {
-        let name = MainActor.assumeIsolated { space.name }
-        let icon = MainActor.assumeIsolated { space.icon }
-        let profileId = MainActor.assumeIsolated { space.profileId }
-        let accent = MainActor.assumeIsolated { space.accentHex }
+        let values = MainActor.assumeIsolated { (space.name, space.icon, space.profileId, space.accentHex) }
+        self.init(name: values.0, icon: values.1, profileId: values.2, accentHex: values.3,
+                  mode: mode, onSave: onSave, onCancel: onCancel)
+    }
+
+    private init(
+        name: String,
+        icon: String,
+        profileId: UUID?,
+        accentHex accent: String,
+        mode: Mode,
+        onSave: @escaping (String, String, UUID?, String) -> Void,
+        onCancel: @escaping () -> Void
+    ) {
         self.mode = mode
         self.originalSpaceName = name
         self.originalSpaceIcon = icon
@@ -49,6 +71,35 @@ struct SpaceEditDialog: DialogPresentable {
         _accentHex = State(initialValue: accent)
         self.onSaveChanges = onSave
         self.onCancelChanges = onCancel
+    }
+
+    /// Presents the edit dialog for a space and writes its changes through TabsController.
+    @MainActor
+    static func present(spaceID: UUID, tabs: TabsController, dialogManager: DialogManager) {
+        guard let space = tabs.space(spaceID) else { return }
+        dialogManager.showDialog(
+            SpaceEditDialog(
+                space: space,
+                mode: .icon,
+                onSave: { name, icon, profileId, accentHex in
+                    guard let current = tabs.space(spaceID) else {
+                        dialogManager.closeDialog()
+                        return
+                    }
+                    tabs.updateSpace(
+                        spaceID,
+                        name: name != current.name ? name : nil,
+                        icon: icon != current.icon ? icon : nil,
+                        accentHex: accentHex.caseInsensitiveCompare(current.accentHex) != .orderedSame ? accentHex : nil
+                    )
+                    if let profileId {
+                        tabs.moveSpaceToEnd(spaceID, ofProfile: profileId)
+                    }
+                    dialogManager.closeDialog()
+                },
+                onCancel: { dialogManager.closeDialog() }
+            )
+        )
     }
 
     func dialogHeader() -> DialogHeader {
