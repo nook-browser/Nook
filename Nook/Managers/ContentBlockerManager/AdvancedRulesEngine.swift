@@ -113,6 +113,7 @@ final class AdvancedRulesEngine {
         }
         let siteScripts: [(resource: String, hostPattern: String)] = [
             ("facebook-sponsored-blocker", #"(^|\.)facebook\.com$"#),
+            ("instagram-sponsored-blocker", #"(^|\.)instagram\.com$"#),
             ("youtube-ad-blocker", #"(^|\.)(youtube\.com|youtubekids\.com|youtube-nocookie\.com)$"#),
             ("twitter-ad-blocker", #"(^|\.)(twitter\.com|x\.com)$"#),
         ]

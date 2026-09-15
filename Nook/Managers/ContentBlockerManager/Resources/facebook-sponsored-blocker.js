@@ -153,6 +153,32 @@
       }
     }
 
+    // Strategy 4: explicit ad-redirect CTA links (Meta's shared ad-click infra, seen on
+    // both facebook.com and instagram.com sponsored posts) — only process NEW ones
+    var adRedirectLinks = document.querySelectorAll('a[href*="/ads/ig_redirect/"]');
+    for (var p = 0; p < adRedirectLinks.length; p++) {
+      var arl = adRedirectLinks[p];
+      if (processedAnchors.has(arl)) continue;
+      processedAnchors.add(arl);
+
+      var post6 = getPostContainer(arl);
+      if (post6 && !markedPosts.has(post6)) {
+        hidePost(post6, 'ads-ig-redirect-href');
+      }
+    }
+
+    // Strategy 5: data-ad-comet-preview / data-ad-preview — seen live on an ad post whose
+    // CTA used the generic l.facebook.com/l.php outbound shim (not ads/ig_redirect), so
+    // Strategies 1/3/4 missed it. Unlike data-ad-rendering-role (Strategy 2), not yet seen
+    // on an organic post — validate live and drop this if it starts hiding real posts.
+    var adPreviewEls = document.querySelectorAll('[data-ad-comet-preview]:not([data-nook-blocked]), [data-ad-preview]:not([data-nook-blocked])');
+    for (var q = 0; q < adPreviewEls.length; q++) {
+      var post7 = getPostContainer(adPreviewEls[q]);
+      if (post7 && !markedPosts.has(post7)) {
+        hidePost(post7, 'ad-preview-attr');
+      }
+    }
+
     var newHides = hiddenCount - hidesBefore;
     if (newHides > 0) {
       var totalPosts = document.querySelectorAll(POST_SEL_STR).length;
@@ -160,15 +186,76 @@
     }
   }
 
+  // --- Stories: advance past an ad as soon as it becomes the active story.
+  // Unverified — no Facebook story ad was seen live during probing (see
+  // docs/superpowers/specs or CLAUDE.md's site-tweak probe method). Reuses the feed's
+  // SPONSORED_LABELS text match; gated to the story-viewer dialog so it can't fire on an
+  // ordinary inline feed video, which also gets aria-label="Video player".
+  var advancedStories = new WeakSet();
+
+  function findLeafLabel(root) {
+    var stack = [root];
+    while (stack.length) {
+      var node = stack.pop();
+      if (node.children && node.children.length) {
+        for (var i = 0; i < node.children.length; i++) stack.push(node.children[i]);
+        continue;
+      }
+      var t = (node.textContent || '').trim().toLowerCase();
+      if (t && isLikelySponsored(t)) return node;
+    }
+    return null;
+  }
+
+  // Prefer the real next-story control (an explicit chevron button next to the story card
+  // on desktop, not an in-video tap zone — a synthetic click inside the video just hits
+  // pause/mute). Fall back to a coordinate tap in case the button isn't found.
+  function advanceStory(card) {
+    var next = document.querySelector('[aria-label="Next" i], [aria-label*="next" i][role="button"]');
+    if (next) { next.click(); return; }
+    var rect = card.getBoundingClientRect();
+    var x = rect.left + rect.width * 0.88;
+    var y = rect.top + rect.height * 0.5;
+    var el = document.elementFromPoint(x, y);
+    if (!el) return;
+    ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(function (type) {
+      el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, view: window }));
+    });
+  }
+
+  function scanStories() {
+    var player = document.querySelector('[aria-label="Video player"]');
+    if (!player || advancedStories.has(player)) return;
+    var dialog = player.closest('[role="dialog"]');
+    if (!dialog) return; // inline feed video, not the story viewer
+    var label = findLeafLabel(dialog);
+    if (label) {
+      advancedStories.add(player);
+      console.log(TAG, 'STORY AD, advancing:', label.textContent.trim());
+      advanceStory(dialog);
+    }
+  }
+
   // --- Observer (replaces setInterval — only scan when DOM changes) ---
+  // Facebook's feed never virtualizes (it only grows as you scroll) and its DOM churns
+  // constantly even for trivial state updates, so scanning on every single mutation batch
+  // — even via requestAnimationFrame, which still fires up to 60x/sec — visibly slowed
+  // scrolling. Nothing here needs sub-second latency; throttle to a few times a second.
   var pending = false;
+  var lastRun = 0;
+  var MIN_INTERVAL_MS = 400;
   function schedScan() {
     if (pending) return;
     pending = true;
-    requestAnimationFrame(function() {
-      pending = false;
-      scan();
-    });
+    var wait = Math.max(0, MIN_INTERVAL_MS - (Date.now() - lastRun));
+    setTimeout(function() {
+      requestAnimationFrame(function() {
+        pending = false;
+        lastRun = Date.now();
+        scan();
+        scanStories();
+      });
+    }, wait);
   }
 
   var observer = new MutationObserver(function(mutations) {
@@ -199,6 +286,7 @@
       childList: true
     });
     scan();
+    scanStories();
   }
 
   start();
