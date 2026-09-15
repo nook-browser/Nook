@@ -247,8 +247,8 @@ struct TopBarView: View {
 
     // Determine if we should animate color changes (within same tab) or snap (tab switch)
     private var shouldAnimateColorChange: Bool {
-        let currentTabId = browserManager.tabs.selectedSession(in: windowState)?.id
-        return currentTabId == previousTabId
+        let selectedItemID = browserManager.tabs.selectedSession(in: windowState)?.id
+        return selectedItemID == previousTabId
     }
 
     // Top bar background color - matches top-right pixel of webview

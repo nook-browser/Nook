@@ -211,7 +211,7 @@ struct WebsiteView: View {
                             rightId: splitManager.rightTabId(for: windowState.id),
                             windowState: windowState,
                             compositorVersion: windowState.compositorVersion,
-                            currentTabId: windowState.selectedItemID
+                            selectedItemID: windowState.selectedItemID
                         )
                         .coordinateSpace(name: dragCoordinateSpace)
                         .background(shouldShowSplit ? Color.clear : Color(nsColor: .windowBackgroundColor))
@@ -435,7 +435,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
     var rightId: UUID?
     let windowState: BrowserWindowState
     var compositorVersion: Int
-    var currentTabId: UUID?
+    var selectedItemID: UUID?
 
     class Coordinator {
         weak var browserManager: BrowserManager?
