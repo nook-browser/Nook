@@ -6,6 +6,8 @@ import UniformTypeIdentifiers
 // Simple subclass to ensure clicking a webview focuses its tab in the app state
 @MainActor
 final class FocusableWKWebView: WKWebView {
+    weak var owningSession: PageSession?
+    /// Legacy back-reference still set by `Tab`; removed in task Z.
     weak var owningTab: Tab?
     var contextMenuBridge: WebContextMenuBridge?
     nonisolated private static let imageContentTypes: [UTType] = [
@@ -14,7 +16,7 @@ final class FocusableWKWebView: WKWebView {
 
     deinit {
         // MEMORY LEAK FIX: Detach bridge deterministically. The primary cleanup now
-        // happens in Tab.cleanupCloneWebView(), but this is a safety net.
+        // happens in PageSession.cleanupClone(_:), but this is a safety net.
         if let bridge = contextMenuBridge {
             let bridge = bridge
             Task { @MainActor in
@@ -26,9 +28,9 @@ final class FocusableWKWebView: WKWebView {
 
     override func mouseDown(with event: NSEvent) {
         // Store Option key state for Peek functionality
-        owningTab?.isOptionKeyDown = event.modifierFlags.contains(.option)
+        owningSession?.isOptionKeyDown = event.modifierFlags.contains(.option)
 
-        owningTab?.activate()
+        owningSession?.activate()
         // Ensure this webview becomes first responder so it can receive menu events
         if window?.firstResponder != self {
             window?.makeFirstResponder(self)
@@ -37,7 +39,7 @@ final class FocusableWKWebView: WKWebView {
     }
 
     override func rightMouseDown(with event: NSEvent) {
-        owningTab?.activate()
+        owningSession?.activate()
         // Ensure this webview becomes first responder so willOpenMenu gets called
         if window?.firstResponder != self {
             window?.makeFirstResponder(self)
@@ -49,7 +51,7 @@ final class FocusableWKWebView: WKWebView {
 
     override func mouseUp(with event: NSEvent) {
         // Reset Option key state after mouse up
-        owningTab?.isOptionKeyDown = false
+        owningSession?.isOptionKeyDown = false
         super.mouseUp(with: event)
     }
     private weak var pendingMenu: NSMenu?
@@ -71,7 +73,7 @@ final class FocusableWKWebView: WKWebView {
 
     private func prepareMenu(_ menu: NSMenu) {
         pendingMenu = menu
-        pendingPayload = owningTab?.pendingContextMenuPayload
+        pendingPayload = owningSession?.pendingContextMenuPayload
 
         contextMenuFallbackWorkItem?.cancel()
         let fallback = DispatchWorkItem { [weak self, weak menu] in
@@ -82,7 +84,7 @@ final class FocusableWKWebView: WKWebView {
             self.pendingMenu = nil
             self.pendingPayload = nil
             self.contextMenuFallbackWorkItem = nil
-            self.owningTab?.pendingContextMenuPayload = nil
+            self.owningSession?.pendingContextMenuPayload = nil
         }
         contextMenuFallbackWorkItem = fallback
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: fallback)
@@ -190,11 +192,11 @@ final class FocusableWKWebView: WKWebView {
         }
 
         if rawValue.hasPrefix("//"),
-           let scheme = owningTab?.url.scheme {
+           let scheme = owningSession?.url.scheme {
             return URL(string: "\(scheme):\(rawValue)")
         }
 
-        if let base = owningTab?.url,
+        if let base = owningSession?.url,
            let resolved = URL(string: rawValue, relativeTo: base)?.absoluteURL {
             return resolved
         }
@@ -224,7 +226,7 @@ final class FocusableWKWebView: WKWebView {
         originalURL: URL,
         destinationPreference: Download.DestinationPreference
     ) {
-        guard let tab = owningTab else {
+        guard let tab = owningSession else {
             return
         }
 
@@ -247,7 +249,7 @@ final class FocusableWKWebView: WKWebView {
         originalURL: URL,
         destinationPreference: Download.DestinationPreference
     ) {
-        guard let tab = owningTab,
+        guard let tab = owningSession,
               let manager = tab.browserManager?.downloadManager else { return }
 
         let proposedName = originalURL.lastPathComponent.isEmpty ? "image" : originalURL.lastPathComponent
@@ -401,7 +403,7 @@ final class FocusableWKWebView: WKWebView {
         pendingPayload = nil
         contextMenuFallbackWorkItem?.cancel()
         contextMenuFallbackWorkItem = nil
-        owningTab?.pendingContextMenuPayload = nil
+        owningSession?.pendingContextMenuPayload = nil
         return true
     }
 
@@ -417,6 +419,6 @@ final class FocusableWKWebView: WKWebView {
             guard let id = item.identifier else { return true }
             return !identifiersToRemove.contains(id)
         }
-        owningTab?.pendingContextMenuPayload = nil
+        owningSession?.pendingContextMenuPayload = nil
     }
 }

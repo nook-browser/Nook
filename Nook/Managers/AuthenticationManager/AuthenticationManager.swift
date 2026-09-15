@@ -71,13 +71,13 @@ final class AuthenticationManager: NSObject {
     private weak var browserManager: BrowserManager?
     private let credentialStore = BasicAuthCredentialStore()
     private var activeIdentityRequest: IdentityRequest?
-    private weak var activeIdentityTab: Tab?
+    private weak var activeIdentitySession: PageSession?
     private var waitingForMiniWindow = false
     func attach(browserManager: BrowserManager) {
         self.browserManager = browserManager
     }
 
-    func beginIdentityFlow(_ request: IdentityRequest, from tab: Tab) {
+    func beginIdentityFlow(_ request: IdentityRequest, from tab: PageSession) {
         // Non-interactive flows cannot be satisfied without UI today.
         if request.interactive == false {
             tab.finishIdentityFlow(requestId: request.requestId, with: .failure(.interactionRequired))
@@ -94,7 +94,7 @@ final class AuthenticationManager: NSObject {
         }
 
         activeIdentityRequest = request
-        activeIdentityTab = tab
+        activeIdentitySession = tab
         waitingForMiniWindow = true
 
         manager.externalMiniWindowManager.present(url: request.url) { [weak self] success, finalURL in
@@ -107,7 +107,7 @@ final class AuthenticationManager: NSObject {
 
     func handleAuthenticationChallenge(
         _ challenge: URLAuthenticationChallenge,
-        for tab: Tab,
+        for tab: PageSession,
         completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) -> Bool {
         switch challenge.protectionSpace.authenticationMethod {
@@ -169,7 +169,7 @@ final class AuthenticationManager: NSObject {
     }
 
     private func handleMiniWindowCompletion(success: Bool, finalURL: URL?) {
-        guard let request = activeIdentityRequest, let tab = activeIdentityTab else {
+        guard let request = activeIdentityRequest, let tab = activeIdentitySession else {
             clearActiveIdentityState()
             return
         }
@@ -187,7 +187,7 @@ final class AuthenticationManager: NSObject {
     }
 
     private func cancelActiveIdentityFlow() {
-        if let request = activeIdentityRequest, let tab = activeIdentityTab {
+        if let request = activeIdentityRequest, let tab = activeIdentitySession {
             tab.finishIdentityFlow(requestId: request.requestId, with: .cancelled)
         }
         clearActiveIdentityState()
@@ -195,13 +195,13 @@ final class AuthenticationManager: NSObject {
 
     private func clearActiveIdentityState() {
         activeIdentityRequest = nil
-        activeIdentityTab = nil
+        activeIdentitySession = nil
         waitingForMiniWindow = false
     }
 
     private func presentBasicCredentialPrompt(
         for challenge: URLAuthenticationChallenge,
-        tab: Tab,
+        tab: PageSession,
         completion: @escaping (URLCredential?) -> Void
     ) {
         guard let manager = browserManager else {
@@ -261,5 +261,26 @@ final class AuthenticationManager: NSObject {
         )
 
         manager.dialogManager.showDialog(dialog)
+    }
+}
+
+// MARK: - Legacy Tab (task Z deletes)
+
+extension AuthenticationManager {
+    func handleAuthenticationChallenge(
+        _ challenge: URLAuthenticationChallenge,
+        for tab: Tab,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) -> Bool {
+        guard let session = tab.browserManager?.tabs.session(for: tab.id) else { return false }
+        return handleAuthenticationChallenge(challenge, for: session, completionHandler: completionHandler)
+    }
+
+    func beginIdentityFlow(_ request: IdentityRequest, from tab: Tab) {
+        guard let session = tab.browserManager?.tabs.session(for: tab.id) else {
+            tab.finishIdentityFlow(requestId: request.requestId, with: .failure(.fallbackUnavailable))
+            return
+        }
+        beginIdentityFlow(request, from: session)
     }
 }

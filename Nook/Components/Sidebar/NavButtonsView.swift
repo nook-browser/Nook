@@ -5,92 +5,13 @@
 //  Created by Maciek Bagiński on 30/07/2025.
 //
 import SwiftUI
-import Combine
-
-// Wrapper to properly observe Tab object and use active window's WebView.
-// Uses KVO on WKWebView.canGoBack/canGoForward/isLoading instead of a polling timer.
-@MainActor
-class ObservableTabWrapper: ObservableObject {
-    @Published var tab: Tab?
-    weak var browserManager: BrowserManager?
-    weak var windowState: BrowserWindowState?
-    private var canGoBackObservation: NSKeyValueObservation?
-    private var canGoForwardObservation: NSKeyValueObservation?
-    private var isLoadingObservation: NSKeyValueObservation?
-    private var loadingStateCancellable: AnyCancellable?
-
-    var canGoBack: Bool {
-        if let tab = tab,
-           let browserManager = browserManager,
-           let windowState = windowState,
-           let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
-            return webView.canGoBack
-        }
-        return tab?.canGoBack ?? false
-    }
-
-    var canGoForward: Bool {
-        if let tab = tab,
-           let browserManager = browserManager,
-           let windowState = windowState,
-           let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
-            return webView.canGoForward
-        }
-        return tab?.canGoForward ?? false
-    }
-
-    func updateTab(_ newTab: Tab?) {
-        tab = newTab
-        observeWebView()
-        observeLoadingState()
-    }
-
-    func setContext(browserManager: BrowserManager, windowState: BrowserWindowState) {
-        self.browserManager = browserManager
-        self.windowState = windowState
-        observeWebView()
-    }
-
-    private func observeWebView() {
-        // Remove old observations
-        canGoBackObservation = nil
-        canGoForwardObservation = nil
-        isLoadingObservation = nil
-
-        guard let tab = tab,
-              let browserManager = browserManager,
-              let windowState = windowState,
-              let webView = browserManager.getWebView(for: tab.id, in: windowState.id)
-        else { return }
-
-        canGoBackObservation = webView.observe(\.canGoBack, options: [.new]) { [weak self] _, _ in
-            Task { @MainActor in self?.objectWillChange.send() }
-        }
-        canGoForwardObservation = webView.observe(\.canGoForward, options: [.new]) { [weak self] _, _ in
-            Task { @MainActor in self?.objectWillChange.send() }
-        }
-        isLoadingObservation = webView.observe(\.isLoading, options: [.new]) { [weak self] _, _ in
-            Task { @MainActor in self?.objectWillChange.send() }
-        }
-    }
-
-    private func observeLoadingState() {
-        loadingStateCancellable = nil
-        guard let tab = tab else { return }
-        loadingStateCancellable = tab.$loadingState
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-    }
-}
+import WebKit
 
 struct NavButtonsView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.nookSettings) var nookSettings
     var effectiveSidebarWidth: CGFloat?
-    @StateObject private var tabWrapper = ObservableTabWrapper()
     @State private var isMenuHovered = false
 
     var body: some View {
@@ -139,7 +60,7 @@ struct NavButtonsView: View {
                             .labelStyle(.iconOnly)
                             .buttonStyle(NookIconButtonStyle())
                             .foregroundStyle(Color.primary)
-                            .disabled(!tabWrapper.canGoBack)
+                            .disabled(!canGoBack)
                             .contextMenu {
                                 NavigationHistoryContextMenu(
                                     historyType: .back,
@@ -151,7 +72,7 @@ struct NavButtonsView: View {
                             .labelStyle(.iconOnly)
                             .buttonStyle(NookIconButtonStyle())
                             .foregroundStyle(Color.primary)
-                            .disabled(!tabWrapper.canGoForward)
+                            .disabled(!canGoForward)
                             .contextMenu {
                                 NavigationHistoryContextMenu(
                                     historyType: .forward,
@@ -171,13 +92,13 @@ struct NavButtonsView: View {
                 
                 if !shouldCollapseRefresh {
                     Button {
-                        if tabWrapper.tab?.isLoading == true {
-                            tabWrapper.tab?.stop()
+                        if session?.isLoading == true {
+                            session?.stop()
                         } else {
                             refreshCurrentTab()
                         }
                     } label: {
-                        Image(systemName: tabWrapper.tab?.isLoading == true ? "xmark" : "arrow.clockwise")
+                        Image(systemName: session?.isLoading == true ? "xmark" : "arrow.clockwise")
                             .contentTransition(.symbolEffect(.replace))
                     }
                     .labelStyle(.iconOnly)
@@ -195,39 +116,30 @@ struct NavButtonsView: View {
                 }
             }
         )
-        .onAppear {
-            tabWrapper.setContext(browserManager: browserManager, windowState: windowState)
-            updateCurrentTab()
-        }
-        .onChange(of: browserManager.currentTab(for: windowState)?.id) { _, _ in
-            updateCurrentTab()
-        }
     }
-    
-    private func updateCurrentTab() {
-        tabWrapper.updateTab(browserManager.currentTab(for: windowState))
+
+    private var session: PageSession? {
+        browserManager.tabs.selectedSession(in: windowState)
     }
-    
+
+    private var canGoBack: Bool { session?.canGoBack ?? false }
+    private var canGoForward: Bool { session?.canGoForward ?? false }
+
+    /// This window's own view of the page, so a clone navigates in its window.
+    private var windowWebView: WKWebView? {
+        session.flatMap { browserManager.webViewCoordinator?.getWebView(for: $0.itemID, in: windowState.id) }
+    }
+
     private func goBack() {
-        if let tab = tabWrapper.tab,
-           let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
-            webView.goBack()
-        } else {
-            tabWrapper.tab?.goBack()
-        }
+        if let webView = windowWebView { webView.goBack() } else { session?.goBack() }
     }
-    
+
     private func goForward() {
-        if let tab = tabWrapper.tab,
-           let webView = browserManager.getWebView(for: tab.id, in: windowState.id) {
-            webView.goForward()
-        } else {
-            tabWrapper.tab?.goForward()
-        }
+        if let webView = windowWebView { webView.goForward() } else { session?.goForward() }
     }
-    
+
     private func refreshCurrentTab() {
-        tabWrapper.tab?.refresh()
+        session?.refresh()
     }
     
     @ViewBuilder
@@ -238,12 +150,12 @@ struct NavButtonsView: View {
                     Button(action: goBack) {
                         Label("Go Back", systemImage: "arrow.backward")
                     }
-                    .disabled(!tabWrapper.canGoBack)
+                    .disabled(!canGoBack)
 
                     Button(action: goForward) {
                         Label("Go Forward", systemImage: "arrow.forward")
                     }
-                    .disabled(!tabWrapper.canGoForward)
+                    .disabled(!canGoForward)
                 }
 
                 if includeAIChat {
