@@ -187,6 +187,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         let start = CFAbsoluteTimeGetCurrent()
         if let manager = browserManager {
             manager.tabManager.persistFinalSnapshotBlocking()
+            manager.tabs.flushSync()
             do {
                 try manager.modelContext.save()
             } catch {

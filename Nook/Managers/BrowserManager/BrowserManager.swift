@@ -1716,6 +1716,9 @@ class BrowserManager: ObservableObject {
             gradientColorManager.setImmediate(.default)
         }
 
+        // New tab model: window space, profile and selection (loads no pages).
+        tabs.attach(window: windowState)
+
         // Apply startup tab loading mode
         applyStartupLoadMode(for: windowState)
     }
@@ -2160,6 +2163,7 @@ class BrowserManager: ObservableObject {
             .ignoresSafeArea(.all)
             .environmentObject(self)
             .environmentObject(tabManager)
+            .environment(tabs)
             .environment(windowRegistry)
             .environment(webViewCoordinator)
             .environmentObject(gradientColorManager)
@@ -2228,6 +2232,7 @@ class BrowserManager: ObservableObject {
             .ignoresSafeArea(.all)
             .environmentObject(self)
             .environmentObject(tabManager)
+            .environment(tabs)
             .environment(windowRegistry)
             .environment(webViewCoordinator)
             .environmentObject(gradientColorManager)
