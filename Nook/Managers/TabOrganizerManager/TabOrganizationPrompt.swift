@@ -10,10 +10,12 @@ import Foundation
 
 // MARK: - TabInput
 
-/// Pairs a tab with a stable integer index for prompt construction and result mapping.
+/// A tab's prompt index, title and URL, captured before inference.
 struct TabInput {
     let index: Int
-    let tab: Tab
+    let itemID: UUID
+    let title: String
+    let url: URL
 }
 
 // MARK: - TabOrganizationPrompt
@@ -116,8 +118,8 @@ enum TabOrganizationPrompt {
 
         // Tab lines
         let lines = capped.map { input in
-            let title = input.tab.displayName
-            let shortURL = shortenURL(input.tab.url)
+            let title = input.title
+            let shortURL = shortenURL(input.url)
             return "\(input.index). \"\(title)\" | \(shortURL)"
         }
 

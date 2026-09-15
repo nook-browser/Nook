@@ -360,8 +360,8 @@ class AIService {
 
     func extractPageContext(windowState: BrowserWindowState) async -> String {
         guard let browserManager = browserManager,
-              let currentTab = browserManager.currentTab(for: windowState),
-              let webView = browserManager.getWebView(for: currentTab.id, in: windowState.id) else {
+              let itemID = windowState.selectedItemID,
+              let webView = browserManager.getWebView(for: itemID, in: windowState.id) else {
             return ""
         }
 

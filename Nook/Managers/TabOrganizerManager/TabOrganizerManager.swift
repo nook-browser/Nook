@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import NookTabsCore
 import OSLog
 
 // MARK: - TabOrganizerManager
@@ -26,9 +27,6 @@ final class TabOrganizerManager {
     /// The local LLM engine used for inference.
     let engine: LocalLLMEngine
 
-    /// Maps 1-based prompt indices to actual Tab objects for the current run.
-    private var tabMapping: [Int: Tab] = [:]
-
     /// Whether an organization run is currently in progress.
     private(set) var isOrganizing: Bool = false
 
@@ -38,11 +36,8 @@ final class TabOrganizerManager {
     /// Whether a previous organization can be undone.
     private(set) var canUndo: Bool = false
 
-    /// Snapshot for undo support.
-    private var undoSnapshot: TabSnapshot?
-
-    /// The space ID that was last organized (needed for undo).
-    private var undoSpaceId: UUID?
+    /// The change that reverts the last organization, applied with `TabsController.apply(_:)`.
+    private var undoChange: Change?
 
     // MARK: - Init
 
@@ -57,68 +52,55 @@ final class TabOrganizerManager {
 
     // MARK: - Organize
 
-    /// Run the full tab organization flow for a given space.
+    /// Run the full tab organization flow for a space's tabs section.
     ///
-    /// 1. Collects unfiled tabs from the space.
+    /// 1. Collects the loose tabs (not in a folder) of the space's tabs section.
     /// 2. Builds a prompt with tab metadata and existing folder names.
     /// 3. Runs local LLM inference.
-    /// 4. Parses the result into a ``TabOrganizationPlan``.
-    /// 5. Sets state for the preview UI.
-    ///
-    /// - Parameters:
-    ///   - space: The space whose tabs should be organized.
-    ///   - tabManager: The tab manager to query for tabs and folders.
-    func organizeTabs(in space: Space, using tabManager: TabManager) async {
-        // Guard: not already organizing
+    /// 4. Parses the result into a ``TabOrganizationPlan`` and applies it.
+    func organizeTabs(in spaceID: UUID, using tabs: TabsController) async {
         guard !isOrganizing else {
             Self.log.warning("Organization already in progress, ignoring request")
             return
         }
-
-        // Clear any previous error
         error = nil
 
-        // Get unfiled tabs (loose tabs not already in a folder)
-        let tabs = tabManager.looseTabs(in: space)
+        guard let space = tabs.space(spaceID) else { return }
+        let section = tabs.children(of: .tabs(spaceID: spaceID))
+        let loose = section.filter { !$0.isFolder }
 
-        // Guard: need at least 3 tabs
-        guard tabs.count >= 3 else {
-            error = "Need at least 3 unfiled tabs to organize (found \(tabs.count))."
-            Self.log.info("Too few tabs to organize: \(tabs.count)")
+        guard loose.count >= 3 else {
+            error = "Need at least 3 unfiled tabs to organize (found \(loose.count))."
+            Self.log.info("Too few tabs to organize: \(loose.count)")
             return
         }
-
-        // Guard: not more than maxTabs
-        guard tabs.count <= TabOrganizationPrompt.maxTabs else {
-            error = "Too many tabs (\(tabs.count)). Maximum is \(TabOrganizationPrompt.maxTabs)."
-            Self.log.info("Too many tabs to organize: \(tabs.count)")
+        guard loose.count <= TabOrganizationPrompt.maxTabs else {
+            error = "Too many tabs (\(loose.count)). Maximum is \(TabOrganizationPrompt.maxTabs)."
+            Self.log.info("Too many tabs to organize: \(loose.count)")
             return
         }
 
         isOrganizing = true
-        Self.log.info("Starting tab organization for space '\(space.name)' with \(tabs.count) tabs")
+        Self.log.info("Starting tab organization for space '\(space.name)' with \(loose.count) tabs")
 
         do {
-            // Build index mapping (1-based) and TabInput array
-            var mapping: [Int: Tab] = [:]
+            var mapping: [Int: UUID] = [:]
             var inputs: [TabInput] = []
-            for (offset, tab) in tabs.enumerated() {
+            for (offset, item) in loose.enumerated() {
                 let index = offset + 1
-                mapping[index] = tab
-                inputs.append(TabInput(index: index, tab: tab))
+                let session = tabs.session(for: item.id)
+                let title = item.customTitle.flatMap { $0.isEmpty ? nil : $0 } ?? session?.title ?? item.displayTitle
+                guard let url = session?.url ?? item.url else { continue }
+                mapping[index] = item.id
+                inputs.append(TabInput(index: index, itemID: item.id, title: title, url: url))
             }
 
-            // Get existing folder names for context
-            let existingFolderNames = tabManager.folders(for: space.id).map(\.name)
-
-            // Build prompt
             let prompt = TabOrganizationPrompt.build(
                 tabs: inputs,
                 spaceName: space.name,
-                existingFolderNames: existingFolderNames
+                existingFolderNames: section.filter(\.isFolder).map(\.displayTitle)
             )
 
-            // Run inference
             let output = try await engine.generate(
                 systemPrompt: prompt.system,
                 userPrompt: prompt.user,
@@ -129,14 +111,11 @@ final class TabOrganizerManager {
 
             Self.log.debug("LLM output: \(output)")
 
-            // Parse the plan
-            let validRange = 1...tabs.count
-            let parsedPlan = try TabOrganizationPlanParser.parse(output, validRange: validRange)
+            let parsedPlan = try TabOrganizationPlanParser.parse(output, validRange: 1...loose.count)
 
             Self.log.info("Organization plan ready: \(parsedPlan.groups.count) groups, \(parsedPlan.renames.count) renames, \(parsedPlan.duplicates.count) duplicate sets")
 
-            // Apply immediately — no preview sheet
-            self.tabMapping = mapping
+            // Apply immediately, no preview sheet
             let accepted = AcceptedChanges(
                 acceptedGroupIds: Set(parsedPlan.groups.map(\.id)),
                 acceptedRenameIds: Set(parsedPlan.renames.map(\.id)),
@@ -144,19 +123,16 @@ final class TabOrganizerManager {
                 applySortOrder: parsedPlan.sort != nil
             )
 
-            let snapshot = TabOrganizationApplier.apply(
+            let undo = TabOrganizationApplier.apply(
                 plan: parsedPlan,
                 accepted: accepted,
                 tabMapping: mapping,
-                spaceId: space.id,
-                tabManager: tabManager
+                spaceID: spaceID,
+                tabs: tabs
             )
 
-            // Store undo state
-            undoSnapshot = snapshot
-            undoSpaceId = space.id
-            canUndo = true
-            self.tabMapping = [:]
+            undoChange = undo.isEmpty ? nil : undo
+            canUndo = undoChange != nil
 
             Self.log.info("Organization applied")
 
@@ -171,37 +147,25 @@ final class TabOrganizerManager {
         isOrganizing = false
     }
 
-    // MARK: - Undo
-
-    /// Undo the last organization operation.
-    ///
-    /// - Parameter tabManager: The tab manager to mutate.
-    func undoLastOrganization(using tabManager: TabManager) {
-        guard let snapshot = undoSnapshot, let spaceId = undoSpaceId else {
-            Self.log.warning("undoLastOrganization called with no snapshot")
-            return
-        }
-
-        Self.log.info("Undoing last organization")
-
-        TabOrganizationApplier.undo(
-            snapshot: snapshot,
-            spaceId: spaceId,
-            tabManager: tabManager
-        )
-
-        // Clear undo state
-        undoSnapshot = nil
-        undoSpaceId = nil
-        canUndo = false
-
-        Self.log.info("Undo complete")
+    /// Old-model entry point for sidebar callers that still hold a `Space`; removed in task Z.
+    func organizeTabs(in space: Space, using tabManager: TabManager) async {
+        guard let tabs = tabManager.browserManager?.tabs else { return }
+        await organizeTabs(in: space.id, using: tabs)
     }
 
-    // MARK: - Private
+    // MARK: - Undo
 
-    private func clearPlanState() {
-        tabMapping = [:]
-        error = nil
+    /// Reverts the last organization: folders it created go away, moved and renamed tabs go back,
+    /// closed duplicates return with their ids.
+    func undoLastOrganization(using tabs: TabsController) {
+        guard let change = undoChange else {
+            Self.log.warning("undoLastOrganization called with nothing to undo")
+            return
+        }
+        Self.log.info("Undoing last organization")
+        tabs.apply(change)
+        undoChange = nil
+        canUndo = false
+        Self.log.info("Undo complete")
     }
 }

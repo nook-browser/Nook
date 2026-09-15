@@ -205,6 +205,7 @@ struct SidebarMenuHistoryTab: View {
                                     HistoryRowView(
                                         entry: entry,
                                         onTap: { openInCurrentTab(entry.url) },
+                                        onOpenInNewTab: { openInNewTab(entry.url) },
                                         onDelete: { deleteEntry(entry) }
                                     )
                                     .onAppear {
@@ -394,11 +395,13 @@ struct SidebarMenuHistoryTab: View {
     }
 
     private func openInCurrentTab(_ url: URL) {
-        if let currentTab = browserManager.tabManager.currentTab {
-            currentTab.loadURL(url)
-        } else {
-            _ = browserManager.tabManager.createNewTab(url: url.absoluteString)
-        }
+        guard let window = browserManager.windowRegistry?.activeWindow else { return }
+        browserManager.tabs.open(url: url, in: window, placement: window.selectedItemID == nil ? .newTab : .replaceCurrent)
+    }
+
+    private func openInNewTab(_ url: URL) {
+        guard let window = browserManager.windowRegistry?.activeWindow else { return }
+        browserManager.tabs.open(url: url, in: window, placement: .newTab)
     }
 
     private func deleteEntry(_ entry: HistoryEntry) {
@@ -429,6 +432,7 @@ struct SidebarMenuHistoryTab: View {
 struct HistoryRowView: View {
     let entry: HistoryEntry
     let onTap: () -> Void
+    let onOpenInNewTab: () -> Void
     let onDelete: () -> Void
 
     @EnvironmentObject var gradientColorManager: GradientColorManager
@@ -538,7 +542,7 @@ struct HistoryRowView: View {
         .contextMenu {
             Button("Open") { onTap() }
             Button("Open in New Tab") {
-                onTap()
+                onOpenInNewTab()
             }
             Divider()
             Button("Remove from History") { onDelete() }
@@ -558,7 +562,7 @@ struct HistoryRowView: View {
         }
 
         let cacheKey = entry.url.host ?? entry.url.absoluteString
-        if let cachedFavicon = Tab.getCachedFavicon(for: cacheKey) {
+        if let cachedFavicon = await FaviconCache.shared.cachedImage(for: cacheKey).map(SwiftUI.Image.init(nsImage:)) {
             await MainActor.run {
                 self.favicon = cachedFavicon
             }
@@ -575,7 +579,7 @@ struct HistoryRowView: View {
                 let nsImage = faviconImage.image
                 let swiftUIImage = SwiftUI.Image(nsImage: nsImage)
 
-                Tab.cacheFavicon(swiftUIImage, for: cacheKey)
+                FaviconCache.shared.store(nsImage, for: cacheKey)
 
                 await MainActor.run {
                     self.favicon = swiftUIImage

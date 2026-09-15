@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct TabSuggestionItem: View {
-    let tab: Tab
+    let tab: SearchManager.TabMatch
     var isSelected: Bool = false
     
     @State private var isHovered: Bool = false
@@ -29,7 +29,7 @@ struct TabSuggestionItem: View {
                 .clipShape(
                     NookDesign.Radius.shape(NookDesign.Radius.xs)
                 )
-                Text(tab.name)
+                Text(tab.title)
                     .font(NookDesign.Font.label)
                     .foregroundStyle(isSelected ? .white : .primary)
                     .lineLimit(1)

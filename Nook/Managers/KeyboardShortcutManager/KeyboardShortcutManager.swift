@@ -258,7 +258,7 @@ class KeyboardShortcutManager {
     /// Forward a keyboard event directly to the active WebView
     private func forwardEventToWebView(_ event: NSEvent) {
         guard let windowState = windowRegistry?.activeWindow,
-              let tabId = windowState.currentTabId,
+              let tabId = windowState.selectedItemID,
               let windowId = windowRegistry?.activeWindow?.id,
               let webView = browserManager?.getWebView(for: tabId, in: windowId) else {
             return
@@ -428,59 +428,61 @@ class KeyboardShortcutManager {
 
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
+            let tabs = browserManager.tabs
+            let window = self.windowRegistry?.activeWindow
 
             switch action {
             // Navigation
             case .goBack:
                 // Use window-specific webview like the UI buttons do
-                if let tab = browserManager.currentTabForActiveWindow(),
-                   let windowId = self.windowRegistry?.activeWindow?.id,
-                   let webView = browserManager.getWebView(for: tab.id, in: windowId) {
+                if let window = self.windowRegistry?.activeWindow,
+                   let itemID = window.selectedItemID,
+                   let webView = browserManager.getWebView(for: itemID, in: window.id) {
                     if webView.canGoBack {
                         webView.goBack()
                     }
                 }
             case .goForward:
                 // Use window-specific webview like the UI buttons do
-                if let tab = browserManager.currentTabForActiveWindow(),
-                   let windowId = self.windowRegistry?.activeWindow?.id,
-                   let webView = browserManager.getWebView(for: tab.id, in: windowId) {
+                if let window = self.windowRegistry?.activeWindow,
+                   let itemID = window.selectedItemID,
+                   let webView = browserManager.getWebView(for: itemID, in: window.id) {
                     if webView.canGoForward {
                         webView.goForward()
                     }
                 }
             case .refresh:
-                browserManager.refreshCurrentTabInActiveWindow()
+                tabs.activeWindowSession?.refresh()
             case .clearCookiesAndRefresh:
                 browserManager.clearCurrentPageCookies()
-                browserManager.refreshCurrentTabInActiveWindow()
+                tabs.activeWindowSession?.refresh()
 
             // Tab Management
             case .newTab:
                 self.windowRegistry?.activeWindow?.commandPalette?.open()
             case .closeTab:
-                browserManager.closeCurrentTab()
+                if let window, !window.isCommandPaletteVisible { tabs.closeSelected(in: window) }
             case .undoCloseTab:
-                browserManager.undoCloseTab()
+                if let window { tabs.reopenLastClosed(in: window) }
             case .nextTab:
-                browserManager.selectNextTabInActiveWindow()
+                if let window { tabs.selectNext(in: window) }
             case .previousTab:
-                browserManager.selectPreviousTabInActiveWindow()
+                if let window { tabs.selectPrevious(in: window) }
             case .goToTab1, .goToTab2, .goToTab3, .goToTab4, .goToTab5, .goToTab6, .goToTab7, .goToTab8:
                 let tabIndex = Int(action.rawValue.components(separatedBy: "_").last ?? "0") ?? 1
-                browserManager.selectTabByIndexInActiveWindow(tabIndex - 1)
+                if let window { tabs.select(index: tabIndex - 1, in: window) }
             case .goToLastTab:
-                browserManager.selectLastTabInActiveWindow()
+                if let window { tabs.selectLast(in: window) }
             case .duplicateTab:
-                browserManager.duplicateCurrentTab()
+                if let window, let selected = window.selectedItemID { tabs.duplicate(selected, in: window) }
             case .toggleTopBarAddressView:
                 browserManager.toggleTopBarAddressView()
 
             // Space Management
             case .nextSpace:
-                browserManager.selectNextSpaceInActiveWindow()
+                if let window { tabs.selectNextSpace(in: window) }
             case .previousSpace:
-                browserManager.selectPreviousSpaceInActiveWindow()
+                if let window { tabs.selectPreviousSpace(in: window) }
 
             // Window Management
             case .newWindow:
@@ -502,11 +504,11 @@ class KeyboardShortcutManager {
             case .viewHistory:
                 browserManager.showHistory()
             case .expandAllFolders:
-                browserManager.expandAllFoldersInSidebar()
+                if let spaceID = window?.spaceID { tabs.setAllFolders(open: true, space: spaceID) }
 
             // NEW: Missing actions that were only in NookCommands
             case .focusAddressBar:
-                let currentURL = browserManager.currentTabForActiveWindow()?.url.absoluteString ?? ""
+                let currentURL = tabs.activeWindowSession?.url.absoluteString ?? ""
                 self.windowRegistry?.activeWindow?.commandPalette?.open(prefill: currentURL, navigateCurrentTab: true)
             case .findInPage:
                 browserManager.showFindBar()
@@ -523,13 +525,13 @@ class KeyboardShortcutManager {
             case .toggleAIAssistant:
                 browserManager.toggleAISidebar()
             case .togglePictureInPicture:
-                browserManager.requestPiPForCurrentTabInActiveWindow()
+                tabs.activeWindowSession?.requestPictureInPicture()
             case .copyCurrentURL:
                 browserManager.copyCurrentURL()
             case .hardReload:
                 browserManager.hardReloadCurrentPage()
             case .muteUnmuteAudio:
-                browserManager.toggleMuteCurrentTabInActiveWindow()
+                tabs.activeWindowSession?.toggleMute()
             case .installExtension:
                 browserManager.showExtensionInstallDialog()
             case .customizeSpaceGradient:

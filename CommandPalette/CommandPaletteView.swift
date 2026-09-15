@@ -281,7 +281,7 @@ struct CommandPaletteView: View {
         .opacity(isVisible ? 1.0 : 0.0)
         .onChange(of: commandPalette.isVisible) { _, newVisible in
             if newVisible {
-                searchManager.setTabManager(browserManager.tabManager)
+                searchManager.setTabs(browserManager.tabs, window: windowState)
                 searchManager.setHistoryManager(browserManager.historyManager)
                 searchManager.updateProfileContext()
 
@@ -307,7 +307,7 @@ struct CommandPaletteView: View {
                 selectedSuggestionIndex = -1
             }
         }
-        .onChange(of: browserManager.currentProfile?.id) { _, _ in
+        .onChange(of: windowState.profileID) { _, _ in
             if commandPalette.isVisible {
                 searchManager.updateProfileContext()
                 searchManager.clearSuggestions()
@@ -418,12 +418,8 @@ struct CommandPaletteView: View {
                 // Fallback: search on the site's domain directly
                 navigateURL = "https://\(site.domain)/search?q=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query)"
             }
-            if commandPalette.shouldNavigateCurrentTab
-                && browserManager.currentTab(for: windowState) != nil
-            {
-                browserManager.currentTab(for: windowState)?.loadURL(navigateURL)
-            } else {
-                browserManager.createNewTab(in: windowState, url: navigateURL)
+            if let url = URL(string: navigateURL) {
+                open(url)
             }
             text = ""
             activeSiteSearch = nil
@@ -449,31 +445,21 @@ struct CommandPaletteView: View {
     private func selectSuggestion(_ suggestion: SearchManager.SearchSuggestion)
     {
         switch suggestion.type {
-        case .tab(let existingTab):
-            browserManager.selectTab(existingTab, in: windowState)
+        case .tab(let match):
+            browserManager.tabs.select(match.itemID, in: windowState)
         case .history(let historyEntry):
-            if commandPalette.shouldNavigateCurrentTab
-                && browserManager.currentTab(for: windowState) != nil
-            {
-                browserManager.currentTab(for: windowState)?.loadURL(
-                    historyEntry.url.absoluteString
-                )
-            } else {
-                browserManager.createNewTab(in: windowState, url: historyEntry.url.absoluteString)
-            }
+            open(historyEntry.url)
         case .url, .search:
-            if commandPalette.shouldNavigateCurrentTab
-                && browserManager.currentTab(for: windowState) != nil
-            {
-                browserManager.currentTab(for: windowState)?.navigateToURL(
-                    suggestion.text
-                )
+            if commandPalette.shouldNavigateCurrentTab, let session = browserManager.tabs.selectedSession(in: windowState) {
+                session.navigate(to: suggestion.text)
             } else {
                 // Normalize the URL/search query first, then create the tab with
                 // the correct URL so the webview loads it directly without a race.
                 let template = browserManager.nookSettings?.resolvedSearchEngineTemplate ?? SearchProvider.google.queryTemplate
                 let resolved = normalizeURL(suggestion.text, queryTemplate: template)
-                browserManager.createNewTab(in: windowState, url: resolved)
+                if let url = URL(string: resolved) {
+                    browserManager.tabs.open(url: url, in: windowState, placement: .newTab)
+                }
             }
         }
 
@@ -481,6 +467,12 @@ struct CommandPaletteView: View {
         activeSiteSearch = nil
         selectedSuggestionIndex = -1
         commandPalette.close()
+    }
+
+    /// Loads `url` in the selected page when the palette was opened to navigate it, else in a new tab.
+    private func open(_ url: URL) {
+        let navigateCurrent = commandPalette.shouldNavigateCurrentTab && windowState.selectedItemID != nil
+        browserManager.tabs.open(url: url, in: windowState, placement: navigateCurrent ? .replaceCurrent : .newTab)
     }
 
     private func navigateSuggestions(direction: Int) {
