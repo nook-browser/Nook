@@ -145,11 +145,8 @@
         if (button) button.style.display = 'none';
     }
 
-    // mouseover fires only when the element under the pointer changes, so this does no work while
-    // the pointer moves within one element.
-    document.addEventListener('mouseover', event => {
-        if (host && event.target === host) return;
-        const element = mediaAt(event.clientX, event.clientY);
+    function update(x, y) {
+        const element = mediaAt(x, y);
         if (element === current && element) return;
         if (!element || misses.get(element) === (element.currentSrc || element.src)) return hide();
         if (!sourceFor(element)) {
@@ -163,11 +160,24 @@
         button.style.top = `${rect.top + INSET}px`;
         button.style.left = `${rect.right - INSET - 32}px`;
         button.style.display = 'flex';
-    }, { capture: true, passive: true });
+    }
 
-    document.addEventListener('mouseout', event => { if (!event.relatedTarget) hide(); }, { capture: true, passive: true });
-    // Only a scroll that moves the hovered image; stories and carousels scroll their own trays.
+    // mouseover fires only when the element under the pointer changes, so this does no work while
+    // the pointer moves within one element.
+    let pointer = null, settle = 0;
+    document.addEventListener('mouseover', event => {
+        pointer = { x: event.clientX, y: event.clientY };
+        if (host && event.target === host) return;
+        update(pointer.x, pointer.y);
+    }, { capture: true, passive: true });
+    document.addEventListener('mousemove', event => { pointer = { x: event.clientX, y: event.clientY }; }, { capture: true, passive: true });
+    document.addEventListener('mouseout', event => { if (!event.relatedTarget) { pointer = null; hide(); } }, { capture: true, passive: true });
+
+    // WebKit sends no mouseover when content scrolls under a still pointer. Hide while the hovered media
+    // moves, then look again once scrolling pauses.
     window.addEventListener('scroll', event => {
         if (current && (event.target === document || event.target.contains?.(current))) hide();
+        clearTimeout(settle);
+        if (pointer) settle = setTimeout(() => pointer && update(pointer.x, pointer.y), 150);
     }, { capture: true, passive: true });
 })();
