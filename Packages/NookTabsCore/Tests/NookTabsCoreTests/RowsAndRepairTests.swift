@@ -41,7 +41,12 @@ struct RowsTests {
         // Dragging b between F's child and b keeps b after F.
         #expect(f.tree.dropTarget(section: tabs, rows: rows, index: 3, intoFolder: false, dragged: b) == (tabs, folder))
         // A folder cannot be dropped into itself.
-        #expect(f.tree.dropTarget(section: tabs, rows: rows, index: 1, intoFolder: true, dragged: folder).parent == tabs)
+        #expect(f.tree.dropTarget(section: tabs, rows: rows, index: 1, intoFolder: true, dragged: folder) == (tabs, a))
+        // Dropping an item on its own slot, or a folder among its own children, keeps its place.
+        #expect(f.tree.dropTarget(section: tabs, rows: rows, index: 3, intoFolder: false, dragged: b) == (tabs, folder))
+        #expect(f.tree.dropTarget(section: tabs, rows: rows, index: 0, intoFolder: false, dragged: a) == (tabs, nil))
+        #expect(f.tree.dropTarget(section: tabs, rows: rows, index: 2, intoFolder: false, dragged: folder) == (tabs, a))
+        #expect(f.tree.dropTarget(section: tabs, rows: rows, index: 1, intoFolder: false, dragged: folder) == (tabs, a))
         _ = child
     }
 }

@@ -27,6 +27,15 @@ extension TabTree {
     /// a neighbor so dropping an item next to itself keeps its place.
     public func dropTarget(section: Parent, rows: [Row], index: Int, intoFolder: Bool, dragged: UUID?) -> (parent: Parent, after: UUID?) {
         let slot = max(0, min(index, rows.count))
+        // A slot on the dragged item or inside its own subtree keeps the item where it is.
+        if let dragged, let moving = item(dragged), slot < rows.count {
+            let target = rows[slot].item.id
+            if target == dragged || folderChain(of: target)?.folders.contains(dragged) == true {
+                let siblings = children(of: moving.parent)
+                let position = siblings.firstIndex(where: { $0.id == dragged }) ?? 0
+                return (moving.parent, position > 0 ? siblings[position - 1].id : nil)
+            }
+        }
         if intoFolder, slot < rows.count, rows[slot].item.isFolder, rows[slot].item.id != dragged {
             return (.folder(itemID: rows[slot].item.id), nil)
         }
