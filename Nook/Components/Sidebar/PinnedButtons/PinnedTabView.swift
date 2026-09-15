@@ -14,8 +14,9 @@ struct PinnedTabView<Icon: View>: View {
     var tabIcon: Icon
     var isActive: Bool
     var isUnloaded: Bool = false
-    /// The favorite's open page has left its home URL.
-    var showsLeftHomeDot: Bool = false
+    /// The favorite's open page has left its pinned URL; hovering shows a reset button.
+    var hasLeftPinnedURL: Bool = false
+    var onResetToPinnedURL: () -> Void = {}
     var action: () -> Void
 
     @State private var isHovered: Bool = false
@@ -37,11 +38,17 @@ struct PinnedTabView<Icon: View>: View {
                 }
             }
             .overlay(alignment: .topTrailing) {
-                if showsLeftHomeDot {
-                    Circle()
-                        .fill(.tertiary)
-                        .frame(width: NookDesign.Size.statusDot, height: NookDesign.Size.statusDot)
-                        .padding(NookDesign.Spacing.xs)
+                if hasLeftPinnedURL && isHovered {
+                    Button(action: onResetToPinnedURL) {
+                        Image(systemName: "arrow.uturn.backward")
+                            .font(NookDesign.Font.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(width: NookDesign.Size.rowButton, height: NookDesign.Size.rowButton)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Reset to Pinned URL")
+                    .padding(NookDesign.Spacing.xs)
                 }
             }
             .frame(maxWidth: .infinity)

@@ -181,7 +181,8 @@ private struct PinnedTile: View {
                 tabIcon: ItemFavicon(item: item, session: session),
                 isActive: tabs.selectedItemID(in: windowState) == item.id,
                 isUnloaded: session?.isUnloaded ?? true,
-                showsLeftHomeDot: tabs.hasLeftHome(item.id),
+                hasLeftPinnedURL: tabs.hasLeftHome(item.id),
+                onResetToPinnedURL: { tabs.resetToHome(item.id) },
                 action: { tabs.select(item.id, in: windowState) }
             )
             .frame(maxWidth: .infinity)

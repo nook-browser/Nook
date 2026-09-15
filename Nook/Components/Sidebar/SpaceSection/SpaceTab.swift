@@ -94,11 +94,19 @@ struct SpaceTab: View {
                         .textSelection(.disabled)
                 }
 
-                if tabs.hasLeftHome(item.id) && !isHovering {
-                    Circle()
-                        .fill(.tertiary)
-                        .frame(width: NookDesign.Size.statusDot, height: NookDesign.Size.statusDot)
-                        .help("Navigated away from the pinned URL")
+                if tabs.hasLeftHome(item.id) {
+                    // Shows the page moved away from the pinned URL and resets to it. Shifts left
+                    // while the hover close button covers the trailing edge.
+                    Button { tabs.resetToHome(item.id) } label: {
+                        Image(systemName: "arrow.uturn.backward")
+                            .font(NookDesign.Font.secondary)
+                            .foregroundStyle(.tertiary)
+                            .frame(width: NookDesign.Size.rowButton, height: NookDesign.Size.rowButton)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Reset to Pinned URL")
+                    .padding(.trailing, isHovering ? NookDesign.Size.rowButton : 0)
                 }
             }
             .overlay(alignment: .trailing) {
