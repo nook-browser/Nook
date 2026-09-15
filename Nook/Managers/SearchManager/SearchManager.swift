@@ -9,13 +9,15 @@ import Foundation
 import Observation
 import SwiftUI
 
+@MainActor
 @Observable
 class SearchManager {
     var suggestions: [SearchSuggestion] = []
     var isLoading: Bool = false
     
     private let session = URLSession.shared
-    private var searchTask: URLSessionDataTask?
+    private var searchTask: Task<Void, Never>?
+    private var searchGeneration = UUID()
     private weak var tabManager: TabManager?
     private weak var historyManager: HistoryManager?
     private var currentProfileId: UUID?
@@ -64,53 +66,43 @@ class SearchManager {
     }
     
     @MainActor func searchSuggestions(for query: String) {
-        // Cancel previous request
         searchTask?.cancel()
-
-        // Clear suggestions if query is empty
+        let generation = UUID()
+        searchGeneration = generation
+        isLoading = false
+        updateProfileContext()
+        let profile = currentProfileId
         guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            if !suggestions.isEmpty {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    suggestions = []
-                }
-            }
+            updateSuggestionsIfNeeded([])
             return
         }
 
-        // Search tabs (highest priority)
-        let tabSuggestions = searchTabs(for: query)
-        let limitedTabSuggestions = Array(tabSuggestions.prefix(2))
-
-        // Search history (lowest priority — shown after search suggestions)
-        let historySuggestions = searchHistory(for: query)
-        let limitedHistorySuggestions = Array(historySuggestions.prefix(2))
-
-        // URL suggestion if query looks like a URL
+        let tabs = Array(searchTabs(for: query).prefix(2))
         let urlSuggestion: SearchSuggestion? = isLikelyURL(query)
-            ? SearchSuggestion(text: query, type: .url)
-            : nil
-
-        // Show immediate suggestions: URL + history + tabs
-        var immediateSuggestions: [SearchSuggestion] = []
-        if let urlSug = urlSuggestion {
-            immediateSuggestions.append(urlSug)
+            ? SearchSuggestion(text: query, type: .url) : nil
+        let urlRows = urlSuggestion.map { [$0] } ?? []
+        // Keep the previous query's web and history rows until fresh ones arrive, so the
+        // list updates in place instead of collapsing and re-expanding on every keystroke.
+        let carriedWeb = suggestions.filter { if case .search = $0.type { true } else { false } }
+        let carriedHistory = suggestions.filter { if case .history = $0.type { true } else { false } }
+        updateSuggestionsIfNeeded(Array((urlRows + carriedWeb + carriedHistory + tabs).prefix(5)))
+        isLoading = true
+        searchTask = Task { [weak self] in
+            do { try await Task.sleep(for: .milliseconds(125)) } catch { return }
+            guard let self, !Task.isCancelled else { return }
+            async let web = self.fetchWebSuggestions(for: query)
+            let history = Array(await self.searchHistory(for: query).prefix(2))
+            guard !Task.isCancelled, self.searchGeneration == generation,
+                  self.tabManager?.browserManager?.currentProfile?.id == profile else { return }
+            self.updateSuggestionsIfNeeded(Array((urlRows + carriedWeb + history + tabs).prefix(5)))
+            let webSuggestions = await web
+            guard !Task.isCancelled, self.searchGeneration == generation,
+                  self.tabManager?.browserManager?.currentProfile?.id == profile else { return }
+            self.updateSuggestionsIfNeeded(Array((urlRows + webSuggestions + history + tabs).prefix(5)))
+            self.isLoading = false
         }
-        immediateSuggestions.append(contentsOf: limitedHistorySuggestions)
-        immediateSuggestions.append(contentsOf: limitedTabSuggestions)
-
-        if !immediateSuggestions.isEmpty {
-            updateSuggestionsIfNeeded(immediateSuggestions)
-        }
-
-        // Fetch web suggestions; final order: tabs -> URL -> search -> history
-        fetchWebSuggestions(
-            for: query,
-            tabSuggestions: limitedTabSuggestions,
-            urlSuggestion: urlSuggestion,
-            historySuggestions: limitedHistorySuggestions
-        )
     }
-    
+
     @MainActor private func searchTabs(for query: String) -> [SearchSuggestion] {
         guard let tabManager = tabManager else { return [] }
         
@@ -153,28 +145,16 @@ class SearchManager {
         return Array(sortedTabs.prefix(3)) // Limit to 3 tab suggestions
     }
     
-    @MainActor private func searchHistory(for query: String) -> [SearchSuggestion] {
+    @MainActor private func searchHistory(for query: String) async -> [SearchSuggestion] {
         guard let historyManager = historyManager else { return [] }
         
         let lowercaseQuery = query.lowercased()
-        let historyEntries = historyManager.searchHistory(query: query, page: 0, pageSize: 20)
+        let historyEntries = await historyManager.searchHistory(query: query, page: 0, pageSize: 20)
         
-        var matchingHistory: [SearchSuggestion] = []
-        
-        for entry in historyEntries.entries {
-            let titleMatch = entry.title.lowercased().contains(lowercaseQuery)
-            let urlMatch = entry.url.absoluteString.lowercased().contains(lowercaseQuery)
-            let hostMatch = entry.url.host?.lowercased().contains(lowercaseQuery) ?? false
-            
-            if titleMatch || urlMatch || hostMatch {
-                let suggestion = SearchSuggestion(
-                    text: entry.displayTitle,
-                    type: .history(entry)
-                )
-                matchingHistory.append(suggestion)
-            }
+        let matchingHistory = historyEntries.entries.map {
+            SearchSuggestion(text: $0.displayTitle, type: .history($0))
         }
-        
+
         // Sort by relevance (title matches first, then URL matches, then by visit count and recency)
         let sortedHistory = matchingHistory.sorted { (lhs: SearchSuggestion, rhs: SearchSuggestion) -> Bool in
             if case .history(let lhsHistory) = lhs.type, case .history(let rhsHistory) = rhs.type {
@@ -201,63 +181,21 @@ class SearchManager {
         return sortedHistory
     }
     
-    private func fetchWebSuggestions(
-        for query: String,
-        tabSuggestions: [SearchSuggestion],
-        urlSuggestion: SearchSuggestion?,
-        historySuggestions: [SearchSuggestion]
-    ) {
-        isLoading = true
-
-        let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        let urlString = "https://suggestqueries.google.com/complete/search?client=firefox&q=\(encodedQuery)"
-
-        guard let url = URL(string: urlString) else {
-            isLoading = false
-            return
-        }
-
-        searchTask = session.dataTask(with: url) { [weak self] data, response, error in
-            DispatchQueue.main.async {
-                self?.isLoading = false
-
-                guard let data = data,
-                      error == nil else {
-                    return
-                }
-
-                do {
-                    guard let jsonArray = try JSONSerialization.jsonObject(with: data) as? [Any],
-                          jsonArray.count >= 2,
-                          let suggestionsArray = jsonArray[1] as? [String] else {
-                        return
-                    }
-
-                    let webSuggestions = suggestionsArray.prefix(5).map { suggestion in
-                        SearchSuggestion(
-                            text: suggestion,
-                            type: isLikelyURL(suggestion) == true ? .url : .search
-                        )
-                    }
-
-                    // Priority order: URL -> search -> history -> tabs
-                    var combined: [SearchSuggestion] = []
-                    if let urlSug = urlSuggestion {
-                        combined.append(urlSug)
-                    }
-                    combined.append(contentsOf: webSuggestions)
-                    combined.append(contentsOf: historySuggestions)
-                    combined.append(contentsOf: tabSuggestions)
-                    self?.updateSuggestionsIfNeeded(Array(combined.prefix(5)))
-
-                } catch {
-                }
+    private func fetchWebSuggestions(for query: String) async -> [SearchSuggestion] {
+        var components = URLComponents(string: "https://suggestqueries.google.com/complete/search")!
+        components.queryItems = [URLQueryItem(name: "client", value: "firefox"), URLQueryItem(name: "q", value: query)]
+        guard let url = components.url else { return [] }
+        do {
+            let (data, _) = try await session.data(from: url)
+            try Task.checkCancellation()
+            guard let jsonArray = try JSONSerialization.jsonObject(with: data) as? [Any],
+                  jsonArray.count >= 2, let strings = jsonArray[1] as? [String] else { return [] }
+            return strings.prefix(5).map {
+                SearchSuggestion(text: $0, type: isLikelyURL($0) ? .url : .search)
             }
-        }
-
-        searchTask?.resume()
+        } catch { return [] }
     }
-    
+
     private func updateSuggestionsIfNeeded(_ newSuggestions: [SearchSuggestion]) {
         let shouldAnimate = shouldAnimateChange(from: suggestions, to: newSuggestions)
         
@@ -296,6 +234,7 @@ class SearchManager {
     
     func clearSuggestions() {
         searchTask?.cancel()
+        searchGeneration = UUID()
         if !suggestions.isEmpty {
             withAnimation(.easeInOut(duration: 0.2)) {
                 suggestions = []

@@ -120,8 +120,13 @@ class WebViewCoordinator {
     /// Creates the "primary" WebView - the first WebView for a tab
     /// This WebView is owned by the tab and is the "source of truth"
     private func createPrimaryWebView(for tab: Tab, in windowId: UUID) -> WKWebView {
-        // Use the standard creation logic but mark it as primary
-        return createWebViewInternal(for: tab, in: windowId, isPrimary: true)
+        // Adopt the tab's fully configured view, including restored navigation and popup state.
+        // Selection may already have created it; never start a second navigation for assignment.
+        tab.loadWebViewIfNeeded()
+        let webView = tab.existingWebView
+            ?? createWebViewInternal(for: tab, in: windowId, isPrimary: true)
+        setWebView(webView, for: tab.id, in: windowId)
+        return webView
     }
     
     /// Creates a "clone" WebView - additional WebViews for multi-window display
@@ -163,27 +168,16 @@ class WebViewCoordinator {
         newWebView.uiDelegate = tab
         newWebView.allowsBackForwardNavigationGestures = true
         newWebView.allowsMagnification = true
-        newWebView.setValue(true, forKey: "drawsBackground")
         newWebView.owningTab = tab
         newWebView.contextMenuBridge = WebContextMenuBridge(tab: tab, configuration: configuration)
-        
-        newWebView.configuration.userContentController.add(tab, name: "linkHover")
-        newWebView.configuration.userContentController.add(tab, name: "commandHover")
-        newWebView.configuration.userContentController.add(tab, name: "commandClick")
-        newWebView.configuration.userContentController.add(tab, name: "pipStateChange")
-        newWebView.configuration.userContentController.add(tab, name: "mediaStateChange_\(tabId.uuidString)")
-        newWebView.configuration.userContentController.add(tab, name: "backgroundColor_\(tabId.uuidString)")
-        newWebView.configuration.userContentController.add(tab, name: "historyStateDidChange")
-        newWebView.configuration.userContentController.add(tab, name: "NookIdentity")
-        newWebView.configuration.userContentController.add(tab, name: "nookShortcutDetect")
-        
+        // Same handlers, user agent and preferences as the primary: a clone is promoted
+        // to primary when its window outlives the primary's window.
+        tab.configureTabWebView(newWebView)
+
         tab.setupThemeColorObserver(for: newWebView)
-        
-        // Only load URL if this is the primary or if we're creating a clone
-        // For clones, we sync the URL via syncTab later
-        if let url = URL(string: tab.url.absoluteString) {
-            newWebView.load(URLRequest(url: url))
-        }
+        tab.setupNavigationStateObservers(for: newWebView)
+
+        Tab.loadPage(tab.url, in: newWebView)
         newWebView.isMuted = tab.isAudioMuted
         
         setWebView(newWebView, for: tabId, in: windowId)
@@ -220,51 +214,48 @@ class WebViewCoordinator {
             return (tabId, webView)
         }
 
-        // Build a lookup dictionary once instead of calling allTabs().first(where:) per webview
-        let allTabsMap = Dictionary(uniqueKeysWithValues: tabManager.allTabs().map { ($0.id, $0) })
+        // Build a lookup dictionary once instead of calling allTabs().first(where:) per webview.
+        // Tolerate a tab listed in two containers rather than trapping on window close.
+        let allTabsMap = Dictionary(tabManager.allTabs().map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 
         for (tabId, webView) in webViewsToCleanup {
-            // Use comprehensive cleanup from Tab class
-            if let tab = allTabsMap[tabId] {
-                tab.cleanupCloneWebView(webView)
-            } else {
-                // Fallback cleanup if tab is not found
-                performFallbackWebViewCleanup(webView, tabId: tabId)
-            }
-
-            // Remove from containers
-            removeWebViewFromContainers(webView)
-
-            // Remove from tracking
             webViewsByTabAndWindow[tabId]?.removeValue(forKey: windowId)
             if webViewsByTabAndWindow[tabId]?.isEmpty == true {
                 webViewsByTabAndWindow.removeValue(forKey: tabId)
             }
+            if let tab = allTabsMap[tabId] {
+                if tab.existingWebView === webView {
+                    if let replacement = webViewsByTabAndWindow[tabId]?.first {
+                        tab.assignWebViewToWindow(replacement.value, windowId: replacement.key)
+                        tab.cleanupCloneWebView(webView)
+                    } else {
+                        tab.unloadWebView()
+                    }
+                } else {
+                    tab.cleanupCloneWebView(webView)
+                }
+            } else {
+                performFallbackWebViewCleanup(webView, tabId: tabId)
+            }
+            removeWebViewFromContainers(webView)
         }
+        removeCompositorContainerView(for: windowId)
     }
 
     func cleanupAllWebViews(tabManager: TabManager) {
-        // Build a lookup dictionary once instead of calling allTabs().first(where:) per webview
-        let allTabsMap = Dictionary(uniqueKeysWithValues: tabManager.allTabs().map { ($0.id, $0) })
-
-        // Clean up all WebViews for all tabs in all windows
-        for (tabId, windowWebViews) in webViewsByTabAndWindow {
-            for (_, webView) in windowWebViews {
-                // Use comprehensive cleanup from Tab class
+        let allTabsMap = Dictionary(tabManager.allTabs().map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let entries = webViewsByTabAndWindow
+        webViewsByTabAndWindow.removeAll()
+        for (tabId, windowWebViews) in entries {
+            for webView in windowWebViews.values {
                 if let tab = allTabsMap[tabId] {
                     tab.cleanupCloneWebView(webView)
                 } else {
-                    // Fallback cleanup if tab is not found
                     performFallbackWebViewCleanup(webView, tabId: tabId)
                 }
-
-                // Remove from containers
-                removeWebViewFromContainers(webView)
             }
         }
-
-        // Clear all tracking
-        webViewsByTabAndWindow.removeAll()
+        for tab in allTabsMap.values { tab.unloadWebView() }
         compositorContainerViews.removeAll()
     }
 
@@ -272,51 +263,13 @@ class WebViewCoordinator {
 
     /// Create a new web view for a specific tab in a specific window
     func createWebView(for tab: Tab, in windowId: UUID) -> WKWebView {
-        let tabId = tab.id
-        
-        // Derive config from shared config or existing webview to preserve
-        // process pool + extension controller (fresh configs break content script injection)
-        let configuration: WKWebViewConfiguration
-        if let originalWebView = tab.existingWebView {
-            configuration = originalWebView.configuration
-        } else {
-            let resolvedProfile = tab.resolveProfile()
-            if let profile = resolvedProfile {
-                configuration = BrowserConfiguration.shared.webViewConfiguration(for: profile)
-            } else {
-                configuration = BrowserConfiguration.shared.webViewConfiguration.copy() as! WKWebViewConfiguration
-            }
+        if let existing = getWebView(for: tab.id, in: windowId) { return existing }
+        if let otherWindow = webViewsByTabAndWindow[tab.id]?.keys.first {
+            return createCloneWebView(for: tab, in: windowId, primaryWindowId: otherWindow)
         }
-        configuration.userContentController = BrowserConfiguration.shared.freshUserContentController()
-
-        let newWebView = FocusableWKWebView(frame: .zero, configuration: configuration)
-        newWebView.navigationDelegate = tab
-        newWebView.uiDelegate = tab
-        newWebView.allowsBackForwardNavigationGestures = true
-        newWebView.allowsMagnification = true
-        newWebView.setValue(true, forKey: "drawsBackground")
-        newWebView.owningTab = tab
-        newWebView.contextMenuBridge = WebContextMenuBridge(tab: tab, configuration: configuration)
-
-        newWebView.configuration.userContentController.add(tab, name: "linkHover")
-        newWebView.configuration.userContentController.add(tab, name: "commandHover")
-        newWebView.configuration.userContentController.add(tab, name: "commandClick")
-        newWebView.configuration.userContentController.add(tab, name: "pipStateChange")
-        newWebView.configuration.userContentController.add(tab, name: "mediaStateChange_\(tabId.uuidString)")
-        newWebView.configuration.userContentController.add(tab, name: "backgroundColor_\(tabId.uuidString)")
-        newWebView.configuration.userContentController.add(tab, name: "historyStateDidChange")
-        newWebView.configuration.userContentController.add(tab, name: "NookIdentity")
-
-        tab.setupThemeColorObserver(for: newWebView)
-
-        if let url = URL(string: tab.url.absoluteString) {
-            newWebView.load(URLRequest(url: url))
-        }
-        newWebView.isMuted = tab.isAudioMuted
-
-        setWebView(newWebView, for: tabId, in: windowId)
-
-        return newWebView
+        let primary = createPrimaryWebView(for: tab, in: windowId)
+        tab.assignWebViewToWindow(primary, windowId: windowId)
+        return primary
     }
 
     // MARK: - Private Helpers
@@ -373,11 +326,28 @@ class WebViewCoordinator {
         let allWebViews = getAllWebViews(for: tabId)
 
         for webView in allWebViews {
-            // Sync the URL if it's different
-            if webView.url != url {
-                webView.load(URLRequest(url: url))
+            // Sync the URL if it's different. WebKit canonicalizes the URL it reports
+            // (a bare host gains "/"), so compare canonical forms: a raw mismatch would
+            // start a second navigation in the view that is already loading it.
+            if Self.canonical(webView.url) != Self.canonical(url) {
+                Tab.loadPage(url, in: webView)
             }
         }
+    }
+
+    /// Lowercased scheme and host, "/" for an empty path, default port dropped.
+    private static func canonical(_ url: URL?) -> String? {
+        guard let url, var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return url?.absoluteString
+        }
+        components.scheme = components.scheme?.lowercased()
+        components.host = components.host?.lowercased()
+        if components.path.isEmpty, components.host != nil { components.path = "/" }
+        if (components.scheme == "http" && components.port == 80)
+            || (components.scheme == "https" && components.port == 443) {
+            components.port = nil
+        }
+        return components.string ?? url.absoluteString
     }
 
     /// Reload a tab across all windows displaying it

@@ -94,11 +94,37 @@ struct SpaceView: View {
         return tabManager.spacePinnedTabs(for: space.id)
     }
 
+    /// Folders shown in the pinned section. Regular folders render in the regular section.
     private var folders: [TabFolder] {
         if windowState.isIncognito {
             return []
         }
-        return tabManager.folders(for: space.id)
+        return tabManager.folders(for: space.id).filter { !$0.isRegular }
+    }
+
+    // Drop zones index by sidebar row, and folders sit above the loose tabs in both sections.
+    // A folder takes its header row plus one row per tab while open. These offsets translate
+    // between the drag session's row slots and TabManager's loose-tab positions.
+    private func rowCount(of folder: TabFolder, tabs: [Tab]) -> Int {
+        folder.isOpen ? 1 + tabs.filter { $0.folderId == folder.id }.count : 1
+    }
+
+    private var pinnedFolderRows: Int {
+        folders.reduce(0) { $0 + rowCount(of: $1, tabs: spacePinnedTabs) }
+    }
+
+    private var regularFolderRows: Int {
+        if windowState.isIncognito { return 0 }
+        return tabManager.regularFolders(for: space.id).reduce(0) { $0 + rowCount(of: $1, tabs: tabs) }
+    }
+
+    /// Converts a row in one of this space's zones to a position among its loose tabs.
+    private func looseIndex(_ row: Int, in zone: DropZoneID) -> Int {
+        switch zone {
+        case .spacePinned: return max(0, row - pinnedFolderRows)
+        case .spaceRegular: return max(0, row - regularFolderRows)
+        default: return row
+        }
     }
 
     private var hasSpacePinnedContent: Bool {
@@ -187,12 +213,10 @@ struct SpaceView: View {
         guard let drop = drop else { return }
         // Only handle drops targeting this space's zones
         let isTargetingThisSpace: Bool
+        // Folder zones are handled by their own TabFolderView.
         switch drop.targetZone {
         case .spacePinned(let id), .spaceRegular(let id):
             isTargetingThisSpace = (id == space.id)
-        case .folder(let folderId):
-            // Check if folder belongs to this space
-            isTargetingThisSpace = folders.contains(where: { $0.id == folderId })
         default:
             isTargetingThisSpace = false
         }
@@ -201,7 +225,14 @@ struct SpaceView: View {
         let allTabs = tabManager.allTabs()
         guard let tab = allTabs.first(where: { $0.id == drop.item.tabId }) else { return }
 
-        let op = dragSession.makeDragOperation(from: drop, tab: tab)
+        let op = DragOperation(
+            tab: tab,
+            fromContainer: drop.sourceZone.asDragContainer,
+            fromIndex: drop.sourceIndex,
+            toContainer: drop.targetZone.asDragContainer,
+            toIndex: looseIndex(drop.targetIndex, in: drop.targetZone),
+            toSpaceId: drop.targetZone.spaceId
+        )
         // Disable all animations — items are already at their visual positions
         // from drag offsets, so the drop should just "lock in" instantly
         var transaction = Transaction()
@@ -217,11 +248,10 @@ struct SpaceView: View {
         guard let reorder = reorder else { return }
         // Only handle reorders for this space's zones
         let isForThisSpace: Bool
+        // Folder zones are handled by their own TabFolderView.
         switch reorder.zone {
         case .spacePinned(let id), .spaceRegular(let id):
             isForThisSpace = (id == space.id)
-        case .folder(let folderId):
-            isForThisSpace = folders.contains(where: { $0.id == folderId })
         default:
             isForThisSpace = false
         }
@@ -232,7 +262,14 @@ struct SpaceView: View {
             return
         }
 
-        let op = dragSession.makeDragOperation(from: reorder, tab: tab)
+        let op = DragOperation(
+            tab: tab,
+            fromContainer: reorder.zone.asDragContainer,
+            fromIndex: reorder.fromIndex,
+            toContainer: reorder.zone.asDragContainer,
+            toIndex: looseIndex(reorder.toIndex, in: reorder.zone),
+            toSpaceId: reorder.zone.spaceId
+        )
         // Disable all animations — items are already at their visual positions
         // from drag offsets, so the reorder should just "lock in" instantly
         var transaction = Transaction()
@@ -266,6 +303,9 @@ struct SpaceView: View {
                                     updateRegularTabsCaches()
                                 }
                                 .onChange(of: tabs.count) { _, _ in
+                                    updateRegularTabsCaches()
+                                }
+                                .onChange(of: regularFolderRows) { _, _ in
                                     updateRegularTabsCaches()
                                 }
                             }
@@ -367,6 +407,8 @@ struct SpaceView: View {
             isVertical: true,
             manager: dragSession
         ) {
+            let folderRows = pinnedFolderRows
+            let folderCount = folders.count
             VStack(spacing: NookDesign.Spacing.rowGap) {
                 ForEach(Array(items.enumerated()), id: \.element) { index, item in
                     if let folderWithTabs = item as? FolderWithTabs {
@@ -384,7 +426,8 @@ struct SpaceView: View {
                             removal: .scale.combined(with: .opacity).animation(NookDesign.Motion.standard)
                         ))
                     } else if let tab = item as? Tab {
-                        pinnedTabView(tab, index: index)
+                        // Items list folders first, so index - folderCount is the loose position.
+                        pinnedTabView(tab, index: folderRows + index - folderCount)
                         .transition(.asymmetric(
                             insertion: .opacity.combined(with: .move(edge: .top)).animation(NookDesign.Motion.standard),
                             removal: .opacity.combined(with: .move(edge: .top)).animation(NookDesign.Motion.quick)
@@ -401,6 +444,9 @@ struct SpaceView: View {
         .onChange(of: spacePinnedItems.count) { _, _ in
             updateSpacePinnedCaches()
         }
+        .onChange(of: pinnedFolderRows) { _, _ in
+            updateSpacePinnedCaches()
+        }
     }
 
     private func updateSpacePinnedCaches() {
@@ -408,7 +454,7 @@ struct SpaceView: View {
         let nonFolderTabs = spacePinnedTabs.filter { $0.folderId == nil }
         dragSession.itemCellSize[zone] = NookDesign.Size.row
         dragSession.itemCellSpacing[zone] = NookDesign.Spacing.rowGap
-        dragSession.itemCounts[zone] = nonFolderTabs.count + folders.count
+        dragSession.itemCounts[zone] = nonFolderTabs.count + pinnedFolderRows
     }
 
     private func pinnedTabView(_ tab: Tab, index: Int) -> some View {
@@ -423,7 +469,7 @@ struct SpaceView: View {
                 tab: tab,
                 action: { handleUserTabActivation(tab) },
                 onClose: { tabManager.forceRemoveTab(tab.id) },
-                onUnload: { tab.unloadWebView() },
+                onUnload: { tabManager.unloadTabMovingSelection(tab) },
                 onMute: { onMuteTab(tab) },
                 menuContext: .spacePinned
             )
@@ -576,10 +622,11 @@ struct SpaceView: View {
                 .environmentObject(browserManager)
             }
 
-            // Loose tabs (no folder)
+            // Loose tabs (no folder), indexed by sidebar row within the zone
             let looseTabs = currentTabs.filter { $0.folderId == nil }
+            let folderRows = regularFolderRows
             ForEach(Array(looseTabs.enumerated()), id: \.element.id) { index, tab in
-                regularTabView(tab, index: index)
+                regularTabView(tab, index: folderRows + index)
             }
         }
     }
@@ -588,7 +635,7 @@ struct SpaceView: View {
         let zone = DropZoneID.spaceRegular(space.id)
         dragSession.itemCellSize[zone] = NookDesign.Size.row
         dragSession.itemCellSpacing[zone] = NookDesign.Spacing.rowGap
-        dragSession.itemCounts[zone] = tabs.count
+        dragSession.itemCounts[zone] = tabs.filter { $0.folderId == nil }.count + regularFolderRows
     }
 
     private func regularTabView(_ tab: Tab, index: Int) -> some View {
@@ -633,11 +680,9 @@ struct SpaceView: View {
     }
 
     private func addTabToFolder(_ folder: TabFolder) {
-        // Create a new tab and add it to the folder
+        // Create the tab, then move it with the folder's own membership rules (pinned or regular).
         let newTab = tabManager.createNewTab(in: space)
-        newTab.folderId = folder.id
-        newTab.isSpacePinned = true
-        tabManager.persistSnapshot()
+        tabManager.moveTabToFolder(tab: newTab, folderId: folder.id)
     }
 
     // MARK: - Scroll State

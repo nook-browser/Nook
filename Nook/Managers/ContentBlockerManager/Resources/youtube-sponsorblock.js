@@ -50,6 +50,9 @@
   var toastTimeout = null;
   var markerContainer = null;
   var manualSkipContainer = null;
+  var manualEndCleanup = null;
+  var unmuteCleanup = null;
+  var mutedSegment = null;
 
   // Virtual time state (performance.now() precision)
   var lastVideoTime = 0;
@@ -67,9 +70,11 @@
       renderProgressBarMarkers();
       if (segments.length > 0) {
         setupVideoListeners();
+        updateTimeReference();
         startSponsorSchedule();
       } else {
         cancelSponsorSchedule();
+        removeVideoListeners();
       }
     },
     updateSettings: function() {}
@@ -108,6 +113,7 @@
   // === Video Element & Event Listeners ===
   function getVideoElement() {
     if (videoElement && videoElement.isConnected) return videoElement;
+    if (videoElement) removeVideoListeners();
     videoElement = document.querySelector('#movie_player video');
     return videoElement;
   }
@@ -123,20 +129,32 @@
     video.addEventListener('ratechange', onVideoRateChange);
     video.addEventListener('pause', onVideoPause);
     video.addEventListener('waiting', onVideoPause);
-    video.addEventListener('timeupdate', updateTimeReference);
+    video.addEventListener('timeupdate', onVideoTimeUpdate);
+    video.addEventListener('ended', onVideoPause);
   }
 
   function removeVideoListeners() {
     if (!videoElement) return;
+    if (unmuteCleanup) unmuteCleanup();
+    removeManualSkipButton();
     videoElement.removeEventListener('play', onVideoPlay);
     videoElement.removeEventListener('playing', onVideoPlay);
     videoElement.removeEventListener('seeking', onVideoSeeking);
     videoElement.removeEventListener('ratechange', onVideoRateChange);
     videoElement.removeEventListener('pause', onVideoPause);
     videoElement.removeEventListener('waiting', onVideoPause);
-    videoElement.removeEventListener('timeupdate', updateTimeReference);
+    videoElement.removeEventListener('timeupdate', onVideoTimeUpdate);
+    videoElement.removeEventListener('ended', onVideoPause);
+    videoElement.removeEventListener('durationchange', onDurationReady);
     videoListenersAttached = false;
     videoElement = null;
+  }
+
+  function onVideoTimeUpdate() {
+    var video = getVideoElement();
+    var looped = video && video.currentTime < lastVideoTime - 1 && lastVideoTime > 2;
+    updateTimeReference();
+    if (looped) startSponsorSchedule();
   }
 
   function onVideoPlay() {
@@ -181,6 +199,7 @@
         performSkip(nextSeg, currentTime);
       } else if (skipOption === 'manual') {
         showManualSkipButton(nextSeg);
+        scheduleManualSegmentEnd(nextSeg);
       }
       return;
     }
@@ -201,6 +220,10 @@
           return;
         }
         var t = getVirtualTime();
+        if (t >= nextSeg.segment[1] - 0.1) {
+          startSponsorSchedule();
+          return;
+        }
         if (t >= nextSeg.segment[0] && t < nextSeg.segment[1] - 0.1) {
           cancelSponsorSchedule();
           var opt = categoryOptions[nextSeg.category] || 'disabled';
@@ -232,7 +255,7 @@
     for (var i = 0; i < segments.length; i++) {
       var seg = segments[i];
       var opt = categoryOptions[seg.category] || 'disabled';
-      if (opt === 'disabled') continue;
+      if (opt === 'disabled' || seg === mutedSegment) continue;
       if (currentTime < seg.segment[1] - 0.1) {
         if (!best || seg.segment[0] < best.segment[0]) {
           best = seg;
@@ -249,8 +272,11 @@
     removeManualSkipButton();
 
     if (seg.actionType === 'mute') {
+      if (unmuteCleanup) unmuteCleanup();
+      var previouslyMuted = video.muted;
       video.muted = true;
-      scheduleUnmute(video, seg.segment[1]);
+      mutedSegment = seg;
+      scheduleUnmute(video, seg.segment[0], seg.segment[1], previouslyMuted);
     } else {
       video.currentTime = seg.segment[1];
       console.log(TAG, 'Skipped', seg.category, seg.segment[0].toFixed(1), '->', seg.segment[1].toFixed(1));
@@ -261,28 +287,41 @@
     setTimeout(startSponsorSchedule, 100);
   }
 
-  function scheduleUnmute(video, endTime) {
-    var check = setInterval(function() {
-      if (!video || video.currentTime >= endTime || video.ended) {
-        video.muted = false;
-        clearInterval(check);
-      }
-    }, 200);
-    setTimeout(function() { clearInterval(check); }, 300000);
+  // Playback events stop naturally while paused; no timers remain running in
+  // paused/background videos just to watch for a segment boundary.
+  function watchPlayback(video, check) {
+    var events = ['timeupdate', 'seeking', 'ended'];
+    events.forEach(function(event) { video.addEventListener(event, check); });
+    return function() {
+      events.forEach(function(event) { video.removeEventListener(event, check); });
+    };
   }
 
-  // When in a manual-skip segment, schedule removal of the button when segment ends
+  function scheduleUnmute(video, startTime, endTime, previouslyMuted) {
+    var detach = watchPlayback(video, function() {
+      if (video.currentTime >= endTime || video.currentTime < startTime || video.ended) {
+        unmuteCleanup();
+        startSponsorSchedule();
+      }
+    });
+    unmuteCleanup = function() {
+      detach();
+      video.muted = previouslyMuted;
+      mutedSegment = null;
+      unmuteCleanup = null;
+    };
+  }
+
   function scheduleManualSegmentEnd(seg) {
-    var check = setInterval(function() {
-      var v = getVideoElement();
-      if (!v || v.currentTime >= seg.segment[1] || v.currentTime < seg.segment[0] - 0.5) {
-        clearInterval(check);
+    if (manualEndCleanup) manualEndCleanup();
+    var video = getVideoElement();
+    if (!video) return;
+    manualEndCleanup = watchPlayback(video, function() {
+      if (video.currentTime >= seg.segment[1] || video.currentTime < seg.segment[0] - 0.5 || video.ended) {
         removeManualSkipButton();
         startSponsorSchedule();
       }
-    }, 200);
-    // Safety cleanup
-    setTimeout(function() { clearInterval(check); }, 600000);
+    });
   }
 
   // === Manual Skip Button ===
@@ -337,6 +376,7 @@
   }
 
   function removeManualSkipButton() {
+    if (manualEndCleanup) { manualEndCleanup(); manualEndCleanup = null; }
     if (manualSkipContainer) {
       manualSkipContainer.remove();
       manualSkipContainer = null;
@@ -515,8 +555,9 @@
   // === SPA Navigation ===
   function onVideoChange() {
     var newID = extractVideoID(location.href);
-    if (!newID || newID === currentVideoID) return;
+    if (newID === currentVideoID) return;
 
+    if (unmuteCleanup) unmuteCleanup();
     currentVideoID = newID;
     segments = [];
     categoryOptions = {};
@@ -526,7 +567,7 @@
     removeManualSkipButton();
     removeToast();
 
-    postToNative({ type: 'video-changed', videoID: newID });
+    if (newID) postToNative({ type: 'video-changed', videoID: newID });
   }
 
   function postToNative(msg) {
@@ -537,19 +578,6 @@
     } catch (e) {
       console.warn(TAG, 'Failed to post to native:', e);
     }
-  }
-
-  // === YouTube Shorts Loop Detection ===
-  function setupLoopDetection() {
-    var lastTime = 0;
-    setInterval(function() {
-      var video = getVideoElement();
-      if (!video) return;
-      if (video.currentTime < lastTime - 1 && lastTime > 2) {
-        startSponsorSchedule();
-      }
-      lastTime = video.currentTime;
-    }, 500);
   }
 
   // === Initialization ===
@@ -566,7 +594,14 @@
       }
     });
 
-    setupLoopDetection();
+    // Discover a late/replaced player from media lifecycle events, without polling.
+    document.addEventListener('loadedmetadata', function(event) {
+      if (!event.target.matches?.('#movie_player video') || !segments.length) return;
+      setupVideoListeners();
+      updateTimeReference();
+      renderProgressBarMarkers();
+      startSponsorSchedule();
+    }, true);
 
     var id = extractVideoID(location.href);
     if (id) {

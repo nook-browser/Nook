@@ -79,6 +79,13 @@ final class LocalLLMEngine {
     /// The loaded model container, if any.
     private var modelContainer: ModelContainer?
 
+    @ObservationIgnored
+    nonisolated(unsafe) private var loadTask: Task<ModelContainer, Error>?
+    @ObservationIgnored
+    nonisolated(unsafe) private var generationTask: Task<String, Error>?
+    private var loadID: UUID?
+    private var generationID: UUID?
+
     /// Timer task for idle unloading.
     /// `@ObservationIgnored` prevents the @Observable macro from synthesizing tracked storage,
     /// which would conflict with the `nonisolated(unsafe)` needed for deinit access.
@@ -96,6 +103,8 @@ final class LocalLLMEngine {
     }
 
     deinit {
+        loadTask?.cancel()
+        generationTask?.cancel()
         memoryPressureSource?.cancel()
         idleTimerTask?.cancel()
     }
@@ -105,118 +114,144 @@ final class LocalLLMEngine {
     /// Downloads the model if not already cached, then loads it into memory.
     /// After this call, the engine is ready for generation.
     func ensureDownloaded() async throws {
-        // If already loaded or loading, nothing to do.
-        if status == .loaded || status == .loading || status == .generating {
-            return
-        }
+        try Task.checkCancellation()
+        if modelContainer != nil { return }
 
-        status = .loading
-        Self.log.info("Loading model: \(Self.modelID)")
-
-        do {
+        let task: Task<ModelContainer, Error>
+        let id: UUID
+        if let existing = loadTask, let existingID = loadID {
+            task = existing
+            id = existingID
+        } else {
+            id = UUID()
+            loadID = id
+            status = .loading
+            idleTimerTask?.cancel()
             let configuration = ModelConfiguration(id: Self.modelID)
-
-            // Use Task.detached to avoid blocking the main actor during heavy I/O.
-            let container = try await Task.detached(priority: .userInitiated) {
-                try await LLMModelFactory.shared.loadContainer(
+            let reportProgress: @MainActor @Sendable (Double) -> Void = { [weak self] fraction in
+                guard let self, self.loadID == id,
+                      self.loadTask?.isCancelled == false,
+                      fraction < 1 else { return }
+                self.status = .downloading(fraction)
+            }
+            task = Task.detached(priority: .userInitiated) {
+                try Task.checkCancellation()
+                let container = try await LLMModelFactory.shared.loadContainer(
                     configuration: configuration
                 ) { progress in
-                    let fractionCompleted = progress.fractionCompleted
-                    Task { @MainActor in
-                        // Only show downloading status if we're actually downloading (not already loaded).
-                        if fractionCompleted < 1.0 {
-                            self.status = .downloading(fractionCompleted)
-                        }
-                    }
+                    let fraction = progress.fractionCompleted
+                    Task { await reportProgress(fraction) }
                 }
-            }.value
+                try Task.checkCancellation()
+                return container
+            }
+            loadTask = task
+        }
 
-            self.modelContainer = container
-            self.status = .loaded
-            Self.log.info("Model loaded successfully")
-            resetIdleTimer()
+        do {
+            let container = try await withTaskCancellationHandler {
+                try await task.value
+            } onCancel: {
+                task.cancel()
+            }
+            try Task.checkCancellation()
+            guard !task.isCancelled else { throw CancellationError() }
+            if loadID == id {
+                loadTask = nil
+                loadID = nil
+                modelContainer = container
+                status = .loaded
+                resetIdleTimer()
+            }
         } catch {
-            let message = error.localizedDescription
-            self.status = .error(message)
-            Self.log.error("Failed to load model: \(message)")
-            throw EngineError.loadFailed(message)
+            if loadID == id {
+                loadTask = nil
+                loadID = nil
+                status = (error is CancellationError || task.isCancelled)
+                    ? .ready : .error(error.localizedDescription)
+            }
+            if error is CancellationError || task.isCancelled { throw CancellationError() }
+            throw EngineError.loadFailed(error.localizedDescription)
         }
     }
 
-    /// Generate text from a system prompt and user prompt using the loaded model.
-    ///
-    /// - Parameters:
-    ///   - systemPrompt: The system instruction for the model.
-    ///   - userPrompt: The user query or input.
-    ///   - maxTokens: Maximum number of tokens to generate (default: 1024).
-    /// - Returns: The generated text as a String.
+    /// Generate one request at a time. Cancellation reaches MLX's token producer,
+    /// and waits for its GPU work to finish before permitting another generation.
     func generate(systemPrompt: String, userPrompt: String, maxTokens: Int = 1024) async throws -> String {
-        guard let container = modelContainer, status == .loaded || status == .generating else {
-            // Attempt auto-load if not loaded yet.
-            if modelContainer == nil {
-                try await ensureDownloaded()
-                return try await generate(systemPrompt: systemPrompt, userPrompt: userPrompt, maxTokens: maxTokens)
-            }
-            throw EngineError.modelNotLoaded
-        }
+        try Task.checkCancellation()
+        guard generationTask == nil else { throw EngineError.alreadyGenerating }
+        try await ensureDownloaded()
+        try Task.checkCancellation()
+        guard generationTask == nil else { throw EngineError.alreadyGenerating }
+        guard let container = modelContainer else { throw EngineError.modelNotLoaded }
 
+        idleTimerTask?.cancel()
+        idleTimerTask = nil
+        let id = UUID()
+        generationID = id
         status = .generating
-        Self.log.info("Starting generation (maxTokens: \(maxTokens))")
-
-        defer {
-            if status == .generating {
-                status = .loaded
-            }
-            resetIdleTimer()
-        }
-
-        do {
-            let result = try await Task.detached(priority: .userInitiated) { [container] in
-                // Build chat messages
-                let chat: [Chat.Message] = [
-                    .system(systemPrompt),
-                    .user(userPrompt),
-                ]
-                let userInput = UserInput(chat: chat)
-
-                // Prepare input through the model's processor
-                let input = try await container.prepare(input: userInput)
-
-                // Configure generation parameters
-                let parameters = GenerateParameters(
-                    maxTokens: maxTokens,
-                    temperature: 0.1
+        let task = Task.detached(priority: .userInitiated) { [container] in
+            try Task.checkCancellation()
+            return try await container.perform { context in
+                let input = try await context.processor.prepare(input: UserInput(chat: [
+                    .system(systemPrompt), .user(userPrompt),
+                ]))
+                try Task.checkCancellation()
+                let iterator = try TokenIterator(
+                    input: input, model: context.model,
+                    parameters: GenerateParameters(maxTokens: maxTokens, temperature: 0.1)
                 )
-
-                // Generate tokens via the AsyncStream API
-                let stream = try await container.generate(
-                    input: input,
-                    parameters: parameters
+                try Task.checkCancellation()
+                let (stream, producer) = MLXLMCommon.generateTask(
+                    promptTokenCount: input.text.tokens.size,
+                    modelConfiguration: context.configuration,
+                    tokenizer: context.tokenizer,
+                    iterator: iterator
                 )
-
-                // Collect all chunks into the output string
-                var output = ""
-                for await generation in stream {
-                    if let chunk = generation.chunk {
-                        output += chunk
+                return try await withTaskCancellationHandler {
+                    var output = ""
+                    for await generation in stream {
+                        if Task.isCancelled { break }
+                        if let chunk = generation.chunk { output += chunk }
                     }
+                    // MLX synchronizes its GPU stream before this task completes.
+                    await producer.value
+                    try Task.checkCancellation()
+                    return output
+                } onCancel: {
+                    producer.cancel()
                 }
-
-                return output
-            }.value
-
-            Self.log.info("Generation complete (\(result.count) characters)")
+            }
+        }
+        generationTask = task
+        defer {
+            if generationID == id {
+                generationTask = nil
+                generationID = nil
+                if status == .generating { status = modelContainer == nil ? .ready : .loaded }
+                if modelContainer != nil { resetIdleTimer() }
+            }
+        }
+        do {
+            let result = try await withTaskCancellationHandler {
+                try await task.value
+            } onCancel: {
+                task.cancel()
+            }
+            try Task.checkCancellation()
+            guard !task.isCancelled else { throw CancellationError() }
             return result
         } catch {
-            let message = error.localizedDescription
-            status = .error(message)
-            Self.log.error("Generation failed: \(message)")
+            if error is CancellationError || task.isCancelled { throw CancellationError() }
+            if generationID == id { status = .error(error.localizedDescription) }
             throw error
         }
     }
 
     /// Unload the model from memory, freeing resources.
     func unload() {
+        loadTask?.cancel()
+        generationTask?.cancel()
         idleTimerTask?.cancel()
         idleTimerTask = nil
         modelContainer = nil

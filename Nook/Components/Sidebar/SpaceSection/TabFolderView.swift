@@ -85,12 +85,10 @@ struct TabFolderView: View {
 
     private func handleFolderReorder(_ reorder: PendingReorder?) {
         guard let reorder = reorder, case .folder(let folderId) = reorder.zone, folderId == folder.id else { return }
-        let tabs = tabsInFolder
-        guard reorder.fromIndex < tabs.count else {
+        guard let tab = tabsInFolder.first(where: { $0.id == reorder.item.tabId }) else {
             dragSession.pendingReorder = nil
             return
         }
-        let tab = tabs[reorder.fromIndex]
         let op = dragSession.makeDragOperation(from: reorder, tab: tab)
         var transaction = Transaction()
         transaction.disablesAnimations = true
@@ -104,7 +102,7 @@ struct TabFolderView: View {
     private var folderHeader: some View {
         Button(action: {
             withAnimation(NookDesign.Motion.spring) {
-                folder.isOpen.toggle()
+                tabManager.toggleFolder(folder.id)
             }
         }) {
             HStack(spacing: NookDesign.Spacing.md) {
@@ -250,7 +248,8 @@ struct TabFolderView: View {
                 action: {
                     onActivateTab(tab)
                 },
-                onClose: { tabManager.removeTab(tab.id) },
+                // Tabs in pinned folders are space-pinned; only a forced remove closes them.
+                onClose: { tabManager.forceRemoveTab(tab.id) },
                 onMute: { tab.toggleMute() },
                 menuContext: .folder
             )
@@ -277,11 +276,10 @@ struct TabFolderView: View {
         let sortedTabs = tabsInFolder.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
 
         withAnimation(NookDesign.Motion.spring) {
-            // Update tab indices to match alphabetical order
+            // Reinsert in order through TabManager so the shared bucket stays consistent
             for (index, tab) in sortedTabs.enumerated() {
-                tab.index = index
+                tabManager.moveTabToFolder(tab: tab, folderId: folder.id, index: index)
             }
-            tabManager.persistSnapshot()
         }
     }
 

@@ -1,257 +1,223 @@
-//
-//  HistoryManager.swift
-//  Nook
-//
-//  Created by Jonathan Caudill on 09/08/2025.
-//
-
+// History persistence stays on its own executor; UI consumers receive value records.
 import Foundation
 import SwiftData
 import Observation
+import OSLog
+
+struct HistoryVisit: Sendable {
+    let url: URL
+    let title: String
+    let timestamp: Date
+    let tabId: UUID?
+    let profileId: UUID?
+}
 
 @MainActor
 @Observable
 class HistoryManager {
-    private let context: ModelContext
-    private let maxHistoryDays: Int = 100
-    // Current profile context for filtering and assignment
+    @ObservationIgnored private let storeTask: Task<HistoryStore, Never>
+    @ObservationIgnored private var pendingWrite: Task<Void, Never>?
     var currentProfileId: UUID?
-    
+
     init(context: ModelContext, profileId: UUID? = nil) {
-        self.context = context
-        self.currentProfileId = profileId
-        Task {
-            await cleanupOldHistory()
+        currentProfileId = profileId
+        let container = context.container
+        // Construct the model executor off the main actor as well as calling it there.
+        storeTask = Task.detached { HistoryStore(modelContainer: container) }
+        clearHistory(olderThan: 100)
+    }
+
+    func switchProfile(_ profileId: UUID?) { currentProfileId = profileId }
+
+    private func enqueue(_ operation: @escaping @Sendable (HistoryStore) async -> Void) {
+        let previous = pendingWrite
+        let storeTask = storeTask
+        pendingWrite = Task {
+            await previous?.value
+            await operation(storeTask.value)
         }
     }
 
-    // MARK: - Profile Switching
-    func switchProfile(_ profileId: UUID?) {
-        self.currentProfileId = profileId
-    }
-    
-    // MARK: - Public Methods
-    
     func addVisit(url: URL, title: String, timestamp: Date = Date(), tabId: UUID?, profileId: UUID? = nil, isEphemeral: Bool = false) {
-        // Skip recording history for ephemeral/incognito profiles
         guard !isEphemeral else { return }
-        
-        // Skip non-web URLs
-        guard url.scheme == "http" || url.scheme == "https" else { return }
-        
-        // Skip common non-history URLs
-        let skipPatterns = ["about:", "chrome:", "moz-extension:", "safari-extension:"]
-        if skipPatterns.contains(where: { url.absoluteString.hasPrefix($0) }) {
-            return
-        }
-        
-        do {
-            // Check if we already have this URL
-            let urlString = url.absoluteString
-            // Prefer a simple fetch filtered in-memory to avoid complex SwiftData predicate issues.
-            let existingAll = try context.fetch(FetchDescriptor<HistoryEntity>())
-            let existing = existingAll.filter { $0.url == urlString }
-            let targetProfileId = profileId ?? currentProfileId
-            
-            // Prefer same-profile entry; otherwise, only fallback to a nil-profile entry (do NOT merge across other profiles)
-            let existingEntrySameProfile = existing.first(where: { $0.profileId == targetProfileId })
-            let existingEntryNilProfile = existing.first(where: { $0.profileId == nil })
-            let existingEntry = existingEntrySameProfile ?? existingEntryNilProfile
+        importVisits([HistoryVisit(url: url, title: title, timestamp: timestamp, tabId: tabId, profileId: profileId ?? currentProfileId)])
+    }
 
-            if let existingEntry = existingEntry {
-                // Update existing entry
-                existingEntry.visitCount += 1
-                existingEntry.lastVisited = timestamp
-                existingEntry.title = title.isEmpty ? existingEntry.title : title
-                existingEntry.tabId = tabId
-                if existingEntry.profileId == nil {
-                    existingEntry.profileId = targetProfileId
-                }
-            } else {
-                // Create new entry
-                let newEntry = HistoryEntity(
-                    url: urlString,
-                    title: title.isEmpty ? (url.host ?? "Unknown") : title,
-                    visitDate: timestamp,
-                    tabId: tabId,
-                    visitCount: 1,
-                    lastVisited: timestamp,
-                    profileId: targetProfileId
-                )
-                context.insert(newEntry)
-            }
-            
-            try context.save()
-        } catch {
-        }
+    func importVisits(_ visits: [HistoryVisit]) {
+        enqueue { await $0.addVisits(visits) }
     }
-    
-    func getHistory(days: Int = 7) -> [HistoryEntry] {
-        return getHistory(days: days, page: 0, pageSize: 1000).entries
+
+    func getHistory(days: Int = 7) async -> [HistoryEntry] {
+        await getHistory(days: days, page: 0, pageSize: 1000).entries
     }
-    
-    func getHistory(days: Int = 7, page: Int = 0, pageSize: Int = 50) -> (entries: [HistoryEntry], hasMore: Bool) {
-        do {
-            let cutoffDate = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
-            let profileFilter = currentProfileId
-            // Fetch by date only; apply profile filtering in-memory for stability
-            let basePredicate = #Predicate<HistoryEntity> { e in e.lastVisited >= cutoffDate }
-            // First get total count by date
-            let countDescriptor = FetchDescriptor<HistoryEntity>(predicate: basePredicate)
-            let totalCount = (try? context.fetchCount(countDescriptor)) ?? 0
-            // Then get paginated results by date, sorted by recency
-            var descriptor = FetchDescriptor<HistoryEntity>(
-                predicate: basePredicate,
-                sortBy: [SortDescriptor(\.lastVisited, order: .reverse)]
-            )
-            descriptor.fetchLimit = pageSize
-            descriptor.fetchOffset = page * pageSize
-            
-            let entities = try context.fetch(descriptor)
-            let filteredByProfile: [HistoryEntity]
-            if let pf = profileFilter {
-                filteredByProfile = entities.filter { $0.profileId == pf || $0.profileId == nil }
-            } else {
-                filteredByProfile = entities
-            }
-            let entries = filteredByProfile.map { HistoryEntry(from: $0) }
-            let hasMore = (page + 1) * pageSize < totalCount
-            
-            return (entries: entries, hasMore: hasMore)
-        } catch {
-            return (entries: [], hasMore: false)
-        }
+
+    func getHistory(days: Int = 7, page: Int = 0, pageSize: Int = 50) async -> (entries: [HistoryEntry], hasMore: Bool) {
+        let profile = currentProfileId
+        await pendingWrite?.value
+        return await storeTask.value.history(days: days, profile: profile, page: page, pageSize: pageSize)
     }
-    
-    func searchHistory(query: String) -> [HistoryEntry] {
-        return searchHistory(query: query, page: 0, pageSize: 1000).entries
+
+    func searchHistory(query: String) async -> [HistoryEntry] {
+        await searchHistory(query: query, page: 0, pageSize: 1000).entries
     }
-    
-    func searchHistory(query: String, page: Int = 0, pageSize: Int = 50) -> (entries: [HistoryEntry], hasMore: Bool) {
-        guard !query.isEmpty else { return getHistory(page: page, pageSize: pageSize) }
-        
-        do {
-            // For search, we need to fetch more than needed and filter in memory
-            // This is a limitation of SwiftData's predicate system for complex text searches
-            let profileFilter = currentProfileId
-            var descriptor = FetchDescriptor<HistoryEntity>(
-                sortBy: [SortDescriptor(\.lastVisited, order: .reverse)]
-            )
-            // Limit memory usage for search - fetch reasonable subset for filtering
-            descriptor.fetchLimit = min(5000, maxResults)
-            
-            let entities = try context.fetch(descriptor)
-            // Apply text filtering and profile filtering
-            let filteredEntities = entities.filter { entity in
-                entity.title.localizedCaseInsensitiveContains(query) ||
-                entity.url.localizedCaseInsensitiveContains(query)
-            }.filter { entity in
-                guard let pf = profileFilter else { return true }
-                return entity.profileId == pf || entity.profileId == nil
-            }
-            
-            // Apply pagination to filtered results
-            let startIndex = page * pageSize
-            let endIndex = min(startIndex + pageSize, filteredEntities.count)
-            
-            guard startIndex < filteredEntities.count else {
-                return (entries: [], hasMore: false)
-            }
-            
-            let pageEntries = Array(filteredEntities[startIndex..<endIndex])
-            let hasMore = endIndex < filteredEntities.count
-            
-            return (entries: pageEntries.map { HistoryEntry(from: $0) }, hasMore: hasMore)
-        } catch {
-            return (entries: [], hasMore: false)
-        }
+
+    func searchHistory(query: String, page: Int = 0, pageSize: Int = 50) async -> (entries: [HistoryEntry], hasMore: Bool) {
+        let profile = currentProfileId
+        await pendingWrite?.value
+        guard !Task.isCancelled else { return ([], false) }
+        return await storeTask.value.search(query: query, profile: profile, page: page, pageSize: pageSize)
     }
-    
-    private let maxResults: Int = 10000
-    
-    func getMostVisited(limit: Int = 10) -> [HistoryEntry] {
-        do {
-            let profileFilter = currentProfileId
-            var descriptor = FetchDescriptor<HistoryEntity>(
-                sortBy: [
-                    SortDescriptor(\.visitCount, order: .reverse),
-                    SortDescriptor(\.lastVisited, order: .reverse)
-                ]
-            )
-            descriptor.fetchLimit = limit
-            
-            let entities = try context.fetch(descriptor).filter { entity in
-                guard let pf = profileFilter else { return true }
-                return entity.profileId == pf || entity.profileId == nil
-            }
-            return entities.map { HistoryEntry(from: $0) }
-        } catch {
-            return []
-        }
+
+    func getMostVisited(limit: Int = 10) async -> [HistoryEntry] {
+        let profile = currentProfileId
+        await pendingWrite?.value
+        return await storeTask.value.mostVisited(profile: profile, limit: limit)
     }
-    
+
     func clearHistory(olderThan days: Int = 0, profileId: UUID? = nil) {
-        do {
-            let cutoffDate = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
-            let pf = profileId ?? currentProfileId
-            // Fetch by date only; profile filtering in-memory for stability
-            let datePredicate = #Predicate<HistoryEntity> { e in e.visitDate < cutoffDate }
-            let descriptor = FetchDescriptor<HistoryEntity>(predicate: datePredicate)
-            var entitiesToDelete = try context.fetch(descriptor)
-            if let p = pf {
-                entitiesToDelete = entitiesToDelete.filter { $0.profileId == p }
-            }
-            for entity in entitiesToDelete {
-                context.delete(entity)
-            }
-            
-            try context.save()
-            if let p = pf {
-            } else {
-            }
-        } catch {
-        }
-    }
-    
-    func deleteHistoryEntry(_ entryId: UUID) {
-        do {
-            let eid = entryId
-            let predicate = #Predicate<HistoryEntity> { e in e.id == eid }
-            let descriptor = FetchDescriptor<HistoryEntity>(predicate: predicate)
-            
-            if let entity = try context.fetch(descriptor).first {
-                context.delete(entity)
-                try context.save()
-            }
-        } catch {
-        }
-    }
-    
-    // MARK: - Private Methods
-    
-    private func cleanupOldHistory() async {
-        clearHistory(olderThan: maxHistoryDays)
+        let profile = profileId ?? currentProfileId
+        enqueue { await $0.clear(days: days, profile: profile) }
     }
 
-    // MARK: - Stats
-    func getHistoryStats(for profileId: UUID?) -> (count: Int, uniqueHosts: Int) {
+    func deleteHistoryEntry(_ entryId: UUID) {
+        enqueue { await $0.delete(entryId) }
+    }
+
+    func getHistoryStats(for profileId: UUID?) async -> (count: Int, uniqueHosts: Int) {
+        let profile = profileId ?? currentProfileId
+        await pendingWrite?.value
+        return await storeTask.value.stats(profile: profile)
+    }
+}
+
+@ModelActor
+actor HistoryStore {
+    private static let logger = Logger(subsystem: "com.baingurley.nook", category: "History")
+
+    private func visible(to profile: UUID?) -> Predicate<HistoryEntity> {
+        guard let profile else { return #Predicate { _ in true } }
+        return #Predicate { $0.profileId == profile || $0.profileId == nil }
+    }
+
+    private func exactURL(_ url: String, profile: UUID?) throws -> HistoryEntity? {
+        var descriptor = FetchDescriptor<HistoryEntity>(predicate: #Predicate { $0.url == url && $0.profileId == profile })
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor).first
+    }
+
+    func addVisits(_ visits: [HistoryVisit]) {
+        let interval = BrowserPerformance.signposter.beginInterval("HistoryWrite")
+        defer { BrowserPerformance.signposter.endInterval("HistoryWrite", interval) }
+        modelContext.autosaveEnabled = false
         do {
-            let pf = profileId ?? currentProfileId
-            let entities = try context.fetch(FetchDescriptor<HistoryEntity>()).filter { entity in
-                guard let p = pf else { return true }
-                return entity.profileId == p || entity.profileId == nil
+            for (index, visit) in visits.enumerated() {
+                guard visit.url.scheme == "http" || visit.url.scheme == "https" else { continue }
+                let url = visit.url.absoluteString
+                let existing = try exactURL(url, profile: visit.profileId)
+                    ?? (visit.profileId == nil ? nil : exactURL(url, profile: nil))
+                if let entry = existing {
+                    entry.visitCount += 1
+                    // An import of older history must not move a recent visit backwards.
+                    if visit.timestamp >= entry.lastVisited {
+                        entry.lastVisited = visit.timestamp
+                        if !visit.title.isEmpty { entry.title = visit.title }
+                        entry.tabId = visit.tabId
+                    }
+                    if entry.profileId == nil { entry.profileId = visit.profileId }
+                } else {
+                    modelContext.insert(HistoryEntity(url: url, title: visit.title.isEmpty ? (visit.url.host ?? "Unknown") : visit.title,
+                        visitDate: visit.timestamp, tabId: visit.tabId, lastVisited: visit.timestamp, profileId: visit.profileId))
+                }
+                // Bound each transaction while avoiding a disk save for every imported row.
+                if (index + 1).isMultiple(of: 500) { try modelContext.save() }
             }
-            let hosts: Set<String> = Set(entities.compactMap { URL(string: $0.url)?.host })
-            return (count: entities.count, uniqueHosts: hosts.count)
+            try modelContext.save()
         } catch {
-            return (0, 0)
+            modelContext.rollback()
+            Self.logger.error("History write failed: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    func history(days: Int, profile: UUID?, page: Int, pageSize: Int) -> (entries: [HistoryEntry], hasMore: Bool) {
+        guard page >= 0, pageSize > 0 else { return ([], false) }
+        let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
+        let predicate: Predicate<HistoryEntity>
+        if let profile {
+            predicate = #Predicate { $0.lastVisited >= cutoff && ($0.profileId == profile || $0.profileId == nil) }
+        } else {
+            predicate = #Predicate { $0.lastVisited >= cutoff }
+        }
+        var descriptor = FetchDescriptor<HistoryEntity>(predicate: predicate, sortBy: [SortDescriptor(\.lastVisited, order: .reverse)])
+        descriptor.fetchOffset = page * pageSize
+        descriptor.fetchLimit = pageSize + 1
+        let entries = (try? modelContext.fetch(descriptor)) ?? []
+        return (entries.prefix(pageSize).map(HistoryEntry.init), entries.count > pageSize)
+    }
+
+    func search(query: String, profile: UUID?, page: Int, pageSize: Int) -> (entries: [HistoryEntry], hasMore: Bool) {
+        if query.isEmpty { return history(days: 7, profile: profile, page: page, pageSize: pageSize) }
+        let interval = BrowserPerformance.signposter.beginInterval("HistorySearch")
+        defer { BrowserPerformance.signposter.endInterval("HistorySearch", interval) }
+        guard page >= 0, pageSize > 0 else { return ([], false) }
+        // Keep Foundation's localized matching semantics. Scan bounded chunks off-main,
+        // stopping once this page plus its lookahead is satisfied.
+        let start = page * pageSize
+        var matches: [HistoryEntry] = []
+        var descriptor = FetchDescriptor<HistoryEntity>(predicate: visible(to: profile), sortBy: [SortDescriptor(\.lastVisited, order: .reverse)])
+        descriptor.fetchLimit = 128
+        do {
+            for offset in stride(from: 0, to: 5000, by: 128) {
+                guard !Task.isCancelled else { return ([], false) }
+                descriptor.fetchOffset = offset
+                descriptor.fetchLimit = min(128, 5000 - offset)
+                let entries = try modelContext.fetch(descriptor)
+                for entry in entries where entry.title.localizedCaseInsensitiveContains(query) || entry.url.localizedCaseInsensitiveContains(query) {
+                    matches.append(HistoryEntry(from: entry))
+                    if matches.count > start + pageSize {
+                        return (Array(matches.dropFirst(start).prefix(pageSize)), true)
+                    }
+                }
+                if entries.count < descriptor.fetchLimit! { break }
+            }
+        } catch { Self.logger.error("History search failed: \(error.localizedDescription, privacy: .public)") }
+        return (Array(matches.dropFirst(start).prefix(pageSize)), false)
+    }
+
+    func mostVisited(profile: UUID?, limit: Int) -> [HistoryEntry] {
+        guard limit > 0 else { return [] }
+        var descriptor = FetchDescriptor<HistoryEntity>(predicate: visible(to: profile), sortBy: [SortDescriptor(\.visitCount, order: .reverse), SortDescriptor(\.lastVisited, order: .reverse)])
+        descriptor.fetchLimit = limit
+        return ((try? modelContext.fetch(descriptor)) ?? []).map(HistoryEntry.init)
+    }
+
+    func clear(days: Int, profile: UUID?) {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
+        do {
+            if let profile {
+                try modelContext.delete(model: HistoryEntity.self, where: #Predicate { $0.lastVisited < cutoff && $0.profileId == profile })
+            } else {
+                try modelContext.delete(model: HistoryEntity.self, where: #Predicate { $0.lastVisited < cutoff })
+            }
+            try modelContext.save()
+        } catch { Self.logger.error("History clear failed: \(error.localizedDescription, privacy: .public)") }
+    }
+
+    func delete(_ id: UUID) {
+        do {
+            try modelContext.delete(model: HistoryEntity.self, where: #Predicate { $0.id == id })
+            try modelContext.save()
+        } catch { Self.logger.error("History deletion failed: \(error.localizedDescription, privacy: .public)") }
+    }
+
+    func stats(profile: UUID?) -> (count: Int, uniqueHosts: Int) {
+        let entries = (try? modelContext.fetch(FetchDescriptor<HistoryEntity>(predicate: visible(to: profile)))) ?? []
+        return (entries.count, Set(entries.compactMap { URL(string: $0.url)?.host }).count)
     }
 }
 
 // MARK: - HistoryEntry Model
 
-struct HistoryEntry: Identifiable, Hashable {
+struct HistoryEntry: Identifiable, Hashable, Sendable {
     let id: UUID
     let url: URL
     let title: String

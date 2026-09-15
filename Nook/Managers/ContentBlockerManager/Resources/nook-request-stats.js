@@ -10,6 +10,8 @@
 
   const handler = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nookRequestStats;
   if (!handler) return;
+  // Native drops messages whose token is stale, so disabling counts stops them without a reload.
+  const token = window.__nookRequestStatsToken;
 
   const FLUSH_MS = 250;
   const MAX_PER_MESSAGE = 200;
@@ -31,7 +33,7 @@
     batch = [];
     for (let i = 0; i < pending.length; i += MAX_PER_MESSAGE) {
       try {
-        handler.postMessage({ requests: pending.slice(i, i + MAX_PER_MESSAGE) });
+        handler.postMessage({ token: token, requests: pending.slice(i, i + MAX_PER_MESSAGE) });
       } catch (e) { log('postMessage failed', e); }
     }
   }

@@ -18,6 +18,7 @@ class NookSettingsService {
     private let tabManagementModeKey = "settings.tabManagementMode"
     private let startupLoadModeKey = "settings.startupLoadMode"
     private let blockXSTKey = "settings.blockCrossSiteTracking"
+    private let detailedBlockingCountsEnabledKey = "settings.detailedBlockingCountsEnabled"
     private let adBlockerEnabledKey = "settings.adBlockerEnabled"
     private let adBlockerWhitelistKey = "settings.adBlockerWhitelist"
     private let adBlockerLastUpdateKey = "settings.adBlockerLastUpdate"
@@ -120,6 +121,10 @@ class NookSettingsService {
             userDefaults.set(blockCrossSiteTracking, forKey: blockXSTKey)
             NotificationCenter.default.post(name: .blockCrossSiteTrackingChanged, object: nil, userInfo: ["enabled": blockCrossSiteTracking])
         }
+    }
+
+    var detailedBlockingCountsEnabled: Bool {
+        didSet { userDefaults.set(detailedBlockingCountsEnabled, forKey: detailedBlockingCountsEnabledKey) }
     }
 
     var adBlockerEnabled: Bool {
@@ -421,6 +426,7 @@ class NookSettingsService {
             rawValue: userDefaults.string(forKey: startupLoadModeKey) ?? ""
         ) ?? .favoritesAndSpace
         self.blockCrossSiteTracking = userDefaults.bool(forKey: blockXSTKey)
+        self.detailedBlockingCountsEnabled = userDefaults.bool(forKey: detailedBlockingCountsEnabledKey)
         self.adBlockerEnabled = userDefaults.bool(forKey: adBlockerEnabledKey)
         if let wlData = userDefaults.data(forKey: adBlockerWhitelistKey),
            let decoded = try? JSONDecoder().decode([String].self, from: wlData) {

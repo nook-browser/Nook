@@ -49,7 +49,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     var spaceId: UUID?
     var index: Int
     var profileId: UUID?
-    // If true, this tab is created to host a popup window; do not perform initial load.
+    // One-shot initial-navigation suppression for a WebKit-created popup.
     var isPopupHost: Bool = false
 
     // Track Option key state for Peek functionality
@@ -67,7 +67,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     // MARK: - Display Name Override
     /// User/AI-set display name that persists across page title changes.
-    /// Only set by the tab organizer; cleared by the user via "Reset Tab Name".
+    /// Set by the tab organizer or a user rename; cleared via "Reset Tab Name".
     var displayNameOverride: String? = nil
 
     /// Display name for sidebar. Prefers user/AI override, falls back to page title.
@@ -373,11 +373,26 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
 
     func refresh() {
+        // An unloaded tab has nothing to reload: recreate it, which loads the saved URL.
+        guard _webView != nil else {
+            loadWebViewIfNeeded()
+            for (_, windowState) in browserManager?.windowRegistry?.windows ?? [:]
+            where windowState.currentTabId == id {
+                windowState.refreshCompositor()
+            }
+            return
+        }
         loadingState = .didStartProvisionalNavigation
-        _webView?.reload()
-
-        // Synchronize refresh across all windows that are displaying this tab
-        browserManager?.reloadTabAcrossWindows(self.id)
+        // The primary view can also belong to the coordinator. Reload each view once.
+        var views = browserManager?.webViewCoordinator?.getAllWebViews(for: id) ?? []
+        if let primary = _webView { views.append(primary) }
+        var reloaded = Set<ObjectIdentifier>()
+        for view in views where reloaded.insert(ObjectIdentifier(view)).inserted {
+            // reload() does nothing when no page ever committed (first load failed).
+            if view.backForwardList.currentItem == nil || view.reload() == nil {
+                Tab.loadPage(url, in: view)
+            }
+        }
     }
 
     func stop() {
@@ -460,6 +475,8 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     // MARK: - WebView Setup
 
     private func setupWebView() {
+        let interval = BrowserPerformance.signposter.beginInterval("WebViewCreation")
+        defer { BrowserPerformance.signposter.endInterval("WebViewCreation", interval) }
         let resolvedProfile = resolveProfile()
         let configuration: WKWebViewConfiguration
         if let profile = resolvedProfile {
@@ -536,66 +553,16 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             applyRestoredNavigationState()
         }
 
-        // Only set up script handlers and user agent for new WebViews
-        // Existing WebViews (from Peek) already have these configured
-        if _existingWebView == nil {
-            // Remove existing handlers first to prevent duplicates
-            _webView?.configuration.userContentController.removeScriptMessageHandler(
-                forName: "linkHover")
-            _webView?.configuration.userContentController.removeScriptMessageHandler(
-                forName: "commandHover")
-            _webView?.configuration.userContentController.removeScriptMessageHandler(
-                forName: "commandClick")
-            _webView?.configuration.userContentController.removeScriptMessageHandler(
-                forName: "pipStateChange")
-            _webView?.configuration.userContentController.removeScriptMessageHandler(
-                forName: "mediaStateChange_\(id.uuidString)")
-            _webView?.configuration.userContentController.removeScriptMessageHandler(
-                forName: "backgroundColor_\(id.uuidString)")
-            _webView?.configuration.userContentController.removeScriptMessageHandler(
-                forName: "historyStateDidChange")
-            _webView?.configuration.userContentController.removeScriptMessageHandler(
-                forName: "NookIdentity")
-            _webView?.configuration.userContentController.removeScriptMessageHandler(
-                forName: "nookShortcutDetect")
-            _webView?.configuration.userContentController.removeScriptMessageHandler(
-                forName: "nookAdBlocker")
-            _webView?.configuration.userContentController.removeScriptMessageHandler(
-                forName: "nookSponsorBlock")
-
-            // Add handlers
-            _webView?.configuration.userContentController.add(self, name: "linkHover")
-            _webView?.configuration.userContentController.add(self, name: "commandHover")
-            _webView?.configuration.userContentController.add(self, name: "commandClick")
-            _webView?.configuration.userContentController.add(self, name: "pipStateChange")
-            _webView?.configuration.userContentController.add(
-                self, name: "mediaStateChange_\(id.uuidString)")
-            _webView?.configuration.userContentController.add(
-                self, name: "backgroundColor_\(id.uuidString)")
-            _webView?.configuration.userContentController.add(self, name: "historyStateDidChange")
-            _webView?.configuration.userContentController.add(self, name: "NookIdentity")
-            _webView?.configuration.userContentController.add(self, name: "nookShortcutDetect")
-            _webView?.configuration.userContentController.add(self, name: "nookAdBlocker")
-            _webView?.configuration.userContentController.add(self, name: "nookSponsorBlock")
-
-            _webView?.customUserAgent =
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0.1 Safari/605.1.15"
-
-            // Let the web content control its own background so extension styles
-            // (like Dark Reader) can paint dark backgrounds. The app's themed
-            // background is only visible while the page is loading.
-            _webView?.setValue(true, forKey: "drawsBackground")
-        }
-
         if let webView = _webView {
-            webView.isInspectable = true
-
-            webView.allowsLinkPreview = true
-            webView.configuration.preferences
-                .isFraudulentWebsiteWarningEnabled = true
-            webView.configuration.preferences
-                .javaScriptCanOpenWindowsAutomatically = true
-            // No ad-hoc page script injection here; rely on WKWebExtension
+            // Adopted Peek and mini-window views have their own controllers without
+            // Nook's handlers, so they need the same setup as a fresh view.
+            configureTabWebView(webView)
+            // An adopted page already finished loading, so didFinish will not inject
+            // the page observers (SPA URL, media state, link hover) for this document.
+            if _existingWebView != nil, !webView.isLoading, webView.url != nil {
+                injectPageObservers(into: webView)
+                if let current = webView.url { url = current }
+            }
         }
 
         // For existing WebViews, ensure the delegates are updated to point to this tab
@@ -611,12 +578,50 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             }
             didNotifyOpenToExtensions = true
         }
-        // For popup-hosting tabs, don't trigger an initial navigation. WebKit will
-        // drive the load into this returned webView from createWebViewWith:.
-        // Also don't reload if we're using an existing WebView (from Peek)
-        if !isPopupHost && _existingWebView == nil {
+        // Consume popup suppression only after setup succeeds. WebKit drives the
+        // original navigation; any replacement view must load the saved URL.
+        let shouldLoadInitialURL = !isPopupHost && _existingWebView == nil
+        isPopupHost = false
+        if shouldLoadInitialURL {
             loadURL(url)
         }
+    }
+
+    /// Script message handler names this tab registers on each of its web views.
+    private var messageHandlerNames: [String] {
+        ["linkHover", "commandHover", "commandClick", "pipStateChange",
+         "mediaStateChange_\(id.uuidString)", "backgroundColor_\(id.uuidString)",
+         "historyStateDidChange", "NookIdentity", "nookShortcutDetect",
+         "nookAdBlocker", "nookSponsorBlock"]
+    }
+
+    /// Handlers, user agent and preferences shared by primary, clone, adopted and popup views.
+    /// The view's controller must belong to this view alone: handlers are keyed by name.
+    func configureTabWebView(_ webView: WKWebView) {
+        let controller = webView.configuration.userContentController
+        for name in messageHandlerNames {
+            controller.removeScriptMessageHandler(forName: name)
+            controller.add(self, name: name)
+        }
+        webView.customUserAgent =
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0.1 Safari/605.1.15"
+        // Let the web content control its own background so extension styles
+        // (like Dark Reader) can paint dark backgrounds. The app's themed
+        // background is only visible while the page is loading.
+        webView.setValue(true, forKey: "drawsBackground")
+        webView.isInspectable = true
+        webView.allowsLinkPreview = true
+        webView.configuration.preferences.isFraudulentWebsiteWarningEnabled = true
+        webView.configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
+    }
+
+    /// Per-document observers. Each script guards against a second install in the same document.
+    private func injectPageObservers(into webView: WKWebView) {
+        injectLinkHoverJavaScript(to: webView)
+        injectPiPStateListener(to: webView)
+        injectMediaDetection(to: webView)
+        injectHistoryStateObserver(into: webView)
+        injectShortcutDetection(to: webView)
     }
 
     // Resolve the Profile for this tab via its space association, or fall back to currentProfile, then default profile
@@ -752,23 +757,26 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         hasFavicon = false
         faviconFetchAttempts = 0
 
-        if newURL.isFileURL {
-            // Grant read access to the containing directory for local resources
-            let directoryURL = newURL.deletingLastPathComponent()
-            activeWebView.loadFileURL(newURL, allowingReadAccessTo: directoryURL)
-        } else {
-            // Regular URL loading with aggressive caching
-            var request = URLRequest(url: newURL)
-            request.cachePolicy = .returnCacheDataElseLoad
-            request.timeoutInterval = 30.0
-            activeWebView.load(request)
-        }
+        Tab.loadPage(newURL, in: activeWebView)
 
         // Synchronize navigation across all windows that are displaying this tab
         browserManager?.syncTabAcrossWindows(self.id)
 
         Task { @MainActor in
             await fetchAndSetFavicon(for: newURL)
+        }
+    }
+
+    /// Loads a URL into a specific view. File URLs get read access to their directory so
+    /// local subresources load. Uses the protocol cache policy: restoring an evicted tab
+    /// with returnCacheDataElseLoad served the stale cached document without revalidation.
+    static func loadPage(_ url: URL, in webView: WKWebView) {
+        if url.isFileURL {
+            webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+        } else {
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 30.0
+            webView.load(request)
         }
     }
 
@@ -814,8 +822,13 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
 
     func saveRename() {
-        if !editingName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            name = editingName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = editingName.trimmingCharacters(in: .whitespacesAndNewlines)
+        // `name` follows the page title; a user rename is an override that
+        // "Reset Tab Name" clears and that survives relaunch.
+        if !trimmed.isEmpty, trimmed != displayNameOverride {
+            objectWillChange.send()
+            displayNameOverride = trimmed
+            browserManager?.tabManager.debouncedPersistSnapshot()
         }
         isRenaming = false
         editingName = ""
@@ -925,314 +938,94 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     private func injectMediaDetection(to webView: WKWebView) {
         let mediaDetectionScript = """
             (function() {
+                if (window.__nookMediaDetectionInstalled) return;
+                window.__nookMediaDetectionInstalled = true;
                 const handlerName = 'mediaStateChange_\(id.uuidString)';
+                const media = new Set(document.querySelectorAll('audio, video'));
+                let pendingCheck = null;
+                let lastState = null;
+                const host = location.hostname;
+                const streamingSelector = host.endsWith('spotify.com')
+                    ? '[data-testid="control-button-playpause"]'
+                    : host.endsWith('soundcloud.com') ? '.playControl'
+                    : host === 'music.apple.com' ? '.web-chrome-playback-controls' : null;
+                let streamingControl = null;
+                const controlObserver = new MutationObserver(scheduleCheck);
 
-                // Track current URL for navigation detection
-                window.__NookCurrentURL = window.location.href;
-
-                // Throttle for timeupdate events — these fire ~4-15/sec during video
-                // playback but we only need to check state at most once per second.
-                let __nookLastMediaCheckTime = 0;
-                function throttledCheckMediaState() {
-                    const now = Date.now();
-                    if (now - __nookLastMediaCheckTime < 1000) return;
-                    __nookLastMediaCheckTime = now;
-                    checkMediaState();
-                }
-
-                function resetSoundTracking() {
-                    window.webkit.messageHandlers[handlerName].postMessage({
-                        hasAudioContent: false,
-                        hasPlayingAudio: false,
-                        hasVideoContent: false,
-                        hasPlayingVideo: false
+                function refreshStreamingControl() {
+                    if (!streamingSelector || streamingControl?.isConnected) return;
+                    controlObserver.disconnect();
+                    streamingControl = document.querySelector(streamingSelector);
+                    if (streamingControl) controlObserver.observe(streamingControl, {
+                        attributes: true, childList: true, subtree: true,
+                        attributeFilter: ['aria-label', 'class']
                     });
-                    setTimeout(checkMediaState, 100);
                 }
-
-                const originalPushState = history.pushState;
-                const originalReplaceState = history.replaceState;
-
-                history.pushState = function(...args) {
-                    originalPushState.apply(history, args);
-                    setTimeout(() => {
-                        if (window.location.href !== window.__NookCurrentURL) {
-                            window.__NookCurrentURL = window.location.href;
-                            resetSoundTracking();
-                        }
-                    }, 0);
-                };
-
-                history.replaceState = function(...args) {
-                    originalReplaceState.apply(history, args);
-                    setTimeout(() => {
-                        if (window.location.href !== window.__NookCurrentURL) {
-                            window.__NookCurrentURL = window.location.href;
-                            resetSoundTracking();
-                        }
-                    }, 0);
-                };
-
-                // Listen for popstate events (back/forward)
-                window.addEventListener('popstate', resetSoundTracking);
-
+                function scheduleCheck() {
+                    if (pendingCheck !== null) return;
+                    pendingCheck = setTimeout(checkMediaState, 50);
+                }
                 function checkMediaState() {
-                    const audios = document.querySelectorAll('audio');
-                    const videos = document.querySelectorAll('video');
-
-                    // Standard media detection
+                    pendingCheck = null;
+                    refreshStreamingControl();
                     let hasPlayingAudio = false;
-                    let hasPlayingVideoWithAudio = false;
                     let hasPlayingVideo = false;
-
-                    // Check audio elements with enhanced detection
-                    Array.from(audios).forEach(audio => {
-                        const standardPlaying = !audio.paused && !audio.ended && audio.readyState >= 2;
-
-                        // Enhanced detection for DRM content using WebKit properties
-                        let drmAudioPlaying = false;
-                        try {
-                            // Check for decoded audio bytes (WebKit-specific)
-                            if ('webkitAudioDecodedByteCount' in audio) {
-                                const decodedBytes = audio.webkitAudioDecodedByteCount;
-                                if (window.__NookLastDecodedBytes === undefined) {
-                                    window.__NookLastDecodedBytes = {};
-                                }
-                                const lastBytes = window.__NookLastDecodedBytes[audio.src] || 0;
-                                if (decodedBytes > lastBytes && audio.currentTime > 0) {
-                                    drmAudioPlaying = true;
-                                }
-                                window.__NookLastDecodedBytes[audio.src] = decodedBytes;
-                            }
-
-                            // Check if current time is progressing (for DRM content)
-                            if (!window.__NookLastCurrentTime) window.__NookLastCurrentTime = {};
-                            const lastTime = window.__NookLastCurrentTime[audio.src] || 0;
-                            if (audio.currentTime > lastTime + 0.1 && audio.readyState >= 2) {
-                                drmAudioPlaying = true;
-                            }
-                            window.__NookLastCurrentTime[audio.src] = audio.currentTime;
-                        } catch (e) {
-                            // Silently continue if WebKit properties aren't available
-                        }
-
-                        if (standardPlaying || drmAudioPlaying) {
-                            hasPlayingAudio = true;
-                        }
-                    });
-
-                    // Check video elements with enhanced detection
-                    Array.from(videos).forEach(video => {
-                        const standardPlaying = !video.paused && !video.ended && video.readyState >= 2;
-
-                        // Enhanced detection for DRM video content
-                        let drmVideoPlaying = false;
-                        try {
-                            // Check for decoded bytes (WebKit-specific)
-                            if ('webkitAudioDecodedByteCount' in video || 'webkitVideoDecodedByteCount' in video) {
-                                const audioBytes = video.webkitAudioDecodedByteCount || 0;
-                                const videoBytes = video.webkitVideoDecodedByteCount || 0;
-                                if (!window.__NookLastVideoBytes) window.__NookLastVideoBytes = {};
-                                const lastAudioBytes = window.__NookLastVideoBytes[video.src + '_audio'] || 0;
-                                const lastVideoBytes = window.__NookLastVideoBytes[video.src + '_video'] || 0;
-
-                                if ((audioBytes > lastAudioBytes || videoBytes > lastVideoBytes) && video.currentTime > 0) {
-                                    drmVideoPlaying = true;
-                                }
-                                window.__NookLastVideoBytes[video.src + '_audio'] = audioBytes;
-                                window.__NookLastVideoBytes[video.src + '_video'] = videoBytes;
-                            }
-
-                            // Check if current time is progressing
-                            if (!window.__NookLastVideoCurrentTime) window.__NookLastVideoCurrentTime = {};
-                            const lastTime = window.__NookLastVideoCurrentTime[video.src] || 0;
-                            if (video.currentTime > lastTime + 0.1 && video.readyState >= 2) {
-                                drmVideoPlaying = true;
-                            }
-                            window.__NookLastVideoCurrentTime[video.src] = video.currentTime;
-                        } catch (e) {
-                            // Silently continue if WebKit properties aren't available
-                        }
-
-                        const isPlaying = standardPlaying || drmVideoPlaying;
-                        if (isPlaying) {
-                            hasPlayingVideo = true;
-                            if (!video.muted && video.volume > 0) {
-                                hasPlayingVideoWithAudio = true;
-                            }
-                        }
-                    });
-
-                    // Additional heuristic detection for streaming sites
-                    let heuristicAudioDetected = false;
-                    try {
-                        // Check for common streaming site indicators
-                        const isSpotify = window.location.hostname.includes('spotify.com');
-                        const isYouTube = window.location.hostname.includes('youtube.com') || window.location.hostname.includes('youtu.be');
-                        const isSoundCloud = window.location.hostname.includes('soundcloud.com');
-                        const isAppleMusic = window.location.hostname.includes('music.apple.com');
-
-                        if (isSpotify) {
-                            const playButton = document.querySelector('[data-testid="control-button-playpause"]');
-                            if (playButton) {
-                                const ariaLabel = playButton.getAttribute('aria-label') || '';
-                                heuristicAudioDetected = ariaLabel.toLowerCase().includes('pause');
-                            }
-                        } else if (isYouTube) {
-                            const player = document.querySelector('.html5-video-player');
-                            const video = document.querySelector('video');
-                            if (player && video) {
-                                heuristicAudioDetected = player.classList.contains('playing-mode') ||
-                                                       (!video.paused && video.currentTime > 0);
-                            }
-                        } else if (isSoundCloud) {
-                            const playButton = document.querySelector('.playControl');
-                            heuristicAudioDetected = playButton && playButton.classList.contains('playing');
-                        } else if (isAppleMusic) {
-                            const playButton = document.querySelector('button[aria-label*="pause"], button[aria-label*="Pause"]');
-                            heuristicAudioDetected = !!playButton;
-                        }
-                    } catch (e) {}
-
-                    const hasAudioContent = hasPlayingAudio || hasPlayingVideoWithAudio || heuristicAudioDetected;
-
-                    window.webkit.messageHandlers[handlerName].postMessage({
-                        hasAudioContent: hasAudioContent,
-                        hasPlayingAudio: hasAudioContent,
-                        hasVideoContent: videos.length > 0,
-                        hasPlayingVideo: hasPlayingVideo
-                    });
-                }
-
-                function addAudioListeners(element) {
-                    // State-change events: check quickly
-                    ['play', 'pause', 'ended', 'loadedmetadata', 'canplay', 'volumechange'].forEach(event => {
-                        element.addEventListener(event, function() {
-                            setTimeout(checkMediaState, 50);
-                        });
-                    });
-                    // timeupdate fires ~4-15/sec during playback — use throttled
-                    // version to avoid flooding Swift with identical state messages
-                    element.addEventListener('timeupdate', function() {
-                        throttledCheckMediaState();
-                    });
-
-                    try {
-                        if ('webkitneedkey' in element) {
-                            element.addEventListener('webkitneedkey', function() {
-                                setTimeout(checkMediaState, 100);
-                            });
-                        }
-
-                        if ('encrypted' in element) {
-                            element.addEventListener('encrypted', function() {
-                                setTimeout(checkMediaState, 100);
-                            });
-                        }
-                    } catch (e) {}
-                }
-
-                document.querySelectorAll('video, audio').forEach(addAudioListeners);
-
-                const mediaObserver = new MutationObserver(function(mutations) {
-                    let hasChanges = false;
-                    mutations.forEach(function(mutation) {
-                        mutation.addedNodes.forEach(function(node) {
-                            if (node.nodeType === 1) {
-                                if (node.tagName === 'VIDEO' || node.tagName === 'AUDIO') {
-                                    addAudioListeners(node);
-                                    hasChanges = true;
-                                } else if (node.querySelector) {
-                                    const mediaElements = node.querySelectorAll('video, audio');
-                                    if (mediaElements.length > 0) {
-                                        mediaElements.forEach(addAudioListeners);
-                                        hasChanges = true;
-                                    }
-                                }
-                            }
-                        });
-
-                        mutation.removedNodes.forEach(function(node) {
-                            if (node.nodeType === 1) {
-                                if (node.tagName === 'VIDEO' || node.tagName === 'AUDIO' ||
-                                    (node.querySelector && node.querySelectorAll('video, audio').length > 0)) {
-                                    hasChanges = true;
-                                }
-                            }
-                        });
-                    });
-
-                    if (hasChanges) {
-                        setTimeout(checkMediaState, 100);
+                    let hasVideoContent = false;
+                    for (const element of media) {
+                        if (!element.isConnected) { media.delete(element); continue; }
+                        const isVideo = element.tagName === 'VIDEO';
+                        hasVideoContent ||= isVideo;
+                        const playing = !element.paused && !element.ended && element.readyState >= 2;
+                        hasPlayingVideo ||= isVideo && playing;
+                        hasPlayingAudio ||= playing && !element.muted && element.volume > 0;
                     }
+                    // Some streaming services use Web Audio instead of a DOM media element.
+                    if (streamingControl) {
+                        const label = streamingControl.getAttribute('aria-label') || '';
+                        hasPlayingAudio ||= label.toLowerCase().includes('pause') ||
+                            streamingControl.classList.contains('playing') ||
+                            !!streamingControl.querySelector('button[aria-label*="pause"], button[aria-label*="Pause"]');
+                    }
+                    const state = {hasAudioContent: hasPlayingAudio, hasPlayingAudio,
+                        hasVideoContent, hasPlayingVideo};
+                    const serialized = JSON.stringify(state);
+                    if (serialized !== lastState) {
+                        lastState = serialized;
+                        window.webkit?.messageHandlers?.[handlerName]?.postMessage(state);
+                    }
+                }
+                // Media events do not bubble, so observe in the capture phase. This also
+                // tracks media created after injection without per-element listeners.
+                ['play', 'playing', 'pause', 'ended', 'emptied', 'loadedmetadata',
+                 'loadeddata', 'canplay', 'volumechange', 'encrypted', 'webkitneedkey'].forEach(type => {
+                    document.addEventListener(type, event => {
+                        if (event.target.matches?.('audio, video')) media.add(event.target);
+                        scheduleCheck();
+                    }, true);
                 });
-                mediaObserver.observe(document.body, { childList: true, subtree: true });
-
-                function setupStreamingSiteMonitoring() {
-                    const hostname = window.location.hostname;
-
-                    if (hostname.includes('spotify.com')) {
-                        const observer = new MutationObserver(() => {
-                            setTimeout(checkMediaState, 100);
-                        });
-
-                        const playerArea = document.querySelector('[data-testid="now-playing-widget"]') || document.body;
-                        if (playerArea) {
-                            observer.observe(playerArea, {
-                                childList: true,
-                                subtree: true,
-                                attributes: true,
-                                attributeFilter: ['aria-label', 'class', 'data-testid']
+                const observer = new MutationObserver(mutations => {
+                    let changed = false;
+                    for (const mutation of mutations) {
+                        for (const node of mutation.addedNodes) {
+                            if (node.nodeType !== 1) continue;
+                            if (node.matches('audio, video')) { media.add(node); changed = true; }
+                            node.querySelectorAll('audio, video').forEach(element => {
+                                media.add(element); changed = true;
                             });
                         }
-                    } else if (hostname.includes('youtube.com') || hostname.includes('youtu.be')) {
-                        window.addEventListener('yt-navigate-finish', () => {
-                            setTimeout(checkMediaState, 500);
-                        });
-
-                        const observer = new MutationObserver(() => {
-                            setTimeout(checkMediaState, 100);
-                        });
-
-                        const playerElement = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
-                        if (playerElement) {
-                            observer.observe(playerElement, {
-                                attributes: true,
-                                attributeFilter: ['class']
-                            });
+                        if (mutation.removedNodes.length && media.size) {
+                            for (const element of media) {
+                                if (!element.isConnected) { media.delete(element); changed = true; }
+                            }
                         }
-                    } else if (hostname.includes('soundcloud.com')) {
-                        const observer = new MutationObserver(() => {
-                            setTimeout(checkMediaState, 100);
-                        });
-
-                        const playerElement = document.querySelector('.playControls') || document.body;
-                        observer.observe(playerElement, {
-                            childList: true,
-                            subtree: true,
-                            attributes: true,
-                            attributeFilter: ['class']
-                        });
-                    } else if (hostname.includes('music.apple.com')) {
-                        const observer = new MutationObserver(() => {
-                            setTimeout(checkMediaState, 100);
-                        });
-
-                        const playerElement = document.querySelector('.web-chrome-playback-controls') || document.body;
-                        observer.observe(playerElement, {
-                            childList: true,
-                            subtree: true,
-                            attributes: true,
-                            attributeFilter: ['aria-label', 'class']
-                        });
                     }
-                }
-
-                setTimeout(setupStreamingSiteMonitoring, 1000);
-                setTimeout(checkMediaState, 500);
-                setInterval(() => {
-                    checkMediaState();
-                }, 5000);
+                    if (streamingSelector && !streamingControl?.isConnected) changed = true;
+                    if (changed) scheduleCheck();
+                });
+                observer.observe(document.documentElement, {childList: true, subtree: true});
+                document.addEventListener('visibilitychange', scheduleCheck);
+                window.addEventListener('pageshow', scheduleCheck);
+                checkMediaState();
             })();
             """
 
@@ -1244,131 +1037,36 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
 
     func unloadWebView() {
-
-        guard let webView = _webView else {
-            return
-        }
-
-        // FORCE KILL ALL MEDIA AND PROCESSES
-        webView.stopLoading()
-
-        // Kill all media and PiP via JavaScript
-        let killScript = """
-            (() => {
-                // FORCE KILL ALL PiP SESSIONS FIRST
-                try {
-                    // Exit any active PiP sessions
-                    if (document.pictureInPictureElement) {
-                        document.exitPictureInPicture();
-                    }
-
-                    // Force exit WebKit PiP for all videos
-                    document.querySelectorAll('video').forEach(video => {
-                        if (video.webkitSupportsPresentationMode && video.webkitPresentationMode === 'picture-in-picture') {
-                            video.webkitSetPresentationMode('inline');
-                        }
-                    });
-
-                    // Disable PiP on all videos permanently
-                    document.querySelectorAll('video').forEach(video => {
-                        video.disablePictureInPicture = true;
-                        video.webkitSupportsPresentationMode = false;
-                    });
-                } catch (e) {
-                    console.log('PiP destruction error:', e);
-                }
-
-                // Kill all media
-                document.querySelectorAll('video, audio').forEach(el => {
-                    el.pause();
-                    el.currentTime = 0;
-                    el.src = '';
-                    el.load();
-                    el.remove();
-                });
-
-                // Kill all WebAudio
-                if (window.AudioContext || window.webkitAudioContext) {
-                    if (window.__NookAudioContexts) {
-                        window.__NookAudioContexts.forEach(ctx => ctx.close());
-                        delete window.__NookAudioContexts;
-                    }
-                }
-
-                // Kill all timers
-                const maxId = setTimeout(() => {}, 0);
-                for (let i = 0; i < maxId; i++) {
-                    clearTimeout(i);
-                    clearInterval(i);
-                }
-
-                // Force garbage collection if available
-                if (window.gc) {
-                    window.gc();
-                }
-            })();
-            """
-        webView.evaluateJavaScript(killScript) { _, error in
-            if let error = error {
-            } else {
-            }
-        }
-
-        // Clean up message handlers - use comprehensive cleanup
-        let controller = webView.configuration.userContentController
-        let allMessageHandlers = [
-            "linkHover",
-            "commandHover",
-            "commandClick",
-            "pipStateChange",
-            "mediaStateChange_\(id.uuidString)",
-            "backgroundColor_\(id.uuidString)",
-            "historyStateDidChange",
-            "NookIdentity",
-            "nookShortcutDetect",
-            "nookAdBlocker",
-        ]
-
-        for handlerName in allMessageHandlers {
-            controller.removeScriptMessageHandler(forName: handlerName)
-        }
-
-        // Remove from view hierarchy and clear delegates
-        webView.removeFromSuperview()
-        webView.navigationDelegate = nil
-        webView.uiDelegate = nil
-
-        // FORCE TERMINATE THE WEB CONTENT PROCESS
-        webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { _ in }
-        webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { _ in }
-        webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { _ in }
-
-        // Remove theme color and navigation state observers before clearing webview reference
-        if let webView = _webView {
-            removeThemeColorObserver(from: webView)
-            removeNavigationStateObservers(from: webView)
-        }
-
-        // Clear the webview reference (this will trigger reload when accessed)
+        let interval = BrowserPerformance.signposter.beginInterval("TabEviction")
+        defer { BrowserPerformance.signposter.endInterval("TabEviction", interval) }
+        // Clear every owner, including window clones and any adopted Peek view.
+        let primary = _webView
+        let coordinator = browserManager?.webViewCoordinator
+        let primaryIsPooled = primary.map { view in
+            coordinator?.getAllWebViews(for: id).contains(where: { $0 === view }) == true
+        } ?? false
+        coordinator?.removeAllWebViews(for: self)
+        if let primary, !primaryIsPooled { cleanupCloneWebView(primary) }
         _webView = nil
-
-        // Stop native audio monitoring since webview is unloaded
+        _existingWebView = nil
+        // WebKit only supplies the original popup navigation. A replacement view
+        // must load the saved URL through the normal tab setup path.
+        isPopupHost = false
+        primaryWindowId = nil
         stopNativeAudioMonitoring()
-
-        // Cancel pending SPA debounce task
         spaPersistDebounceTask?.cancel()
         spaPersistDebounceTask = nil
-
-        // Clean up WebStore handler
-        if webStoreHandler != nil {
-            controller.removeScriptMessageHandler(
-                forName: WebStoreScriptHandler.handlerName, contentWorld: WebStoreScriptHandler.contentWorld)
-            webStoreHandler = nil
-        }
-
-        // Reset loading state
+        profileAwaitCancellable?.cancel()
+        profileAwaitCancellable = nil
+        extensionAwaitCancellable?.cancel()
+        extensionAwaitCancellable = nil
+        webStoreHandler = nil
         loadingState = .idle
-
+        hasPiPActive = false
+        hasPlayingVideo = false
+        hasPlayingAudio = false
+        hasAudioContent = false
+        hasVideoContent = false
     }
 
     func loadWebViewIfNeeded() {
@@ -1602,41 +1300,9 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         // 1. Stop all loading and media
         webView.stopLoading()
 
-        // 2. Kill all media and JavaScript execution
-        let killScript = """
-            (() => {
-                try {
-                    // Kill all media
-                    document.querySelectorAll('video, audio').forEach(el => {
-                        el.pause();
-                        el.currentTime = 0;
-                        el.src = '';
-                        el.load();
-                    });
-
-                    // Kill all WebAudio contexts
-                    if (window.AudioContext || window.webkitAudioContext) {
-                        if (window.__NookAudioContexts) {
-                            window.__NookAudioContexts.forEach(ctx => ctx.close());
-                            delete window.__NookAudioContexts;
-                        }
-                    }
-
-                    // Kill all timers
-                    const maxId = setTimeout(() => {}, 0);
-                    for (let i = 0; i < maxId; i++) {
-                        clearTimeout(i);
-                        clearInterval(i);
-                    }
-                } catch (e) {
-                    console.log('Cleanup script error:', e);
-                }
-            })();
-            """
-        webView.evaluateJavaScript(killScript) { _, error in
-            if let error = error {
-            }
-        }
+        // Stop playback through WebKit; releasing the view tears down its document.
+        // Do not enumerate every historical JavaScript timer ID during eviction.
+        webView.pauseAllMediaPlayback(completionHandler: nil)
 
         // 3. Remove ALL message handlers comprehensively
         let controller = webView.configuration.userContentController
@@ -1651,11 +1317,18 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             "NookIdentity",
             "nookShortcutDetect",
             "nookAdBlocker",
+            "nookSponsorBlock",
+            ContentBlockerManager.requestStatsHandlerName,
         ]
 
         for handlerName in allMessageHandlers {
             controller.removeScriptMessageHandler(forName: handlerName)
         }
+
+        controller.removeScriptMessageHandler(
+            forName: WebStoreScriptHandler.handlerName, contentWorld: WebStoreScriptHandler.contentWorld)
+        controller.removeScriptMessageHandler(
+            forName: AdvancedRulesEngine.messageHandlerName, contentWorld: .page)
 
         // 4. MEMORY LEAK FIX: Detach contextMenuBridge before clearing delegates
         // This breaks the retain cycle: WKWebView → contextMenuBridge → userContentController → WKWebView
@@ -1682,15 +1355,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
     /// MEMORY LEAK FIX: Comprehensive cleanup for the main tab WebView
     public func performComprehensiveWebViewCleanup() {
-        guard let webView = _webView else { return }
-
-
-        // Use the same comprehensive cleanup as clone WebViews
-        cleanupCloneWebView(webView)
-
-        // Additional cleanup for main WebView
-        _webView = nil
-
+        unloadWebView()
     }
 
     public override func observeValue(
@@ -1940,85 +1605,38 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     private func injectLinkHoverJavaScript(to webView: WKWebView) {
         let linkHoverScript = """
             (function() {
-                var currentHoveredLink = null;
-                var isCommandPressed = false;
-                var hoverCheckInterval = null;
+                if (window.__nookLinkHoverInstalled) return;
+                window.__nookLinkHoverInstalled = true;
+                let currentHoveredLink = null;
+                let isCommandPressed = false;
+                let lastCommandLink = null;
 
-                function sendLinkHover(href) {
-                    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.linkHover) {
-                        window.webkit.messageHandlers.linkHover.postMessage(href);
+                function reportHover(href, commandPressed) {
+                    const commandLink = commandPressed ? href : null;
+                    if (href !== currentHoveredLink) {
+                        currentHoveredLink = href;
+                        window.webkit?.messageHandlers?.linkHover?.postMessage(href);
                     }
+                    if (commandLink !== lastCommandLink) {
+                        lastCommandLink = commandLink;
+                        window.webkit?.messageHandlers?.commandHover?.postMessage(commandLink);
+                    }
+                    isCommandPressed = commandPressed;
                 }
-
-                function sendCommandHover(href) {
-                    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.commandHover) {
-                        window.webkit.messageHandlers.commandHover.postMessage(href);
-                    }
+                function linkAt(target) {
+                    return target?.closest?.('a[href]')?.href || null;
                 }
-
-                // Track Command key state
-                document.addEventListener('keydown', function(e) {
-                    if (e.metaKey) {
-                        isCommandPressed = true;
-                        if (currentHoveredLink) {
-                            sendCommandHover(currentHoveredLink);
-                        }
-                    }
-                });
-
-                document.addEventListener('keyup', function(e) {
-                    if (!e.metaKey) {
-                        isCommandPressed = false;
-                        sendCommandHover(null);
-                    }
-                });
-
-                // Use a completely passive approach - add invisible event listeners directly to links
-                function attachLinkListeners() {
-                    var links = document.querySelectorAll('a[href]');
-                    links.forEach(function(link) {
-                        if (!link.dataset.NookListener) {
-                            link.dataset.NookListener = 'true';
-
-                            link.addEventListener('mouseenter', function() {
-                                currentHoveredLink = link.href;
-                                sendLinkHover(link.href);
-                                if (isCommandPressed) {
-                                    sendCommandHover(link.href);
-                                }
-                            }, { passive: true });
-
-                            link.addEventListener('mouseleave', function() {
-                                if (currentHoveredLink === link.href) {
-                                    currentHoveredLink = null;
-                                    sendLinkHover(null);
-                                    sendCommandHover(null);
-                                }
-                            }, { passive: true });
-                        }
-                    });
-                }
-
-                // Initial attachment
-                if (document.readyState === 'loading') {
-                    document.addEventListener('DOMContentLoaded', attachLinkListeners);
-                } else {
-                    attachLinkListeners();
-                }
-
-                // Re-attach when DOM changes (for dynamic content)
-                var observer = new MutationObserver(function(mutations) {
-                    var needsReattach = false;
-                    mutations.forEach(function(mutation) {
-                        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                            needsReattach = true;
-                        }
-                    });
-                    if (needsReattach) {
-                        setTimeout(attachLinkListeners, 100);
-                    }
-                });
-                observer.observe(document.body, { childList: true, subtree: true });
+                // Capture delegation handles dynamic links without scanning the DOM.
+                document.addEventListener('mouseover', e => {
+                    const link = e.composedPath().find(node => node.matches?.('a[href]'));
+                    reportHover(link?.href || null, e.metaKey);
+                }, {capture: true, passive: true});
+                document.addEventListener('mouseout', e => {
+                    reportHover(linkAt(e.relatedTarget), e.metaKey);
+                }, {capture: true, passive: true});
+                document.addEventListener('keydown', e => reportHover(currentHoveredLink, e.metaKey));
+                document.addEventListener('keyup', e => reportHover(currentHoveredLink, e.metaKey));
+                window.addEventListener('blur', () => reportHover(null, false));
 
                 // Handle command+click for new tabs
                 document.addEventListener('click', function(e) {
@@ -2143,14 +1761,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
     }
     
     private func injectShortcutDetection(to webView: WKWebView) {
-        // Inject the JS script from WebsiteShortcutDetector for runtime shortcut detection
-        let script = WebsiteShortcutDetector.jsDetectionScript
-        
-        webView.evaluateJavaScript(script) { _, error in
-            if let error = error {
-            } else {
-            }
-        }
+        browserManager?.keyboardShortcutManager?.websiteShortcutDetector.configure(webView: webView)
     }
 
     func activate() {
@@ -2564,11 +2175,7 @@ extension Tab: WKNavigationDelegate {
             }
         }
 
-        injectLinkHoverJavaScript(to: webView)
-        injectPiPStateListener(to: webView)
-        injectMediaDetection(to: webView)
-        injectHistoryStateObserver(into: webView)
-        injectShortcutDetection(to: webView)
+        injectPageObservers(into: webView)
         updateNavigationStateEnhanced(source: "didCommit")
 
         // Trigger background color extraction after page fully loads
@@ -2623,12 +2230,23 @@ extension Tab: WKNavigationDelegate {
         NSLog("[Tab] WebContent process terminated for tab %@ (crash #%d in window)", id.uuidString, webProcessCrashCount)
         loadingState = .idle
 
+        // No window shows this tab: unload instead of respawning a process in the background
+        // (often the system reclaiming memory). Selecting the tab restores its saved URL.
+        if let bm = browserManager, webView === _webView {
+            var views = bm.webViewCoordinator?.getAllWebViews(for: id) ?? []
+            views.append(webView)
+            if views.allSatisfy({ $0.window == nil }) {
+                bm.compositorManager.unloadTab(self)
+                return
+            }
+        }
+
         // Hard stop after 4 crashes in a 30-second window — the system is in a bad state
         // (e.g., XPC services unavailable after sleep/wake) and retrying is making it worse.
-        // Load about:blank to stop WebKit from reloading the crashing content into respawned processes.
+        // Leave the view without a process; Reload (or unloading the tab) tries again.
+        // Loading about:blank here would overwrite and persist the tab's real URL.
         guard webProcessCrashCount <= 4 else {
-            NSLog("[Tab] Giving up on tab %@ after %d consecutive crashes — loading blank to break crash loop", id.uuidString, webProcessCrashCount)
-            webView.load(URLRequest(url: URL(string: "about:blank")!))
+            NSLog("[Tab] Giving up on tab %@ after %d consecutive crashes", id.uuidString, webProcessCrashCount)
             return
         }
 
@@ -2636,8 +2254,13 @@ extension Tab: WKNavigationDelegate {
         // into the same broken XPC state, causing a tight crash loop. The delay gives launchservicesd
         // and other XPC services time to finish restarting after a system wake.
         let delay = Double(webProcessCrashCount) * 2.0 // 2s, 4s, 6s, 8s
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak webView] in
-            webView?.reload()
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self, weak webView] in
+            // Skip views released or unloaded while waiting.
+            guard let self, let webView, (webView.navigationDelegate as AnyObject?) === self else { return }
+            // reload() does nothing when the crash happened before any page committed.
+            if webView.backForwardList.currentItem == nil || webView.reload() == nil {
+                Tab.loadPage(self.url, in: webView)
+            }
         }
     }
 
@@ -2648,6 +2271,16 @@ extension Tab: WKNavigationDelegate {
         withError error: Error
     ) {
         loadingState = .didFailProvisionalNavigation(error)
+
+        // didStartProvisionalNavigation moved `url` to the attempted URL. A navigation that
+        // never commits (download response, Stop, network error) must not become the URL
+        // that is persisted and restored; the view still shows the committed page. When a
+        // newer navigation superseded this one, isLoading is still true and that one owns `url`.
+        if !webView.isLoading, let committed = webView.url, committed != url {
+            url = committed
+            ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
+            browserManager?.tabManager.debouncedPersistSnapshot()
+        }
 
         // Set connection error favicon
         Task { @MainActor in
@@ -3033,9 +2666,17 @@ extension Tab: WKScriptMessageHandler {
     }
 
     private func handleCommandClick(url: URL) {
-        // Create a new tab with the URL and focus it
-        browserManager?.tabManager.createNewTab(
-            url: url.absoluteString, in: browserManager?.tabManager.currentSpace)
+        guard let bm = browserManager else { return }
+        // A private tab's links stay in its incognito window, never a regular space.
+        if let window = bm.incognitoWindow(containing: self), let profile = window.ephemeralProfile {
+            // Background open, like the regular path: createEphemeralTab selects the new tab.
+            let previousTabId = window.currentTabId
+            _ = bm.tabManager.createEphemeralTab(url: url, in: window, profile: profile)
+            window.currentTabId = previousTabId
+            return
+        }
+        // Create a new tab with the URL (background: the window keeps its current tab)
+        bm.tabManager.createNewTab(url: url.absoluteString, in: bm.tabManager.currentSpace)
     }
 
     private func handleOAuthRequest(message: WKScriptMessage) {
@@ -3213,12 +2854,24 @@ extension Tab: WKUIDelegate {
             return nil
         }
 
-        // For regular popups, create a new webView with the EXACT configuration that WebKit provided
+        // WebKit's configuration shares the opener's userContentController. Handlers are keyed
+        // by name, so registering the popup's on it would reroute the opener's messages to the
+        // popup, and closing the popup would strip them from the opener. Give the popup its own
+        // controller; WebKit only requires the configuration's related web view to match.
+        configuration.userContentController = BrowserConfiguration.shared.freshUserContentController()
         let newWebView = FocusableWKWebView(frame: .zero, configuration: configuration)
 
-        // Create a new tab to manage this webView
-        let space = bm.tabManager.currentSpace
-        let newTab = bm.tabManager.createPopupTab(in: space)
+        // Create a new tab to manage this webView. A private tab's popup stays in its window.
+        let incognito = bm.incognitoWindow(containing: self)
+        let newTab: Tab
+        if let incognito, let profile = incognito.ephemeralProfile {
+            newTab = bm.tabManager.createEphemeralTab(
+                url: navigationAction.request.url ?? URL(string: "about:blank")!,
+                in: incognito, profile: profile)
+            newTab.isPopupHost = true
+        } else {
+            newTab = bm.tabManager.createPopupTab(in: bm.tabManager.currentSpace)
+        }
 
         // Set up the new webView with the same delegates and settings as the current tab
         newWebView.navigationDelegate = newTab
@@ -3228,57 +2881,25 @@ extension Tab: WKUIDelegate {
 
         // Set the owning tab reference
         newWebView.owningTab = newTab
+        newWebView.contextMenuBridge = WebContextMenuBridge(tab: newTab, configuration: configuration)
 
         // Store the webView in the new tab
         newTab._webView = newWebView
 
-        // Set up message handlers
-        // Remove any existing handlers first to avoid duplicates
-        newWebView.configuration.userContentController.removeScriptMessageHandler(
-            forName: "linkHover")
-        newWebView.configuration.userContentController.removeScriptMessageHandler(
-            forName: "commandHover")
-        newWebView.configuration.userContentController.removeScriptMessageHandler(
-            forName: "commandClick")
-        newWebView.configuration.userContentController.removeScriptMessageHandler(
-            forName: "pipStateChange")
-        newWebView.configuration.userContentController.removeScriptMessageHandler(
-            forName: "mediaStateChange_\(newTab.id.uuidString)")
-        newWebView.configuration.userContentController.removeScriptMessageHandler(
-            forName: "backgroundColor_\(newTab.id.uuidString)")
-        newWebView.configuration.userContentController.removeScriptMessageHandler(
-            forName: "historyStateDidChange")
-        newWebView.configuration.userContentController.removeScriptMessageHandler(
-            forName: "NookIdentity")
-        newWebView.configuration.userContentController.removeScriptMessageHandler(
-            forName: "nookAdBlocker")
-
-        // Now add the handlers
-        newWebView.configuration.userContentController.add(newTab, name: "linkHover")
-        newWebView.configuration.userContentController.add(newTab, name: "commandHover")
-        newWebView.configuration.userContentController.add(newTab, name: "commandClick")
-        newWebView.configuration.userContentController.add(newTab, name: "pipStateChange")
-        newWebView.configuration.userContentController.add(
-            newTab, name: "mediaStateChange_\(newTab.id.uuidString)")
-        newWebView.configuration.userContentController.add(
-            newTab, name: "backgroundColor_\(newTab.id.uuidString)")
-        newWebView.configuration.userContentController.add(newTab, name: "historyStateDidChange")
-        newWebView.configuration.userContentController.add(newTab, name: "NookIdentity")
-        newWebView.configuration.userContentController.add(newTab, name: "nookAdBlocker")
-
-        // Set custom user agent
-        newWebView.customUserAgent =
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0.1 Safari/605.1.15"
-
-        // Configure preferences
-        newWebView.configuration.preferences.isFraudulentWebsiteWarningEnabled = true
-        newWebView.configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
+        newTab.configureTabWebView(newWebView)
+        newTab.setupThemeColorObserver(for: newWebView)
+        newTab.setupNavigationStateObservers(for: newWebView)
 
         // Load the URL if provided
         if let url = navigationAction.request.url, url.scheme != nil,
             url.absoluteString != "about:blank"
         {
             newTab.loadURL(url)
+        }
+
+        // Show the private popup only after it owns its view, so selection cannot create a second one.
+        if let incognito, incognito.ephemeralTabs.contains(where: { $0.id == newTab.id }) {
+            bm.selectTab(newTab, in: incognito)
         }
 
         return newWebView

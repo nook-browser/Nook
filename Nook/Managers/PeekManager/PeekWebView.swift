@@ -26,8 +26,9 @@ struct PeekWebView: NSViewRepresentable {
            let profile = peekManager?.browserManager?.profileManager.profiles.first(where: { $0.id == profileId }) {
             configuration = BrowserConfiguration.shared.webViewConfiguration(for: profile)
         } else {
-            // Fallback to default configuration
-            configuration = BrowserConfiguration.shared.webViewConfiguration
+            // A copy with its own controller: the view can be adopted into a tab, which
+            // registers name-keyed handlers that must not land on the shared controller.
+            configuration = BrowserConfiguration.shared.cacheOptimizedWebViewConfiguration()
         }
 
         let webView = WKWebView(frame: .zero, configuration: configuration)

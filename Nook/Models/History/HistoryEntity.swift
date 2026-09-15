@@ -10,6 +10,7 @@ import SwiftData
 
 @Model
 class HistoryEntity {
+    #Index<HistoryEntity>([\.url, \.profileId], [\.lastVisited])
     @Attribute(.unique) var id: UUID
     var url: String
     var title: String

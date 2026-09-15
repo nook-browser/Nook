@@ -69,7 +69,7 @@ final class Persistence {
     // MARK: - Init
     private init() {
         do {
-            let config = ModelConfiguration(url: Self.storeURL)
+            let config = ModelConfiguration(url: Self.storeURL, cloudKitDatabase: .none)
             container = try ModelContainer(for: Self.schema, configurations: [config])
             Self.log.info("SwiftData container initialized successfully")
         } catch {
@@ -95,10 +95,11 @@ final class Persistence {
                         Self.log.notice("No backups found when attempting to create backup.")
                     }
                 } catch {
-                    // Unexpected backup failure — continue but warn
-                    Self.log.error(
-                        "Backup attempt failed: \(String(describing: error), privacy: .public). Proceeding with cautious reset."
+                    // Never delete a store that could not be copied: the user's tabs live only there.
+                    Self.log.fault(
+                        "Backup attempt failed: \(String(describing: error), privacy: .public). Not deleting store."
                     )
+                    fatalError("SwiftData store could not be opened or backed up; store left untouched: \(error)")
                 }
 
                 do {
@@ -106,7 +107,7 @@ final class Persistence {
                     Self.log.notice(
                         "Deleted existing store (and sidecars) for schema-mismatch recovery")
 
-                    let config = ModelConfiguration(url: Self.storeURL)
+                    let config = ModelConfiguration(url: Self.storeURL, cloudKitDatabase: .none)
                     container = try ModelContainer(for: Self.schema, configurations: [config])
                     Self.log.notice(
                         "Recreated SwiftData container after schema mismatch using configured URL")
@@ -604,6 +605,7 @@ class BrowserManager: ObservableObject {
     /// Load tabs according to the user's startup mode preference.
     /// Always loads the last active tab. Called after windowState is fully configured.
     private var startupWaitedForContentBlocker = false
+    private var startupWarmTasks: [UUID: Task<Void, Never>] = [:]
 
     private func applyStartupLoadMode(for windowState: BrowserWindowState) {
         // Content blocking should be active before the first navigation, otherwise the startup
@@ -613,12 +615,9 @@ class BrowserManager: ObservableObject {
            let activation = contentBlockerManager.activationTask {
             startupWaitedForContentBlocker = true
             Task { @MainActor [weak self, weak windowState] in
-                await withTaskGroup(of: Void.self) { group in
-                    group.addTask { await activation.value }
-                    group.addTask { try? await Task.sleep(for: .seconds(2)) }
-                    await group.next()
-                    group.cancelAll()
-                }
+                let interval = BrowserPerformance.signposter.beginInterval("StartupBlockerWait")
+                _ = await TaskDeadline.wait(for: activation, timeout: .seconds(2))
+                BrowserPerformance.signposter.endInterval("StartupBlockerWait", interval)
                 guard let self, let windowState else { return }
                 self.applyStartupLoadMode(for: windowState)
             }
@@ -646,32 +645,50 @@ class BrowserManager: ObservableObject {
             }
         }
 
-        // Load additional tabs based on startup mode
+        // Paint the active page first. Warm one page at a time, without a launch burst.
         let startupMode = nookSettings?.startupLoadMode ?? .favoritesAndSpace
-
-        switch startupMode {
-        case .nothing:
-            break
-        case .favorites:
-            let essentials = tabManager.essentialTabs(for: windowState.currentProfileId)
-            for tab in essentials where tab.isUnloaded {
-                preloadTabInCoordinator(tab, windowId: windowState.id)
+        var warmTabs: [Tab] = []
+        if startupMode != .nothing {
+            warmTabs = tabManager.essentialTabs(for: windowState.currentProfileId)
+            if startupMode == .favoritesAndSpace, let space = activeSpace {
+                warmTabs += tabManager.tabs(in: space)
             }
-        case .favoritesAndSpace:
-            let essentials = tabManager.essentialTabs(for: windowState.currentProfileId)
-            for tab in essentials where tab.isUnloaded {
-                preloadTabInCoordinator(tab, windowId: windowState.id)
-            }
-            if let space = activeSpace {
-                let spaceTabs = tabManager.tabs(in: space)
-                for tab in spaceTabs where tab.isUnloaded {
-                    preloadTabInCoordinator(tab, windowId: windowState.id)
-                }
+        }
+        var seen = Set<UUID>()
+        let warmIDs = warmTabs.filter { $0.id != activeTab?.id && seen.insert($0.id).inserted }.map(\.id)
+        startupWarmTasks[windowState.id]?.cancel()
+        startupWarmTasks[windowState.id] = Task { @MainActor [weak self, weak windowState] in
+            defer { if let windowState { self?.startupWarmTasks[windowState.id] = nil } }
+            // Wait for the visible page before competing for WebKit and network resources.
+            if let view = activeTab?.existingWebView,
+               !(await Self.waitForStartupNavigation(view)) { return }
+            for id in warmIDs {
+                do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
+                guard !Task.isCancelled, let self, let windowState,
+                      self.windowRegistry?.windows[windowState.id] != nil,
+                      self.compositorManager.allowsBackgroundWarming,
+                      let tab = self.tabManager.tabById(id) else { return }
+                guard tab.isUnloaded else { continue }
+                self.preloadTabInCoordinator(tab, windowId: windowState.id)
+                if let view = tab.existingWebView,
+                   !(await Self.waitForStartupNavigation(view)) { return }
             }
         }
 
         // Refresh compositor to show the current tab
         windowState.refreshCompositor()
+    }
+
+    /// Abort speculative warming after a slow page; other tabs remain available on demand.
+    private static func waitForStartupNavigation(_ webView: WKWebView) async -> Bool {
+        let completion = Task { @MainActor in
+            for await loading in webView.publisher(for: \.isLoading, options: [.initial, .new]).values {
+                if !loading || Task.isCancelled { return }
+            }
+        }
+        let finished = await TaskDeadline.wait(for: completion, timeout: .seconds(10))
+        completion.cancel()
+        return finished
     }
 
     /// Pre-create a tab's display webview in the coordinator pool so the compositor
@@ -688,7 +705,8 @@ class BrowserManager: ObservableObject {
         // Create the display webview in the coordinator pool (loads URL in background)
         let webView = coordinator.createWebView(for: tab, in: windowId)
         // Assign as primary so tab.isUnloaded returns false (compositor guard)
-        tab.assignWebViewToWindow(webView, windowId: windowId)
+        if tab.existingWebView == nil { tab.assignWebViewToWindow(webView, windowId: windowId) }
+        compositorManager.markTabAccessed(tab.id)
     }
 
     // MARK: - Profile Switching
@@ -936,60 +954,59 @@ class BrowserManager: ObservableObject {
         selectTab(newTab, in: windowState)
     }
 
+    /// The incognito window that owns `tab`, when it is a private tab. Tabs opened from a
+    /// private tab must go back into that window, never into a persisted space.
+    func incognitoWindow(containing tab: Tab?) -> BrowserWindowState? {
+        guard let tab else { return nil }
+        return windowRegistry?.windows.values.first { window in
+            window.isIncognito && window.ephemeralTabs.contains { $0.id == tab.id }
+        }
+    }
+
     func duplicateCurrentTab() {
-        #if DEBUG
-        print("🔧 [BrowserManager] duplicateCurrentTab called")
-        #endif
-        guard let currentTab = currentTabForActiveWindow() else {
-            #if DEBUG
-            print("🔧 [BrowserManager] No current tab found")
-            #endif
+        guard let currentTab = currentTabForActiveWindow() else { return }
+        duplicateTab(currentTab)
+    }
+
+    /// Opens a copy of `tab` and selects it. A loose regular tab gets its copy directly below it;
+    /// other tabs get a regular copy in their space (or the window's space for favorites).
+    /// Private tabs are copied inside their own incognito window.
+    func duplicateTab(_ tab: Tab) {
+        if let window = incognitoWindow(containing: tab) {
+            guard let profile = window.ephemeralProfile else { return }
+            let copy = tabManager.createEphemeralTab(url: tab.url, in: window, profile: profile)
+            selectTab(copy, in: window)
             return
         }
-        #if DEBUG
-        print("🔧 [BrowserManager] Current tab: \(currentTab.name) - \(currentTab.url)")
-        #endif
 
-        // Get the current space for the active window
+        let activeWindow = windowRegistry?.activeWindow
         let targetSpace =
-            windowRegistry?.activeWindow?.currentSpaceId.flatMap { id in
-                tabManager.spaces.first(where: { $0.id == id })
-            } ?? tabManager.currentSpace
+            tab.spaceId.flatMap { id in tabManager.spaces.first(where: { $0.id == id }) }
+            ?? activeWindow?.currentSpaceId.flatMap { id in tabManager.spaces.first(where: { $0.id == id }) }
+            ?? tabManager.currentSpace
+        guard let targetSpace else { return }
 
-        // Get the current tab's index to place the duplicate below it
-        let currentTabIndex = tabManager.tabs.firstIndex(where: { $0.id == currentTab.id }) ?? 0
-        let insertIndex = currentTabIndex + 1
-
-        // Create a new tab with the same URL and name
         let newTab = Tab(
-            url: currentTab.url,
-            name: currentTab.name,
+            url: tab.url,
+            name: tab.name,
             favicon: "globe",  // Will be updated by fetchAndSetFavicon
-            spaceId: targetSpace?.id,
-            index: 0,  // Will be set correctly after insertion
+            spaceId: targetSpace.id,
+            index: 0,
             browserManager: self
         )
-
-        // Add the tab to the current space (it will be added at the end)
         tabManager.addTab(newTab)
 
-        // Now move it to the correct position (right below the current tab)
-        if let spaceId = targetSpace?.id {
-            tabManager.reorderRegular(newTab, in: spaceId, to: insertIndex)
+        // Regular buckets are kept in index order, so the source's position plus one is right below it.
+        if tab.spaceId == targetSpace.id, tab.folderId == nil, !tab.isSpacePinned, !tab.isPinned,
+           let sourcePosition = tabManager.tabs(in: targetSpace).filter({ $0.id != newTab.id }).firstIndex(where: { $0.id == tab.id }) {
+            tabManager.reorderRegular(newTab, in: targetSpace.id, to: sourcePosition + 1)
         }
 
-        // Set as active tab in the current window
-        if let windowState = windowRegistry?.activeWindow {
-            selectTab(newTab, in: windowState)
+        if let activeWindow {
+            selectTab(newTab, in: activeWindow)
         } else {
             selectTab(newTab)
         }
-
-        #if DEBUG
-        print(
-            "🔧 [BrowserManager] Duplicated tab created: \(newTab.name) - \(newTab.url) at index \(insertIndex)"
-        )
-        #endif
     }
 
     func closeCurrentTab() {
@@ -1132,23 +1149,9 @@ class BrowserManager: ObservableObject {
     }
 
     private func quitApplication() {
-        // Clean up all tabs before terminating
-        cleanupAllTabs()
+        // AppDelegate saves the final tab snapshot. Do not close tabs first: a closed tab is
+        // removed from the snapshot and therefore deleted from the store.
         NSApplication.shared.terminate(nil)
-    }
-
-    func cleanupAllTabs() {
-        #if DEBUG
-        print("🔄 [BrowserManager] Cleaning up all tabs")
-        #endif
-        let allTabs = tabManager.pinnedTabs + tabManager.tabs
-
-        for tab in allTabs {
-            #if DEBUG
-            print("🔄 [BrowserManager] Cleaning up tab: \(tab.name)")
-            #endif
-            tab.closeTab()
-        }
     }
 
     // MARK: - Private Methods
@@ -2193,11 +2196,17 @@ class BrowserManager: ObservableObject {
                 }
             }
 
-            // If no current tab, try TabManager's current tab (if loaded).
+            // If no current tab, try TabManager's current tab (if loaded), but only when it
+            // belongs to this window's space or that space's favorites. Another window's tab
+            // from a different space or profile would not match this window's sidebar.
             // Don't search for fallbacks — if TabManager set currentTab to nil,
             // all tabs are unloaded and we should show the empty state.
             if windowState.currentTabId == nil {
-                if let managerCurrentTab = tabManager.currentTab, !managerCurrentTab.isUnloaded {
+                let windowSpace = windowState.currentSpaceId.flatMap { id in tabManager.spaces.first(where: { $0.id == id }) }
+                if let managerCurrentTab = tabManager.currentTab, !managerCurrentTab.isUnloaded,
+                   let windowSpace,
+                   managerCurrentTab.spaceId == windowSpace.id
+                    || tabManager.essentialTabs(for: windowSpace.profileId).contains(where: { $0.id == managerCurrentTab.id }) {
                     windowState.currentTabId = managerCurrentTab.id
                     #if DEBUG
                     print(
@@ -2351,16 +2360,12 @@ class BrowserManager: ObservableObject {
         }
 
         if !result.history.isEmpty {
-            for entry in result.history {
-                guard let url = URL(string: entry.url) else { continue }
-                historyManager.addVisit(
-                    url: url,
-                    title: entry.title,
-                    timestamp: entry.visitDate,
-                    tabId: nil,
-                    profileId: nil
-                )
-            }
+            let profileId = historyManager.currentProfileId
+            historyManager.importVisits(result.history.compactMap { entry in
+                guard let url = URL(string: entry.url) else { return nil }
+                return HistoryVisit(url: url, title: entry.title, timestamp: entry.visitDate,
+                                    tabId: nil, profileId: profileId)
+            })
         }
     }
 

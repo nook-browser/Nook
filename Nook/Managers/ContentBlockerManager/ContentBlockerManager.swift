@@ -30,6 +30,10 @@ final class ContentBlockerManager: NSObject {
     private(set) var trackingParamStripper = TrackingParamStripper()
     let requestStatsEngine = RequestStatsEngine()
     static let requestStatsHandlerName = "nookRequestStats"
+    /// Non-nil while detailed counts are on. Each enable mints a new token; pages injected
+    /// under an older token are ignored until they reload.
+    private var requestStatsToken: String?
+    private var lastRulesHash: String?
 
     /// In-flight activation; startup tab loading waits on it so the first page is protected.
     private(set) var activationTask: Task<Void, Never>?
@@ -107,6 +111,9 @@ final class ContentBlockerManager: NSObject {
         if let whitelist = browserManager.nookSettings?.adBlockerWhitelist {
             allowedDomains = Set(whitelist.map { $0.lowercased() })
         }
+        if browserManager.nookSettings?.detailedBlockingCountsEnabled == true {
+            requestStatsToken = UUID().uuidString
+        }
         if let enabled = browserManager.nookSettings?.enabledOptionalFilterLists {
             filterListManager.enabledOptionalFilterListFilenames = Set(enabled)
         }
@@ -175,7 +182,49 @@ final class ContentBlockerManager: NSObject {
         trackingParamStripper = await Task.detached(priority: .userInitiated) { TrackingParamStripper(rules: rules) }.value
         // Counting engine is not needed for the first paint; build it after activation returns.
         let hash = result.rulesHash
+        lastRulesHash = hash
+        guard requestStatsToken != nil else { return }
         Task { [requestStatsEngine] in await requestStatsEngine.build(rules: rules, hash: hash) }
+    }
+
+    // MARK: - Detailed Counts
+
+    func setDetailedCountsEnabled(_ enabled: Bool) {
+        guard enabled != (requestStatsToken != nil) else { return }
+        requestStatsToken = enabled ? UUID().uuidString : nil
+        if enabled {
+            // Rules are not kept in memory; reload them. The engine reuses its serialized cache by hash.
+            if isEnabled, let hash = lastRulesHash {
+                Task { [filterListManager, requestStatsEngine] in
+                    let rules = await Task.detached(priority: .utility) { filterListManager.loadAllFilterRulesAsLines() }.value
+                    await requestStatsEngine.build(rules: rules, hash: hash)
+                }
+            }
+        } else {
+            requestStatsEngine.unload()
+            browserManager?.tabManager.allTabs().forEach { $0.blockedRequestCount = 0 }
+        }
+        guard isEnabled else { return }
+        syncRequestStatsScript(in: BrowserConfiguration.shared.webViewConfiguration.userContentController)
+        guard let bm = browserManager else { return }
+        for tab in bm.tabManager.allTabs() {
+            guard let wv = tab.existingWebView, !exemptedWebViews.contains(wv) else { continue }
+            syncRequestStatsScript(in: wv.configuration.userContentController)
+        }
+    }
+
+    /// Make the controller carry the stats observer for the current token, or none when counts are off.
+    private func syncRequestStatsScript(in ucc: WKUserContentController) {
+        let marker = AdvancedRulesEngine.requestStatsScriptMarker
+        let wanted = requestStatsToken.flatMap { AdvancedRulesEngine.requestStatsScript(token: $0) }
+        // Evaluate the lazily bridged array fully before removeAllUserScripts() (see replaceConfigScript).
+        let all = ucc.userScripts
+        let others = all.filter { !$0.source.hasPrefix(marker) }
+        let current = all.first { $0.source.hasPrefix(marker) }
+        guard current?.source != wanted?.source else { return }
+        ucc.removeAllUserScripts()
+        others.forEach { ucc.addUserScript($0) }
+        if let wanted { ucc.addUserScript(wanted) }
     }
 
     // MARK: - Filter List Updates
@@ -280,6 +329,7 @@ final class ContentBlockerManager: NSObject {
         ucc.removeAllContentRuleLists()
         for list in compiledRuleLists { ucc.add(list) }
         ensureStaticScripts(in: ucc)
+        syncRequestStatsScript(in: ucc)
     }
 
     private func removeFromSharedConfiguration() {
@@ -304,6 +354,7 @@ final class ContentBlockerManager: NSObject {
         ucc.removeAllContentRuleLists()
         for list in compiledRuleLists { ucc.add(list) }
         ensureStaticScripts(in: ucc)
+        syncRequestStatsScript(in: ucc)
         exemptedWebViews.remove(webView)
     }
 
@@ -338,7 +389,8 @@ final class ContentBlockerManager: NSObject {
     }
 
     private func removeOwnScripts(from ucc: WKUserContentController) {
-        let markers = [AdvancedRulesEngine.scriptMarker, AdvancedRulesEngine.configScriptMarker]
+        let markers = [AdvancedRulesEngine.scriptMarker, AdvancedRulesEngine.configScriptMarker,
+                       AdvancedRulesEngine.requestStatsScriptMarker]
         let all = ucc.userScripts
         let remaining = all.filter { script in !markers.contains { script.source.hasPrefix($0) } }
         guard remaining.count != all.count else { return }
@@ -386,8 +438,9 @@ extension ContentBlockerManager: WKScriptMessageHandlerWithReply {
 extension ContentBlockerManager: WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard isEnabled, message.name == Self.requestStatsHandlerName,
+              let token = requestStatsToken,
               let webView = message.webView, let tab = tab(for: webView),
-              let body = message.body as? [String: Any],
+              let body = message.body as? [String: Any], body["token"] as? String == token,
               let raw = body["requests"] as? [[String: Any]] else { return }
         let requests: [(url: String, type: String)] = raw.compactMap {
             guard let u = $0["url"] as? String, let t = $0["type"] as? String else { return nil }

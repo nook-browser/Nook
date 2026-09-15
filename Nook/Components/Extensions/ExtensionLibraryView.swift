@@ -451,11 +451,13 @@ private struct ExtensionGridItem: View {
 
 /// Content blocker row; observes the tab so the blocked-request count updates live.
 private struct ContentBlockerSiteRow: View {
+    @Environment(\.nookSettings) var nookSettings
     @ObservedObject var tab: Tab
     @Binding var enabled: Bool
 
     private var subtitle: String {
         guard enabled else { return "Disabled for this site" }
+        guard nookSettings.detailedBlockingCountsEnabled else { return "Enabled" }
         let n = tab.blockedRequestCount
         return n > 0 ? "Enabled · \(n) blocked" : "Enabled"
     }

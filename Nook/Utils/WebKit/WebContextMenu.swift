@@ -375,6 +375,14 @@ final class HandlerMenuItem: NSMenuItem {
 extension FocusableWKWebView {
     func openLinkInNewTab(_ url: URL) {
         guard let browserManager = owningTab?.browserManager else { return }
+        if let window = browserManager.incognitoWindow(containing: owningTab) {
+            // Private links stay private, opened in the background like the regular path.
+            guard let profile = window.ephemeralProfile else { return }
+            let previousTabId = window.currentTabId
+            browserManager.tabManager.createEphemeralTab(url: url, in: window, profile: profile)
+            window.currentTabId = previousTabId
+            return
+        }
         let space = browserManager.tabManager.spaces.first(where: { $0.id == owningTab?.spaceId })
         _ = browserManager.tabManager.createNewTab(url: url.absoluteString, in: space)
     }

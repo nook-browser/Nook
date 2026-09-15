@@ -177,100 +177,34 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
 
     // MARK: - Application Termination
 
-    /// Initiates async termination process to avoid MainActor deadlocks
+    /// Saves tab state and SwiftData synchronously, then lets the app quit.
     ///
-    /// Returns `.terminateLater` immediately, then performs async cleanup:
-    /// 1. Phase 1: Atomic snapshot persistence (non-blocking)
-    /// 2. Phase 2: SwiftData context save
-    /// 3. Phase 3: WKWebView process cleanup
-    ///
-    /// - Returns: Always returns `.terminateLater` to handle termination asynchronously
+    /// Every quit path (Cmd+Q with or without the warning, Dock, logout, restart) comes
+    /// through here, so this is the one place that guarantees the final save. Tabs are not
+    /// torn down first: removing them would make the final snapshot delete them, and the
+    /// WebContent processes exit with the app anyway.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        // When "warn before quitting" is disabled, terminate(nil) is called directly
-        // from the SwiftUI CommandGroup button action. Returning .terminateLater in that
-        // context deadlocks because the async Task can't execute during the termination
-        // run loop mode. Since the user opted out of the warning, just quit immediately.
-        let askBeforeQuit = userDefaults.bool(forKey: "settings.askBeforeQuit")
-        if !askBeforeQuit {
-            return .terminateNow
-        }
-
-        handleTermination(sender: sender, shouldTerminate: true)
-        return .terminateLater
-    }
-
-    /// Performs async termination tasks on MainActor
-    ///
-    /// This method executes the three-phase shutdown process:
-    /// - **Phase 1**: Atomic tab snapshot persistence
-    /// - **Phase 2**: SwiftData context save
-    /// - **Phase 3**: WebView cleanup
-    ///
-    /// Timing is logged for each phase to monitor performance.
-    private func handleTermination(sender: NSApplication, shouldTerminate: Bool) {
-        AppDelegate.log.info(
-            "applicationShouldTerminate: returning terminateLater and starting async persistence")
-
-        Task { @MainActor in
-            guard shouldTerminate else {
-                sender.reply(toApplicationShouldTerminate: false)
-                return
-            }
-
-            // Minimal fallback if BrowserManager is unavailable
-            guard let manager = browserManager else {
-                // Attempt a best-effort save via shared persistence container
-                do {
-                    let ctx = Persistence.shared.container.mainContext
-                    try ctx.save()
-                    AppDelegate.log.info("Fallback save without BrowserManager succeeded")
-                } catch {
-                    AppDelegate.log.error(
-                        "Fallback save without BrowserManager failed: \(String(describing: error))"
-                    )
-                }
-                sender.reply(toApplicationShouldTerminate: true)
-                return
-            }
-
-            let overallStart = CFAbsoluteTimeGetCurrent()
-            AppDelegate.log.info("Termination task started on MainActor")
-
-            // Phase 1: Atomic snapshot persistence (non-throwing Bool)
-            let persistStart = CFAbsoluteTimeGetCurrent()
-            let atomic: Bool = await manager.tabManager.persistSnapshotAwaitingResult()
-            let pdt = CFAbsoluteTimeGetCurrent() - persistStart
-            AppDelegate.log.info(
-                "Atomic persistence \(atomic ? "succeeded" : "did not run; fallback used") in \(String(format: "%.3f", pdt))s"
-            )
-
-            // Phase 2: Ensure SwiftData changes are committed
-            let contextSaveStart = CFAbsoluteTimeGetCurrent()
+        let start = CFAbsoluteTimeGetCurrent()
+        if let manager = browserManager {
+            manager.tabManager.persistFinalSnapshotBlocking()
             do {
                 try manager.modelContext.save()
-                let sdt = CFAbsoluteTimeGetCurrent() - contextSaveStart
-                AppDelegate.log.info("Context save completed in \(String(format: "%.3f", sdt))s")
             } catch {
-                let sdt = CFAbsoluteTimeGetCurrent() - contextSaveStart
-                AppDelegate.log.error(
-                    "Context save failed in \(String(format: "%.3f", sdt))s: \(String(describing: error))"
-                )
+                AppDelegate.log.error("Context save at quit failed: \(String(describing: error), privacy: .public)")
             }
-
-            // Phase 3: Graceful cleanup
-            manager.cleanupAllTabs()
-            AppDelegate.log.info("Cleanup completed; WKWebView processes terminated")
-
-            let total = CFAbsoluteTimeGetCurrent() - overallStart
-            AppDelegate.log.info(
-                "Termination task finished in \(String(format: "%.3f", total))s; replying to terminate"
-            )
-            sender.reply(toApplicationShouldTerminate: true)
+        } else {
+            do {
+                try Persistence.shared.container.mainContext.save()
+            } catch {
+                AppDelegate.log.error("Fallback save without BrowserManager failed: \(String(describing: error), privacy: .public)")
+            }
         }
+        AppDelegate.log.info("Quit save finished in \(String(format: "%.3f", CFAbsoluteTimeGetCurrent() - start))s")
+        return .terminateNow
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // Keep minimal to avoid MainActor deadlocks; main work happens in applicationShouldTerminate
+        // Saving happens in applicationShouldTerminate; this only stops child processes.
         AppDelegate.log.info("applicationWillTerminate called")
 
         // Stop MCP child processes synchronously (blocking up to 5 seconds)

@@ -48,6 +48,9 @@ struct SidebarMenuHistoryTab: View {
     @State private var isLoadingMore: Bool = false
     @State private var isShowingFilters: Bool = false
 
+    @State private var historyTask: Task<Void, Never>?
+    @State private var requestID = UUID()
+
     private let pageSize: Int = 50
     private let maxResults: Int = 1000
 
@@ -239,85 +242,56 @@ struct SidebarMenuHistoryTab: View {
         .onAppear {
             loadHistory()
         }
+        .onChange(of: browserManager.historyManager.currentProfileId) { _, _ in
+            loadHistory()
+        }
+        .onDisappear { historyTask?.cancel() }
     }
 
     // MARK: Functions
 
     private func loadHistory() {
-        isLoading = true
-        currentPage = 0
-
-        Task { @MainActor in
-            let result = browserManager.historyManager.getHistory(
-                days: selectedTimeRange.days,
-                page: currentPage,
-                pageSize: pageSize
-            )
-
-            withAnimation(NookDesign.Motion.standard) {
-                historyEntries = result.entries
-                groupedHistoryEntries = groupHistoryEntries(result.entries)
-                hasMoreResults = result.hasMore
-                isLoading = false
-            }
-        }
+        requestHistory(reset: true)
     }
 
     private func loadMoreHistory() {
-        guard hasMoreResults, !isLoadingMore else { return }
-
-        isLoadingMore = true
-        currentPage += 1
-
-        Task { @MainActor in
-            let result: (entries: [HistoryEntry], hasMore: Bool)
-
-            if text.isEmpty {
-                result = browserManager.historyManager.getHistory(
-                    days: selectedTimeRange.days,
-                    page: currentPage,
-                    pageSize: pageSize
-                )
-            } else {
-                result = browserManager.historyManager.searchHistory(
-                    query: text,
-                    page: currentPage,
-                    pageSize: pageSize
-                )
-            }
-
-            let animationCurve = historyEntries.count > 100 ? NookDesign.Motion.quick : NookDesign.Motion.standard
-
-            withAnimation(animationCurve) {
-                historyEntries.append(contentsOf: result.entries)
-                groupedHistoryEntries = groupHistoryEntries(historyEntries)
-                hasMoreResults = result.hasMore
-                isLoadingMore = false
-            }
-        }
+        guard hasMoreResults, !isLoading, !isLoadingMore else { return }
+        requestHistory(reset: false)
     }
 
     private func searchHistory() {
-        guard !text.isEmpty else {
-            loadHistory()
-            return
-        }
+        requestHistory(reset: true)
+    }
 
-        isLoading = true
-        currentPage = 0
-
-        Task { @MainActor in
-            let result = browserManager.historyManager.searchHistory(
-                query: text,
-                page: currentPage,
-                pageSize: pageSize
-            )
-
+    private func requestHistory(reset: Bool) {
+        historyTask?.cancel()
+        let id = UUID()
+        requestID = id
+        let query = text
+        let days = selectedTimeRange.days
+        let page = reset ? 0 : currentPage + 1
+        let profile = browserManager.historyManager.currentProfileId
+        isLoading = reset
+        isLoadingMore = !reset
+        historyTask = Task { @MainActor in
+            if reset && !query.isEmpty {
+                do { try await Task.sleep(for: .milliseconds(125)) } catch { return }
+            }
+            let result: (entries: [HistoryEntry], hasMore: Bool)
+            if query.isEmpty {
+                result = await browserManager.historyManager.getHistory(days: days, page: page, pageSize: pageSize)
+            } else {
+                result = await browserManager.historyManager.searchHistory(query: query, page: page, pageSize: pageSize)
+            }
+            guard !Task.isCancelled, requestID == id,
+                  browserManager.historyManager.currentProfileId == profile else { return }
             withAnimation(NookDesign.Motion.standard) {
-                historyEntries = result.entries
-                groupedHistoryEntries = groupHistoryEntries(result.entries)
+                historyEntries = reset ? result.entries : historyEntries + result.entries
+                groupedHistoryEntries = groupHistoryEntries(historyEntries)
+                currentPage = page
                 hasMoreResults = result.hasMore
                 isLoading = false
+                isLoadingMore = false
             }
         }
     }
@@ -431,6 +405,7 @@ struct SidebarMenuHistoryTab: View {
         browserManager.historyManager.deleteHistoryEntry(entry.id)
         historyEntries.removeAll { $0.id == entry.id }
         groupedHistoryEntries = groupHistoryEntries(historyEntries)
+        requestHistory(reset: true)
     }
 
     private func clearHistory() {
@@ -446,6 +421,7 @@ struct SidebarMenuHistoryTab: View {
             browserManager.historyManager.clearHistory()
             historyEntries.removeAll()
             groupedHistoryEntries.removeAll()
+            requestHistory(reset: true)
         }
     }
 }

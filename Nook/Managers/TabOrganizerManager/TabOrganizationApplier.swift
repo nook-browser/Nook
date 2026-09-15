@@ -117,7 +117,7 @@ enum TabOrganizationApplier {
 
             for tabIndex in group.tabs {
                 guard let tab = tabMapping[tabIndex] else { continue }
-                tabManager.moveTabToRegularFolder(tab: tab, folderId: folder.id)
+                tabManager.moveTabToFolder(tab: tab, folderId: folder.id)
             }
         }
 

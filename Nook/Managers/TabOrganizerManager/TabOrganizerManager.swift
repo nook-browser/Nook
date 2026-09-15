@@ -125,6 +125,8 @@ final class TabOrganizerManager {
                 maxTokens: 1024
             )
 
+            try Task.checkCancellation()
+
             Self.log.debug("LLM output: \(output)")
 
             // Parse the plan
@@ -158,6 +160,8 @@ final class TabOrganizerManager {
 
             Self.log.info("Organization applied")
 
+        } catch is CancellationError {
+            // Cancellation (including memory-pressure unload) is not an organization failure.
         } catch {
             let message = error.localizedDescription
             self.error = message

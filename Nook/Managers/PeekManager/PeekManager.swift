@@ -73,6 +73,16 @@ final class PeekManager: ObservableObject {
               let browserManager,
               let windowState = windowRegistry?.activeWindow else { return }
 
+        // A private window's tabs are ephemeral and must never land in a persisted space.
+        if let window = windowRegistry?.activeWindow, window.isIncognito {
+            if let profile = window.ephemeralProfile {
+                let newTab = browserManager.tabManager.createEphemeralTab(url: session.currentURL, in: window, profile: profile)
+                browserManager.selectTab(newTab, in: window)
+            }
+            dismissPeek()
+            return
+        }
+
         // Try to get the WebView from coordinator, fall back to creating new WebView if not ready
         let extractedWebView = webViewCoordinator?.webView
 
@@ -104,6 +114,16 @@ final class PeekManager: ObservableObject {
         guard let session = currentSession,
               let browserManager,
               let coordinator = webViewCoordinator else { return }
+
+        // A private window's tabs are ephemeral and must never land in a persisted space.
+        if let window = windowRegistry?.activeWindow, window.isIncognito {
+            if let profile = window.ephemeralProfile {
+                let newTab = browserManager.tabManager.createEphemeralTab(url: session.currentURL, in: window, profile: profile)
+                browserManager.selectTab(newTab, in: window)
+            }
+            dismissPeek()
+            return
+        }
 
         // Extract the WebView from the Peek coordinator for transfer
         let extractedWebView = coordinator.webView

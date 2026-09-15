@@ -111,11 +111,6 @@ final class AdvancedRulesEngine {
         } else {
             log.error("nook-advanced-blocking.js missing from bundle; advanced rules disabled")
         }
-        // Request observer for blocked-request counts (already carries the marker as its first line).
-        if let stats = bundledSource("nook-request-stats") {
-            scripts.append(WKUserScript(source: stats, injectionTime: .atDocumentStart, forMainFrameOnly: false))
-        }
-
         let siteScripts: [(resource: String, hostPattern: String)] = [
             ("facebook-sponsored-blocker", #"(^|\.)facebook\.com$"#),
             ("youtube-ad-blocker", #"(^|\.)(youtube\.com|youtubekids\.com|youtube-nocookie\.com)$"#),
@@ -131,6 +126,16 @@ final class AdvancedRulesEngine {
         }
         return scripts
     }()
+
+    /// Distinct from `scriptMarker` (which ends in a newline) so the optional stats observer
+    /// never satisfies `ensureStaticScripts`' check for the blocking scripts.
+    static let requestStatsScriptMarker = "// Nook Content Blocker Stats\n"
+
+    static func requestStatsScript(token: String) -> WKUserScript? {
+        guard let source = bundledSource("nook-request-stats") else { return nil }
+        let script = requestStatsScriptMarker + "window.__nookRequestStatsToken = '\(token)';\n" + source
+        return WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: false)
+    }
 
     private static func bundledSource(_ name: String) -> String? {
         guard let url = Bundle.main.url(forResource: name, withExtension: "js") else { return nil }

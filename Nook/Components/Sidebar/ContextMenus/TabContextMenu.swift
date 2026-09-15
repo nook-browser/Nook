@@ -93,7 +93,7 @@ struct TabContextMenu: View {
                 Menu {
                     ForEach(folders, id: \.id) { folder in
                         Button {
-                            tabManager.moveTabToRegularFolder(tab: tab, folderId: folder.id)
+                            tabManager.moveTabToFolder(tab: tab, folderId: folder.id)
                         } label: {
                             Label(folder.name, systemImage: "folder.fill")
                         }
@@ -152,13 +152,14 @@ struct TabContextMenu: View {
         if tab.displayNameOverride != nil {
             Button {
                 tab.displayNameOverride = nil
+                tabManager.debouncedPersistSnapshot()
             } label: {
                 Label("Reset Tab Name", systemImage: "arrow.uturn.backward")
             }
         }
 
         Button {
-            browserManager.duplicateCurrentTab()
+            browserManager.duplicateTab(tab)
         } label: {
             Label("Duplicate", systemImage: "plus.square.on.square")
         }
@@ -249,7 +250,7 @@ struct TabContextMenu: View {
         // TabManager refuses to unload essential tabs, so the item would be inert there.
         if context != .essential {
             Button {
-                tabManager.unloadTab(tab)
+                tabManager.unloadTabMovingSelection(tab)
             } label: {
                 Label("Unload Tab", systemImage: "moon.zzz")
             }
@@ -268,9 +269,9 @@ struct TabContextMenu: View {
     @ViewBuilder
     private var closeSection: some View {
         Button(role: .destructive) {
-            // A space-pinned row is only removed by forceRemoveTab; removeTab just
-            // deactivates it and leaves the row in place.
-            if context == .spacePinned {
+            // A space-pinned row (including one inside a pinned folder) is only removed by
+            // forceRemoveTab; removeTab just deactivates it and leaves the row in place.
+            if context == .spacePinned || context == .folder {
                 tabManager.forceRemoveTab(tab.id)
             } else {
                 tabManager.removeTab(tab.id)

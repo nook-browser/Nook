@@ -56,6 +56,12 @@ class TabCompositorManager: ObservableObject {
     private var memoryPressureSource: DispatchSourceMemoryPressure?
     private var appResignObserver: Any?
     private var lastMemoryPressureTime: Date?
+    private var budgetRetryTimer: Timer?
+
+    var allowsBackgroundWarming: Bool {
+        !ProcessInfo.processInfo.isLowPowerModeEnabled
+            && (lastMemoryPressureTime.map { Date().timeIntervalSince($0) >= 60 } ?? true)
+    }
 
     private(set) var mode: TabManagementMode = .standard
 
@@ -65,6 +71,8 @@ class TabCompositorManager: ObservableObject {
 
     deinit {
         memoryPressureSource?.cancel()
+        budgetRetryTimer?.invalidate()
+        unloadTimers.values.forEach { $0.invalidate() }
         if let observer = appResignObserver {
             NotificationCenter.default.removeObserver(observer)
         }
@@ -86,15 +94,20 @@ class TabCompositorManager: ObservableObject {
         }
 
         // Enforce max loaded tabs if switching to a mode with a limit
-        if newMode.maxLoadedTabs != nil {
-            enforceMaxLoadedTabs()
-        }
+        enforceMaxLoadedTabs()
     }
 
     // MARK: - Tab Access & Loading
 
     func markTabAccessed(_ tabId: UUID) {
         lastAccessTimes[tabId] = Date()
+        // The compositor marks the current tab on every SwiftUI update (hover, resize).
+        // A timer rescheduled within the last minute is close enough; handleTabTimeout
+        // re-arms for any remaining time.
+        if let timer = unloadTimers[tabId], timer.isValid,
+           timer.fireDate.timeIntervalSinceNow > mode.unloadTimeout - 60 {
+            return
+        }
         restartTimer(for: tabId)
     }
 
@@ -118,10 +131,10 @@ class TabCompositorManager: ObservableObject {
 
     // MARK: - Timer Management
 
-    private func restartTimer(for tabId: UUID) {
+    private func restartTimer(for tabId: UUID, after interval: TimeInterval? = nil) {
         unloadTimers[tabId]?.invalidate()
 
-        let timer = Timer.scheduledTimer(withTimeInterval: mode.unloadTimeout, repeats: false) { [weak self] _ in
+        let timer = Timer.scheduledTimer(withTimeInterval: interval ?? mode.unloadTimeout, repeats: false) { [weak self] _ in
             Task { @MainActor in
                 self?.handleTabTimeout(tabId)
             }
@@ -139,9 +152,24 @@ class TabCompositorManager: ObservableObject {
     }
 
     private func handleTabTimeout(_ tabId: UUID) {
-        guard let tab = findTab(by: tabId) else { return }
+        unloadTimers.removeValue(forKey: tabId)
+        // Closed or already unloaded: nothing to time out until the tab is accessed again.
+        guard let tab = findTab(by: tabId), !tab.isUnloaded else {
+            lastAccessTimes.removeValue(forKey: tabId)
+            return
+        }
+        // Pinned tabs are never unloaded automatically, so re-arming would only wake the app.
+        if tab.isPinned || tab.isSpacePinned { return }
 
-        if isExemptFromUnloading(tab) {
+        if let lastAccess = lastAccessTimes[tabId] {
+            let remaining = mode.unloadTimeout - Date().timeIntervalSince(lastAccess)
+            if remaining > 1 {
+                restartTimer(for: tabId, after: remaining)
+                return
+            }
+        }
+
+        if !canUnloadInactiveTab(tab) {
             restartTimer(for: tabId)
             return
         }
@@ -152,18 +180,33 @@ class TabCompositorManager: ObservableObject {
 
     // MARK: - Tab Importance & Exemptions
 
-    private func isExemptFromUnloading(_ tab: Tab) -> Bool {
-        if isCurrentTabInAnyWindow(tab) { return true }
-        if tab.hasPlayingVideo || tab.hasPlayingAudio || tab.hasAudioContent { return true }
-        if tab.isPinned || tab.isSpacePinned { return true }
-        return false
+    /// Shared eligibility for automatic eviction and bulk inactive-tab unloading.
+    /// Explicitly unloading an individual tab deliberately bypasses this policy.
+    func canUnloadInactiveTab(_ tab: Tab) -> Bool {
+        if tab.isUnloaded || isCurrentTabInAnyWindow(tab) { return false }
+        if tab.hasPiPActive || tab.hasPlayingVideo || tab.hasPlayingAudio || tab.hasAudioContent { return false }
+        var views = browserManager?.webViewCoordinator?.getAllWebViews(for: tab.id) ?? []
+        if let primary = tab.existingWebView { views.append(primary) }
+        if views.contains(where: { $0.cameraCaptureState != .none || $0.microphoneCaptureState != .none }) {
+            return false
+        }
+        if tab.isPinned || tab.isSpacePinned { return false }
+        return true
     }
 
     private func isCurrentTabInAnyWindow(_ tab: Tab) -> Bool {
-        guard let registry = browserManager?.windowRegistry else {
+        guard let registry = browserManager?.windowRegistry, !registry.allWindows.isEmpty else {
             return tab.isCurrentTab
         }
-        return registry.allWindows.contains { $0.currentTabId == tab.id }
+        return registry.allWindows.contains { window in
+            if window.currentTabId == tab.id { return true }
+            guard let split = browserManager?.splitManager.getSplitState(for: window.id),
+                  split.isSplit,
+                  window.currentTabId == split.leftTabId || window.currentTabId == split.rightTabId else {
+                return false
+            }
+            return tab.id == split.leftTabId || tab.id == split.rightTabId
+        }
     }
 
     /// Scores tab importance for deciding unload order. Higher = more important to keep.
@@ -207,7 +250,7 @@ class TabCompositorManager: ObservableObject {
         guard let browserManager = browserManager else { return }
 
         let allTabs = browserManager.tabManager.allTabs()
-        let loadedNonExempt = allTabs.filter { !$0.isUnloaded && !isExemptFromUnloading($0) }
+        let loadedNonExempt = allTabs.filter { canUnloadInactiveTab($0) }
 
         guard !loadedNonExempt.isEmpty else { return }
 
@@ -257,30 +300,20 @@ class TabCompositorManager: ObservableObject {
     private func handleAppDidResignActive() {
         guard mode.unloadsOnBackground, let browserManager = browserManager else { return }
 
-        // Collect current tab IDs from ALL windows
-        let currentTabIds = Set(
-            browserManager.windowRegistry?.allWindows.compactMap { $0.currentTabId } ?? []
-        )
-
-        let allTabs = browserManager.tabManager.allTabs()
-        var unloadCount = 0
-        for tab in allTabs {
-            guard !tab.isUnloaded,
-                  !currentTabIds.contains(tab.id),
-                  !isExemptFromUnloading(tab) else { continue }
+        for tab in browserManager.tabManager.allTabs() where canUnloadInactiveTab(tab) {
             browserManager.tabManager.unloadTab(tab)
-            unloadCount += 1
         }
-
     }
 
     // MARK: - Max Loaded Tab Enforcement
 
     private func enforceMaxLoadedTabs() {
+        budgetRetryTimer?.invalidate()
+        budgetRetryTimer = nil
         guard let maxTabs = mode.maxLoadedTabs, let browserManager = browserManager else { return }
 
         let allTabs = browserManager.tabManager.allTabs()
-        let loadedNonExempt = allTabs.filter { !$0.isUnloaded && !isExemptFromUnloading($0) }
+        let loadedNonExempt = allTabs.filter { canUnloadInactiveTab($0) }
 
         // Don't count pinned tabs toward the limit
         let loadedRegular = loadedNonExempt.filter { !$0.isPinned && !$0.isSpacePinned }
@@ -302,6 +335,21 @@ class TabCompositorManager: ObservableObject {
 
         for tab in tabsToUnload {
             browserManager.tabManager.unloadTab(tab)
+        }
+
+        // A burst can exceed the budget while every tab is inside its grace period.
+        // Retry once at the next expiry, rather than waiting for another user action.
+        if loadedRegular.count - tabsToUnload.count > maxTabs,
+           let nextExpiry = loadedRegular.compactMap({ tab -> Date? in
+               guard let accessed = lastAccessTimes[tab.id] else { return nil }
+               let expiry = accessed.addingTimeInterval(gracePeriod)
+               return expiry > now ? expiry : nil
+           }).min() {
+            budgetRetryTimer = Timer.scheduledTimer(
+                withTimeInterval: max(0.05, nextExpiry.timeIntervalSinceNow), repeats: false
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in self?.enforceMaxLoadedTabs() }
+            }
         }
     }
 

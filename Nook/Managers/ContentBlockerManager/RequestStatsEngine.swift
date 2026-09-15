@@ -19,6 +19,8 @@ private let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", cate
 final class RequestStatsEngine: @unchecked Sendable {
 
     private let queue = DispatchQueue(label: "com.baingurley.nook.request-stats", qos: .utility)
+    private let generationLock = NSLock()
+    private var generation = UUID()
     private var engine: UnsafeMutableRawPointer?
 
     private static var cacheDir: URL {
@@ -30,10 +32,29 @@ final class RequestStatsEngine: @unchecked Sendable {
         if let e = engine { nook_adblock_engine_free(e) }
     }
 
+    private func currentGeneration() -> UUID {
+        generationLock.lock()
+        defer { generationLock.unlock() }
+        return generation
+    }
+
+    /// Invalidate queued/in-flight work immediately; free the pointer on its owner queue.
+    func unload() {
+        generationLock.lock()
+        generation = UUID()
+        generationLock.unlock()
+        queue.async {
+            if let engine = self.engine { nook_adblock_engine_free(engine) }
+            self.engine = nil
+        }
+    }
+
     /// Build the engine from the filter rules, or load the serialized copy cached for this rules hash.
     func build(rules: [String], hash: String) async {
+        let generation = currentGeneration()
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
             queue.async {
+                guard generation == self.currentGeneration() else { cont.resume(); return }
                 let start = CFAbsoluteTimeGetCurrent()
                 if let old = self.engine { nook_adblock_engine_free(old); self.engine = nil }
 
@@ -67,6 +88,10 @@ final class RequestStatsEngine: @unchecked Sendable {
                     }
                     log.info("Request stats engine built from \(rules.count, privacy: .public) rules in \(String(format: "%.2f", CFAbsoluteTimeGetCurrent() - start), privacy: .public)s")
                 }
+                if generation != self.currentGeneration() {
+                    if let engine = self.engine { nook_adblock_engine_free(engine) }
+                    self.engine = nil
+                }
                 cont.resume()
             }
         }
@@ -74,12 +99,13 @@ final class RequestStatsEngine: @unchecked Sendable {
 
     /// Number of `requests` (url + adblock-rust request type) that would be blocked when made from `sourceURL`.
     func blockedCount(of requests: [(url: String, type: String)], sourceURL: String) async -> Int {
-        await withCheckedContinuation { (cont: CheckedContinuation<Int, Never>) in
+        let generation = currentGeneration()
+        return await withCheckedContinuation { (cont: CheckedContinuation<Int, Never>) in
             queue.async {
-                guard let e = self.engine else { cont.resume(returning: 0); return }
+                guard generation == self.currentGeneration(), let e = self.engine else { cont.resume(returning: 0); return }
                 var n = 0
                 for r in requests where nook_adblock_engine_matches(e, r.url, sourceURL, r.type) { n += 1 }
-                cont.resume(returning: n)
+                cont.resume(returning: generation == self.currentGeneration() ? n : 0)
             }
         }
     }

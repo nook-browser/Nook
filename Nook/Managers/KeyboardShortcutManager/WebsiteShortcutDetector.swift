@@ -11,6 +11,7 @@
 
 import Foundation
 import AppKit
+import WebKit
 
 // MARK: - Website Shortcut Detector
 
@@ -40,7 +41,39 @@ class WebsiteShortcutDetector {
 
     // MARK: - Initialization
 
+    private let instrumentedWebViews = NSHashTable<WKWebView>.weakObjects()
+    @ObservationIgnored
+    nonisolated(unsafe) private var settingsObserver: NSObjectProtocol?
+    private var detectionEnabled = WebsiteShortcutProfile.isFeatureEnabled
+
     init() {
+        settingsObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let enabled = WebsiteShortcutProfile.isFeatureEnabled
+                guard enabled != self.detectionEnabled else { return }
+                self.detectionEnabled = enabled
+                self.jsDetectedShortcuts.removeAll()
+                self.clearAllPendingShortcuts()
+                for webView in self.instrumentedWebViews.allObjects {
+                    self.configure(webView: webView)
+                }
+            }
+        }
+    }
+
+    deinit {
+        if let settingsObserver { NotificationCenter.default.removeObserver(settingsObserver) }
+    }
+
+    func configure(webView: WKWebView) {
+        instrumentedWebViews.add(webView)
+        let script = WebsiteShortcutProfile.isFeatureEnabled
+            ? Self.jsDetectionScript
+            : "window.__nookStopShortcutDetection?.();"
+        webView.evaluateJavaScript(script, completionHandler: nil)
     }
     
     // MARK: - Public Interface
@@ -211,6 +244,7 @@ extension WebsiteShortcutDetector {
             // Only run once per page
             if (window.__nookShortcutDetectionActive) return;
             window.__nookShortcutDetectionActive = true;
+            let active = true;
             
             // Track detected shortcuts
             const detectedShortcuts = new Set();
@@ -218,7 +252,7 @@ extension WebsiteShortcutDetector {
             // Hook into addEventListener to catch keydown/keyup listeners
             const originalAddEventListener = EventTarget.prototype.addEventListener;
             EventTarget.prototype.addEventListener = function(type, listener, options) {
-                if (type === 'keydown') {
+                if (active && type === 'keydown') {
                     // Try to parse the listener to extract key combinations
                     // This is best-effort and won't catch all cases
                     try {
@@ -250,51 +284,72 @@ extension WebsiteShortcutDetector {
                         // Ignore parsing errors
                     }
                 }
+                if (active && type === 'keydown') scheduleReport();
                 return originalAddEventListener.call(this, type, listener, options);
             };
             
-            // Also try to detect accesskey attributes
-            function checkAccessKeys() {
-                const elements = document.querySelectorAll('[accesskey]');
-                elements.forEach(el => {
-                    const key = el.getAttribute('accesskey')?.toLowerCase();
-                    if (key && key.length === 1) {
-                        detectedShortcuts.add('accesskey:' + key);
-                    }
-                });
+            // Keep only live accesskey nodes, updating changed subtrees rather than
+            // rescanning the entire document for every mutation batch.
+            const accessKeys = new Map();
+            let reportTimer = null;
+            let lastReport = null;
+            function updateNode(node) {
+                if (node.nodeType !== 1) return;
+                const key = node.getAttribute('accesskey')?.toLowerCase();
+                if (node.isConnected && key?.length === 1) accessKeys.set(node, 'accesskey:' + key);
+                else accessKeys.delete(node);
             }
-            
-            // Check accesskeys after DOM loads
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', checkAccessKeys);
-            } else {
-                checkAccessKeys();
+            function scanSubtree(node) {
+                updateNode(node);
+                node.querySelectorAll?.('[accesskey]').forEach(updateNode);
             }
-            
-            // Monitor for dynamic accesskey additions
-            const observer = new MutationObserver(() => checkAccessKeys());
-            observer.observe(document.body || document.documentElement, { 
-                childList: true, 
-                subtree: true,
-                attributes: true,
-                attributeFilter: ['accesskey']
-            });
-            
-            // Report detected shortcuts to native
+            function scheduleReport() {
+                if (reportTimer !== null) return;
+                reportTimer = setTimeout(reportShortcuts, 100);
+            }
             function reportShortcuts() {
-                if (window.webkit?.messageHandlers?.nookShortcutDetect && detectedShortcuts.size > 0) {
-                    window.webkit.messageHandlers.nookShortcutDetect.postMessage(
-                        Array.from(detectedShortcuts).join(',')
-                    );
+                reportTimer = null;
+                const keys = new Set([...detectedShortcuts, ...accessKeys.values()]);
+                const report = Array.from(keys).sort().join(',');
+                if (report !== lastReport) {
+                    lastReport = report;
+                    window.webkit?.messageHandlers?.nookShortcutDetect?.postMessage(report);
                 }
             }
-            
-            // Report periodically and on visibility change
-            setInterval(reportShortcuts, 5000);
-            document.addEventListener('visibilitychange', reportShortcuts);
-            
-            // Initial report after a short delay
-            setTimeout(reportShortcuts, 1000);
+            scanSubtree(document.documentElement);
+            const observer = new MutationObserver(mutations => {
+                let removed = false;
+                for (const mutation of mutations) {
+                    if (mutation.type === 'attributes') updateNode(mutation.target);
+                    else {
+                        mutation.addedNodes.forEach(scanSubtree);
+                        removed ||= mutation.removedNodes.length > 0;
+                    }
+                }
+                if (removed) {
+                    for (const node of accessKeys.keys()) {
+                        if (!node.isConnected) accessKeys.delete(node);
+                    }
+                }
+                scheduleReport();
+            });
+            observer.observe(document.documentElement, {
+                childList: true, subtree: true, attributes: true, attributeFilter: ['accesskey']
+            });
+            const hookedAddEventListener = EventTarget.prototype.addEventListener;
+            window.__nookStopShortcutDetection = function() {
+                window.__nookShortcutDetectionActive = false;
+                active = false;
+                observer.disconnect();
+                clearTimeout(reportTimer);
+                accessKeys.clear();
+                detectedShortcuts.clear();
+                // Preserve wrappers installed by the website after ours.
+                if (EventTarget.prototype.addEventListener === hookedAddEventListener) {
+                    EventTarget.prototype.addEventListener = originalAddEventListener;
+                }
+            };
+            scheduleReport();
         })();
         """
     }

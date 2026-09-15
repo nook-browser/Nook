@@ -22,13 +22,15 @@ final class SpaceEntity {
     // SwiftData should migrate automatically for new optional properties.
     // If issues arise in the wild, consider introducing an explicit model version and migration plan.
     var profileId: UUID?
+    var activeTabId: UUID?
 
-    init(id: UUID, name: String, icon: String, index: Int, gradientData: Data = SpaceGradient.default.encoded ?? Data(), profileId: UUID? = nil) {
+    init(id: UUID, name: String, icon: String, index: Int, gradientData: Data = SpaceGradient.default.encoded ?? Data(), profileId: UUID? = nil, activeTabId: UUID? = nil) {
         self.id = id
         self.name = name
         self.icon = icon
         self.index = index
         self.gradientData = gradientData
         self.profileId = profileId
+        self.activeTabId = activeTabId
     }
 }

@@ -8,21 +8,28 @@ import OSLog
 // MARK: - Persistence Actor & Types
 
 /// Serializes all SwiftData writes for Tab snapshots and provides
-/// a best-effort atomic save using a child ModelContext pattern.
-    actor PersistenceActor {
+/// atomic saves using a fresh ModelContext for each attempt.
+actor PersistenceActor {
     private let container: ModelContainer
     private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "TabPersistence")
 
-    // Lightweight, in-memory backup of the most recent snapshot
-    // to allow quick recovery if atomic operations fail mid-flight.
-    private var lastBackupJSON: Data?
+    // Last snapshot committed atomically. Only this actor writes these entities, so an
+    // identical snapshot has nothing to change on disk.
+    private var lastCommittedJSON: Data?
 
-    enum PersistenceError: Error {
+    enum PersistenceError: Error, Sendable {
         case concurrencyConflict
         case dataCorruption
         case storageFailure
         case rollbackFailed
         case invalidModelState
+    }
+
+    enum SaveResult: Sendable {
+        case committed
+        case fallbackCommitted
+        case stale
+        case failed(PersistenceError)
     }
 
     init(container: ModelContainer) {
@@ -114,47 +121,53 @@ import OSLog
     private var latestGeneration: Int = 0
 
     // MARK: - Public API (Actor)
-    // Returns true if the atomic path succeeded. False if a fallback or staleness short-circuit occurred.
-    func persist(snapshot: Snapshot, generation: Int) async -> Bool {
-        // Coalesce stale generations
-        if generation < self.latestGeneration {
-            Self.log.debug("[persist] Skipping stale snapshot generation=\(generation) < latest=\(self.latestGeneration)")
-            return false
-        }
-        self.latestGeneration = generation
-        let start = Date()
-        Self.log.debug("[persist] Starting atomic persistence…")
+    func persist(snapshot: Snapshot, generation: Int) -> SaveResult {
+        guard generation >= latestGeneration else { return .stale }
+        let interval = BrowserPerformance.signposter.beginInterval("TabPersistence")
+        defer { BrowserPerformance.signposter.endInterval("TabPersistence", interval) }
+        let encoded: Data
         do {
-            // Backup current intent/state to JSON first
-            try createDataSnapshot(snapshot)
-            try await performAtomicPersistence(snapshot)
-            Self.log.notice("[persist] Atomic persistence completed in \(String(format: "%.2f", Date().timeIntervalSince(start)))s")
-            return true
+            // Invalid snapshots must never reach a less strict recovery path.
+            try validateInput(snapshot)
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            encoded = try encoder.encode(snapshot)
         } catch {
-            let classified = classify(error)
-            Self.log.error("[persist] Atomic persistence failed (\(String(describing: classified), privacy: .public)): \(String(describing: error), privacy: .public)")
-
-            // Attempt graceful recovery: try best-effort fallback, else restore
-            do {
-                try await performBestEffortPersistence(snapshot)
-                Self.log.notice("[persist] Fallback persistence succeeded after atomic failure")
-                return false
-            } catch {
-                Self.log.fault("[persist] Fallback persistence failed: \(String(describing: error), privacy: .public). Attempting recovery from backup…")
+            let failure = classify(error)
+            Self.log.fault("[persist] Rejected snapshot: \(String(describing: failure), privacy: .public)")
+            return .failed(failure)
+        }
+        // Only a valid snapshot supersedes older ones; a rejected one must not block them.
+        latestGeneration = generation
+        if encoded == lastCommittedJSON { return .committed }
+        do {
+            try performAtomicPersistence(snapshot)
+            lastCommittedJSON = encoded
+            return .committed
+        } catch {
+            let failure = classify(error)
+            Self.log.error("[persist] Save failed: \(String(describing: failure), privacy: .public)")
+            switch failure {
+            case .concurrencyConflict, .storageFailure:
+                // Retry the complete transaction in a fresh context. Never omit folders
+                // or bypass validation, and leave the previous committed store intact.
                 do {
-                    try await recoverFromBackup()
-                    Self.log.notice("[persist] Recovered from in-memory backup snapshot")
-                    return false
+                    try performAtomicPersistence(snapshot)
+                    lastCommittedJSON = encoded
+                    return .fallbackCommitted
                 } catch {
-                    Self.log.fault("[persist] Backup recovery failed: \(String(describing: error), privacy: .public)")
-                    return false
+                    let retryFailure = classify(error)
+                    Self.log.error("[persist] Retry failed: \(String(describing: retryFailure), privacy: .public)")
+                    return .failed(retryFailure)
                 }
+            case .invalidModelState, .dataCorruption, .rollbackFailed:
+                return .failed(failure)
             }
         }
     }
 
     // MARK: - Atomic Transaction Helper
-    private func performAtomicPersistence(_ snapshot: Snapshot) async throws {
+    private func performAtomicPersistence(_ snapshot: Snapshot) throws {
         let ctx = ModelContext(container)
         ctx.autosaveEnabled = false
 
@@ -173,9 +186,10 @@ import OSLog
             throw classify(error)
         }
 
-        let tabLookup = Dictionary(uniqueKeysWithValues: allTabEntities.map { ($0.id, $0) })
-        let folderLookup = Dictionary(uniqueKeysWithValues: allFolderEntities.map { ($0.id, $0) })
-        let spaceLookup = Dictionary(uniqueKeysWithValues: allSpaceEntities.map { ($0.id, $0) })
+        // Ids are unique in the store today; never trap on a duplicate row regardless.
+        let tabLookup = Dictionary(allTabEntities.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let folderLookup = Dictionary(allFolderEntities.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let spaceLookup = Dictionary(allSpaceEntities.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 
         // 1) Cleanup orphan TabEntities
         let keepTabIDs = Set(snapshot.tabs.map { $0.id })
@@ -217,18 +231,12 @@ import OSLog
         // 6) Integrity validation before save (so failures abort atomically)
         try validateDataIntegrity(in: ctx, snapshot: snapshot)
 
-        // 7) Save (commit atomic set)
+        // 7) Save (commit atomic set). The pre-save check already read the pending state,
+        // so a post-save re-fetch would only repeat it.
         do {
             try ctx.save()
         } catch {
             throw classify(error)
-        }
-
-        // 8) Post-save integrity check (non-fatal)
-        do {
-            try validateDataIntegrity(in: ctx, snapshot: snapshot)
-        } catch {
-            Self.log.error("[persist] Post-save integrity validation reported issues: \(String(describing: error), privacy: .public)")
         }
     }
 
@@ -300,6 +308,7 @@ import OSLog
             e.index = s.index
             if let data = s.gradientData { e.gradientData = data }
             e.profileId = s.profileId
+            e.activeTabId = s.activeTabId
         } else {
             let e = SpaceEntity(
                 id: s.id,
@@ -307,103 +316,58 @@ import OSLog
                 icon: s.icon,
                 index: s.index,
                 gradientData: s.gradientData ?? (SpaceGradient.default.encoded ?? Data()),
-                profileId: s.profileId
+                profileId: s.profileId,
+                activeTabId: s.activeTabId
             )
             ctx.insert(e)
         }
     }
 
-    // MARK: - Backup & Recovery
-    private func createDataSnapshot(_ snapshot: Snapshot) throws {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        self.lastBackupJSON = try encoder.encode(snapshot)
-    }
-
-    private func recoverFromBackup() async throws {
-        guard let data = lastBackupJSON else { return }
-        let decoder = JSONDecoder()
-        let snapshot = try decoder.decode(Snapshot.self, from: data)
-        try await performBestEffortPersistence(snapshot)
-    }
-
-    // Best-effort non-atomic writes on the main context. Used only as a fallback.
-    private func performBestEffortPersistence(_ snapshot: Snapshot) async throws {
-        let ctx = ModelContext(container)
-        ctx.autosaveEnabled = false
-
-        // Pre-fetch all entities into lookup dictionaries to avoid N+1 queries
-        let allTabEntities: [TabEntity]
-        let allSpaceEntities: [SpaceEntity]
-        do {
-            allTabEntities = try ctx.fetch(FetchDescriptor<TabEntity>())
-            allSpaceEntities = try ctx.fetch(FetchDescriptor<SpaceEntity>())
-        } catch {
-            throw classify(error)
-        }
-
-        let tabLookup = Dictionary(uniqueKeysWithValues: allTabEntities.map { ($0.id, $0) })
-        let spaceLookup = Dictionary(uniqueKeysWithValues: allSpaceEntities.map { ($0.id, $0) })
-
-        // Cleanup orphan tabs
-        let keepTabIDs = Set(snapshot.tabs.map { $0.id })
-        for e in allTabEntities where !keepTabIDs.contains(e.id) { ctx.delete(e) }
-
-        // Upserts
-        for t in snapshot.tabs {
-            do { try upsertTab(in: ctx, t, existing: tabLookup[t.id]) } catch { throw classify(error) }
-        }
-        for s in snapshot.spaces {
-            do { try upsertSpace(in: ctx, s, existing: spaceLookup[s.id]) } catch { throw classify(error) }
-        }
-        // Cleanup orphan spaces
-        let keepSpaceIDs = Set(snapshot.spaces.map { $0.id })
-        for e in allSpaceEntities where !keepSpaceIDs.contains(e.id) { ctx.delete(e) }
-
-        do {
-            let states = try ctx.fetch(FetchDescriptor<TabsStateEntity>())
-            let st = states.first ?? {
-                let s = TabsStateEntity(currentTabID: nil, currentSpaceID: nil)
-                ctx.insert(s)
-                return s
-            }()
-            st.currentTabID = snapshot.state.currentTabID
-            st.currentSpaceID = snapshot.state.currentSpaceID
-        } catch {
-            throw classify(error)
-        }
-        do {
-            try ctx.save()
-        } catch {
-            throw classify(error)
-        }
-    }
-
     // MARK: - Validation
     private func validateInput(_ snapshot: Snapshot) throws {
-        // Basic invariants: indices non-negative, ids unique
-        if snapshot.tabs.contains(where: { $0.index < 0 }) { throw PersistenceError.invalidModelState }
-        let tabIDs = Set(snapshot.tabs.map { $0.id })
-        if tabIDs.count != snapshot.tabs.count { throw PersistenceError.invalidModelState }
-        let spaceIDs = Set(snapshot.spaces.map { $0.id })
-        if spaceIDs.count != snapshot.spaces.count { throw PersistenceError.invalidModelState }
-        // Ensure all spaceIds referenced by tabs exist (or are nil) and flag invariants
-        for t in snapshot.tabs {
-            if let sid = t.spaceId, !spaceIDs.contains(sid) { throw PersistenceError.invalidModelState }
-            // Mutual exclusivity of pinned flags
-            if t.isPinned && t.isSpacePinned { throw PersistenceError.invalidModelState }
-            // Global pinned cannot have a spaceId
-            if t.isPinned && t.spaceId != nil { throw PersistenceError.invalidModelState }
-            // Space-pinned must have a spaceId
-            if t.isSpacePinned && t.spaceId == nil { throw PersistenceError.invalidModelState }
+        let tabs = Dictionary(snapshot.tabs.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let spaces = Dictionary(snapshot.spaces.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let folders = Dictionary(snapshot.folders.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        guard tabs.count == snapshot.tabs.count,
+              spaces.count == snapshot.spaces.count,
+              folders.count == snapshot.folders.count,
+              snapshot.tabs.allSatisfy({ $0.index >= 0 }),
+              snapshot.spaces.allSatisfy({ $0.index >= 0 }),
+              snapshot.folders.allSatisfy({ $0.index >= 0 }) else {
+            throw PersistenceError.invalidModelState
         }
-
-        // TODO: Once profiles participate in snapshots, validate that each space.profileId
-        // corresponds to a known Profile. For now, log missing profile assignments after migration.
-        for s in snapshot.spaces {
-            if s.profileId == nil {
-                Self.log.debug("[validate] Space missing profileId: \(s.id.uuidString, privacy: .public)")
+        for folder in snapshot.folders {
+            guard spaces[folder.spaceId] != nil else { throw PersistenceError.invalidModelState }
+        }
+        for tab in snapshot.tabs {
+            guard !(tab.isPinned && tab.isSpacePinned) else { throw PersistenceError.invalidModelState }
+            if tab.isPinned {
+                guard tab.spaceId == nil, tab.folderId == nil, tab.profileId != nil else {
+                    throw PersistenceError.invalidModelState
+                }
+            } else {
+                guard let sid = tab.spaceId, spaces[sid] != nil else { throw PersistenceError.invalidModelState }
             }
+            if let fid = tab.folderId {
+                guard let folder = folders[fid], folder.spaceId == tab.spaceId,
+                      folder.isRegular == !tab.isSpacePinned else { throw PersistenceError.invalidModelState }
+            }
+        }
+        func isVisible(_ tabID: UUID, in space: SnapshotSpace) -> Bool {
+            guard let tab = tabs[tabID] else { return false }
+            return tab.spaceId == space.id || (tab.isPinned && tab.profileId == space.profileId)
+        }
+        for space in snapshot.spaces {
+            if let active = space.activeTabId, !isVisible(active, in: space) {
+                throw PersistenceError.invalidModelState
+            }
+        }
+        if let sid = snapshot.state.currentSpaceID, spaces[sid] == nil {
+            throw PersistenceError.invalidModelState
+        }
+        if let active = snapshot.state.currentTabID {
+            guard let sid = snapshot.state.currentSpaceID, let space = spaces[sid],
+                  isVisible(active, in: space) else { throw PersistenceError.invalidModelState }
         }
     }
 
@@ -425,6 +389,7 @@ import OSLog
 
     // MARK: - Error Classification
     private func classify(_ error: Error) -> PersistenceError {
+        if let failure = error as? PersistenceError { return failure }
         let ns = error as NSError
         let domain = ns.domain.lowercased()
         let desc = (ns.userInfo[NSLocalizedDescriptionKey] as? String)?.lowercased() ?? ns.localizedDescription.lowercased()
@@ -734,17 +699,23 @@ class TabManager: ObservableObject {
         guard let idx = spaces.firstIndex(where: { $0.id == id }) else {
             return
         }
-        // Move tabs out or close them; here we close normal tabs of the space
-        let closing = tabsBySpace[id] ?? []
-        let spacePinnedClosing = spacePinnedTabs[id] ?? []
-        for t in closing + spacePinnedClosing {
+        // The dialog says the space's tabs are deleted. Release their webviews, splits and
+        // extension state like any other close; there is nothing to undo into.
+        let closing = (tabsBySpace[id] ?? []) + (spacePinnedTabs[id] ?? [])
+        for t in closing {
+            browserManager?.splitManager.handleTabClosure(t.id)
+            browserManager?.compositorManager.unloadTab(t)
+            browserManager?.webViewCoordinator?.removeAllWebViews(for: t)
+            ExtensionManager.shared.notifyTabClosed(t)
             if currentTab?.id == t.id { currentTab = nil }
         }
         setTabs([], for: id)
         setSpacePinnedTabs([], for: id)
+        setFolders([], for: id)
         if idx < spaces.count { spaces.remove(at: idx) }
-        if currentSpace?.id == id {
-            currentSpace = spaces.first
+        if currentSpace?.id == id, let next = spaces.first {
+            // Selects that space's remembered or first tab instead of leaving no selection.
+            setActiveSpace(next)
         }
 
         debouncedPersistSnapshot()
@@ -858,7 +829,8 @@ class TabManager: ObservableObject {
         let folder = TabFolder(
             name: name,
             spaceId: spaceId,
-            color: spaces.first(where: { $0.id == spaceId })?.color ?? .controlAccentColor
+            color: spaces.first(where: { $0.id == spaceId })?.color ?? .controlAccentColor,
+            index: (foldersBySpace[spaceId]?.map { $0.index }.max() ?? -1) + 1
         )
 
         var folders = foldersBySpace[spaceId] ?? []
@@ -889,21 +861,15 @@ class TabManager: ObservableObject {
             if let index = folders.firstIndex(where: { $0.id == folderId }) {
                 let folder = folders[index]
 
-                // Move all tabs out of folder
-                let isRegularFolder = folder.isRegular
-                for tab in allTabs() {
-                    if tab.folderId == folderId {
-                        tab.folderId = nil
-                        // Only set isSpacePinned for space-pinned folders, not regular ones
-                        if !isRegularFolder {
-                            tab.isSpacePinned = true
-                        }
-                    }
+                // Use the same membership rules as menu and drag transfers.
+                for tab in allTabs() where tab.folderId == folderId {
+                    transferTab(tab, to: .space(spaceId, pinned: !folder.isRegular))
                 }
 
                 // Remove the folder
                 var mutableFolders = folders
                 mutableFolders.remove(at: index)
+                for (i, item) in mutableFolders.enumerated() { item.index = i }
                 setFolders(mutableFolders, for: spaceId)
 
                 // Send notification for SpaceView folderChangeCount
@@ -939,6 +905,7 @@ class TabManager: ObservableObject {
             name: name,
             spaceId: spaceId,
             color: spaces.first(where: { $0.id == spaceId })?.color ?? .controlAccentColor,
+            index: (foldersBySpace[spaceId]?.map { $0.index }.max() ?? -1) + 1,
             isRegular: true
         )
 
@@ -949,19 +916,6 @@ class TabManager: ObservableObject {
         NotificationCenter.default.post(name: .init("TabFoldersDidChange"), object: nil)
         debouncedPersistSnapshot()
         return folder
-    }
-
-    /// Move a regular tab into a regular folder. Does NOT set isSpacePinned.
-    func moveTabToRegularFolder(tab: Tab, folderId: UUID) {
-        tab.folderId = folderId
-        // Tab stays in tabsBySpace — it's still a regular tab, just with a folderId
-        if let spaceId = tab.spaceId {
-            var regularTabs = tabsBySpace[spaceId] ?? []
-            if !regularTabs.contains(where: { $0.id == tab.id }) {
-                regularTabs.append(tab)
-                setTabs(regularTabs, for: spaceId)
-            }
-        }
     }
 
     /// Get regular (non-space-pinned) tabs in a specific folder.
@@ -981,16 +935,9 @@ class TabManager: ObservableObject {
         return (foldersBySpace[spaceId] ?? []).filter { $0.isRegular }
     }
 
-    func moveTabToFolder(tab: Tab, folderId: UUID) {
-        let newTab = tab
-        removeFromCurrentContainer(newTab)
-        newTab.folderId = folderId
-        newTab.isSpacePinned = true
-        var sp = spacePinnedTabs[tab.spaceId!] ?? []
-        sp.append(tab)
-        // Reindex
-        for (i, t) in sp.enumerated() { t.index = i }
-        setSpacePinnedTabs(sp, for: tab.spaceId!)
+    /// `index` is the position among the folder's tabs; nil appends.
+    func moveTabToFolder(tab: Tab, folderId: UUID, index: Int? = nil) {
+        transferTab(tab, to: .folder(folderId), index: index)
     }
 
     // MARK: - Tab Management (Normal within current space)
@@ -999,7 +946,7 @@ class TabManager: ObservableObject {
         attach(tab)
         if contains(tab) { return }
 
-        if tab.spaceId == nil {
+        if tab.spaceId == nil || !spaces.contains(where: { $0.id == tab.spaceId }) {
             tab.spaceId = currentSpace?.id
         }
         guard let sid = tab.spaceId else {
@@ -1021,18 +968,16 @@ class TabManager: ObservableObject {
     }
 
     /// Removes a pinned tab, bypassing the normal guard that protects pinned tabs from removal.
-    /// Unpins the tab first, then removes it.
+    /// The pin state stays on the undo copy so Undo Close brings the pin back.
     func forceRemoveTab(_ id: UUID) {
-        if let tab = tabById(id) {
-            tab.isSpacePinned = false
-            tab.isPinned = false
-        }
-        removeTab(id)
+        removeTab(id, force: true)
     }
 
-    func removeTab(_ id: UUID) {
+    /// Every close goes through here. `track: false` is for bulk closes that record their own undo
+    /// entry; `force` removes pinned tabs instead of deactivating them.
+    func removeTab(_ id: UUID, track: Bool = true, force: Bool = false) {
         // Pinned/space-pinned tabs should not be removed — just deactivate them
-        if let tab = tabById(id),
+        if !force, let tab = tabById(id),
            tab.isPinned || tab.isSpacePinned {
             deactivatePinnedTab(tab)
             return
@@ -1084,7 +1029,7 @@ class TabManager: ObservableObject {
         guard let tab = removed else { return }
 
         // Add to recently closed tabs for undo functionality
-        trackRecentlyClosedTab(tab, spaceId: removedSpaceId)
+        if track { trackRecentlyClosedTab(tab, spaceId: removedSpaceId) }
 
         // Force unload the tab from compositor before removing
         browserManager?.compositorManager.unloadTab(tab)
@@ -1126,12 +1071,18 @@ class TabManager: ObservableObject {
     /// Deactivates a pinned/space-pinned tab without removing it.
     /// Unloads the webview and switches to the MRU tab.
     private func deactivatePinnedTab(_ tab: Tab) {
-        browserManager?.splitManager.handleTabClosure(tab.id)
-
         // Reset URL to the pinned home URL so next open starts fresh
         if let pinnedURL = tab.pinnedURL {
             tab.url = pinnedURL
         }
+        deactivateTab(tab)
+    }
+
+    /// Unloads a tab without removing it. A tab still on screen hands selection to the most
+    /// recent loaded tab first; any other window showing it falls back to the empty state
+    /// rather than a blank pane that still claims the tab.
+    private func deactivateTab(_ tab: Tab) {
+        browserManager?.splitManager.handleTabClosure(tab.id)
 
         // Unload webview directly (bypasses TabManager.unloadTab which guards essentials)
         browserManager?.compositorManager.unloadTab(tab)
@@ -1143,14 +1094,11 @@ class TabManager: ObservableObject {
                 browserManager?.selectTab(nextTab)
             } else {
                 currentTab = nil
-                // Clear all window states that pointed to this tab so EmptyWebsiteView shows
-                for (_, windowState) in browserManager?.windowRegistry?.windows ?? [:] {
-                    if windowState.currentTabId == tab.id {
-                        windowState.currentTabId = nil
-                        windowState.refreshCompositor()
-                    }
-                }
             }
+        }
+        for (_, windowState) in browserManager?.windowRegistry?.windows ?? [:] where windowState.currentTabId == tab.id {
+            windowState.currentTabId = nil
+            windowState.refreshCompositor()
         }
     }
 
@@ -1456,30 +1404,33 @@ class TabManager: ObservableObject {
     }
 
     func clearRegularTabs(for spaceId: UUID) {
-        guard let tabs = tabsBySpace[spaceId] else { return }
-
-        // Remove all regular tabs for this space
-        for tab in tabs {
-            if(tab.id != self.currentTab?.id) {
-                removeTab(tab.id)
-            }
+        // Clear counts and removes loose tabs only; folders keep their contents. Tabs on
+        // screen in any window stay open.
+        let visibleIds = Set((browserManager?.windowRegistry?.windows.values).map { $0.compactMap { $0.currentTabId } } ?? [])
+            .union([currentTab?.id].compactMap { $0 })
+        for tab in (tabsBySpace[spaceId] ?? []) where tab.folderId == nil && !visibleIds.contains(tab.id) {
+            removeTab(tab.id)
         }
-
-        debouncedPersistSnapshot()
     }
     
+    /// Automatic unloading (idle timer, budget, memory pressure). Callers only pass tabs that
+    /// are not on screen.
     func unloadTab(_ tab: Tab) {
         // Never unload essentials tabs except on browser close/restart
         guard !allPinnedTabsAllProfiles.contains(where: { $0.id == tab.id }) else { return }
         browserManager?.compositorManager.unloadTab(tab)
     }
+
+    /// User-requested unload from the sidebar. The tab may be the one on screen.
+    func unloadTabMovingSelection(_ tab: Tab) {
+        guard !allPinnedTabsAllProfiles.contains(where: { $0.id == tab.id }) else { return }
+        deactivateTab(tab)
+    }
     
     func unloadAllInactiveTabs() {
-        // Only unload regular tabs, never essentials (pinned) tabs
-        for tab in tabs {
-            if tab.id != currentTab?.id {
-                unloadTab(tab)
-            }
+        guard let compositor = browserManager?.compositorManager else { return }
+        for tab in tabs where compositor.canUnloadInactiveTab(tab) {
+            unloadTab(tab)
         }
     }
 
@@ -1488,243 +1439,23 @@ class TabManager: ObservableObject {
     func handleDragOperation(_ operation: DragOperation) {
         let tab = operation.tab
         
-        switch (operation.fromContainer, operation.toContainer) {
-        case (.essentials, .essentials):
-            reorderGlobalPinnedTabs(tab, to: operation.toIndex)
-            
-        case (.spacePinned(let fromSpaceId), .spacePinned(let toSpaceId)):
-            if fromSpaceId == toSpaceId {
-                reorderSpacePinnedTabs(tab, in: toSpaceId, to: operation.toIndex)
-            } else {
-                moveTabBetweenSpaces(tab, from: fromSpaceId, to: toSpaceId, asSpacePinned: true, toIndex: operation.toIndex)
-            }
-            
-        case (.spaceRegular(let fromSpaceId), .spaceRegular(let toSpaceId)):
-            if fromSpaceId == toSpaceId {
-                reorderRegularTabs(tab, in: toSpaceId, to: operation.toIndex)
-            } else {
-                moveTabBetweenSpaces(tab, from: fromSpaceId, to: toSpaceId, asSpacePinned: false, toIndex: operation.toIndex)
-            }
-            
-        case (.spaceRegular(let spaceId), .spacePinned(let targetSpaceId)):
-            // Regular tab to space pinned
-            if spaceId == targetSpaceId {
-                pinTabToSpace(tab, spaceId: spaceId)
-                reorderSpacePinnedTabs(tab, in: spaceId, to: operation.toIndex)
-            } else {
-                moveTabBetweenSpaces(tab, from: spaceId, to: targetSpaceId, asSpacePinned: true, toIndex: operation.toIndex)
-            }
-            
-        case (.spacePinned(let spaceId), .spaceRegular(let targetSpaceId)):
-            // Space pinned to regular tab
-            if spaceId == targetSpaceId {
-                unpinTabFromSpace(tab)
-                reorderRegularTabs(tab, in: spaceId, to: operation.toIndex)
-            } else {
-                moveTabBetweenSpaces(tab, from: spaceId, to: targetSpaceId, asSpacePinned: false, toIndex: operation.toIndex)
-            }
-            
-        case (.spaceRegular(_), .essentials):
-            // Regular -> Essentials: ensure a valid profile before removing from source
-            guard browserManager?.currentProfile?.id != nil else { return }
-            // Now safe to move
-            removeFromCurrentContainer(tab)
-            tab.spaceId = nil
-            tab.isPinned = true
-            tab.isSpacePinned = false
-            tab.folderId = nil
-            if tab.pinnedURL == nil { tab.pinnedURL = tab.url }
-            withCurrentProfilePinnedArray { arr in
-                let safeIndex = max(0, min(operation.toIndex, arr.count))
-                arr.insert(tab, at: safeIndex)
-            }
-            debouncedPersistSnapshot()
-
-        case (.spacePinned(_), .essentials):
-            // SpacePinned -> Essentials: ensure a valid profile before removing from source
-            guard browserManager?.currentProfile?.id != nil else { return }
-            // Now safe to move
-            removeFromCurrentContainer(tab)
-            tab.spaceId = nil
-            tab.isPinned = true
-            tab.isSpacePinned = false
-            tab.folderId = nil
-            if tab.pinnedURL == nil { tab.pinnedURL = tab.url }
-            withCurrentProfilePinnedArray { arr in
-                let safeIndex = max(0, min(operation.toIndex, arr.count))
-                arr.insert(tab, at: safeIndex)
-            }
-            debouncedPersistSnapshot()
-
-        case (.essentials, .spaceRegular(let spaceId)):
-            // Essentials -> Regular (specific space): direct transfer without side-effect moves
-            removeFromCurrentContainer(tab) // remove from global pinned
-            tab.spaceId = spaceId
-            tab.isPinned = false
-            tab.isSpacePinned = false
-            tab.pinnedURL = nil
-            var arr = tabsBySpace[spaceId] ?? []
-            let safeIndex = max(0, min(operation.toIndex, arr.count))
-            arr.insert(tab, at: safeIndex)
-            // Reindex
-            for (i, t) in arr.enumerated() { t.index = i }
-            setTabs(arr, for: spaceId)
-            debouncedPersistSnapshot()
-
-        case (.essentials, .spacePinned(let spaceId)):
-            // Essentials -> Space Pinned (specific space): direct transfer
-            removeFromCurrentContainer(tab) // remove from global pinned
-            tab.spaceId = spaceId
-            tab.isPinned = false
-            tab.isSpacePinned = true
-            if tab.pinnedURL == nil { tab.pinnedURL = tab.url }
-            var sp = spacePinnedTabs[spaceId] ?? []
-            let safeIndex = max(0, min(operation.toIndex, sp.count))
-            sp.insert(tab, at: safeIndex)
-            // Reindex
-            for (i, t) in sp.enumerated() { t.index = i }
-            setSpacePinnedTabs(sp, for: spaceId)
-            debouncedPersistSnapshot()
-
-        // MARK: - Folder Operations
-
-        case (.folder(let fromFolderId), .folder(let toFolderId)):
-            guard let spaceId = tab.spaceId else { return }
-            var spacePinned = spacePinnedTabs[spaceId] ?? []
-
-            if let currentIndex = spacePinned.firstIndex(where: { $0.id == tab.id }) {
-                if currentIndex < spacePinned.count { spacePinned.remove(at: currentIndex) }
-
-                if fromFolderId != toFolderId {
-                    tab.folderId = toFolderId
-                    tab.isSpacePinned = true
-                }
-
-                let safeIndex = max(0, min(operation.toIndex, spacePinned.count))
-                spacePinned.insert(tab, at: safeIndex)
-
-                for (idx, pinnedTab) in spacePinned.enumerated() {
-                    pinnedTab.index = idx
-                }
-
-                setSpacePinnedTabs(spacePinned, for: spaceId)
-                debouncedPersistSnapshot()
-            }
-
-        case (.folder(_), .essentials):
-            // Move from folder to essentials
-            guard browserManager?.currentProfile?.id != nil else { return }
-            guard let originalSpaceId = tab.spaceId else { return }
-
-            // Remove from spacePinnedTabs since it's no longer a folder tab
-            if var sp = spacePinnedTabs[originalSpaceId] {
-                if let index = sp.firstIndex(where: { $0.id == tab.id }) {
-                    sp.remove(at: index)
-                    // Reindex remaining tabs
-                    for (i, t) in sp.enumerated() { t.index = i }
-                    setSpacePinnedTabs(sp, for: originalSpaceId)
-                }
-            }
-
-            tab.folderId = nil
-            tab.spaceId = nil
-            tab.isSpacePinned = false
-            withCurrentProfilePinnedArray { arr in
-                let safeIndex = max(0, min(operation.toIndex, arr.count))
-                arr.insert(tab, at: safeIndex)
-            }
-            debouncedPersistSnapshot()
-
-        case (.folder(_), .spacePinned(let spaceId)):
-            let originalSpaceId = tab.spaceId
-
-            if let originalSpaceId,
-               var originalSp = spacePinnedTabs[originalSpaceId],
-               let currentIndex = originalSp.firstIndex(where: { $0.id == tab.id }) {
-                if currentIndex < originalSp.count { originalSp.remove(at: currentIndex) }
-                for (idx, existing) in originalSp.enumerated() { existing.index = idx }
-                setSpacePinnedTabs(originalSp, for: originalSpaceId)
-            }
-
-            tab.folderId = nil
-            tab.spaceId = spaceId
-            tab.isSpacePinned = true
-
-            var destination = spacePinnedTabs[spaceId] ?? []
-            let safeIndex = max(0, min(operation.toIndex, destination.count))
-            destination.insert(tab, at: safeIndex)
-            for (idx, pinnedTab) in destination.enumerated() { pinnedTab.index = idx }
-            setSpacePinnedTabs(destination, for: spaceId)
-            debouncedPersistSnapshot()
-
-        case (.folder(_), .spaceRegular(let spaceId)):
-            // Move from folder to regular space
-            guard let originalSpaceId = tab.spaceId else { return }
-
-            // Remove from spacePinnedTabs since it's no longer a folder tab
-            if var sp = spacePinnedTabs[originalSpaceId] {
-                if let index = sp.firstIndex(where: { $0.id == tab.id }) {
-                    sp.remove(at: index)
-                    // Reindex remaining tabs
-                    for (i, t) in sp.enumerated() { t.index = i }
-                    setSpacePinnedTabs(sp, for: originalSpaceId)
-                }
-            }
-
-            tab.folderId = nil
-            tab.spaceId = spaceId
-            tab.isSpacePinned = false
-            var arr = tabsBySpace[spaceId] ?? []
-            let safeIndex = max(0, min(operation.toIndex, arr.count))
-            arr.insert(tab, at: safeIndex)
-            // Reindex
-            for (i, t) in arr.enumerated() { t.index = i }
-            setTabs(arr, for: spaceId)
-            debouncedPersistSnapshot()
-
-        case (.spaceRegular(let spaceId), .folder(let toFolderId)):
-            // Move from regular space to folder
-            removeFromCurrentContainer(tab)
-            tab.folderId = toFolderId
-            tab.spaceId = spaceId
-            tab.isSpacePinned = true
-            // Add to spacePinnedTabs since folder tabs are now space-pinned
-            var sp = spacePinnedTabs[spaceId] ?? []
-            let safeIndex = max(0, min(operation.toIndex, sp.count))
-            sp.insert(tab, at: safeIndex)
-            // Reindex
-            for (i, t) in sp.enumerated() { t.index = i }
-            setSpacePinnedTabs(sp, for: spaceId)
-            debouncedPersistSnapshot()
-
-        case (.spacePinned(let spaceId), .folder(let toFolderId)):
-            var spacePinned = spacePinnedTabs[spaceId] ?? []
-
-            if let currentIndex = spacePinned.firstIndex(where: { $0.id == tab.id }) {
-                if currentIndex < spacePinned.count { spacePinned.remove(at: currentIndex) }
-            }
-
-            tab.folderId = toFolderId
-            tab.spaceId = spaceId
-            tab.isSpacePinned = true
-
-            let safeIndex = max(0, min(operation.toIndex, spacePinned.count))
-            spacePinned.insert(tab, at: safeIndex)
-
-            for (idx, pinnedTab) in spacePinned.enumerated() {
-                pinnedTab.index = idx
-            }
-
-            setSpacePinnedTabs(spacePinned, for: spaceId)
-            debouncedPersistSnapshot()
-
-        case (.essentials, .folder(_)):
-            // Prevent global pinned (essentials) tabs from being moved to folders
+        guard operation.fromContainer != .none else { return }
+        let destination: TabTransferDestination
+        switch operation.toContainer {
+        case .essentials:
+            guard let profileId = browserManager?.currentProfile?.id else { return }
+            destination = .essentials(profileId)
+        case .spacePinned(let spaceId):
+            destination = .space(spaceId, pinned: true)
+        case .spaceRegular(let spaceId):
+            destination = .space(spaceId, pinned: false)
+        case .folder(let folderId):
+            destination = .folder(folderId)
+        case .none:
             return
-
-        case (.none, _), (_, .none):
-            break
         }
+        // Drag indices refer to the visible folder/loose-tab list, not its backing bucket.
+        guard transferTab(tab, to: destination, index: operation.toIndex) else { return }
         // If the moved tab is currently part of an active split, dissolve the split.
         // Keep the opposite side focused so the remaining pane stays visible.
         if let sm = browserManager?.splitManager, let bm = browserManager {
@@ -1742,83 +1473,18 @@ class TabManager: ObservableObject {
     }
     
     private func reorderGlobalPinnedTabs(_ tab: Tab, to index: Int) {
-        withCurrentProfilePinnedArray { arr in
-            guard let currentIndex = arr.firstIndex(where: { $0.id == tab.id }) else { return }
-            guard index != currentIndex else { return }
-            if currentIndex < arr.count { arr.remove(at: currentIndex) }
-            let safeIndex = max(0, min(index, arr.count))
-            arr.insert(tab, at: safeIndex)
-        }
-        debouncedPersistSnapshot()
+        guard let profileId = pinnedByProfile.first(where: { $0.value.contains(where: { $0.id == tab.id }) })?.key else { return }
+        transferTab(tab, to: .essentials(profileId), index: index)
     }
 
     private func reorderSpacePinnedTabs(_ tab: Tab, in spaceId: UUID, to index: Int) {
-        guard var spacePinned = spacePinnedTabs[spaceId],
-              let currentIndex = spacePinned.firstIndex(where: { $0.id == tab.id }) else { return }
-        guard index != currentIndex else { return }
-        
-        if currentIndex < spacePinned.count { spacePinned.remove(at: currentIndex) }
-        let clampedIndex = min(max(index, 0), spacePinned.count)
-        spacePinned.insert(tab, at: clampedIndex)
-        
-        // Update indices
-        for (i, pinnedTab) in spacePinned.enumerated() {
-            pinnedTab.index = i
-        }
-        
-        setSpacePinnedTabs(spacePinned, for: spaceId)
-        debouncedPersistSnapshot()
+        let destination: TabTransferDestination = tab.folderId.map { .folder($0) } ?? .space(spaceId, pinned: true)
+        transferTab(tab, to: destination, index: index, indexWithinGroup: false)
     }
 
     private func reorderRegularTabs(_ tab: Tab, in spaceId: UUID, to index: Int) {
-        guard var regularTabs = tabsBySpace[spaceId],
-              let currentIndex = regularTabs.firstIndex(where: { $0.id == tab.id }) else { return }
-        guard index != currentIndex else { return }
-        
-        if currentIndex < regularTabs.count { regularTabs.remove(at: currentIndex) }
-        let clampedIndex = min(max(index, 0), regularTabs.count)
-        regularTabs.insert(tab, at: clampedIndex)
-        
-        // Update indices
-        for (i, regularTab) in regularTabs.enumerated() {
-            regularTab.index = i
-        }
-        
-        setTabs(regularTabs, for: spaceId)
-        debouncedPersistSnapshot()
-    }
-
-    private func moveTabBetweenSpaces(_ tab: Tab, from fromSpaceId: UUID, to toSpaceId: UUID, asSpacePinned: Bool, toIndex: Int) {
-        // Remove from source space
-        removeFromCurrentContainer(tab)
-        
-        // Add to target space
-        tab.spaceId = toSpaceId
-        tab.isPinned = false
-        tab.isSpacePinned = asSpacePinned
-        if asSpacePinned {
-            var spacePinned = spacePinnedTabs[toSpaceId] ?? []
-            tab.index = toIndex
-            let safeIndex = max(0, min(toIndex, spacePinned.count))
-            spacePinned.insert(tab, at: safeIndex)
-            // Update indices
-            for (i, pinnedTab) in spacePinned.enumerated() {
-                pinnedTab.index = i
-            }
-            setSpacePinnedTabs(spacePinned, for: toSpaceId)
-        } else {
-            var regularTabs = tabsBySpace[toSpaceId] ?? []
-            tab.index = toIndex
-            let safeIndex = max(0, min(toIndex, regularTabs.count))
-            regularTabs.insert(tab, at: safeIndex)
-            // Update indices
-            for (i, regularTab) in regularTabs.enumerated() {
-                regularTab.index = i
-            }
-            setTabs(regularTabs, for: toSpaceId)
-        }
-
-        debouncedPersistSnapshot()
+        let destination: TabTransferDestination = tab.folderId.map { .folder($0) } ?? .space(spaceId, pinned: false)
+        transferTab(tab, to: destination, index: index, indexWithinGroup: false)
     }
 
     // MARK: - Tab Ordering
@@ -1831,7 +1497,15 @@ class TabManager: ObservableObject {
 
         // Move to target space at the end of regular tabs
         let targetTabs = tabsBySpace[targetSpaceId] ?? []
-        moveTabBetweenSpaces(tab, from: currentSpaceId, to: targetSpaceId, asSpacePinned: false, toIndex: targetTabs.count)
+        guard transferTab(tab, to: .space(targetSpaceId, pinned: false), index: targetTabs.count) else { return }
+
+        // A window showing the tab follows it to its new space, so the page on screen stays in
+        // that window's sidebar. The tab can't stay in a split with a tab from the old space.
+        // selectTab also moves the global current space when that window is active.
+        browserManager?.splitManager.handleTabClosure(tabId)
+        for (_, windowState) in browserManager?.windowRegistry?.windows ?? [:] where windowState.currentTabId == tabId {
+            browserManager?.selectTab(tab, in: windowState)
+        }
     }
 
     func moveTabUp(_ tabId: UUID) {
@@ -1895,58 +1569,15 @@ class TabManager: ObservableObject {
     // MARK: - Pinned tabs (global)
 
     func pinTab(_ tab: Tab) {
-        guard contains(tab) || allPinnedTabsAllProfiles.contains(where: { $0.id == tab.id }) else {
-            return
-        }
-        guard let pid = browserManager?.currentProfile?.id else { return }
-        // Already pinned for this profile?
-        if (pinnedByProfile[pid] ?? []).contains(where: { $0.id == tab.id }) { return }
-
-        // Remove from its current container (regular or space-pinned)
-        removeFromCurrentContainer(tab)
-
-        // CRITICAL: Clear ALL conflicting properties to prevent duplication
-        tab.spaceId = nil
-        tab.isSpacePinned = false  // Clear space-pinned status
-        tab.folderId = nil         // Clear folder reference
-        tab.isPinned = true        // CRITICAL: Explicitly set global pin status
-        if tab.pinnedURL == nil { tab.pinnedURL = tab.url }
-
-        withCurrentProfilePinnedArray { arr in
-            // Append to end; index normalized after mutation
-            let nextIndex = (arr.map { $0.index }.max() ?? -1) + 1
-            tab.index = nextIndex
-            arr.append(tab)
-        }
-        if currentTab?.id == tab.id { currentTab = tab }
-        debouncedPersistSnapshot()
+        guard let profileId = browserManager?.currentProfile?.id else { return }
+        if (pinnedByProfile[profileId] ?? []).contains(where: { $0.id == tab.id }) { return }
+        transferTab(tab, to: .essentials(profileId))
     }
 
     func unpinTab(_ tab: Tab) {
-        // Find and remove from whichever profile bucket contains it
-        var moved: Tab? = nil
-        for (pid, arr) in pinnedByProfile {
-            if let idx = arr.firstIndex(where: { $0.id == tab.id }) {
-                var copy = arr
-                if idx < copy.count { moved = copy.remove(at: idx) }
-                setPinnedTabs(copy, for: pid)
-                break
-            }
-        }
-        guard let moved = moved else { return }
-        let targetSpaceId = currentSpace?.id ?? spaces.first?.id
-        guard let sid = targetSpaceId else {
-            return
-        }
-        moved.isPinned = false
-        moved.pinnedURL = nil
-        moved.spaceId = sid
-        var arr = tabsBySpace[sid] ?? []
-        arr.insert(moved, at: 0)
-        setTabs(arr, for: sid)
-        if currentTab?.id == moved.id { currentTab = moved }
-
-        debouncedPersistSnapshot()
+        guard allPinnedTabsAllProfiles.contains(where: { $0.id == tab.id }),
+              let spaceId = currentSpace?.id ?? spaces.first?.id else { return }
+        transferTab(tab, to: .space(spaceId, pinned: false), index: 0)
     }
 
     func togglePin(_ tab: Tab) {
@@ -1988,75 +1619,116 @@ class TabManager: ObservableObject {
     }
     
     func pinTabToSpace(_ tab: Tab, spaceId: UUID) {
-        guard contains(tab) else { return }
-        guard let space = spaces.first(where: { $0.id == spaceId }) else { return }
-
-        // Remove from current location
-        removeFromCurrentContainer(tab)
-
-        // Add to space pinned tabs
-        tab.spaceId = spaceId
-        tab.isSpacePinned = true   // CRITICAL: Explicitly set space-pinned status
-        tab.isPinned = false       // CRITICAL: Clear global pin status
-        if tab.pinnedURL == nil { tab.pinnedURL = tab.url }
-        var spacePinned = spacePinnedTabs[spaceId] ?? []
-        let nextIndex = (spacePinned.map { $0.index }.max() ?? -1) + 1
-        tab.index = nextIndex
-        spacePinned.append(tab)
-        setSpacePinnedTabs(spacePinned, for: spaceId)
-
-        debouncedPersistSnapshot()
+        transferTab(tab, to: .space(spaceId, pinned: true))
     }
 
     func unpinTabFromSpace(_ tab: Tab) {
         guard let spaceId = tab.spaceId,
-              var spacePinned = spacePinnedTabs[spaceId],
-              let index = spacePinned.firstIndex(where: { $0.id == tab.id }) else { return }
+              (spacePinnedTabs[spaceId] ?? []).contains(where: { $0.id == tab.id }) else { return }
+        transferTab(tab, to: .space(spaceId, pinned: false))
+    }
 
-        // Remove from space pinned tabs
-        guard index < spacePinned.count else { return }
-        let unpinned = spacePinned.remove(at: index)
-        setSpacePinnedTabs(spacePinned, for: spaceId)
+    private enum TabTransferDestination {
+        case essentials(UUID)
+        case space(UUID, pinned: Bool)
+        case folder(UUID)
+    }
 
-        unpinned.pinnedURL = nil
-        unpinned.isSpacePinned = false
+    /// Validate before removal, then establish exactly one membership and normalize both buckets.
+    /// An index is the final position after removing the source, matching the drag session contract.
+    @discardableResult
+    private func transferTab(_ tab: Tab, to destination: TabTransferDestination, index: Int? = nil, indexWithinGroup: Bool = true) -> Bool {
+        guard contains(tab) || allPinnedTabsAllProfiles.contains(where: { $0.id == tab.id }) else { return false }
+        let spaceId: UUID?
+        let profileId: UUID?
+        let folderId: UUID?
+        let pinned: Bool
+        switch destination {
+        case .essentials(let id):
+            guard browserManager?.currentProfile?.id == id || pinnedByProfile[id] != nil
+                    || browserManager?.profileManager.profiles.contains(where: { $0.id == id }) == true else { return false }
+            profileId = id
+            spaceId = nil
+            folderId = nil
+            pinned = false
+        case .space(let id, let isPinned):
+            guard spaces.contains(where: { $0.id == id }) else { return false }
+            spaceId = id
+            profileId = nil
+            folderId = nil
+            pinned = isPinned
+        case .folder(let id):
+            guard let folder = foldersBySpace.values.flatMap({ $0 }).first(where: { $0.id == id }),
+                  spaces.contains(where: { $0.id == folder.spaceId }),
+                  (foldersBySpace[folder.spaceId] ?? []).contains(where: { $0.id == id }) else { return false }
+            spaceId = folder.spaceId
+            profileId = nil
+            folderId = id
+            pinned = !folder.isRegular
+        }
 
-        // Add to regular tabs in the same space
-        var regularTabs = tabsBySpace[spaceId] ?? []
-        let nextIndex = (regularTabs.map { $0.index }.max() ?? -1) + 1
-        unpinned.index = nextIndex
-        regularTabs.append(unpinned)
-        setTabs(regularTabs, for: spaceId)
+        removeFromCurrentContainer(tab)
+        tab.spaceId = spaceId
+        tab.profileId = profileId
+        tab.folderId = folderId
+        tab.isPinned = profileId != nil
+        tab.isSpacePinned = pinned
+        if tab.isPinned || pinned {
+            if tab.pinnedURL == nil { tab.pinnedURL = tab.url }
+        } else {
+            tab.pinnedURL = nil
+        }
 
+        var destinationTabs: [Tab]
+        if let profileId {
+            destinationTabs = pinnedByProfile[profileId] ?? []
+        } else if let spaceId {
+            destinationTabs = pinned ? (spacePinnedTabs[spaceId] ?? []) : (tabsBySpace[spaceId] ?? [])
+        } else {
+            return false // All validated destinations have a profile or space.
+        }
+        let insertionIndex: Int
+        if indexWithinGroup {
+            let members = destinationTabs.indices.filter { destinationTabs[$0].folderId == folderId }
+            let position = max(0, min(index ?? members.count, members.count))
+            insertionIndex = position < members.count ? members[position] : (members.last.map { $0 + 1 } ?? destinationTabs.count)
+        } else {
+            insertionIndex = max(0, min(index ?? destinationTabs.count, destinationTabs.count))
+        }
+        destinationTabs.insert(tab, at: insertionIndex)
+        for (i, item) in destinationTabs.enumerated() { item.index = i }
+        if let profileId {
+            setPinnedTabs(destinationTabs, for: profileId)
+        } else if let spaceId {
+            if pinned { setSpacePinnedTabs(destinationTabs, for: spaceId) }
+            else { setTabs(destinationTabs, for: spaceId) }
+        }
+
+        for space in spaces where space.activeTabId == tab.id {
+            if space.id != spaceId && (profileId == nil || space.profileId != profileId) {
+                space.activeTabId = nil
+            }
+        }
         debouncedPersistSnapshot()
+        return true
     }
 
     private func removeFromCurrentContainer(_ tab: Tab) {
-        // Remove from global pinned (search across profiles)
-        for (pid, arr) in pinnedByProfile {
-            if let index = arr.firstIndex(where: { $0.id == tab.id }) {
-                var copy = arr
-                if index < copy.count { copy.remove(at: index) }
-                setPinnedTabs(copy, for: pid)
-                return
-            }
+        // Search every bucket by identity, repairing any pre-existing duplicate memberships too.
+        for (profileId, tabs) in pinnedByProfile where tabs.contains(where: { $0.id == tab.id }) {
+            let remaining = tabs.filter { $0.id != tab.id }
+            for (i, item) in remaining.enumerated() { item.index = i }
+            setPinnedTabs(remaining, for: profileId)
         }
-
-        // Remove from space pinned
-        if let spaceId = tab.spaceId,
-           var spacePinned = spacePinnedTabs[spaceId],
-           let index = spacePinned.firstIndex(where: { $0.id == tab.id }) {
-            if index < spacePinned.count { spacePinned.remove(at: index) }
-            setSpacePinnedTabs(spacePinned, for: spaceId)
-            return
+        for (spaceId, tabs) in spacePinnedTabs where tabs.contains(where: { $0.id == tab.id }) {
+            let remaining = tabs.filter { $0.id != tab.id }
+            for (i, item) in remaining.enumerated() { item.index = i }
+            setSpacePinnedTabs(remaining, for: spaceId)
         }
-
-        // Remove from regular tabs
-        if let spaceId = tab.spaceId,
-           var regularTabs = tabsBySpace[spaceId],
-           let index = regularTabs.firstIndex(where: { $0.id == tab.id }) {
-            if index < regularTabs.count { regularTabs.remove(at: index) }
-            setTabs(regularTabs, for: spaceId)
+        for (spaceId, tabs) in tabsBySpace where tabs.contains(where: { $0.id == tab.id }) {
+            let remaining = tabs.filter { $0.id != tab.id }
+            for (i, item) in remaining.enumerated() { item.index = i }
+            setTabs(remaining, for: spaceId)
         }
     }
 
@@ -2099,6 +1771,7 @@ class TabManager: ObservableObject {
         )
         t.folderId = e.folderId
         t.isPinned = e.isPinned
+        t.profileId = e.isPinned ? e.profileId : nil
         t.isSpacePinned = e.isSpacePinned
         t.displayNameOverride = e.displayNameOverride
 
@@ -2129,36 +1802,18 @@ class TabManager: ObservableObject {
             )
             let sortedSpaces = spaceEntities.sorted { $0.index < $1.index }
             self.spaces = sortedSpaces.map {
-                Space(
+                let space = Space(
                     id: $0.id,
                     name: $0.name,
                     icon: $0.icon,
                     gradient: SpaceGradient.decode($0.gradientData),
                     profileId: $0.profileId
                 )
+                space.activeTabId = $0.activeTabId
+                return space
             }
 
-            // Deduplicate spaces that share the same name and icon (auto-created defaults).
-            // This cleans up duplicates from a prior race condition on launch.
-            // Build a mapping from duplicate space IDs → kept space ID so tabs can be migrated.
-            var duplicateToKept: [UUID: UUID] = [:]
-            if spaces.count > 1 {
-                var seen: [String: UUID] = [:]  // key → kept space ID
-                var duplicateIds: [UUID] = []
-                for sp in spaces {
-                    let key = "\(sp.name)|\(sp.icon)"
-                    if let keptId = seen[key] {
-                        duplicateIds.append(sp.id)
-                        duplicateToKept[sp.id] = keptId
-                    } else {
-                        seen[key] = sp.id
-                    }
-                }
-                if !duplicateIds.isEmpty {
-                    spaces.removeAll { duplicateIds.contains($0.id) }
-                }
-            }
-
+            // Names and icons are presentation, not identity. Preserve every stored UUID.
             for sp in spaces {
                 setTabs([], for: sp.id)
                 setSpacePinnedTabs([], for: sp.id)
@@ -2203,6 +1858,7 @@ class TabManager: ObservableObject {
                     arr.append(t)
                     pinnedMap[stored] = arr
                 } else if let fb = fallbackProfileId {
+                    t.profileId = fb
                     __didAssignDefaultProfile = true
                     var arr = pinnedMap[fb] ?? []
                     arr.append(t)
@@ -2216,12 +1872,9 @@ class TabManager: ObservableObject {
             self.pendingPinnedWithoutProfile = __pending
             
             // Load space-pinned tabs
-            // Load space-pinned tabs
             for e in spacePinned {
                 let t = toRuntime(e)
-                if var sid = e.spaceId {
-                    // Remap tabs from deduplicated spaces to the kept space
-                    if let keptId = duplicateToKept[sid] { sid = keptId; t.spaceId = keptId }
+                if let sid = e.spaceId {
                     var arr = spacePinnedTabs[sid] ?? []
                     arr.append(t)
                     setSpacePinnedTabs(arr, for: sid)
@@ -2231,9 +1884,7 @@ class TabManager: ObservableObject {
             // Load regular tabs
             for e in normals {
                 let t = toRuntime(e)
-                if var sid = e.spaceId {
-                    // Remap tabs from deduplicated spaces to the kept space
-                    if let keptId = duplicateToKept[sid] { sid = keptId; t.spaceId = keptId }
+                if let sid = e.spaceId {
                     var arr = tabsBySpace[sid] ?? []
                     arr.append(t)
                     setTabs(arr, for: sid)
@@ -2242,21 +1893,35 @@ class TabManager: ObservableObject {
 
             // Folders
             let folderEntities = try context.fetch(FetchDescriptor<FolderEntity>())
-            for e in folderEntities {
-                // Remap folders from deduplicated spaces to the kept space
-                let resolvedSpaceId = duplicateToKept[e.spaceId] ?? e.spaceId
+            for e in folderEntities.sorted(by: { $0.index < $1.index }) {
+                let resolvedSpaceId = e.spaceId
                 let folder = TabFolder(
                     id: e.id,
                     name: e.name,
                     spaceId: resolvedSpaceId,
                     icon: e.icon,
                     color: NSColor(hex: e.color) ?? .controlAccentColor,
+                    index: e.index,
                     isRegular: e.isRegular
                 )
                 folder.isOpen = e.isOpen
                 var folders = foldersBySpace[resolvedSpaceId] ?? []
                 folders.append(folder)
                 setFolders(folders, for: resolvedSpaceId)
+            }
+
+            // Repair orphan folder references left by older transfer code. Keep the tab
+            // in its existing container and expose it as a loose tab instead of hiding it.
+            for tab in allTabsAllSpaces() {
+                if let fid = tab.folderId {
+                    let folder = tab.spaceId.flatMap { foldersBySpace[$0]?.first { $0.id == fid } }
+                    if folder == nil || tab.isPinned || folder?.isRegular != !tab.isSpacePinned {
+                        tab.folderId = nil
+                    }
+                }
+            }
+            for space in spaces {
+                space.activeTabId = validActiveTabID(space.activeTabId, in: space)
             }
 
             // Attach browser manager
@@ -2286,7 +1951,7 @@ class TabManager: ObservableObject {
 
             let spacePinnedForSelection = currentSpace.flatMap { spacePinnedTabs(for: $0.id) } ?? []
             let allForSelection =
-                self.pinnedTabs
+                self.essentialTabs(for: currentSpace?.profileId)
                 + spacePinnedForSelection
                 + (currentSpace.flatMap { tabsBySpace[$0.id] } ?? [])
             if let id = state?.currentTabID,
@@ -2308,16 +1973,21 @@ class TabManager: ObservableObject {
             if let bm = self.browserManager, let space = self.currentSpace {
                 bm.refreshGradientsForSpace(space, animate: false)
             }
-            // If we assigned default profile to legacy pinned tabs or deduplicated spaces, persist to capture migrations
-            if __didAssignDefaultProfile || !duplicateToKept.isEmpty { persistSnapshot() }
+            // Capture legacy profile assignments.
+            if __didAssignDefaultProfile { persistSnapshot() }
             
             // Notify that initial data load is complete so window states can be updated
             NotificationCenter.default.post(name: .tabManagerDidLoadInitialData, object: nil)
         } catch {
-            Self.log.error("[loadFromStore] SwiftData load error: \(String(describing: error), privacy: .public)")
+            // A partial load would make the next full snapshot delete everything not loaded.
+            // Keep the store untouched for this session.
+            persistenceDisabled = true
+            Self.log.fault("[loadFromStore] SwiftData load error; persistence disabled for this session: \(String(describing: error), privacy: .public)")
         }
     }
 
+    // Set when the store failed to load or the final quit snapshot was written.
+    private var persistenceDisabled = false
     private var snapshotGeneration: Int = 0
     private var persistDebounceTask: Task<Void, Never>?
 
@@ -2337,21 +2007,50 @@ class TabManager: ObservableObject {
         }
     }
 
-    // Returns true if atomic path succeeded; false if fallback was used or stale
-    public nonisolated func persistSnapshotAwaitingResult() async -> Bool {
+    /// Termination only: writes the final snapshot before the process exits and then stops
+    /// further writes, so teardown work cannot save a half-closed state. The persistence actor
+    /// never hops to the main actor, so blocking the main thread here cannot deadlock.
+    func persistFinalSnapshotBlocking(timeout: TimeInterval = 5) {
+        persistDebounceTask?.cancel()
+        guard !persistenceDisabled else { return }
+        persistenceDisabled = true
+        snapshotGeneration &+= 1
+        let generation = snapshotGeneration
+        let snapshot = _buildSnapshot()
+        let persistence = self.persistence
+        let done = DispatchSemaphore(value: 0)
+        Task.detached {
+            let result = await persistence.persist(snapshot: snapshot, generation: generation)
+            Self.log.notice("[terminate] Final tab snapshot: \(String(describing: result), privacy: .public)")
+            done.signal()
+        }
+        if done.wait(timeout: .now() + timeout) == .timedOut {
+            Self.log.fault("[terminate] Final tab snapshot did not finish within \(timeout)s")
+        }
+    }
+
+    // Reports whether the snapshot committed, retried, was superseded, or failed.
+    public nonisolated func persistSnapshotAwaitingResult() async -> PersistenceActor.SaveResult {
         // Build snapshot and capture a generation on MainActor
         let payload: (PersistenceActor.Snapshot, Int)? = await MainActor.run { [weak self] in
-            guard let strong = self else { return nil }
+            guard let strong = self, !strong.persistenceDisabled else { return nil }
             strong.snapshotGeneration &+= 1
             let gen = strong.snapshotGeneration
             let snap = strong._buildSnapshot()
             return (snap, gen)
         }
         guard let (snapshot, generation) = payload else {
-            // In case self was deallocated while switching actors
-            return false
+            // Deallocated while switching actors, or the store failed to load
+            return .failed(.invalidModelState)
         }
         return await persistence.persist(snapshot: snapshot, generation: generation)
+    }
+
+    private func validActiveTabID(_ id: UUID?, in space: Space) -> UUID? {
+        guard let id else { return nil }
+        let localTabs = (tabsBySpace[space.id] ?? []) + (spacePinnedTabs[space.id] ?? [])
+        let essentials = essentialTabs(for: space.profileId)
+        return (localTabs + essentials).contains { $0.id == id } ? id : nil
     }
 
     // Build a persistence snapshot from the current in-memory state (MainActor)
@@ -2373,10 +2072,26 @@ class TabManager: ObservableObject {
                 icon: sp.icon,
                 index: sIndex,
                 gradientData: sp.gradient.encoded,
-                activeTabId: sp.activeTabId,
+                activeTabId: validActiveTabID(sp.activeTabId, in: sp),
                 profileId: sp.profileId
             )
             spaceSnapshots.append(ss)
+        }
+
+        // A tab whose folder is gone, in another space, or of the other type would be hidden
+        // from every sidebar list and reject the whole snapshot. Repair it to a loose tab.
+        var folderTypes: [UUID: (spaceId: UUID, isRegular: Bool)] = [:]
+        for (spaceId, folders) in foldersBySpace {
+            for folder in folders { folderTypes[folder.id] = (spaceId, folder.isRegular) }
+        }
+        func repairedFolderId(_ tab: Tab, spaceId: UUID?, isRegular: Bool) -> UUID? {
+            guard let fid = tab.folderId else { return nil }
+            if let spaceId, let folder = folderTypes[fid], folder.spaceId == spaceId, folder.isRegular == isRegular {
+                return fid
+            }
+            Self.log.error("[snapshot] Cleared invalid folder reference on tab \(tab.id.uuidString, privacy: .public)")
+            tab.folderId = nil
+            return nil
         }
 
         // Tabs: global pinned, space pinned, and regular, with indices normalized per container
@@ -2396,7 +2111,7 @@ class TabManager: ObservableObject {
                     isPinned: true,
                     isSpacePinned: false,
                     profileId: pid,
-                    folderId: t.folderId,
+                    folderId: repairedFolderId(t, spaceId: nil, isRegular: false),
                     displayNameOverride: t.displayNameOverride,
                     currentURLString: t.url.absoluteString,
                     canGoBack: t.canGoBack,
@@ -2420,7 +2135,7 @@ class TabManager: ObservableObject {
                     isPinned: false,
                     isSpacePinned: true,
                     profileId: nil,
-                    folderId: t.folderId,
+                    folderId: repairedFolderId(t, spaceId: sp.id, isRegular: false),
                     displayNameOverride: t.displayNameOverride,
                     currentURLString: t.url.absoluteString,
                     canGoBack: t.canGoBack,
@@ -2441,7 +2156,7 @@ class TabManager: ObservableObject {
                     isPinned: false,
                     isSpacePinned: false,
                     profileId: nil,
-                    folderId: t.folderId,
+                    folderId: repairedFolderId(t, spaceId: sp.id, isRegular: true),
                     displayNameOverride: t.displayNameOverride,
                     currentURLString: t.url.absoluteString,
                     canGoBack: t.canGoBack,
@@ -2470,9 +2185,12 @@ class TabManager: ObservableObject {
             }
         }
 
+        let selectedSpace = currentSpace.flatMap { space in
+            persistableSpaceIds.contains(space.id) ? space : nil
+        }
         let state = PersistenceActor.SnapshotState(
-            currentTabID: currentTab?.id,
-            currentSpaceID: currentSpace?.id
+            currentTabID: selectedSpace.flatMap { validActiveTabID(currentTab?.id, in: $0) },
+            currentSpaceID: selectedSpace?.id
         )
 
         return PersistenceActor.Snapshot(spaces: spaceSnapshots, tabs: tabSnapshots, folders: folderSnapshots, state: state)
@@ -2491,7 +2209,10 @@ extension TabManager {
         // Assign any pinned tabs that were loaded without a profile once currentProfile is known
         if browserManager?.currentProfile?.id != nil, !pendingPinnedWithoutProfile.isEmpty {
             // Set browserManager on those tabs
-            for t in pendingPinnedWithoutProfile { t.browserManager = bm }
+            for t in pendingPinnedWithoutProfile {
+                t.browserManager = bm
+                t.profileId = bm.currentProfile?.id
+            }
             withCurrentProfilePinnedArray { arr in
                 arr.append(contentsOf: pendingPinnedWithoutProfile)
             }
@@ -2531,11 +2252,17 @@ extension TabManager {
 extension TabManager {
     /// Reassigns spaces from a deleted profile to a fallback profile and cleans up state.
     func cleanupProfileReferences(_ deletedProfileId: UUID) {
-        guard let fallback = browserManager?.profileManager.profiles.first else { return }
+        // Called before the profile is removed, so it may still be first in the list.
+        guard let fallback = browserManager?.profileManager.profiles.first(where: { $0.id != deletedProfileId }) else { return }
         var didChange = false
         for i in spaces.indices where spaces[i].profileId == deletedProfileId {
             spaces[i].profileId = fallback.id
             if currentSpace?.id == spaces[i].id { currentSpace?.profileId = fallback.id }
+            didChange = true
+        }
+        // Favorites are unlinked like spaces: move them to the fallback profile, never orphan them.
+        for tab in essentialTabs(for: deletedProfileId) {
+            transferTab(tab, to: .essentials(fallback.id))
             didChange = true
         }
         if didChange { persistSnapshot() }
@@ -2687,6 +2414,9 @@ extension TabManager {
         tabCopy.isPinned = tab.isPinned
         tabCopy.isSpacePinned = tab.isSpacePinned
         tabCopy.folderId = tab.folderId
+        tabCopy.profileId = tab.profileId
+        tabCopy.pinnedURL = tab.pinnedURL
+        tabCopy.displayNameOverride = tab.displayNameOverride
 
         // Store snapshot with navigation state for accurate restoration
         recentlyClosedTabs.append((
@@ -2741,6 +2471,9 @@ extension TabManager {
             tabCopy.isPinned = tab.isPinned
             tabCopy.isSpacePinned = tab.isSpacePinned
             tabCopy.folderId = tab.folderId
+            tabCopy.profileId = tab.profileId
+            tabCopy.pinnedURL = tab.pinnedURL
+            tabCopy.displayNameOverride = tab.displayNameOverride
 
             // Store snapshot with navigation state for accurate restoration
             recentlyClosedTabs.append((
@@ -2775,14 +2508,10 @@ extension TabManager {
 
         let mostRecent = recentlyClosedTabs.removeLast()
 
-        // Apply navigation state BEFORE addTab to ensure it's available when webView is created
-        mostRecent.tab.restoredCanGoBack = mostRecent.canGoBack
-        mostRecent.tab.restoredCanGoForward = mostRecent.canGoForward
-
+        // The copy is a fresh web view with no history; don't restore Back/Forward state it can't honor.
         // Restore the tab with its navigation state from when it was closed
-        addTab(mostRecent.tab)
-
-        setActiveTab(mostRecent.tab)
+        restoreClosedTab(mostRecent.tab)
+        selectRestoredTab(mostRecent.tab)
 
         // Clear the timer if no more tabs to undo
         if recentlyClosedTabs.isEmpty {
@@ -2799,21 +2528,49 @@ extension TabManager {
             let tabInfo = recentlyClosedTabs.removeLast()
             restoredTabs.append(tabInfo.tab)
 
-            // Apply navigation state to match what the user saw when tab was closed
-            tabInfo.tab.restoredCanGoBack = tabInfo.canGoBack
-            tabInfo.tab.restoredCanGoForward = tabInfo.canGoForward
-
-            addTab(tabInfo.tab)
+            restoreClosedTab(tabInfo.tab)
         }
 
         // Set the most recently restored tab as active
         if let lastTab = restoredTabs.last {
-            setActiveTab(lastTab)
+            selectRestoredTab(lastTab)
         }
 
         // Clear the timer if no more tabs to undo
         if recentlyClosedTabs.isEmpty {
             clearUndoTimer()
+        }
+    }
+
+    /// Puts an undo copy back through the normal transfer rules. Its space or folder may have
+    /// been deleted since it closed; it then lands as a loose tab in the current space.
+    private func restoreClosedTab(_ tab: Tab) {
+        let wasEssential = tab.isPinned
+        let wasSpacePinned = tab.isSpacePinned
+        let folderId = tab.folderId
+        let profileId = tab.profileId
+        let formerIndex = tab.index
+        tab.isPinned = false
+        tab.isSpacePinned = false
+        tab.folderId = nil
+        tab.profileId = nil
+        addTab(tab)
+        guard contains(tab), let spaceId = tab.spaceId else { return }
+
+        // Final placement always goes through transferTab, which renumbers the bucket.
+        if wasEssential, let pid = profileId ?? browserManager?.currentProfile?.id,
+           transferTab(tab, to: .essentials(pid), index: formerIndex) {
+            return
+        }
+        if let folderId, transferTab(tab, to: .folder(folderId), index: formerIndex) { return }
+        transferTab(tab, to: .space(spaceId, pinned: wasSpacePinned), index: formerIndex)
+    }
+
+    private func selectRestoredTab(_ tab: Tab) {
+        if let browserManager, browserManager.windowRegistry?.activeWindow != nil {
+            browserManager.selectTab(tab)
+        } else {
+            setActiveTab(tab)
         }
     }
 
@@ -2867,19 +2624,25 @@ extension TabManager {
 
     // MARK: - Bulk Tab Operations
 
+    /// Regular tabs shown in the same sidebar group as `tab`: its folder, or the loose tabs.
+    private func regularGroupTabs(of tab: Tab) -> [Tab] {
+        guard let spaceId = tab.spaceId else { return [] }
+        return (tabsBySpace[spaceId] ?? []).filter { $0.folderId == tab.folderId }.sorted { $0.index < $1.index }
+    }
+
     func closeOtherTabs(_ tab: Tab) {
         guard let spaceId = tab.spaceId else { return }
-        guard let tabs = tabsBySpace[spaceId] else { return }
+        let group = regularGroupTabs(of: tab)
+        guard group.contains(where: { $0.id == tab.id }) else { return }
 
-        // Get all regular tabs in this space except the given tab
-        let otherTabs = tabs.filter { $0.id != tab.id }
+        let otherTabs = group.filter { $0.id != tab.id }
 
         if otherTabs.isEmpty { return }
 
         let tabsToTrack = otherTabs.map { (tab: $0, spaceId: spaceId) }
 
         for tabToClose in otherTabs {
-            closeTabWithoutTracking(tabToClose.id)
+            removeTab(tabToClose.id, track: false)
         }
 
         trackRecentlyClosedTabs(tabsToTrack, count: otherTabs.count)
@@ -2887,13 +2650,11 @@ extension TabManager {
 
     func closeAllTabsBelow(_ tab: Tab) {
         guard let spaceId = tab.spaceId else { return }
-        guard let tabs = tabsBySpace[spaceId] else { return }
+        let group = regularGroupTabs(of: tab)
+        guard group.contains(where: { $0.id == tab.id }) else { return }
 
-        // Find the current tab's index
-        guard tabs.firstIndex(where: { $0.id == tab.id }) != nil else { return }
-
-        // Get all tabs below the current tab (higher index values)
-        let tabsBelow = tabs.filter { $0.index > tab.index }
+        // Tabs below within the same visible group
+        let tabsBelow = group.filter { $0.index > tab.index }
 
         // Return early if no tabs below
         if tabsBelow.isEmpty { return }
@@ -2904,77 +2665,10 @@ extension TabManager {
         // Close all tabs below
         for tabToClose in tabsBelow {
             // Close the tab without tracking (we'll do bulk tracking)
-            closeTabWithoutTracking(tabToClose.id)
+            removeTab(tabToClose.id, track: false)
         }
 
         // Track all closed tabs for undo and show toast
         trackRecentlyClosedTabs(tabsToTrack, count: tabsBelow.count)
-    }
-
-    private func closeTabWithoutTracking(_ id: UUID) {
-        // This is a copy of removeTab but without the tracking call
-        let wasCurrent = (currentTab?.id == id)
-        var removed: Tab?
-        var removedIndexInCurrentSpace: Int?
-
-        for space in spaces {
-            // Check space-pinned tabs first
-            if var spacePinned = spacePinnedTabs[space.id],
-                let i = spacePinned.firstIndex(where: { $0.id == id })
-            {
-                if i < spacePinned.count { removed = spacePinned.remove(at: i) }
-                removedIndexInCurrentSpace =
-                    (space.id == currentSpace?.id) ? i : nil
-                setSpacePinnedTabs(spacePinned, for: space.id)
-                break
-            }
-            // Then check regular tabs
-            if var arr = tabsBySpace[space.id],
-                let i = arr.firstIndex(where: { $0.id == id })
-            {
-                if i < arr.count { removed = arr.remove(at: i) }
-                removedIndexInCurrentSpace =
-                    (space.id == currentSpace?.id) ? i : nil
-                setTabs(arr, for: space.id)
-                break
-            }
-        }
-        if removed == nil {
-            outer: for (pid, arr) in pinnedByProfile {
-                if let i = arr.firstIndex(where: { $0.id == id }) {
-                    var copy = arr
-                    if i < copy.count { removed = copy.remove(at: i) }
-                    setPinnedTabs(copy, for: pid)
-                    break outer
-                }
-            }
-        }
-
-        guard let tab = removed else { return }
-
-        // Force unload the tab from compositor before removing
-        browserManager?.compositorManager.unloadTab(tab)
-        browserManager?.webViewCoordinator?.removeAllWebViews(for: tab)
-
-        ExtensionManager.shared.notifyTabClosed(tab)
-
-        if wasCurrent {
-            if tab.spaceId == nil {
-                // Tab was global pinned
-                let tabs = essentialTabs(for: browserManager?.currentProfile?.id)
-                if !tabs.isEmpty {
-                    setActiveTab(tabs[0])
-                }
-            } else {
-                // Tab was in a space
-                if let spaceTabs = tabsBySpace[tab.spaceId!], !spaceTabs.isEmpty {
-                    // Try to select the tab at the same index, or the one before
-                    let targetIndex = min(removedIndexInCurrentSpace ?? 0, spaceTabs.count - 1)
-                    setActiveTab(spaceTabs[targetIndex])
-                }
-            }
-        }
-
-        debouncedPersistSnapshot()
     }
 }

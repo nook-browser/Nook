@@ -300,13 +300,17 @@ public class DownloadManager: NSObject {
     }
 
     func removeDownload(_ id: UUID) {
+        if let download = downloads[id], download.state == .pending || download.state == .downloading {
+            cancelDownload(id)
+        }
+        downloadDelegates[id]?.stopProgressObservation()
         downloads.removeValue(forKey: id)
         downloadDelegates.removeValue(forKey: id)
     }
 
     func cancelDownload(_ id: UUID) {
         guard let download = downloads[id] else { return }
-        download.state = .cancelled
+        updateDownloadState(id, state: .cancelled)
         download.download.cancel()
         #if DEBUG
         print("Cancelled download: \(download.suggestedFilename)")
@@ -335,8 +339,7 @@ public class DownloadManager: NSObject {
     }
 
     func clearAllDownloads() {
-        downloads.removeAll()
-        downloadDelegates.removeAll()
+        for id in Array(downloads.keys) { removeDownload(id) }
     }
 
     // MARK: - Download Updates
@@ -353,16 +356,20 @@ public class DownloadManager: NSObject {
         print("Updating download progress: \(progress * 100)% for \(download.suggestedFilename)")
         #endif
 
+        guard download.state == .pending || download.state == .downloading else { return }
+
         download.progress = progress
         download.downloadedBytes = downloadedBytes
         download.fileSize = fileSize
 
         // Calculate estimated time remaining
-        if let fileSize = fileSize, downloadedBytes > 0 {
+        if let fileSize = fileSize, fileSize > 0, downloadedBytes > 0 {
             let elapsed = Date().timeIntervalSince(download.startDate)
-            let bytesPerSecond = Double(downloadedBytes) / elapsed
-            let remainingBytes = fileSize - downloadedBytes
+            let bytesPerSecond = Double(downloadedBytes) / max(elapsed, 0.001)
+            let remainingBytes = max(0, fileSize - downloadedBytes)
             download.estimatedTimeRemaining = Double(remainingBytes) / bytesPerSecond
+        } else {
+            download.estimatedTimeRemaining = nil
         }
     }
 
@@ -378,8 +385,19 @@ public class DownloadManager: NSObject {
         print("Updating download state to \(state.description) for \(download.suggestedFilename)")
         #endif
 
+        guard download.state == .pending || download.state == .downloading else { return }
         download.state = state
         download.error = error
+        if state == .completed || state == .failed || state == .cancelled {
+            downloadDelegates[id]?.stopProgressObservation()
+            download.download.delegate = nil
+            downloadDelegates.removeValue(forKey: id)
+        }
+        if state == .completed {
+            download.progress = 1
+            download.downloadedBytes = max(download.downloadedBytes, download.download.progress.completedUnitCount)
+            download.estimatedTimeRemaining = 0
+        }
 
         #if DEBUG
         if state == .completed {
@@ -398,9 +416,11 @@ public class DownloadManager: NSObject {
 
 // MARK: - Download Delegate
 
+@MainActor
 private class DownloadDelegate: NSObject, WKDownloadDelegate {
     weak var downloadManager: DownloadManager?
     let download: Download
+    private var progressObservations: [NSKeyValueObservation] = []
 
     init(downloadManager: DownloadManager, download: Download) {
         self.downloadManager = downloadManager
@@ -502,6 +522,10 @@ private class DownloadDelegate: NSObject, WKDownloadDelegate {
 
         DispatchQueue.main.async {
             savePanel.begin { result in
+                guard self.download.state == .pending else {
+                    completion(.cancel)
+                    return
+                }
                 if result == .OK, let url = savePanel.url {
                     self.configureDownload(for: url, response: response)
                     completion(.proceed(url))
@@ -521,108 +545,49 @@ private class DownloadDelegate: NSObject, WKDownloadDelegate {
         #if DEBUG
         print("Download destination set: \(destination.path) with fileSize: \(fileSize) bytes")
         #endif
-        downloadManager?.updateDownloadProgress(download.id, progress: 0.0, downloadedBytes: 0, fileSize: fileSize)
+        downloadManager?.updateDownloadProgress(download.id, progress: 0.0, downloadedBytes: 0, fileSize: fileSize > 0 ? fileSize : nil)
         downloadManager?.updateDownloadState(download.id, state: .downloading)
         downloadManager?.setDownloadDestination(download.id, destination: destination)
 
-        startFileSizeMonitoring()
+        startProgressObservation()
     }
 
-    private func startProgressSimulation() {
-        DispatchQueue.global(qos: .background).async {
-            var progress = 0.0
-            let totalSteps = 20
-            let stepDuration = 0.5
-
-            for step in 1 ... totalSteps {
-                progress = Double(step) / Double(totalSteps)
-
-                DispatchQueue.main.async {
-                    self.downloadManager?.updateDownloadProgress(
-                        self.download.id,
-                        progress: progress,
-                        downloadedBytes: Int64(Double(self.download.fileSize ?? 0) * progress),
-                        fileSize: self.download.fileSize
-                    )
-                }
-
-                Thread.sleep(forTimeInterval: stepDuration)
-            }
-        }
+    private func startProgressObservation() {
+        stopProgressObservation()
+        let progress = download.download.progress
+        // Progress is KVO-compliant; WebKit supplies byte counts without disk polling.
+        progressObservations = [
+            progress.observe(\.completedUnitCount, options: [.initial, .new]) { [weak self] _, _ in
+                Task { @MainActor [weak self] in self?.publishProgress() }
+            },
+            progress.observe(\.totalUnitCount, options: [.new]) { [weak self] _, _ in
+                Task { @MainActor [weak self] in self?.publishProgress() }
+            },
+        ]
     }
 
-    private func startFileSizeMonitoring() {
-        guard let destinationURL = download.destinationURL else { return }
-
-        DispatchQueue.global(qos: .background).async {
-            var lastSize: Int64 = 0
-
-            while true {
-                do {
-                    let attributes = try FileManager.default.attributesOfItem(atPath: destinationURL.path)
-                    if let fileSize = attributes[.size] as? Int64 {
-                        if fileSize > lastSize {
-                            lastSize = fileSize
-
-                            let expectedSize = self.download.fileSize ?? 0
-                            let progress = expectedSize > 0 ? Double(fileSize) / Double(expectedSize) : 0.0
-                            let clampedProgress = min(progress, 1.0)
-
-                            DispatchQueue.main.async {
-                                self.downloadManager?.updateDownloadProgress(
-                                    self.download.id,
-                                    progress: clampedProgress,
-                                    downloadedBytes: fileSize,
-                                    fileSize: expectedSize
-                                )
-                            }
-
-                            #if DEBUG
-                            print("File size monitoring: \(clampedProgress * 100)% (\(fileSize) / \(expectedSize))")
-                            #endif
-                        }
-                    }
-                } catch {
-                    #if DEBUG
-                    print("Error monitoring file size: \(error)")
-                    #endif
-                }
-
-                Thread.sleep(forTimeInterval: 0.5)
-
-                if self.download.state == .completed || self.download.state == .failed {
-                    break
-                }
-            }
-        }
+    func stopProgressObservation() {
+        progressObservations.forEach { $0.invalidate() }
+        progressObservations.removeAll()
     }
 
-    func download(_: WKDownload, didReceive response: URLResponse) {
-        let fileSize = response.expectedContentLength
-        #if DEBUG
-        print("Download started with file size: \(fileSize) bytes")
-        #endif
-        downloadManager?.updateDownloadProgress(download.id, progress: 0.0, downloadedBytes: 0, fileSize: fileSize)
-        downloadManager?.updateDownloadState(download.id, state: .downloading)
-    }
-
-    func download(_: WKDownload, didReceive bytes: UInt64) {
-        let downloadedBytes = Int64(bytes)
-        let progress = download.fileSize.map { Double(downloadedBytes) / Double($0) } ?? 0.0
-
-        let clampedProgress = min(progress, 1.0)
-
-        downloadManager?.updateDownloadProgress(download.id, progress: clampedProgress, downloadedBytes: downloadedBytes, fileSize: download.fileSize)
-
-        #if DEBUG
-        print("Download progress: \(clampedProgress * 100)% (\(downloadedBytes) / \(download.fileSize ?? 0))")
-        #endif
+    private func publishProgress() {
+        guard download.state == .downloading else { return }
+        let progress = download.download.progress
+        let completed = max(0, progress.completedUnitCount)
+        let total = progress.totalUnitCount > 0 ? progress.totalUnitCount : download.fileSize
+        let fraction = total.flatMap { $0 > 0 ? min(1, Double(completed) / Double($0)) : nil } ?? 0
+        downloadManager?.updateDownloadProgress(
+            download.id, progress: fraction, downloadedBytes: completed, fileSize: total
+        )
     }
 
     func downloadDidFinish(_: WKDownload) {
         #if DEBUG
         print("Download finished: \(download.suggestedFilename)")
         #endif
+
+        publishProgress()
 
         // Set quarantine attribute so Gatekeeper warns about downloaded executables
         if let destinationURL = download.destinationURL {
