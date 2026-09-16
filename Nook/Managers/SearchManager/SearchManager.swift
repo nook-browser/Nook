@@ -92,7 +92,7 @@ class SearchManager {
         // list updates in place instead of collapsing and re-expanding on every keystroke.
         let carriedWeb = suggestions.filter { if case .search = $0.type { true } else { false } }
         let carriedHistory = suggestions.filter { if case .history = $0.type { true } else { false } }
-        updateSuggestionsIfNeeded(Array((urlRows + carriedWeb + carriedHistory + tabs).prefix(5)))
+        updateSuggestionsIfNeeded(Array((urlRows + tabs + carriedHistory + carriedWeb).prefix(5)))
         isLoading = true
         searchTask = Task { [weak self] in
             do { try await Task.sleep(for: .milliseconds(125)) } catch { return }
@@ -101,11 +101,11 @@ class SearchManager {
             let history = Array(await self.searchHistory(for: query).prefix(2))
             guard !Task.isCancelled, self.searchGeneration == generation,
                   self.window?.spaceID == space else { return }
-            self.updateSuggestionsIfNeeded(Array((urlRows + carriedWeb + history + tabs).prefix(5)))
+            self.updateSuggestionsIfNeeded(Array((urlRows + tabs + history + carriedWeb).prefix(5)))
             let webSuggestions = await web
             guard !Task.isCancelled, self.searchGeneration == generation,
                   self.window?.spaceID == space else { return }
-            self.updateSuggestionsIfNeeded(Array((urlRows + webSuggestions + history + tabs).prefix(5)))
+            self.updateSuggestionsIfNeeded(Array((urlRows + tabs + history + webSuggestions).prefix(5)))
             self.isLoading = false
         }
     }
