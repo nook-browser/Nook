@@ -14,9 +14,13 @@ struct SettingsSocialMediaTab: View {
         @Bindable var settings = nookSettings
         Form {
             Section {
-                Toggle("Download button", isOn: $settings.socialImageDownload)
+                Toggle("Instagram", isOn: $settings.instagramDownload)
+                Toggle("Facebook", isOn: $settings.facebookDownload)
+                Toggle("VSCO", isOn: $settings.vscoDownload)
+            } header: {
+                Text("Download Button")
             } footer: {
-                Text("Shows a download button on photos and videos on Instagram, Facebook, and VSCO, and saves the largest size the page offers to Downloads. Applies when one of these pages next loads.")
+                Text("Shows a download button on photos and videos, and saves the largest size the page offers to Downloads.")
             }
 
             Section {
@@ -25,7 +29,7 @@ struct SettingsSocialMediaTab: View {
             } header: {
                 Text("Facebook")
             } footer: {
-                Text("Hide Reels removes the Reels carousel from the news feed. Hide suggested posts removes posts from groups, pages, and people you don't follow, and People You May Know. Friends, followed pages, and your groups stay. Applies when Facebook next loads.")
+                Text("Hide Reels removes the Reels carousel from the news feed. Hide suggested posts removes posts from groups, pages, and people you don't follow, and People You May Know. Friends, followed pages, and your groups stay.")
             }
         }
         .formStyle(.grouped)

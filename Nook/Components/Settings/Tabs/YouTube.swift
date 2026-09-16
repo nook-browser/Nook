@@ -25,7 +25,7 @@ struct SettingsYouTubeTab: View {
             } header: {
                 Text("Layout")
             } footer: {
-                Text("Videos per row applies to Home, Subscriptions, and channel pages. Frame thumbnails show a still from the video instead of the uploader's thumbnail. Changes apply when a YouTube page next loads.")
+                Text("Videos per row applies to Home, Subscriptions, and channel pages. Frame thumbnails show a still from the video instead of the uploader's thumbnail.")
             }
 
             Section("Hide") {

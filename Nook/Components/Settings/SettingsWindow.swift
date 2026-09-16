@@ -16,12 +16,15 @@ struct SettingsWindow: View {
 
     var body: some View {
         @Bindable var settings = nookSettings
-        NavigationSplitView {
+        // Like System Settings: the sidebar always shows, and the selected page names the window.
+        NavigationSplitView(columnVisibility: .constant(.all)) {
             SettingsSidebar(selection: $settings.currentSettingsTab)
+                .toolbar(removing: .sidebarToggle)
         } detail: {
             SettingsDetailPane(tab: nookSettings.currentSettingsTab)
                 .environmentObject(browserManager)
                 .environmentObject(gradientColorManager)
+                .navigationTitle(nookSettings.currentSettingsTab.name)
         }
         .frame(width: windowSize.width, height: windowSize.height)
         .navigationSplitViewStyle(.balanced)

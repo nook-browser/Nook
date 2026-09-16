@@ -11,50 +11,72 @@ import WebKit
 
 private let socialLog = Logger(subsystem: "com.baingurley.nook", category: "SocialImageTweaks")
 
-/// Download button over photos and videos on Instagram, Facebook, and VSCO. The isolated script picks the
-/// largest srcset candidate, or asks a page-world script for the MP4 in React's data; the app saves it
-/// through the same WKDownload path as the image context menu.
+/// Download button over photos and videos on Instagram, Facebook, and VSCO, each with its own setting. The
+/// isolated script picks the largest srcset candidate, or asks a page-world script for the MP4 in React's
+/// data; the app saves it through the same WKDownload path as the image context menu.
 @MainActor
 enum SocialImageTweaks {
     private static let marker = "// Nook Social Image Download"
+    private static let pageMarker = "// Nook Social Video Source"
     private static let world = WKContentWorld.world(name: "NookSocialImageTweaks")
     private static let handlerName = "nookSocialImageDownload"
-    private static let siteDomains = ["instagram.com", "facebook.com", "vsco.co"]
     private static let imageDomains = ["cdninstagram.com", "fbcdn.net", "vsco.co"]
 
-    private static let script = bundled("social-image-download")
+    private static let script = source("social-image-download")
     /// Page world: reads video URLs from React props, which the isolated world cannot see.
-    private static let pageScript = bundled("social-video-source")
+    private static let pageScript = source("social-video-source")
 
-    private static func bundled(_ name: String) -> String? {
+    private static func source(_ name: String) -> String? {
         guard let url = Bundle.main.url(forResource: name, withExtension: "js"),
               let source = try? String(contentsOf: url, encoding: .utf8)
         else {
             socialLog.warning("Failed to load \(name, privacy: .public).js from bundle")
             return nil
         }
-        return "\(marker)\n\(source)"
+        return source
     }
 
-    /// Main-frame navigation hook, next to YouTubeTweaks. The script checks the hostname itself, so once
-    /// installed it stays for the tab's life: leaving and returning to these sites rebuilds nothing.
+    private static func enabledDomains(_ settings: NookSettingsService) -> [String] {
+        var domains: [String] = []
+        if settings.instagramDownload { domains.append("instagram.com") }
+        if settings.facebookDownload { domains.append("facebook.com") }
+        if settings.vscoDownload { domains.append("vsco.co") }
+        return domains
+    }
+
+    /// Main-frame navigation hook, next to YouTubeTweaks. Installed on the first visit to an enabled site and
+    /// rebuilt only when the enabled sites change; the scripts check the hostname themselves.
     static func apply(for url: URL, in webView: WKWebView, settings: NookSettingsService) {
+        let domains = enabledDomains(settings)
         let ucc = webView.configuration.userContentController
         // Read everything from the lazily bridged array before removeAllUserScripts (Release-only trap).
         let all = ucc.userScripts
-        let installed = all.contains { $0.source.hasPrefix(marker) }
+        let current = all.first { $0.source.hasPrefix(marker) }?.source
+        guard current != nil || matches(url.host, domains) else { return }
 
-        if settings.socialImageDownload {
-            guard !installed, let script, let pageScript, matches(url.host, siteDomains) else { return }
-            ucc.add(Handler.shared, contentWorld: world, name: handlerName)
-            ucc.addUserScript(WKUserScript(source: pageScript, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .page))
-            ucc.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: world))
-        } else if installed {
-            let others = all.filter { !$0.source.hasPrefix(marker) }
-            ucc.removeAllUserScripts()
-            others.forEach { ucc.addUserScript($0) }
-            ucc.removeScriptMessageHandler(forName: handlerName, contentWorld: world)
+        var wanted: String?
+        if let script, !domains.isEmpty {
+            let pattern = "(^|\\.)(" + domains.map { $0.replacingOccurrences(of: ".", with: "\\.") }.joined(separator: "|") + ")$"
+            wanted = "\(marker)\nconst NOOK_DOWNLOAD_SITES = \(jsString(pattern));\n\(script)"
         }
+        guard wanted != current else { return }
+
+        let others = all.filter { !$0.source.hasPrefix(marker) && !$0.source.hasPrefix(pageMarker) }
+        ucc.removeAllUserScripts()
+        others.forEach { ucc.addUserScript($0) }
+        ucc.removeScriptMessageHandler(forName: handlerName, contentWorld: world)
+        guard let wanted else { return }
+        ucc.add(Handler.shared, contentWorld: world, name: handlerName)
+        if let pageScript, domains.contains(where: { $0 != "vsco.co" }) {
+            ucc.addUserScript(WKUserScript(source: "\(pageMarker)\n\(pageScript)", injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .page))
+        }
+        ucc.addUserScript(WKUserScript(source: wanted, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: world))
+    }
+
+    private static func jsString(_ value: String) -> String {
+        guard let data = try? JSONSerialization.data(withJSONObject: [value]),
+              let json = String(data: data, encoding: .utf8) else { return "\"\"" }
+        return String(json.dropFirst().dropLast())
     }
 
     private static func matches(_ host: String?, _ domains: [String]) -> Bool {

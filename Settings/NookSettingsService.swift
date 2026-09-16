@@ -57,7 +57,10 @@ class NookSettingsService {
     private let youTubeVideosPerRowKey = "settings.youTubeVideosPerRow"
     private let youTubeFrameThumbnailsKey = "settings.youTubeFrameThumbnails"
     private let youTubeNoHoverPreviewKey = "settings.youTubeNoHoverPreview"
-    private let socialImageDownloadKey = "settings.socialImageDownload"
+    private let legacySocialImageDownloadKey = "settings.socialImageDownload"
+    private let instagramDownloadKey = "settings.instagramDownload"
+    private let facebookDownloadKey = "settings.facebookDownload"
+    private let vscoDownloadKey = "settings.vscoDownload"
     private let facebookHideReelsKey = "settings.facebookHideReels"
     private let facebookHideSuggestedKey = "settings.facebookHideSuggested"
 
@@ -349,9 +352,17 @@ class NookSettingsService {
         didSet { userDefaults.set(youTubeNoHoverPreview, forKey: youTubeNoHoverPreviewKey) }
     }
 
-    /// Download button over photos and videos on Instagram, Facebook, and VSCO.
-    var socialImageDownload: Bool {
-        didSet { userDefaults.set(socialImageDownload, forKey: socialImageDownloadKey) }
+    /// Download button over photos and videos, per site.
+    var instagramDownload: Bool {
+        didSet { userDefaults.set(instagramDownload, forKey: instagramDownloadKey) }
+    }
+
+    var facebookDownload: Bool {
+        didSet { userDefaults.set(facebookDownload, forKey: facebookDownloadKey) }
+    }
+
+    var vscoDownload: Bool {
+        didSet { userDefaults.set(vscoDownload, forKey: vscoDownloadKey) }
     }
 
     /// Remove the Reels carousel from Facebook's news feed.
@@ -494,7 +505,11 @@ class NookSettingsService {
         self.youTubeVideosPerRow = userDefaults.integer(forKey: youTubeVideosPerRowKey)
         self.youTubeFrameThumbnails = userDefaults.bool(forKey: youTubeFrameThumbnailsKey)
         self.youTubeNoHoverPreview = userDefaults.bool(forKey: youTubeNoHoverPreviewKey)
-        self.socialImageDownload = userDefaults.bool(forKey: socialImageDownloadKey)
+        // One setting covered all three sites until September 2026; it seeds the per-site ones.
+        let legacyDownload = userDefaults.bool(forKey: legacySocialImageDownloadKey)
+        self.instagramDownload = userDefaults.object(forKey: instagramDownloadKey) as? Bool ?? legacyDownload
+        self.facebookDownload = userDefaults.object(forKey: facebookDownloadKey) as? Bool ?? legacyDownload
+        self.vscoDownload = userDefaults.object(forKey: vscoDownloadKey) as? Bool ?? legacyDownload
         self.facebookHideReels = userDefaults.bool(forKey: facebookHideReelsKey)
         self.facebookHideSuggested = userDefaults.bool(forKey: facebookHideSuggestedKey)
 

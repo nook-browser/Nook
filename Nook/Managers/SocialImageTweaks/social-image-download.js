@@ -1,10 +1,10 @@
 // Runs at document start in the main frame, in its own content world.
-// Shows a download button over the photo or video under the pointer on Instagram, Facebook, and VSCO.
+// Shows a download button over the photo or video under the pointer on the sites in
+// NOOK_DOWNLOAD_SITES (a regex source set by SocialImageTweaks: Instagram, Facebook, VSCO).
 // Both sites obfuscate class names and cover media with transparent overlays, so media is
 // found by what is under the pointer and where it is served from, not by selector or event target.
 (function () {
-    const SITE = /(^|\.)(instagram\.com|facebook\.com|vsco\.co)$/;
-    if (!SITE.test(location.hostname)) return;
+    if (!new RegExp(NOOK_DOWNLOAD_SITES).test(location.hostname)) return;
 
     const CDN = /(^|\.)(cdninstagram\.com|fbcdn\.net|vsco\.co)$/;
     const MIN_SIZE = 120;       // skips avatars and icons
