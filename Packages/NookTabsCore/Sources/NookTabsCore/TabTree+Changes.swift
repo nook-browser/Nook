@@ -9,10 +9,6 @@ extension TabTree {
     @discardableResult
     public mutating func apply(_ change: Change) -> Change {
         var redo = Change()
-        for (id, value) in change.profiles {
-            redo.profiles[id] = .some(profiles[id])
-            profiles[id] = value
-        }
         for (id, value) in change.spaces {
             redo.spaces[id] = .some(spaces[id])
             spaces[id] = value
@@ -139,12 +135,11 @@ extension TabTree {
     // MARK: - Spaces
 
     @discardableResult
-    public mutating func createSpace(id: UUID = UUID(), profileID: UUID, name: String, icon: String, accentHex: String, after: UUID?, now: Date = Date()) throws -> Change {
-        guard profile(profileID) != nil else { throw TreeError.missingProfile }
+    public mutating func createSpace(id: UUID = UUID(), name: String, icon: String, accentHex: String, after: UUID?, now: Date = Date()) -> Change {
         var change = Change()
-        let siblings = orderedSpaces(in: profileID)
+        let siblings = orderedSpaces
         let order = key(after: after, among: siblings) ?? renumberSpaces(siblings, insertingAfter: after, change: &change, now: now)
-        record(&change, space: SpaceRecord(id: id, profileID: profileID, name: name, icon: icon, accentHex: accentHex, order: order, modifiedAt: now))
+        record(&change, space: SpaceRecord(id: id, name: name, icon: icon, accentHex: accentHex, order: order, modifiedAt: now))
         return change
     }
 
@@ -161,15 +156,13 @@ extension TabTree {
         return change
     }
 
-    /// Reorders a space within a profile, or moves it to another profile.
+    /// Reorders a space, placing it directly after `after` (nil = first).
     @discardableResult
-    public mutating func moveSpace(_ id: UUID, toProfile profileID: UUID, after: UUID?, now: Date = Date()) throws -> Change {
+    public mutating func moveSpace(_ id: UUID, after: UUID?, now: Date = Date()) throws -> Change {
         guard var target = space(id) else { throw TreeError.missingSpace }
-        guard profile(profileID) != nil else { throw TreeError.missingProfile }
         var change = Change()
-        let siblings = orderedSpaces(in: profileID).filter { $0.id != id }
+        let siblings = orderedSpaces.filter { $0.id != id }
         target.order = key(after: after, among: siblings) ?? renumberSpaces(siblings, insertingAfter: after, change: &change, now: now)
-        target.profileID = profileID
         target.modifiedAt = now
         record(&change, space: target)
         return change
@@ -181,7 +174,7 @@ extension TabTree {
         guard orderedSpaces.count > 1 else { throw TreeError.lastSpace }
         var change = Change()
         var closed: [ClosedEntry] = []
-        for section in [Parent.pinned(spaceID: id), .tabs(spaceID: id)] {
+        for section in [Parent.favorites(spaceID: id), .pinned(spaceID: id), .tabs(spaceID: id)] {
             for root in children(of: section) {
                 let result = try close(root.id, now: now)
                 change.merge(result.change)
@@ -194,55 +187,13 @@ extension TabTree {
         return (change, closed)
     }
 
-    // MARK: - Profiles
-
-    @discardableResult
-    public mutating func createProfile(id: UUID = UUID(), name: String, icon: String, now: Date = Date()) -> Change {
-        var change = Change()
-        let order = OrderKey.between(orderedProfiles.last?.order, nil) ?? OrderKey.sequence(count: orderedProfiles.count + 1).last!
-        record(&change, profile: ProfileRecord(id: id, name: name, icon: icon, order: order, modifiedAt: now))
-        return change
-    }
-
-    @discardableResult
-    public mutating func updateProfile(_ id: UUID, name: String? = nil, icon: String? = nil, now: Date = Date()) throws -> Change {
-        guard var target = profile(id) else { throw TreeError.missingProfile }
-        if let name { target.name = name }
-        if let icon { target.icon = icon }
-        guard target != profiles[id] else { return Change() }
-        target.modifiedAt = now
-        var change = Change()
-        record(&change, profile: target)
-        return change
-    }
-
-    /// Deletes a profile. Its spaces and favorites move to `heir` (appended at the end).
-    @discardableResult
-    public mutating func deleteProfile(_ id: UUID, heir: UUID, now: Date = Date()) throws -> Change {
-        guard var target = profile(id) else { throw TreeError.missingProfile }
-        guard heir != id, profile(heir) != nil else { throw TreeError.lastProfile }
-        var change = Change()
-        for space in orderedSpaces(in: id) {
-            let moved = try moveSpace(space.id, toProfile: heir, after: orderedSpaces(in: heir).last?.id, now: now)
-            change.merge(moved)
-        }
-        for favorite in favorites(of: id) {
-            let moved = try move(favorite.id, to: .favorites(profileID: heir), after: favorites(of: heir).last?.id, now: now)
-            change.merge(moved)
-        }
-        target.deletedAt = now
-        target.modifiedAt = now
-        record(&change, profile: target)
-        return change
-    }
-
     // MARK: - Validation
 
     /// Throws when `parent` cannot hold the item. `placing` is the id being moved (nil for new).
     func validate(parent: Parent, placing id: UUID?, isFolder: Bool) throws {
         switch parent {
-        case .favorites(let profileID):
-            guard profile(profileID) != nil else { throw TreeError.missingProfile }
+        case .favorites(let spaceID):
+            guard space(spaceID) != nil else { throw TreeError.missingSpace }
             if isFolder { throw TreeError.folderInFavorites }
         case .pinned(let spaceID), .tabs(let spaceID):
             guard space(spaceID) != nil else { throw TreeError.missingSpace }
@@ -269,11 +220,6 @@ extension TabTree {
     private mutating func record(_ change: inout Change, space: SpaceRecord) {
         if change.spaces[space.id] == nil { change.spaces[space.id] = .some(spaces[space.id]) }
         spaces[space.id] = space
-    }
-
-    private mutating func record(_ change: inout Change, profile: ProfileRecord) {
-        if change.profiles[profile.id] == nil { change.profiles[profile.id] = .some(profiles[profile.id]) }
-        profiles[profile.id] = profile
     }
 
     private mutating func remove(_ change: inout Change, itemID: UUID, now: Date) {
@@ -333,7 +279,7 @@ extension TabTree {
 
     private func canPlace(entryRoot root: Item, height: Int, under parent: Parent) -> Bool {
         switch parent {
-        case .favorites(let p): return !root.isFolder && profile(p) != nil
+        case .favorites(let s): return !root.isFolder && space(s) != nil
         case .pinned(let s), .tabs(let s): return space(s) != nil
         case .folder(let f):
             guard let folder = item(f), folder.isFolder, let chain = folderChain(of: f) else { return false }

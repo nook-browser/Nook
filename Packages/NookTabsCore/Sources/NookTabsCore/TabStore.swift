@@ -2,7 +2,7 @@ import Foundation
 
 /// How a launch obtained its state.
 public enum LoadOutcome: Equatable, Sendable {
-    /// No files and no backups. The caller seeds the first profile, space and tab.
+    /// No files and no backups. The caller seeds the first space and tab.
     case firstLaunch
     case loaded
     /// A file failed to decode or was empty; state came from this backup folder.
@@ -15,6 +15,9 @@ public struct LoadedState: Sendable {
     public var tree: TabTree
     public var device: DeviceState
     public var outcome: LoadOutcome
+    /// Space ids the profile merge remapped (old space id -> merged space id). Empty unless this
+    /// launch migrated a format-1 file; the app uses it to repoint ids it stores elsewhere.
+    public var migratedSpaceIDs: [UUID: UUID] = [:]
 }
 
 /// Reads and writes `structure.json` (synced scope) and `device.json` (device scope).
@@ -24,19 +27,23 @@ public struct LoadedState: Sendable {
 public final class TabStore: @unchecked Sendable {
     public static let coalesceInterval: TimeInterval = 0.5
     public static let backupDays = 7
+    /// Bumped when profiles merged into spaces. Format 1 files are migrated on load.
+    public static let formatVersion = 2
 
     struct StructureFile: Codable {
-        var formatVersion = 1
-        var profiles: [ProfileRecord]
+        var formatVersion = TabStore.formatVersion
         var spaces: [SpaceRecord]
         var items: [Item]
     }
 
     struct DeviceFile: Codable {
-        var formatVersion = 1
+        var formatVersion = TabStore.formatVersion
         var items: [Item]
         var state: DeviceState
     }
+
+    /// Just enough of either file to tell which format it is.
+    private struct VersionProbe: Codable { var formatVersion: Int }
 
     public let directory: URL
     private var structureURL: URL { directory.appendingPathComponent("structure.json") }
@@ -71,14 +78,22 @@ public final class TabStore: @unchecked Sendable {
         }
 
         if let state = Self.decode(structure: structureURL, device: deviceURL) {
-            return finish(LoadedState(tree: state.0, device: state.1, outcome: .loaded), now: now, backup: true)
+            // The pre-merge files are kept apart from the daily backups, which a later launch
+            // today would overwrite with migrated data.
+            if !state.migrated.isEmpty { copyFiles(into: "\(Self.dayStamp(now))-pre-merge") }
+            var loaded = LoadedState(tree: state.tree, device: state.device, outcome: .loaded)
+            loaded.migratedSpaceIDs = state.migrated
+            return finish(loaded, now: now, backup: true)
         }
 
         for folder in backupFolders() {
             let s = folder.appendingPathComponent("structure.json")
             let d = folder.appendingPathComponent("device.json")
             if let state = Self.decode(structure: s, device: d) {
-                return finish(LoadedState(tree: state.0, device: state.1, outcome: .restoredFromBackup(folder.lastPathComponent)), now: now, backup: false)
+                var loaded = LoadedState(tree: state.tree, device: state.device,
+                                         outcome: .restoredFromBackup(folder.lastPathComponent))
+                loaded.migratedSpaceIDs = state.migrated
+                return finish(loaded, now: now, backup: false)
             }
         }
 
@@ -90,23 +105,35 @@ public final class TabStore: @unchecked Sendable {
 
     public var isReadOnly: Bool { lock.withLock { readOnly } }
 
-    /// Decodes both files. structure.json must hold at least one live profile. A missing or
-    /// unreadable device.json yields a fresh device state; a duplicate id keeps the synced copy.
-    static func decode(structure: URL, device: URL) -> (TabTree, DeviceState)? {
+    /// Decodes both files, migrating a format-1 pair first. structure.json must hold at least one
+    /// live space. A missing or unreadable device.json yields a fresh device state; a duplicate id
+    /// keeps the synced copy.
+    static func decode(structure: URL, device: URL) -> (tree: TabTree, device: DeviceState, migrated: [UUID: UUID])? {
+        guard var structureData = try? Data(contentsOf: structure) else { return nil }
+        var deviceData = try? Data(contentsOf: device)
         let decoder = JSONDecoder()
-        guard let data = try? Data(contentsOf: structure),
-              let file = try? decoder.decode(StructureFile.self, from: data),
-              file.profiles.contains(where: { $0.deletedAt == nil }) else { return nil }
+
+        var migrated: [UUID: UUID] = [:]
+        let version = (try? decoder.decode(VersionProbe.self, from: structureData))?.formatVersion
+        if version != formatVersion {
+            guard let result = ProfileMerge.migrate(structure: structureData, device: deviceData) else { return nil }
+            structureData = result.structure
+            deviceData = result.device
+            migrated = result.spaceIDs
+        }
+
+        guard let file = try? decoder.decode(StructureFile.self, from: structureData),
+              file.spaces.contains(where: { $0.deletedAt == nil }) else { return nil }
         var deviceItems: [Item] = []
         var state = DeviceState()
-        if let data = try? Data(contentsOf: device), let deviceFile = try? decoder.decode(DeviceFile.self, from: data) {
+        if let deviceData, let deviceFile = try? decoder.decode(DeviceFile.self, from: deviceData) {
             deviceItems = deviceFile.items
             state = deviceFile.state
         }
         let syncedIDs = Set(file.items.map(\.id))
-        let tree = TabTree(profiles: file.profiles, spaces: file.spaces, items: file.items + deviceItems.filter { !syncedIDs.contains($0.id) })
+        let tree = TabTree(spaces: file.spaces, items: file.items + deviceItems.filter { !syncedIDs.contains($0.id) })
         state.firstLaunchCompleted = true
-        return (tree, state)
+        return (tree, state, migrated)
     }
 
     private func finish(_ loaded: LoadedState, now: Date, backup: Bool) -> LoadedState {
@@ -164,13 +191,13 @@ public final class TabStore: @unchecked Sendable {
             if tree.scope(of: item.id) == .synced { synced.append(item) } else { local.append(item) }
         }
         let syncedIDs = Set(synced.map(\.id))
-        let structure = StructureFile(profiles: Array(tree.profiles.values), spaces: Array(tree.spaces.values), items: synced)
+        let structure = StructureFile(spaces: Array(tree.spaces.values), items: synced)
 
         // Destination first. structure.json gains items entering the synced scope and keeps items
         // leaving it, then device.json is written, then items that left are dropped from
         // structure.json. A crash between any two writes leaves a duplicate, never a loss.
         let leaving = previousSynced.subtracting(syncedIDs).intersection(Set(local.map(\.id)))
-        let bridge = StructureFile(profiles: structure.profiles, spaces: structure.spaces, items: synced + local.filter { leaving.contains($0.id) })
+        let bridge = StructureFile(spaces: structure.spaces, items: synced + local.filter { leaving.contains($0.id) })
         try encoder.encode(bridge).write(to: structureURL, options: .atomic)
         try encoder.encode(DeviceFile(items: local, state: device)).write(to: deviceURL, options: .atomic)
         if !leaving.isEmpty {
@@ -187,36 +214,42 @@ public final class TabStore: @unchecked Sendable {
         return names.sorted(by: >).map { backupsURL.appendingPathComponent($0, isDirectory: true) }
     }
 
-    /// Copies both files into `Backups/<yyyy-MM-dd>/` and keeps the newest `backupDays` folders.
-    func makeBackup(now: Date) {
-        let fm = FileManager.default
+    static func dayStamp(_ now: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd"
-        let folder = backupsURL.appendingPathComponent(formatter.string(from: now), isDirectory: true)
+        return formatter.string(from: now)
+    }
+
+    /// Copies both files into `Backups/<name>/`.
+    private func copyFiles(into name: String) {
+        let fm = FileManager.default
+        let folder = backupsURL.appendingPathComponent(name, isDirectory: true)
         do {
             try fm.createDirectory(at: folder, withIntermediateDirectories: true)
             for source in [structureURL, deviceURL] where fm.fileExists(atPath: source.path) {
-                let target = folder.appendingPathComponent(source.lastPathComponent)
                 let data = try Data(contentsOf: source)
-                try data.write(to: target, options: .atomic)
-            }
-            for old in backupFolders().dropFirst(Self.backupDays) {
-                try? fm.removeItem(at: old)
+                try data.write(to: folder.appendingPathComponent(source.lastPathComponent), options: .atomic)
             }
         } catch {
             lock.withLock { lastError = error }
         }
     }
+
+    /// Copies both files into `Backups/<yyyy-MM-dd>/` and keeps the newest `backupDays` folders.
+    func makeBackup(now: Date) {
+        copyFiles(into: Self.dayStamp(now))
+        for old in backupFolders().dropFirst(Self.backupDays) {
+            try? FileManager.default.removeItem(at: old)
+        }
+    }
 }
 
 extension TabTree {
-    /// The state a first launch starts with: one profile, one space, one tab.
-    public static func firstLaunch(profileID: UUID = UUID(), profileName: String = "Default", spaceName: String = "Personal", homeURL: URL, now: Date = Date()) -> TabTree {
+    /// The state a first launch starts with: one space with one tab.
+    public static func firstLaunch(spaceID: UUID = UUID(), spaceName: String = "Personal", homeURL: URL, now: Date = Date()) -> TabTree {
         var tree = TabTree()
-        tree.createProfile(id: profileID, name: profileName, icon: "person.crop.circle", now: now)
-        let spaceID = UUID()
-        try! tree.createSpace(id: spaceID, profileID: profileID, name: spaceName, icon: "house", accentHex: "#7C7C7C", after: nil, now: now)
+        tree.createSpace(id: spaceID, name: spaceName, icon: "house", accentHex: "#7C7C7C", after: nil, now: now)
         try! tree.createTab(url: homeURL, title: "New Tab", in: .tabs(spaceID: spaceID), after: nil, now: now)
         return tree
     }

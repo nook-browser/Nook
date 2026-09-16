@@ -13,7 +13,7 @@ struct TabStoreTests {
         var f = Fixture()
         let folder = f.folder("F", in: .pinned(spaceID: f.spaceA))
         f.tab("pinned child", in: .folder(itemID: folder))
-        f.tab("fav", in: .favorites(profileID: f.profile))
+        f.tab("fav", in: .favorites(spaceID: f.spaceA))
         let regular = f.tab("regular", in: .tabs(spaceID: f.spaceA))
         try! f.tree.rename(regular, customTitle: "Mine", now: fixedNow)
         var device = DeviceState()
@@ -27,7 +27,7 @@ struct TabStoreTests {
         let store = TabStore(directory: tempDirectory())
         let loaded = store.load(now: fixedNow)
         #expect(loaded.outcome == .firstLaunch)
-        #expect(loaded.tree.profiles.isEmpty)
+        #expect(loaded.tree.spaces.isEmpty)
 
         let seeded = TabTree.firstLaunch(homeURL: url("home"), now: fixedNow)
         checkInvariants(seeded)
@@ -90,7 +90,7 @@ struct TabStoreTests {
         // Rebuild the bridge state: phase 1 structure plus the old device file.
         var bridgeItems = tree.items.values.filter { tree.scope(of: $0.id) == .synced }
         bridgeItems.append(tree.items[child]!)
-        let bridge = TabStore.StructureFile(profiles: Array(tree.profiles.values), spaces: Array(tree.spaces.values), items: bridgeItems)
+        let bridge = TabStore.StructureFile(spaces: Array(tree.spaces.values), items: bridgeItems)
         try JSONEncoder().encode(bridge).write(to: dir.appendingPathComponent("structure.json"))
         try oldDevice.write(to: dir.appendingPathComponent("device.json"))
         let afterCrash = TabStore(directory: dir).load(now: fixedNow)
@@ -121,9 +121,9 @@ struct TabStoreTests {
         #expect(restored.tree == tree)
     }
 
-    @Test func emptyProfilesCountAsCorruption() throws {
+    @Test func noSpacesCountsAsCorruption() throws {
         let dir = tempDirectory()
-        let empty = TabStore.StructureFile(profiles: [], spaces: [], items: [])
+        let empty = TabStore.StructureFile(spaces: [], items: [])
         try JSONEncoder().encode(empty).write(to: dir.appendingPathComponent("structure.json"))
         let store = TabStore(directory: dir)
         let loaded = store.load(now: fixedNow)
@@ -136,7 +136,7 @@ struct TabStoreTests {
         store.save(tree, device)
         store.flush()
         let onDisk = try JSONDecoder().decode(TabStore.StructureFile.self, from: Data(contentsOf: dir.appendingPathComponent("structure.json")))
-        #expect(onDisk.profiles.isEmpty, "read-only store must not write")
+        #expect(onDisk.spaces.isEmpty, "read-only store must not write")
     }
 
     @Test func closedEntryDecodesWithoutEndedPage() throws {

@@ -6,17 +6,15 @@ let fixedNow = Date(timeIntervalSince1970: 1_800_000_000)
 
 func url(_ s: String) -> URL { URL(string: "https://example.com/\(s.replacingOccurrences(of: " ", with: "-"))")! }
 
-/// One profile with two spaces, empty sections.
+/// Two spaces and their sections.
 struct Fixture {
     var tree = TabTree()
-    let profile = UUID()
     let spaceA = UUID()
     let spaceB = UUID()
 
     init() {
-        tree.createProfile(id: profile, name: "P", icon: "person", now: fixedNow)
-        try! tree.createSpace(id: spaceA, profileID: profile, name: "A", icon: "a", accentHex: "#000", after: nil, now: fixedNow)
-        try! tree.createSpace(id: spaceB, profileID: profile, name: "B", icon: "b", accentHex: "#000", after: spaceA, now: fixedNow)
+        tree.createSpace(id: spaceA, name: "A", icon: "a", accentHex: "#000", after: nil, now: fixedNow)
+        tree.createSpace(id: spaceB, name: "B", icon: "b", accentHex: "#000", after: spaceA, now: fixedNow)
     }
 
     @discardableResult
@@ -37,28 +35,27 @@ struct Fixture {
     func titles(_ parent: Parent) -> [String] { tree.children(of: parent).map(\.displayTitle) }
 }
 
-/// Every rule from the spec, checked against a whole tree.
+/// Every rule in the spec, checked against the whole tree.
 func checkInvariants(_ tree: TabTree, sourceLocation: SourceLocation = #_sourceLocation) {
-    for space in tree.spaces.values where space.deletedAt == nil {
-        #expect(tree.profile(space.profileID) != nil, "space without live profile", sourceLocation: sourceLocation)
-    }
     for item in tree.items.values where item.deletedAt == nil {
+        // The parent exists and is a live record.
         switch item.parent {
-        case .favorites(let p):
-            #expect(tree.profile(p) != nil, "favorite without profile", sourceLocation: sourceLocation)
-            #expect(!item.isFolder, "folder in favorites", sourceLocation: sourceLocation)
-        case .pinned(let s), .tabs(let s):
-            #expect(tree.space(s) != nil, "item in missing space", sourceLocation: sourceLocation)
-        case .folder(let f):
-            #expect(tree.item(f)?.isFolder == true, "item in missing folder", sourceLocation: sourceLocation)
+        case .favorites(let spaceID), .pinned(let spaceID), .tabs(let spaceID):
+            #expect(tree.space(spaceID) != nil, "parent space missing", sourceLocation: sourceLocation)
+        case .folder(let folderID):
+            #expect(tree.item(folderID)?.isFolder == true, "parent folder missing", sourceLocation: sourceLocation)
         }
+        // No cycles, within the depth limit, and no folder in favorites.
         guard let chain = tree.folderChain(of: item.id) else {
             Issue.record("cycle at \(item.id)", sourceLocation: sourceLocation)
             continue
         }
         let levels = chain.folders.count + (item.isFolder ? 1 : 0)
         #expect(levels <= TabTree.maxFolderDepth, "too deep: \(levels)", sourceLocation: sourceLocation)
-        if case .favorites = chain.section { #expect(chain.folders.isEmpty, sourceLocation: sourceLocation) }
+        if case .favorites = chain.section {
+            #expect(chain.folders.isEmpty, "folder in favorites", sourceLocation: sourceLocation)
+            #expect(!item.isFolder, "folder in favorites", sourceLocation: sourceLocation)
+        }
     }
 }
 

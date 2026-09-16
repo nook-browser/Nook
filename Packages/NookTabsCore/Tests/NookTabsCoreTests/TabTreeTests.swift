@@ -19,11 +19,12 @@ struct TabTreeTests {
         let pinnedFolder = f.folder("F", in: .pinned(spaceID: f.spaceA))
         let inPinned = f.tab("x", in: .folder(itemID: pinnedFolder))
         let regular = f.tab("y", in: .tabs(spaceID: f.spaceA))
-        let favorite = f.tab("z", in: .favorites(profileID: f.profile))
+        let favorite = f.tab("z", in: .favorites(spaceID: f.spaceA))
         #expect(f.tree.scope(of: inPinned) == .synced)
         #expect(f.tree.scope(of: favorite) == .synced)
         #expect(f.tree.scope(of: regular) == .device)
-        #expect(f.tree.profileID(of: regular) == f.profile)
+        #expect(f.tree.spaceID(of: favorite) == f.spaceA)
+        #expect(f.tree.spaceID(of: regular) == f.spaceA)
         #expect(f.tree.spaceID(of: inPinned) == f.spaceA)
 
         // Moving the folder into the tabs section moves its subtree into the device scope.
@@ -38,7 +39,7 @@ struct TabTreeTests {
         try! f.tree.move(t, to: .pinned(spaceID: f.spaceA), after: nil, currentURL: url("now"), now: fixedNow)
         #expect(f.tree.item(t)?.url == url("now"))
         // A move inside the same scope keeps the home URL.
-        try! f.tree.move(t, to: .favorites(profileID: f.profile), after: nil, currentURL: url("elsewhere"), now: fixedNow)
+        try! f.tree.move(t, to: .favorites(spaceID: f.spaceA), after: nil, currentURL: url("elsewhere"), now: fixedNow)
         #expect(f.tree.item(t)?.url == url("now"))
     }
 
@@ -55,7 +56,7 @@ struct TabTreeTests {
         #expect(throws: TreeError.tooDeep) { try f.tree.createFolder(title: "six", in: parent, after: nil, now: fixedNow) }
         #expect(throws: TreeError.cycle) { try f.tree.move(folders[0], to: .folder(itemID: folders[3]), after: nil, now: fixedNow) }
         #expect(throws: TreeError.cycle) { try f.tree.move(folders[2], to: .folder(itemID: folders[2]), after: nil, now: fixedNow) }
-        #expect(throws: TreeError.folderInFavorites) { try f.tree.move(folders[4], to: .favorites(profileID: f.profile), after: nil, now: fixedNow) }
+        #expect(throws: TreeError.folderInFavorites) { try f.tree.move(folders[4], to: .favorites(spaceID: f.spaceA), after: nil, now: fixedNow) }
         #expect(throws: TreeError.missingSpace) { try f.tree.createTab(url: url("x"), title: "x", in: .tabs(spaceID: UUID()), after: nil, now: fixedNow) }
         #expect(f.tree == before)
 
@@ -113,23 +114,45 @@ struct TabTreeTests {
         checkInvariants(f.tree)
     }
 
-    @Test func deleteSpaceAndProfile() {
+    /// A space owns its favorites now, so deleting it closes all three of its sections.
+    @Test func deleteSpaceClosesFavoritesPinnedAndTabs() {
         var f = Fixture()
+        f.tab("fav", in: .favorites(spaceID: f.spaceB))
         f.tab("p", in: .pinned(spaceID: f.spaceB))
         f.tab("t", in: .tabs(spaceID: f.spaceB))
         let result = try! f.tree.deleteSpace(f.spaceB, now: fixedNow)
-        #expect(result.closed.count == 2)
+        #expect(result.closed.count == 3)
         #expect(f.tree.space(f.spaceB) == nil)
+        #expect(f.tree.favorites(of: f.spaceB).isEmpty)
         #expect(throws: TreeError.lastSpace) { try f.tree.deleteSpace(f.spaceA, now: fixedNow) }
-
-        let heir = UUID()
-        f.tree.createProfile(id: heir, name: "Heir", icon: "h", now: fixedNow)
-        let fav = f.tab("fav", in: .favorites(profileID: f.profile))
-        try! f.tree.deleteProfile(f.profile, heir: heir, now: fixedNow)
-        #expect(f.tree.space(f.spaceA)?.profileID == heir)
-        #expect(f.tree.favorites(of: heir).map(\.id) == [fav])
-        #expect(throws: TreeError.lastProfile) { try f.tree.deleteProfile(heir, heir: heir, now: fixedNow) }
         checkInvariants(f.tree)
+    }
+
+    /// Favorites belong to one space, so each space has its own grid.
+    @Test func favoritesArePerSpace() {
+        var f = Fixture()
+        let a = f.tab("a", in: .favorites(spaceID: f.spaceA))
+        let b = f.tab("b", in: .favorites(spaceID: f.spaceB))
+        #expect(f.tree.favorites(of: f.spaceA).map(\.id) == [a])
+        #expect(f.tree.favorites(of: f.spaceB).map(\.id) == [b])
+
+        // Moving a favorite to the other space's grid stays in the synced scope.
+        try! f.tree.move(a, to: .favorites(spaceID: f.spaceB), after: b, currentURL: url("cur"), now: fixedNow)
+        #expect(f.tree.favorites(of: f.spaceA).isEmpty)
+        #expect(f.tree.favorites(of: f.spaceB).map(\.id) == [b, a])
+        #expect(f.tree.item(a)?.url == url("a"))
+        #expect(f.tree.spaceID(of: a) == f.spaceB)
+        checkInvariants(f.tree)
+    }
+
+    @Test func moveSpaceReorders() {
+        var f = Fixture()
+        #expect(f.tree.orderedSpaces.map(\.id) == [f.spaceA, f.spaceB])
+        try! f.tree.moveSpace(f.spaceB, after: nil, now: fixedNow)
+        #expect(f.tree.orderedSpaces.map(\.id) == [f.spaceB, f.spaceA])
+        try! f.tree.moveSpace(f.spaceB, after: f.spaceA, now: fixedNow)
+        #expect(f.tree.orderedSpaces.map(\.id) == [f.spaceA, f.spaceB])
+        #expect(throws: TreeError.missingSpace) { try f.tree.moveSpace(UUID(), after: nil, now: fixedNow) }
     }
 
     @Test func renameTrimsAndClears() {
@@ -174,11 +197,10 @@ struct TabTreeTests {
             let liveItems = f.tree.items.values.filter { $0.deletedAt == nil }.map(\.id).sorted { $0.uuidString < $1.uuidString }
             let folders = f.tree.items.values.filter { $0.deletedAt == nil && $0.isFolder }.map(\.id).sorted { $0.uuidString < $1.uuidString }
             let spaces = f.tree.orderedSpaces.map(\.id)
-            let profiles = f.tree.orderedProfiles.map(\.id)
             func randomParent() -> Parent {
                 // Folders are favored so deep nesting and depth-limit rejections both occur.
                 switch Int.random(in: 0..<6, using: &rng) {
-                case 0: return .favorites(profileID: profiles.randomElement(using: &rng)!)
+                case 0: return .favorites(spaceID: spaces.randomElement(using: &rng)!)
                 case 1: return .pinned(spaceID: spaces.randomElement(using: &rng)!)
                 case 2 where !folders.isEmpty, 3 where !folders.isEmpty, 4 where !folders.isEmpty:
                     return .folder(itemID: folders.randomElement(using: &rng)!)
@@ -217,19 +239,18 @@ struct TabTreeTests {
                     guard let entry = closed.popLast(), let space = spaces.first else { continue }
                     change = try f.tree.reopen(entry, fallback: .tabs(spaceID: space), now: fixedNow)
                 case 8:
-                    change = try f.tree.createSpace(profileID: profiles.randomElement(using: &rng)!, name: "s\(step)", icon: "i", accentHex: "#000", after: nil, now: fixedNow)
+                    change = f.tree.createSpace(name: "s\(step)", icon: "i", accentHex: "#000",
+                                                after: Bool.random(using: &rng) ? nil : spaces.randomElement(using: &rng), now: fixedNow)
                 case 9:
                     let result = try f.tree.deleteSpace(spaces.randomElement(using: &rng)!, now: fixedNow)
                     closed.append(contentsOf: result.closed)
                     change = result.change
                 case 10:
-                    if profiles.count < 3 {
-                        change = f.tree.createProfile(name: "p\(step)", icon: "i", now: fixedNow)
-                    } else {
-                        change = try f.tree.deleteProfile(profiles[0], heir: profiles[1], now: fixedNow)
-                    }
+                    let p = randomParent()
+                    change = try f.tree.createFolder(title: "g\(step)", in: p, after: randomAfter(p), now: fixedNow)
                 case 11:
-                    change = try f.tree.moveSpace(spaces.randomElement(using: &rng)!, toProfile: profiles.randomElement(using: &rng)!, after: nil, now: fixedNow)
+                    change = try f.tree.moveSpace(spaces.randomElement(using: &rng)!,
+                                                  after: Bool.random(using: &rng) ? nil : spaces.randomElement(using: &rng), now: fixedNow)
                 default:
                     guard let last = history.popLast() else { continue }
                     f.tree.apply(last)

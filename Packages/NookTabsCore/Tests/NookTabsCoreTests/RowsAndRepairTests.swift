@@ -70,7 +70,7 @@ struct RepairTests {
         // Item in a deleted space.
         let lost = Item(parent: .tabs(spaceID: UUID()), order: OrderKey("V"), kind: .tab(url: url("l"), pageTitle: "l"))
         // Folder in favorites.
-        let favFolder = Item(parent: .favorites(profileID: f.profile), order: OrderKey("V"), kind: .folder)
+        let favFolder = Item(parent: .favorites(spaceID: f.spaceA), order: OrderKey("V"), kind: .folder)
         // Seven nested folders.
         var parent = tabs
         var chain: [UUID] = []
@@ -105,10 +105,12 @@ struct RepairTests {
         #expect(f.tree.items[recent] != nil)
     }
 
-    @Test func spaceWithMissingProfileJoinsFirstProfile() {
+    @Test func favoriteOfDeletedSpaceMovesToFirstSpace() {
         var f = Fixture()
-        f.tree.spaces[f.spaceB]?.profileID = UUID()
+        let stray = Item(parent: .favorites(spaceID: UUID()), order: OrderKey("V"), kind: .tab(url: url("s"), pageTitle: "s"))
+        f.tree.items[stray.id] = stray
         f.tree.repair(now: fixedNow)
-        #expect(f.tree.space(f.spaceB)?.profileID == f.profile)
+        #expect(f.tree.item(stray.id)?.parent == .tabs(spaceID: f.spaceA))
+        checkInvariants(f.tree)
     }
 }

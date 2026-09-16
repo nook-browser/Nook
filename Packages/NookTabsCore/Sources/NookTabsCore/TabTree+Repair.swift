@@ -5,26 +5,21 @@ extension TabTree {
 
     /// Makes a loaded tree satisfy every rule without dropping live records.
     ///
-    /// Tombstones older than `tombstoneLifetime` are purged. A space whose profile is gone joins
-    /// the first profile. An item whose parent is gone, or that sits in a cycle, moves to the root
-    /// of its original section when that still exists, else the first space's tabs section.
-    /// Folders nested deeper than `maxFolderDepth` are lifted to the deepest allowed level, and a
-    /// folder in favorites moves to its profile's first space. Returns true when anything changed.
+    /// Tombstones older than `tombstoneLifetime` are purged. An item whose parent is gone, or that
+    /// sits in a cycle, moves to the root of its original section when that still exists, else the
+    /// first space's tabs section. Folders nested deeper than `maxFolderDepth` are lifted to the
+    /// deepest allowed level, and a folder in favorites moves to its space's pinned section.
+    /// Returns true when anything changed.
     @discardableResult
     public mutating func repair(now: Date = Date()) -> Bool {
         var changed = false
 
         let cutoff = now.addingTimeInterval(-Self.tombstoneLifetime)
-        for (id, p) in Array(profiles) where (p.deletedAt ?? .distantFuture) < cutoff { profiles[id] = nil; changed = true }
         for (id, s) in Array(spaces) where (s.deletedAt ?? .distantFuture) < cutoff { spaces[id] = nil; changed = true }
         for (id, i) in Array(items) where (i.deletedAt ?? .distantFuture) < cutoff { items[id] = nil; changed = true }
 
-        guard let firstProfile = orderedProfiles.first else { return changed }
-        for (id, space) in Array(spaces) where space.deletedAt == nil && profile(space.profileID) == nil {
-            spaces[id]?.profileID = firstProfile.id
-            changed = true
-        }
-        let fallback: Parent? = orderedSpaces.first.map { .tabs(spaceID: $0.id) }
+        guard let firstSpace = orderedSpaces.first else { return changed }
+        let fallback = Parent.tabs(spaceID: firstSpace.id)
 
         // Parents and cycles. Repeat until stable: lifting one item can expose a child's problem.
         var pass = true
@@ -60,17 +55,13 @@ extension TabTree {
     }
 
     /// The parent an item should have, or nil when it has no live position at all.
-    private func repairedParent(for id: UUID, fallback: Parent?) -> Parent? {
+    private func repairedParent(for id: UUID, fallback: Parent) -> Parent? {
         guard let item = items[id] else { return nil }
         switch item.parent {
-        case .favorites(let profileID):
-            if profile(profileID) == nil {
-                return orderedProfiles.first.map { .favorites(profileID: $0.id) } ?? fallback
-            }
-            if item.isFolder {
-                return orderedSpaces(in: profileID).first.map { .pinned(spaceID: $0.id) } ?? fallback
-            }
-            return item.parent
+        case .favorites(let spaceID):
+            guard space(spaceID) != nil else { return fallback }
+            // Favorites hold tabs only; a folder drops into the same space's pinned section.
+            return item.isFolder ? .pinned(spaceID: spaceID) : item.parent
         case .pinned(let spaceID), .tabs(let spaceID):
             return space(spaceID) == nil ? fallback : item.parent
         case .folder(let folderID):
@@ -94,10 +85,7 @@ extension TabTree {
     }
 
     private func liveSection(_ section: Parent) -> Parent? {
-        switch section {
-        case .favorites(let p): return profile(p) == nil ? nil : section
-        case .pinned(let s), .tabs(let s): return space(s) == nil ? nil : section
-        case .folder: return nil
-        }
+        guard let spaceID = section.spaceID, space(spaceID) != nil else { return nil }
+        return section
     }
 }

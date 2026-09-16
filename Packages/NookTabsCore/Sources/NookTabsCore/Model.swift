@@ -1,26 +1,9 @@
 import Foundation
 
-public struct ProfileRecord: Identifiable, Codable, Hashable, Sendable {
-    public let id: UUID
-    public var name: String
-    public var icon: String
-    public var order: OrderKey
-    public var modifiedAt: Date
-    public var deletedAt: Date?
-
-    public init(id: UUID = UUID(), name: String, icon: String, order: OrderKey, modifiedAt: Date = Date(), deletedAt: Date? = nil) {
-        self.id = id
-        self.name = name
-        self.icon = icon
-        self.order = order
-        self.modifiedAt = modifiedAt
-        self.deletedAt = deletedAt
-    }
-}
-
+/// A space: one login context (its own website data store), one favorites grid, one pinned
+/// section and one tabs section. There is no separate profile record.
 public struct SpaceRecord: Identifiable, Codable, Hashable, Sendable {
     public let id: UUID
-    public var profileID: UUID
     public var name: String
     public var icon: String
     public var accentHex: String
@@ -28,9 +11,8 @@ public struct SpaceRecord: Identifiable, Codable, Hashable, Sendable {
     public var modifiedAt: Date
     public var deletedAt: Date?
 
-    public init(id: UUID = UUID(), profileID: UUID, name: String, icon: String, accentHex: String, order: OrderKey, modifiedAt: Date = Date(), deletedAt: Date? = nil) {
+    public init(id: UUID = UUID(), name: String, icon: String, accentHex: String, order: OrderKey, modifiedAt: Date = Date(), deletedAt: Date? = nil) {
         self.id = id
-        self.profileID = profileID
         self.name = name
         self.icon = icon
         self.accentHex = accentHex
@@ -42,7 +24,7 @@ public struct SpaceRecord: Identifiable, Codable, Hashable, Sendable {
 
 /// Where an item sits. Sections (favorites, pinned, tabs) are parent values with no record.
 public enum Parent: Codable, Hashable, Sendable {
-    case favorites(profileID: UUID)
+    case favorites(spaceID: UUID)
     case pinned(spaceID: UUID)
     case tabs(spaceID: UUID)
     case folder(itemID: UUID)
@@ -50,6 +32,14 @@ public enum Parent: Codable, Hashable, Sendable {
     public var isSection: Bool {
         if case .folder = self { return false }
         return true
+    }
+
+    /// The space a section belongs to; nil for a folder.
+    public var spaceID: UUID? {
+        switch self {
+        case .favorites(let id), .pinned(let id), .tabs(let id): return id
+        case .folder: return nil
+        }
     }
 }
 
@@ -100,7 +90,7 @@ public struct Item: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
-/// Synced items travel with the profile's data; device items stay on this Mac.
+/// Synced items travel with the space's data; device items stay on this Mac.
 public enum Scope: Hashable, Sendable {
     case synced
     case device
@@ -131,11 +121,9 @@ public enum TreeError: Error, Equatable, Sendable {
     case missingItem
     case missingParent
     case missingSpace
-    case missingProfile
     case cycle
     case tooDeep
     case folderInFavorites
     case notATab
     case lastSpace
-    case lastProfile
 }

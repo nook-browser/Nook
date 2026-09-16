@@ -1,28 +1,21 @@
 import Foundation
 
-/// Profiles, spaces and items with the rules that keep them a valid tree.
+/// Spaces and items with the rules that keep them a valid tree.
 ///
 /// A value type: every mutation records the prior value of each record it writes and
 /// returns that as a `Change`, so undo is `apply(change)`.
 public struct TabTree: Codable, Equatable, Sendable {
     public static let maxFolderDepth = 5
 
-    public internal(set) var profiles: [UUID: ProfileRecord]
     public internal(set) var spaces: [UUID: SpaceRecord]
     public internal(set) var items: [UUID: Item]
 
-    public init(profiles: [ProfileRecord] = [], spaces: [SpaceRecord] = [], items: [Item] = []) {
-        self.profiles = Dictionary(profiles.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    public init(spaces: [SpaceRecord] = [], items: [Item] = []) {
         self.spaces = Dictionary(spaces.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         self.items = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     // MARK: - Lookup
-
-    public func profile(_ id: UUID) -> ProfileRecord? {
-        guard let p = profiles[id], p.deletedAt == nil else { return nil }
-        return p
-    }
 
     public func space(_ id: UUID) -> SpaceRecord? {
         guard let s = spaces[id], s.deletedAt == nil else { return nil }
@@ -34,17 +27,8 @@ public struct TabTree: Codable, Equatable, Sendable {
         return i
     }
 
-    public var orderedProfiles: [ProfileRecord] {
-        profiles.values.filter { $0.deletedAt == nil }.sorted(by: Self.sortKey)
-    }
-
-    public func orderedSpaces(in profileID: UUID) -> [SpaceRecord] {
-        spaces.values.filter { $0.deletedAt == nil && $0.profileID == profileID }.sorted(by: Self.sortKey)
-    }
-
-    /// Every live space, grouped by profile order.
     public var orderedSpaces: [SpaceRecord] {
-        orderedProfiles.flatMap { orderedSpaces(in: $0.id) }
+        spaces.values.filter { $0.deletedAt == nil }.sorted(by: Self.sortKey)
     }
 
     /// Live children of a parent in display order.
@@ -52,8 +36,8 @@ public struct TabTree: Codable, Equatable, Sendable {
         items.values.filter { $0.deletedAt == nil && $0.parent == parent }.sorted(by: Self.sortKey)
     }
 
-    public func favorites(of profileID: UUID) -> [Item] {
-        children(of: .favorites(profileID: profileID))
+    public func favorites(of spaceID: UUID) -> [Item] {
+        children(of: .favorites(spaceID: spaceID))
     }
 
     /// Live items grouped by parent, each group in display order. One pass for whole-tree reads.
@@ -92,20 +76,9 @@ public struct TabTree: Codable, Equatable, Sendable {
         }
     }
 
+    /// The space whose data store an item's page uses.
     public func spaceID(of id: UUID) -> UUID? {
-        switch section(of: id) {
-        case .pinned(let s), .tabs(let s): return s
-        default: return nil
-        }
-    }
-
-    /// The profile whose data store an item's page uses.
-    public func profileID(of id: UUID) -> UUID? {
-        switch section(of: id) {
-        case .favorites(let p): return p
-        case .pinned(let s), .tabs(let s): return spaces[s]?.profileID
-        default: return nil
-        }
+        section(of: id)?.spaceID
     }
 
     /// Live ids of the item and everything under it, parents before children.
@@ -146,6 +119,5 @@ protocol Orderable {
     var order: OrderKey { get }
 }
 
-extension ProfileRecord: Orderable {}
 extension SpaceRecord: Orderable {}
 extension Item: Orderable {}
