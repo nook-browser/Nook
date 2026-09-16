@@ -8,6 +8,15 @@
 
   var TAG = '[NookFBAd]';
 
+  // Right-column ads: React adds each as a[target="rhcad…"] (with attributionsrc) two levels below
+  // the section that also holds the "Sponsored" heading. A stylesheet hides that section before
+  // it paints; Strategy 6 hides the server-rendered heading that shows before the ads arrive.
+  var columnStyle = document.createElement('style');
+  columnStyle.textContent =
+    '[role="complementary"] div:has(> div > div > a[target^="rhcad"]),' +
+    '[role="complementary"] div:has(> div > div > a[attributionsrc]) { display: none !important; }';
+  document.documentElement.appendChild(columnStyle);
+
   var PRIVACY_ATTR_SEL = 'a[attributionsrc^="/privacy_sandbox/comet/register/source/"]';
 
   var POST_SELS = [
@@ -161,6 +170,28 @@
 
     // (Strategy 5, data-ad-comet-preview / data-ad-preview, removed 2026-09: live logs showed it
     //  on organic posts: most of 48 live hides were group and friend posts.)
+
+    // Strategy 6: the right column's server-rendered "Sponsored" heading, shown before React adds
+    // the ads that columnStyle hides. Climb from the h3 while the parent has under 3 children
+    // and no other heading.
+    var column = document.querySelector('[role="complementary"]');
+    if (column) {
+      var headings = column.querySelectorAll('h3');
+      for (var h = 0; h < headings.length; h++) {
+        var heading = headings[h];
+        if (processedAnchors.has(heading)) continue;
+        processedAnchors.add(heading);
+        if (!isLikelySponsored((heading.textContent || '').replace(/[\s\u200b]/g, ''))) continue;
+        var section = heading;
+        while (section.parentElement && section.parentElement !== column &&
+               section.parentElement.children.length < 3 &&
+               section.parentElement.querySelectorAll('h3').length <= 1) {
+          section = section.parentElement;
+        }
+        section.style.setProperty('display', 'none', 'important');
+        section.setAttribute('data-nook-blocked', 'sponsored-column');
+      }
+    }
 
     var newHides = hiddenCount - hidesBefore;
     if (newHides > 0) {
