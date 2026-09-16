@@ -10,7 +10,7 @@ import UniformTypeIdentifiers
 
 struct PinnedGrid: View {
     let width: CGFloat
-    let profileId: UUID?
+    let spaceID: UUID?
 
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
@@ -18,24 +18,24 @@ struct PinnedGrid: View {
     @ObservedObject private var dragSession = NookDragSessionManager.shared
     private let maxColumns = 4
 
-    init(width: CGFloat, profileId: UUID? = nil) {
+    init(width: CGFloat, spaceID: UUID? = nil) {
         self.width = width
-        self.profileId = profileId
+        self.spaceID = spaceID
     }
 
     private var tabs: TabsController { browserManager.tabs }
 
     @ViewBuilder
     var body: some View {
-        let effectiveProfileId = profileId ?? windowState.profileID
-        let items: [Item] = effectiveProfileId.map { tabs.favorites(of: $0) } ?? []
+        let effectiveSpaceID = spaceID ?? windowState.spaceID
+        let items: [Item] = effectiveSpaceID.map { tabs.favorites(of: $0) } ?? []
         let colsCount: Int = columnCount(for: width, itemCount: items.count)
         let columns: [GridItem] = makeColumns(count: colsCount)
 
-        let shouldAnimate = (windowRegistry.activeWindow?.id == windowState.id) && !browserManager.isTransitioningProfile
+        let shouldAnimate = (windowRegistry.activeWindow?.id == windowState.id) && !browserManager.isSwitchingSpace
 
-        if let profileID = effectiveProfileId {
-            let zone = DropZoneID.favorites(profileID: profileID)
+        if let spaceID = effectiveSpaceID {
+            let zone = DropZoneID.favorites(spaceID: spaceID)
             if items.isEmpty {
                 let isDragging = dragSession.isDragging
 
@@ -43,7 +43,7 @@ struct PinnedGrid: View {
                     zoneID: zone,
                     layout: .grid(count: 0, columns: colsCount),
                     manager: dragSession,
-                    onDrop: { id, position in tabs.dropOnFavorites(id, profileID: profileID, index: position.index) }
+                    onDrop: { id, position in tabs.dropOnFavorites(id, spaceID: spaceID, index: position.index) }
                 ) {
                     VStack(spacing: NookDesign.Spacing.md) {
                         Image(systemName: "star.circle.fill")
@@ -80,7 +80,7 @@ struct PinnedGrid: View {
                     zoneID: zone,
                     layout: .grid(count: items.count, columns: colsCount),
                     manager: dragSession,
-                    onDrop: { id, position in tabs.dropOnFavorites(id, profileID: profileID, index: position.index) }
+                    onDrop: { id, position in tabs.dropOnFavorites(id, spaceID: spaceID, index: position.index) }
                 ) {
                     LazyVGrid(columns: columns, alignment: .center, spacing: NookDesign.Spacing.sm) {
                         let insertionIdx = insertionIndex(in: zone, items: items)
@@ -106,7 +106,7 @@ struct PinnedGrid: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .animation(shouldAnimate ? NookDesign.Motion.standard : nil, value: colsCount)
                 .animation(shouldAnimate ? NookDesign.Motion.standard : nil, value: items.count)
-                .allowsHitTesting(!browserManager.isTransitioningProfile)
+                .allowsHitTesting(!browserManager.isSwitchingSpace)
             }
         }
     }

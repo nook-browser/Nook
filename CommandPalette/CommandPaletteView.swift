@@ -283,7 +283,7 @@ struct CommandPaletteView: View {
             if newVisible {
                 searchManager.setTabs(browserManager.tabs, window: windowState)
                 searchManager.setHistoryManager(browserManager.historyManager)
-                searchManager.updateProfileContext()
+                searchManager.updateSpaceContext()
 
                 text = commandPalette.prefilledText
                 userTypedText = commandPalette.prefilledText
@@ -307,9 +307,9 @@ struct CommandPaletteView: View {
                 selectedSuggestionIndex = -1
             }
         }
-        .onChange(of: windowState.profileID) { _, _ in
+        .onChange(of: windowState.spaceID) { _, _ in
             if commandPalette.isVisible {
-                searchManager.updateProfileContext()
+                searchManager.updateSpaceContext()
                 searchManager.clearSuggestions()
             }
         }

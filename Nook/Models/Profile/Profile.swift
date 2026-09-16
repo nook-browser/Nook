@@ -2,9 +2,10 @@
 //  Profile.swift
 //  Nook
 //
-//  Runtime profile model representing a browsing persona.
-//  Each Profile now owns a persistent, isolated WKWebsiteDataStore
-//  to provide strong data separation across profiles.
+//  One space's login context: the persistent, isolated WKWebsiteDataStore keyed by the space's
+//  id, plus its stats and cleanup. There is no profile as a user-facing concept; spaces own
+//  their data. `TabsController.profile(forSpace:)` vends these, one per space, and a private
+//  window holds an ephemeral one that is destroyed when the window closes.
 //
 
 import Foundation
@@ -41,9 +42,8 @@ final class Profile: NSObject, Identifiable {
         self.id = id
         self.name = name
         self.icon = icon
-        // Create a persistent, profile-specific data store derived from the profile ID.
-        // Falls back to the default store if unavailable for any reason.
-        self.dataStore = Profile.createDataStore(for: id)
+        // A persistent store identified by the space's UUID, so it is stable across launches.
+        self.dataStore = WKWebsiteDataStore(forIdentifier: id)
         super.init()
     }
 
@@ -72,16 +72,6 @@ final class Profile: NSObject, Identifiable {
         )
         profile.isEphemeral = true
         return profile
-    }
-
-    // MARK: - Data Store Creation
-    /// Create a persistent, profile-specific WKWebsiteDataStore for the given profile ID.
-    /// Uses a deterministic identifier so stores remain stable across launches.
-    /// Falls back to the default store for compatibility scenarios.
-    private static func createDataStore(for profileId: UUID) -> WKWebsiteDataStore {
-        // Prefer a persistent store identified by the profile UUID when available
-        let store = WKWebsiteDataStore(forIdentifier: profileId)
-        return store
     }
 
     // MARK: - Validation & Stats

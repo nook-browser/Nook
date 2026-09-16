@@ -26,10 +26,4 @@ extension TabsController {
     func tabCount(inSpace spaceID: UUID) -> Int {
         tabCount(under: .pinned(spaceID: spaceID)) + tabCount(under: .tabs(spaceID: spaceID))
     }
-
-    /// Moves a space to the end of another profile's spaces.
-    func moveSpaceToEnd(_ spaceID: UUID, ofProfile profileID: UUID) {
-        guard space(spaceID)?.profileID != profileID else { return }
-        moveSpace(spaceID, toProfile: profileID, after: spaces(inProfile: profileID).last?.id)
-    }
 }

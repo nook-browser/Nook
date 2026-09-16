@@ -11,12 +11,12 @@ extension BrowserManager {
     /// Import Data from arc
     func importArcData() async {
         let result = await importManager.importArcSidebarData()
-        guard let window = importWindow, let profileID = importProfileID(window) else { return }
+        guard let window = importWindow, let targetSpace = importSpaceID(window) else { return }
 
-        var lastSpace = tabs.spaces(inProfile: profileID).last?.id
+        var lastSpace = tabs.orderedSpaces.last?.id
         for space in result.spaces {
             guard let spaceID = tabs.createSpace(
-                profileID: profileID, name: space.title, icon: space.emoji ?? "person.fill",
+                name: space.title, icon: space.emoji ?? "person.fill",
                 accentHex: "#7C7C7C", after: lastSpace
             ) else { continue }
             lastSpace = spaceID
@@ -30,15 +30,14 @@ extension BrowserManager {
             importTabs(space.pinnedTabs.map(\.url), into: .pinned(spaceID: spaceID), window: window)
         }
 
-        importTabs(result.topTabs.map(\.url), into: .favorites(profileID: profileID), window: window)
+        importTabs(result.topTabs.map(\.url), into: .favorites(spaceID: targetSpace), window: window)
     }
 
     func importDiaData() async {
         let result = await importManager.importDiaData()
-        guard let window = importWindow, let profileID = importProfileID(window),
-              let spaceID = tabs.spaces(inProfile: profileID).first?.id else { return }
+        guard let window = importWindow, let spaceID = importSpaceID(window) else { return }
 
-        importTabs(result.favoriteTabs.map(\.url), into: .favorites(profileID: profileID), window: window)
+        importTabs(result.favoriteTabs.map(\.url), into: .favorites(spaceID: spaceID), window: window)
         importTabs(result.windowTabs.map(\.url), into: .tabs(spaceID: spaceID), window: window)
     }
 
@@ -49,12 +48,11 @@ extension BrowserManager {
             importHistory: importHistory
         )
 
-        if !result.bookmarks.isEmpty, let window = importWindow, let profileID = importProfileID(window),
-           let spaceID = tabs.spaces(inProfile: profileID).first?.id {
+        if !result.bookmarks.isEmpty, let window = importWindow, let spaceID = importSpaceID(window) {
             let favoritesBookmarks = result.bookmarks.filter { $0.folder == "Favorites" }
             let otherBookmarks = result.bookmarks.filter { $0.folder != "Favorites" }
 
-            importTabs(favoritesBookmarks.map(\.url), into: .favorites(profileID: profileID), window: window)
+            importTabs(favoritesBookmarks.map(\.url), into: .favorites(spaceID: spaceID), window: window)
 
             var folderGroups: [String: [SafariBookmark]] = [:]
             var unfolderedBookmarks: [SafariBookmark] = []
@@ -93,8 +91,8 @@ extension BrowserManager {
         return tabs.regularWindows.first ?? BrowserWindowState()
     }
 
-    private func importProfileID(_ window: BrowserWindowState) -> UUID? {
-        window.profileID ?? tabs.tree.orderedProfiles.first?.id
+    private func importSpaceID(_ window: BrowserWindowState) -> UUID? {
+        window.spaceID ?? tabs.orderedSpaces.first?.id
     }
 
     /// Adds tabs under `parent` in source order without loading pages or changing selection.

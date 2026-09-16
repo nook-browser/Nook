@@ -93,7 +93,7 @@ final class ExternalMiniWindowManager {
         let profile = window.flatMap { window in
             window.isIncognito
                 ? window.ephemeralProfile
-                : browserManager.profileManager.profiles.first { $0.id == window.profileID }
+                : window.spaceID.flatMap { browserManager.tabs.profile(forSpace: $0) }
         } ?? browserManager.currentProfile
         let session = MiniWindowSession(
             url: url,
@@ -131,10 +131,10 @@ final class ExternalMiniWindowManager {
         guard let browserManager, let window = browserManager.windowRegistry?.activeWindow else { return }
         let tabs = browserManager.tabs
 
-        // The live page carries its profile's data store; only reuse it when the window's
-        // space uses the same profile, otherwise reload in the space's own profile.
-        let windowProfileID = window.isIncognito ? window.ephemeralProfile?.id : window.profileID
-        if let webView = session.webView, windowProfileID == session.profile?.id {
+        // The live page carries its space's data store; only reuse it when the window shows
+        // that same space, otherwise reload in the space's own store.
+        let windowStoreID = window.isIncognito ? window.ephemeralProfile?.id : window.spaceID
+        if let webView = session.webView, windowStoreID == session.profile?.id {
             tabs.adopt(webView: webView, url: session.currentURL, title: webView.title ?? session.currentURL.host ?? "",
                        in: window, placement: .newTab)
         } else {
@@ -250,7 +250,7 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
         window.toolbar = toolbar
     }
 
-    /// Mirrors the page into the window's title and the profile into its subtitle,
+    /// Mirrors the page into the window's title and the space into its subtitle,
     /// so the toolbar carries no label views of its own.
     private func observeNavigationState(for window: NSWindow) {
         session.$currentURL

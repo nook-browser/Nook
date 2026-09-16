@@ -81,4 +81,31 @@ class SiteRoutingManager {
     func rules() -> [SiteRoutingRule] {
         settingsService?.siteRoutingRules ?? []
     }
+
+    // MARK: - Migration
+
+    /// Rules used to name a space and a profile. A space that was merged away is no longer live,
+    /// and the space that took over its login is the one the old profile id names, so that becomes
+    /// the target. Rules pointing nowhere are dropped. Runs once per launch and writes only when
+    /// something changed.
+    func dropMergedProfileTargets() {
+        guard let settingsService, let tabs = browserManager?.tabs else { return }
+        let live = Set(tabs.orderedSpaces.map(\.id))
+        var changed = false
+        let updated = settingsService.siteRoutingRules.compactMap { rule -> SiteRoutingRule? in
+            guard !live.contains(rule.targetSpaceId) else { return rule }
+            guard let heir = rule.legacyProfileId, live.contains(heir) else {
+                logger.info("Dropping routing rule for \(rule.domain, privacy: .public): its space is gone")
+                changed = true
+                return nil
+            }
+            changed = true
+            var moved = rule
+            moved.targetSpaceId = heir
+            moved.legacyProfileId = nil
+            return moved
+        }
+        guard changed else { return }
+        settingsService.siteRoutingRules = updated
+    }
 }

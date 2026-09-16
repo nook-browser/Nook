@@ -74,9 +74,9 @@ struct TabContextMenu: View {
             } label: {
                 Label("Remove from Favorites", systemImage: "star.slash")
             }
-        } else if let profileID = tabs.profileID(of: itemID) {
+        } else if let spaceID = tabs.spaceID(of: itemID) {
             Button {
-                tabs.pin(itemID, to: .favorites(profileID: profileID))
+                tabs.pin(itemID, to: .favorites(spaceID: spaceID))
             } label: {
                 Label("Add to Favorites", systemImage: "star")
             }
@@ -119,9 +119,7 @@ struct TabContextMenu: View {
     @ViewBuilder
     private var moveToSpaceMenu: some View {
         let current = tabs.spaceID(of: itemID)
-        let spaces = windowState?.privateTree != nil
-            ? (windowState?.profileID.map { tabs.spaces(inProfile: $0) } ?? [])
-            : tabs.orderedSpaces
+        let spaces = tabs.spaces(visibleIn: windowState)
         if spaces.count > 1 {
             Menu {
                 ForEach(spaces) { space in

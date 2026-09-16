@@ -2,7 +2,7 @@
 //  SpaceSwitcherTitle.swift
 //  Nook
 //
-//  The current space's name in the traffic-light row. Clicking it lists every space by profile.
+//  The current space's name in the traffic-light row. Clicking it lists every space.
 //
 
 import NookTabsCore
@@ -65,20 +65,14 @@ struct SpaceSwitcherTitle: View {
 
     @ViewBuilder
     private func menuContent(current: SpaceRecord) -> some View {
-        let profiles = browserManager.profileManager.profiles
-        let grouped = profiles.map { profile in (profile, tabs.spaces(inProfile: profile.id)) }.filter { !$0.1.isEmpty }
-        ForEach(grouped, id: \.0.id) { profile, spaces in
-            Section(grouped.count > 1 ? profile.name : "") {
-                ForEach(spaces) { space in
-                    Button {
-                        tabs.setSpace(space.id, in: windowState)
-                    } label: {
-                        if space.id == current.id {
-                            Label(space.name, systemImage: "checkmark")
-                        } else {
-                            Text(space.name)
-                        }
-                    }
+        ForEach(tabs.orderedSpaces) { space in
+            Button {
+                tabs.setSpace(space.id, in: windowState)
+            } label: {
+                if space.id == current.id {
+                    Label(space.name, systemImage: "checkmark")
+                } else {
+                    Text(space.name)
                 }
             }
         }
@@ -87,8 +81,8 @@ struct SpaceSwitcherTitle: View {
         Button("Edit Space…", systemImage: "pencil") {
             SpaceEditDialog.present(spaceID: current.id, tabs: tabs, dialogManager: browserManager.dialogManager)
         }
-        Button("Profile Settings", systemImage: "gearshape") {
-            nookSettings.currentSettingsTab = .profiles
+        Button("Space Settings", systemImage: "gearshape") {
+            nookSettings.currentSettingsTab = .spaces
             openSettings()
         }
     }

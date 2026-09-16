@@ -54,15 +54,6 @@ struct WindowView: View {
         // System notification toasts - top trailing corner
         .overlay(alignment: .topTrailing) {
             VStack(spacing: 8) {
-                // Profile switch toast
-                if windowState.isShowingProfileSwitchToast,
-                   let toast = windowState.profileSwitchToast
-                {
-                    ProfileSwitchToastView(toast: toast)
-                        .environment(windowState)
-                        .environmentObject(browserManager)
-                }
-
                 // Tab closure toast
                 if browserManager.showTabClosureToast && browserManager.tabClosureToastCount > 0 {
                     TabClosureToast()
@@ -85,7 +76,6 @@ struct WindowView: View {
             }
             .padding(10)
             // Animate toast insertions/removals
-            .animation(.smooth(duration: 0.25), value: windowState.isShowingProfileSwitchToast)
             .animation(.smooth(duration: 0.25), value: browserManager.showTabClosureToast)
             .animation(.smooth(duration: 0.25), value: windowState.isShowingCopyURLToast)
             .animation(.smooth(duration: 0.25), value: windowState.isShowingShortcutConflictToast)
@@ -336,40 +326,3 @@ struct WindowView: View {
     }
 }
 
-// MARK: - Profile Switch Toast View
-private struct ProfileSwitchToastView: View {
-    let toast: BrowserManager.ProfileSwitchToast
-    @Environment(BrowserWindowState.self) private var windowState
-    @EnvironmentObject var browserManager: BrowserManager
-
-    var body: some View {
-        ToastView {
-            HStack {
-                Text("Switched to \(toast.toProfile.name)")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white)
-                Image(systemName: "person.crop.circle")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white)
-                    .frame(width: 14, height: 14)
-                    .padding(4)
-                    .background(Color.white.opacity(0.2))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(.white.opacity(0.4), lineWidth: 1)
-                    }
-            }
-        }
-        .transition(.toast)
-        .onAppear {
-            // Auto-dismiss after 2 seconds
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                browserManager.hideProfileSwitchToast(for: windowState)
-            }
-        }
-        .onTapGesture {
-            browserManager.hideProfileSwitchToast(for: windowState)
-        }
-    }
-}

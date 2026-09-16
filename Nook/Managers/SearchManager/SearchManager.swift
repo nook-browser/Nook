@@ -21,7 +21,7 @@ class SearchManager {
     private weak var tabs: TabsController?
     private weak var window: BrowserWindowState?
     private weak var historyManager: HistoryManager?
-    private var currentProfileId: UUID?
+    private var currentSpaceId: UUID?
     
     /// An open tab the palette can switch to, captured when the query ran.
     struct TabMatch {
@@ -57,19 +57,19 @@ class SearchManager {
         }
     }
     
-    /// The controller and window whose profile's tabs the palette searches.
+    /// The controller and window whose space's tabs the palette searches.
     func setTabs(_ tabs: TabsController?, window: BrowserWindowState?) {
         self.tabs = tabs
         self.window = window
-        updateProfileContext()
+        updateSpaceContext()
     }
     
     func setHistoryManager(_ historyManager: HistoryManager?) {
         self.historyManager = historyManager
     }
 
-    @MainActor func updateProfileContext() {
-        currentProfileId = window?.profileID
+    @MainActor func updateSpaceContext() {
+        currentSpaceId = window?.spaceID
     }
     
     @MainActor func searchSuggestions(for query: String) {
@@ -77,8 +77,8 @@ class SearchManager {
         let generation = UUID()
         searchGeneration = generation
         isLoading = false
-        updateProfileContext()
-        let profile = currentProfileId
+        updateSpaceContext()
+        let space = currentSpaceId
         guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             updateSuggestionsIfNeeded([])
             return
@@ -100,20 +100,20 @@ class SearchManager {
             async let web = self.fetchWebSuggestions(for: query)
             let history = Array(await self.searchHistory(for: query).prefix(2))
             guard !Task.isCancelled, self.searchGeneration == generation,
-                  self.window?.profileID == profile else { return }
+                  self.window?.spaceID == space else { return }
             self.updateSuggestionsIfNeeded(Array((urlRows + carriedWeb + history + tabs).prefix(5)))
             let webSuggestions = await web
             guard !Task.isCancelled, self.searchGeneration == generation,
-                  self.window?.profileID == profile else { return }
+                  self.window?.spaceID == space else { return }
             self.updateSuggestionsIfNeeded(Array((urlRows + webSuggestions + history + tabs).prefix(5)))
             self.isLoading = false
         }
     }
 
     @MainActor private func searchTabs(for query: String) -> [SearchSuggestion] {
-        guard let tabs, let profileID = window?.profileID else { return [] }
+        guard let tabs, let spaceID = window?.spaceID else { return [] }
         let lowercaseQuery = query.lowercased()
-        let matches: [TabMatch] = tabs.items(inProfile: profileID).compactMap { item in
+        let matches: [TabMatch] = tabs.items(inSpace: spaceID).compactMap { item in
             let session = tabs.session(for: item.id)
             guard let url = session?.url ?? tabs.device.openPages[item.id]?.url ?? item.url else { return nil }
             let title = item.customTitle.flatMap { $0.isEmpty ? nil : $0 } ?? session?.title ?? item.displayTitle

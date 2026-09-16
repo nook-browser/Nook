@@ -25,7 +25,7 @@ final class ExtensionManager: NSObject, ObservableObject,
     @Published var isPopupActive: Bool = false
     @Published var extensionsLoaded: Bool = false
     // Scope: extensions are global. One controller, one install/enabled state, and one
-    // storage namespace shared by every profile. Private (ephemeral) tabs get no controller.
+    // storage namespace shared by every space. Private (ephemeral) tabs get no controller.
 
     internal var extensionController: WKWebExtensionController?
     internal var extensionContexts: [String: WKWebExtensionContext] = [:]

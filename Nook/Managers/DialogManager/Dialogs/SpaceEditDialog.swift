@@ -18,44 +18,39 @@ struct SpaceEditDialog: DialogPresentable {
     private let mode: Mode
     private let originalSpaceName: String
     private let originalSpaceIcon: String
-    private let originalProfileId: UUID?
     private let originalAccentHex: String
 
     @State private var spaceName: String
     @State private var spaceIcon: String
-    @State private var selectedProfileId: UUID?
     @State private var accentHex: String
 
-    private let onSaveChanges: (String, String, UUID?, String) -> Void
+    private let onSaveChanges: (String, String, String) -> Void
     private let onCancelChanges: () -> Void
 
     init(
         space: SpaceRecord,
         mode: Mode,
-        onSave: @escaping (String, String, UUID?, String) -> Void,
+        onSave: @escaping (String, String, String) -> Void,
         onCancel: @escaping () -> Void
     ) {
-        self.init(name: space.name, icon: space.icon, profileId: space.profileID, accentHex: space.accentHex,
+        self.init(name: space.name, icon: space.icon, accentHex: space.accentHex,
                   mode: mode, onSave: onSave, onCancel: onCancel)
     }
 
     private init(
         name: String,
         icon: String,
-        profileId: UUID?,
         accentHex accent: String,
         mode: Mode,
-        onSave: @escaping (String, String, UUID?, String) -> Void,
+        onSave: @escaping (String, String, String) -> Void,
         onCancel: @escaping () -> Void
     ) {
         self.mode = mode
         self.originalSpaceName = name
         self.originalSpaceIcon = icon
-        self.originalProfileId = profileId
         self.originalAccentHex = accent
         _spaceName = State(initialValue: name)
         _spaceIcon = State(initialValue: icon)
-        _selectedProfileId = State(initialValue: profileId)
         _accentHex = State(initialValue: accent)
         self.onSaveChanges = onSave
         self.onCancelChanges = onCancel
@@ -69,7 +64,7 @@ struct SpaceEditDialog: DialogPresentable {
             SpaceEditDialog(
                 space: space,
                 mode: .icon,
-                onSave: { name, icon, profileId, accentHex in
+                onSave: { name, icon, accentHex in
                     guard let current = tabs.space(spaceID) else {
                         dialogManager.closeDialog()
                         return
@@ -80,9 +75,6 @@ struct SpaceEditDialog: DialogPresentable {
                         icon: icon != current.icon ? icon : nil,
                         accentHex: accentHex.caseInsensitiveCompare(current.accentHex) != .orderedSame ? accentHex : nil
                     )
-                    if let profileId {
-                        tabs.moveSpaceToEnd(spaceID, ofProfile: profileId)
-                    }
                     dialogManager.closeDialog()
                 },
                 onCancel: { dialogManager.closeDialog() }
@@ -103,7 +95,6 @@ struct SpaceEditDialog: DialogPresentable {
         SpaceEditContent(
             spaceName: $spaceName,
             spaceIcon: $spaceIcon,
-            selectedProfileId: $selectedProfileId,
             accentHex: $accentHex,
             originalIcon: originalSpaceIcon,
             mode: mode
@@ -127,7 +118,7 @@ struct SpaceEditDialog: DialogPresentable {
                     iconName: "checkmark",
                     variant: .primary,
                     action: {
-                        onSaveChanges(effectiveName, iconValue, selectedProfileId, accentHex)
+                        onSaveChanges(effectiveName, iconValue, accentHex)
                     }
                 )
             ]
@@ -138,7 +129,6 @@ struct SpaceEditDialog: DialogPresentable {
 private struct SpaceEditContent: View {
     @Binding var spaceName: String
     @Binding var spaceIcon: String
-    @Binding var selectedProfileId: UUID?
     @Binding var accentHex: String
 
     let originalIcon: String
@@ -200,56 +190,12 @@ private struct SpaceEditContent: View {
                     .foregroundStyle(.primary)
                 SpaceAccentPicker(selectedHex: $accentHex)
             }
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Profile")
-                    .font(NookDesign.Font.label)
-                    .foregroundStyle(.primary)
-
-                Picker(
-                    currentProfileName,
-                    systemImage: currentProfileIcon,
-                    selection: Binding(
-                        get: {
-                            selectedProfileId ?? browserManager.profileManager.profiles.first?.id ?? UUID()
-                        },
-                        set: { newId in
-                            selectedProfileId = newId
-                        }
-                    )
-                ) {
-                    ForEach(browserManager.profileManager.profiles, id: \.id) { profile in
-                        Label(profile.name, systemImage: profile.icon).tag(profile.id)
-                    }
-                }
-            }
         }
         .padding(.horizontal, 4)
     }
 
     private var currentIcon: String {
-        if !spaceIcon.isEmpty {
-            return spaceIcon
-        }
-        return originalIcon
-    }
-
-    private var currentProfileName: String {
-        guard let profileId = selectedProfileId,
-              let profile = browserManager.profileManager.profiles.first(where: { $0.id == profileId })
-        else {
-            return browserManager.profileManager.profiles.first?.name ?? "Default"
-        }
-        return profile.name
-    }
-
-    private var currentProfileIcon: String {
-        guard let profileId = selectedProfileId,
-              let profile = browserManager.profileManager.profiles.first(where: { $0.id == profileId })
-        else {
-            return browserManager.profileManager.profiles.first?.icon ?? "person.circle"
-        }
-        return profile.icon
+        spaceIcon.isEmpty ? originalIcon : spaceIcon
     }
 }
 

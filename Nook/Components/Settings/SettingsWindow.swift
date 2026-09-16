@@ -107,8 +107,8 @@ private struct SettingsDetailPane: View {
                 SettingsSocialMediaTab()
             case .airTrafficControl:
                 AirTrafficControlSettingsView()
-            case .profiles:
-                ProfilesSettingsView()
+            case .spaces:
+                SpacesSettingsView()
             case .shortcuts:
                 ShortcutsSettingsView()
             case .extensions:

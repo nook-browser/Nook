@@ -38,11 +38,11 @@ extension TabsController {
         }
     }
 
-    /// Drops into a profile's favorites grid at tile `index` of the displayed favorites.
-    func dropOnFavorites(_ itemID: UUID, profileID: UUID, index: Int) {
-        let favorites = favorites(of: profileID)
+    /// Drops into a space's favorites grid at tile `index` of the displayed favorites.
+    func dropOnFavorites(_ itemID: UUID, spaceID: UUID, index: Int) {
+        let favorites = favorites(of: spaceID)
         let after = favorites.prefix(index).last(where: { $0.id != itemID })?.id
-        move(itemID, to: .favorites(profileID: profileID), after: after)
+        move(itemID, to: .favorites(spaceID: spaceID), after: after)
     }
 
     // MARK: - Reads

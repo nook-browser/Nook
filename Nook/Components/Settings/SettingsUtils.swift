@@ -16,7 +16,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
     case youTube
     case socialMedia
     case airTrafficControl
-    case profiles
+    case spaces
     case shortcuts
     case extensions
     case advanced
@@ -31,7 +31,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
         case .youTube: return "YouTube"
         case .socialMedia: return "Social Media"
         case .airTrafficControl: return "Air Traffic Control"
-        case .profiles: return "Profiles"
+        case .spaces: return "Spaces"
         case .shortcuts: return "Shortcuts"
         case .extensions: return "Extensions"
         case .advanced: return "Advanced"
@@ -48,7 +48,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
         case .youTube: return "play.rectangle"
         case .socialMedia: return "photo.on.rectangle"
         case .airTrafficControl: return "arrow.triangle.branch"
-        case .profiles: return "person.crop.circle"
+        case .spaces: return "square.on.square"
         case .shortcuts: return "keyboard"
         case .extensions: return "puzzlepiece.extension"
         case .advanced: return "wrench.and.screwdriver"
@@ -65,7 +65,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
         case .youTube: return .red
         case .socialMedia: return .pink
         case .airTrafficControl: return .mint
-        case .profiles: return .cyan
+        case .spaces: return .cyan
         case .shortcuts: return .indigo
         case .extensions: return .teal
         case .advanced: return .secondary
@@ -78,7 +78,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
             (nil, [.general, .appearance]),
             (nil, [.ai]),
             (nil, [.privacy, .adBlocker, .airTrafficControl]),
-            (nil, [.profiles, .shortcuts, .extensions]),
+            (nil, [.spaces, .shortcuts, .extensions]),
             ("Tweaks", [.youTube, .socialMedia]),
         ]
         #if DEBUG

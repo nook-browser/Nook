@@ -339,26 +339,6 @@ final class Persistence {
     }
 }
 
-extension BrowserManager.ProfileSwitchContext {
-    fileprivate var shouldProvideFeedback: Bool {
-        switch self {
-        case .windowActivation:
-            return false
-        case .spaceChange, .userInitiated, .recovery:
-            return true
-        }
-    }
-
-    fileprivate var shouldAnimateTransition: Bool {
-        switch self {
-        case .windowActivation:
-            return false
-        case .spaceChange, .userInitiated, .recovery:
-            return true
-        }
-    }
-}
-
 @MainActor
 class BrowserManager: ObservableObject {
     // Legacy global state - kept for backward compatibility during transition
@@ -372,14 +352,12 @@ class BrowserManager: ObservableObject {
     @Published var urlBarFrame: CGRect = .zero
     @Published var shouldShowZoomPopup: Bool = false
     var zoomPopupHideTimer: Timer?
+    /// The website data store of the active window's space.
     @Published var currentProfile: Profile?
-    // Indicates an in-progress animated profile transition for coordinating UI
-    @Published var isTransitioningProfile: Bool = false
+    /// True for the length of a space change, so views do not animate content from the old space
+    /// into the new one.
+    @Published var isSwitchingSpace: Bool = false
     private var transitionEndTask: Task<Void, Never>?
-    // Migration state
-    @Published var migrationProgress: MigrationProgress?
-    @Published var isMigrationInProgress: Bool = false
-
     // Tab closure undo notification
     @Published var showTabClosureToast: Bool = false
     @Published var tabClosureToastCount: Int = 0
@@ -395,7 +373,6 @@ class BrowserManager: ObservableObject {
     var modelContext: ModelContext
     /// The tab model: tree, device state, window selection and live pages.
     let tabs: TabsController
-    var profileManager: ProfileManager
     var dialogManager: DialogManager
     var downloadManager: DownloadManager
     var authenticationManager: AuthenticationManager
@@ -433,39 +410,31 @@ class BrowserManager: ObservableObject {
 
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard
-    var isSwitchingProfile: Bool = false
     private var cancellables: Set<AnyCancellable> = []
 
-    private func adoptProfileIfNeeded(
-        for windowState: BrowserWindowState, context: ProfileSwitchContext
-    ) {
-        guard let targetProfileId = windowState.profileID else { return }
-        guard !isSwitchingProfile else { return }
-        guard currentProfile?.id != targetProfileId else { return }
-        guard let targetProfile = profileManager.profiles.first(where: { $0.id == targetProfileId })
-        else { return }
-        Task { [weak self] in
-            await self?.switchToProfile(targetProfile, context: context, in: windowState)
-        }
+    /// Profiles from before spaces owned their data, read only to seed a first launch that has no
+    /// tab files but does have data stores worth keeping. `ProfileEntity` is otherwise unused.
+    private static func legacyProfileRecords(in context: ModelContext) -> [(id: UUID, name: String)] {
+        let descriptor = FetchDescriptor<ProfileEntity>(sortBy: [SortDescriptor(\.index, order: .forward)])
+        let entities = (try? context.fetch(descriptor)) ?? []
+        return entities.map { ($0.id, $0.name) }
     }
-
 
     init() {
         // Phase 1: initialize all stored properties
         self.modelContext = Persistence.shared.container.mainContext
         self.extensionManager = ExtensionManager.shared
-        self.profileManager = ProfileManager(context: modelContext)
-        // Ensure at least one profile exists and set current immediately for manager initialization
-        self.profileManager.ensureDefaultProfile()
-        let initialProfile = self.profileManager.profiles.first
+        let tabs = TabsController(legacyProfiles: Self.legacyProfileRecords(in: modelContext))
+        self.tabs = tabs
+        // The first space's data store is the one the app starts on.
+        let initialProfile = tabs.orderedSpaces.first.flatMap { tabs.profile(forSpace: $0.id) }
         self.currentProfile = initialProfile
-        self.tabs = TabsController(profileManager: self.profileManager)
 
         // settingsManager will be injected from NookApp
         self.dialogManager = DialogManager()
         self.downloadManager = DownloadManager.shared
         self.authenticationManager = AuthenticationManager()
-        // Initialize managers with current profile context for isolation
+        // Initialize managers with the current space's data store for isolation
         self.historyManager = HistoryManager(context: modelContext, profileId: initialProfile?.id)
         self.cookieManager = CookieManager(dataStore: initialProfile?.dataStore)
         self.cacheManager = CacheManager(dataStore: initialProfile?.dataStore)
@@ -603,92 +572,32 @@ class BrowserManager: ObservableObject {
         return finished
     }
 
-    // MARK: - Profile Switching
-    struct ProfileSwitchToast: Equatable {
-        let fromProfile: Profile?
-        let toProfile: Profile
-        let timestamp: Date
-    }
+    // MARK: - Space Switching
 
-    enum ProfileSwitchContext {
-        case userInitiated
-        case spaceChange
-        case windowActivation
-        case recovery
-    }
+    /// A window changed space. A space owns its login context, so cookies, cache and history
+    /// follow it. Only the active window's space sets the app-wide managers.
+    func windowSpaceChanged(_ windowState: BrowserWindowState) {
+        guard !windowState.isIncognito else { return }
+        guard windowRegistry?.activeWindow == nil || windowRegistry?.activeWindow?.id == windowState.id else { return }
+        guard let spaceID = windowState.spaceID, let profile = tabs.profile(forSpace: spaceID),
+              currentProfile?.id != profile.id else { return }
 
-    actor ProfileOps { func run(_ body: @MainActor () async -> Void) async { await body() } }
-    private let profileOps = ProfileOps()
-
-    func switchToProfile(
-        _ profile: Profile, context: ProfileSwitchContext = .userInitiated,
-        in windowState: BrowserWindowState? = nil
-    ) async {
-        await profileOps.run { [weak self] in
-            guard let self else { return }
-            if self.isSwitchingProfile {
-                #if DEBUG
-                print("⏳ [BrowserManager] Ignoring concurrent profile switch request")
-                #endif
-                return
-            }
-            self.isSwitchingProfile = true
-            defer { self.isSwitchingProfile = false }
-
-            let previousProfile = self.currentProfile
-            #if DEBUG
-            print(
-                "🔀 [BrowserManager] Switching to profile: \(profile.name) (\(profile.id.uuidString)) from: \(previousProfile?.name ?? "none")"
-            )
-            #endif
-            let animateTransition = context.shouldAnimateTransition
-
-            let performUpdates = {
-                if animateTransition {
-                    self.isTransitioningProfile = true
-                } else {
-                    self.isTransitioningProfile = false
-                }
-                self.currentProfile = profile
-                // Switch data stores for cookie/cache
-                self.cookieManager.switchDataStore(profile.dataStore, profileId: profile.id)
-                self.cacheManager.switchDataStore(profile.dataStore, profileId: profile.id)
-                // Update history filtering
-                self.historyManager.switchProfile(profile.id)
-                // A window's profile follows its space: an explicit switch shows that profile's first space.
-                if context == .userInitiated || context == .recovery,
-                   let window = windowState ?? self.windowRegistry?.activeWindow, !window.isIncognito,
-                   window.profileID != profile.id,
-                   let space = self.tabs.spaces(inProfile: profile.id).first {
-                    self.tabs.setSpace(space.id, in: window)
-                }
-            }
-
-            if animateTransition {
-                withAnimation(.easeInOut(duration: 0.35)) {
-                    performUpdates()
-                }
-            } else {
-                performUpdates()
-            }
-
-            if context.shouldProvideFeedback {
-                self.showProfileSwitchToast(
-                    from: previousProfile, to: profile, in: windowState ?? self.windowRegistry?.activeWindow)
-                NSHapticFeedbackManager.defaultPerformer.perform(
-                    .generic, performanceTime: .drawCompleted)
-            }
-
-            if animateTransition {
-                transitionEndTask?.cancel()
-                transitionEndTask = Task { [weak self] in
-                    try? await Task.sleep(for: .seconds(0.35))
-                    guard !Task.isCancelled else { return }
-                    self?.isTransitioningProfile = false
-                }
-            }
+        isSwitchingSpace = true
+        withAnimation(.easeInOut(duration: Self.spaceSwitchDuration)) {
+            currentProfile = profile
+            cookieManager.switchDataStore(profile.dataStore, profileId: profile.id)
+            cacheManager.switchDataStore(profile.dataStore, profileId: profile.id)
+            historyManager.switchProfile(profile.id)
+        }
+        transitionEndTask?.cancel()
+        transitionEndTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(Self.spaceSwitchDuration))
+            guard !Task.isCancelled else { return }
+            self?.isSwitchingSpace = false
         }
     }
+
+    private static let spaceSwitchDuration: TimeInterval = 0.35
 
     func updateSidebarWidth(_ width: CGFloat) {
         if let activeWindow = windowRegistry?.activeWindow {
@@ -939,65 +848,10 @@ class BrowserManager: ObservableObject {
         }
     }
 
-    // Profile-specific cleanup helpers
-    func clearCurrentProfileCookies() {
-        guard let pid = currentProfile?.id else { return }
-        #if DEBUG
-        print("🧹 [BrowserManager] Clearing cookies for current profile: \(pid.uuidString)")
-        #endif
-        Task { await cookieManager.deleteAllCookies() }
-    }
-
-    func clearCurrentProfileCache() {
-        guard currentProfile?.id != nil else { return }
-        #if DEBUG
-        print("🧹 [BrowserManager] Clearing cache for current profile")
-        #endif
-        Task { await cacheManager.clearAllCache() }
-    }
-
-    func clearAllProfilesCookies() {
-        #if DEBUG
-        print("🧹 [BrowserManager] Clearing cookies for ALL profiles (sequential, isolated)")
-        #endif
-        let profiles = profileManager.profiles
-        Task { @MainActor in
-            for profile in profiles {
-                let cm = CookieManager(dataStore: profile.dataStore)
-                #if DEBUG
-                print(
-                    "   → Clearing cookies for profile=\(profile.id.uuidString) [\(profile.name)]")
-                #endif
-                await cm.deleteAllCookies()
-            }
-        }
-    }
-
-    func performPrivacyCleanupAllProfiles() {
-        #if DEBUG
-        print(
-            "🧹 [BrowserManager] Performing privacy cleanup across ALL profiles (sequential, isolated)"
-        )
-        #endif
-        let profiles = profileManager.profiles
-        Task { @MainActor in
-            for profile in profiles {
-                #if DEBUG
-                print("   → Cleaning profile=\(profile.id.uuidString) [\(profile.name)]")
-                #endif
-                let cm = CookieManager(dataStore: profile.dataStore)
-                let cam = CacheManager(dataStore: profile.dataStore)
-                await cm.performPrivacyCleanup()
-                await cam.performPrivacyCompliantCleanup()
-            }
-        }
-    }
-
-    // MARK: - Migration Helpers
-    /// Assign a default profile to any history entries without a profileId for backward compatibility
+    /// History written before entries carried a space belongs to the first space.
     func migrateUnassignedDataToDefaultProfile() {
-        guard let defaultProfileId = profileManager.profiles.first?.id else { return }
-        assignDefaultProfileToExistingData(defaultProfileId)
+        guard let firstSpace = tabs.orderedSpaces.first?.id else { return }
+        assignDefaultProfileToExistingData(firstSpace)
     }
 
     func assignDefaultProfileToExistingData(_ profileId: UUID) {
@@ -1050,346 +904,6 @@ class BrowserManager: ObservableObject {
         extensionManager?.uninstallExtension(extensionId)
     }
 
-    // MARK: - Profile Switch Toast
-    func showProfileSwitchToast(from: Profile?, to: Profile, in windowState: BrowserWindowState?) {
-        guard let targetWindow = windowState ?? windowRegistry?.activeWindow else { return }
-        let toast = ProfileSwitchToast(fromProfile: from, toProfile: to, timestamp: Date())
-        let windowId = targetWindow.id
-        targetWindow.profileSwitchToast = toast
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
-            targetWindow.isShowingProfileSwitchToast = true
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
-            self?.hideProfileSwitchToast(forWindowId: windowId)
-        }
-    }
-
-    func hideProfileSwitchToast(for windowState: BrowserWindowState? = nil) {
-        guard let window = windowState ?? windowRegistry?.activeWindow else { return }
-        hideProfileSwitchToast(forWindowId: window.id)
-    }
-
-    private func hideProfileSwitchToast(forWindowId windowId: UUID) {
-        guard
-            let window = windowRegistry?.windows[windowId]
-                ?? (windowRegistry?.activeWindow?.id == windowId ? windowRegistry?.activeWindow : nil)
-        else { return }
-        withAnimation(.spring(response: 0.45, dampingFraction: 0.9)) {
-            window.isShowingProfileSwitchToast = false
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak window] in
-            window?.profileSwitchToast = nil
-        }
-    }
-
-    // MARK: - Migration Utilities
-    struct MigrationProgress {
-        var currentStep: String
-        var progress: Double
-        var totalSteps: Int
-        var currentStepIndex: Int
-    }
-
-    struct LegacyDataSummary {
-        var hasCookies: Bool
-        var hasCache: Bool
-        var hasLocalStorage: Bool
-        var cookieCount: Int
-        var recordCount: Int
-        var estimatedDescription: String
-        var hasAny: Bool { hasCookies || hasCache || hasLocalStorage }
-    }
-
-    func detectLegacySharedData() async -> LegacyDataSummary {
-        let defaultStore = WKWebsiteDataStore.default()
-        var cookieCount = 0
-        var recordCount = 0
-        let types: Set<String> = [
-            WKWebsiteDataTypeCookies,
-            WKWebsiteDataTypeDiskCache,
-            WKWebsiteDataTypeMemoryCache,
-            WKWebsiteDataTypeLocalStorage,
-            WKWebsiteDataTypeIndexedDBDatabases,
-            WKWebsiteDataTypeFetchCache,
-            WKWebsiteDataTypeServiceWorkerRegistrations,
-        ]
-
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            defaultStore.httpCookieStore.getAllCookies { cookies in
-                cookieCount = cookies.count
-                cont.resume()
-            }
-        }
-
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            WKWebsiteDataStore.default().fetchDataRecords(ofTypes: types) { records in
-                recordCount = records.count
-                cont.resume()
-            }
-        }
-
-        let hasCookies = cookieCount > 0
-        let hasCache = recordCount > 0
-        // We cannot easily distinguish local storage vs caches without deeper inspection; approximate
-        let hasLocalStorage = hasCache
-        let estimated = "Cookies: \(cookieCount), Records: \(recordCount)"
-        return LegacyDataSummary(
-            hasCookies: hasCookies,
-            hasCache: hasCache,
-            hasLocalStorage: hasLocalStorage,
-            cookieCount: cookieCount,
-            recordCount: recordCount,
-            estimatedDescription: estimated
-        )
-    }
-
-    func migrateCookiesToCurrentProfile() async throws {
-        guard let targetStore = currentProfile?.dataStore else { return }
-        isMigrationInProgress = true
-        migrationProgress = MigrationProgress(
-            currentStep: "Copying cookies…", progress: 0.0, totalSteps: 3, currentStepIndex: 1)
-        let defaultStore = WKWebsiteDataStore.default()
-
-        let cookies = await withCheckedContinuation {
-            (cont: CheckedContinuation<[HTTPCookie], Never>) in
-            defaultStore.httpCookieStore.getAllCookies { cookies in cont.resume(returning: cookies)
-            }
-        }
-        let total = max(1, cookies.count)
-        var copied = 0
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            for cookie in cookies {
-                group.addTask { @MainActor in
-                    if Task.isCancelled { return }
-                    await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-                        targetStore.httpCookieStore.setCookie(cookie) {
-                            cont.resume()
-                        }
-                    }
-                    copied += 1
-                    self.migrationProgress?.progress = Double(copied) / Double(total) * (1.0 / 3.0)
-                }
-            }
-            try await group.waitForAll()
-            if Task.isCancelled { throw CancellationError() }
-        }
-    }
-
-    func migrateCacheToCurrentProfile() async throws {
-        // There is no public API to copy cached site data across stores.
-        // We track progress for UX and attempt to prime the target store by visiting entries post-migration if needed.
-        migrationProgress?.currentStep = "Migrating site data…"
-        migrationProgress?.currentStepIndex = 2
-        // Simulate progress for UX purposes
-        for i in 1...10 {  // 10 ticks
-            if Task.isCancelled { throw CancellationError() }
-            try await Task.sleep(nanoseconds: 80_000_000)  // 80ms per tick
-            migrationProgress?.progress = (1.0 / 3.0) + Double(i) / 10.0 * (1.0 / 3.0)
-        }
-    }
-
-    func clearSharedDataAfterMigration() async {
-        migrationProgress?.currentStep = "Clearing shared data…"
-        migrationProgress?.currentStepIndex = 3
-        let allTypes: Set<String> = [
-            WKWebsiteDataTypeCookies,
-            WKWebsiteDataTypeDiskCache,
-            WKWebsiteDataTypeMemoryCache,
-            WKWebsiteDataTypeLocalStorage,
-            WKWebsiteDataTypeIndexedDBDatabases,
-            WKWebsiteDataTypeFetchCache,
-            WKWebsiteDataTypeServiceWorkerRegistrations,
-        ]
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            WKWebsiteDataStore.default().removeData(ofTypes: allTypes, modifiedSince: .distantPast)
-            {
-                cont.resume()
-            }
-        }
-        migrationProgress?.progress = 1.0
-        isMigrationInProgress = false
-    }
-
-    func createFreshProfileStores() async {
-        // Ensure each profile's dataStore is initialized and empty if requested
-        for p in profileManager.profiles {
-            // No-op if already created; optionally clear
-            await p.clearAllData()
-        }
-    }
-
-    @Published var migrationTask: Task<Void, Never>? = nil
-
-    func startMigrationToCurrentProfile() {
-        guard isMigrationInProgress == false else { return }
-        isMigrationInProgress = true
-        migrationProgress = MigrationProgress(
-            currentStep: "Preparing…", progress: 0.0, totalSteps: 3, currentStepIndex: 0)
-        migrationTask = Task { @MainActor in
-            do {
-                if Task.isCancelled {
-                    self.resetMigrationState()
-                    return
-                }
-                try await migrateCookiesToCurrentProfile()
-                if Task.isCancelled {
-                    self.resetMigrationState()
-                    return
-                }
-                try await migrateCacheToCurrentProfile()
-                if Task.isCancelled {
-                    self.resetMigrationState()
-                    return
-                }
-                await clearSharedDataAfterMigration()
-                self.dialogManager.showDialog {
-                    StandardDialog(
-                        header: {
-                            DialogHeader(
-                                icon: "checkmark.seal",
-                                title: "Migration Complete",
-                                subtitle: currentProfile?.name ?? ""
-                            )
-                        },
-                        content: {
-                            Text("Your shared data has been migrated to the current profile.")
-                                .font(.body)
-                        },
-                        footer: {
-                            DialogFooter(rightButtons: [
-                                DialogButton(text: "OK", variant: .primary) { [weak self] in
-                                    self?.dialogManager.closeDialog()
-                                }
-                            ])
-                        }
-                    )
-                }
-            } catch is CancellationError {
-                self.resetMigrationState()
-            } catch {
-                self.resetMigrationState()
-                self.recoverFromProfileError(error, profile: self.currentProfile)
-            }
-            self.migrationTask = nil
-        }
-    }
-
-    private func resetMigrationState() {
-        self.isMigrationInProgress = false
-        self.migrationProgress = nil
-    }
-
-    // MARK: - Validation & Recovery
-    func validateProfileIntegrity() {
-        // Ensure currentProfile is still valid
-        if let cp = currentProfile, profileManager.profiles.first(where: { $0.id == cp.id }) == nil
-        {
-            #if DEBUG
-            print("⚠️ [BrowserManager] Current profile invalid; falling back to first available")
-            #endif
-            currentProfile = profileManager.profiles.first
-        }
-    }
-
-    func recoverFromProfileError(_ error: Error, profile: Profile?) {
-        #if DEBUG
-        print("❗️[BrowserManager] Profile operation failed: \(error)")
-        #endif
-        // Fallback to default/first profile
-        if let first = profileManager.profiles.first {
-            Task { await switchToProfile(first, context: .recovery) }
-        }
-        // Show dialog
-        dialogManager.showDialog {
-            StandardDialog(
-                header: {
-                    DialogHeader(
-                        icon: "exclamationmark.triangle",
-                        title: "Profile Error",
-                        subtitle: profile?.name ?? ""
-                    )
-                },
-                content: {
-                    Text(
-                        "An error occurred while performing a profile operation. Your session has been switched to a safe profile."
-                    )
-                    .font(.body)
-                },
-                footer: {
-                    DialogFooter(rightButtons: [
-                        DialogButton(text: "OK", variant: .primary) { [weak self] in
-                            self?.dialogManager.closeDialog()
-                        }
-                    ])
-                }
-            )
-        }
-    }
-
-    // MARK: - Profile Deletion Coordinator
-
-    /// The one profile delete path: the current profile moves to `heir`, the profile's data is
-    /// cleared, TabsController moves its spaces and favorites to `heir` and removes the app profile.
-    func deleteProfile(_ profile: Profile, heir: Profile) {
-        // Avoid deleting the last profile
-        guard profileManager.profiles.count > 1 else {
-            dialogManager.showDialog {
-                StandardDialog(
-                    header: {
-                        DialogHeader(
-                            icon: "exclamationmark.triangle",
-                            title: "Cannot Delete Last Profile",
-                            subtitle: profile.name
-                        )
-                    },
-                    content: {
-                        Text("At least one profile must remain.")
-                            .font(.body)
-                    },
-                    footer: {
-                        DialogFooter(rightButtons: [
-                            DialogButton(text: "OK", variant: .primary) { [weak self] in
-                                self?.dialogManager.closeDialog()
-                            }
-                        ])
-                    }
-                )
-            }
-            return
-        }
-        Task { @MainActor in
-            if self.currentProfile?.id == profile.id {
-                await self.switchToProfile(heir)
-            }
-            await profile.clearAllData()
-            let ok = self.tabs.deleteProfile(profile.id, heir: heir.id)
-            if !ok {
-                self.dialogManager.showDialog {
-                    StandardDialog(
-                        header: {
-                            DialogHeader(
-                                icon: "exclamationmark.triangle",
-                                title: "Couldn't Delete Profile",
-                                subtitle: profile.name
-                            )
-                        },
-                        content: {
-                            Text("An error occurred while saving changes. Please try again.")
-                                .font(.body)
-                        },
-                        footer: {
-                            DialogFooter(rightButtons: [
-                                DialogButton(text: "OK", variant: .primary) { [weak self] in
-                                    self?.dialogManager.closeDialog()
-                                }
-                            ])
-                        }
-                    )
-                }
-            }
-        }
-    }
-
     /// Presents an external URL in a mini window popup (for URL events)
     func presentExternalURL(_ url: URL) {
         externalMiniWindowManager.present(url: url)
@@ -1411,9 +925,7 @@ class BrowserManager: ObservableObject {
 
         tabs.attach(window: windowState)
         guard !windowState.isIncognito else { return }
-        if windowRegistry?.activeWindow == nil || windowRegistry?.activeWindow?.id == windowState.id {
-            adoptProfileIfNeeded(for: windowState, context: .windowActivation)
-        }
+        windowSpaceChanged(windowState)
         applyStartupLoadMode(for: windowState)
         restoreSavedWindows()
     }
@@ -1433,14 +945,8 @@ class BrowserManager: ObservableObject {
             gradientColorManager.setImmediate(.incognito)
         }
         isCommandPaletteVisible = windowState.isCommandPaletteVisible
-        adoptProfileIfNeeded(for: windowState, context: .windowActivation)
-    }
-
-    /// A window's space moved it to another profile. The active window adopts that profile
-    /// (data stores, history, cookies), as the old space switch did.
-    func windowProfileChanged(_ windowState: BrowserWindowState) {
-        guard !windowState.isIncognito, windowRegistry?.activeWindow?.id == windowState.id else { return }
-        adoptProfileIfNeeded(for: windowState, context: .spaceChange)
+        // The newly active window's space is the app's login context.
+        windowSpaceChanged(windowState)
     }
 
     // MARK: - Window-Aware Tab Operations
@@ -1542,7 +1048,7 @@ class BrowserManager: ObservableObject {
 
         let windowState = BrowserWindowState()
         windowState.isIncognito = true
-        windowState.ephemeralProfile = profileManager.createEphemeralProfile(for: windowState.id)
+        windowState.ephemeralProfile = Profile.createEphemeral()
 
         // Registration gives the window its private tree (TabsController.attach). It must happen
         // before the hosting view exists: the sidebar's first render otherwise sees no private
@@ -1561,13 +1067,35 @@ class BrowserManager: ObservableObject {
         newWindow.makeKeyAndOrderFront(nil)
     }
 
-    /// Destroys a closed incognito window's ephemeral profile and data store. Its pages were
-    /// already ended by TabsController.detach.
+    /// Destroys a closed incognito window's ephemeral data store. Its pages were already ended by
+    /// TabsController.detach.
     func closeIncognitoWindow(_ windowState: BrowserWindowState) async {
-        guard windowState.isIncognito else { return }
-        await profileManager.removeEphemeralProfile(for: windowState.id)
+        guard windowState.isIncognito, let profile = windowState.ephemeralProfile else { return }
         windowState.ephemeralProfile = nil
         windowState.spaceID = nil
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let resume = OneShot(continuation)
+            // The store is gone either way once the window is; never block the close on WebKit.
+            Task {
+                try? await Task.sleep(for: .seconds(5))
+                resume.fire()
+            }
+            profile.destroyEphemeralDataStore { resume.fire() }
+        }
+    }
+
+    /// Resumes a continuation exactly once, whichever of two callbacks arrives first.
+    private final class OneShot: @unchecked Sendable {
+        private var continuation: CheckedContinuation<Void, Never>?
+        private let lock = NSLock()
+        init(_ continuation: CheckedContinuation<Void, Never>) { self.continuation = continuation }
+        func fire() {
+            lock.lock()
+            let pending = continuation
+            continuation = nil
+            lock.unlock()
+            pending?.resume()
+        }
     }
 
     /// Close the active window

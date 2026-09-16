@@ -60,12 +60,6 @@ class BrowserWindowState {
     /// Toast info for this window
     var toastInfo: WindowToastInfo?
 
-    /// Profile switch toast payload for this window
-    var profileSwitchToast: BrowserManager.ProfileSwitchToast?
-
-    /// Presentation flag for the profile switch toast
-    var isShowingProfileSwitchToast: Bool = false
-    
     /// Presentation flag for the copy URL toast
     var isShowingCopyURLToast: Bool = false
     
@@ -108,8 +102,8 @@ class BrowserWindowState {
     /// Whether this window is an incognito/private browsing window
     var isIncognito: Bool = false
     
-    /// The ephemeral profile associated with this incognito window
-    /// Only set when isIncognito is true
+    /// The ephemeral, non-persistent data store this incognito window's pages use.
+    /// Only set when isIncognito is true.
     var ephemeralProfile: Profile?
     
     /// Whether the download warning has been shown in this incognito session
@@ -139,11 +133,7 @@ class BrowserWindowState {
     /// The split pair shown in this window, if any.
     var split: SplitRecord?
 
-    /// The profile whose favorites and data store this window uses (its space's profile).
-    var profileID: UUID?
-
-    /// A private window's in-memory tree: one profile record for the ephemeral profile and one
-    /// space. Never saved. nil for regular windows.
+    /// A private window's in-memory tree: one temporary space. Never saved. nil for regular windows.
     var privateTree: TabTree?
 
     /// Live pages of a private window, by item id.

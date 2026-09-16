@@ -20,8 +20,8 @@ extension NSPasteboard.PasteboardType {
 
 /// A place a dragged item can land.
 enum DropZoneID: Hashable {
-    /// A profile's favorites grid.
-    case favorites(profileID: UUID)
+    /// A space's favorites grid.
+    case favorites(spaceID: UUID)
     /// The rows of a sidebar section (`.pinned` or `.tabs`).
     case section(Parent)
     /// A target without rows (space title, space switcher) that receives the item as a whole.

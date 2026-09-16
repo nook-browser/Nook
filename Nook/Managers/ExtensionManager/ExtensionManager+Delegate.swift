@@ -386,8 +386,7 @@ extension ExtensionManager {
         }
 
         // An extension window is emulated as a new space in the focused window.
-        guard let profileID = window.profileID ?? window.spaceID.flatMap({ tabs.space($0)?.profileID }),
-              let spaceID = tabs.createSpace(profileID: profileID, name: "Window", icon: "macwindow",
+        guard let spaceID = tabs.createSpace(name: "Window", icon: "macwindow",
                                              accentHex: "#7C7C7C", after: window.spaceID)
         else {
             completionHandler(nil, NSError(domain: "ExtensionManager", code: 3, userInfo: [NSLocalizedDescriptionKey: "Could not create window"]))

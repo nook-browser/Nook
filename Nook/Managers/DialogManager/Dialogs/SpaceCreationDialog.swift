@@ -11,19 +11,17 @@ import SwiftUI
 struct SpaceCreationDialog: DialogPresentable {
     @State private var spaceName: String
     @State private var spaceIcon: String
-    @State private var selectedProfileId: UUID?
     @State private var accentHex: String = SpaceAccent.defaultHex
 
-    let onCreate: (String, String, UUID?, String) -> Void
+    let onCreate: (String, String, String) -> Void
     let onCancel: () -> Void
 
     init(
-        onCreate: @escaping (String, String, UUID?, String) -> Void,
+        onCreate: @escaping (String, String, String) -> Void,
         onCancel: @escaping () -> Void
     ) {
         _spaceName = State(initialValue: "")
         _spaceIcon = State(initialValue: "")
-        _selectedProfileId = State(initialValue: nil)
         self.onCreate = onCreate
         self.onCancel = onCancel
     }
@@ -41,7 +39,6 @@ struct SpaceCreationDialog: DialogPresentable {
         SpaceCreationContent(
             spaceName: $spaceName,
             spaceIcon: $spaceIcon,
-            selectedProfileId: $selectedProfileId,
             accentHex: $accentHex
         )
     }
@@ -68,14 +65,13 @@ struct SpaceCreationDialog: DialogPresentable {
 
     private func handleCreate() {
         let trimmedName = spaceName.trimmingCharacters(in: .whitespacesAndNewlines)
-        onCreate(trimmedName, spaceIcon, selectedProfileId, accentHex)
+        onCreate(trimmedName, spaceIcon, accentHex)
     }
 }
 
 struct SpaceCreationContent: View {
     @Binding var spaceName: String
     @Binding var spaceIcon: String
-    @Binding var selectedProfileId: UUID?
     @Binding var accentHex: String
     @State private var showIconPicker = false
     @EnvironmentObject var browserManager: BrowserManager
@@ -132,48 +128,9 @@ struct SpaceCreationContent: View {
                 SpaceAccentPicker(selectedHex: $accentHex)
             }
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Profile")
-                    .font(NookDesign.Font.label)
-                    .foregroundStyle(.primary)
-
-                Picker(
-                    currentProfileName,
-                    systemImage: currentProfileIcon,
-                    selection: Binding(
-                        get: {
-                            selectedProfileId ?? browserManager.profileManager.profiles.first?.id ?? UUID()
-                        },
-                        set: { newId in
-                            selectedProfileId = newId
-                        }
-                    )
-                ) {
-                    ForEach(browserManager.profileManager.profiles, id: \.id) { profile in
-                        Label(profile.name, systemImage: profile.icon).tag(profile.id)
-                    }
-                }
-            }
         }
         .padding(.horizontal, 4)
     }
 
-    private var currentProfileName: String {
-        guard let profileId = selectedProfileId,
-              let profile = browserManager.profileManager.profiles.first(where: { $0.id == profileId })
-        else {
-            return browserManager.profileManager.profiles.first?.name ?? "Default"
-        }
-        return profile.name
-    }
-
-    private var currentProfileIcon: String {
-        guard let profileId = selectedProfileId,
-              let profile = browserManager.profileManager.profiles.first(where: { $0.id == profileId })
-        else {
-            return browserManager.profileManager.profiles.first?.icon ?? "person.circle"
-        }
-        return profile.icon
-    }
 }
 

@@ -21,22 +21,6 @@ struct SpaceContextMenu: View {
 
     var body: some View {
         Group {
-            // Profile picker
-            Picker(
-                currentProfile?.name ?? "Default",
-                systemImage: currentProfile?.icon ?? "person.circle",
-                selection: Binding(
-                    get: { space.profileID },
-                    set: { tabs.moveSpaceToEnd(space.id, ofProfile: $0) }
-                )
-            ) {
-                ForEach(browserManager.profileManager.profiles, id: \.id) { profile in
-                    Label(profile.name, systemImage: profile.icon).tag(profile.id)
-                }
-            }
-
-            Divider()
-
             // Rename (optional)
             if let onEditName = onEditName {
                 Button {
@@ -93,12 +77,5 @@ struct SpaceContextMenu: View {
                 }
             )
         )
-    }
-
-    // MARK: - Helper Properties
-
-    private var currentProfile: Profile? {
-        let profiles = browserManager.profileManager.profiles
-        return profiles.first { $0.id == space.profileID } ?? profiles.first
     }
 }

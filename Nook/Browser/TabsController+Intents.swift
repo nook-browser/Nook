@@ -2,7 +2,7 @@
 //  TabsController+Intents.swift
 //  Nook
 //
-//  Every user-facing change to tabs, folders, spaces, profiles and window selection.
+//  Every user-facing change to tabs, folders, spaces and window selection.
 //
 
 import AppKit
@@ -104,15 +104,12 @@ extension TabsController {
             return
         }
         let previous = selectedSession(in: window)
+        let movedSpace = source.spaceID(of: itemID).map { $0 != window.spaceID } ?? false
         if let spaceID = source.spaceID(of: itemID) {
             window.spaceID = spaceID
-        } else if let profileID = source.profileID(of: itemID),
-                  window.spaceID.flatMap({ source.space($0)?.profileID }) != profileID {
-            // A favorite of another profile: show that profile's first space.
-            window.spaceID = source.orderedSpaces(in: profileID).first?.id ?? window.spaceID
         }
         guard let spaceID = window.spaceID else { return }
-        setProfile(source.space(spaceID)?.profileID, of: window)
+        if movedSpace { browserManager?.windowSpaceChanged(window) }
         window.selectedItemBySpace[spaceID] = itemID
         window.emptiedSpaces.remove(spaceID)
         // The latest window to select a page takes its live view; others show a placeholder.
@@ -161,12 +158,14 @@ extension TabsController {
         select(last, in: window)
     }
 
-    /// Shows a space; its remembered selection (or first item) becomes selected.
+    /// Shows a space; its remembered selection (or first item) becomes selected. The space owns
+    /// its login context, so this is also the data store, history and cookie switch.
     func setSpace(_ spaceID: UUID, in window: BrowserWindowState) {
         let source = tree(owner(of: window))
-        guard let space = source.space(spaceID) else { return }
+        guard source.space(spaceID) != nil else { return }
+        let changed = window.spaceID != spaceID
         window.spaceID = spaceID
-        setProfile(space.profileID, of: window)
+        if changed { browserManager?.windowSpaceChanged(window) }
         let order = displayOrder(in: window)
         if let remembered = window.selectedItemBySpace[spaceID], order.contains(remembered) {
             select(remembered, in: window)
@@ -177,13 +176,6 @@ extension TabsController {
             mirror(window)
             window.refreshCompositor()
         }
-    }
-
-    /// A window showing another profile's space adopts that profile (data store, history, cookies).
-    private func setProfile(_ profileID: UUID?, of window: BrowserWindowState) {
-        guard window.profileID != profileID else { return }
-        window.profileID = profileID
-        browserManager?.windowProfileChanged(window)
     }
 
     func selectNextSpace(in window: BrowserWindowState) {
@@ -328,8 +320,7 @@ extension TabsController {
             }
             let recent = (window.recentItemsBySpace[spaceID] ?? []).reversed().filter { id in
                 guard let item = source.item(id), !item.isFolder, isOpen(id) else { return false }
-                let itemSpace = source.spaceID(of: id)
-                return itemSpace == spaceID || (itemSpace == nil && source.profileID(of: id) == source.space(spaceID)?.profileID)
+                return source.spaceID(of: id) == spaceID
             }
             let candidates = recent
                 + order[(index + 1)...].filter { !ids.contains($0) && isOpen($0) }
@@ -393,7 +384,6 @@ extension TabsController {
     func unpin(_ itemID: UUID) {
         let spaceID = self.spaceID(of: itemID)
             ?? allWindows.first(where: { $0.selectedItemID == itemID })?.spaceID
-            ?? profileID(of: itemID).flatMap { spaces(inProfile: $0).first?.id }
         guard let spaceID else { return }
         move(itemID, to: .tabs(spaceID: spaceID), after: nil)
     }
@@ -452,8 +442,7 @@ extension TabsController {
     func createFolder(title: String, in parent: Parent, after: UUID?) -> UUID? {
         let owner: TabsController.Owner?
         switch parent {
-        case .favorites(let profileID): owner = self.owner(ofProfile: profileID)
-        case .pinned(let spaceID), .tabs(let spaceID): owner = self.owner(ofSpace: spaceID)
+        case .favorites(let spaceID), .pinned(let spaceID), .tabs(let spaceID): owner = self.owner(ofSpace: spaceID)
         case .folder(let folderID): owner = self.owner(ofItem: folderID)
         }
         guard let owner else { return nil }
@@ -490,12 +479,12 @@ extension TabsController {
 
     // MARK: - Spaces
 
+    /// A new space with its own (empty) website data store, so it starts logged out.
     @discardableResult
-    func createSpace(profileID: UUID, name: String, icon: String, accentHex: String, after: UUID?) -> UUID? {
-        guard let owner = owner(ofProfile: profileID) else { return nil }
+    func createSpace(name: String, icon: String, accentHex: String, after: UUID?) -> UUID? {
         let id = UUID()
-        guard perform(owner, "createSpace", {
-            try $0.createSpace(id: id, profileID: profileID, name: name, icon: icon, accentHex: accentHex, after: after)
+        guard perform(.main, "createSpace", {
+            $0.createSpace(id: id, name: name, icon: icon, accentHex: accentHex, after: after)
         }) != nil else { return nil }
         return id
     }
@@ -505,16 +494,12 @@ extension TabsController {
         perform(owner, "updateSpace") { try $0.updateSpace(spaceID, name: name, icon: icon, accentHex: accentHex) }
     }
 
-    func moveSpace(_ spaceID: UUID, toProfile profileID: UUID, after: UUID?) {
+    func moveSpace(_ spaceID: UUID, after: UUID?) {
         guard let owner = owner(ofSpace: spaceID) else { return }
-        guard perform(owner, "moveSpace", { try $0.moveSpace(spaceID, toProfile: profileID, after: after) }) != nil else { return }
-        for window in allWindows where window.spaceID == spaceID { setProfile(profileID, of: window) }
-        let source = tree(owner)
-        let roots = source.children(of: .pinned(spaceID: spaceID)) + source.children(of: .tabs(spaceID: spaceID))
-        unloadPagesOnWrongDataStore(roots.flatMap { source.subtree(of: $0.id) })
+        perform(owner, "moveSpace") { try $0.moveSpace(spaceID, after: after) }
     }
 
-    /// Pages whose item now belongs to another profile reload on that profile's data store.
+    /// Pages whose item now belongs to another space reload on that space's data store.
     private func unloadPagesOnWrongDataStore(_ ids: [UUID]) {
         for id in ids {
             guard let page = session(for: id), let view = page.webView, let profile = page.profile,
@@ -523,12 +508,17 @@ extension TabsController {
         }
     }
 
-    /// Deletes a space; its items go to the reopen history. Windows showing it move to another space.
+    /// Deletes a space; its items go to the reopen history and its website data is cleared.
+    /// Windows showing it move to another space.
     func deleteSpace(_ spaceID: UUID) {
         guard let owner = owner(ofSpace: spaceID) else { return }
         let source = tree(owner)
-        let ids = (source.children(of: .pinned(spaceID: spaceID)) + source.children(of: .tabs(spaceID: spaceID)))
+        let ids = (source.children(of: .favorites(spaceID: spaceID))
+                   + source.children(of: .pinned(spaceID: spaceID))
+                   + source.children(of: .tabs(spaceID: spaceID)))
             .flatMap { source.subtree(of: $0.id) }
+        // The data store has to be taken while the space still exists.
+        let deleted = profile(forSpace: spaceID)
         var closed: [ClosedEntry] = []
         guard perform(owner, "deleteSpace", { tree in
             let result = try tree.deleteSpace(spaceID)
@@ -542,39 +532,16 @@ extension TabsController {
         let remaining = tree(owner).orderedSpaces
         for window in allWindows where window.spaceID == spaceID {
             window.selectedItemBySpace[spaceID] = nil
-            let sameProfile = remaining.first { $0.profileID == window.profileID }
-            if let next = sameProfile ?? remaining.first {
+            if let next = remaining.first {
+                window.spaceID = nil
                 setSpace(next.id, in: window)
             }
         }
-    }
-
-    // MARK: - Profiles
-
-    /// Creates the app profile (which owns its data store) and its record under the same id.
-    @discardableResult
-    func createProfile(name: String, icon: String) -> UUID {
-        let id = createAppProfile(name: name, icon: icon)
-        perform(.main, "createProfile") { $0.createProfile(id: id, name: name, icon: icon) }
-        return id
-    }
-
-    func updateProfile(_ profileID: UUID, name: String?, icon: String?) {
-        guard perform(.main, "updateProfile", { try $0.updateProfile(profileID, name: name, icon: icon) }) != nil else { return }
-        updateAppProfile(profileID, name: name, icon: icon)
-    }
-
-    /// Deletes a profile; its spaces and favorites move to `heir`, windows on it switch to `heir`,
-    /// and the app profile is removed. false when either delete fails.
-    @discardableResult
-    func deleteProfile(_ profileID: UUID, heir: UUID) -> Bool {
-        let affected = items(inProfile: profileID).map(\.id)
-        guard perform(.main, "deleteProfile", { try $0.deleteProfile(profileID, heir: heir) }) != nil else { return false }
-        unloadPagesOnWrongDataStore(affected)
-        for window in regularWindows where window.profileID == profileID {
-            setProfile(heir, of: window)
+        if case .main = owner, let profile = deleted {
+            // Its cookies and logins go with it. Nothing else shares this data store.
+            forgetProfile(spaceID)
+            Task { await profile.clearAllData() }
         }
-        return deleteAppProfile(profileID)
     }
 
     // MARK: - Unload

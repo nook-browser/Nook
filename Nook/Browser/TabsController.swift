@@ -39,10 +39,12 @@ final class TabsController {
     /// Open folders of private windows, kept apart so their ids never reach device.json.
     private var privateOpenFolders: Set<UUID> = []
 
+    /// One `Profile` (website data store) per space, made on first use and kept for the session.
+    @ObservationIgnored private var spaceProfiles: [UUID: Profile] = [:]
+
     @ObservationIgnored private let store: TabStore
     @ObservationIgnored private(set) var undoStack: [Change] = []
     @ObservationIgnored private var isTerminating = false
-    @ObservationIgnored private let profileManager: ProfileManager
     @ObservationIgnored weak var browserManager: BrowserManager?
     @ObservationIgnored let log = Logger(subsystem: "com.baingurley.nook", category: "Tabs")
 
@@ -54,8 +56,7 @@ final class TabsController {
 
     // MARK: - Load
 
-    init(profileManager: ProfileManager, directory: URL = TabsController.defaultDirectory) {
-        self.profileManager = profileManager
+    init(legacyProfiles: [(id: UUID, name: String)] = [], directory: URL = TabsController.defaultDirectory) {
         let store = TabStore(directory: directory)
         self.store = store
         let loaded = store.load()
@@ -63,38 +64,35 @@ final class TabsController {
         switch loaded.outcome {
         case .firstLaunch, .readOnly:
             // Read-only still needs a working sidebar; the store writes nothing this session.
-            tree = Self.seed(from: profileManager.profiles)
+            tree = Self.seed(from: legacyProfiles)
             device = DeviceState()
             device.firstLaunchCompleted = true
         case .loaded, .restoredFromBackup:
             tree = loaded.tree
             device = loaded.device
-            // Every app profile owns a data store; give any without a record one under its id.
-            for profile in profileManager.profiles where tree.profile(profile.id) == nil {
-                tree.createProfile(id: profile.id, name: profile.name, icon: profile.icon)
-            }
         }
         log.info("Tabs loaded: \(String(describing: loaded.outcome), privacy: .public), \(self.tree.items.count) items")
         if case .readOnly(let reason) = loaded.outcome {
             Self.presentReadOnlyAlert(reason: reason, directory: directory)
         }
         if case .firstLaunch = loaded.outcome { save() }
+        if !loaded.migratedSpaceIDs.isEmpty {
+            log.info("Merged profiles into \(self.tree.orderedSpaces.count) spaces")
+        }
     }
 
-    /// One profile record per existing profile (same UUID, so each WKWebsiteDataStore keeps its
-    /// cookies and logins), each with one space and one tab.
-    static func seed(from profiles: [Profile], now: Date = Date()) -> TabTree {
-        guard !profiles.isEmpty else { return TabTree.firstLaunch(homeURL: homeURL, now: now) }
+    /// One space per profile left over from before spaces owned their data (same UUID, so each
+    /// WKWebsiteDataStore keeps its cookies and logins), each with one tab.
+    static func seed(from legacyProfiles: [(id: UUID, name: String)], now: Date = Date()) -> TabTree {
+        guard !legacyProfiles.isEmpty else { return TabTree.firstLaunch(homeURL: homeURL, now: now) }
         var tree = TabTree()
-        for profile in profiles {
-            tree.createProfile(id: profile.id, name: profile.name, icon: profile.icon, now: now)
-            let spaceID = UUID()
+        for profile in legacyProfiles {
+            tree.createSpace(id: profile.id, name: profile.name, icon: "house", accentHex: "#7C7C7C",
+                             after: tree.orderedSpaces.last?.id, now: now)
             do {
-                try tree.createSpace(id: spaceID, profileID: profile.id, name: profiles.count == 1 ? "Personal" : profile.name,
-                                     icon: "house", accentHex: "#7C7C7C", after: tree.orderedSpaces(in: profile.id).last?.id, now: now)
-                try tree.createTab(url: homeURL, title: "Google", in: .tabs(spaceID: spaceID), after: nil, now: now)
+                try tree.createTab(url: homeURL, title: "Google", in: .tabs(spaceID: profile.id), after: nil, now: now)
             } catch {
-                Logger(subsystem: "com.baingurley.nook", category: "Tabs").error("Seeding profile failed: \(String(describing: error), privacy: .public)")
+                Logger(subsystem: "com.baingurley.nook", category: "Tabs").error("Seeding space failed: \(String(describing: error), privacy: .public)")
             }
         }
         return tree
@@ -148,7 +146,7 @@ final class TabsController {
         if undoStack.count > Self.undoLimit { undoStack.removeFirst(undoStack.count - Self.undoLimit) }
     }
 
-    /// Where an item, space or profile lives.
+    /// Where an item or space lives.
     enum Owner {
         case main
         case privateWindow(BrowserWindowState)
@@ -170,11 +168,6 @@ final class TabsController {
     func owner(ofSpace id: UUID) -> Owner? {
         if tree.space(id) != nil { return .main }
         return privateWindows.first { $0.privateTree?.space(id) != nil }.map(Owner.privateWindow)
-    }
-
-    func owner(ofProfile id: UUID) -> Owner? {
-        if tree.profile(id) != nil { return .main }
-        return privateWindows.first { $0.privateTree?.profile(id) != nil }.map(Owner.privateWindow)
     }
 
     func owner(of window: BrowserWindowState) -> Owner {
@@ -222,8 +215,10 @@ final class TabsController {
 
     var orderedSpaces: [SpaceRecord] { tree.orderedSpaces }
 
-    func spaces(inProfile profileID: UUID) -> [SpaceRecord] {
-        owner(ofProfile: profileID).map { tree($0).orderedSpaces(in: profileID) } ?? []
+    /// The spaces a window can move a tab to: its own temporary one when private, else all of them.
+    func spaces(visibleIn window: BrowserWindowState?) -> [SpaceRecord] {
+        guard let window else { return orderedSpaces }
+        return tree(owner(of: window)).orderedSpaces
     }
 
     func item(_ id: UUID) -> Item? {
@@ -234,8 +229,8 @@ final class TabsController {
         treeHolding(parent).children(of: parent)
     }
 
-    func favorites(of profileID: UUID) -> [Item] {
-        children(of: .favorites(profileID: profileID))
+    func favorites(of spaceID: UUID) -> [Item] {
+        children(of: .favorites(spaceID: spaceID))
     }
 
     func rows(space spaceID: UUID) -> [Row] {
@@ -251,16 +246,12 @@ final class TabsController {
         owner(ofItem: itemID).flatMap { tree($0).spaceID(of: itemID) }
     }
 
-    func profileID(of itemID: UUID) -> UUID? {
-        owner(ofItem: itemID).flatMap { tree($0).profileID(of: itemID) }
-    }
-
-    /// Live tabs in every section of a profile: favorites and the tabs of all its spaces.
-    func items(inProfile profileID: UUID) -> [Item] {
-        guard let owner = owner(ofProfile: profileID) else { return [] }
+    /// Live tabs in every section of a space: its favorites, pinned tabs and tabs.
+    func items(inSpace spaceID: UUID) -> [Item] {
+        guard let owner = owner(ofSpace: spaceID) else { return [] }
         let source = tree(owner)
         return source.items.values.filter { item in
-            item.deletedAt == nil && !item.isFolder && source.profileID(of: item.id) == profileID
+            item.deletedAt == nil && !item.isFolder && source.spaceID(of: item.id) == spaceID
         }
     }
 
@@ -290,9 +281,10 @@ final class TabsController {
 
     func treeHolding(_ parent: Parent) -> TabTree {
         switch parent {
-        case .favorites(let profileID): return owner(ofProfile: profileID).map(tree) ?? tree
-        case .pinned(let spaceID), .tabs(let spaceID): return owner(ofSpace: spaceID).map(tree) ?? tree
-        case .folder(let itemID): return owner(ofItem: itemID).map(tree) ?? tree
+        case .favorites(let spaceID), .pinned(let spaceID), .tabs(let spaceID):
+            return owner(ofSpace: spaceID).map(tree) ?? tree
+        case .folder(let itemID):
+            return owner(ofItem: itemID).map(tree) ?? tree
         }
     }
 
@@ -346,13 +338,11 @@ final class TabsController {
         return session
     }
 
-    /// Favorites of the window's profile, then the tabs of its space in sidebar order.
+    /// Favorites of the window's space, then its rows in sidebar order.
     func displayOrder(in window: BrowserWindowState) -> [UUID] {
-        let source = tree(owner(of: window))
-        let profileID = window.profileID ?? window.spaceID.flatMap { source.space($0)?.profileID }
-        let favorites = profileID.map { source.favorites(of: $0).map(\.id) } ?? []
-        let rows = window.spaceID.map { rows(space: $0) } ?? []
-        return favorites + rows.filter { !$0.item.isFolder }.map(\.item.id)
+        guard let spaceID = window.spaceID else { return [] }
+        let favorites = tree(owner(of: window)).favorites(of: spaceID).map(\.id)
+        return favorites + rows(space: spaceID).filter { !$0.item.isFolder }.map(\.item.id)
     }
 
     func isVisibleInAnyWindow(_ itemID: UUID) -> Bool {
@@ -408,17 +398,39 @@ final class TabsController {
         }
     }
 
-    /// The profile a session's page uses: the private window's ephemeral profile, else the
-    /// profile that owns the item's section.
+    /// The website data store of a space, made on first use. Its name and icon follow the space.
+    func profile(forSpace spaceID: UUID) -> Profile? {
+        guard let space = tree.space(spaceID) else { return nil }
+        if let existing = spaceProfiles[spaceID] {
+            existing.name = space.name
+            existing.icon = space.icon
+            return existing
+        }
+        let profile = Profile(id: spaceID, name: space.name, icon: space.icon)
+        spaceProfiles[spaceID] = profile
+        return profile
+    }
+
+    /// Every space's data store, made if it does not exist yet. For whole-app cleanup only.
+    var allSpaceProfiles: [Profile] {
+        tree.orderedSpaces.compactMap { profile(forSpace: $0.id) }
+    }
+
+    /// Drops the cached data store of a deleted space.
+    func forgetProfile(_ spaceID: UUID) {
+        spaceProfiles[spaceID] = nil
+    }
+
+    /// The data store a session's page uses: the private window's ephemeral one, else the store
+    /// of the space that owns the item's section.
     func profile(for session: PageSession) -> Profile? {
         if session.isPrivate {
             return privateWindows.first { $0.privateSessions[session.itemID] === session }?.ephemeralProfile
         }
-        if let id = tree.profileID(of: session.itemID),
-           let profile = profileManager.profiles.first(where: { $0.id == id }) {
+        if let id = tree.spaceID(of: session.itemID), let profile = profile(forSpace: id) {
             return profile
         }
-        return browserManager?.currentProfile ?? profileManager.profiles.first
+        return browserManager?.currentProfile ?? tree.orderedSpaces.first.flatMap { profile(forSpace: $0.id) }
     }
 
     /// The window a session's actions belong to: its private window, else the active window
@@ -436,8 +448,7 @@ final class TabsController {
     func canShow(_ itemID: UUID, in window: BrowserWindowState) -> Bool {
         let source = tree(owner(of: window))
         guard source.item(itemID) != nil else { return false }
-        if let spaceID = source.spaceID(of: itemID) { return spaceID == window.spaceID }
-        return source.profileID(of: itemID) == (window.profileID ?? window.spaceID.flatMap { source.space($0)?.profileID })
+        return source.spaceID(of: itemID) == window.spaceID
     }
 
     // MARK: - Page Ownership
@@ -550,39 +561,20 @@ final class TabsController {
         liveSessions[session.itemID] = session
     }
 
-    // MARK: - App Profiles
-
-    /// The app profile owns the data store; its id is the record id.
-    func createAppProfile(name: String, icon: String) -> UUID {
-        profileManager.createProfile(name: name, icon: icon).id
-    }
-
-    func updateAppProfile(_ profileID: UUID, name: String?, icon: String?) {
-        guard let profile = profileManager.profiles.first(where: { $0.id == profileID }) else { return }
-        if let name { profile.name = name }
-        if let icon { profile.icon = icon }
-        profileManager.persistProfiles()
-    }
-
-    func deleteAppProfile(_ profileID: UUID) -> Bool {
-        guard let profile = profileManager.profiles.first(where: { $0.id == profileID }) else { return false }
-        return profileManager.deleteProfile(profile)
-    }
-
     // MARK: - Windows
 
     /// Sets up a newly registered window: a private window gets its own tree; a regular window
     /// takes an unclaimed saved window record, else the first space. Loads no pages.
     func attach(window: BrowserWindowState) {
-        if window.isIncognito, let profile = window.ephemeralProfile {
+        if window.isIncognito, window.ephemeralProfile != nil {
             if window.privateTree == nil {
+                // One temporary space, never written to disk. Its pages use the window's
+                // ephemeral data store, not one keyed by this id.
                 var privateTree = TabTree()
-                privateTree.createProfile(id: profile.id, name: profile.name, icon: profile.icon)
                 let spaceID = UUID()
-                _ = try? privateTree.createSpace(id: spaceID, profileID: profile.id, name: "Private", icon: "eyeglasses", accentHex: "#3A3A3C", after: nil)
+                privateTree.createSpace(id: spaceID, name: "Private", icon: "eyeglasses", accentHex: "#3A3A3C", after: nil)
                 window.privateTree = privateTree
                 window.spaceID = spaceID
-                window.profileID = profile.id
             }
             return
         }
@@ -600,7 +592,6 @@ final class TabsController {
         if window.spaceID == nil {
             window.spaceID = tree.orderedSpaces.first?.id
         }
-        window.profileID = window.spaceID.flatMap { tree.space($0)?.profileID }
         if let spaceID = window.spaceID, window.selectedItemBySpace[spaceID] == nil,
            let first = displayOrder(in: window).first {
             window.selectedItemBySpace[spaceID] = first

@@ -315,7 +315,7 @@ struct SpacesSideBarView: View {
             if !windowState.isIncognito {
                 PinnedGrid(
                     width: windowState.sidebarContentWidth,
-                    profileId: space.profileID
+                    spaceID: space.id
                 )
                 .environmentObject(browserManager)
                 .environment(windowState)
@@ -355,16 +355,13 @@ struct SpacesSideBarView: View {
     private func showSpaceCreationDialog() {
         browserManager.dialogManager.showDialog(
             SpaceCreationDialog(
-                onCreate: { name, icon, profileId, accentHex in
-                    let profileID = profileId ?? windowState.profileID ?? browserManager.profileManager.profiles.first?.id
-                    if let profileID,
-                       let spaceID = tabs.createSpace(
-                           profileID: profileID,
-                           name: name.isEmpty ? "New Space" : name,
-                           icon: icon.isEmpty ? "square.grid.2x2" : icon,
-                           accentHex: accentHex,
-                           after: tabs.spaces(inProfile: profileID).last?.id
-                       ) {
+                onCreate: { name, icon, accentHex in
+                    if let spaceID = tabs.createSpace(
+                        name: name.isEmpty ? "New Space" : name,
+                        icon: icon.isEmpty ? "square.grid.2x2" : icon,
+                        accentHex: accentHex,
+                        after: tabs.orderedSpaces.last?.id
+                    ) {
                         tabs.setSpace(spaceID, in: windowState)
                     }
                     browserManager.dialogManager.closeDialog()

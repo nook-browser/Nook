@@ -64,9 +64,6 @@ struct AirTrafficControlSettingsView: View {
 
     private func ruleRow(_ rule: SiteRoutingRule) -> some View {
         let space = browserManager.tabs.space(rule.targetSpaceId)
-        // Routing opens in the space's current profile; the stored profile id is only a fallback label.
-        let profileID = space?.profileID ?? rule.targetProfileId
-        let profile = browserManager.profileManager.profiles.first(where: { $0.id == profileID })
 
         return LabeledContent {
             Toggle("Enabled", isOn: Binding(
@@ -100,11 +97,6 @@ struct AirTrafficControlSettingsView: View {
                             .font(NookDesign.Font.caption)
                             .foregroundStyle(.red)
                     }
-                    if browserManager.profileManager.profiles.count > 1, let profile {
-                        Text("(\(profile.name))")
-                            .font(NookDesign.Font.caption)
-                            .foregroundStyle(.tertiary)
-                    }
                 }
             }
         }
@@ -135,7 +127,6 @@ private struct RuleEditSheet: View {
     @State private var domain: String = ""
     @State private var pathPrefix: String = ""
     @State private var selectedSpaceId: UUID?
-    @State private var selectedProfileId: UUID?
     @State private var isEnabled: Bool = true
     @State private var validationError: String?
 
@@ -152,13 +143,9 @@ private struct RuleEditSheet: View {
                 Section("Destination") {
                     Picker("Space", selection: $selectedSpaceId) {
                         Text("Select a space").tag(nil as UUID?)
-                        ForEach(groupedSpaces, id: \.profileName) { group in
-                            Section(group.profileName) {
-                                ForEach(group.spaces) { space in
-                                    Label(space.name, systemImage: space.icon)
-                                        .tag(space.id as UUID?)
-                                }
-                            }
+                        ForEach(browserManager.tabs.orderedSpaces) { space in
+                            Label(space.name, systemImage: space.icon)
+                                .tag(space.id as UUID?)
                         }
                     }
                 }
@@ -196,21 +183,8 @@ private struct RuleEditSheet: View {
                 domain = rule.domain
                 pathPrefix = rule.pathPrefix ?? ""
                 selectedSpaceId = rule.targetSpaceId
-                selectedProfileId = rule.targetProfileId
                 isEnabled = rule.isEnabled
             }
-        }
-        .onChange(of: selectedSpaceId) { _, newValue in
-            if let spaceId = newValue,
-               let space = browserManager.tabs.space(spaceId) {
-                selectedProfileId = space.profileID
-            }
-        }
-    }
-
-    private var groupedSpaces: [(profileName: String, spaces: [SpaceRecord])] {
-        browserManager.profileManager.profiles.filter { !$0.isEphemeral }.map { profile in
-            (profileName: profile.name, spaces: browserManager.tabs.spaces(inProfile: profile.id))
         }
     }
 
@@ -234,8 +208,7 @@ private struct RuleEditSheet: View {
             return
         }
 
-        guard let spaceId = selectedSpaceId,
-              let profileId = selectedProfileId else {
+        guard let spaceId = selectedSpaceId else {
             validationError = "Please select a target space."
             return
         }
@@ -245,7 +218,6 @@ private struct RuleEditSheet: View {
             domain: normalized,
             pathPrefix: effectivePathPrefix,
             targetSpaceId: spaceId,
-            targetProfileId: profileId,
             isEnabled: isEnabled
         )
         onSave(rule)

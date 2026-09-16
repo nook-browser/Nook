@@ -10,23 +10,28 @@ struct SiteRoutingRule: Codable, Identifiable, Equatable {
     var domain: String
     var pathPrefix: String?
     var targetSpaceId: UUID
-    var targetProfileId: UUID
     var isEnabled: Bool
+    /// Only set on rules written before spaces owned their data, where the target was a space
+    /// inside a profile. `SiteRoutingManager.dropMergedProfileTargets()` resolves and clears it.
+    var legacyProfileId: UUID?
 
     init(
         id: UUID = UUID(),
         domain: String,
         pathPrefix: String? = nil,
         targetSpaceId: UUID,
-        targetProfileId: UUID,
         isEnabled: Bool = true
     ) {
         self.id = id
         self.domain = SiteRoutingRule.normalizeDomain(domain)
         self.pathPrefix = pathPrefix
         self.targetSpaceId = targetSpaceId
-        self.targetProfileId = targetProfileId
         self.isEnabled = isEnabled
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, domain, pathPrefix, targetSpaceId, isEnabled
+        case legacyProfileId = "targetProfileId"
     }
 
     static func normalizeDomain(_ input: String) -> String {
