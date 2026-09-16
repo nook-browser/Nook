@@ -27,10 +27,13 @@
   // Deliberately not here yet: gpt.js and google-ima.js are API shims, not
   // empty files, so an empty stub can break a page worse than a blocked one.
   // Add them with a real shim, and a site that proves each one is needed.
+  // Never stub Ad-Shield (html-load.*, ad-shield CDN mirrors). It compares the
+  // script it receives against an X-Length response header, and a data: URL
+  // carries no headers, so an empty stub reads as "script malformed" and it
+  // escalates: on jeepforum.com it replaced the whole document with an
+  // error-report.com modal. Blocking it outright is the milder failure.
   const TABLE = [
     [/\/pagead\/js\/adsbygoogle\.js/, 'js'],   // Google AdSense loader
-    [/html-load\.(cc|com)\/script\//, 'js'],   // Ad-Shield loader
-    [/ad-shield\/e\//, 'js'],                  // Ad-Shield CDN mirrors
     [/a\.pub\.network\/core\/imgs\//, 'img']   // Freestar detection image
   ];
 

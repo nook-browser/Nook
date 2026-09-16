@@ -138,6 +138,14 @@ jeep-cj.com#@#.ad-banner
 jeep-cj.com#@#.ad_box
 jeep-cj.com#@#.adbox
 
+! --- Ad-Shield's error modal (jeepforum.com and other Ad-Shield sites) ---
+! When its loader does not arrive intact, Ad-Shield's inline bootstrap replaces
+! the whole document with an iframe onto report.error-report.com/modal. Remove
+! that bootstrap before it runs, the way uBO does on its Ad-Shield domains, and
+! block the reporting host outright.
+||error-report.com^
+jeepforum.com##+js(remove-node-text, script, error-report.com)
+
 ! === COMMON AD NETWORKS ===
 
 ||pagead2.googlesyndication.com^
