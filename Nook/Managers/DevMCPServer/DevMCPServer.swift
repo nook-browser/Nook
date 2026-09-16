@@ -9,7 +9,6 @@
 //    --header "Authorization: Bearer $(cat ~/Library/Application\ Support/com.baingurley.nook/dev-mcp-token)"
 //
 
-#if DEBUG
 import AppKit
 import Foundation
 import Network
@@ -419,4 +418,3 @@ private struct HTTPRequest {
         body = buffer.subdata(in: bodyStart..<(bodyStart + length))
     }
 }
-#endif
