@@ -11,14 +11,19 @@ struct EmptyWebsiteView: View {
     @Environment(\.colorScheme) var colorScheme
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(WindowRegistry.self) var windowRegistry
 
     var body: some View {
         GeometryReader { proxy in
             ZStack {
-                // Match the exact background and styling of the real webview
-                Color(nsColor: .windowBackgroundColor).opacity(0.2)
+                // Match the container background so this reads as chrome, not webview content.
+                let accent = windowState.isIncognito ? SpaceGradient.incognito.primaryColor : browserManager.gradientColorManager.accentColor
+                let isActive = windowRegistry.activeWindowId == windowState.id
+
+                NookDesign.Surface.containerGradient(accent: accent, isActive: isActive)
                     .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
                     .nookElevation(.raised)
+                    .animation(NookDesign.Motion.standard, value: isActive)
 
                 VStack(spacing: 16) {
                     Image(systemName: "moon.stars")

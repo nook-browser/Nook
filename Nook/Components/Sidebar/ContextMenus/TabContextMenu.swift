@@ -126,26 +126,13 @@ struct TabContextMenu: View {
                     Button {
                         tabs.move(itemID, to: .tabs(spaceID: space.id), after: nil)
                     } label: {
-                        spaceLabel(for: space)
+                        Text(space.name)
                     }
                     .disabled(space.id == current)
                 }
             } label: {
                 Label("Move to Space", systemImage: "arrow.right.square")
             }
-        }
-    }
-
-    @ViewBuilder
-    private func spaceLabel(for space: SpaceRecord) -> some View {
-        if space.icon.isEmojiIcon {
-            Label {
-                Text(space.name)
-            } icon: {
-                Text(space.icon)
-            }
-        } else {
-            Label(space.name, systemImage: space.icon)
         }
     }
 

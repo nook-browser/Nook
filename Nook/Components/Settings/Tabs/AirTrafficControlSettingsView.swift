@@ -144,7 +144,7 @@ private struct RuleEditSheet: View {
                     Picker("Space", selection: $selectedSpaceId) {
                         Text("Select a space").tag(nil as UUID?)
                         ForEach(browserManager.tabs.orderedSpaces) { space in
-                            Label(space.name, systemImage: space.icon)
+                            Text(space.name)
                                 .tag(space.id as UUID?)
                         }
                     }

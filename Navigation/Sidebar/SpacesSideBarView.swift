@@ -355,10 +355,10 @@ struct SpacesSideBarView: View {
     private func showSpaceCreationDialog() {
         browserManager.dialogManager.showDialog(
             SpaceCreationDialog(
-                onCreate: { name, icon, accentHex in
+                onCreate: { name, accentHex in
                     if let spaceID = tabs.createSpace(
                         name: name.isEmpty ? "New Space" : name,
-                        icon: icon.isEmpty ? "square.grid.2x2" : icon,
+                        icon: "square.grid.2x2",
                         accentHex: accentHex,
                         after: tabs.orderedSpaces.last?.id
                     ) {

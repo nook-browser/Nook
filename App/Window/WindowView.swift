@@ -18,17 +18,17 @@ struct WindowView: View {
     @Environment(AIService.self) private var aiService
     @Environment(TabOrganizerManager.self) private var tabOrganizerManager
     @Environment(\.nookSettings) var nookSettings
+    @Environment(\.openSettings) private var openSettings
     @StateObject private var hoverSidebarManager = HoverSidebarManager()
     @Environment(\.colorScheme) var colorScheme
-    
+
     var body: some View {
         ZStack {
             WindowBackground()
                 .contextMenu {
                     Button("Space Settings...") {
-                        if let spaceID = windowState.spaceID {
-                            SpaceEditDialog.present(spaceID: spaceID, tabs: tabs, dialogManager: browserManager.dialogManager)
-                        }
+                        nookSettings.currentSettingsTab = .spaces
+                        openSettings()
                     }
                     .disabled(windowState.spaceID.flatMap { tabs.space($0) } == nil)
                 }
@@ -178,12 +178,17 @@ struct WindowView: View {
 
     @ViewBuilder
     private func WindowBackground() -> some View {
-        BlurEffectView(material: .sidebar, blendingMode: .behindWindow, state: .followsWindowActiveState)
+        // Private windows keep the neutral incognito accent, never the space's color.
+        let accent = windowState.isIncognito ? SpaceGradient.incognito.primaryColor : browserManager.gradientColorManager.accentColor
+        let isActive = windowRegistry.activeWindowId == windowState.id
+
+        NookDesign.Surface.containerGradient(accent: accent, isActive: isActive)
             // Private windows tint all chrome so they are never mistaken for a regular window.
             .overlay(windowState.isIncognito ? NookDesign.Surface.privateTint : Color.clear)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .backgroundDraggable()
             .environment(windowState)
+            .animation(NookDesign.Motion.standard, value: isActive)
     }
 
     @ViewBuilder

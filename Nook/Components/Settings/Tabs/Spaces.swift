@@ -15,6 +15,7 @@ struct SpacesSettingsView: View {
 
     /// Cookie and record counts per space, filled in as each store answers.
     @State private var stats: [UUID: String] = [:]
+    @State private var showAccentPickerFor: UUID?
 
     var body: some View {
         Form {
@@ -39,18 +40,37 @@ struct SpacesSettingsView: View {
     @ViewBuilder
     private func row(_ space: SpaceRecord) -> some View {
         HStack(spacing: NookDesign.Spacing.md) {
-            SpaceIconView(icon: space.icon, tint: space.accentColor)
+            Button {
+                showAccentPickerFor = space.id
+            } label: {
+                Circle()
+                    .fill(space.accentColor)
+                    .frame(width: NookDesign.Size.iconButton, height: NookDesign.Size.iconButton)
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: Binding(
+                get: { showAccentPickerFor == space.id },
+                set: { if !$0 { showAccentPickerFor = nil } }
+            )) {
+                SpaceAccentPicker(selectedHex: Binding(
+                    get: { space.accentHex },
+                    set: { tabs.updateSpace(space.id, name: nil, icon: nil, accentHex: $0) }
+                ))
+                .padding(NookDesign.Spacing.lg)
+            }
+
             VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
-                Text(space.name)
+                TextField("Space name", text: Binding(
+                    get: { space.name },
+                    set: { tabs.updateSpace(space.id, name: $0, icon: nil, accentHex: nil) }
+                ))
+                .textFieldStyle(.plain)
                 Text(stats[space.id] ?? "Checking…")
                     .font(NookDesign.Font.secondary)
                     .foregroundStyle(.secondary)
             }
             Spacer()
             Menu {
-                Button("Edit Space…", systemImage: "pencil") {
-                    SpaceEditDialog.present(spaceID: space.id, tabs: tabs, dialogManager: browserManager.dialogManager)
-                }
                 Button("Clear Website Data", systemImage: "trash") {
                     Task { await clearData(space) }
                 }
@@ -89,10 +109,10 @@ struct SpacesSettingsView: View {
     private func showCreateDialog() {
         browserManager.dialogManager.showDialog(
             SpaceCreationDialog(
-                onCreate: { name, icon, accentHex in
+                onCreate: { name, accentHex in
                     tabs.createSpace(
                         name: name.isEmpty ? "New Space" : name,
-                        icon: icon.isEmpty ? "square.grid.2x2" : icon,
+                        icon: "square.grid.2x2",
                         accentHex: accentHex,
                         after: tabs.orderedSpaces.last?.id
                     )
@@ -107,7 +127,6 @@ struct SpacesSettingsView: View {
         browserManager.dialogManager.showDialog(
             SpaceDeleteConfirmationDialog(
                 spaceName: space.name,
-                spaceIcon: space.icon,
                 tabsCount: tabs.tabCount(inSpace: space.id),
                 isLastSpace: tabs.orderedSpaces.count <= 1,
                 onDelete: {

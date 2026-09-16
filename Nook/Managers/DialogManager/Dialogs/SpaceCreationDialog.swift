@@ -10,18 +10,16 @@ import SwiftUI
 
 struct SpaceCreationDialog: DialogPresentable {
     @State private var spaceName: String
-    @State private var spaceIcon: String
     @State private var accentHex: String = SpaceAccent.defaultHex
 
-    let onCreate: (String, String, String) -> Void
+    let onCreate: (String, String) -> Void
     let onCancel: () -> Void
 
     init(
-        onCreate: @escaping (String, String, String) -> Void,
+        onCreate: @escaping (String, String) -> Void,
         onCancel: @escaping () -> Void
     ) {
         _spaceName = State(initialValue: "")
-        _spaceIcon = State(initialValue: "")
         self.onCreate = onCreate
         self.onCancel = onCancel
     }
@@ -38,7 +36,6 @@ struct SpaceCreationDialog: DialogPresentable {
     func dialogContent() -> some View {
         SpaceCreationContent(
             spaceName: $spaceName,
-            spaceIcon: $spaceIcon,
             accentHex: $accentHex
         )
     }
@@ -65,15 +62,13 @@ struct SpaceCreationDialog: DialogPresentable {
 
     private func handleCreate() {
         let trimmedName = spaceName.trimmingCharacters(in: .whitespacesAndNewlines)
-        onCreate(trimmedName, spaceIcon, accentHex)
+        onCreate(trimmedName, accentHex)
     }
 }
 
 struct SpaceCreationContent: View {
     @Binding var spaceName: String
-    @Binding var spaceIcon: String
     @Binding var accentHex: String
-    @State private var showIconPicker = false
     @EnvironmentObject var browserManager: BrowserManager
 
     var body: some View {
@@ -89,36 +84,6 @@ struct SpaceCreationContent: View {
                     variant: .default,
                     iconName: "textformat"
                 )
-            }
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Space Icon")
-                    .font(NookDesign.Font.label)
-                    .foregroundStyle(.primary)
-
-                HStack(spacing: 12) {
-                    Button {
-                        showIconPicker = true
-                    } label: {
-                        SpaceIconView(icon: spaceIcon, tint: .primary)
-                            .padding(4)
-                            .background(.white.opacity(0.2))
-                            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
-                    }
-                    .contentShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
-                    .buttonStyle(PlainButtonStyle())
-                    .popover(isPresented: $showIconPicker) {
-                        SpaceIconPicker(selected: spaceIcon, onPick: {
-                            spaceIcon = $0
-                            showIconPicker = false
-                        })
-                    }
-
-                    Text("Choose an icon to represent this space")
-                        .font(NookDesign.Font.secondary)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
             }
 
             VStack(alignment: .leading, spacing: NookDesign.Spacing.sectionGap) {

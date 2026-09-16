@@ -9,7 +9,6 @@ import SwiftUI
 
 struct SpaceDeleteConfirmationDialog: DialogPresentable {
     let spaceName: String
-    let spaceIcon: String
     let tabsCount: Int
     let isLastSpace: Bool
     let onDelete: () -> Void
@@ -26,18 +25,9 @@ struct SpaceDeleteConfirmationDialog: DialogPresentable {
     @ViewBuilder
     func dialogContent() -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
-                if spaceIcon.isEmojiIcon {
-                    Text(spaceIcon)
-                        .font(NookDesign.Font.titleLarge)
-                } else {
-                    Image(systemName: spaceIcon)
-                        .font(NookDesign.Font.titleLarge)
-                }
-                Text(spaceName)
-                    .font(NookDesign.Font.title)
-            }
-            .padding(.bottom, 4)
+            Text(spaceName)
+                .font(NookDesign.Font.title)
+                .padding(.bottom, 4)
 
             HStack(spacing: 8) {
                 Label("\(tabsCount) tabs", systemImage: "rectangle.stack")

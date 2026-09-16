@@ -8,6 +8,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 enum NookDesign {
 
@@ -119,6 +120,17 @@ enum NookDesign {
         static let dropBorderActive = Color.primary.opacity(0.4)    // dashed drop target while dragging
         static let scrim = Color.black.opacity(0.4)                 // modal dimming behind a dialog
         static let privateTint = Color(red: 0.36, green: 0.22, blue: 0.62).opacity(0.38) // private window chrome
+
+        /// Sidebar/window chrome fill: the space accent fading to the system window background.
+        /// The top stop is a tint, not the raw accent, so it reads as light/washed out for every
+        /// color. Inactive windows blend further toward that background, approximating the dimming
+        /// NSVisualEffectView.followsWindowActiveState used to give the old blur for free.
+        static func containerGradient(accent: Color, isActive: Bool) -> LinearGradient {
+            let end = Color(nsColor: .windowBackgroundColor)
+            let topBlend = isActive ? 0.55 : 0.8
+            let top = Color(nsColor: NSColor(accent).blended(withFraction: topBlend, of: .windowBackgroundColor) ?? NSColor(accent))
+            return LinearGradient(colors: [top, end], startPoint: .top, endPoint: .bottom)
+        }
     }
 
     // MARK: - Elevation

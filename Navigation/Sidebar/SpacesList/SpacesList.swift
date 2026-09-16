@@ -13,17 +13,9 @@ struct SpacesList: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(TabsController.self) private var tabs
     @Environment(BrowserWindowState.self) private var windowState
-    @State private var availableWidth: CGFloat = 0
     @State private var hoveredSpaceId: UUID?
     @State private var showPreview: Bool = false
     @State private var isHoveringList: Bool = false
-
-    private var layoutMode: SpacesListLayoutMode {
-        SpacesListLayoutMode.determine(
-            spacesCount: visibleSpaces.count,
-            availableWidth: availableWidth
-        )
-    }
 
     private var visibleSpaces: [SpaceRecord] {
         tabs.switchableSpaces(for: windowState)
@@ -31,18 +23,12 @@ struct SpacesList: View {
 
     var body: some View {
         Color.clear
-            .onGeometryChange(for: CGFloat.self) { proxy in
-                proxy.size.width
-            } action: { newWidth in
-                availableWidth = newWidth
-            }
             .overlay{
-                    HStack(spacing: 0) {
-                        ForEach(Array(visibleSpaces.enumerated()), id: \.element.id) { index, space in
+                    HStack(spacing: NookDesign.Spacing.xxs) {
+                        ForEach(visibleSpaces, id: \.id) { space in
                             SpacesListItem(
                                 space: space,
                                 isActive: windowState.spaceID == space.id,
-                                compact: layoutMode == .compact,
                                 isFaded: false,
                                 onHoverChange: { isHovering in
                                     if isHovering {
@@ -69,12 +55,6 @@ struct SpacesList: View {
                                 insertion: .scale.combined(with: .opacity),
                                 removal: .scale.combined(with: .opacity)
                             ))
-                            
-                            if index != visibleSpaces.count - 1 {
-                                Spacer()
-                                    .frame(minWidth: NookDesign.Size.hairlineWidth, maxWidth: NookDesign.Spacing.md)
-                                    .layoutPriority(-1)
-                            }
                         }
                     }
                     .onHoverTracking { hovering in
@@ -103,25 +83,4 @@ struct SpacesList: View {
     }
 
 
-}
-
-// MARK: - Layout Mode
-
-enum SpacesListLayoutMode {
-    case normal    // Full icons with spacing
-    case compact   // Dots for inactive, icons for active
-
-    static func determine(spacesCount: Int, availableWidth: CGFloat) -> Self {
-        guard spacesCount > 0 else { return .normal }
-
-        // Measurements for NookIconButtonStyle at its default size
-        let buttonSize = NookDesign.Size.iconButton
-        let minSpacing = NookDesign.Spacing.xs
-
-        // Normal mode: all icons visible with minimum spacing
-        let normalMinWidth = (CGFloat(spacesCount) * buttonSize) + (CGFloat(spacesCount - 1) * minSpacing)
-
-        // Choose mode: switch to compact whenever normal mode would be too cramped
-        return availableWidth >= normalMinWidth ? .normal : .compact
-    }
 }

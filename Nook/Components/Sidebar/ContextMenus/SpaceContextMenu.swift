@@ -14,31 +14,11 @@ struct SpaceContextMenu: View {
     @Environment(TabsController.self) private var tabs
     let space: SpaceRecord
     let canDelete: Bool
-    let onEditName: (() -> Void)?
-    let onEditIcon: (() -> Void)?
     let onOpenSettings: () -> Void
     let onDeleteSpace: () -> Void
 
     var body: some View {
         Group {
-            // Rename (optional)
-            if let onEditName = onEditName {
-                Button {
-                    onEditName()
-                } label: {
-                    Label("Rename", systemImage: "textformat")
-                }
-            }
-
-            // Change icon (optional)
-            if let onEditIcon = onEditIcon {
-                Button {
-                    onEditIcon()
-                } label: {
-                    Label("Change Icon", systemImage: "face.smiling")
-                }
-            }
-
             // Space settings
             Button {
                 onOpenSettings()
@@ -65,7 +45,6 @@ struct SpaceContextMenu: View {
         browserManager.dialogManager.showDialog(
             SpaceDeleteConfirmationDialog(
                 spaceName: space.name,
-                spaceIcon: space.icon,
                 tabsCount: tabs.tabCount(inSpace: space.id),
                 isLastSpace: !canDelete,
                 onDelete: {
