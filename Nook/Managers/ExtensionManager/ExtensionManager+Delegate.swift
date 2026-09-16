@@ -345,23 +345,36 @@ extension ExtensionManager {
         }
         let url = configuration.url ?? TabsController.homeURL
         let parent: Parent? = configuration.shouldBePinned ? .pinned(spaceID: spaceID) : nil
-        guard let itemID = bm.tabs.open(
-            url: url, in: window, placement: configuration.shouldBeActive ? .newTab : .background, parent: parent)
+        guard let itemID = openExtensionTab(
+            url, in: window, placement: configuration.shouldBeActive ? .newTab : .background,
+            parent: parent, controller: controller)
         else {
             completionHandler(nil, NSError(domain: "ExtensionManager", code: 2, userInfo: [NSLocalizedDescriptionKey: "Could not open tab"]))
             return
         }
+        if configuration.shouldBeMuted { bm.tabs.session(for: itemID)?.setMuted(true) }
+        Self.logger.info("Extension opened tab \(url.absoluteString, privacy: .public)")
+        completionHandler(adapter(for: itemID), nil)
+    }
 
-        // Extension pages (options, popup) load with the extension's configuration.
+    /// Opens one tab for an extension. An extension page (popup, options, a FIDO2 or OAuth popout)
+    /// needs the extension's own configuration; without it the `webkit-extension://` URL does not
+    /// resolve and the tab renders blank.
+    @discardableResult
+    private func openExtensionTab(
+        _ url: URL, in window: BrowserWindowState, placement: TabsController.Placement,
+        parent: Parent? = nil, controller: WKWebExtensionController
+    ) -> UUID? {
+        guard let bm = browserManagerRef,
+              let itemID = bm.tabs.open(url: url, in: window, placement: placement, parent: parent)
+        else { return nil }
         if let scheme = url.scheme?.lowercased(), scheme == "safari-web-extension" || scheme == "webkit-extension",
            let resolvedContext = controller.extensionContext(for: url),
            let session = bm.tabs.session(for: itemID) {
             session.applyConfigurationOverride(
                 resolvedContext.webViewConfiguration ?? BrowserConfiguration.shared.webViewConfiguration)
         }
-        if configuration.shouldBeMuted { bm.tabs.session(for: itemID)?.setMuted(true) }
-        Self.logger.info("Extension opened tab \(url.absoluteString, privacy: .public)")
-        completionHandler(adapter(for: itemID), nil)
+        return itemID
     }
 
     func webExtensionController(
@@ -371,35 +384,22 @@ extension ExtensionManager {
         completionHandler:
             @escaping ((any WKWebExtensionWindow)?, (any Error)?) -> Void
     ) {
-        guard let bm = browserManagerRef, let window = targetWindow(nil) else {
+        guard let window = targetWindow(nil) else {
             completionHandler(nil, Self.noWindowError())
             return
         }
-        let tabs = bm.tabs
 
-        // OAuth flows from extensions open as a tab so they share the page's data store;
-        // mini windows use separate stores, which breaks the flow.
-        if let firstURL = configuration.tabURLs.first, OAuthDetector.isLikelyOAuthPopupURL(firstURL) {
-            tabs.open(url: firstURL, in: window, placement: .newTab)
-            completionHandler(windowAdapter(for: window), nil)
-            return
-        }
-
-        // An extension window is emulated as a new space in the focused window.
-        guard let spaceID = tabs.createSpace(name: "Window", icon: "macwindow",
-                                             accentHex: "#7C7C7C", after: window.spaceID)
-        else {
-            completionHandler(nil, NSError(domain: "ExtensionManager", code: 3, userInfo: [NSLocalizedDescriptionKey: "Could not create window"]))
-            return
-        }
-        tabs.setSpace(spaceID, in: window)
+        // An extension window opens as tabs in the window's current space. A space owns its website
+        // data store, so giving one to each extension window would hand its pages an empty cookie
+        // jar and move the user out of the space they were working in: an OAuth or FIDO2 popout
+        // would lose the session of the very page that asked for it.
         let urls = configuration.tabURLs.isEmpty ? [TabsController.homeURL] : configuration.tabURLs
         // Each tab opens at the top, so open in reverse and select the first URL last.
         for url in urls.dropFirst().reversed() {
-            tabs.open(url: url, in: window, placement: .background)
+            openExtensionTab(url, in: window, placement: .background, controller: controller)
         }
-        tabs.open(url: urls[0], in: window, placement: .newTab)
-        Self.logger.info("Extension opened window as space with \(urls.count) tabs")
+        openExtensionTab(urls[0], in: window, placement: .newTab, controller: controller)
+        Self.logger.info("Extension opened window as \(urls.count) tabs in the current space")
         completionHandler(windowAdapter(for: window), nil)
     }
 
