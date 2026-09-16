@@ -110,6 +110,32 @@ Two options, in order of preference:
 Option 1 needs a check on a handful of ad-heavy sites for layout gaps before it
 ships. It is independent of the shim; either can land first.
 
+## Vendors that validate what comes back
+
+A stub only helps against a detector that asks whether a load *succeeded*.
+Against one that inspects what arrived, an empty stub is a louder signal than a
+block, and the reaction can be worse than the wall.
+
+Ad-Shield proved this in testing. It compares the script it fetches against an
+`X-Length` response header. A `data:` URL carries no headers, so the stub read
+as `script malformed. source length: 0, X-Length: null`, and Ad-Shield went
+from recovering ads to replacing the whole document with an iframe onto
+`report.error-report.com/modal`. Blocked, the same loader only made it try its
+CDN mirrors. Ad-Shield is now excluded from the table, and its error modal is
+handled with filter rules instead: remove the inline bootstrap, block the
+reporting host.
+
+This cannot be satisfied by a better stub. We do not control response headers
+on a `data:` URL, so a length check can never pass.
+
+**This is a hard constraint on phase 2.** Deriving the table from the lists'
+`$redirect` rules automatically will pick up Ad-Shield's patterns again, since
+uBO does redirect some of them, and reintroduce this at scale. Phase 2 needs a
+deny-list of vendors known to validate their payload, applied after the parse,
+seeded with Ad-Shield (`html-load.*`, the `ad-shield` CDN mirrors). Adding a
+vendor to the table is a claim that it checks only whether the load worked, and
+that claim needs a page load to back it.
+
 ## Non-goals
 
 - **No local proxy.** Synthesising HTTPS responses means terminating TLS with
@@ -137,7 +163,8 @@ ships. It is independent of the shim; either can land first.
    (`adsbygoogle.js`, `gpt.js`, `pubads`, Ad-Shield loaders). Settings toggle,
    default on. Verify against the three sites above.
 2. Parse `$redirect` from the lists at compile time and drop the hand-seeded
-   table.
+   table. Needs the payload-validation deny-list above, or it will hand
+   Ad-Shield an empty stub again.
 3. Adopt uBO's API shims one at a time, each with a site that needs it.
 4. Bait-element change, measured on ad-heavy sites for layout damage.
 
