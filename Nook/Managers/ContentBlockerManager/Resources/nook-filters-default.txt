@@ -1,7 +1,7 @@
 ! Title: Nook Filters
 ! Homepage: https://github.com/nook-browser/nook-filters
 ! Description: Site-specific ad blocking rules for Nook browser
-! Last modified: 2026-03-22
+! Last modified: 2026-09-16
 ! License: GPL-3.0
 
 ! === YOUTUBE ===
@@ -98,6 +98,24 @@ reddit.com##.promotedlink
 reddit.com###ad-slot
 reddit.com##shreddit-comments-page-ad
 reddit.com##div[data-testid="post-container"]:has(a[href*="/r/RedditAdvertising/"])
+
+! === ANTI-ADBLOCK WALLS ===
+
+! --- Freestar ad-block wall (vsco.co and other Freestar sites) ---
+! The inline wall script fetches its config from these hosts in turn and reports
+! to <host>/v2/abr. Without a config it never renders. First three are from
+! AdGuard Base antiadblock.txt; frfigures.com is the fourth host in the script.
+||config-factory.com^$third-party
+||content-settings.com^$third-party
+||site-config.com^$third-party
+||frfigures.com^$third-party
+! The config path is <site>.json on every host, so this catches new hosts too.
+/vsco-co.json^$third-party,domain=vsco.co
+! Last resort if the config shape changes: hide the modal (class names are per
+! build) and undo the body overflow lock. The wall also pins scrolling with
+! window.onscroll; set-constant on onscroll makes every write throw, so leave it.
+vsco.co##body > div[dir="auto"][id]:has(> div > div > h2 + span[tabindex])
+vsco.co#$#body:has(> div[dir="auto"][id] > div > div > h2 + span[tabindex]) { overflow: auto !important; }
 
 ! === COMMON AD NETWORKS ===
 
