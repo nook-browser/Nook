@@ -122,11 +122,12 @@ vsco.co#$#body:has(> div[dir="auto"][id] > div > div > h2 + span[tabindex]) { ov
 ! animation bait, fetch(adsbygoogle.js) and, on Safari, an XHR for the same
 ! file. Any failure shows a modal that locks scrolling, and a MutationObserver
 ! rebuilds the modal when it is hidden or collapsed, so cosmetic hiding loops.
-! Both remaining checks have to pass instead: let the bait render at its 1x1
-! size, and answer the two adsbygoogle.js probes with an empty 200 so the
-! script itself stays blocked and no ads load. An @@ exception cannot do the
-! second part: WebKit evaluates each compiled list on its own, so an exception
-! here cannot override EasyList's block of pagead2 in another list.
+! Both remaining checks have to pass instead. The bait needs to render at its
+! 1x1 size, which is what these exceptions do. The two adsbygoogle.js probes
+! are answered by nook-stealth-redirects.js, which is generic and needs no rule
+! here. An @@ exception could not do that job: WebKit evaluates each compiled
+! list on its own, so an exception here cannot override EasyList's pagead2
+! block in another list.
 jeep-cj.com#@#.pub_300x250
 jeep-cj.com#@#.pub_300x250m
 jeep-cj.com#@#.text-ad
@@ -136,8 +137,6 @@ jeep-cj.com#@#.adBanner
 jeep-cj.com#@#.ad-banner
 jeep-cj.com#@#.ad_box
 jeep-cj.com#@#.adbox
-jeep-cj.com##+js(no-fetch-if, adsbygoogle.js)
-jeep-cj.com##+js(no-xhr-if, adsbygoogle.js)
 
 ! === COMMON AD NETWORKS ===
 

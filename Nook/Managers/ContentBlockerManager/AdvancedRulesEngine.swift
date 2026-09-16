@@ -111,6 +111,15 @@ final class AdvancedRulesEngine {
         } else {
             log.error("nook-advanced-blocking.js missing from bundle; advanced rules disabled")
         }
+        // Answers known ad URLs with an inert stub so a blocked request does not
+        // read as a failure to anti-adblock scripts. All frames: detection runs in
+        // subframes too. Removed with the other blocker scripts when a host is
+        // allowlisted, so an exempt page is untouched.
+        if let stealth = bundledSource("nook-stealth-redirects") {
+            scripts.append(WKUserScript(source: scriptMarker + stealth, injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        } else {
+            log.error("nook-stealth-redirects.js missing from bundle; stealth redirects disabled")
+        }
         let siteScripts: [(resource: String, hostPattern: String, setup: String)] = [
             // The feed pruners patch JSON.parse, so they must run before the page's own scripts.
             // facebook-feed-prune is shared with FacebookTweaks; this copy turns on its ad flag.
