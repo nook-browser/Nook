@@ -111,21 +111,23 @@ final class AdvancedRulesEngine {
         } else {
             log.error("nook-advanced-blocking.js missing from bundle; advanced rules disabled")
         }
-        let siteScripts: [(resource: String, hostPattern: String)] = [
+        let siteScripts: [(resource: String, hostPattern: String, setup: String)] = [
             // The feed pruners patch JSON.parse, so they must run before the page's own scripts.
-            ("facebook-feed-prune", #"(^|\.)facebook\.com$"#),
-            ("facebook-sponsored-blocker", #"(^|\.)facebook\.com$"#),
-            ("instagram-feed-prune", #"(^|\.)instagram\.com$"#),
-            ("instagram-sponsored-blocker", #"(^|\.)instagram\.com$"#),
-            ("youtube-ad-blocker", #"(^|\.)(youtube\.com|youtubekids\.com|youtube-nocookie\.com)$"#),
-            ("twitter-ad-blocker", #"(^|\.)(twitter\.com|x\.com)$"#),
+            // facebook-feed-prune is shared with FacebookTweaks; this copy turns on its ad flag.
+            ("facebook-feed-prune", #"(^|\.)facebook\.com$"#,
+             "(window.__nookFBFilter = window.__nookFBFilter || {}).ads = true;"),
+            ("facebook-sponsored-blocker", #"(^|\.)facebook\.com$"#, ""),
+            ("instagram-feed-prune", #"(^|\.)instagram\.com$"#, ""),
+            ("instagram-sponsored-blocker", #"(^|\.)instagram\.com$"#, ""),
+            ("youtube-ad-blocker", #"(^|\.)(youtube\.com|youtubekids\.com|youtube-nocookie\.com)$"#, ""),
+            ("twitter-ad-blocker", #"(^|\.)(twitter\.com|x\.com)$"#, ""),
         ]
         for entry in siteScripts {
             guard let source = bundledSource(entry.resource) else {
                 log.warning("Site script missing from bundle: \(entry.resource, privacy: .public)")
                 continue
             }
-            let guarded = "\(scriptMarker)(function(){ if (!/\(entry.hostPattern)/.test(location.hostname)) return;\n\(source)\n})();"
+            let guarded = "\(scriptMarker)(function(){ if (!/\(entry.hostPattern)/.test(location.hostname)) return;\n\(entry.setup)\n\(source)\n})();"
             scripts.append(WKUserScript(source: guarded, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
         return scripts

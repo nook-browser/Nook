@@ -58,6 +58,8 @@ class NookSettingsService {
     private let youTubeFrameThumbnailsKey = "settings.youTubeFrameThumbnails"
     private let youTubeNoHoverPreviewKey = "settings.youTubeNoHoverPreview"
     private let socialImageDownloadKey = "settings.socialImageDownload"
+    private let facebookHideReelsKey = "settings.facebookHideReels"
+    private let facebookHideSuggestedKey = "settings.facebookHideSuggested"
 
     var currentSettingsTab: SettingsTabs = .general
 
@@ -352,6 +354,16 @@ class NookSettingsService {
         didSet { userDefaults.set(socialImageDownload, forKey: socialImageDownloadKey) }
     }
 
+    /// Remove the Reels carousel from Facebook's news feed.
+    var facebookHideReels: Bool {
+        didSet { userDefaults.set(facebookHideReels, forKey: facebookHideReelsKey) }
+    }
+
+    /// Remove posts and units from groups, pages, and people the viewer does not follow.
+    var facebookHideSuggested: Bool {
+        didSet { userDefaults.set(facebookHideSuggested, forKey: facebookHideSuggestedKey) }
+    }
+
     init() {
         // Register default values
         userDefaults.register(defaults: [
@@ -483,6 +495,8 @@ class NookSettingsService {
         self.youTubeFrameThumbnails = userDefaults.bool(forKey: youTubeFrameThumbnailsKey)
         self.youTubeNoHoverPreview = userDefaults.bool(forKey: youTubeNoHoverPreviewKey)
         self.socialImageDownload = userDefaults.bool(forKey: socialImageDownloadKey)
+        self.facebookHideReels = userDefaults.bool(forKey: facebookHideReelsKey)
+        self.facebookHideSuggested = userDefaults.bool(forKey: facebookHideSuggestedKey)
 
         if let data = userDefaults.data(forKey: siteSearchEntriesKey),
            let decoded = try? JSONDecoder().decode([SiteSearchEntry].self, from: data) {
