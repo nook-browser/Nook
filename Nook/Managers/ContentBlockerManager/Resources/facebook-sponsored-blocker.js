@@ -127,16 +127,8 @@
       }
     }
 
-    // Strategy 2: data-ad-rendering-role (supplementary signal only)
-    // Facebook uses this attribute on regular page/group posts too, not just ads.
-    // Only log — do NOT hide based on this attribute alone.
-    var adRoles = document.querySelectorAll('[data-ad-rendering-role]:not([data-nook-blocked])');
-    for (var k = 0; k < adRoles.length; k++) {
-      var post4 = getPostContainer(adRoles[k]);
-      if (post4 && !markedPosts.has(post4)) {
-        console.log(TAG, 'skip ad-role-only:', describePost(post4));
-      }
-    }
+    // (Strategy 2, data-ad-rendering-role, removed 2026-09: Facebook puts it on organic posts
+    //  too, so it only logged, and re-walking every post each scan caused load-time jank.)
 
     // Strategy 3: /ads/about links — only process NEW ones
     var adsAboutLinks = document.querySelectorAll('a[href*="/ads/about"]');
@@ -167,17 +159,8 @@
       }
     }
 
-    // Strategy 5: data-ad-comet-preview / data-ad-preview — seen live on an ad post whose
-    // CTA used the generic l.facebook.com/l.php outbound shim (not ads/ig_redirect), so
-    // Strategies 1/3/4 missed it. Unlike data-ad-rendering-role (Strategy 2), not yet seen
-    // on an organic post — validate live and drop this if it starts hiding real posts.
-    var adPreviewEls = document.querySelectorAll('[data-ad-comet-preview]:not([data-nook-blocked]), [data-ad-preview]:not([data-nook-blocked])');
-    for (var q = 0; q < adPreviewEls.length; q++) {
-      var post7 = getPostContainer(adPreviewEls[q]);
-      if (post7 && !markedPosts.has(post7)) {
-        hidePost(post7, 'ad-preview-attr');
-      }
-    }
+    // (Strategy 5, data-ad-comet-preview / data-ad-preview, removed 2026-09: live logs showed it
+    //  on organic posts: most of 48 live hides were group and friend posts.)
 
     var newHides = hiddenCount - hidesBefore;
     if (newHides > 0) {

@@ -1,7 +1,11 @@
-// Nook Content Blocker — Instagram Sponsored Post & Story Blocker
+// Nook Content Blocker — Instagram Story Ad Fallback
 //
-// Instagram marks sponsored feed posts and stories with a leaf text node reading exactly
-// "Ad" in the post/story header (confirmed live, Sept 2026 — unlike Facebook's per-letter
+// instagram-feed-prune.js removes feed and story ads from the data, so this only skips a story
+// ad that still reaches the screen. (A DOM feed scan was removed 2026-09: Instagram's
+// virtualized feed recycles <article> nodes, and hiding them blanked the feed.)
+//
+// Instagram marks sponsored stories with a leaf text node reading exactly
+// "Ad" in the story header (confirmed live, Sept 2026 — unlike Facebook's per-letter
 // "Sponsored" spans, this is a plain text node). LABELS also covers "sponsored" and a few
 // localizations in case placement or locale ever renders that instead.
 (function() {
@@ -18,10 +22,6 @@
     'patrocinado': true, 'gesponsord': true, '広告': true, '광고': true, '赞助': true,
   };
 
-  var POST_SEL = 'article';
-
-  var hiddenCount = 0;
-
   function findAdLabel(root) {
     var stack = [root];
     while (stack.length) {
@@ -34,31 +34,6 @@
       if (t && LABELS[t]) return node;
     }
     return null;
-  }
-
-  function scanFeed() {
-    // Re-check every visible post on every scan rather than caching a per-node verdict:
-    // Instagram's feed is virtualized and recycles <article> DOM nodes for different posts
-    // as you scroll, so a node marked "ad" earlier can become a real post later — a cached
-    // verdict would leave it hidden (or hide a future ad-labeled post's real predecessor)
-    // forever. The feed is small enough on screen that re-scanning is cheap.
-    var posts = document.querySelectorAll(POST_SEL);
-    for (var i = 0; i < posts.length; i++) {
-      var post = posts[i];
-      var header = post.querySelector('header') || post;
-      var label = findAdLabel(header);
-      if (label) {
-        if (post.getAttribute('data-nook-blocked') !== 'sponsored') {
-          hiddenCount++;
-          post.style.setProperty('display', 'none', 'important');
-          post.setAttribute('data-nook-blocked', 'sponsored');
-          console.log(TAG, 'HIDE #' + hiddenCount, 'label="' + label.textContent.trim() + '"');
-        }
-      } else if (post.getAttribute('data-nook-blocked') === 'sponsored') {
-        post.style.removeProperty('display');
-        post.removeAttribute('data-nook-blocked');
-      }
-    }
   }
 
   // --- Stories: advance past an ad as soon as it becomes the active story.
@@ -95,7 +70,6 @@
   }
 
   function scan() {
-    scanFeed();
     scanStories();
   }
 

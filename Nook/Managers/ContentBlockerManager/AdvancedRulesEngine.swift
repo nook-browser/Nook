@@ -112,7 +112,10 @@ final class AdvancedRulesEngine {
             log.error("nook-advanced-blocking.js missing from bundle; advanced rules disabled")
         }
         let siteScripts: [(resource: String, hostPattern: String)] = [
+            // The feed pruners patch JSON.parse, so they must run before the page's own scripts.
+            ("facebook-feed-prune", #"(^|\.)facebook\.com$"#),
             ("facebook-sponsored-blocker", #"(^|\.)facebook\.com$"#),
+            ("instagram-feed-prune", #"(^|\.)instagram\.com$"#),
             ("instagram-sponsored-blocker", #"(^|\.)instagram\.com$"#),
             ("youtube-ad-blocker", #"(^|\.)(youtube\.com|youtubekids\.com|youtube-nocookie\.com)$"#),
             ("twitter-ad-blocker", #"(^|\.)(twitter\.com|x\.com)$"#),
