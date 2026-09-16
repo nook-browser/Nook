@@ -33,6 +33,7 @@ final class ContentBlockerManager: NSObject {
     /// Non-nil while detailed counts are on. Each enable mints a new token; pages injected
     /// under an older token are ignored until they reload.
     private var requestStatsToken: String?
+    var detailedCountsEnabled: Bool { requestStatsToken != nil }
     private var lastRulesHash: String?
 
     /// In-flight activation; startup tab loading waits on it so the first page is protected.
