@@ -2,7 +2,7 @@
 
 Date: 2026-09-17
 Gate for: [the AdGuard swap plan](./2026-09-17-adblock-rust-swap.md), Task 9
-Verdict: **go**
+Verdict: **go**, with one regression found after the sweep and fixed in `7dee97d`. See "Regression found after this gate".
 
 ## Method
 
@@ -17,13 +17,13 @@ cleared first so neither could take a cache hit. The baseline is commit
 | | SafariConverterLib (`019d7db`) | adblock-rust (`8d0b157`) |
 |---|---|---|
 | Input lines loaded | 177,405 | 177,405 |
-| Safari rules produced | 148,441 | **154,997** |
-| Entries compiled | 148,450 | 155,006 |
+| Safari rules produced | 148,441 | **154,263** |
+| Entries compiled | 148,450 | 154,272 |
 | Compiled rule lists | 5 | 6 |
 | Conversion wall time | 1.73s | **0.23s** |
 | Lookup engine build | not logged | 0.06s |
 
-adblock-rust puts 6,556 more rules into the content rule list, 4.4% more, and
+adblock-rust puts 5,822 more rules into the content rule list, 3.9% more, and
 converts 7.5 times faster. More rules in the compiled list means more blocking
 happens natively in WebKit's out-of-process matcher rather than through
 injected CSS.
@@ -38,12 +38,12 @@ SafariConverterLib reported `163,734 source, 148,441 safari, 4,566 advanced,
 rules it cannot express in Safari syntax into "advanced" (routed to its runtime
 engine) and "errors" (discarded).
 
-`RustContentBlockingConverter` reports `177,405 source, 154,997 safari, 12,652
+`RustContentBlockingConverter` reports `177,405 source, 154,263 safari, 12,624
 errors`. It counts every line it was handed, skips comments and `[Adblock`
 headers without counting them, and lumps everything that fails
 `CbRuleEquivalent::try_from` into one bucket.
 
-So Nook's 12,652 is the analogue of SafariConverterLib's 4,566 + 4,341 = 8,907,
+So Nook's 12,624 is the analogue of SafariConverterLib's 4,566 + 4,341 = 8,907,
 and the difference is mostly procedural cosmetic rules and `$redirect=` rules,
 which are still handled: procedural rules come back through
 `BlockerEngine.configuration` at lookup time, and `$removeparam` is handled
@@ -84,6 +84,28 @@ rather than a code result, and a signed Release build should be run before
 shipping.
 
 17 Rust tests pass in release.
+
+## Regression found after this gate
+
+This sweep passed while a serious over-block was live, which is worth recording
+as a limit of the method rather than glossed over.
+
+Every cosmetic exception in every list was being converted into a site-wide
+hide rule. The crate inverts an `UNHIDE` filter's domains into `unless_domain`,
+so `redtube.com#@#svg` became a `css-display-none` rule for `svg` with no
+`if-domain`. On facebook.com that hid 46 of 46 SVGs. `$badfilter` had the same
+shape and was also being converted into blocks. Fixed in `7dee97d`; the numbers
+in this document are the post-fix ones.
+
+**Why the sweep missed it.** The eight sites were checked for "did the page
+load and is the script active", and every one of them did load. Hidden icons
+are invisible to a body-text-length check. A count of elements with computed
+`display: none`, compared against the same page with blocking off, would have
+caught it immediately and now exists as
+`tests/no_overbroad_rules.rs` at the conversion layer.
+
+**The lesson for the iOS phases.** "Page rendered" is not a blocking-correctness
+check. Any future gate needs an A/B against blocking-off on the same page.
 
 ## What this gate did not cover
 
