@@ -275,7 +275,7 @@ The passkey entitlement (`web-browser.public-key-credential`) was requested and 
 | **FaviconFinder** | FaviconFinder | Fetches favicon URLs | PageSession, CommandPalette suggestions, SidebarMenuHistoryTab |
 | **mlx-swift-lm** | MLXLLM | On-device LLM inference (Apple Silicon only) | LocalLLMEngine → TabOrganizerManager |
 
-Transitive: swift-atomics, swift-numerics, swift-collections, swift-transformers, swift-jinja, swift-argument-parser, swift-asn1, swift-crypto, swift-log, SwiftSoup, LRUCache, Chronicle, yyjson, mlx-swift.
+Transitive: swift-atomics, swift-numerics, swift-collections, swift-transformers, swift-jinja, swift-asn1, swift-crypto, swift-log, SwiftSoup, LRUCache, Chronicle, yyjson, mlx-swift.
 
 **Nook links no GPL-3.0 code it does not own.** SafariConverterLib (AdGuard, GPL-3.0) was removed in September 2026 because a §7 App Store exception can only be granted by a copyright holder. See `LICENSE-EXCEPTION.md`.
 
