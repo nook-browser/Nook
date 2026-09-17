@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import NookDesign
 
 struct SplitCardView: View {
     var icon: String

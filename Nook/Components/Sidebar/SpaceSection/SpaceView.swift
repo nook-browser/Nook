@@ -12,6 +12,7 @@
 
 import NookTabsCore
 import SwiftUI
+import NookDesign
 
 struct SpaceView: View {
     let spaceID: UUID

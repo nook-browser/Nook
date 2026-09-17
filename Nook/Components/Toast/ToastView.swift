@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import NookDesign
 
 /// A reusable toast container that provides standardized visual styling.
 /// Use with `.transition(.toast)` and `.animation(NookDesign.Motion.standard, value: condition)` in parent.

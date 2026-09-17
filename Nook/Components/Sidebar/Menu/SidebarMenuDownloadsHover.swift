@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import NookDesign
 import UniformTypeIdentifiers
 
 struct SidebarMenuHoverDownloads: View {

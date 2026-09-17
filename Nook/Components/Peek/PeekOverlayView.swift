@@ -7,6 +7,7 @@
 
 import NookTabsCore
 import SwiftUI
+import NookDesign
 import AppKit
 
 struct PeekOverlayView: View {

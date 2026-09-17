@@ -7,6 +7,7 @@
 
 import NookTabsCore
 import SwiftUI
+import NookDesign
 
 /// One tab row in the sidebar outline.
 struct SpaceTab: View {

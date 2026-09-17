@@ -10,6 +10,7 @@ import AppKit
 import NookSettings
 import NookTabsCore
 import SwiftUI
+import NookDesign
 import UniformTypeIdentifiers
 import Sparkle
 

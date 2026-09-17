@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import NookDesign
 
 struct EditPinnedURLDialog: DialogPresentable {
     let originalURL: String

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import NookDesign
 
 struct SpaceAccentPicker: View {
     @Binding var selectedHex: String

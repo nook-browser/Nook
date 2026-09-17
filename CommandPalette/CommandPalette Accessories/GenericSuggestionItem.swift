@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import NookDesign
 
 struct GenericSuggestionItem: View {
     let icon: Image

@@ -8,6 +8,7 @@
 
 import NookTabsCore
 import SwiftUI
+import NookDesign
 
 struct SpacesList: View {
     @EnvironmentObject var browserManager: BrowserManager

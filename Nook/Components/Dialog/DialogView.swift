@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import NookDesign
 
 struct DialogView: View {
     @EnvironmentObject var browserManager: BrowserManager

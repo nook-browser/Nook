@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import NookDesign
 
 struct CacheDetailsView: View {
     let cache: CacheInfo

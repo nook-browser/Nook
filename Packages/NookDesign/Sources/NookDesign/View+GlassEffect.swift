@@ -9,7 +9,7 @@
 
 import SwiftUI
 
-extension View {
+public extension View {
     /// Liquid Glass layer that floats over content. Never sidebar rows.
     @ViewBuilder
     func nookGlassEffect<S: Shape>(in shape: S) -> some View {

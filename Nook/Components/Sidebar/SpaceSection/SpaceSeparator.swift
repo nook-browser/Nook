@@ -5,6 +5,7 @@
 //  Created by Maciek Bagiński on 30/07/2025.
 //
 import SwiftUI
+import NookDesign
 
 struct SpaceSeparator: View {
     @Binding var isHovering: Bool

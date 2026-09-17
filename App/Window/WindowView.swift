@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import NookDesign
 
 /// Main window view that orchestrates the browser UI layout
 struct WindowView: View {

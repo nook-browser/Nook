@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import NookDesign
 
 struct TabClosureToast: View {
     @EnvironmentObject var browserManager: BrowserManager

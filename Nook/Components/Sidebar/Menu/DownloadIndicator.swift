@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import NookDesign
 
 struct DownloadIndicator: View {
     @EnvironmentObject var browserManager: BrowserManager

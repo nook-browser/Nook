@@ -7,6 +7,7 @@
 
 import AppKit
 import SwiftUI
+import NookDesign
 
 struct SpaceCreationDialog: DialogPresentable {
     @State private var spaceName: String

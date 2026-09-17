@@ -7,6 +7,7 @@
 
 import AppKit
 import SwiftUI
+import NookDesign
 
 struct PageElsewhereView: View {
     let title: String

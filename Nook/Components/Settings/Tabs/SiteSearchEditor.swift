@@ -7,6 +7,7 @@
 
 import NookSettings
 import SwiftUI
+import NookDesign
 
 struct SiteSearchEntryEditor: View {
     let entry: SiteSearchEntry?

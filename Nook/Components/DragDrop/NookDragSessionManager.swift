@@ -5,6 +5,7 @@
 //
 
 import SwiftUI
+import NookDesign
 @preconcurrency import AppKit
 import Combine
 import NookTabsCore

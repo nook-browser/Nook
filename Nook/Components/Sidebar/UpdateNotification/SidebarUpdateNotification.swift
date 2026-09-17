@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import NookDesign
 
 struct SidebarUpdateNotification: View {
     @EnvironmentObject var browserManager: BrowserManager

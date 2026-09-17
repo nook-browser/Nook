@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import NookDesign
 
 struct TabSuggestionItem: View {
     let tab: SearchManager.TabMatch

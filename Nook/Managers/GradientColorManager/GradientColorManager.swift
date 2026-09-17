@@ -9,6 +9,7 @@
 
 import AppKit
 import SwiftUI
+import NookDesign
 
 @MainActor
 final class GradientColorManager: ObservableObject {

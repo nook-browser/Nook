@@ -6,6 +6,7 @@
 //
 import NookTabsCore
 import SwiftUI
+import NookDesign
 import UniformTypeIdentifiers
 
 struct PinnedGrid: View {

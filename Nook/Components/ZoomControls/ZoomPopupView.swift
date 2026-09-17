@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import NookDesign
 
 struct ZoomPopupView: View {
     @ObservedObject var zoomManager: ZoomManager

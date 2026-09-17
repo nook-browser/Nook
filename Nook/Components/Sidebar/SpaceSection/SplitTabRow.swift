@@ -1,5 +1,6 @@
 import NookTabsCore
 import SwiftUI
+import NookDesign
 
 /// The window's split pair shown as one sidebar row (from `BrowserWindowState.split`).
 struct SplitTabRow: View {

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import NookDesign
 
 struct ToolExecutionGlowView: View {
     @State private var rotation1: Double = 0

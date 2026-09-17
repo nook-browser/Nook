@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import NookDesign
 
 struct FindBarView: View {
     @ObservedObject var findManager: FindManager

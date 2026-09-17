@@ -7,6 +7,7 @@
 
 import NookSettings
 import SwiftUI
+import NookDesign
 
 struct SettingsAITab: View {
     @Environment(\.nookSettings) var nookSettings

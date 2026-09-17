@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import NookDesign
 
 /// Square icon button. Hover shows a fill, press shows a stronger fill and a 0.95 scale.
 /// Pass size: or radius: only where a call site needs a non-default (media controls 24, URL bar and space title 28, space switcher radius lg).

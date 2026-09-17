@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import NookDesign
 
 enum Tabs {
     case history

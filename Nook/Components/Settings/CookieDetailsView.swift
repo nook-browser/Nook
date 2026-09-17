@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import NookDesign
 
 struct CookieDetailsView: View {
     let cookie: CookieInfo

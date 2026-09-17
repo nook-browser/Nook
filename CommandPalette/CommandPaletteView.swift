@@ -8,6 +8,7 @@
 import AppKit
 import NookSettings
 import SwiftUI
+import NookDesign
 import Garnish
 
 struct CommandPaletteView: View {

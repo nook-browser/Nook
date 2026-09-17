@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import NookDesign
 
 struct SettingsAdBlockerTab: View {
     @EnvironmentObject var browserManager: BrowserManager

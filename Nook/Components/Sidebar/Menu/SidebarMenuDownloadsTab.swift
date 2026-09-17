@@ -7,6 +7,7 @@
 
 import AppKit
 import SwiftUI
+import NookDesign
 import UniformTypeIdentifiers
 
 struct SidebarMenuDownloadsTab: View {

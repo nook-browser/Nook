@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import NookDesign
 
 struct ShortcutsSettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager

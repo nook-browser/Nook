@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import NookDesign
 
 struct AISidebarResizeView: View {
     @EnvironmentObject var browserManager: BrowserManager

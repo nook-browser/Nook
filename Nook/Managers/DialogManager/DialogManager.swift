@@ -7,6 +7,7 @@
 
 import Observation
 import SwiftUI
+import NookDesign
 
 @MainActor
 @Observable

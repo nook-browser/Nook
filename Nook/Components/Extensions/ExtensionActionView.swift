@@ -7,6 +7,7 @@
 
 import NookSettings
 import SwiftUI
+import NookDesign
 import WebKit
 import AppKit
 import os

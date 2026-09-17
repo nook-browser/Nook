@@ -22,6 +22,7 @@
 		A1B2C3D62F0E6A0100ABCDEF /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D52F0E6A0100ABCDEF /* MLXLLM */; };
 		C0DE7AB50000000000000003 /* NookTabsCore in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE7AB50000000000000002 /* NookTabsCore */; };
 		C0DE7AB50000000000000013 /* NookSettings in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE7AB50000000000000012 /* NookSettings */; };
+		C0DE7AB50000000000000023 /* NookDesign in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE7AB50000000000000022 /* NookDesign */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -138,6 +139,7 @@
 				A1B2C3D62F0E6A0100ABCDEF /* MLXLLM in Frameworks */,
 				C0DE7AB50000000000000003 /* NookTabsCore in Frameworks */,
 				C0DE7AB50000000000000013 /* NookSettings in Frameworks */,
+				C0DE7AB50000000000000023 /* NookDesign in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -196,6 +198,7 @@
 				A1B2C3D52F0E6A0100ABCDEF /* MLXLLM */,
 				C0DE7AB50000000000000002 /* NookTabsCore */,
 				C0DE7AB50000000000000012 /* NookSettings */,
+				C0DE7AB50000000000000022 /* NookDesign */,
 			);
 			productName = Pulse;
 			productReference = 7F8340FC2E37F39400674A5D /* Nook.app */;
@@ -232,6 +235,7 @@
 				A1B2C3D42F0E6A0100ABCDEF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
 				C0DE7AB50000000000000001 /* XCLocalSwiftPackageReference "Packages/NookTabsCore" */,
 				C0DE7AB50000000000000011 /* XCLocalSwiftPackageReference "Packages/NookSettings" */,
+				C0DE7AB50000000000000021 /* XCLocalSwiftPackageReference "Packages/NookDesign" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7F8340FD2E37F39400674A5D /* Products */;
@@ -533,6 +537,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NookSettings;
 		};
+		C0DE7AB50000000000000021 /* XCLocalSwiftPackageReference "Packages/NookDesign" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NookDesign;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -598,6 +606,10 @@
 		C0DE7AB50000000000000012 /* NookSettings */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = NookSettings;
+		};
+		C0DE7AB50000000000000022 /* NookDesign */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NookDesign;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
