@@ -28,6 +28,27 @@ final class DevMCPServer {
     private var token = ""
     private let queue = DispatchQueue(label: "com.baingurley.nook.devmcp")
 
+    /// Remember the browser and start only if the user has turned the server on.
+    /// Off is the default: see NookSettingsService.browserControlServerEnabled.
+    func configure(browserManager: BrowserManager, enabled: Bool) {
+        self.browserManager = browserManager
+        applyEnabledSetting(enabled)
+    }
+
+    /// Called when the setting changes, so the server starts and stops without a relaunch.
+    func applyEnabledSetting(_ enabled: Bool) {
+        guard enabled else { stop(); return }
+        guard let browserManager else { return }   // configure() has not run yet
+        start(browserManager: browserManager)
+    }
+
+    func stop() {
+        guard listener != nil else { return }
+        listener?.cancel()
+        listener = nil
+        Self.log.notice("listener stopped")
+    }
+
     func start(browserManager: BrowserManager) {
         guard listener == nil else { return }
         self.browserManager = browserManager

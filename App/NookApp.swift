@@ -166,7 +166,7 @@ struct NookApp: App {
         browserManager.keyboardShortcutManager = keyboardShortcutManager
         browserManager.mcpManager = mcpManager
         browserManager.tabOrganizerManager = tabOrganizerManager
-        DevMCPServer.shared.start(browserManager: browserManager)
+        DevMCPServer.shared.configure(browserManager: browserManager, enabled: settingsManager.browserControlServerEnabled)
 
         // Set up window lifecycle callbacks
         windowRegistry.onWindowRegister = { [weak browserManager] windowState in

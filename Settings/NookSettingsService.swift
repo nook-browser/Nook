@@ -30,6 +30,7 @@ class NookSettingsService {
     private let geminiApiKeyKey = "settings.geminiApiKey"
     private let geminiModelKey = "settings.geminiModel"
     private let showAIAssistantKey = "settings.showAIAssistant"
+    private let browserControlServerKey = "settings.browserControlServer"
     private let aiProviderKey = "settings.aiProvider"
     private let openRouterApiKeyKey = "settings.openRouterApiKey"
     private let openRouterModelKey = "settings.openRouterModel"
@@ -215,6 +216,16 @@ class NookSettingsService {
         }
     }
 
+    /// Local MCP server (127.0.0.1:47823) that lets a coding agent drive this browser.
+    /// Off by default: anything that can read the token file gets full control of the
+    /// browser, including pages the user is signed in to. See DevMCPServer.
+    var browserControlServerEnabled: Bool {
+        didSet {
+            userDefaults.set(browserControlServerEnabled, forKey: browserControlServerKey)
+            DevMCPServer.shared.applyEnabledSetting(browserControlServerEnabled)
+        }
+    }
+
     var aiProvider: AIProvider {
         didSet {
             userDefaults.set(aiProvider.rawValue, forKey: aiProviderKey)
@@ -389,6 +400,7 @@ class NookSettingsService {
 
             geminiModelKey: GeminiModel.flash.rawValue,
             showAIAssistantKey: true,
+            browserControlServerKey: false,
             aiProviderKey: AIProvider.gemini.rawValue,
             openRouterModelKey: OpenRouterModel.gpt4o.rawValue,
             ollamaEndpointKey: "http://localhost:11434",
@@ -477,6 +489,7 @@ class NookSettingsService {
         self.geminiApiKey = ""  // In-memory only; persistent storage via AIKeychainStorage
         self.geminiModel = GeminiModel(rawValue: userDefaults.string(forKey: geminiModelKey) ?? GeminiModel.flash.rawValue) ?? .flash
         self.showAIAssistant = userDefaults.bool(forKey: showAIAssistantKey)
+        self.browserControlServerEnabled = userDefaults.bool(forKey: browserControlServerKey)
         self.aiProvider = AIProvider(rawValue: userDefaults.string(forKey: aiProviderKey) ?? AIProvider.gemini.rawValue) ?? .gemini
         self.openRouterApiKey = ""  // In-memory only; persistent storage via AIKeychainStorage
         self.openRouterModel = OpenRouterModel(rawValue: userDefaults.string(forKey: openRouterModelKey) ?? OpenRouterModel.gpt4o.rawValue) ?? .gpt4o
