@@ -8,6 +8,7 @@
 import Foundation
 import WebKit
 import SwiftUI
+import NookWeb
 
 @MainActor
 class CacheManager: ObservableObject {

@@ -5,6 +5,7 @@
 
 import Foundation
 import NookTabsCore
+import NookWeb
 import SwiftUI
 
 extension BrowserManager {

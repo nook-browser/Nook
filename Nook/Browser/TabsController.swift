@@ -10,6 +10,7 @@
 
 import AppKit
 import NookTabsCore
+import NookWeb
 import OSLog
 import WebKit
 

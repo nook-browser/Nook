@@ -14,27 +14,27 @@ import Observation
 
 @MainActor
 @Observable
-final class Profile: NSObject, Identifiable {
-    let id: UUID
-    var name: String
-    var icon: String
-    let dataStore: WKWebsiteDataStore
+public final class Profile: NSObject, Identifiable {
+    public let id: UUID
+    public var name: String
+    public var icon: String
+    public let dataStore: WKWebsiteDataStore
     // Metadata (not yet persisted)
-    var createdDate: Date = Date()
-    var lastUsed: Date = Date()
-    var isDefault: Bool { name.lowercased() == "default" }
+    public var createdDate: Date = Date()
+    public var lastUsed: Date = Date()
+    public var isDefault: Bool { name.lowercased() == "default" }
     
     /// Whether this is an ephemeral/incognito profile (no disk persistence)
-    var isEphemeral: Bool = false
+    public var isEphemeral: Bool = false
     
     // Cached stats
-    private(set) var cachedCookieCount: Int = 0
-    private(set) var cachedRecordCount: Int = 0
-    var estimatedDataSize: String { "Cookies: \(cachedCookieCount), Records: \(cachedRecordCount)" }
-    var cookieCount: Int { cachedCookieCount }
-    var hasStoredData: Bool { cachedCookieCount > 0 || cachedRecordCount > 0 }
+    public private(set) var cachedCookieCount: Int = 0
+    public private(set) var cachedRecordCount: Int = 0
+    public var estimatedDataSize: String { "Cookies: \(cachedCookieCount), Records: \(cachedRecordCount)" }
+    public var cookieCount: Int { cachedCookieCount }
+    public var hasStoredData: Bool { cachedCookieCount > 0 || cachedRecordCount > 0 }
 
-    init(
+    public init(
         id: UUID = UUID(),
         name: String = "Default Profile",
         icon: String = "person.crop.circle"
@@ -48,7 +48,7 @@ final class Profile: NSObject, Identifiable {
     }
 
     /// Initialize with a custom data store (used for ephemeral profiles)
-    init(
+    public init(
         id: UUID = UUID(),
         name: String,
         icon: String,
@@ -63,7 +63,7 @@ final class Profile: NSObject, Identifiable {
 
     // MARK: - Ephemeral Profile Factory
     /// Create a new ephemeral/incognito profile with non-persistent data store
-    static func createEphemeral() -> Profile {
+    public static func createEphemeral() -> Profile {
         let profile = Profile(
             id: UUID(),
             name: "Incognito",
@@ -75,7 +75,7 @@ final class Profile: NSObject, Identifiable {
     }
 
     // MARK: - Validation & Stats
-    func validateDataStore() async -> Bool {
+    public func validateDataStore() async -> Bool {
         // Basic check: store exists and is persistent
         if dataStore.isPersistent == false { return false }
         await refreshDataStoreStats()
@@ -83,7 +83,7 @@ final class Profile: NSObject, Identifiable {
     }
 
     @MainActor
-    func refreshDataStoreStats() async {
+    public func refreshDataStoreStats() async {
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
             dataStore.httpCookieStore.getAllCookies { cookies in
                 self.cachedCookieCount = cookies.count
@@ -107,7 +107,7 @@ final class Profile: NSObject, Identifiable {
     }
 
     // MARK: - Cleanup
-    func clearAllData() async {
+    public func clearAllData() async {
         let allTypes: Set<String> = [
             WKWebsiteDataTypeCookies,
             WKWebsiteDataTypeDiskCache,
@@ -129,7 +129,7 @@ final class Profile: NSObject, Identifiable {
     /// This should be called before releasing an ephemeral profile to ensure
     /// all incognito data is wiped and the store can be properly deallocated.
     /// - Parameter completion: Optional completion handler called when destruction is complete
-    func destroyEphemeralDataStore(completion: (() -> Void)? = nil) {
+    public func destroyEphemeralDataStore(completion: (() -> Void)? = nil) {
         guard isEphemeral else {
             completion?()
             return

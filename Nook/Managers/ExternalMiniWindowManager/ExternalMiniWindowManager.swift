@@ -9,6 +9,7 @@ import SwiftUI
 import WebKit
 import AppKit
 import Combine
+import NookWeb
 
 @MainActor
 final class MiniWindowSession: ObservableObject, Identifiable {

@@ -9,6 +9,7 @@ import AppKit
 import SwiftUI
 import WebKit
 import NookBlocker
+import NookWeb
 
 class BrowserConfiguration {
     static let shared = BrowserConfiguration()

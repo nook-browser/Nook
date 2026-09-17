@@ -13,6 +13,7 @@ import CoreAudio
 import FaviconFinder
 import NookBlocker
 import NookSettings
+import NookWeb
 import SwiftUI
 import WebKit
 

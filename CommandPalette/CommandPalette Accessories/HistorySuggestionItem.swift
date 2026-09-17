@@ -7,6 +7,7 @@
 
 import SwiftUI
 import NookDesign
+import NookWeb
 import FaviconFinder
 
 struct HistorySuggestionItem: View {

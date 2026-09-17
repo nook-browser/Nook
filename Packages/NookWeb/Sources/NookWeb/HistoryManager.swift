@@ -4,22 +4,30 @@ import SwiftData
 import Observation
 import OSLog
 
-struct HistoryVisit: Sendable {
-    let url: URL
-    let title: String
-    let timestamp: Date
-    let tabId: UUID?
-    let profileId: UUID?
+public struct HistoryVisit: Sendable {
+    public let url: URL
+    public let title: String
+    public let timestamp: Date
+    public let tabId: UUID?
+    public let profileId: UUID?
+
+    public init(url: URL, title: String, timestamp: Date, tabId: UUID?, profileId: UUID?) {
+        self.url = url
+        self.title = title
+        self.timestamp = timestamp
+        self.tabId = tabId
+        self.profileId = profileId
+    }
 }
 
 @MainActor
 @Observable
-class HistoryManager {
+public final class HistoryManager {
     @ObservationIgnored private let storeTask: Task<HistoryStore, Never>
     @ObservationIgnored private var pendingWrite: Task<Void, Never>?
-    var currentProfileId: UUID?
+    public var currentProfileId: UUID?
 
-    init(context: ModelContext, profileId: UUID? = nil) {
+    public init(context: ModelContext, profileId: UUID? = nil) {
         currentProfileId = profileId
         let container = context.container
         // Construct the model executor off the main actor as well as calling it there.
@@ -27,7 +35,7 @@ class HistoryManager {
         clearHistory(olderThan: 100)
     }
 
-    func switchProfile(_ profileId: UUID?) { currentProfileId = profileId }
+    public func switchProfile(_ profileId: UUID?) { currentProfileId = profileId }
 
     private func enqueue(_ operation: @escaping @Sendable (HistoryStore) async -> Void) {
         let previous = pendingWrite
@@ -38,52 +46,52 @@ class HistoryManager {
         }
     }
 
-    func addVisit(url: URL, title: String, timestamp: Date = Date(), tabId: UUID?, profileId: UUID? = nil, isEphemeral: Bool = false) {
+    public func addVisit(url: URL, title: String, timestamp: Date = Date(), tabId: UUID?, profileId: UUID? = nil, isEphemeral: Bool = false) {
         guard !isEphemeral else { return }
         importVisits([HistoryVisit(url: url, title: title, timestamp: timestamp, tabId: tabId, profileId: profileId ?? currentProfileId)])
     }
 
-    func importVisits(_ visits: [HistoryVisit]) {
+    public func importVisits(_ visits: [HistoryVisit]) {
         enqueue { await $0.addVisits(visits) }
     }
 
-    func getHistory(days: Int = 7) async -> [HistoryEntry] {
+    public func getHistory(days: Int = 7) async -> [HistoryEntry] {
         await getHistory(days: days, page: 0, pageSize: 1000).entries
     }
 
-    func getHistory(days: Int = 7, page: Int = 0, pageSize: Int = 50) async -> (entries: [HistoryEntry], hasMore: Bool) {
+    public func getHistory(days: Int = 7, page: Int = 0, pageSize: Int = 50) async -> (entries: [HistoryEntry], hasMore: Bool) {
         let profile = currentProfileId
         await pendingWrite?.value
         return await storeTask.value.history(days: days, profile: profile, page: page, pageSize: pageSize)
     }
 
-    func searchHistory(query: String) async -> [HistoryEntry] {
+    public func searchHistory(query: String) async -> [HistoryEntry] {
         await searchHistory(query: query, page: 0, pageSize: 1000).entries
     }
 
-    func searchHistory(query: String, page: Int = 0, pageSize: Int = 50) async -> (entries: [HistoryEntry], hasMore: Bool) {
+    public func searchHistory(query: String, page: Int = 0, pageSize: Int = 50) async -> (entries: [HistoryEntry], hasMore: Bool) {
         let profile = currentProfileId
         await pendingWrite?.value
         guard !Task.isCancelled else { return ([], false) }
         return await storeTask.value.search(query: query, profile: profile, page: page, pageSize: pageSize)
     }
 
-    func getMostVisited(limit: Int = 10) async -> [HistoryEntry] {
+    public func getMostVisited(limit: Int = 10) async -> [HistoryEntry] {
         let profile = currentProfileId
         await pendingWrite?.value
         return await storeTask.value.mostVisited(profile: profile, limit: limit)
     }
 
-    func clearHistory(olderThan days: Int = 0, profileId: UUID? = nil) {
+    public func clearHistory(olderThan days: Int = 0, profileId: UUID? = nil) {
         let profile = profileId ?? currentProfileId
         enqueue { await $0.clear(days: days, profile: profile) }
     }
 
-    func deleteHistoryEntry(_ entryId: UUID) {
+    public func deleteHistoryEntry(_ entryId: UUID) {
         enqueue { await $0.delete(entryId) }
     }
 
-    func getHistoryStats(for profileId: UUID?) async -> (count: Int, uniqueHosts: Int) {
+    public func getHistoryStats(for profileId: UUID?) async -> (count: Int, uniqueHosts: Int) {
         let profile = profileId ?? currentProfileId
         await pendingWrite?.value
         return await storeTask.value.stats(profile: profile)
@@ -217,16 +225,16 @@ actor HistoryStore {
 
 // MARK: - HistoryEntry Model
 
-struct HistoryEntry: Identifiable, Hashable, Sendable {
-    let id: UUID
-    let url: URL
-    let title: String
-    let visitDate: Date
-    let tabId: UUID?
-    let visitCount: Int
-    let lastVisited: Date
-    
-    init(from entity: HistoryEntity) {
+public struct HistoryEntry: Identifiable, Hashable, Sendable {
+    public let id: UUID
+    public let url: URL
+    public let title: String
+    public let visitDate: Date
+    public let tabId: UUID?
+    public let visitCount: Int
+    public let lastVisited: Date
+
+    public init(from entity: HistoryEntity) {
         self.id = entity.id
         self.url = URL(string: entity.url) ?? URL(string: "https://www.google.com")!
         self.title = entity.title
@@ -236,15 +244,15 @@ struct HistoryEntry: Identifiable, Hashable, Sendable {
         self.lastVisited = entity.lastVisited
     }
     
-    var displayTitle: String {
+    public var displayTitle: String {
         return title.isEmpty ? (url.host ?? "Unknown") : title
     }
     
-    var displayURL: String {
+    public var displayURL: String {
         return url.absoluteString
     }
     
-    var timeAgo: String {
+    public var timeAgo: String {
         let formatter = RelativeDateTimeFormatter()
         formatter.dateTimeStyle = .named
         return formatter.localizedString(for: lastVisited, relativeTo: Date())

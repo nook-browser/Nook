@@ -7,6 +7,7 @@
 
 import Foundation
 import NookTabsCore
+import NookWeb
 import SwiftUI
 
 /// Represents the state of a single browser window, allowing multiple windows

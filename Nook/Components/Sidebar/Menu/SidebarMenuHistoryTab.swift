@@ -10,6 +10,7 @@ import FaviconFinder
 import Garnish
 import SwiftUI
 import NookDesign
+import NookWeb
 
 struct HistorySection: Identifiable {
     let id = UUID()

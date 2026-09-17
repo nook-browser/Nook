@@ -25,6 +25,7 @@
 		C0DE7AB50000000000000023 /* NookDesign in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE7AB50000000000000022 /* NookDesign */; };
 		C0DE7AB50000000000000033 /* NookBlocker in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE7AB50000000000000032 /* NookBlocker */; };
 		C0DE7AB50000000000000043 /* NookTweaks in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE7AB50000000000000042 /* NookTweaks */; };
+		C0DE7AB50000000000000053 /* NookWeb in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE7AB50000000000000052 /* NookWeb */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -48,7 +49,6 @@
 				ThirdParty/AdblockRustFFI/src/lib.rs,
 				ThirdParty/AdblockRustFFI/tests/no_overbroad_rules.rs,
 				ThirdParty/BigUIPaging/README.md,
-				ThirdParty/MuteableWKWebView/README.md,
 			);
 			target = 7F8340FB2E37F39400674A5D /* Nook */;
 		};
@@ -147,6 +147,7 @@
 				C0DE7AB50000000000000023 /* NookDesign in Frameworks */,
 				C0DE7AB50000000000000033 /* NookBlocker in Frameworks */,
 				C0DE7AB50000000000000043 /* NookTweaks in Frameworks */,
+				C0DE7AB50000000000000053 /* NookWeb in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -208,6 +209,7 @@
 				C0DE7AB50000000000000022 /* NookDesign */,
 				C0DE7AB50000000000000032 /* NookBlocker */,
 				C0DE7AB50000000000000042 /* NookTweaks */,
+				C0DE7AB50000000000000052 /* NookWeb */,
 			);
 			productName = Pulse;
 			productReference = 7F8340FC2E37F39400674A5D /* Nook.app */;
@@ -247,6 +249,7 @@
 				C0DE7AB50000000000000021 /* XCLocalSwiftPackageReference "Packages/NookDesign" */,
 				C0DE7AB50000000000000031 /* XCLocalSwiftPackageReference "Packages/NookBlocker" */,
 				C0DE7AB50000000000000041 /* XCLocalSwiftPackageReference "Packages/NookTweaks" */,
+				C0DE7AB50000000000000051 /* XCLocalSwiftPackageReference "Packages/NookWeb" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7F8340FD2E37F39400674A5D /* Products */;
@@ -438,7 +441,6 @@
 				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = YES;
 				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/Nook/Supporting Files/Nook-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -487,7 +489,6 @@
 				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
 				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/Nook/Supporting Files/Nook-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
@@ -535,6 +536,10 @@
 		C0DE7AB50000000000000041 /* XCLocalSwiftPackageReference "Packages/NookTweaks" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NookTweaks;
+		};
+		C0DE7AB50000000000000051 /* XCLocalSwiftPackageReference "Packages/NookWeb" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NookWeb;
 		};
 /* End XCLocalSwiftPackageReference section */
 
@@ -613,6 +618,10 @@
 		C0DE7AB50000000000000042 /* NookTweaks */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = NookTweaks;
+		};
+		C0DE7AB50000000000000052 /* NookWeb */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NookWeb;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

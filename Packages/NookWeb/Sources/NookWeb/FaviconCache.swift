@@ -8,16 +8,16 @@
 //  background queue.
 //
 
-import AppKit
+import Foundation
 import SwiftUI
 
-final class FaviconCache: @unchecked Sendable {
-    static let shared = FaviconCache()
+public final class FaviconCache: @unchecked Sendable {
+    public static let shared = FaviconCache()
 
-    static let maxMemoryEntries = 200
+    public static let maxMemoryEntries = 200
 
     private struct Entry {
-        let nsImage: NSImage
+        let nsImage: PlatformImage
         let image: SwiftUI.Image
     }
 
@@ -27,7 +27,7 @@ final class FaviconCache: @unchecked Sendable {
     private let lock = NSLock()
     private let queue = DispatchQueue(label: "favicon.cache", attributes: .concurrent)
 
-    let directory: URL = {
+    public let directory: URL = {
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
         let dir = caches.appendingPathComponent("FaviconCache")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -39,49 +39,46 @@ final class FaviconCache: @unchecked Sendable {
     // MARK: - Lookup
 
     /// Memory cache only, synchronous.
-    func image(for key: String) -> NSImage? {
+    public func image(for key: String) -> PlatformImage? {
         lock.withLock { memory[key]?.nsImage }
     }
 
     /// Memory cache only, as a SwiftUI image.
-    func swiftUIImage(for key: String) -> SwiftUI.Image? {
+    public func swiftUIImage(for key: String) -> SwiftUI.Image? {
         lock.withLock { memory[key]?.image }
     }
 
     /// Memory first, then disk off the main thread. A disk hit is promoted to memory.
-    func cachedImage(for key: String) async -> NSImage? {
+    public func cachedImage(for key: String) async -> PlatformImage? {
         if let hit = image(for: key) { return hit }
         return await withCheckedContinuation { continuation in
             queue.async {
                 let image = self.readFromDisk(key)
-                if let image { self.insert(Entry(nsImage: image, image: SwiftUI.Image(nsImage: image)), for: key) }
+                if let image { self.insert(Entry(nsImage: image, image: SwiftUI.Image(platformImage: image)), for: key) }
                 continuation.resume(returning: image)
             }
         }
     }
 
     /// Synchronous disk read with promotion to memory. For startup restore of a few visible rows.
-    func imageFromDiskSync(for key: String) -> NSImage? {
+    public func imageFromDiskSync(for key: String) -> PlatformImage? {
         guard let image = readFromDisk(key) else { return nil }
-        insert(Entry(nsImage: image, image: SwiftUI.Image(nsImage: image)), for: key)
+        insert(Entry(nsImage: image, image: SwiftUI.Image(platformImage: image)), for: key)
         return image
     }
 
     // MARK: - Store
 
     /// Stores in memory and writes a PNG to disk.
-    func store(_ image: NSImage, for key: String) {
+    public func store(_ image: PlatformImage, for key: String) {
         store(image, for: key, toDisk: true)
     }
 
-    func store(_ image: NSImage, for key: String, toDisk: Bool) {
-        insert(Entry(nsImage: image, image: SwiftUI.Image(nsImage: image)), for: key)
+    func store(_ image: PlatformImage, for key: String, toDisk: Bool) {
+        insert(Entry(nsImage: image, image: SwiftUI.Image(platformImage: image)), for: key)
         guard toDisk else { return }
         // PNG encoding is CPU work, not I/O; do it on the caller.
-        guard let tiff = image.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiff),
-              let png = bitmap.representation(using: .png, properties: [:])
-        else { return }
+        guard let png = image.pngData() else { return }
         let url = fileURL(key)
         queue.async(flags: .barrier) {
             try? png.write(to: url)
@@ -90,7 +87,7 @@ final class FaviconCache: @unchecked Sendable {
 
     // MARK: - Maintenance
 
-    func clear() {
+    public func clear() {
         lock.withLock {
             memory.removeAll()
             order.removeAll()
@@ -103,14 +100,14 @@ final class FaviconCache: @unchecked Sendable {
     }
 
     /// Entry counts in memory and on disk.
-    func stats() -> (memory: Int, disk: Int) {
+    public func stats() -> (memory: Int, disk: Int) {
         let memoryCount = lock.withLock { memory.count }
         let diskCount = (try? FileManager.default.contentsOfDirectory(atPath: directory.path).count) ?? 0
         return (memoryCount, diskCount)
     }
 
     /// Keys currently in memory.
-    var memoryKeys: [String] {
+    public var memoryKeys: [String] {
         lock.withLock { Array(memory.keys) }
     }
 
@@ -140,8 +137,8 @@ final class FaviconCache: @unchecked Sendable {
         directory.appendingPathComponent("\(key).png")
     }
 
-    private func readFromDisk(_ key: String) -> NSImage? {
+    private func readFromDisk(_ key: String) -> PlatformImage? {
         guard let data = try? Data(contentsOf: fileURL(key)) else { return nil }
-        return NSImage(data: data)
+        return PlatformImage(data: data)
     }
 }

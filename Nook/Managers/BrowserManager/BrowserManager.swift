@@ -11,6 +11,7 @@ import CoreServices
 import NookBlocker
 import NookSettings
 import NookTweaks
+import NookWeb
 import OSLog
 import Sparkle
 import SwiftData

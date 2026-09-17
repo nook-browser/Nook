@@ -9,19 +9,19 @@ import Foundation
 import SwiftData
 
 @Model
-class HistoryEntity {
+public final class HistoryEntity {
     #Index<HistoryEntity>([\.url, \.profileId], [\.lastVisited])
-    @Attribute(.unique) var id: UUID
-    var url: String
-    var title: String
-    var visitDate: Date
-    var tabId: UUID?
-    var visitCount: Int
-    var lastVisited: Date
+    @Attribute(.unique) public var id: UUID
+    public var url: String
+    public var title: String
+    public var visitDate: Date
+    public var tabId: UUID?
+    public var visitCount: Int
+    public var lastVisited: Date
     // Optional profile association for backward compatibility during migration
-    var profileId: UUID?
+    public var profileId: UUID?
     
-    init(
+    public init(
         id: UUID = UUID(),
         url: String,
         title: String,

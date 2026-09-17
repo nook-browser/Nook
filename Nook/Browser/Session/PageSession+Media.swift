@@ -9,6 +9,7 @@ import AppKit
 import CoreAudio
 import SwiftUI
 import WebKit
+import NookWeb
 extension PageSession {
     // MARK: - Simple Media Detection (mainly for manual checks)
     func checkMediaState() {

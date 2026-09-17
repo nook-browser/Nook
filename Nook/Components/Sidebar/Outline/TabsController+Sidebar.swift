@@ -7,6 +7,7 @@
 
 import AppKit
 import NookTabsCore
+import NookWeb
 import SwiftUI
 
 extension TabsController {

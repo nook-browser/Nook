@@ -9,6 +9,7 @@
 import NookTabsCore
 import SwiftUI
 import NookDesign
+import NookWeb
 
 struct SpacesSettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager
