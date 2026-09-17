@@ -10,6 +10,7 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 
 pub(crate) mod content_blocking_ffi;
+pub(crate) mod cosmetic_ffi;
 
 // panic = "abort" in release; catch_unwind still guards debug/test builds.
 pub(crate) fn guard<T>(f: impl FnOnce() -> T, fallback: T) -> T {

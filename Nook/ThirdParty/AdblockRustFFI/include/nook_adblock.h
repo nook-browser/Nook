@@ -54,6 +54,21 @@ char *nook_adblock_convert_to_content_blocking(const char *rules_utf8, size_t ru
 /// NULL is a no-op.
 void nook_adblock_string_free(char *s);
 
+/// Cosmetic rules that apply to one URL, as a NUL-terminated UTF-8 JSON object
+/// with keys hide_selectors (array of string), procedural_actions (array of
+/// string, each itself a JSON object), injected_script (string), exceptions
+/// (array of string) and generichide (bool).
+/// Returns NULL when nothing applies, or on a NULL/non-UTF-8 argument.
+///
+/// `engine` must come from nook_adblock_engine_from_rules. The same thread
+/// safety rule applies as for matching: serialize all calls on a given engine.
+///
+/// injected_script is always empty unless the engine was given scriptlet
+/// resources, and Nook gives it none.
+///
+/// Free the result with nook_adblock_string_free.
+char *nook_adblock_cosmetic_for_url(void *engine, const char *url);
+
 #ifdef __cplusplus
 }
 #endif

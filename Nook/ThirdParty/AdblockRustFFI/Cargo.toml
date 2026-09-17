@@ -10,9 +10,16 @@ crate-type = ["staticlib"]
 
 [dependencies]
 # content-blocking is off by default; it is the filter-to-WKContentRuleList
-# converter Brave wrote for Brave iOS. css-validation is deliberately not
-# enabled: it pulls cssparser and selectors, and nothing here validates selectors.
-adblock = { version = "0.13.3", features = ["content-blocking"] }
+# converter Brave wrote for Brave iOS.
+#
+# css-validation is not optional despite its name. Without it the crate's
+# validate_css_selector is a stub that wraps every selector as a plain
+# CssSelector, so procedural filters (:has-text, :upward, :matches-css, :style)
+# are never classified. They then arrive in hide_selectors as raw text and get
+# injected as invalid CSS, and one invalid selector in a comma-joined rule
+# invalidates the whole rule. It also keeps the converter from emitting
+# css-display-none actions with selectors Safari cannot parse.
+adblock = { version = "0.13.3", features = ["content-blocking", "css-validation"] }
 serde_json = "1"
 
 [profile.release]
