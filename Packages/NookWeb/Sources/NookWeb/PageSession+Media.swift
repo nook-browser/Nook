@@ -11,7 +11,7 @@ import WebKit
 
 extension PageSession {
     // MARK: - Simple Media Detection (mainly for manual checks)
-    public func checkMediaState() {
+    func checkMediaState() {
         // Get all web views for this tab across all windows
         let allWebViews: [WKWebView]
         if let coordinator = controller?.webViews {
@@ -124,7 +124,7 @@ extension PageSession {
     }
 
     // MARK: - Native Audio Monitoring
-    public func startNativeAudioMonitoring() {
+    func startNativeAudioMonitoring() {
         guard !isMonitoringNativeAudio else { return }
         isMonitoringNativeAudio = true
 
@@ -135,7 +135,7 @@ extension PageSession {
         setupAudioSessionNotifications()
     }
 
-    public func stopNativeAudioMonitoring() {
+    func stopNativeAudioMonitoring() {
         guard isMonitoringNativeAudio else { return }
         isMonitoringNativeAudio = false
 
@@ -145,18 +145,18 @@ extension PageSession {
         removeCoreAudioPropertyListeners()
     }
 
-    public func setupAudioSessionNotifications() {
+    func setupAudioSessionNotifications() {
         setupCoreAudioPropertyListeners()
     }
 
     /// Helper class that holds a weak reference to the session for the Core Audio listener callback.
     /// Prevents dangling pointer if the session is deallocated before the listener is removed.
-    public final class AudioListenerHelper {
+    final class AudioListenerHelper {
         weak var session: PageSession?
         init(session: PageSession) { self.session = session }
     }
 
-    public func setupCoreAudioPropertyListeners() {
+    func setupCoreAudioPropertyListeners() {
         guard !hasAddedCoreAudioListener else { return }
 
         let helper = AudioListenerHelper(session: self)
@@ -197,7 +197,7 @@ extension PageSession {
         }
     }
 
-    public func removeCoreAudioPropertyListeners() {
+    func removeCoreAudioPropertyListeners() {
         guard hasAddedCoreAudioListener, let listenerProc = audioDeviceListenerProc,
               let helper = audioListenerHelper else { return }
 
@@ -223,7 +223,7 @@ extension PageSession {
         }
     }
 
-    public func checkNativeAudioActivity() {
+    func checkNativeAudioActivity() {
         let now = Date()
         guard now.timeIntervalSince(lastAudioDeviceCheckTime) > 0.5 else { return }
         lastAudioDeviceCheckTime = now
@@ -239,7 +239,7 @@ extension PageSession {
         }
     }
 
-    public func isDefaultAudioDeviceActive() -> Bool {
+    func isDefaultAudioDeviceActive() -> Bool {
         var deviceID: AudioDeviceID = 0
         var dataSize = UInt32(MemoryLayout<AudioDeviceID>.size)
 
@@ -287,14 +287,14 @@ extension PageSession {
         }
     }
 
-    public func removeThemeColorObserver(from webView: WKWebView) {
+    func removeThemeColorObserver(from webView: WKWebView) {
         if themeColorObservedWebViews.contains(webView) {
             webView.removeObserver(self, forKeyPath: "themeColor")
             themeColorObservedWebViews.remove(webView)
         }
     }
 
-    public func updateBackgroundColor(from webView: WKWebView) {
+    func updateBackgroundColor(from webView: WKWebView) {
         // Check if we should sample based on domain change
         guard let currentURL = webView.url,
               let currentDomain = extractDomain(from: currentURL) else {
@@ -332,7 +332,7 @@ extension PageSession {
         return host
     }
 
-    public func extractBackgroundColorWithJavaScript(from webView: WKWebView) {
+    func extractBackgroundColorWithJavaScript(from webView: WKWebView) {
         guard let sampleRect = colorSampleRect(for: webView) else {
             runLegacyBackgroundColorScript(on: webView)
             return
@@ -361,7 +361,7 @@ extension PageSession {
         }
     }
 
-    public func colorSampleRect(for webView: WKWebView) -> CGRect? {
+    func colorSampleRect(for webView: WKWebView) -> CGRect? {
         let bounds = webView.bounds
         guard bounds.width >= 1, bounds.height >= 1 else { return nil }
 
@@ -380,7 +380,7 @@ extension PageSession {
         return CGRect(x: sampleX, y: sampleY, width: 1, height: 1)
     }
     
-    public func topRightPixelRect(for webView: WKWebView) -> CGRect? {
+    func topRightPixelRect(for webView: WKWebView) -> CGRect? {
         let bounds = webView.bounds
         guard bounds.width >= 1, bounds.height >= 1 else { return nil }
         
@@ -398,7 +398,7 @@ extension PageSession {
         return CGRect(x: sampleX, y: sampleY, width: 1, height: 1)
     }
     
-    public func extractTopBarColor(from webView: WKWebView) {
+    func extractTopBarColor(from webView: WKWebView) {
         // Only sample once per domain
         if let currentURL = webView.url,
            let domain = extractDomain(from: currentURL) {
@@ -424,7 +424,7 @@ extension PageSession {
         }
     }
 
-    public func runLegacyBackgroundColorScript(on webView: WKWebView) {
+    func runLegacyBackgroundColorScript(on webView: WKWebView) {
         let colorExtractionScript = """
             (function() {
                 function rgbToHex(r, g, b) {

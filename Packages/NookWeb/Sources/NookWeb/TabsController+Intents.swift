@@ -64,7 +64,7 @@ extension TabsController {
     /// A WebKit-created popup from `opener`: a new selected tab in the opener's window whose
     /// session owns `webView`. WebKit drives the popup's first navigation.
     @discardableResult
-    public func adoptPopup(webView: WKWebView, url: URL?, opener: PageSession) -> UUID? {
+    func adoptPopup(webView: WKWebView, url: URL?, opener: PageSession) -> UUID? {
         guard let window = window(for: opener), let spaceID = window.spaceID else { return nil }
         let id = UUID()
         let pageURL = url ?? URL(string: "about:blank")!
@@ -290,7 +290,7 @@ extension TabsController {
         }
     }
 
-    public static let recentLimit = 30
+    static let recentLimit = 30
 
     /// Before items disappear (or a pinned tab's page ends), every window selecting one returns
     /// to the item it selected before, else the next item in display order, else the previous.
@@ -494,7 +494,7 @@ extension TabsController {
         perform(owner, "updateSpace") { try $0.updateSpace(spaceID, name: name, icon: icon, accentHex: accentHex) }
     }
 
-    public func moveSpace(_ spaceID: UUID, after: UUID?) {
+    func moveSpace(_ spaceID: UUID, after: UUID?) {
         guard let owner = owner(ofSpace: spaceID) else { return }
         perform(owner, "moveSpace") { try $0.moveSpace(spaceID, after: after) }
     }

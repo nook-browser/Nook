@@ -192,7 +192,7 @@ extension PageSession: WKNavigationDelegate, WKDownloadDelegate {
 
         // No window shows this tab: unload instead of respawning a process in the background
         // (often the system reclaiming memory). Selecting the tab restores its saved URL.
-        if webView === primaryWebView {
+        if controller?.webViews != nil, webView === primaryWebView {
             var views = controller?.webViews?.allWebViews(for: itemID) ?? []
             views.append(webView)
             if views.allSatisfy({ $0.window == nil }) {

@@ -11,7 +11,7 @@ import NookTweaks
 
 extension PageSession {
     /// Script message handler names this session registers on each of its web views.
-    public var messageHandlerNames: [String] {
+    var messageHandlerNames: [String] {
         ["linkHover", "commandHover", "commandClick", "pipStateChange",
          "mediaStateChange_\(itemID.uuidString)", "backgroundColor_\(itemID.uuidString)",
          "historyStateDidChange", "NookIdentity", "nookShortcutDetect",
@@ -19,7 +19,7 @@ extension PageSession {
     }
 
     /// Per-document observers. Each script guards against a second install in the same document.
-    public func injectPageObservers(into webView: WKWebView) {
+    func injectPageObservers(into webView: WKWebView) {
         injectLinkHoverJavaScript(to: webView)
         injectPiPStateListener(to: webView)
         injectMediaDetection(to: webView)

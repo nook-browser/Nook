@@ -56,11 +56,11 @@ public enum IdentityFailure: Equatable {
         case .missingCallbackHandler:
             return "Could not determine an appropriate callback handler for this authentication flow."
         case .unableToStart:
-            return "Unable to start the authentication session."
+            return "The authentication session could not be started."
         case .fallbackUnavailable:
-            return "No fallback authentication method is available."
+            return "Unable to present a fallback authentication window."
         case .fallbackCancelled:
-            return "Authentication was cancelled."
+            return "Authentication window was closed before completion."
         case .underlying(let message):
             return message
         }
@@ -92,8 +92,9 @@ public protocol PageSessionDelegate: AnyObject {
     // MARK: Downloads and panels
 
     func addDownload(_ download: WKDownload, originalURL: URL, suggestedFilename: String)
-    /// Enters or leaves full screen for the window showing `webView`.
-    func toggleFullScreen(for webView: WKWebView)
+    /// Enters or leaves full screen for the window showing `webView`. Returns false when
+    /// `webView` has no window, so the caller can fail its completion handler.
+    func toggleFullScreen(for webView: WKWebView) -> Bool
 
     // MARK: Peek and sign-in
 

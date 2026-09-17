@@ -135,14 +135,14 @@ public final class PageSession: NSObject, Identifiable {
     /// Whether this page hosts an OAuth/sign-in flow popup.
     public var isOAuthFlow: Bool = false
     /// The item whose page started this OAuth flow.
-    @ObservationIgnored public var oauthParentItemID: UUID?
+    @ObservationIgnored var oauthParentItemID: UUID?
     /// The OAuth provider host (e.g., "accounts.google.com") for tracking protection exemption.
-    @ObservationIgnored public var oauthProviderHost: String?
+    @ObservationIgnored var oauthProviderHost: String?
 
     // MARK: - Internal State
 
     /// One-shot initial-navigation suppression for a WebKit-created popup.
-    @ObservationIgnored public var isPopupHost: Bool = false
+    @ObservationIgnored var isPopupHost: Bool = false
     @ObservationIgnored var hasFavicon: Bool = false
     @ObservationIgnored var faviconFetchInFlight: Bool = false
     @ObservationIgnored var faviconFetchAttempts: Int = 0
@@ -167,11 +167,11 @@ public final class PageSession: NSObject, Identifiable {
 
     // MARK: - Web View Ownership
 
-    public var primaryWebView: WKWebView?
+    var primaryWebView: WKWebView?
     /// A view created elsewhere (Peek, mini window, popup) that this session adopts on setup.
-    @ObservationIgnored public var adoptedWebView: WKWebView?
+    @ObservationIgnored var adoptedWebView: WKWebView?
     /// The window that owns the primary web view; nil until a window displays the page.
-    @ObservationIgnored public var primaryWindowId: UUID?
+    @ObservationIgnored var primaryWindowId: UUID?
 
     public var isUnloaded: Bool { primaryWebView == nil }
 
@@ -341,7 +341,7 @@ public final class PageSession: NSObject, Identifiable {
 
     /// Installs a WebKit-created popup view as this session's primary view. WebKit drives the
     /// popup's first navigation.
-    public func installPopupWebView(_ webView: WKWebView) {
+    func installPopupWebView(_ webView: WKWebView) {
         (webView as? SessionWebView)?.owningSession = self
         (webView as? SessionWebView)?.contextMenuBridge = WebContextMenuBridge(session: self, configuration: webView.configuration)
         webView.navigationDelegate = self
@@ -399,7 +399,7 @@ public final class PageSession: NSObject, Identifiable {
     }
 
     /// Final cleanup when the page ends (item closed, pinned page closed, window closed).
-    public func tearDown() {
+    func tearDown() {
         hasPiPActive = false
         unload()
         isAudioMuted = false
@@ -539,7 +539,7 @@ public final class PageSession: NSObject, Identifiable {
 
     /// KVO on canGoBack/canGoForward gives real-time updates. A single delayed check catches
     /// WebKit's back-forward list settling asynchronously after a commit.
-    public func updateNavigationStateEnhanced(source: String = "unknown") {
+    func updateNavigationStateEnhanced(source: String = "unknown") {
         updateNavigationState()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
             self?.updateNavigationState()
@@ -567,7 +567,7 @@ public final class PageSession: NSObject, Identifiable {
         }
     }
 
-    public func removeNavigationStateObservers(from webView: WKWebView) {
+    func removeNavigationStateObservers(from webView: WKWebView) {
         if navigationStateObservedWebViews.contains(webView) {
             webView.removeObserver(self, forKeyPath: "canGoBack")
             webView.removeObserver(self, forKeyPath: "canGoForward")
@@ -615,7 +615,7 @@ public final class PageSession: NSObject, Identifiable {
     }
 
     /// Memory then disk cache, synchronously. Gives restored rows their favicon at once.
-    public func restoreFaviconFromCache() {
+    func restoreFaviconFromCache() {
         guard url.scheme == "http" || url.scheme == "https", let host = url.host else { return }
         if let cached = FaviconCache.shared.image(for: host) ?? FaviconCache.shared.imageFromDiskSync(for: host) {
             favicon = SwiftUI.Image(platformImage: cached)
@@ -623,7 +623,7 @@ public final class PageSession: NSObject, Identifiable {
         }
     }
 
-    public func fetchAndSetFavicon(for url: URL) async {
+    func fetchAndSetFavicon(for url: URL) async {
         let defaultFavicon = SwiftUI.Image(systemName: "globe")
         guard url.scheme == "http" || url.scheme == "https", url.host != nil else {
             favicon = defaultFavicon
@@ -684,7 +684,7 @@ public final class PageSession: NSObject, Identifiable {
 
     // MARK: - Context Menu
 
-    public func deliverContextMenuPayload(_ payload: WebContextMenuPayload?) {
+    func deliverContextMenuPayload(_ payload: WebContextMenuPayload?) {
         pendingContextMenuPayload = payload
         if let webView = primaryWebView as? SessionWebView {
             webView.contextMenuPayloadDidUpdate(payload)

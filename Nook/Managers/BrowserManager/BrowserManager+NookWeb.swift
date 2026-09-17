@@ -52,9 +52,10 @@ extension BrowserManager: PageSessionDelegate {
             download, originalURL: originalURL, suggestedFilename: suggestedFilename)
     }
 
-    func toggleFullScreen(for webView: WKWebView) {
-        guard let window = webView.window else { return }
+    func toggleFullScreen(for webView: WKWebView) -> Bool {
+        guard let window = webView.window else { return false }
         DispatchQueue.main.async { window.toggleFullScreen(nil) }
+        return true
     }
 
     func presentPeek(url: URL, from session: PageSession) {

@@ -10,7 +10,7 @@ import WebKit
 import NookBlocker
 import NookTweaks
 extension PageSession {
-    public func isLikelyOAuthOrExternalWindow(url: URL, windowFeatures: WKWindowFeatures) -> Bool {
+    func isLikelyOAuthOrExternalWindow(url: URL, windowFeatures: WKWindowFeatures) -> Bool {
         if OAuthDetector.isLikelyOAuthPopupURL(url) { return true }
 
         // If the popup has explicit dimensions AND is cross-origin, it's likely a sign-in window.
@@ -30,7 +30,7 @@ extension PageSession {
 
     // MARK: - Peek Detection
 
-    public func shouldRedirectToPeek(url: URL) -> Bool {
+    func shouldRedirectToPeek(url: URL) -> Bool {
         // Always redirect to Peek if Option key is down (for any URL)
         if isOptionKeyDown {
             return true
@@ -131,7 +131,7 @@ extension PageSession: WKUIDelegate {
     // MARK: - OAuth Helpers
 
     /// Checks if a URL indicates OAuth completion and handles the flow
-    public func checkOAuthCompletion(url: URL) {
+    func checkOAuthCompletion(url: URL) {
         guard isOAuthFlow, let parentItemID = oauthParentItemID else { return }
         
         let urlString = url.absoluteString.lowercased()
@@ -221,7 +221,14 @@ extension PageSession: WKUIDelegate {
         enterFullScreenForVideoWith completionHandler: @escaping (Bool, Error?) -> Void
     ) {
 
-        controller?.sessionDelegate?.toggleFullScreen(for: webView)
+        guard controller?.sessionDelegate?.toggleFullScreen(for: webView) == true else {
+            completionHandler(
+                false,
+                NSError(
+                    domain: "PageSession", code: -1,
+                    userInfo: [NSLocalizedDescriptionKey: "No window available for full-screen"]))
+            return
+        }
         // Call completion handler immediately - WebKit will handle the actual full-screen transition
         completionHandler(true, nil)
     }
@@ -231,7 +238,16 @@ extension PageSession: WKUIDelegate {
         exitFullScreenWith completionHandler: @escaping (Bool, Error?) -> Void
     ) {
 
-        controller?.sessionDelegate?.toggleFullScreen(for: webView)
+        guard controller?.sessionDelegate?.toggleFullScreen(for: webView) == true else {
+            completionHandler(
+                false,
+                NSError(
+                    domain: "PageSession", code: -1,
+                    userInfo: [
+                        NSLocalizedDescriptionKey: "No window available for exiting full-screen"
+                    ]))
+            return
+        }
         // Call completion handler immediately - WebKit will handle the actual full-screen transition
         completionHandler(true, nil)
     }

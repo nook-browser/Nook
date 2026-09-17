@@ -121,7 +121,7 @@ public enum WebContextMenuPayload {
         }
     }
 
-    public var containsImage: Bool {
+    var containsImage: Bool {
         switch self {
         case .image:
             return true

@@ -22,7 +22,7 @@ public final class TabsController {
     public enum Placement { case newTab, background, replaceCurrent }
 
     public static let homeURL = URL(string: "https://www.google.com")!
-    public static let undoLimit = 100
+    static let undoLimit = 100
 
     // MARK: - State
 
@@ -30,7 +30,7 @@ public final class TabsController {
     public private(set) var device: DeviceState
     public let loadOutcome: LoadOutcome
     public let directory: URL
-    public var isReadOnly: Bool {
+    var isReadOnly: Bool {
         if case .readOnly = loadOutcome { return true }
         return false
     }
@@ -47,7 +47,7 @@ public final class TabsController {
     @ObservationIgnored private var spaceProfiles: [UUID: Profile] = [:]
 
     @ObservationIgnored private let store: TabStore
-    @ObservationIgnored public private(set) var undoStack: [Change] = []
+    @ObservationIgnored private(set) var undoStack: [Change] = []
     @ObservationIgnored private var isTerminating = false
     @ObservationIgnored public let log = Logger(subsystem: "com.baingurley.nook", category: "Tabs")
 
@@ -148,14 +148,14 @@ public final class TabsController {
         store.flush()
     }
 
-    public func pushUndo(_ change: Change) {
+    func pushUndo(_ change: Change) {
         guard !change.isEmpty else { return }
         undoStack.append(change)
         if undoStack.count > Self.undoLimit { undoStack.removeFirst(undoStack.count - Self.undoLimit) }
     }
 
     /// Where an item or space lives.
-    public enum Owner {
+    enum Owner {
         case main
         case privateWindow(BrowserWindowState)
     }
@@ -168,21 +168,21 @@ public final class TabsController {
 
     public var regularWindows: [BrowserWindowState] { allWindows.filter { $0.privateTree == nil } }
 
-    public func owner(ofItem id: UUID) -> Owner? {
+    func owner(ofItem id: UUID) -> Owner? {
         if tree.item(id) != nil { return .main }
         return privateWindows.first { $0.privateTree?.item(id) != nil }.map(Owner.privateWindow)
     }
 
-    public func owner(ofSpace id: UUID) -> Owner? {
+    func owner(ofSpace id: UUID) -> Owner? {
         if tree.space(id) != nil { return .main }
         return privateWindows.first { $0.privateTree?.space(id) != nil }.map(Owner.privateWindow)
     }
 
-    public func owner(of window: BrowserWindowState) -> Owner {
+    func owner(of window: BrowserWindowState) -> Owner {
         window.privateTree != nil ? .privateWindow(window) : .main
     }
 
-    public func tree(_ owner: Owner) -> TabTree {
+    func tree(_ owner: Owner) -> TabTree {
         switch owner {
         case .main: return tree
         case .privateWindow(let window): return window.privateTree ?? TabTree()
@@ -192,7 +192,7 @@ public final class TabsController {
     /// Runs one tree edit. Main-tree edits push their undo change and save; private edits never save.
     /// Tree errors are logged and leave state unchanged.
     @discardableResult
-    public func perform(_ owner: Owner, _ label: String, undoable: Bool = true, _ body: (inout TabTree) throws -> Change) -> Change? {
+    func perform(_ owner: Owner, _ label: String, undoable: Bool = true, _ body: (inout TabTree) throws -> Change) -> Change? {
         do {
             switch owner {
             case .main:
@@ -285,9 +285,9 @@ public final class TabsController {
         return path.hasSuffix("/") ? String(path.dropLast()) : path
     }
 
-    public var canReopenClosed: Bool { !device.closed.isEmpty }
+    var canReopenClosed: Bool { !device.closed.isEmpty }
 
-    public func treeHolding(_ parent: Parent) -> TabTree {
+    func treeHolding(_ parent: Parent) -> TabTree {
         switch parent {
         case .favorites(let spaceID), .pinned(let spaceID), .tabs(let spaceID):
             return owner(ofSpace: spaceID).map(tree) ?? tree
@@ -296,7 +296,7 @@ public final class TabsController {
         }
     }
 
-    public func openFolders(_ owner: Owner) -> Set<UUID> {
+    func openFolders(_ owner: Owner) -> Set<UUID> {
         switch owner {
         case .main: return device.openFolders
         case .privateWindow: return privateOpenFolders
@@ -389,7 +389,7 @@ public final class TabsController {
     }
 
     /// Removes and tears down a session without touching the tree.
-    public func endSession(_ itemID: UUID) {
+    func endSession(_ itemID: UUID) {
         let session: PageSession?
         if let main = liveSessions.removeValue(forKey: itemID) {
             session = main
@@ -420,12 +420,12 @@ public final class TabsController {
     }
 
     /// Every space's data store, made if it does not exist yet. For whole-app cleanup only.
-    public var allSpaceProfiles: [Profile] {
+    var allSpaceProfiles: [Profile] {
         tree.orderedSpaces.compactMap { profile(forSpace: $0.id) }
     }
 
     /// Drops the cached data store of a deleted space.
-    public func forgetProfile(_ spaceID: UUID) {
+    func forgetProfile(_ spaceID: UUID) {
         spaceProfiles[spaceID] = nil
     }
 
@@ -453,7 +453,7 @@ public final class TabsController {
         return active?.privateTree == nil ? active : regularWindows.first
     }
 
-    public func canShow(_ itemID: UUID, in window: BrowserWindowState) -> Bool {
+    func canShow(_ itemID: UUID, in window: BrowserWindowState) -> Bool {
         let source = tree(owner(of: window))
         guard source.item(itemID) != nil else { return false }
         return source.spaceID(of: itemID) == window.spaceID
@@ -502,7 +502,7 @@ public final class TabsController {
 
     /// A committed navigation or SPA URL change. Device items store it as their URL; synced items
     /// keep their home URL and store the open page instead.
-    public func pageCommitted(itemID: UUID, url: URL) {
+    func pageCommitted(itemID: UUID, url: URL) {
         guard let owner = owner(ofItem: itemID) else { return }
         guard tree(owner).scope(of: itemID) == .synced else {
             perform(owner, "setURL", undoable: false) { try $0.setURL(itemID, url) }
@@ -515,7 +515,7 @@ public final class TabsController {
         save()
     }
 
-    public func pageTitleChanged(itemID: UUID, title: String) {
+    func pageTitleChanged(itemID: UUID, title: String) {
         guard let owner = owner(ofItem: itemID) else { return }
         if case .main = owner, tree.scope(of: itemID) == .synced {
             guard var page = device.openPages[itemID], page.title != title else { return }
@@ -529,14 +529,14 @@ public final class TabsController {
 
     // MARK: - Device State Edits
 
-    public func setOpenPage(_ itemID: UUID, _ page: OpenPage?) {
+    func setOpenPage(_ itemID: UUID, _ page: OpenPage?) {
         guard device.openPages[itemID] != page else { return }
         device.openPages[itemID] = page
         save()
     }
 
     /// Main-tree folders are remembered in device.json; private ones only in memory.
-    public func setFolder(_ folderID: UUID, open: Bool) {
+    func setFolder(_ folderID: UUID, open: Bool) {
         guard let owner = owner(ofItem: folderID) else { return }
         switch owner {
         case .main:
@@ -547,25 +547,25 @@ public final class TabsController {
         }
     }
 
-    public func recordClosed(_ entry: ClosedEntry) {
+    func recordClosed(_ entry: ClosedEntry) {
         device.pushClosed(entry)
         save()
     }
 
     /// Removes reopen entries holding any of `ids` (items that are back in the tree).
-    public func dropClosed(containing ids: Set<UUID>) {
+    func dropClosed(containing ids: Set<UUID>) {
         let count = device.closed.count
         device.closed.removeAll { entry in entry.items.contains { ids.contains($0.id) } }
         if device.closed.count != count { save() }
     }
 
-    public func dropLastClosed() {
+    func dropLastClosed() {
         guard !device.closed.isEmpty else { return }
         device.closed.removeLast()
         save()
     }
 
-    public func addSession(_ session: PageSession) {
+    func addSession(_ session: PageSession) {
         liveSessions[session.itemID] = session
     }
 

@@ -71,7 +71,7 @@ public class BrowserWindowState {
     public var urlBarFrame: CGRect = .zero
 
     /// Toast info for this window
-    public var toastInfo: WindowToastInfo?
+    var toastInfo: WindowToastInfo?
 
     /// Presentation flag for the copy URL toast
     public var isShowingCopyURLToast: Bool = false
@@ -88,11 +88,11 @@ public class BrowserWindowState {
     }
 
     /// Saved frame to apply once the platform window exists.
-    @ObservationIgnored public var pendingFrame: String?
+    @ObservationIgnored var pendingFrame: String?
 
     /// Applies `pendingFrame` after the window's own setup, which restores the autosaved frame
     /// asynchronously and would otherwise overwrite the saved one.
-    public func applyPendingFrame() {
+    func applyPendingFrame() {
         guard let frame = pendingFrame, let handle = windowHandle else { return }
         pendingFrame = nil
         handle.applyFrame(frame)
@@ -108,7 +108,7 @@ public class BrowserWindowState {
     public var ephemeralProfile: Profile?
 
     /// Whether the download warning has been shown in this incognito session
-    public var hasShownDownloadWarning: Bool = false
+    var hasShownDownloadWarning: Bool = false
 
     // MARK: - Tab Model (TabsController)
 
@@ -116,15 +116,15 @@ public class BrowserWindowState {
     public var spaceID: UUID?
 
     /// The selected item per space in this window.
-    public var selectedItemBySpace: [UUID: UUID] = [:]
+    var selectedItemBySpace: [UUID: UUID] = [:]
 
     /// Items this window selected in each space, most recent last. Closing the selected item
     /// returns to the one before it. In memory only.
-    public var recentItemsBySpace: [UUID: [UUID]] = [:]
+    var recentItemsBySpace: [UUID: [UUID]] = [:]
 
     /// Spaces whose last open tab was closed in this window. Returning to one shows the empty
     /// space instead of selecting its first tab. In memory only.
-    public var emptiedSpaces: Set<UUID> = []
+    var emptiedSpaces: Set<UUID> = []
 
     /// The selected item in the current space. There is no global current tab.
     public var selectedItemID: UUID? {
@@ -138,10 +138,10 @@ public class BrowserWindowState {
     public var privateTree: TabTree?
 
     /// Live pages of a private window, by item id.
-    public var privateSessions: [UUID: PageSession] = [:]
+    var privateSessions: [UUID: PageSession] = [:]
 
     /// A private window's reopen-closed history, newest last. Memory only.
-    public var privateClosed: [ClosedEntry] = []
+    var privateClosed: [ClosedEntry] = []
 
     public init(id: UUID = UUID()) {
         self.id = id
@@ -160,7 +160,7 @@ public enum SidebarMenuTab: Hashable, Sendable {
 }
 
 /// Toast information specific to a window
-public struct WindowToastInfo: Equatable {
+struct WindowToastInfo: Equatable {
     public let message: String
     public let timestamp: Date
     public let duration: TimeInterval
