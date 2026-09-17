@@ -9,8 +9,10 @@ use std::os::raw::c_char;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 
+pub(crate) mod content_blocking_ffi;
+
 // panic = "abort" in release; catch_unwind still guards debug/test builds.
-fn guard<T>(f: impl FnOnce() -> T, fallback: T) -> T {
+pub(crate) fn guard<T>(f: impl FnOnce() -> T, fallback: T) -> T {
     catch_unwind(AssertUnwindSafe(f)).unwrap_or(fallback)
 }
 

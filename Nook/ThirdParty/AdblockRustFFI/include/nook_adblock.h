@@ -42,6 +42,18 @@ bool nook_adblock_engine_matches(void *engine, const char *url, const char *sour
 /// Free an engine. NULL is a no-op.
 void nook_adblock_engine_free(void *engine);
 
+/// Convert ABP/uBlock filter text (UTF-8, not NUL-terminated) into a
+/// NUL-terminated UTF-8 JSON array of WKContentRuleList rule objects.
+/// Writes the converted rule count to *out_rule_count and the number of lines
+/// that failed to convert to *out_error_count; either pointer may be NULL.
+/// Returns NULL on a NULL or non-UTF-8 input.
+/// Free the result with nook_adblock_string_free.
+char *nook_adblock_convert_to_content_blocking(const char *rules_utf8, size_t rules_len, size_t *out_rule_count, size_t *out_error_count);
+
+/// Free a string returned by any char*-returning function in this library.
+/// NULL is a no-op.
+void nook_adblock_string_free(char *s);
+
 #ifdef __cplusplus
 }
 #endif
