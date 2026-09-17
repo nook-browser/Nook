@@ -7,6 +7,7 @@
 
 import SwiftUI
 import NookDesign
+import NookUI
 
 struct SettingsWindow: View {
     @EnvironmentObject var browserManager: BrowserManager

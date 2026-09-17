@@ -27,11 +27,3 @@ extension EnvironmentValues {
         set { self[NookSettingsServiceKey.self] = newValue }
     }
 }
-
-// MARK: - Site Search
-
-extension SiteSearchEntry {
-    var color: Color {
-        Color(hex: colorHex)
-    }
-}

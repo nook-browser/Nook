@@ -8,6 +8,7 @@ import AppKit
 import os
 import NookDesign
 import NookWeb
+import NookUI
 
 struct ExtensionLibraryButton: View {
     @EnvironmentObject var browserManager: BrowserManager

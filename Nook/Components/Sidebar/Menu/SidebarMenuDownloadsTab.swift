@@ -9,6 +9,7 @@ import AppKit
 import SwiftUI
 import NookDesign
 import UniformTypeIdentifiers
+import NookUI
 
 struct SidebarMenuDownloadsTab: View {
     @EnvironmentObject var browserManager: BrowserManager

@@ -8,6 +8,7 @@
 import SwiftUI
 import NookDesign
 import AppKit
+import NookUI
 
 struct ShortcutRecorderView: View {
     @Binding var keyCombination: KeyCombination

@@ -11,6 +11,7 @@ import Garnish
 import SwiftUI
 import NookDesign
 import NookWeb
+import NookUI
 
 struct HistorySection: Identifiable {
     let id = UUID()

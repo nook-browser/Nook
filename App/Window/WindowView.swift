@@ -9,6 +9,7 @@
 import SwiftUI
 import NookDesign
 import NookWeb
+import NookUI
 
 /// Main window view that orchestrates the browser UI layout
 struct WindowView: View {
@@ -72,7 +73,11 @@ struct WindowView: View {
                 if windowState.isShowingShortcutConflictToast,
                    let conflictInfo = windowState.shortcutConflictInfo
                 {
-                    ShortcutConflictToast(conflictInfo: conflictInfo)
+                    ShortcutConflictToast(
+                        shortcut: conflictInfo.keyCombination.displayString,
+                        websiteName: conflictInfo.websiteName,
+                        nookActionName: conflictInfo.nookActionName
+                    )
                         .environment(windowState)
                 }
             }

@@ -1,9 +1,11 @@
 import SwiftUI
 import NookDesign
 import NookTabsCore
+import NookUI
 import NookWeb
 
 /// The window's split pair shown as one sidebar row (from `BrowserWindowState.split`).
+/// The halves' visuals are `SplitHalfLabel` in NookUI; this file is the drag source around them.
 struct SplitTabRow: View {
     let left: Item
     let right: Item
@@ -28,86 +30,19 @@ private struct SplitHalfTab: View {
     let item: Item
     let zoneID: DropZoneID
 
-    @State private var isHovering: Bool = false
-    @State private var isCloseHovering: Bool = false
-    @EnvironmentObject var browserManager: BrowserManager
-    @Environment(BrowserWindowState.self) private var windowState
+    @Environment(TabsController.self) private var tabs
     @ObservedObject private var dragSession = NookDragSessionManager.shared
 
-    private var tabs: TabsController { browserManager.tabs }
-
     var body: some View {
-        let title = tabs.title(for: item)
         let session = tabs.session(for: item.id)
         NookDragSourceView(
-            item: NookDragItem(tabId: item.id, title: title, urlString: tabs.currentURL(for: item)?.absoluteString ?? ""),
+            item: NookDragItem(tabId: item.id, title: tabs.title(for: item), urlString: tabs.currentURL(for: item)?.absoluteString ?? ""),
             icon: session?.favicon,
             zoneID: zoneID,
             manager: dragSession
         ) {
-            Button(action: { tabs.select(item.id, in: windowState) }) {
-                HStack(spacing: NookDesign.Spacing.md) {
-                    ItemFavicon(item: item, session: session)
-                        .frame(width: NookDesign.Size.favicon, height: NookDesign.Size.favicon)
-                        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
-                    Text(title)
-                        .font(NookDesign.Font.body)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    Spacer(minLength: NookDesign.Spacing.xs)
-                    if isHovering {
-                        Button(action: { tabs.close(item.id) }) {
-                            Image(systemName: "xmark")
-                                .font(NookDesign.Font.secondary)
-                                .foregroundColor(.primary)
-                                .frame(width: NookDesign.Size.rowButton, height: NookDesign.Size.rowButton)
-                                .background(isCloseHovering ? NookDesign.Surface.fillPressed : Color.clear)
-                                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .onHoverTracking { state in
-                            isCloseHovering = state
-                        }
-                    }
-                }
-                .padding(.horizontal, NookDesign.Spacing.rowPadding)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(PlainButtonStyle())
-            .onHoverTracking { hovering in
-                withAnimation(NookDesign.Motion.quick) {
-                    isHovering = hovering
-                }
-            }
-            .contextMenu {
-                TabContextMenu(itemID: item.id, context: .split)
-                    .environmentObject(browserManager)
-                    .environment(windowState)
-            }
+            SplitHalfLabel(item: item)
         }
         .opacity(dragSession.draggedItem?.tabId == item.id ? NookDesign.Surface.unloadedOpacity : 1)
-        .background(backgroundColor)
-        .overlay {
-            if isActive {
-                NookDesign.Radius.shape(NookDesign.Radius.md)
-                    .strokeBorder(NookDesign.Surface.hairline, lineWidth: NookDesign.Size.hairlineWidth)
-            }
-        }
-    }
-
-    private var isActive: Bool {
-        tabs.selectedItemID(in: windowState) == item.id
-    }
-
-    private var backgroundColor: Color {
-        if isActive {
-            return NookDesign.Surface.raised
-        } else if isHovering {
-            return NookDesign.Surface.fill
-        } else {
-            return Color.clear
-        }
     }
 }

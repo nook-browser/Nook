@@ -12,6 +12,7 @@ import os
 import NookDesign
 import NookSettings
 import NookWeb
+import NookUI
 
 struct ExtensionActionView: View {
     let extensions: [InstalledExtension]

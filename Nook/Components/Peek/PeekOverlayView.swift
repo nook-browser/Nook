@@ -10,6 +10,7 @@ import SwiftUI
 import NookDesign
 import NookWeb
 import AppKit
+import NookUI
 
 struct PeekOverlayView: View {
     @EnvironmentObject var browserManager: BrowserManager

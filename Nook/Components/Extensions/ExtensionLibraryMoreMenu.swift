@@ -10,6 +10,7 @@ import AVFoundation
 import CoreLocation
 import NookDesign
 import NookWeb
+import NookUI
 
 @MainActor
 final class ExtensionLibraryMoreMenuController {

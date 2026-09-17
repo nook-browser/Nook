@@ -9,6 +9,7 @@ import SwiftUI
 import NookDesign
 import NookWeb
 import FaviconFinder
+import NookUI
 
 struct CommandPaletteSuggestionView: View {
     var favicon: SwiftUI.Image

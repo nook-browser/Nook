@@ -8,6 +8,7 @@ import SwiftUI
 import WebKit
 import NookDesign
 import NookWeb
+import NookUI
 
 struct NavButtonsView: View {
     @EnvironmentObject var browserManager: BrowserManager

@@ -11,6 +11,7 @@ import Garnish
 import NookDesign
 import NookSettings
 import NookWeb
+import NookUI
 
 struct CommandPaletteView: View {
     @EnvironmentObject var browserManager: BrowserManager

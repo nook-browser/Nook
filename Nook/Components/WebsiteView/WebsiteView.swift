@@ -10,6 +10,7 @@ import WebKit
 import AppKit
 import NookDesign
 import NookWeb
+import NookUI
 
 // MARK: - Status Bar View
 struct LinkStatusBar: View {

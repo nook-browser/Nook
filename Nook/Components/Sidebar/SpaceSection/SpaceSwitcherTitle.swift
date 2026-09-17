@@ -9,6 +9,7 @@ import SwiftUI
 import NookDesign
 import NookTabsCore
 import NookWeb
+import NookUI
 
 struct SpaceSwitcherTitle: View {
     @Environment(TabsController.self) private var tabs

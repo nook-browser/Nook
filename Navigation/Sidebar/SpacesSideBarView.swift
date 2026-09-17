@@ -14,6 +14,7 @@ import NookDesign
 import NookSettings
 import NookTabsCore
 import NookWeb
+import NookUI
 
 struct SpacesSideBarView: View {
     @EnvironmentObject var browserManager: BrowserManager

@@ -12,6 +12,7 @@ import NookBlocker
 import NookDesign
 import NookSettings
 import NookWeb
+import NookUI
 
 struct ExtensionLibraryView: View {
     let browserManager: BrowserManager

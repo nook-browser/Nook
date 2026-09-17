@@ -10,6 +10,7 @@ import Foundation
 import AppKit
 #endif
 import SwiftUI
+import NookUI
 
 struct SpaceGradient: Codable, Hashable {
     var angle: Double

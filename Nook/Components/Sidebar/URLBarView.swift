@@ -9,6 +9,7 @@ import SwiftUI
 import AppKit
 import NookDesign
 import NookWeb
+import NookUI
 
 struct URLBarView: View {
     @EnvironmentObject var browserManager: BrowserManager

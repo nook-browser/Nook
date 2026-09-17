@@ -26,6 +26,7 @@
 		C0DE7AB50000000000000033 /* NookBlocker in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE7AB50000000000000032 /* NookBlocker */; };
 		C0DE7AB50000000000000043 /* NookTweaks in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE7AB50000000000000042 /* NookTweaks */; };
 		C0DE7AB50000000000000053 /* NookWeb in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE7AB50000000000000052 /* NookWeb */; };
+		C0DE7AB50000000000000063 /* NookUI in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE7AB50000000000000062 /* NookUI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -69,8 +70,6 @@
 			membershipExceptions = (
 				Sidebar/SidebarBottomBar.swift,
 				Sidebar/SidebarHeader.swift,
-				Sidebar/SpacesList/SpacesList.swift,
-				Sidebar/SpacesList/SpacesListItem.swift,
 				Sidebar/SpacesSideBarView.swift,
 			);
 			target = 7F8340FB2E37F39400674A5D /* Nook */;
@@ -148,6 +147,7 @@
 				C0DE7AB50000000000000033 /* NookBlocker in Frameworks */,
 				C0DE7AB50000000000000043 /* NookTweaks in Frameworks */,
 				C0DE7AB50000000000000053 /* NookWeb in Frameworks */,
+				C0DE7AB50000000000000063 /* NookUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -210,6 +210,7 @@
 				C0DE7AB50000000000000032 /* NookBlocker */,
 				C0DE7AB50000000000000042 /* NookTweaks */,
 				C0DE7AB50000000000000052 /* NookWeb */,
+				C0DE7AB50000000000000062 /* NookUI */,
 			);
 			productName = Pulse;
 			productReference = 7F8340FC2E37F39400674A5D /* Nook.app */;
@@ -250,6 +251,7 @@
 				C0DE7AB50000000000000031 /* XCLocalSwiftPackageReference "Packages/NookBlocker" */,
 				C0DE7AB50000000000000041 /* XCLocalSwiftPackageReference "Packages/NookTweaks" */,
 				C0DE7AB50000000000000051 /* XCLocalSwiftPackageReference "Packages/NookWeb" */,
+				C0DE7AB50000000000000061 /* XCLocalSwiftPackageReference "Packages/NookUI" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7F8340FD2E37F39400674A5D /* Products */;
@@ -541,6 +543,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NookWeb;
 		};
+		C0DE7AB50000000000000061 /* XCLocalSwiftPackageReference "Packages/NookUI" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NookUI;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -622,6 +628,10 @@
 		C0DE7AB50000000000000052 /* NookWeb */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = NookWeb;
+		};
+		C0DE7AB50000000000000062 /* NookUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NookUI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

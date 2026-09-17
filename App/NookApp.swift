@@ -12,6 +12,7 @@ import OSLog
 import Sparkle
 import SwiftUI
 import NookSettings
+import NookUI
 import NookWeb
 
 @main
@@ -49,6 +50,7 @@ struct NookApp: App {
                     .ignoresSafeArea(.all)
                     .background(BackgroundWindowModifier())
                     .environment(\.nookSettings, settingsManager)
+                    .environment(settingsManager)
                     .environmentObject(browserManager)
                     .environment(browserManager.tabs)
             } viewB: {
@@ -60,6 +62,8 @@ struct NookApp: App {
                     .environment(windowRegistry)
                     .environment(webViewCoordinator)
                     .environment(\.nookSettings, settingsManager)
+                    .environment(settingsManager)
+                    .environment(\.tabActions, browserManager)
                     .environment(keyboardShortcutManager)
                     .environment(aiConfigService)
                     .environment(mcpManager)
@@ -92,6 +96,10 @@ struct NookApp: App {
                 .environment(browserManager.tabs)
                 .environmentObject(browserManager.gradientColorManager)
                 .environment(\.nookSettings, settingsManager)
+                .environment(settingsManager)
+                .environment(\.tabActions, browserManager)
+                .environment(\.contentBlocker, browserManager.contentBlockerManager)
+                .environment(\.siteRouting, browserManager.siteRoutingManager)
                 .environment(keyboardShortcutManager)
                 .environment(aiConfigService)
                 .environment(mcpManager)

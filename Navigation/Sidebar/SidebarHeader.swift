@@ -8,6 +8,7 @@
 import SwiftUI
 import NookDesign
 import NookWeb
+import NookUI
 
 /// Header section of the sidebar (window controls, navigation buttons, URL bar)
 struct SidebarHeader: View {
