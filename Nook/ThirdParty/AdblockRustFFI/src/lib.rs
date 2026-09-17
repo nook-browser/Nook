@@ -155,4 +155,23 @@ mod tests {
             nook_adblock_engine_free(ptr::null_mut());
         }
     }
+
+    /// Reachability check for the `content-blocking` feature, which is off by
+    /// default. Without it the module is invisible and every conversion call
+    /// fails to compile with an unresolved-module error rather than a missing
+    /// feature one.
+    #[test]
+    fn content_blocking_module_is_available() {
+        use adblock::content_blocking::{CbRuleEquivalent, CbType};
+        use adblock::lists::{parse_filter, ParseOptions};
+        use std::convert::TryFrom;
+
+        let parsed = parse_filter("||example.com^", true, ParseOptions::default())
+            .expect("filter should parse");
+        let equivalent = CbRuleEquivalent::try_from(parsed).expect("should convert");
+        let rules: Vec<_> = equivalent.into_iter().collect();
+        assert_eq!(rules.len(), 1);
+        assert!(matches!(rules[0].action.typ, CbType::Block));
+        assert!(rules[0].trigger.url_filter.contains("example"));
+    }
 }

@@ -9,7 +9,11 @@ publish = false
 crate-type = ["staticlib"]
 
 [dependencies]
-adblock = "0.13.3"
+# content-blocking is off by default; it is the filter-to-WKContentRuleList
+# converter Brave wrote for Brave iOS. css-validation is deliberately not
+# enabled: it pulls cssparser and selectors, and nothing here validates selectors.
+adblock = { version = "0.13.3", features = ["content-blocking"] }
+serde_json = "1"
 
 [profile.release]
 lto = true
