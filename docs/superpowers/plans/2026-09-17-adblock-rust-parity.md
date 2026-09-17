@@ -107,6 +107,39 @@ caught it immediately and now exists as
 **The lesson for the iOS phases.** "Page rendered" is not a blocking-correctness
 check. Any future gate needs an A/B against blocking-off on the same page.
 
+## Completed A/B sweep, 2026-09-17
+
+The blocking-on vs blocking-off sweep finally ran to completion across 14 sites
+after `026108d`. Result: **no over-blocking anywhere**.
+
+| Site | extra elements hidden by blocking |
+|---|---|
+| theguardian, forbes, businessinsider, espn, allrecipes, healthline, weather, vsco, instagram | 0 |
+| cnn | 0 (5 ad-exchange sync pixels on an earlier run, correct) |
+| imdb, speedtest, facebook | 1 to 2, load-to-load variance |
+| reuters | 55, investigated and dismissed, see below |
+
+**reuters.com was a false positive.** 55 SVGs read as hidden, all
+`jw-svg-icon`. Attributing each one against the page's own stylesheets returned
+`hiddenByPageOwnCSS: 55, unexplained: 0`, matching rules such as
+`.jwplayer:not(.jw-state-buffering) .jw-svg-icon-buffer`. JW Player keeps its
+whole icon set in the DOM and hides whichever do not apply to its current
+state, so two loads of the same page disagree for reasons that have nothing to
+do with blocking.
+
+**The metric needs attribution.** Counting `display: none` without asking which
+stylesheet set it produces false positives on any stateful widget. The probe
+should walk `document.styleSheets` and only report elements no author rule
+explains. That check is what cleared reuters and it belongs in the script.
+
+**Why the first four attempts failed.** Runs 2 to 4 all died between sites 5 and
+8, and the cause was the sweep itself. Each site toggles the blocker twice, and
+each toggle quadrupled the user-script list, so by site 6 the list was past
+100,000 entries and WebKit overflowed its `Vector<WebUserScriptData>`. The
+sweep could not have completed while that bug existed. Fixed in `026108d`;
+after it, the same 14 sites ran clean with the script count flat and the
+footprint at 204 MB. Run 1 died of a `head -6` in my own command line.
+
 ## What this gate did not cover
 
 Facebook, Instagram and X were not swept, because they need a signed-in session
