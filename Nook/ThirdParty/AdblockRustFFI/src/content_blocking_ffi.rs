@@ -6,7 +6,8 @@
 
 use crate::guard;
 use adblock::content_blocking::{CbRule, CbRuleEquivalent};
-use adblock::lists::{parse_filter, ParseOptions};
+use adblock::filters::cosmetic::CosmeticFilterMask;
+use adblock::lists::{parse_filter, ParseOptions, ParsedLine};
 use std::convert::TryFrom;
 use std::ffi::CString;
 use std::os::raw::c_char;
@@ -55,11 +56,33 @@ pub unsafe extern "C" fn nook_adblock_string_free(s: *mut c_char) {
     }
 }
 
+/// True for rules that cancel another rule rather than describing one.
+///
+/// Neither kind can be expressed as a standalone content blocking rule, and
+/// handing either to the converter produces something actively wrong:
+///
+/// - A cosmetic exception (`#@#`) is inverted by the crate into
+///   `unless_domain`, so `redtube.com#@#svg` becomes "hide every svg on the web
+///   except on redtube.com". Left in, ~6,600 of these hid icons across every
+///   site. Cosmetic exceptions belong to the lookup engine, which applies them
+///   correctly per URL, and WebKit could not honour them here anyway: an
+///   exception in one compiled list cannot override a rule in another.
+/// - `$badfilter` cancels a network rule elsewhere in the lists. The crate
+///   debug_asserts that it never arrives, and converting one turns a
+///   cancellation into a block.
+fn cancels_another_rule(parsed: &ParsedLine) -> bool {
+    match parsed {
+        ParsedLine::Cosmetic(c) => c.mask.contains(CosmeticFilterMask::UNHIDE),
+        ParsedLine::Network(n) => n.is_badfilter(),
+    }
+}
+
 /// Returns the converted rules and the number of lines that could not convert.
 ///
 /// `TryFrom<ParsedLine>` covers both network and cosmetic filters, so there is
-/// no need to match on the variant here. A network filter can yield more than
-/// one content blocking rule, which is what CbRuleEquivalent's iterator is for.
+/// no need to match on the variant beyond the cancellation check. A network
+/// filter can yield more than one content blocking rule, which is what
+/// CbRuleEquivalent's iterator is for.
 fn convert_text(text: &str) -> (Vec<CbRule>, usize) {
     let opts = ParseOptions::default();
     let mut out: Vec<CbRule> = Vec::new();
@@ -71,10 +94,16 @@ fn convert_text(text: &str) -> (Vec<CbRule>, usize) {
             continue;
         }
         match parse_filter(line, true, opts) {
-            Ok(parsed) => match CbRuleEquivalent::try_from(parsed) {
-                Ok(equivalent) => out.extend(equivalent.into_iter()),
-                Err(_) => errors += 1,
-            },
+            Ok(parsed) => {
+                // Deliberate skips are not errors, or the error rate means nothing.
+                if cancels_another_rule(&parsed) {
+                    continue;
+                }
+                match CbRuleEquivalent::try_from(parsed) {
+                    Ok(equivalent) => out.extend(equivalent.into_iter()),
+                    Err(_) => errors += 1,
+                }
+            }
             Err(_) => errors += 1,
         }
     }
@@ -139,6 +168,53 @@ mod tests {
     fn multiple_rule_expansion_is_preserved() {
         let (rules, _) = convert_text("||example.com^$third-party\n||other.test^\n");
         assert!(rules.len() >= 2);
+    }
+
+    /// `#@#` is a cosmetic EXCEPTION: it cancels a hide rule. It cannot be
+    /// expressed as a standalone content blocking rule, and the crate inverts it
+    /// into "hide everywhere EXCEPT here", which hides the element across the
+    /// entire web. Every such rule must be skipped.
+    #[test]
+    fn cosmetic_exception_produces_no_rule() {
+        let (rules, _) = convert_text("redtube.com#@#svg\n");
+        assert!(
+            rules.is_empty(),
+            "a cosmetic exception must not convert, got {}",
+            serde_json::to_string(&rules).unwrap()
+        );
+    }
+
+    /// The regression that hid all 46 SVGs on facebook.com.
+    #[test]
+    fn cosmetic_exception_never_becomes_a_global_hide() {
+        let (rules, _) = convert_text("redtube.com#@#svg\nexample.com##.ad\n");
+        for r in &rules {
+            let sel = r.action.selector.as_deref().unwrap_or("");
+            assert_ne!(sel, "svg", "a bare svg hide rule escaped the converter");
+            if sel == ".ad" {
+                assert!(
+                    r.trigger.if_domain.is_some(),
+                    "the surviving hide rule lost its domain scoping"
+                );
+            }
+        }
+    }
+
+    /// `$badfilter` cancels another network rule. The crate debug_asserts that
+    /// these never reach the converter, and converting one turns a cancellation
+    /// into a block.
+    #[test]
+    fn badfilter_rules_are_skipped() {
+        let (rules, _) = convert_text("||example.com^$badfilter\n");
+        assert!(rules.is_empty(), "a $badfilter rule must not convert");
+    }
+
+    /// Skipping a rule that is deliberately unconvertible is not an error, or
+    /// the error rate stops meaning anything.
+    #[test]
+    fn deliberate_skips_are_not_counted_as_errors() {
+        let (_, errors) = convert_text("redtube.com#@#svg\n||example.com^$badfilter\n");
+        assert_eq!(errors, 0);
     }
 
     #[test]
