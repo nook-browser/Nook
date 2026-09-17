@@ -8,6 +8,7 @@
 import AppKit
 import SwiftUI
 import WebKit
+import NookTweaks
 
 extension PageSession {
     /// Script message handler names this session registers on each of its web views.

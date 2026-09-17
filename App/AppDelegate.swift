@@ -241,7 +241,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         }
         Task { @MainActor in
             // Air Traffic Control — route to designated space if a rule matches
-            if manager.siteRoutingManager.applyRoute(url: url, from: nil as PageSession?) {
+            if manager.siteRoutingManager.applyRoute(url: url, from: nil) {
                 return
             }
             manager.presentExternalURL(url)

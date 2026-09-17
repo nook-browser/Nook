@@ -15,9 +15,9 @@ import WebKit
 private let sbLog = Logger(subsystem: "com.baingurley.nook", category: "SponsorBlock")
 
 @MainActor
-final class SponsorBlockManager {
+public final class SponsorBlockManager {
 
-    weak var browserManager: BrowserManager?
+    private let settings: NookSettingsService
 
     // MARK: - Constants
 
@@ -43,13 +43,14 @@ final class SponsorBlockManager {
 
     // MARK: - Init
 
-    init() {
+    public init(settings: NookSettingsService) {
+        self.settings = settings
         loadScript()
     }
 
     private func loadScript() {
-        guard let path = Bundle.main.path(forResource: "youtube-sponsorblock", ofType: "js"),
-              let source = try? String(contentsOfFile: path, encoding: .utf8)
+        guard let url = Bundle.module.url(forResource: "youtube-sponsorblock", withExtension: "js", subdirectory: "Resources"),
+              let source = try? String(contentsOf: url, encoding: .utf8)
         else {
             sbLog.warning("Failed to load youtube-sponsorblock.js from bundle")
             return
@@ -60,9 +61,8 @@ final class SponsorBlockManager {
 
     // MARK: - Script Injection
 
-    func injectScriptIfNeeded(for url: URL, in webView: WKWebView) {
-        guard let settings = browserManager?.nookSettings,
-              settings.sponsorBlockEnabled else { return }
+    public func injectScriptIfNeeded(for url: URL, in webView: WKWebView) {
+        guard settings.sponsorBlockEnabled else { return }
         guard isYouTubeDomain(url.host ?? "") else { return }
         guard let script = sponsorBlockScript else { return }
 
@@ -98,7 +98,7 @@ final class SponsorBlockManager {
 
     /// Fetch segments using the privacy-preserving hash prefix endpoint.
     /// Only fetches categories that are not disabled.
-    func fetchSegments(for videoID: String) async -> [SponsorBlockSegment] {
+    public func fetchSegments(for videoID: String) async -> [SponsorBlockSegment] {
         // Check cache
         if let cached = segmentCache[videoID],
            Date().timeIntervalSince(cached.fetchedAt) < cacheTTL
@@ -107,8 +107,7 @@ final class SponsorBlockManager {
             return cached.segments
         }
 
-        guard let settings = browserManager?.nookSettings,
-              settings.sponsorBlockEnabled else { return [] }
+        guard settings.sponsorBlockEnabled else { return [] }
 
         // Get categories that are not disabled
         let enabledCategories = Set(
@@ -171,7 +170,7 @@ final class SponsorBlockManager {
     }
 
     /// Deliver segments and per-category options to the webview.
-    func deliverSegments(_ segments: [SponsorBlockSegment], to webView: WKWebView) {
+    public func deliverSegments(_ segments: [SponsorBlockSegment], to webView: WKWebView) {
         guard let segData = try? JSONEncoder().encode(segments),
               let segJSON = String(data: segData, encoding: .utf8)
         else {
@@ -180,7 +179,7 @@ final class SponsorBlockManager {
         }
 
         // Pass category options so JS knows which are auto vs manual
-        let categoryOptions = browserManager?.nookSettings?.sponsorBlockCategoryOptions ?? [:]
+        let categoryOptions = settings.sponsorBlockCategoryOptions
         guard let optData = try? JSONEncoder().encode(categoryOptions),
               let optJSON = String(data: optData, encoding: .utf8)
         else {
@@ -197,7 +196,7 @@ final class SponsorBlockManager {
     }
 
     /// Report a viewed segment to SponsorBlock (telemetry to support community data).
-    func reportViewedSegment(uuid: String) {
+    public func reportViewedSegment(uuid: String) {
         guard let url = URL(string: "\(Self.baseURL)/viewedVideoSponsorTime?UUID=\(uuid)") else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -208,7 +207,7 @@ final class SponsorBlockManager {
 
     // MARK: - Helpers
 
-    func isYouTubeDomain(_ host: String) -> Bool {
+    public func isYouTubeDomain(_ host: String) -> Bool {
         let lowered = host.lowercased()
         if Self.youTubeDomains.contains(lowered) { return true }
         let parts = lowered.split(separator: ".", maxSplits: 1)

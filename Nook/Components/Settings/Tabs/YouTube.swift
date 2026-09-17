@@ -8,6 +8,7 @@
 import NookSettings
 import SwiftUI
 import NookDesign
+import NookTweaks
 
 struct SettingsYouTubeTab: View {
     @Environment(\.nookSettings) var nookSettings

@@ -14,7 +14,7 @@ import NookSettings
 
 // MARK: - Action Type
 
-enum SponsorBlockActionType: String, Codable {
+public enum SponsorBlockActionType: String, Codable {
     case skip
     case mute
     case full
@@ -24,19 +24,19 @@ enum SponsorBlockActionType: String, Codable {
 
 // MARK: - Segment
 
-struct SponsorBlockSegment: Codable, Identifiable {
-    let UUID: String
-    let segment: [Double]
-    let category: String
-    let actionType: String
-    let votes: Int?
-    let locked: Int?
+public struct SponsorBlockSegment: Codable, Identifiable {
+    public let UUID: String
+    public let segment: [Double]
+    public let category: String
+    public let actionType: String
+    public let votes: Int?
+    public let locked: Int?
 
-    var id: String { UUID }
-    var startTime: Double { segment.count >= 2 ? segment[0] : 0 }
-    var endTime: Double { segment.count >= 2 ? segment[1] : 0 }
-    var categoryEnum: SponsorBlockCategory? { SponsorBlockCategory(rawValue: category) }
-    var actionEnum: SponsorBlockActionType? { SponsorBlockActionType(rawValue: actionType) }
+    public var id: String { UUID }
+    public var startTime: Double { segment.count >= 2 ? segment[0] : 0 }
+    public var endTime: Double { segment.count >= 2 ? segment[1] : 0 }
+    public var categoryEnum: SponsorBlockCategory? { SponsorBlockCategory(rawValue: category) }
+    public var actionEnum: SponsorBlockActionType? { SponsorBlockActionType(rawValue: actionType) }
 }
 
 // MARK: - Hash-Based API Response

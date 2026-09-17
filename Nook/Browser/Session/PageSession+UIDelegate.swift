@@ -9,6 +9,7 @@ import AppKit
 import SwiftUI
 import WebKit
 import NookBlocker
+import NookTweaks
 extension PageSession {
     func isLikelyOAuthOrExternalWindow(url: URL, windowFeatures: WKWindowFeatures) -> Bool {
         if OAuthDetector.isLikelyOAuthPopupURL(url) { return true }

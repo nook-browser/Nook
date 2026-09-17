@@ -17,7 +17,7 @@ private let fbTweaksLog = Logger(subsystem: "com.baingurley.nook", category: "Fa
 /// `facebook-feed-prune.js` with the content blocker: this copy sets the reels and suggested flags,
 /// the blocker's copy sets the ad flag, and whichever runs first installs the one JSON.parse hook.
 @MainActor
-enum FacebookTweaks {
+public enum FacebookTweaks {
     private static let marker = "// Nook Facebook Tweaks"
 
     private static let filter: String? = {
@@ -30,7 +30,7 @@ enum FacebookTweaks {
     }()
 
     /// Main-frame navigation hook, next to YouTubeTweaks. Settings apply on the next page load.
-    static func apply(for url: URL, in webView: WKWebView, settings: NookSettingsService) {
+    public static func apply(for url: URL, in webView: WKWebView, settings: NookSettingsService) {
         let source = isFacebook(url.host) ? userScriptSource(settings) : nil
         let ucc = webView.configuration.userContentController
         // Read everything from the lazily bridged array before removeAllUserScripts (Release-only trap).

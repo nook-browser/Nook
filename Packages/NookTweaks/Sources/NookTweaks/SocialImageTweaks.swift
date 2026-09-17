@@ -17,7 +17,10 @@ private let socialLog = Logger(subsystem: "com.baingurley.nook", category: "Soci
 /// isolated script picks the largest srcset candidate, or asks a page-world script for the MP4 in React's
 /// data; the app saves it through the same WKDownload path as the image context menu.
 @MainActor
-enum SocialImageTweaks {
+public enum SocialImageTweaks {
+    /// Set by the app; saves through the same WKDownload path as the image context menu.
+    public static weak var downloader: MediaDownloading?
+
     private static let marker = "// Nook Social Image Download"
     private static let pageMarker = "// Nook Social Video Source"
     private static let world = WKContentWorld.world(name: "NookSocialImageTweaks")
@@ -29,10 +32,10 @@ enum SocialImageTweaks {
     private static let pageScript = source("social-video-source")
 
     private static func source(_ name: String) -> String? {
-        guard let url = Bundle.main.url(forResource: name, withExtension: "js"),
+        guard let url = Bundle.module.url(forResource: name, withExtension: "js", subdirectory: "Resources"),
               let source = try? String(contentsOf: url, encoding: .utf8)
         else {
-            socialLog.warning("Failed to load \(name, privacy: .public).js from bundle")
+            socialLog.warning("Failed to load \(name, privacy: .public).js from NookTweaks")
             return nil
         }
         return source
@@ -48,7 +51,7 @@ enum SocialImageTweaks {
 
     /// Main-frame navigation hook, next to YouTubeTweaks. Installed on the first visit to an enabled site and
     /// rebuilt only when the enabled sites change; the scripts check the hostname themselves.
-    static func apply(for url: URL, in webView: WKWebView, settings: NookSettingsService) {
+    public static func apply(for url: URL, in webView: WKWebView, settings: NookSettingsService) {
         let domains = enabledDomains(settings)
         let ucc = webView.configuration.userContentController
         // Read everything from the lazily bridged array before removeAllUserScripts (Release-only trap).
@@ -96,10 +99,10 @@ enum SocialImageTweaks {
                   let url = URL(string: string),
                   url.scheme == "https",
                   SocialImageTweaks.matches(url.host, SocialImageTweaks.imageDomains),
-                  let webView = message.webView as? FocusableWKWebView
+                  let webView = message.webView
             else { return }
             socialLog.debug("Downloading \(url.absoluteString, privacy: .public) (\(body["note"] as? String ?? "image", privacy: .public))")
-            webView.downloadImage(from: url)
+            SocialImageTweaks.downloader?.downloadImage(at: url, from: webView)
         }
     }
 }

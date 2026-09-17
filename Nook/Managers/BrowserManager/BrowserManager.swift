@@ -10,6 +10,7 @@ import Combine
 import CoreServices
 import NookBlocker
 import NookSettings
+import NookTweaks
 import OSLog
 import Sparkle
 import SwiftData
@@ -397,7 +398,7 @@ class BrowserManager: ObservableObject {
     weak var aiService: AIService?
     weak var aiConfigService: AIConfigService?
 
-    var siteRoutingManager = SiteRoutingManager()
+    var siteRoutingManager: SiteRoutingManager
     var externalMiniWindowManager = ExternalMiniWindowManager()
     @Published var peekManager = PeekManager()
 
@@ -445,7 +446,8 @@ class BrowserManager: ObservableObject {
         self.splitManager = SplitViewManager()
         self.gradientColorManager = GradientColorManager()
         self.contentBlockerManager = ContentBlockerManager(settings: settings)
-        self.sponsorBlockManager = SponsorBlockManager()
+        self.sponsorBlockManager = SponsorBlockManager(settings: settings)
+        self.siteRoutingManager = SiteRoutingManager(settings: settings)
         self.findManager = FindManager()
         self.importManager = ImportManager()
 
@@ -466,7 +468,8 @@ class BrowserManager: ObservableObject {
         }
         self.gradientColorManager.setImmediate(.default)
         self.contentBlockerManager.attach(host: self)
-        self.sponsorBlockManager.browserManager = self
+        self.siteRoutingManager.host = self
+        SocialImageTweaks.downloader = self
         // Note: tracking protection will be configured after settingsManager injection
 
         self.externalMiniWindowManager.attach(browserManager: self)

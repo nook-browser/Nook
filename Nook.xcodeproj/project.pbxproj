@@ -24,6 +24,7 @@
 		C0DE7AB50000000000000013 /* NookSettings in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE7AB50000000000000012 /* NookSettings */; };
 		C0DE7AB50000000000000023 /* NookDesign in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE7AB50000000000000022 /* NookDesign */; };
 		C0DE7AB50000000000000033 /* NookBlocker in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE7AB50000000000000032 /* NookBlocker */; };
+		C0DE7AB50000000000000043 /* NookTweaks in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE7AB50000000000000042 /* NookTweaks */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -145,6 +146,7 @@
 				C0DE7AB50000000000000013 /* NookSettings in Frameworks */,
 				C0DE7AB50000000000000023 /* NookDesign in Frameworks */,
 				C0DE7AB50000000000000033 /* NookBlocker in Frameworks */,
+				C0DE7AB50000000000000043 /* NookTweaks in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -205,6 +207,7 @@
 				C0DE7AB50000000000000012 /* NookSettings */,
 				C0DE7AB50000000000000022 /* NookDesign */,
 				C0DE7AB50000000000000032 /* NookBlocker */,
+				C0DE7AB50000000000000042 /* NookTweaks */,
 			);
 			productName = Pulse;
 			productReference = 7F8340FC2E37F39400674A5D /* Nook.app */;
@@ -243,6 +246,7 @@
 				C0DE7AB50000000000000011 /* XCLocalSwiftPackageReference "Packages/NookSettings" */,
 				C0DE7AB50000000000000021 /* XCLocalSwiftPackageReference "Packages/NookDesign" */,
 				C0DE7AB50000000000000031 /* XCLocalSwiftPackageReference "Packages/NookBlocker" */,
+				C0DE7AB50000000000000041 /* XCLocalSwiftPackageReference "Packages/NookTweaks" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7F8340FD2E37F39400674A5D /* Products */;
@@ -528,6 +532,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NookBlocker;
 		};
+		C0DE7AB50000000000000041 /* XCLocalSwiftPackageReference "Packages/NookTweaks" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NookTweaks;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -601,6 +609,10 @@
 		C0DE7AB50000000000000032 /* NookBlocker */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = NookBlocker;
+		};
+		C0DE7AB50000000000000042 /* NookTweaks */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NookTweaks;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -9,6 +9,7 @@ import AppKit
 import SwiftUI
 import WebKit
 import NookBlocker
+import NookTweaks
 // MARK: - WKNavigationDelegate
 extension PageSession: WKNavigationDelegate, WKDownloadDelegate {
 

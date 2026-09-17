@@ -7,6 +7,7 @@ import NookSettings
 import NookTabsCore
 import SwiftUI
 import NookDesign
+import NookTweaks
 
 struct AirTrafficControlSettingsView: View {
     @Environment(\.nookSettings) var nookSettings

@@ -37,17 +37,17 @@ extension YouTubeHomeSection {
 }
 
 @MainActor
-enum YouTubeTweaks {
-    static let videosPerRowRange = 3...8
+public enum YouTubeTweaks {
+    public static let videosPerRowRange = 3...8
 
     private static let marker = "// Nook YouTube Tweaks"
     private static let world = WKContentWorld.world(name: "NookYouTubeTweaks")
 
     private static let script: String? = {
-        guard let url = Bundle.main.url(forResource: "youtube-tweaks", withExtension: "js"),
+        guard let url = Bundle.module.url(forResource: "youtube-tweaks", withExtension: "js", subdirectory: "Resources"),
               let source = try? String(contentsOf: url, encoding: .utf8)
         else {
-            ytLog.warning("Failed to load youtube-tweaks.js from bundle")
+            ytLog.warning("Failed to load youtube-tweaks.js from NookTweaks")
             return nil
         }
         return source
@@ -66,7 +66,7 @@ enum YouTubeTweaks {
     ]
 
     /// Main-frame navigation hook, next to SponsorBlock's. Settings apply from the next page load.
-    static func apply(for url: URL, in webView: WKWebView, settings: NookSettingsService) {
+    public static func apply(for url: URL, in webView: WKWebView, settings: NookSettingsService) {
         let host = url.host?.lowercased()
         let source = (host == "www.youtube.com" || host == "youtube.com") ? userScriptSource(settings) : nil
 
