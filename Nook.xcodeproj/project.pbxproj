@@ -20,7 +20,6 @@
 		564997D82E9B24CC00D89F78 /* Garnish in Frameworks */ = {isa = PBXBuildFile; productRef = 564997D72E9B24CC00D89F78 /* Garnish */; };
 		7FAFC5DA2E3ADDCD009D7DC4 /* FaviconFinder in Frameworks */ = {isa = PBXBuildFile; productRef = 7FAFC5D92E3ADDCD009D7DC4 /* FaviconFinder */; };
 		A1B2C3D62F0E6A0100ABCDEF /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D52F0E6A0100ABCDEF /* MLXLLM */; };
-		A7A6FB442F70F4B8007C79C8 /* ContentBlockerConverter in Frameworks */ = {isa = PBXBuildFile; productRef = B1F2E3D52F0F8B0100FACADE /* ContentBlockerConverter */; };
 		C0DE7AB50000000000000003 /* NookTabsCore in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE7AB50000000000000002 /* NookTabsCore */; };
 /* End PBXBuildFile section */
 
@@ -122,7 +121,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A7A6FB442F70F4B8007C79C8 /* ContentBlockerConverter in Frameworks */,
 				360021442EC6EC7F0016A41E /* (null) in Frameworks */,
 				3600213C2EC6EC450016A41E /* (null) in Frameworks */,
 				3600213F2EC6EC710016A41E /* (null) in Frameworks */,
@@ -193,7 +191,6 @@
 				2C16A0252E87430B0070894B /* Sparkle */,
 				564997D72E9B24CC00D89F78 /* Garnish */,
 				A1B2C3D52F0E6A0100ABCDEF /* MLXLLM */,
-				B1F2E3D52F0F8B0100FACADE /* ContentBlockerConverter */,
 				C0DE7AB50000000000000002 /* NookTabsCore */,
 			);
 			productName = Pulse;
@@ -229,7 +226,6 @@
 				2C16A0242E87430B0070894B /* XCRemoteSwiftPackageReference "Sparkle" */,
 				564997D62E9B24CC00D89F78 /* XCRemoteSwiftPackageReference "Garnish" */,
 				A1B2C3D42F0E6A0100ABCDEF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
-				B1F2E3D42F0F8B0100FACADE /* XCRemoteSwiftPackageReference "SafariConverterLib" */,
 				C0DE7AB50000000000000001 /* XCLocalSwiftPackageReference "Packages/NookTabsCore" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -563,14 +559,6 @@
 				minimumVersion = 2.30.6;
 			};
 		};
-		B1F2E3D42F0F8B0100FACADE /* XCRemoteSwiftPackageReference "SafariConverterLib" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/AdguardTeam/SafariConverterLib";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 4.3.0;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -593,11 +581,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A1B2C3D42F0E6A0100ABCDEF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
 			productName = MLXLLM;
-		};
-		B1F2E3D52F0F8B0100FACADE /* ContentBlockerConverter */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B1F2E3D42F0F8B0100FACADE /* XCRemoteSwiftPackageReference "SafariConverterLib" */;
-			productName = ContentBlockerConverter;
 		};
 		C0DE7AB50000000000000002 /* NookTabsCore */ = {
 			isa = XCSwiftPackageProductDependency;
