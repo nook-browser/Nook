@@ -37,7 +37,8 @@
 				ThirdParty/AdblockRustFFI/README.md,
 				ThirdParty/AdblockRustFFI/build.sh,
 				ThirdParty/AdblockRustFFI/include/nook_adblock.h,
-				ThirdParty/AdblockRustFFI/lib/macos-arm64/libnook_adblock.a,
+				ThirdParty/AdblockRustFFI/include/module.modulemap,
+				ThirdParty/AdblockRustFFI/NookAdblock.xcframework,
 				ThirdParty/AdblockRustFFI/src/lib.rs,
 				ThirdParty/BigUIPaging/README.md,
 				ThirdParty/MuteableWKWebView/README.md,
@@ -420,11 +421,11 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Nook/ThirdParty/AdblockRustFFI/include",
+					"$(PROJECT_DIR)/Nook/ThirdParty/AdblockRustFFI/NookAdblock.xcframework/macos-arm64/Headers",
 				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Nook/ThirdParty/AdblockRustFFI/lib/macos-arm64",
+					"$(PROJECT_DIR)/Nook/ThirdParty/AdblockRustFFI/NookAdblock.xcframework/macos-arm64",
 				);
 				OTHER_LDFLAGS = (
 					"$(inherited)",
@@ -481,11 +482,11 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Nook/ThirdParty/AdblockRustFFI/include",
+					"$(PROJECT_DIR)/Nook/ThirdParty/AdblockRustFFI/NookAdblock.xcframework/macos-arm64/Headers",
 				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Nook/ThirdParty/AdblockRustFFI/lib/macos-arm64",
+					"$(PROJECT_DIR)/Nook/ThirdParty/AdblockRustFFI/NookAdblock.xcframework/macos-arm64",
 				);
 				OTHER_LDFLAGS = (
 					"$(inherited)",
