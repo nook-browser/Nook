@@ -41,10 +41,21 @@ maintainer keeps the records outside this repo.
 
 The exception covers Nook's own source. It does not reach code Nook links that
 others license under GPL-3.0, because Nook cannot add permissions to work it
-does not own. As of this date that means AdGuard's SafariConverterLib and the
-`@adguard/safari-extension` bundle inside `nook-advanced-blocking.js`, both of
-which are being replaced by `adblock-rust` under MPL-2.0. See
-[the iOS port design](./docs/superpowers/specs/2026-09-17-ios-port-design.md).
+does not own.
+
+As of commit `d98dd76`, 2026-09-17, **Nook links no GPL-3.0 code it does not
+own.** AdGuard's SafariConverterLib and the `@adguard/safari-extension` bundle
+inside `nook-advanced-blocking.js` were both removed and replaced by
+`adblock-rust` under MPL-2.0. See
+[the iOS port design](./docs/superpowers/specs/2026-09-17-ios-port-design.md)
+and [the parity record](./docs/superpowers/plans/2026-09-17-adblock-rust-parity.md).
+
+Scriptlet bodies are the reason Nook executes none. Every general-purpose
+scriptlet library is GPL-3.0: uBlock Origin's, `@adguard/scriptlets`, Adblock
+Plus's snippets, and the uBO bodies embedded in `@ghostery/adblocker`. Brave's
+`adblock-resources` is MPL-2.0 but holds only 17 Brave-specific scripts, and
+Brave's real library comes from a uBlock Origin submodule. None of it is
+grantable by Nook, so `injected_script` stays empty.
 
 The filter lists under `Nook/Managers/ContentBlockerManager/Resources/` are
 data rather than linked code, and travel as separate works under their own
