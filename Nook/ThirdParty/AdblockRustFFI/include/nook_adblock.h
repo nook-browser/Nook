@@ -44,11 +44,18 @@ void nook_adblock_engine_free(void *engine);
 
 /// Convert ABP/uBlock filter text (UTF-8, not NUL-terminated) into a
 /// NUL-terminated UTF-8 JSON array of WKContentRuleList rule objects.
-/// Writes the converted rule count to *out_rule_count and the number of lines
-/// that failed to convert to *out_error_count; either pointer may be NULL.
+///
+/// Writes the converted rule count to *out_rule_count, the number of lines
+/// skipped because they cancel another rule to *out_skipped_count, and the
+/// number with no Safari equivalent to *out_unconverted_count. Any may be NULL.
+///
+/// "Unconverted" is not "lost": procedural cosmetic filters are answered by
+/// nook_adblock_cosmetic_for_url at page load, and $removeparam is handled by
+/// TrackingParamStripper on the Swift side.
+///
 /// Returns NULL on a NULL or non-UTF-8 input.
 /// Free the result with nook_adblock_string_free.
-char *nook_adblock_convert_to_content_blocking(const char *rules_utf8, size_t rules_len, size_t *out_rule_count, size_t *out_error_count);
+char *nook_adblock_convert_to_content_blocking(const char *rules_utf8, size_t rules_len, size_t *out_rule_count, size_t *out_skipped_count, size_t *out_unconverted_count);
 
 /// Free a string returned by any char*-returning function in this library.
 /// NULL is a no-op.

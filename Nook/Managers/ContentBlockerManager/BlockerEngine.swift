@@ -78,15 +78,26 @@ final class BlockerEngine {
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return nil }
 
-        let hide = object["hide_selectors"] as? [String] ?? []
+        // `hide_selectors` is deliberately dropped. Every cosmetic filter with a
+        // plain CSS selector already compiled into the WKContentRuleList as a
+        // css-display-none entry, which WebKit applies natively and out of
+        // process. Re-sending them here injected 21KB of JSON into every page on
+        // every navigation (496 selectors on reuters.com), which fed the
+        // renderer until jetsam killed the app.
+        //
+        // Known gap: a cosmetic filter the converter rejected for a reason other
+        // than being procedural is in neither place. That is entity rules
+        // (`google.*##.x`) and non-ASCII selectors. Small, and worth fixing by
+        // teaching the converter those cases rather than by shipping 21KB a page.
+        //
         // Each procedural entry is itself a JSON document, so it needs a second decode.
         let procedural = (object["procedural_actions"] as? [String] ?? []).compactMap { entry -> [String: Any]? in
             guard let d = entry.data(using: .utf8) else { return nil }
             return try? JSONSerialization.jsonObject(with: d) as? [String: Any]
         }
 
-        if hide.isEmpty && procedural.isEmpty { return nil }
-        return ["css": hide, "extendedCss": procedural]
+        if procedural.isEmpty { return nil }
+        return ["extendedCss": procedural]
     }
 
     /// True when the request would be blocked. Used by the dev MCP `check_urls`

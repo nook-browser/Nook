@@ -14,15 +14,25 @@ use std::os::raw::c_char;
 use std::ptr;
 
 /// Convert ABP/uBlock filter text into a JSON array of WKContentRuleList rules.
-/// Writes the converted rule count to `*out_rule_count` and the count of lines
-/// that failed to convert to `*out_error_count`; either may be NULL.
+///
+/// Writes the converted rule count to `*out_rule_count`, the count of lines
+/// deliberately skipped because they cancel another rule to `*out_skipped_count`,
+/// and the count of lines that could not be expressed in Safari's syntax to
+/// `*out_unconverted_count`. Any of the three may be NULL.
+///
+/// "Unconverted" is not "lost": procedural cosmetic filters come back through
+/// the cosmetic lookup at page load, and `$removeparam` is handled by
+/// TrackingParamStripper. Calling that number an error rate is what made it
+/// misleading.
+///
 /// Returns NULL on a null or non-UTF-8 input. Free with nook_adblock_string_free.
 #[no_mangle]
 pub unsafe extern "C" fn nook_adblock_convert_to_content_blocking(
     rules_utf8: *const c_char,
     rules_len: usize,
     out_rule_count: *mut usize,
-    out_error_count: *mut usize,
+    out_skipped_count: *mut usize,
+    out_unconverted_count: *mut usize,
 ) -> *mut c_char {
     if rules_utf8.is_null() {
         return ptr::null_mut();
@@ -31,15 +41,18 @@ pub unsafe extern "C" fn nook_adblock_convert_to_content_blocking(
     let Ok(text) = std::str::from_utf8(bytes) else {
         return ptr::null_mut();
     };
-    let (rules, errors) = guard(|| convert_text(text), (Vec::new(), 0));
-    let Ok(json) = serde_json::to_string(&rules) else {
+    let stats = guard(|| convert_text(text), Conversion::default());
+    let Ok(json) = serde_json::to_string(&stats.rules) else {
         return ptr::null_mut();
     };
     if !out_rule_count.is_null() {
-        *out_rule_count = rules.len();
+        *out_rule_count = stats.rules.len();
     }
-    if !out_error_count.is_null() {
-        *out_error_count = errors;
+    if !out_skipped_count.is_null() {
+        *out_skipped_count = stats.skipped;
+    }
+    if !out_unconverted_count.is_null() {
+        *out_unconverted_count = stats.unconverted;
     }
     match CString::new(json) {
         Ok(c) => c.into_raw(),
@@ -77,16 +90,26 @@ fn cancels_another_rule(parsed: &ParsedLine) -> bool {
     }
 }
 
-/// Returns the converted rules and the number of lines that could not convert.
+#[derive(Default)]
+pub(crate) struct Conversion {
+    pub rules: Vec<CbRule>,
+    /// Lines skipped on purpose because they cancel another rule.
+    pub skipped: usize,
+    /// Lines with no equivalent in Safari's content blocking syntax. Procedural
+    /// cosmetic filters and `$redirect` dominate this; they are handled
+    /// elsewhere rather than lost.
+    pub unconverted: usize,
+}
+
+/// Convert filter text, counting deliberate skips apart from real failures.
 ///
 /// `TryFrom<ParsedLine>` covers both network and cosmetic filters, so there is
 /// no need to match on the variant beyond the cancellation check. A network
 /// filter can yield more than one content blocking rule, which is what
 /// CbRuleEquivalent's iterator is for.
-fn convert_text(text: &str) -> (Vec<CbRule>, usize) {
+fn convert_text(text: &str) -> Conversion {
     let opts = ParseOptions::default();
-    let mut out: Vec<CbRule> = Vec::new();
-    let mut errors = 0usize;
+    let mut c = Conversion::default();
 
     for line in text.lines() {
         let line = line.trim();
@@ -95,19 +118,19 @@ fn convert_text(text: &str) -> (Vec<CbRule>, usize) {
         }
         match parse_filter(line, true, opts) {
             Ok(parsed) => {
-                // Deliberate skips are not errors, or the error rate means nothing.
                 if cancels_another_rule(&parsed) {
+                    c.skipped += 1;
                     continue;
                 }
                 match CbRuleEquivalent::try_from(parsed) {
-                    Ok(equivalent) => out.extend(equivalent.into_iter()),
-                    Err(_) => errors += 1,
+                    Ok(equivalent) => c.rules.extend(equivalent.into_iter()),
+                    Err(_) => c.unconverted += 1,
                 }
             }
-            Err(_) => errors += 1,
+            Err(_) => c.unconverted += 1,
         }
     }
-    (out, errors)
+    c
 }
 
 #[cfg(test)]
@@ -117,8 +140,8 @@ mod tests {
     use std::ffi::CStr;
 
     fn convert(text: &str) -> Vec<Value> {
-        let (rules, _) = convert_text(text);
-        serde_json::from_str(&serde_json::to_string(&rules).unwrap()).unwrap()
+        let c = convert_text(text);
+        serde_json::from_str(&serde_json::to_string(&c.rules).unwrap()).unwrap()
     }
 
     #[test]
@@ -149,25 +172,25 @@ mod tests {
 
     #[test]
     fn comments_and_blank_lines_are_skipped_not_counted_as_errors() {
-        let (rules, errors) = convert_text("! a comment\n\n[Adblock Plus 2.0]\n||x.test^\n");
-        assert_eq!(rules.len(), 1);
-        assert_eq!(errors, 0);
+        let c = convert_text("! a comment\n\n[Adblock Plus 2.0]\n||x.test^\n");
+        assert_eq!(c.rules.len(), 1);
+        assert_eq!(c.unconverted, 0);
     }
 
     /// A rule the converter cannot express in Safari's syntax must be counted
     /// rather than silently dropped, so the Swift side can log a real error rate.
     #[test]
     fn unconvertible_lines_are_counted() {
-        let (_, errors) = convert_text("||x.test^$redirect=noopjs\n");
-        assert!(errors >= 1, "expected at least one unconvertible line");
+        let c = convert_text("||x.test^$redirect=noopjs\n");
+        assert!(c.unconverted >= 1, "expected at least one unconvertible line");
     }
 
     /// A single network filter can expand to more than one content blocking
     /// rule; the iterator must not drop the extras.
     #[test]
     fn multiple_rule_expansion_is_preserved() {
-        let (rules, _) = convert_text("||example.com^$third-party\n||other.test^\n");
-        assert!(rules.len() >= 2);
+        let c = convert_text("||example.com^$third-party\n||other.test^\n");
+        assert!(c.rules.len() >= 2);
     }
 
     /// `#@#` is a cosmetic EXCEPTION: it cancels a hide rule. It cannot be
@@ -176,19 +199,20 @@ mod tests {
     /// entire web. Every such rule must be skipped.
     #[test]
     fn cosmetic_exception_produces_no_rule() {
-        let (rules, _) = convert_text("redtube.com#@#svg\n");
+        let c = convert_text("redtube.com#@#svg\n");
         assert!(
-            rules.is_empty(),
+            c.rules.is_empty(),
             "a cosmetic exception must not convert, got {}",
-            serde_json::to_string(&rules).unwrap()
+            serde_json::to_string(&c.rules).unwrap()
         );
+        assert_eq!(c.skipped, 1);
     }
 
     /// The regression that hid all 46 SVGs on facebook.com.
     #[test]
     fn cosmetic_exception_never_becomes_a_global_hide() {
-        let (rules, _) = convert_text("redtube.com#@#svg\nexample.com##.ad\n");
-        for r in &rules {
+        let c = convert_text("redtube.com#@#svg\nexample.com##.ad\n");
+        for r in &c.rules {
             let sel = r.action.selector.as_deref().unwrap_or("");
             assert_ne!(sel, "svg", "a bare svg hide rule escaped the converter");
             if sel == ".ad" {
@@ -205,41 +229,47 @@ mod tests {
     /// into a block.
     #[test]
     fn badfilter_rules_are_skipped() {
-        let (rules, _) = convert_text("||example.com^$badfilter\n");
-        assert!(rules.is_empty(), "a $badfilter rule must not convert");
+        let c = convert_text("||example.com^$badfilter\n");
+        assert!(c.rules.is_empty(), "a $badfilter rule must not convert");
+        assert_eq!(c.skipped, 1);
     }
 
-    /// Skipping a rule that is deliberately unconvertible is not an error, or
-    /// the error rate stops meaning anything.
+    /// Skipping a rule that is deliberately unconvertible is not a failure, or
+    /// the reported rate stops meaning anything.
     #[test]
-    fn deliberate_skips_are_not_counted_as_errors() {
-        let (_, errors) = convert_text("redtube.com#@#svg\n||example.com^$badfilter\n");
-        assert_eq!(errors, 0);
+    fn deliberate_skips_are_counted_apart_from_failures() {
+        let c = convert_text("redtube.com#@#svg\n||example.com^$badfilter\n");
+        assert_eq!(c.unconverted, 0);
+        assert_eq!(c.skipped, 2);
     }
 
     #[test]
     fn ffi_roundtrip_and_free() {
         let text = "||ads.example.com^\n";
         let mut count = 0usize;
-        let mut errs = 0usize;
+        let mut skipped = 0usize;
+        let mut unconv = 0usize;
         unsafe {
             let p = nook_adblock_convert_to_content_blocking(
                 text.as_ptr() as *const c_char,
                 text.len(),
                 &mut count,
-                &mut errs,
+                &mut skipped,
+                &mut unconv,
             );
             assert!(!p.is_null());
             let json = CStr::from_ptr(p).to_str().unwrap().to_owned();
             assert!(json.starts_with('['));
             assert_eq!(count, 1);
-            assert_eq!(errs, 0);
+            assert_eq!(skipped, 0);
+            assert_eq!(unconv, 0);
             nook_adblock_string_free(p);
             nook_adblock_string_free(ptr::null_mut());
 
             assert!(nook_adblock_convert_to_content_blocking(
                 ptr::null(),
                 0,
+                ptr::null_mut(),
                 ptr::null_mut(),
                 ptr::null_mut()
             )
@@ -255,6 +285,7 @@ mod tests {
             let p = nook_adblock_convert_to_content_blocking(
                 text.as_ptr() as *const c_char,
                 text.len(),
+                ptr::null_mut(),
                 ptr::null_mut(),
                 ptr::null_mut(),
             );

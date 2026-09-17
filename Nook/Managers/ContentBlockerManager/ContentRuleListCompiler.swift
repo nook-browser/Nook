@@ -78,7 +78,7 @@ final class ContentRuleListCompiler {
             RustContentBlockingConverter.convert(rules: rules)
         }.value
 
-        cbLog.info("adblock-rust: \(rules.count) source, \(converted.ruleCount) safari, \(converted.errorCount) errors")
+        cbLog.info("adblock-rust: \(rules.count) source, \(converted.ruleCount) safari, \(converted.skippedCount) skipped (cancel other rules), \(converted.unconvertedCount) no Safari equivalent")
 
         // Prepend built-in YouTube rules
         var allEntries = converted.entries
