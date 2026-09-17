@@ -10,6 +10,11 @@
 
 **Spec:** [docs/superpowers/specs/2026-09-17-ios-port-design.md](../specs/2026-09-17-ios-port-design.md), phase 1.
 
+**Status:** Tasks 1 to 3 are done (`6cae0d5`, `dd27696`, `d5d272a`). Reading the
+crate during execution overturned three assumptions this plan was written on,
+and the tasks below were corrected to match what was built. See
+"Corrections made during execution" near the end.
+
 ## Global Constraints
 
 - Deployment target is macOS 26.0. Never add `@available` or `#available` guards below 26.
@@ -107,7 +112,16 @@ In `Nook/ThirdParty/AdblockRustFFI/Cargo.toml`, replace the dependency line:
 adblock = { version = "0.13.3", features = ["content-blocking"] }
 ```
 
-Do not add `css-validation`. It pulls cssparser and selectors, which are Servo crates and meaningfully large, and nothing in this plan needs selector validation.
+Add `css-validation` as well. Its name undersells what it does: without it the
+crate's `validate_css_selector` is a stub that wraps every selector as a plain
+`CssSelector`, so `:has-text`, `:upward`, `:matches-css` and `:style` are never
+classified as procedural. They then arrive in `hide_selectors` as raw text and
+get injected as invalid CSS, and one invalid selector in a comma-joined rule
+invalidates the whole rule, so a single such filter could disable cosmetic
+hiding for a site. It also stops the converter emitting `css-display-none`
+actions with selectors Safari cannot parse.
+
+It costs 282KB in the static library. Worth it.
 
 - [ ] **Step 4: Run the test to verify it passes**
 
@@ -421,9 +435,14 @@ Assisted by Claude Code."
 **Interfaces:**
 - Consumes: `guard` and `nook_adblock_string_free` from Task 2.
 - Produces:
-  - `void *nook_adblock_cosmetic_from_rules(const char *rules_utf8, size_t rules_len)`: opaque `CosmeticFilterCache` pointer, NULL on failure. Free with `nook_adblock_cosmetic_free`.
-  - `char *nook_adblock_cosmetic_for_url(void *cache, const char *url, bool generic_hide)`: NUL-terminated UTF-8 JSON, or NULL when nothing applies. Free with `nook_adblock_string_free`.
-  - `void nook_adblock_cosmetic_free(void *cache)`: NULL is a no-op.
+  - `char *nook_adblock_cosmetic_for_url(void *engine, const char *url)`: NUL-terminated UTF-8 JSON, or NULL when nothing applies. Free with `nook_adblock_string_free`.
+
+**One function, not three.** `CosmeticFilterCache` is `pub(crate)` and not
+reachable. The crate's public cosmetic API is `Engine::url_cosmetic_resources`,
+and `nook_adblock_engine_from_rules` already builds an `Engine`. So the caller
+builds one engine, uses it for both matching and cosmetics, and frees it with
+the existing `nook_adblock_engine_free`. No second opaque type, no
+`ResourceStorage` to manage, no URL parsing on the Rust side.
 
 The JSON object returned by `nook_adblock_cosmetic_for_url` has exactly these keys:
 
@@ -432,6 +451,7 @@ The JSON object returned by `nook_adblock_cosmetic_for_url` has exactly these ke
   "hide_selectors": ["string"],
   "procedural_actions": ["string (each itself a JSON object)"],
   "injected_script": "string",
+  "exceptions": ["string"],
   "generichide": false
 }
 ```
@@ -867,7 +887,7 @@ Assisted by Claude Code."
 - Create: `Nook/Managers/ContentBlockerManager/CosmeticFilterEngine.swift`
 
 **Interfaces:**
-- Consumes: `nook_adblock_cosmetic_from_rules`, `nook_adblock_cosmetic_for_url`, `nook_adblock_cosmetic_free`, `nook_adblock_string_free` from Task 3.
+- Consumes: `nook_adblock_engine_from_rules` and `nook_adblock_engine_free` (which already existed), plus `nook_adblock_cosmetic_for_url` and `nook_adblock_string_free` from Tasks 2 and 3.
 - Produces:
   - `actor CosmeticFilterEngine`
   - `func build(rules: [String]) async`
@@ -909,23 +929,23 @@ private let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", cate
 
 actor CosmeticFilterEngine {
 
-    private var cache: UnsafeMutableRawPointer?
+    private var engine: UnsafeMutableRawPointer?
 
     deinit {
-        if let cache { nook_adblock_cosmetic_free(cache) }
+        if let engine { nook_adblock_engine_free(engine) }
     }
 
     /// Build or rebuild the cache. Replaces any previous one.
     func build(rules: [String]) async {
-        clearCache()
+        clearEngine()
         guard !rules.isEmpty else {
             log.info("No filter rules; cosmetic engine cleared")
             return
         }
         let start = CFAbsoluteTimeGetCurrent()
         let text = rules.joined(separator: "\n")
-        cache = text.withCString { nook_adblock_cosmetic_from_rules($0, strlen($0)) }
-        if cache == nil {
+        engine = text.withCString { nook_adblock_engine_from_rules($0, strlen($0)) }
+        if engine == nil {
             log.error("Failed to build the cosmetic filter cache")
             return
         }
@@ -933,7 +953,7 @@ actor CosmeticFilterEngine {
     }
 
     func clear() async {
-        clearCache()
+        clearEngine()
     }
 
     /// Cosmetic configuration for a frame, or nil when nothing applies.
@@ -941,9 +961,9 @@ actor CosmeticFilterEngine {
     /// adblock-rust keys cosmetic lookups on the frame's own host, so a subframe
     /// gets its own rules rather than the top document's.
     func configuration(for pageUrl: URL, topUrl: URL?) async -> [String: Any]? {
-        guard let cache else { return nil }
+        guard let engine else { return nil }
         let raw: String? = pageUrl.absoluteString.withCString { urlPtr in
-            guard let p = nook_adblock_cosmetic_for_url(cache, urlPtr, false) else { return nil }
+            guard let p = nook_adblock_cosmetic_for_url(engine, urlPtr) else { return nil }
             defer { nook_adblock_string_free(p) }
             return String(cString: p)
         }
@@ -963,9 +983,9 @@ actor CosmeticFilterEngine {
         return ["css": hide, "extendedCss": procedural, "js": script]
     }
 
-    private func clearCache() {
-        if let cache { nook_adblock_cosmetic_free(cache) }
-        cache = nil
+    private func clearEngine() {
+        if let engine { nook_adblock_engine_free(engine) }
+        engine = nil
     }
 }
 ```
@@ -980,7 +1000,7 @@ xcodebuild -scheme Nook -configuration Debug -arch arm64 -derivedDataPath build 
 
 Expected: `BUILD SUCCEEDED`. Nothing calls this type yet; this step proves it compiles against the header.
 
-If the compiler objects to `nook_adblock_cosmetic_free` in `deinit` because `deinit` cannot be isolated, move the free into `clear()` and add a `// ponytail:` comment noting the cache leaks if the actor is dropped without `clear()`, which in practice it is not, since `ContentBlockerManager` holds one for the process lifetime.
+If the compiler objects to `nook_adblock_engine_free` in `deinit` because `deinit` cannot access actor-isolated state, move the free into `clear()` and add a `// ponytail:` comment noting the engine leaks if the actor is dropped without `clear()`, which in practice it is not, since `ContentBlockerManager` holds one for the process lifetime.
 
 - [ ] **Step 3: Commit**
 
@@ -1528,6 +1548,29 @@ Assisted by Claude Code."
 
 ---
 
+## Corrections made during execution
+
+Three assumptions in the original draft were wrong, found by reading the crate
+while running Task 1. Recorded so the same ground is not re-covered.
+
+**`ParsedFilter` does not exist.** `parse_filter` returns
+`Result<ParsedLine, FilterParseError>`. Better: `TryFrom<ParsedLine> for
+CbRuleEquivalent` exists and covers network and cosmetic filters in one arm, so
+`convert_text` never matches on the variant.
+
+**`CosmeticFilterCache` is `pub(crate)`.** The public cosmetic API is
+`Engine::url_cosmetic_resources(&self, url: &str) -> UrlSpecificResources`,
+which takes a URL rather than a hostname and owns its own `ResourceStorage`.
+This collapsed three planned FFI functions into one and deleted the planned
+`host_of` helper and `NookCosmeticCache` type outright.
+
+**`css-validation` is required, not optional.** See Task 1. This was the plan's
+worst call: skipping it would have shipped invalid CSS selectors into live
+stylesheets.
+
+The plan's advice to believe the compiler over the plan was the part that held
+up. Tasks 4 to 10 have not been executed and carry the same risk.
+
 ## Where this plan departs from the spec
 
 **Conversion granularity.** The spec says to convert per 30,000-rule chunk
@@ -1604,4 +1647,9 @@ served to a vendor that validates its payload.
 
 **Serialized cosmetic cache warm start.** The old engine reused a serialized `WebExtension` across launches. The new one rebuilds from rules. If the build time logged by `CosmeticFilterEngine` is over a second on a cold launch, add serialization; the crate supports it.
 
-**`css-validation`.** Not enabled. If invalid selectors from filter lists start breaking stylesheets, enabling it is the fix, at the cost of pulling cssparser and selectors into the binary.
+**Sharing one engine between cosmetics and request counting.** `RequestStatsEngine`
+builds an `adblock::Engine` from the same rules, and `CosmeticFilterEngine` now
+builds another. When detailed counts are on, that is two engines over one rule
+set. They have different lifecycles today, which is why this plan leaves them
+separate, but on a phone the duplicate is worth removing. Revisit during the
+phase 3 memory spike.
