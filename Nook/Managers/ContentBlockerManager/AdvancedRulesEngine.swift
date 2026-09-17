@@ -2,12 +2,13 @@
 //  AdvancedRulesEngine.swift
 //  Nook
 //
-//  Answers, per frame URL, which "advanced" filter rules apply: cosmetic CSS,
-//  extended CSS, JS snippets and scriptlets. Lookup is done by SafariConverterLib's
-//  FilterEngine (the same engine AdGuard for Safari uses), so domain, path and
-//  exception semantics match the filter lists. The rules are applied in-page by
-//  nook-advanced-blocking.js, a bundle of AdGuard's @adguard/safari-extension
-//  content-script library (ExtendedCss + Scriptlets included).
+//  Answers, per frame URL, which cosmetic filter rules apply that a compiled
+//  WKContentRuleList cannot express, chiefly procedural filters. Lookup is done
+//  by BlockerEngine over adblock-rust (MPL-2.0). The rules are applied in-page
+//  by nook-cosmetic.js, which is Nook's own script and needs no build step.
+//
+//  Plain cosmetic filters do not come through here: the converter turns them
+//  into css-display-none entries in the compiled rule list.
 //
 //  Foundation + WebKit only; nothing here is AppKit-specific.
 //
@@ -15,8 +16,6 @@
 import Foundation
 import WebKit
 import OSLog
-import ContentBlockerConverter
-import FilterEngine
 
 private let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "AdvancedRules")
 
@@ -30,41 +29,19 @@ final class AdvancedRulesEngine {
     /// WKScriptMessageHandlerWithReply name the runtime uses for subframe lookups.
     static let messageHandlerName = "nookAdvancedBlocking"
 
-    private nonisolated(unsafe) var webExtension: WebExtension?
-
-    private static var containerURL: URL {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return appSupport.appendingPathComponent("io.browsewithnook.nook/ContentBlocker/AdvancedRules", isDirectory: true)
-    }
+    /// One adblock-rust engine, shared by cosmetic lookup and the dev MCP
+    /// check_urls tool. Actor-isolated because the engine pointer is Send but
+    /// not Sync.
+    let engine = BlockerEngine()
 
     // MARK: - Build
 
-    /// Build (or rebuild) the lookup engine from SafariConverterLib's advancedRulesText. Runs off the main actor.
-    /// With `reuseSerialized`, the engine serialized by the previous build is opened instead (fast warm start);
-    /// WebExtension falls back to a rebuild from its own copy of the rules if that is missing or stale.
-    func build(rulesText: String?, reuseSerialized: Bool = false) async {
-        guard let text = rulesText, !text.isEmpty else {
-            webExtension = nil
-            log.info("No advanced rules; engine cleared")
-            return
-        }
-        let containerURL = Self.containerURL
-        let start = CFAbsoluteTimeGetCurrent()
-        let built: WebExtension? = await Task.detached(priority: .userInitiated) {
-            do {
-                let ext = try WebExtension(containerURL: containerURL)
-                if reuseSerialized, ext.lookup(pageUrl: URL(string: "https://example.com/")!, topUrl: nil) != nil {
-                    return ext
-                }
-                _ = try ext.buildFilterEngine(rules: text)
-                return ext
-            } catch {
-                log.error("Failed to build advanced rules engine: \(error.localizedDescription, privacy: .public)")
-                return nil
-            }
-        }.value
-        webExtension = built
-        log.info("Advanced rules engine built in \(String(format: "%.2f", CFAbsoluteTimeGetCurrent() - start), privacy: .public)s")
+    /// Build (or rebuild) the lookup engine from the raw filter rules.
+    /// adblock-rust parses filter syntax directly, so there is no intermediate
+    /// "advanced rules text" of the kind SafariConverterLib produced, and no
+    /// serialized warm start to reuse.
+    func build(rules: [String]) async {
+        await engine.build(rules: rules)
     }
 
     // MARK: - Lookup
@@ -72,15 +49,7 @@ final class AdvancedRulesEngine {
     /// JSON-ready configuration for a frame, or nil when nothing applies.
     /// `topUrl` is the top-level document URL; pass nil for the main frame.
     func configuration(for pageUrl: URL, topUrl: URL?) -> [String: Any]? {
-        guard let ext = webExtension, let conf = ext.lookup(pageUrl: pageUrl, topUrl: topUrl) else { return nil }
-        if conf.css.isEmpty && conf.extendedCss.isEmpty && conf.js.isEmpty && conf.scriptlets.isEmpty { return nil }
-        return [
-            "css": conf.css,
-            "extendedCss": conf.extendedCss,
-            "js": conf.js,
-            "scriptlets": conf.scriptlets.map { ["name": $0.name, "args": $0.args] },
-            "engineTimestamp": conf.engineTimestamp,
-        ]
+        engine.configuration(for: pageUrl, topUrl: topUrl)
     }
 
     /// Main-frame fast path: embed the configuration so the runtime applies it synchronously
@@ -94,7 +63,7 @@ final class AdvancedRulesEngine {
             json = text
         }
         return WKUserScript(
-            source: Self.configScriptMarker + "window.__nookAdvancedBlockingConfig = \(json);",
+            source: Self.configScriptMarker + "window.__nookCosmeticConfig = \(json);",
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         )
@@ -106,10 +75,10 @@ final class AdvancedRulesEngine {
     static let staticUserScripts: [WKUserScript] = {
         var scripts: [WKUserScript] = []
 
-        if let runtime = bundledSource("nook-advanced-blocking") {
+        if let runtime = bundledSource("nook-cosmetic") {
             scripts.append(WKUserScript(source: scriptMarker + runtime, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         } else {
-            log.error("nook-advanced-blocking.js missing from bundle; advanced rules disabled")
+            log.error("nook-cosmetic.js missing from bundle; cosmetic filtering disabled")
         }
         // Answers known ad URLs with an inert stub so a blocked request does not
         // read as a failure to anti-adblock scripts. All frames: detection runs in
@@ -141,16 +110,6 @@ final class AdvancedRulesEngine {
         }
         return scripts
     }()
-
-    /// Distinct from `scriptMarker` (which ends in a newline) so the optional stats observer
-    /// never satisfies `ensureStaticScripts`' check for the blocking scripts.
-    static let requestStatsScriptMarker = "// Nook Content Blocker Stats\n"
-
-    static func requestStatsScript(token: String) -> WKUserScript? {
-        guard let source = bundledSource("nook-request-stats") else { return nil }
-        let script = requestStatsScriptMarker + "window.__nookRequestStatsToken = '\(token)';\n" + source
-        return WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: false)
-    }
 
     private static func bundledSource(_ name: String) -> String? {
         guard let url = Bundle.main.url(forResource: name, withExtension: "js") else { return nil }

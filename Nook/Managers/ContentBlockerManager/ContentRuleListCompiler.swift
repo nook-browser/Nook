@@ -2,9 +2,10 @@
 //  ContentRuleListCompiler.swift
 //  Nook
 //
-//  Uses SafariConverterLib to convert AdGuard/uBlock filter rules into
-//  WKContentRuleList JSON and advanced rules text for scriptlet/CSS injection.
-//  Compiles JSON via WKContentRuleListStore in chunks.
+//  Uses adblock-rust (MPL-2.0) to convert AdGuard/uBlock filter rules into
+//  WKContentRuleList JSON. Compiles JSON via WKContentRuleListStore in chunks.
+//  Cosmetic rules the rule list cannot express are looked up per-URL by
+//  BlockerEngine instead of being carried here as text.
 //
 //  Caches compiled rule lists: if the rules hash hasn't changed since the last
 //  compile, previously compiled WKContentRuleLists are looked up from the store
@@ -15,7 +16,6 @@ import Foundation
 import WebKit
 import OSLog
 import CryptoKit
-import ContentBlockerConverter
 
 private let cbLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "ContentBlocker")
 
@@ -23,11 +23,12 @@ private let cbLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", ca
 final class ContentRuleListCompiler {
 
     private static let chunkSize = 30_000
-    private static let storeIdentifierPrefix = "NookAdBlocker"
+    // Bumped for the adblock-rust swap so the first launch after it recompiles
+    // rather than adopting rule lists SafariConverterLib produced.
+    private static let storeIdentifierPrefix = "NookAdBlockerRust"
 
     struct CompilationResult {
         let ruleLists: [WKContentRuleList]
-        let advancedRulesText: String?
         /// True when nothing changed since the last compile (rule lists and advanced text came from cache).
         var fromCache = false
         /// SHA-256 of the input rules; keys the caches of every engine built from them.
@@ -43,17 +44,19 @@ final class ContentRuleListCompiler {
 
     private static var hashFile: URL { cacheDir.appendingPathComponent("rules.sha256") }
     private static var chunkCountFile: URL { cacheDir.appendingPathComponent("chunk-count.txt") }
-    private static var advancedRulesFile: URL { cacheDir.appendingPathComponent("advanced-rules.txt") }
+    /// Written only by saveCache. Its absence means the cache predates the adblock-rust swap.
+    private static var converterStampFile: URL { cacheDir.appendingPathComponent("converter-adblock-rust") }
 
     // MARK: - Public API
 
-    /// Compile filter rules via SafariConverterLib.
-    /// Returns WKContentRuleLists for network blocking + advancedRulesText for scriptlet/CSS injection.
+    /// Compile filter rules via adblock-rust.
+    /// Returns WKContentRuleLists for network blocking. Cosmetic rules that cannot be
+    /// expressed as rule list entries are looked up per-URL by BlockerEngine.
     /// Uses cached compiled lists when rules haven't changed since last compile.
     static func compile(rules: [String]) async -> CompilationResult {
         guard let store = WKContentRuleListStore.default() else {
             cbLog.error("No WKContentRuleListStore available")
-            return CompilationResult(ruleLists: [], advancedRulesText: nil)
+            return CompilationResult(ruleLists: [])
         }
 
         // Compute hash off main thread
@@ -69,33 +72,16 @@ final class ContentRuleListCompiler {
             return cached
         }
 
-        cbLog.info("Cache miss — converting \(rules.count) rules via SafariConverterLib")
+        cbLog.info("Cache miss — converting \(rules.count) rules via adblock-rust")
 
-        // Run SafariConverterLib conversion off the main thread
-        let (jsonEntries, advancedText, stats) = await Task.detached(priority: .userInitiated) {
-            let converter = ContentBlockerConverter()
-            let result = converter.convertArray(
-                rules: rules,
-                safariVersion: SafariVersion.autodetect(),
-                advancedBlocking: true
-            )
-
-            let stats = (result.sourceRulesCount, result.safariRulesCount, result.advancedRulesCount, result.errorsCount)
-
-            // Parse JSON off main thread too
-            var entries: [[String: Any]] = []
-            if let data = result.safariRulesJSON.data(using: .utf8),
-               let parsed = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
-                entries = parsed
-            }
-
-            return (entries, result.advancedRulesText, stats)
+        let converted = await Task.detached(priority: .userInitiated) {
+            RustContentBlockingConverter.convert(rules: rules)
         }.value
 
-        cbLog.info("SafariConverterLib: \(stats.0) source, \(stats.1) safari, \(stats.2) advanced, \(stats.3) errors")
+        cbLog.info("adblock-rust: \(rules.count) source, \(converted.ruleCount) safari, \(converted.errorCount) errors")
 
         // Prepend built-in YouTube rules
-        var allEntries = jsonEntries
+        var allEntries = converted.entries
         allEntries.insert(contentsOf: youTubeNetworkRules(), at: 0)
 
         // Remove old rule lists
@@ -126,11 +112,10 @@ final class ContentRuleListCompiler {
         cbLog.info("Compiled \(compiled.count) rule list(s) from \(allEntries.count) entries")
 
         // Persist cache metadata for next launch
-        saveCache(hash: rulesHash, chunkCount: compiled.count, advancedRulesText: advancedText)
+        saveCache(hash: rulesHash, chunkCount: compiled.count)
 
         return CompilationResult(
             ruleLists: compiled,
-            advancedRulesText: advancedText,
             rulesHash: rulesHash
         )
     }
@@ -160,6 +145,14 @@ final class ContentRuleListCompiler {
             return nil
         }
 
+        // The converter changed. A hash written by SafariConverterLib says nothing
+        // about rule lists this build can use, and the hash is over the input rules
+        // so it would otherwise still match.
+        guard FileManager.default.fileExists(atPath: converterStampFile.path) else {
+            cbLog.info("Cache invalid: predates the adblock-rust converter")
+            return nil
+        }
+
         // Read chunk count
         guard let countStr = try? String(contentsOf: chunkCountFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
               let chunkCount = Int(countStr), chunkCount > 0 else {
@@ -177,27 +170,20 @@ final class ContentRuleListCompiler {
             lists.append(list)
         }
 
-        // Load advanced rules text
-        let advancedText = try? String(contentsOf: advancedRulesFile, encoding: .utf8)
-
-        return CompilationResult(ruleLists: lists, advancedRulesText: advancedText)
+        return CompilationResult(ruleLists: lists)
     }
 
-    private static func saveCache(hash: String, chunkCount: Int, advancedRulesText: String?) {
+    private static func saveCache(hash: String, chunkCount: Int) {
         try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
         try? hash.write(to: hashFile, atomically: true, encoding: .utf8)
         try? "\(chunkCount)".write(to: chunkCountFile, atomically: true, encoding: .utf8)
-        if let text = advancedRulesText {
-            try? text.write(to: advancedRulesFile, atomically: true, encoding: .utf8)
-        } else {
-            try? FileManager.default.removeItem(at: advancedRulesFile)
-        }
+        try? Data().write(to: converterStampFile)
     }
 
     private static func clearCache() {
         try? FileManager.default.removeItem(at: hashFile)
         try? FileManager.default.removeItem(at: chunkCountFile)
-        try? FileManager.default.removeItem(at: advancedRulesFile)
+        try? FileManager.default.removeItem(at: converterStampFile)
     }
 
     private static func lookupRuleList(identifier: String, store: WKContentRuleListStore) async -> WKContentRuleList? {

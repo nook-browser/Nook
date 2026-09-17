@@ -210,7 +210,7 @@ final class DevMCPServer {
         ),
         AIToolDefinition(
             name: "check_urls",
-            description: "Ask adblock-rust whether each URL would be blocked when requested from sourceURL (default: the selected tab's URL). type is an adblock request type: script, image, stylesheet, xmlhttprequest, sub_frame, media, font, ping, other. Needs 'Detailed blocked-request counts' on.",
+            description: "Ask adblock-rust whether each URL would be blocked when requested from sourceURL (default: the selected tab's URL). type is an adblock request type: script, image, stylesheet, xmlhttprequest, sub_frame, media, font, ping, other.",
             parameters: ["type": "object", "properties": [
                 "urls": ["type": "array", "items": ["type": "string"]],
                 "type": ["type": "string"],
@@ -322,12 +322,10 @@ final class DevMCPServer {
                     "enabled": cb.isEnabled,
                     "compiling": cb.isCompiling,
                     "hostAllowlisted": cb.isDomainAllowed(host),
-                    "detailedCounts": cb.detailedCountsEnabled,
                     "host": host ?? ""
                 ]
                 if let s = session {
                     status["blockingApplied"] = cb.shouldApplyBlocking(to: s)
-                    status["blockedRequestCount"] = s.blockedRequestCount
                     status["oauthFlow"] = s.isOAuthFlow
                     status["temporarilyDisabled"] = cb.isTemporarilyDisabled(tabId: s.itemID)
                 }
@@ -340,16 +338,13 @@ final class DevMCPServer {
                 return text("Blocking \(enabled ? "on" : "off") for \(host); reloading. Call wait_for_load next.")
 
             case "check_urls":
-                let cb = bm.contentBlockerManager
-                guard cb.detailedCountsEnabled else {
-                    return text("Turn on Settings > Ad Blocker > Detailed blocked-request counts first.", error: true)
-                }
+                let engine = bm.contentBlockerManager.advancedRulesEngine.engine
                 let urls = args["urls"] as? [String] ?? []
                 let type = args["type"] as? String ?? "script"
                 let source = args["sourceURL"] as? String ?? webView?.url?.absoluteString ?? ""
                 var out: [String: Bool] = [:]
                 for url in urls {
-                    out[url] = await cb.requestStatsEngine.blockedCount(of: [(url, type)], sourceURL: source) > 0
+                    out[url] = engine.matches(url: url, sourceURL: source, type: type)
                 }
                 return text(json(out))
 

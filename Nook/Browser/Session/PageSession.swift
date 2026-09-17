@@ -93,8 +93,6 @@ final class PageSession: NSObject, Identifiable {
     var isLoading: Bool { loadingState.isLoading }
     var canGoBack: Bool = false
     var canGoForward: Bool = false
-    /// Requests on the current page that the ad blocker's lists match (see RequestStatsEngine).
-    var blockedRequestCount: Int = 0
 
     // MARK: - Web Process Crash Tracking
 
@@ -420,7 +418,7 @@ final class PageSession: NSObject, Identifiable {
         webView.pauseAllMediaPlayback(completionHandler: nil)
 
         let controller = webView.configuration.userContentController
-        for handlerName in messageHandlerNames + [ContentBlockerManager.requestStatsHandlerName] {
+        for handlerName in messageHandlerNames {
             controller.removeScriptMessageHandler(forName: handlerName)
         }
         controller.removeScriptMessageHandler(

@@ -25,14 +25,6 @@ struct SettingsAdBlockerTab: View {
             }
 
             if nookSettings.adBlockerEnabled {
-                Section {
-                    Toggle("Detailed blocked-request counts", isOn: $settings.detailedBlockingCountsEnabled)
-                        .onChange(of: nookSettings.detailedBlockingCountsEnabled) { _, enabled in
-                            browserManager.contentBlockerManager.setDetailedCountsEnabled(enabled)
-                        }
-                } footer: {
-                    Text("Uses additional memory and page activity to estimate blocked requests. Enabling applies after reloading pages; disabling stops counting immediately. Ad and tracker blocking works with counts off.")
-                }
                 Section("Status") {
                     HStack {
                         if isUpdatingFilters {
