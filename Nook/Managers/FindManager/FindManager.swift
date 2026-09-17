@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import NookWeb
 
 @MainActor
 class FindManager: ObservableObject {

@@ -5,9 +5,10 @@
 //  The current space's name in the traffic-light row. Clicking it lists every space.
 //
 
-import NookTabsCore
 import SwiftUI
 import NookDesign
+import NookTabsCore
+import NookWeb
 
 struct SpaceSwitcherTitle: View {
     @Environment(TabsController.self) private var tabs

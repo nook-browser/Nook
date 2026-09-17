@@ -3,11 +3,12 @@
 //  Nook
 //
 
-import NookSettings
 import SwiftUI
-import NookDesign
 import AppKit
 import os
+import NookDesign
+import NookSettings
+import NookWeb
 
 @MainActor
 final class ExtensionLibraryPanelController {

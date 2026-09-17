@@ -7,6 +7,7 @@
 
 import SwiftUI
 import NookDesign
+import NookWeb
 
 struct WebsiteLoadingIndicator: View {
     @EnvironmentObject var browserManager: BrowserManager

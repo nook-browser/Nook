@@ -9,6 +9,7 @@
 import Foundation
 import AppKit
 import WebKit
+import NookWeb
 
 @MainActor
 final class PiPManager: NSObject {

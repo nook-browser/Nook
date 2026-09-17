@@ -7,6 +7,7 @@
 
 import SwiftUI
 import NookDesign
+import NookWeb
 
 struct SidebarMenuTab: View {
     var image: String

@@ -8,6 +8,7 @@
 
 import Foundation
 import WebKit
+import NookWeb
 
 extension ExtensionManager {
     /// Called once a session has a web view, before it loads, so content scripts can resolve it.

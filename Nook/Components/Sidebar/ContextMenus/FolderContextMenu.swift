@@ -5,8 +5,9 @@
 //  Created by Claude on 2026-09-14.
 //
 
-import NookTabsCore
 import SwiftUI
+import NookTabsCore
+import NookWeb
 
 /// Shared context menu for sidebar folders. Used both by the folder
 /// header's hover menu and by its right-click menu.

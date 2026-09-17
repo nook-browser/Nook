@@ -1,7 +1,8 @@
 import AppKit
+import WebKit
 import NookSettings
 import NookTabsCore
-import WebKit
+import NookWeb
 
 // MARK: - Tab Compositor Manager
 

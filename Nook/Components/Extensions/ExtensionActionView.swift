@@ -5,12 +5,13 @@
 //  Clean ExtensionActionView using ONLY native WKWebExtension APIs
 //
 
-import NookSettings
 import SwiftUI
-import NookDesign
 import WebKit
 import AppKit
 import os
+import NookDesign
+import NookSettings
+import NookWeb
 
 struct ExtensionActionView: View {
     let extensions: [InstalledExtension]

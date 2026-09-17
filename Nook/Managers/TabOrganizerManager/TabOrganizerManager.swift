@@ -8,8 +8,9 @@
 //
 
 import Foundation
-import NookTabsCore
 import OSLog
+import NookTabsCore
+import NookWeb
 
 // MARK: - TabOrganizerManager
 

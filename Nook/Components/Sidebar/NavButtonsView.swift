@@ -5,8 +5,9 @@
 //  Created by Maciek Bagiński on 30/07/2025.
 //
 import SwiftUI
-import NookDesign
 import WebKit
+import NookDesign
+import NookWeb
 
 struct NavButtonsView: View {
     @EnvironmentObject var browserManager: BrowserManager

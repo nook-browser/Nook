@@ -5,9 +5,10 @@
 //  Created by Jonathan Caudill on 2025-09-13.
 //
 
-import NookSettings
 import SwiftUI
 import AppKit
+import NookSettings
+import NookWeb
 
 /// Manages reveal/hide of the overlay sidebar when the real sidebar is collapsed.
 /// Uses a global mouse-move monitor to handle edge hover, including slight overshoot

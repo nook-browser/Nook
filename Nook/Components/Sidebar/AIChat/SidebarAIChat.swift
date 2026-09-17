@@ -6,9 +6,10 @@
 //
 
 import SwiftUI
-import NookDesign
 import AppKit
 import Garnish
+import NookDesign
+import NookWeb
 
 struct ChatMessage: Identifiable, Equatable {
     let id = UUID()

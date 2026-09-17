@@ -6,8 +6,9 @@
 //
 
 import SwiftUI
-import NookDesign
 import AppKit
+import NookDesign
+import NookWeb
 
 struct SidebarHoverOverlayView: View {
     @EnvironmentObject var browserManager: BrowserManager

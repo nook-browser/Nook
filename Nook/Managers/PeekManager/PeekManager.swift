@@ -8,6 +8,7 @@
 import SwiftUI
 import WebKit
 import AppKit
+import NookWeb
 
 @MainActor
 final class PeekManager: ObservableObject {

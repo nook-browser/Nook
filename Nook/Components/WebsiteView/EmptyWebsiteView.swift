@@ -7,6 +7,7 @@
 
 import SwiftUI
 import NookDesign
+import NookWeb
 
 struct EmptyWebsiteView: View {
     @Environment(\.colorScheme) var colorScheme

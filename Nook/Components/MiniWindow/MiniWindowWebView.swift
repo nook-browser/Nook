@@ -7,6 +7,7 @@
 
 import SwiftUI
 import WebKit
+import NookWeb
 
 /// Keeps the page's fixed content clear of the window's glass toolbar while the
 /// page itself scrolls underneath it. Synced in `layout()` so it survives resize,

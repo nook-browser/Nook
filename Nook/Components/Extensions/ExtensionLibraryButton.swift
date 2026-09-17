@@ -4,9 +4,10 @@
 //
 
 import SwiftUI
-import NookDesign
 import AppKit
 import os
+import NookDesign
+import NookWeb
 
 struct ExtensionLibraryButton: View {
     @EnvironmentObject var browserManager: BrowserManager

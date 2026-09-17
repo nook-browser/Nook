@@ -9,6 +9,7 @@ import AppKit
 import Foundation
 import os
 import WebKit
+import NookWeb
 
 extension ExtensionManager {
 

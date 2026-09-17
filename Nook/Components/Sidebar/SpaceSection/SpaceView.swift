@@ -10,9 +10,10 @@
 //  drop position math in `NookDragSessionManager` relies on.
 //
 
-import NookTabsCore
 import SwiftUI
 import NookDesign
+import NookTabsCore
+import NookWeb
 
 struct SpaceView: View {
     let spaceID: UUID

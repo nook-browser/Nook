@@ -4,10 +4,11 @@
 //
 //      Created by Maciek Bagiński on 30/07/2025.
 //
-import NookTabsCore
 import SwiftUI
-import NookDesign
 import UniformTypeIdentifiers
+import NookDesign
+import NookTabsCore
+import NookWeb
 
 struct PinnedGrid: View {
     let width: CGFloat

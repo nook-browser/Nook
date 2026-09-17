@@ -8,6 +8,7 @@
 import AppKit
 import OSLog
 import Sparkle
+import NookWeb
 
 /// Handles application-level lifecycle events and coordinates app termination
 ///

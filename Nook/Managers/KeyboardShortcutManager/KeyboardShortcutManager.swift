@@ -9,6 +9,7 @@ import Foundation
 import AppKit
 import SwiftUI
 import WebKit
+import NookWeb
 
 @MainActor
 @Observable

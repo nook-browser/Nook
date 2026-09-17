@@ -8,14 +8,15 @@
 import Foundation
 import Observation
 import SwiftUI
-import NookWeb
 
 @MainActor
 @Observable
-class SearchManager {
-    var suggestions: [SearchSuggestion] = []
-    var isLoading: Bool = false
+public class SearchManager {
+    public var suggestions: [SearchSuggestion] = []
+    public var isLoading: Bool = false
     
+    public init() {}
+
     private let session = URLSession.shared
     private var searchTask: Task<Void, Never>?
     private var searchGeneration = UUID()
@@ -25,26 +26,38 @@ class SearchManager {
     private var currentSpaceId: UUID?
     
     /// An open tab the palette can switch to, captured when the query ran.
-    struct TabMatch {
-        let itemID: UUID
-        let title: String
-        let url: URL
-        let favicon: SwiftUI.Image
+    public struct TabMatch {
+        public let itemID: UUID
+        public let title: String
+        public let url: URL
+        public let favicon: SwiftUI.Image
+
+        public init(itemID: UUID, title: String, url: URL, favicon: SwiftUI.Image) {
+            self.itemID = itemID
+            self.title = title
+            self.url = url
+            self.favicon = favicon
+        }
     }
 
-    struct SearchSuggestion: Identifiable, Equatable {
-        let id = UUID()
-        let text: String
-        let type: SuggestionType
+    public struct SearchSuggestion: Identifiable, Equatable {
+        public let id = UUID()
+        public let text: String
+        public let type: SuggestionType
+
+        public init(text: String, type: SuggestionType) {
+            self.text = text
+            self.type = type
+        }
         
-        enum SuggestionType {
+        public enum SuggestionType {
             case search
             case url
             case tab(TabMatch)
             case history(HistoryEntry)
         }
         
-        static func == (lhs: SearchSuggestion, rhs: SearchSuggestion) -> Bool {
+        public static func == (lhs: SearchSuggestion, rhs: SearchSuggestion) -> Bool {
             switch (lhs.type, rhs.type) {
             case (.search, .search), (.url, .url):
                 return lhs.text == rhs.text
@@ -59,21 +72,21 @@ class SearchManager {
     }
     
     /// The controller and window whose space's tabs the palette searches.
-    func setTabs(_ tabs: TabsController?, window: BrowserWindowState?) {
+    public func setTabs(_ tabs: TabsController?, window: BrowserWindowState?) {
         self.tabs = tabs
         self.window = window
         updateSpaceContext()
     }
     
-    func setHistoryManager(_ historyManager: HistoryManager?) {
+    public func setHistoryManager(_ historyManager: HistoryManager?) {
         self.historyManager = historyManager
     }
 
-    @MainActor func updateSpaceContext() {
+    @MainActor public func updateSpaceContext() {
         currentSpaceId = window?.spaceID
     }
     
-    @MainActor func searchSuggestions(for query: String) {
+    @MainActor public func searchSuggestions(for query: String) {
         searchTask?.cancel()
         let generation = UUID()
         searchGeneration = generation
@@ -222,7 +235,7 @@ class SearchManager {
     }
     
     
-    func clearSuggestions() {
+    public func clearSuggestions() {
         searchTask?.cancel()
         searchGeneration = UUID()
         if !suggestions.isEmpty {

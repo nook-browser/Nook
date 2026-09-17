@@ -5,18 +5,17 @@
 //  Created by Maciek Bagiński on 31/07/2025.
 //
 
-import AppKit
 import SwiftUI
 import WebKit
 import NookBlocker
 import NookWeb
 
-class BrowserConfiguration {
-    static let shared = BrowserConfiguration()
+public class BrowserConfiguration {
+    public static let shared = BrowserConfiguration()
     
     private init() {}
     
-    lazy var webViewConfiguration: WKWebViewConfiguration = {
+    public lazy var webViewConfiguration: WKWebViewConfiguration = {
         let config = WKWebViewConfiguration()
 
         // Use default website data store for normal browsing
@@ -96,7 +95,7 @@ class BrowserConfiguration {
     }()
 
     /// Optional hook for ContentBlockerManager to apply rule lists to new controllers.
-    var contentRuleListApplicator: ((WKUserContentController) -> Void)?
+    public var contentRuleListApplicator: ((WKUserContentController) -> Void)?
 
     // MARK: - Fresh User Content Controller
     // Creates a fresh WKUserContentController but preserves Nook's own shared
@@ -106,7 +105,7 @@ class BrowserConfiguration {
     // Only Nook-owned scripts are copied. WKWebExtensionController injects its
     // content scripts into every new controller itself, so copying them here as
     // well would hand each new tab two of each. See WKUserScript+NookOwned.
-    func freshUserContentController() -> WKUserContentController {
+    public func freshUserContentController() -> WKUserContentController {
         let controller = WKUserContentController()
         for script in webViewConfiguration.userContentController.userScripts.nookOwned {
             controller.addUserScript(script)
@@ -118,7 +117,7 @@ class BrowserConfiguration {
 
     // MARK: - Cache-Optimized Configuration
     // Derives from shared config to preserve process pool + extension controller
-    func cacheOptimizedWebViewConfiguration() -> WKWebViewConfiguration {
+    public func cacheOptimizedWebViewConfiguration() -> WKWebViewConfiguration {
         let config = webViewConfiguration.copy() as! WKWebViewConfiguration
         config.userContentController = freshUserContentController()
         return config
@@ -127,7 +126,7 @@ class BrowserConfiguration {
     // MARK: - Profile-Aware Configurations
     // Derive from the shared config so extension controller + process pool are inherited
     @MainActor
-    func webViewConfiguration(for profile: Profile) -> WKWebViewConfiguration {
+    public func webViewConfiguration(for profile: Profile) -> WKWebViewConfiguration {
         let config = webViewConfiguration.copy() as! WKWebViewConfiguration
 
         // Fresh UCC per tab to avoid cross-tab handler conflicts (preserves shared scripts)
@@ -147,7 +146,7 @@ class BrowserConfiguration {
     // MARK: - Chrome Web Store Integration
     
     /// Get the Web Store injector script
-    static func webStoreInjectorScript() -> WKUserScript? {
+    public static func webStoreInjectorScript() -> WKUserScript? {
         guard let scriptPath = Bundle.main.path(forResource: "WebStoreInjector", ofType: "js"),
               let scriptSource = try? String(contentsOfFile: scriptPath, encoding: .utf8) else {
             return nil

@@ -4,11 +4,12 @@
 //
 
 import SwiftUI
-import NookDesign
 import AppKit
 import WebKit
 import AVFoundation
 import CoreLocation
+import NookDesign
+import NookWeb
 
 @MainActor
 final class ExtensionLibraryMoreMenuController {

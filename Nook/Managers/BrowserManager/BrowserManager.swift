@@ -8,15 +8,15 @@
 import AppKit
 import Combine
 import CoreServices
-import NookBlocker
-import NookSettings
-import NookTweaks
-import NookWeb
 import OSLog
 import Sparkle
 import SwiftData
 import SwiftUI
 import WebKit
+import NookBlocker
+import NookSettings
+import NookTweaks
+import NookWeb
 
 @MainActor
 final class Persistence {
@@ -424,12 +424,21 @@ class BrowserManager: ObservableObject {
         return entities.map { ($0.id, $0.name) }
     }
 
-    init(settings: NookSettingsService) {
+    init(settings: NookSettingsService, windowRegistry: WindowRegistry) {
         // Phase 1: initialize all stored properties
         self.nookSettings = settings
         self.modelContext = Persistence.shared.container.mainContext
         self.extensionManager = ExtensionManager.shared
-        let tabs = TabsController(legacyProfiles: Self.legacyProfileRecords(in: modelContext))
+        let blocker = ContentBlockerManager(settings: settings)
+        let sponsorBlock = SponsorBlockManager(settings: settings)
+        let siteRouting = SiteRoutingManager(settings: settings)
+        self.contentBlockerManager = blocker
+        self.sponsorBlockManager = sponsorBlock
+        self.siteRoutingManager = siteRouting
+        let tabs = TabsController(
+            settings: settings, windowRegistry: windowRegistry, blocker: blocker,
+            sponsorBlock: sponsorBlock, siteRouting: siteRouting,
+            legacyProfiles: Self.legacyProfileRecords(in: modelContext))
         self.tabs = tabs
         // The first space's data store is the one the app starts on.
         let initialProfile = tabs.orderedSpaces.first.flatMap { tabs.profile(forSpace: $0.id) }
@@ -446,18 +455,23 @@ class BrowserManager: ObservableObject {
         self.compositorManager = TabCompositorManager()
         self.splitManager = SplitViewManager()
         self.gradientColorManager = GradientColorManager()
-        self.contentBlockerManager = ContentBlockerManager(settings: settings)
-        self.sponsorBlockManager = SponsorBlockManager(settings: settings)
-        self.siteRoutingManager = SiteRoutingManager(settings: settings)
         self.findManager = FindManager()
         self.importManager = ImportManager()
 
         // Phase 2: wire dependencies and perform side effects (safe to use self)
         self.compositorManager.browserManager = self
         self.splitManager.browserManager = self
-        self.splitManager.windowRegistry = self.windowRegistry
+        self.windowRegistry = windowRegistry
+        self.splitManager.windowRegistry = windowRegistry
         // Note: settingsManager will be injected later, so we skip initialization here
-        self.tabs.browserManager = self
+        self.tabs.history = self.historyManager
+        self.tabs.webViews = self
+        self.tabs.sessionDelegate = self
+        self.tabs.tabEvents = self
+        self.tabs.alerts = self
+        if case .readOnly(let reason) = tabs.loadOutcome {
+            TabsController.presentReadOnlyAlert(reason: reason, directory: tabs.directory)
+        }
         if let mgr = self.extensionManager {
             // Attach extension manager BEFORE any WKWebView is created so content scripts can inject
             mgr.attach(browserManager: self)

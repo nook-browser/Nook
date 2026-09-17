@@ -6,10 +6,11 @@
 //
 
 import AppKit
-import NookSettings
 import SwiftUI
-import NookDesign
 import Garnish
+import NookDesign
+import NookSettings
+import NookWeb
 
 struct CommandPaletteView: View {
     @EnvironmentObject var browserManager: BrowserManager

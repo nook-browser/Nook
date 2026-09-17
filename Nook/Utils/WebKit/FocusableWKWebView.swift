@@ -1,11 +1,12 @@
 import AppKit
+import NookWeb
 @preconcurrency import UserNotifications
 import WebKit
 import UniformTypeIdentifiers
 
 // Simple subclass to ensure clicking a webview focuses its tab in the app state
 @MainActor
-final class FocusableWKWebView: WKWebView {
+final class FocusableWKWebView: WKWebView, SessionWebView {
     weak var owningSession: PageSession?
     var contextMenuBridge: WebContextMenuBridge?
     nonisolated private static let imageContentTypes: [UTType] = [
@@ -247,8 +248,8 @@ final class FocusableWKWebView: WKWebView {
         originalURL: URL,
         destinationPreference: Download.DestinationPreference
     ) {
-        guard let tab = owningSession,
-              let manager = tab.browserManager?.downloadManager else { return }
+        guard owningSession != nil else { return }
+        let manager = DownloadManager.shared
 
         let proposedName = originalURL.lastPathComponent.isEmpty ? "image" : originalURL.lastPathComponent
         _ = manager.addDownload(

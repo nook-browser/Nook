@@ -7,6 +7,7 @@
 
 import SwiftUI
 import NookDesign
+import NookWeb
 
 struct CopyURLToast: View {
     @Environment(BrowserWindowState.self) private var windowState

@@ -7,11 +7,9 @@
 
 import SwiftUI
 import NookDesign
+import NookWeb
 
-enum Tabs {
-    case history
-    case downloads
-}
+typealias Tabs = SidebarMenuTab
 
 struct SidebarMenu: View {
     @Environment(BrowserWindowState.self) private var windowState

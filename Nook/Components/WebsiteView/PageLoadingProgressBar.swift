@@ -7,8 +7,9 @@
 //
 
 import SwiftUI
-import NookDesign
 import WebKit
+import NookDesign
+import NookWeb
 
 struct PageLoadingProgressBar: View {
     let session: PageSession?

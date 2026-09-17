@@ -7,6 +7,7 @@
 
 import SwiftUI
 import WebKit
+import NookWeb
 
 struct PeekWebView: NSViewRepresentable {
     @ObservedObject var session: PeekSession

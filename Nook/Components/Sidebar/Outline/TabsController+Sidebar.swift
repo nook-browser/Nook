@@ -6,9 +6,9 @@
 //
 
 import AppKit
+import SwiftUI
 import NookTabsCore
 import NookWeb
-import SwiftUI
 
 extension TabsController {
     // MARK: - Drops
@@ -44,43 +44,6 @@ extension TabsController {
         let favorites = favorites(of: spaceID)
         let after = favorites.prefix(index).last(where: { $0.id != itemID })?.id
         move(itemID, to: .favorites(spaceID: spaceID), after: after)
-    }
-
-    // MARK: - Reads
-
-    /// Every folder in a space's pinned and tabs sections, depth first, with its depth.
-    func folders(inSpace spaceID: UUID) -> [(item: Item, depth: Int)] {
-        var result: [(item: Item, depth: Int)] = []
-        func walk(_ parent: Parent, depth: Int) {
-            for child in children(of: parent) where child.isFolder {
-                result.append((child, depth))
-                walk(.folder(itemID: child.id), depth: depth + 1)
-            }
-        }
-        walk(.pinned(spaceID: spaceID), depth: 0)
-        walk(.tabs(spaceID: spaceID), depth: 0)
-        return result
-    }
-
-    /// True for favorites and pinned items (and anything inside pinned folders).
-    func isSynced(_ itemID: UUID) -> Bool {
-        switch section(of: itemID) {
-        case .favorites, .pinned: return true
-        default: return false
-        }
-    }
-
-    /// Row title: custom title, else the live page title, else the saved page title, else the host.
-    func title(for item: Item) -> String {
-        if let custom = item.customTitle, !custom.isEmpty { return custom }
-        if let live = session(for: item.id)?.title, !live.isEmpty { return live }
-        if !item.displayTitle.isEmpty { return item.displayTitle }
-        return item.url?.host ?? "New Tab"
-    }
-
-    /// Current page URL: the live page, else the saved URL.
-    func currentURL(for item: Item) -> URL? {
-        session(for: item.id)?.url ?? item.url
     }
 }
 
@@ -121,7 +84,7 @@ struct ItemFavicon: View {
                 session?.ensureFaviconLoaded()
                 guard let host = item.url?.host,
                       let image = await FaviconCache.shared.cachedImage(for: host) else { return }
-                cached = Image(nsImage: image)
+                cached = Image(platformImage: image)
             }
     }
 }

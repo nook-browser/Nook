@@ -1,0 +1,238 @@
+//
+//  BrowserManager+NookWeb.swift
+//  Nook
+//
+//  What NookWeb asks of its host. The tab model and its live pages reach every AppKit-only
+//  manager (web view pool, downloads, Peek, zoom, PiP, extensions, native panels) through
+//  these four protocols and nothing else.
+//
+
+import AppKit
+import Combine
+import WebKit
+import NookWeb
+
+// MARK: - WebViewProvider
+
+extension BrowserManager: WebViewProvider {
+    func makeWebView(configuration: WKWebViewConfiguration) -> WKWebView {
+        FocusableWKWebView(frame: .zero, configuration: configuration)
+    }
+
+    func webView(for itemID: UUID, in windowID: UUID) -> WKWebView? {
+        webViewCoordinator?.getWebView(for: itemID, in: windowID)
+    }
+
+    func allWebViews(for itemID: UUID) -> [WKWebView] {
+        webViewCoordinator?.getAllWebViews(for: itemID) ?? []
+    }
+
+    func releaseWebViews(for session: PageSession) {
+        webViewCoordinator?.removeAllWebViews(for: session)
+    }
+
+    func removeFromContainers(_ webView: WKWebView) {
+        webViewCoordinator?.removeWebViewFromContainers(webView)
+    }
+}
+
+// MARK: - PageSessionDelegate
+
+extension BrowserManager: PageSessionDelegate {
+    var currentProfilePublisher: AnyPublisher<Profile?, Never> {
+        $currentProfile.eraseToAnyPublisher()
+    }
+
+    func navigateAcrossWindows(_ itemID: UUID, to url: URL) {
+        navigateTabAcrossWindows(itemID, to: url)
+    }
+
+    func addDownload(_ download: WKDownload, originalURL: URL, suggestedFilename: String) {
+        _ = downloadManager.addDownload(
+            download, originalURL: originalURL, suggestedFilename: suggestedFilename)
+    }
+
+    func toggleFullScreen(for webView: WKWebView) {
+        guard let window = webView.window else { return }
+        DispatchQueue.main.async { window.toggleFullScreen(nil) }
+    }
+
+    func presentPeek(url: URL, from session: PageSession) {
+        peekManager.presentExternalURL(url, from: session)
+    }
+
+    func presentSignInWindow(url: URL, completion: @escaping (Bool) -> Void) {
+        externalMiniWindowManager.present(url: url) { success, _ in completion(success) }
+    }
+
+    func handleAuthenticationChallenge(
+        _ challenge: URLAuthenticationChallenge,
+        for session: PageSession,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) -> Bool {
+        authenticationManager.handleAuthenticationChallenge(
+            challenge, for: session, completionHandler: completionHandler)
+    }
+
+    func beginIdentityFlow(_ request: IdentityRequest, from session: PageSession) {
+        authenticationManager.beginIdentityFlow(request, from: session)
+    }
+
+    func loadZoom(for itemID: UUID) { loadZoomForTab(itemID) }
+
+    func cleanupZoom(for itemID: UUID) { cleanupZoomForTab(itemID) }
+
+    func setMuteState(_ muted: Bool, for itemID: UUID) {
+        setMuteState(muted, for: itemID, originatingWindowId: windowRegistry?.activeWindow?.id)
+    }
+
+    func requestPictureInPicture(for session: PageSession, webView: WKWebView?) {
+        if let webView {
+            PiPManager.shared.requestPiP(for: session, webView: webView)
+        } else {
+            PiPManager.shared.requestPiP(for: session)
+        }
+    }
+
+    func isPictureInPictureActive(for session: PageSession) -> Bool {
+        PiPManager.shared.isPiPActive(for: session)
+    }
+
+    func configureShortcutDetection(in webView: WKWebView) {
+        keyboardShortcutManager?.websiteShortcutDetector.configure(webView: webView)
+    }
+
+    func shortcutDetectorDidNavigate(to url: URL) {
+        keyboardShortcutManager?.websiteShortcutDetector.updateCurrentURL(url)
+    }
+
+    func updateDetectedShortcuts(for url: String, shortcuts: Set<String>) {
+        keyboardShortcutManager?.websiteShortcutDetector.updateJSDetectedShortcuts(
+            for: url, shortcuts: shortcuts)
+    }
+
+    func installWebStoreScript(in webView: WKWebView) -> AnyObject? {
+        guard let url = webView.url, WebStoreScriptHandler.store(for: url) != nil,
+              let script = BrowserConfiguration.webStoreInjectorScript()
+        else { return nil }
+        let controller = webView.configuration.userContentController
+        let world = WebStoreScriptHandler.contentWorld
+        controller.removeScriptMessageHandler(forName: WebStoreScriptHandler.handlerName, contentWorld: world)
+        let handler = WebStoreScriptHandler(browserManager: self)
+        controller.add(handler, contentWorld: world, name: WebStoreScriptHandler.handlerName)
+        webView.evaluateJavaScript(script.source, in: nil, in: world, completionHandler: nil)
+        return handler
+    }
+
+    func removeWebStoreHandler(from controller: WKUserContentController) {
+        controller.removeScriptMessageHandler(
+            forName: WebStoreScriptHandler.handlerName, contentWorld: WebStoreScriptHandler.contentWorld)
+    }
+}
+
+// MARK: - TabEventObserver
+
+extension BrowserManager: TabEventObserver {
+    func tabOpened(_ session: PageSession) {
+        ExtensionManager.shared.notifyTabOpened(session)
+    }
+
+    func tabActivated(new session: PageSession, previous: PageSession?) {
+        ExtensionManager.shared.notifyTabActivated(new: session, previous: previous)
+    }
+
+    func tabClosed(itemID: UUID) {
+        ExtensionManager.shared.notifyTabClosed(itemID: itemID)
+    }
+
+    func tabMoved(itemID: UUID, from oldIndex: Int?, in oldWindow: BrowserWindowState?, pinnedChanged: Bool) {
+        ExtensionManager.shared.notifyTabMoved(
+            itemID: itemID, from: oldIndex, in: oldWindow, pinnedChanged: pinnedChanged)
+    }
+
+    func tabPropertiesChanged(_ session: PageSession, properties: WKWebExtension.TabChangedProperties) {
+        ExtensionManager.shared.notifyTabPropertiesChanged(session, properties: properties)
+    }
+
+    func grantAccess(to url: URL) {
+        ExtensionManager.shared.grantExtensionAccessToURL(url)
+    }
+
+    func wakeBackgroundWorkers() {
+        ExtensionManager.shared.wakeBackgroundWorkers()
+    }
+
+    var nativeController: WKWebExtensionController? {
+        ExtensionManager.shared.nativeController
+    }
+
+    func diagnose(for webView: WKWebView, url: URL) {
+        #if DEBUG
+        ExtensionManager.shared.diagnoseExtensionState(for: webView, url: url)
+        #endif
+    }
+}
+
+// MARK: - AlertPresenter
+
+extension BrowserManager: AlertPresenter {
+    func presentAlert(message: String, over webView: WKWebView, completion: @escaping () -> Void) {
+        let alert = NSAlert()
+        alert.messageText = "JavaScript Alert"
+        alert.informativeText = message
+        alert.addButton(withTitle: "OK")
+        guard let window = webView.window else { return completion() }
+        alert.beginSheetModal(for: window) { _ in completion() }
+    }
+
+    func presentConfirm(message: String, over webView: WKWebView, completion: @escaping (Bool) -> Void) {
+        let alert = NSAlert()
+        alert.messageText = "JavaScript Confirm"
+        alert.informativeText = message
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Cancel")
+        guard let window = webView.window else { return completion(false) }
+        alert.beginSheetModal(for: window) { completion($0 == .alertFirstButtonReturn) }
+    }
+
+    func presentPrompt(
+        prompt: String, defaultText: String?, over webView: WKWebView,
+        completion: @escaping (String?) -> Void
+    ) {
+        let alert = NSAlert()
+        alert.messageText = "JavaScript Prompt"
+        alert.informativeText = prompt
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Cancel")
+        let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+        textField.stringValue = defaultText ?? ""
+        alert.accessoryView = textField
+        guard let window = webView.window else { return completion(nil) }
+        alert.beginSheetModal(for: window) {
+            completion($0 == .alertFirstButtonReturn ? textField.stringValue : nil)
+        }
+    }
+
+    func presentOpenPanel(
+        allowsMultipleSelection: Bool, allowsDirectories: Bool, over webView: WKWebView,
+        completion: @escaping ([URL]?) -> Void
+    ) {
+        let openPanel = NSOpenPanel()
+        openPanel.allowsMultipleSelection = allowsMultipleSelection
+        openPanel.canChooseDirectories = allowsDirectories
+        openPanel.canChooseFiles = true
+        openPanel.resolvesAliases = true
+        openPanel.title = "Choose File"
+        openPanel.prompt = "Choose"
+        DispatchQueue.main.async {
+            let finish: (NSApplication.ModalResponse) -> Void = { response in
+                completion(response == .OK ? openPanel.urls : nil)
+            }
+            if let window = webView.window {
+                openPanel.beginSheetModal(for: window, completionHandler: finish)
+            } else {
+                openPanel.begin(completionHandler: finish)
+            }
+        }
+    }
+}

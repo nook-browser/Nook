@@ -7,11 +7,12 @@
 
 import AppKit
 import Foundation
-import NookTabsCore
 import os
 import SwiftData
 import SwiftUI
 import WebKit
+import NookTabsCore
+import NookWeb
 
 extension ExtensionManager {
 

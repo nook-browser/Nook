@@ -5,13 +5,12 @@
 //  Popups, OAuth windows, JavaScript panels, file upload and full screen for a PageSession.
 //
 
-import AppKit
 import SwiftUI
 import WebKit
 import NookBlocker
 import NookTweaks
 extension PageSession {
-    func isLikelyOAuthOrExternalWindow(url: URL, windowFeatures: WKWindowFeatures) -> Bool {
+    public func isLikelyOAuthOrExternalWindow(url: URL, windowFeatures: WKWindowFeatures) -> Bool {
         if OAuthDetector.isLikelyOAuthPopupURL(url) { return true }
 
         // If the popup has explicit dimensions AND is cross-origin, it's likely a sign-in window.
@@ -31,7 +30,7 @@ extension PageSession {
 
     // MARK: - Peek Detection
 
-    func shouldRedirectToPeek(url: URL) -> Bool {
+    public func shouldRedirectToPeek(url: URL) -> Bool {
         // Always redirect to Peek if Option key is down (for any URL)
         if isOptionKeyDown {
             return true
@@ -60,7 +59,7 @@ extension PageSession: WKUIDelegate {
         for navigationAction: WKNavigationAction,
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
-        guard let bm = browserManager else { return nil }
+        guard let delegate = controller?.sessionDelegate else { return nil }
 
         // OAuth and signin flows should open in a miniwindow for better UX
         // The miniwindow handles OAuth completion detection and notifies the parent tab
@@ -74,7 +73,7 @@ extension PageSession: WKUIDelegate {
             
             // Reselect and reload the opener once the sign-in window succeeds.
             let parentItemID = itemID
-            bm.externalMiniWindowManager.present(url: url) { [weak self] success, _ in
+            delegate.presentSignInWindow(url: url) { [weak self] success in
                 guard success else { return }
                 DispatchQueue.main.async {
                     guard let self, let controller = self.controller,
@@ -97,9 +96,9 @@ extension PageSession: WKUIDelegate {
         {
 
             // Trigger Peek after returning control to WebKit to avoid runloop-mode issues
-            RunLoop.current.perform { [weak self, weak bm] in
-                guard let self, let bm else { return }
-                bm.peekManager.presentExternalURL(url, from: self)
+            RunLoop.current.perform { [weak self] in
+                guard let self else { return }
+                self.controller?.sessionDelegate?.presentPeek(url: url, from: self)
             }
 
             return nil  // Don't create a WebView, we're using Peek
@@ -107,7 +106,7 @@ extension PageSession: WKUIDelegate {
 
         // Air Traffic Control — route popup URLs to designated spaces
         if let url = navigationAction.request.url,
-           browserManager?.siteRoutingManager.applyRoute(url: url, from: self) == true {
+           controller?.siteRouting.applyRoute(url: url, from: self) == true {
             return nil
         }
 
@@ -116,7 +115,7 @@ extension PageSession: WKUIDelegate {
         // popup, and closing the popup would strip them from the opener. Give the popup its own
         // controller; WebKit only requires the configuration's related web view to match.
         configuration.userContentController = BrowserConfiguration.shared.freshUserContentController()
-        let newWebView = FocusableWKWebView(frame: .zero, configuration: configuration)
+        guard let newWebView = controller?.webViews?.makeWebView(configuration: configuration) else { return nil }
 
         // A session owns the popup's view; a private page's popup stays in its private window.
         guard let controller,
@@ -132,7 +131,7 @@ extension PageSession: WKUIDelegate {
     // MARK: - OAuth Helpers
 
     /// Checks if a URL indicates OAuth completion and handles the flow
-    func checkOAuthCompletion(url: URL) {
+    public func checkOAuthCompletion(url: URL) {
         guard isOAuthFlow, let parentItemID = oauthParentItemID else { return }
         
         let urlString = url.absoluteString.lowercased()
@@ -175,17 +174,8 @@ extension PageSession: WKUIDelegate {
         initiatedByFrame frame: WKFrameInfo,
         completionHandler: @escaping () -> Void
     ) {
-        let alert = NSAlert()
-        alert.messageText = "JavaScript Alert"
-        alert.informativeText = message
-        alert.addButton(withTitle: "OK")
-        if let window = webView.window {
-            alert.beginSheetModal(for: window) { _ in
-                completionHandler()
-            }
-        } else {
-            completionHandler()
-        }
+        guard let alerts = controller?.alerts else { return completionHandler() }
+        alerts.presentAlert(message: message, over: webView, completion: completionHandler)
     }
 
     public func webView(
@@ -194,18 +184,8 @@ extension PageSession: WKUIDelegate {
         initiatedByFrame frame: WKFrameInfo,
         completionHandler: @escaping (Bool) -> Void
     ) {
-        let alert = NSAlert()
-        alert.messageText = "JavaScript Confirm"
-        alert.informativeText = message
-        alert.addButton(withTitle: "OK")
-        alert.addButton(withTitle: "Cancel")
-        if let window = webView.window {
-            alert.beginSheetModal(for: window) { result in
-                completionHandler(result == .alertFirstButtonReturn)
-            }
-        } else {
-            completionHandler(false)
-        }
+        guard let alerts = controller?.alerts else { return completionHandler(false) }
+        alerts.presentConfirm(message: message, over: webView, completion: completionHandler)
     }
 
     public func webView(
@@ -215,23 +195,8 @@ extension PageSession: WKUIDelegate {
         initiatedByFrame frame: WKFrameInfo,
         completionHandler: @escaping (String?) -> Void
     ) {
-        let alert = NSAlert()
-        alert.messageText = "JavaScript Prompt"
-        alert.informativeText = prompt
-        alert.addButton(withTitle: "OK")
-        alert.addButton(withTitle: "Cancel")
-
-        let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
-        textField.stringValue = defaultText ?? ""
-        alert.accessoryView = textField
-
-        if let window = webView.window {
-            alert.beginSheetModal(for: window) { result in
-                completionHandler(result == .alertFirstButtonReturn ? textField.stringValue : nil)
-            }
-        } else {
-            completionHandler(nil)
-        }
+        guard let alerts = controller?.alerts else { return completionHandler(nil) }
+        alerts.presentPrompt(prompt: prompt, defaultText: defaultText, over: webView, completion: completionHandler)
     }
 
     // MARK: - File Upload Support
@@ -242,36 +207,12 @@ extension PageSession: WKUIDelegate {
         completionHandler: @escaping ([URL]?) -> Void
     ) {
 
-        let openPanel = NSOpenPanel()
-        openPanel.allowsMultipleSelection = parameters.allowsMultipleSelection
-        openPanel.canChooseDirectories = parameters.allowsDirectories
-        openPanel.canChooseFiles = true
-        openPanel.resolvesAliases = true
-        openPanel.title = "Choose File"
-        openPanel.prompt = "Choose"
-
-        // Ensure we're on the main thread for UI operations
-        DispatchQueue.main.async {
-            if let window = webView.window {
-                // Present as sheet if we have a window
-                openPanel.beginSheetModal(for: window) { response in
-                    if response == .OK {
-                        completionHandler(openPanel.urls)
-                    } else {
-                        completionHandler(nil)
-                    }
-                }
-            } else {
-                // Fall back to modal presentation
-                openPanel.begin { response in
-                    if response == .OK {
-                        completionHandler(openPanel.urls)
-                    } else {
-                        completionHandler(nil)
-                    }
-                }
-            }
-        }
+        guard let alerts = controller?.alerts else { return completionHandler(nil) }
+        alerts.presentOpenPanel(
+            allowsMultipleSelection: parameters.allowsMultipleSelection,
+            allowsDirectories: parameters.allowsDirectories,
+            over: webView,
+            completion: completionHandler)
     }
 
     // MARK: - Full-Screen Video Support
@@ -280,22 +221,7 @@ extension PageSession: WKUIDelegate {
         enterFullScreenForVideoWith completionHandler: @escaping (Bool, Error?) -> Void
     ) {
 
-        // Get the window containing this webView
-        guard let window = webView.window else {
-            completionHandler(
-                false,
-                NSError(
-                    domain: "PageSession", code: -1,
-                    userInfo: [NSLocalizedDescriptionKey: "No window available for full-screen"]))
-            return
-        }
-
-
-        // Enter full-screen mode
-        DispatchQueue.main.async {
-            window.toggleFullScreen(nil)
-        }
-
+        controller?.sessionDelegate?.toggleFullScreen(for: webView)
         // Call completion handler immediately - WebKit will handle the actual full-screen transition
         completionHandler(true, nil)
     }
@@ -305,24 +231,7 @@ extension PageSession: WKUIDelegate {
         exitFullScreenWith completionHandler: @escaping (Bool, Error?) -> Void
     ) {
 
-        // Get the window containing this webView
-        guard let window = webView.window else {
-            completionHandler(
-                false,
-                NSError(
-                    domain: "PageSession", code: -1,
-                    userInfo: [
-                        NSLocalizedDescriptionKey: "No window available for exiting full-screen"
-                    ]))
-            return
-        }
-
-
-        // Exit full-screen mode
-        DispatchQueue.main.async {
-            window.toggleFullScreen(nil)
-        }
-
+        controller?.sessionDelegate?.toggleFullScreen(for: webView)
         // Call completion handler immediately - WebKit will handle the actual full-screen transition
         completionHandler(true, nil)
     }

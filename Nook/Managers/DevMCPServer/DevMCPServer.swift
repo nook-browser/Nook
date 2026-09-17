@@ -15,6 +15,7 @@ import Network
 import OSLog
 import WebKit
 import NookBlocker
+import NookWeb
 
 @MainActor
 final class DevMCPServer {

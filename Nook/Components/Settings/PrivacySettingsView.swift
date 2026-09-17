@@ -9,6 +9,7 @@ import SwiftUI
 import WebKit
 
 import NookSettings
+import NookWeb
 
 struct PrivacySettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager
@@ -350,5 +351,5 @@ struct PrivacySettingsView: View {
 
 #Preview {
     PrivacySettingsView()
-        .environmentObject(BrowserManager(settings: NookSettingsService()))
+        .environmentObject(BrowserManager(settings: NookSettingsService(), windowRegistry: WindowRegistry()))
 }

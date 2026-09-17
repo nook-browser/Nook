@@ -5,9 +5,10 @@
 //  Created by Maciek Bagiński on 07/12/2025.
 //
 
-import NookSettings
 import SwiftUI
 import NookDesign
+import NookSettings
+import NookWeb
 
 struct SettingsGeneralTab: View {
     @EnvironmentObject var browserManager: BrowserManager

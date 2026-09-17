@@ -9,65 +9,13 @@ import AppKit
 import Foundation
 import WebKit
 import NookBlocker
+import NookWeb
 
 @MainActor
 final class AuthenticationManager: NSObject {
-    struct IdentityRequest {
-        let requestId: String
-        let url: URL
-        let interactive: Bool
-        let prefersEphemeralSession: Bool
-        let explicitCallbackScheme: String?
-    }
-
-    enum IdentityFlowResult {
-        case success(URL)
-        case cancelled
-        case failure(IdentityFailure)
-    }
-
-    enum IdentityFailure: Equatable {
-        case interactionRequired
-        case missingCallbackHandler
-        case unableToStart
-        case fallbackUnavailable
-        case fallbackCancelled
-        case underlying(String)
-
-        var code: String {
-            switch self {
-            case .interactionRequired:
-                return "interaction_required"
-            case .missingCallbackHandler:
-                return "missing_callback_handler"
-            case .unableToStart:
-                return "unable_to_start"
-            case .fallbackUnavailable:
-                return "fallback_unavailable"
-            case .fallbackCancelled:
-                return "fallback_cancelled"
-            case .underlying:
-                return "error"
-            }
-        }
-
-        var message: String {
-            switch self {
-            case .interactionRequired:
-                return "User interaction is required to complete this authentication flow."
-            case .missingCallbackHandler:
-                return "Could not determine an appropriate callback handler for this authentication flow."
-            case .unableToStart:
-                return "The authentication session could not be started."
-            case .fallbackUnavailable:
-                return "Unable to present a fallback authentication window."
-            case .fallbackCancelled:
-                return "Authentication window was closed before completion."
-            case let .underlying(details):
-                return details
-            }
-        }
-    }
+    typealias IdentityRequest = NookWeb.IdentityRequest
+    typealias IdentityFlowResult = NookWeb.IdentityFlowResult
+    typealias IdentityFailure = NookWeb.IdentityFailure
 
     private weak var browserManager: BrowserManager?
     private let credentialStore = BasicAuthCredentialStore()

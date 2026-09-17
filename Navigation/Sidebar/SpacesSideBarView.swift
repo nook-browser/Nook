@@ -7,12 +7,13 @@
 //
 
 import AppKit
-import NookSettings
-import NookTabsCore
 import SwiftUI
-import NookDesign
 import UniformTypeIdentifiers
 import Sparkle
+import NookDesign
+import NookSettings
+import NookTabsCore
+import NookWeb
 
 struct SpacesSideBarView: View {
     @EnvironmentObject var browserManager: BrowserManager

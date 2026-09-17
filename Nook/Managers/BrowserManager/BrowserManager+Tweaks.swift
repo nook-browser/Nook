@@ -9,10 +9,11 @@
 //
 
 import Foundation
-import NookTabsCore
-import NookTweaks
 import OSLog
 import WebKit
+import NookTabsCore
+import NookTweaks
+import NookWeb
 
 private let tweaksLog = Logger(subsystem: "com.baingurley.nook", category: "SiteRouting")
 

@@ -5,18 +5,17 @@
 //  Media, audio, picture-in-picture and page color state for a PageSession.
 //
 
-import AppKit
 import CoreAudio
 import SwiftUI
 import WebKit
-import NookWeb
+
 extension PageSession {
     // MARK: - Simple Media Detection (mainly for manual checks)
-    func checkMediaState() {
+    public func checkMediaState() {
         // Get all web views for this tab across all windows
         let allWebViews: [WKWebView]
-        if let coordinator = browserManager?.webViewCoordinator {
-            allWebViews = coordinator.getAllWebViews(for: itemID)
+        if let coordinator = controller?.webViews {
+            allWebViews = coordinator.allWebViews(for: itemID)
         } else if let webView = primaryWebView {
             // Fallback to original web view for backward compatibility
             allWebViews = [webView]
@@ -107,26 +106,25 @@ extension PageSession {
         }
     }
 
-    func toggleMute() {
+    public func toggleMute() {
         setMuted(!isAudioMuted)
     }
 
-    func setMuted(_ muted: Bool) {
+    public func setMuted(_ muted: Bool) {
         if let webView = primaryWebView {
             // Set the mute state using MuteableWKWebView's muted property
             webView.isMuted = muted
         } else {
         }
 
-        browserManager?.setMuteState(
-            muted, for: itemID, originatingWindowId: browserManager?.windowRegistry?.activeWindow?.id)
+        controller?.sessionDelegate?.setMuteState(muted, for: itemID)
 
         // Update our internal state (already on main thread via @MainActor)
         isAudioMuted = muted
     }
 
     // MARK: - Native Audio Monitoring
-    func startNativeAudioMonitoring() {
+    public func startNativeAudioMonitoring() {
         guard !isMonitoringNativeAudio else { return }
         isMonitoringNativeAudio = true
 
@@ -137,7 +135,7 @@ extension PageSession {
         setupAudioSessionNotifications()
     }
 
-    func stopNativeAudioMonitoring() {
+    public func stopNativeAudioMonitoring() {
         guard isMonitoringNativeAudio else { return }
         isMonitoringNativeAudio = false
 
@@ -147,18 +145,18 @@ extension PageSession {
         removeCoreAudioPropertyListeners()
     }
 
-    func setupAudioSessionNotifications() {
+    public func setupAudioSessionNotifications() {
         setupCoreAudioPropertyListeners()
     }
 
     /// Helper class that holds a weak reference to the session for the Core Audio listener callback.
     /// Prevents dangling pointer if the session is deallocated before the listener is removed.
-    final class AudioListenerHelper {
+    public final class AudioListenerHelper {
         weak var session: PageSession?
         init(session: PageSession) { self.session = session }
     }
 
-    func setupCoreAudioPropertyListeners() {
+    public func setupCoreAudioPropertyListeners() {
         guard !hasAddedCoreAudioListener else { return }
 
         let helper = AudioListenerHelper(session: self)
@@ -199,7 +197,7 @@ extension PageSession {
         }
     }
 
-    func removeCoreAudioPropertyListeners() {
+    public func removeCoreAudioPropertyListeners() {
         guard hasAddedCoreAudioListener, let listenerProc = audioDeviceListenerProc,
               let helper = audioListenerHelper else { return }
 
@@ -225,7 +223,7 @@ extension PageSession {
         }
     }
 
-    func checkNativeAudioActivity() {
+    public func checkNativeAudioActivity() {
         let now = Date()
         guard now.timeIntervalSince(lastAudioDeviceCheckTime) > 0.5 else { return }
         lastAudioDeviceCheckTime = now
@@ -241,7 +239,7 @@ extension PageSession {
         }
     }
 
-    func isDefaultAudioDeviceActive() -> Bool {
+    public func isDefaultAudioDeviceActive() -> Bool {
         var deviceID: AudioDeviceID = 0
         var dataSize = UInt32(MemoryLayout<AudioDeviceID>.size)
 
@@ -281,7 +279,7 @@ extension PageSession {
     }
 
     // MARK: - Background Color Management
-    func setupThemeColorObserver(for webView: WKWebView) {
+    public func setupThemeColorObserver(for webView: WKWebView) {
         if !themeColorObservedWebViews.contains(webView) {
             webView.addObserver(
                 self, forKeyPath: "themeColor", options: [.new, .initial], context: nil)
@@ -289,14 +287,14 @@ extension PageSession {
         }
     }
 
-    func removeThemeColorObserver(from webView: WKWebView) {
+    public func removeThemeColorObserver(from webView: WKWebView) {
         if themeColorObservedWebViews.contains(webView) {
             webView.removeObserver(self, forKeyPath: "themeColor")
             themeColorObservedWebViews.remove(webView)
         }
     }
 
-    func updateBackgroundColor(from webView: WKWebView) {
+    public func updateBackgroundColor(from webView: WKWebView) {
         // Check if we should sample based on domain change
         guard let currentURL = webView.url,
               let currentDomain = extractDomain(from: currentURL) else {
@@ -311,7 +309,7 @@ extension PageSession {
         // Only sample if domain changed or we haven't sampled yet
         let shouldSample = lastSampledDomain != currentDomain
 
-        var newColor: NSColor? = nil
+        var newColor: PlatformColor? = nil
 
         newColor = webView.themeColor
 
@@ -329,12 +327,12 @@ extension PageSession {
     }
     
     /// Extract domain and subdomain from URL (e.g., "subdomain.example.com" -> "subdomain.example.com")
-    func extractDomain(from url: URL) -> String? {
+    public func extractDomain(from url: URL) -> String? {
         guard let host = url.host else { return nil }
         return host
     }
 
-    func extractBackgroundColorWithJavaScript(from webView: WKWebView) {
+    public func extractBackgroundColorWithJavaScript(from webView: WKWebView) {
         guard let sampleRect = colorSampleRect(for: webView) else {
             runLegacyBackgroundColorScript(on: webView)
             return
@@ -363,7 +361,7 @@ extension PageSession {
         }
     }
 
-    func colorSampleRect(for webView: WKWebView) -> CGRect? {
+    public func colorSampleRect(for webView: WKWebView) -> CGRect? {
         let bounds = webView.bounds
         guard bounds.width >= 1, bounds.height >= 1 else { return nil }
 
@@ -382,7 +380,7 @@ extension PageSession {
         return CGRect(x: sampleX, y: sampleY, width: 1, height: 1)
     }
     
-    func topRightPixelRect(for webView: WKWebView) -> CGRect? {
+    public func topRightPixelRect(for webView: WKWebView) -> CGRect? {
         let bounds = webView.bounds
         guard bounds.width >= 1, bounds.height >= 1 else { return nil }
         
@@ -400,7 +398,7 @@ extension PageSession {
         return CGRect(x: sampleX, y: sampleY, width: 1, height: 1)
     }
     
-    func extractTopBarColor(from webView: WKWebView) {
+    public func extractTopBarColor(from webView: WKWebView) {
         // Only sample once per domain
         if let currentURL = webView.url,
            let domain = extractDomain(from: currentURL) {
@@ -426,7 +424,7 @@ extension PageSession {
         }
     }
 
-    func runLegacyBackgroundColorScript(on webView: WKWebView) {
+    public func runLegacyBackgroundColorScript(on webView: WKWebView) {
         let colorExtractionScript = """
             (function() {
                 function rgbToHex(r, g, b) {
@@ -508,23 +506,16 @@ extension PageSession {
         webView.evaluateJavaScript(colorExtractionScript) { _, _ in }
     }
 
-    func requestPictureInPicture() {
+    public func requestPictureInPicture() {
         // In multi-window setup, we need to work with the WebView that's actually visible
         // in the current window, not just the first WebView created
-        if let browserManager = browserManager,
-           let activeWindowId = browserManager.windowRegistry?.activeWindow?.id,
-            let activeWebView = browserManager.getWebView(for: self.itemID, in: activeWindowId)
-        {
-            // Use the WebView that's actually visible in the current window
-            PiPManager.shared.requestPiP(for: self, webView: activeWebView)
-        } else {
-            // Fallback to the original behavior for backward compatibility
-            PiPManager.shared.requestPiP(for: self)
-        }
+        let activeWindowID = controller?.windowRegistry.activeWindow?.id
+        let activeWebView = activeWindowID.flatMap { controller?.webViews?.webView(for: self.itemID, in: $0) }
+        controller?.sessionDelegate?.requestPictureInPicture(for: self, webView: activeWebView)
     }
 
-    func pause() {
-        if !hasPiPActive && !PiPManager.shared.isPiPActive(for: self) {
+    public func pause() {
+        if !hasPiPActive && controller?.sessionDelegate?.isPictureInPictureActive(for: self) != true {
             primaryWebView?.evaluateJavaScript(
                 "document.querySelectorAll('video, audio').forEach(el => el.pause());",
                 completionHandler: nil

@@ -7,42 +7,41 @@
 //  the session reports committed URLs and titles to its TabsController.
 //
 
-import AppKit
 import Combine
 import CoreAudio
 import FaviconFinder
 import NookBlocker
 import NookSettings
-import NookWeb
+import OSLog
 import SwiftUI
 import WebKit
 
 @MainActor
 @Observable
-final class PageSession: NSObject, Identifiable {
+public final class PageSession: NSObject, Identifiable {
     // MARK: - Identity
 
-    let itemID: UUID
-    var id: UUID { itemID }
+    public let itemID: UUID
+    public var id: UUID { itemID }
+    @ObservationIgnored static let log = Logger(subsystem: "com.baingurley.nook", category: "PageSession")
     /// A session in a private window: ephemeral profile, never saved, no extensions.
-    let isPrivate: Bool
+    public let isPrivate: Bool
 
-    @ObservationIgnored weak var controller: TabsController?
-    @ObservationIgnored weak var browserManager: BrowserManager?
+    @ObservationIgnored public weak var controller: TabsController?
 
     /// The profile whose data store this page uses.
-    var profile: Profile? {
+    public var profile: Profile? {
         controller?.profile(for: self)
     }
 
     // MARK: - Page State
 
     /// Last committed URL (or the URL being loaded when nothing has committed yet).
-    var url: URL
-    var title: String
-    var favicon: SwiftUI.Image
+    public var url: URL
+    public var title: String
+    public var favicon: SwiftUI.Image
 
-    enum LoadingState: Equatable {
+    public enum LoadingState: Equatable {
         case idle
         case didStartProvisionalNavigation
         case didCommit
@@ -50,7 +49,7 @@ final class PageSession: NSObject, Identifiable {
         case didFail(Error)
         case didFailProvisionalNavigation(Error)
 
-        static func == (lhs: LoadingState, rhs: LoadingState) -> Bool {
+        public static func == (lhs: LoadingState, rhs: LoadingState) -> Bool {
             switch (lhs, rhs) {
             case (.idle, .idle),
                 (.didStartProvisionalNavigation, .didStartProvisionalNavigation),
@@ -65,7 +64,7 @@ final class PageSession: NSObject, Identifiable {
             }
         }
 
-        var isLoading: Bool {
+        public var isLoading: Bool {
             switch self {
             case .idle, .didFinish, .didFail, .didFailProvisionalNavigation:
                 return false
@@ -92,24 +91,24 @@ final class PageSession: NSObject, Identifiable {
         }
     }
 
-    var loadingState: LoadingState = .idle
-    var isLoading: Bool { loadingState.isLoading }
-    var canGoBack: Bool = false
-    var canGoForward: Bool = false
+    public var loadingState: LoadingState = .idle
+    public var isLoading: Bool { loadingState.isLoading }
+    public var canGoBack: Bool = false
+    public var canGoForward: Bool = false
 
     // MARK: - Web Process Crash Tracking
 
-    var webProcessCrashCount: Int = 0
-    var lastWebProcessCrashDate: Date = .distantPast
+    public var webProcessCrashCount: Int = 0
+    public var lastWebProcessCrashDate: Date = .distantPast
 
     // MARK: - Media State
 
-    var hasPlayingVideo: Bool = false
-    var hasVideoContent: Bool = false
-    var hasPiPActive: Bool = false
-    var hasPlayingAudio: Bool = false
-    var isAudioMuted: Bool = false
-    var hasAudioContent: Bool = false {
+    public var hasPlayingVideo: Bool = false
+    public var hasVideoContent: Bool = false
+    public var hasPiPActive: Bool = false
+    public var hasPlayingAudio: Bool = false
+    public var isAudioMuted: Bool = false
+    public var hasAudioContent: Bool = false {
         didSet {
             if oldValue != hasAudioContent {
                 if hasAudioContent {
@@ -123,27 +122,27 @@ final class PageSession: NSObject, Identifiable {
 
     // MARK: - Chrome
 
-    var pageBackgroundColor: NSColor? = nil
-    var topBarBackgroundColor: NSColor? = nil
+    public var pageBackgroundColor: PlatformColor? = nil
+    public var topBarBackgroundColor: PlatformColor? = nil
     /// Option key state for Peek on link click.
-    @ObservationIgnored var isOptionKeyDown: Bool = false
-    @ObservationIgnored var onLinkHover: ((String?) -> Void)? = nil
-    @ObservationIgnored var onCommandHover: ((String?) -> Void)? = nil
-    @ObservationIgnored var pendingContextMenuPayload: WebContextMenuPayload?
+    @ObservationIgnored public var isOptionKeyDown: Bool = false
+    @ObservationIgnored public var onLinkHover: ((String?) -> Void)? = nil
+    @ObservationIgnored public var onCommandHover: ((String?) -> Void)? = nil
+    @ObservationIgnored public var pendingContextMenuPayload: WebContextMenuPayload?
 
     // MARK: - OAuth Flow State
 
     /// Whether this page hosts an OAuth/sign-in flow popup.
-    var isOAuthFlow: Bool = false
+    public var isOAuthFlow: Bool = false
     /// The item whose page started this OAuth flow.
-    @ObservationIgnored var oauthParentItemID: UUID?
+    @ObservationIgnored public var oauthParentItemID: UUID?
     /// The OAuth provider host (e.g., "accounts.google.com") for tracking protection exemption.
-    @ObservationIgnored var oauthProviderHost: String?
+    @ObservationIgnored public var oauthProviderHost: String?
 
     // MARK: - Internal State
 
     /// One-shot initial-navigation suppression for a WebKit-created popup.
-    @ObservationIgnored var isPopupHost: Bool = false
+    @ObservationIgnored public var isPopupHost: Bool = false
     @ObservationIgnored var hasFavicon: Bool = false
     @ObservationIgnored var faviconFetchInFlight: Bool = false
     @ObservationIgnored var faviconFetchAttempts: Int = 0
@@ -160,7 +159,7 @@ final class PageSession: NSObject, Identifiable {
     @ObservationIgnored var audioMonitoringTimer: Timer?
     @ObservationIgnored var hasAddedCoreAudioListener = false
     @ObservationIgnored var profileAwaitCancellable: AnyCancellable?
-    @ObservationIgnored var webStoreHandler: WebStoreScriptHandler?
+    @ObservationIgnored var webStoreHandler: AnyObject?
     @ObservationIgnored var didNotifyOpenToExtensions: Bool = false
 
     @ObservationIgnored let themeColorObservedWebViews = NSHashTable<AnyObject>.weakObjects()
@@ -168,19 +167,19 @@ final class PageSession: NSObject, Identifiable {
 
     // MARK: - Web View Ownership
 
-    var primaryWebView: WKWebView?
+    public var primaryWebView: WKWebView?
     /// A view created elsewhere (Peek, mini window, popup) that this session adopts on setup.
-    @ObservationIgnored var adoptedWebView: WKWebView?
+    @ObservationIgnored public var adoptedWebView: WKWebView?
     /// The window that owns the primary web view; nil until a window displays the page.
-    @ObservationIgnored var primaryWindowId: UUID?
+    @ObservationIgnored public var primaryWindowId: UUID?
 
-    var isUnloaded: Bool { primaryWebView == nil }
+    public var isUnloaded: Bool { primaryWebView == nil }
 
     /// The existing web view. Never creates one.
-    var webView: WKWebView? { primaryWebView }
+    public var webView: WKWebView? { primaryWebView }
 
     /// The web view, created on first access.
-    var activeWebView: WKWebView {
+    public var activeWebView: WKWebView {
         if primaryWebView == nil {
             setupWebView()
         }
@@ -188,19 +187,18 @@ final class PageSession: NSObject, Identifiable {
     }
 
     /// The web view only once a window displays it, so callers never create orphan views.
-    var assignedWebView: WKWebView? {
+    public var assignedWebView: WKWebView? {
         primaryWindowId != nil ? primaryWebView : nil
     }
 
     // MARK: - Init
 
-    init(
+    public init(
         itemID: UUID,
         url: URL,
         title: String,
         isPrivate: Bool,
         controller: TabsController?,
-        browserManager: BrowserManager?,
         adoptedWebView: WKWebView? = nil
     ) {
         self.itemID = itemID
@@ -208,7 +206,6 @@ final class PageSession: NSObject, Identifiable {
         self.title = title
         self.isPrivate = isPrivate
         self.controller = controller
-        self.browserManager = browserManager
         self.adoptedWebView = adoptedWebView
         self.favicon = SwiftUI.Image(systemName: "globe")
         super.init()
@@ -222,7 +219,7 @@ final class PageSession: NSObject, Identifiable {
 
     // MARK: - Web View Lifecycle
 
-    func loadWebViewIfNeeded() {
+    public func loadWebViewIfNeeded() {
         if primaryWebView == nil {
             setupWebView()
         }
@@ -230,7 +227,7 @@ final class PageSession: NSObject, Identifiable {
     }
 
     /// Makes `webView` the primary view, owned by the window that displays it first.
-    func assignWebView(_ webView: WKWebView, toWindow windowId: UUID) {
+    public func assignWebView(_ webView: WKWebView, toWindow windowId: UUID) {
         primaryWebView = webView
         primaryWindowId = windowId
     }
@@ -245,8 +242,8 @@ final class PageSession: NSObject, Identifiable {
         } else {
             // Edge case: no profile yet. Delay creating WKWebView until one resolves.
             if profileAwaitCancellable == nil {
-                profileAwaitCancellable = browserManager?
-                    .$currentProfile
+                profileAwaitCancellable = controller?.sessionDelegate?
+                    .currentProfilePublisher
                     .receive(on: RunLoop.main)
                     .sink { [weak self] value in
                         guard let self else { return }
@@ -255,7 +252,7 @@ final class PageSession: NSObject, Identifiable {
                             self.profileAwaitCancellable = nil
                             self.setupWebView()
                             if self.primaryWebView != nil {
-                                for (_, windowState) in self.browserManager?.windowRegistry?.windows ?? [:] {
+                                for (_, windowState) in self.controller?.windowRegistry.windows ?? [:] {
                                     windowState.refreshCompositor()
                                 }
                             }
@@ -273,7 +270,7 @@ final class PageSession: NSObject, Identifiable {
         // run in private pages.
         if configuration.webExtensionController == nil,
            resolvedProfile?.isEphemeral != true,
-           let extensionController = ExtensionManager.shared.nativeController {
+           let extensionController = controller?.tabEvents?.nativeController {
             configuration.webExtensionController = extensionController
         }
 
@@ -281,13 +278,13 @@ final class PageSession: NSObject, Identifiable {
         if let adopted {
             primaryWebView = adopted
         } else {
-            let created = FocusableWKWebView(frame: .zero, configuration: configuration)
-            created.contextMenuBridge = WebContextMenuBridge(session: self, configuration: configuration)
+            let created = controller?.webViews?.makeWebView(configuration: configuration)
+            (created as? SessionWebView)?.contextMenuBridge = WebContextMenuBridge(session: self, configuration: configuration)
             primaryWebView = created
         }
 
         guard let webView = primaryWebView else { return }
-        (webView as? FocusableWKWebView)?.owningSession = self
+        (webView as? SessionWebView)?.owningSession = self
         webView.navigationDelegate = self
         webView.uiDelegate = self
         webView.allowsBackForwardNavigationGestures = true
@@ -308,9 +305,9 @@ final class PageSession: NSObject, Identifiable {
         // Inform extensions before loading so content scripts and messaging can resolve this
         // page during early document phases.
         if !didNotifyOpenToExtensions {
-            ExtensionManager.shared.notifyTabOpened(self)
+            controller?.tabEvents?.tabOpened(self)
             if controller?.activeWindowSession === self {
-                ExtensionManager.shared.notifyTabActivated(new: self, previous: nil)
+                controller?.tabEvents?.tabActivated(new: self, previous: nil)
             }
             didNotifyOpenToExtensions = true
         }
@@ -325,7 +322,7 @@ final class PageSession: NSObject, Identifiable {
 
     /// Handlers, user agent and preferences shared by primary, clone, adopted and popup views.
     /// The view's controller must belong to this view alone: handlers are keyed by name.
-    func configure(_ webView: WKWebView) {
+    public func configure(_ webView: WKWebView) {
         let controller = webView.configuration.userContentController
         for name in messageHandlerNames {
             controller.removeScriptMessageHandler(forName: name)
@@ -344,9 +341,9 @@ final class PageSession: NSObject, Identifiable {
 
     /// Installs a WebKit-created popup view as this session's primary view. WebKit drives the
     /// popup's first navigation.
-    func installPopupWebView(_ webView: FocusableWKWebView) {
-        webView.owningSession = self
-        webView.contextMenuBridge = WebContextMenuBridge(session: self, configuration: webView.configuration)
+    public func installPopupWebView(_ webView: WKWebView) {
+        (webView as? SessionWebView)?.owningSession = self
+        (webView as? SessionWebView)?.contextMenuBridge = WebContextMenuBridge(session: self, configuration: webView.configuration)
         webView.navigationDelegate = self
         webView.uiDelegate = self
         webView.allowsBackForwardNavigationGestures = true
@@ -356,13 +353,13 @@ final class PageSession: NSObject, Identifiable {
         setupThemeColorObserver(for: webView)
         setupNavigationStateObservers(for: webView)
         if !didNotifyOpenToExtensions, !isPrivate {
-            ExtensionManager.shared.notifyTabOpened(self)
+            controller?.tabEvents?.tabOpened(self)
             didNotifyOpenToExtensions = true
         }
     }
 
     /// Updates the extension controller on the existing web view.
-    func applyConfigurationOverride(_ configuration: WKWebViewConfiguration) {
+    public func applyConfigurationOverride(_ configuration: WKWebViewConfiguration) {
         guard let existing = primaryWebView else { return }
         if let extensionController = configuration.webExtensionController {
             existing.configuration.webExtensionController = extensionController
@@ -371,15 +368,15 @@ final class PageSession: NSObject, Identifiable {
 
     /// Releases every web view for this page (primary, window clones, adopted view) and resets
     /// live state. The item and its URL stay; selecting it again loads a fresh view.
-    func unload() {
+    public func unload() {
         let interval = BrowserPerformance.signposter.beginInterval("TabEviction")
         defer { BrowserPerformance.signposter.endInterval("TabEviction", interval) }
         let primary = primaryWebView
-        let coordinator = browserManager?.webViewCoordinator
+        let coordinator = controller?.webViews
         let primaryIsPooled = primary.map { view in
-            coordinator?.getAllWebViews(for: itemID).contains(where: { $0 === view }) == true
+            coordinator?.allWebViews(for: itemID).contains(where: { $0 === view }) == true
         } ?? false
-        coordinator?.removeAllWebViews(for: self)
+        coordinator?.releaseWebViews(for: self)
         if let primary, !primaryIsPooled { cleanupClone(primary) }
         primaryWebView = nil
         adoptedWebView = nil
@@ -402,20 +399,21 @@ final class PageSession: NSObject, Identifiable {
     }
 
     /// Final cleanup when the page ends (item closed, pinned page closed, window closed).
-    func tearDown() {
+    public func tearDown() {
         hasPiPActive = false
         unload()
         isAudioMuted = false
-        browserManager?.cleanupZoomForTab(itemID)
+        controller?.sessionDelegate?.cleanupZoom(for: itemID)
         if webStoreHandler != nil {
-            primaryWebView?.configuration.userContentController.removeScriptMessageHandler(
-                forName: WebStoreScriptHandler.handlerName, contentWorld: WebStoreScriptHandler.contentWorld)
+            if let controller = primaryWebView?.configuration.userContentController {
+                self.controller?.sessionDelegate?.removeWebStoreHandler(from: controller)
+            }
             webStoreHandler = nil
         }
     }
 
     /// Detaches a view from this session: handlers, observers, delegates, superview.
-    func cleanupClone(_ webView: WKWebView) {
+    public func cleanupClone(_ webView: WKWebView) {
         webView.stopLoading()
         // Stop playback through WebKit; releasing the view tears down its document.
         webView.pauseAllMediaPlayback(completionHandler: nil)
@@ -424,13 +422,12 @@ final class PageSession: NSObject, Identifiable {
         for handlerName in messageHandlerNames {
             controller.removeScriptMessageHandler(forName: handlerName)
         }
-        controller.removeScriptMessageHandler(
-            forName: WebStoreScriptHandler.handlerName, contentWorld: WebStoreScriptHandler.contentWorld)
+        self.controller?.sessionDelegate?.removeWebStoreHandler(from: controller)
         controller.removeScriptMessageHandler(
             forName: AdvancedRulesEngine.messageHandlerName, contentWorld: .page)
 
         // Break the retain cycle WKWebView -> contextMenuBridge -> userContentController -> WKWebView.
-        if let focusable = webView as? FocusableWKWebView {
+        if let focusable = webView as? SessionWebView {
             focusable.contextMenuBridge?.detach()
             focusable.contextMenuBridge = nil
         }
@@ -440,7 +437,7 @@ final class PageSession: NSObject, Identifiable {
         webView.navigationDelegate = nil
         webView.uiDelegate = nil
         webView.removeFromSuperview()
-        browserManager?.webViewCoordinator?.removeWebViewFromContainers(webView)
+        self.controller?.webViews?.removeFromContainers(webView)
     }
 
     // MARK: - Navigation
@@ -448,7 +445,7 @@ final class PageSession: NSObject, Identifiable {
     /// Loads a URL into a specific view. File URLs get read access to their directory so local
     /// subresources load. Uses the protocol cache policy: restoring an evicted page with
     /// returnCacheDataElseLoad served the stale cached document without revalidation.
-    static func loadPage(_ url: URL, in webView: WKWebView) {
+    public static func loadPage(_ url: URL, in webView: WKWebView) {
         if url.isFileURL {
             webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
         } else {
@@ -458,12 +455,12 @@ final class PageSession: NSObject, Identifiable {
         }
     }
 
-    func load(_ newURL: URL) {
+    public func load(_ newURL: URL) {
         url = newURL
         loadingState = .didStartProvisionalNavigation
 
         // Grant extension access before loading so content scripts inject at document_start.
-        ExtensionManager.shared.grantExtensionAccessToURL(newURL)
+        controller?.tabEvents?.grantAccess(to: newURL)
 
         // Reset audio tracking for the new page; the mute preference is preserved.
         hasAudioContent = false
@@ -475,7 +472,7 @@ final class PageSession: NSObject, Identifiable {
         PageSession.loadPage(newURL, in: activeWebView)
 
         // Keep other windows displaying this page on the same URL.
-        browserManager?.navigateTabAcrossWindows(itemID, to: newURL)
+        controller?.sessionDelegate?.navigateAcrossWindows(itemID, to: newURL)
 
         Task { @MainActor in
             await fetchAndSetFavicon(for: newURL)
@@ -483,23 +480,23 @@ final class PageSession: NSObject, Identifiable {
     }
 
     /// Navigates to typed input with search engine normalization.
-    func navigate(to input: String) {
-        let template = browserManager?.nookSettings?.resolvedSearchEngineTemplate ?? SearchProvider.google.queryTemplate
+    public func navigate(to input: String) {
+        let template = controller?.settings.resolvedSearchEngineTemplate ?? SearchProvider.google.queryTemplate
         guard let validURL = URL(string: normalizeURL(input, queryTemplate: template)) else { return }
         load(validURL)
     }
 
-    func goBack() {
+    public func goBack() {
         guard canGoBack else { return }
         primaryWebView?.goBack()
     }
 
-    func goForward() {
+    public func goForward() {
         guard canGoForward else { return }
         primaryWebView?.goForward()
     }
 
-    func refresh() {
+    public func refresh() {
         // An unloaded page has nothing to reload: recreate it, which loads the saved URL.
         guard primaryWebView != nil else {
             loadWebViewIfNeeded()
@@ -508,7 +505,7 @@ final class PageSession: NSObject, Identifiable {
         }
         loadingState = .didStartProvisionalNavigation
         // The primary view can also belong to the coordinator. Reload each view once.
-        var views = browserManager?.webViewCoordinator?.getAllWebViews(for: itemID) ?? []
+        var views = controller?.webViews?.allWebViews(for: itemID) ?? []
         if let primary = primaryWebView { views.append(primary) }
         var reloaded = Set<ObjectIdentifier>()
         for view in views where reloaded.insert(ObjectIdentifier(view)).inserted {
@@ -519,18 +516,18 @@ final class PageSession: NSObject, Identifiable {
         }
     }
 
-    func stop() {
+    public func stop() {
         primaryWebView?.stopLoading()
         loadingState = .idle
     }
 
     /// Selects this page in the active window (a click inside the web view).
-    func activate() {
+    public func activate() {
         guard let window = controller?.window(for: self) else { return }
         controller?.select(itemID, in: window)
     }
 
-    func updateNavigationState() {
+    public func updateNavigationState() {
         guard let webView = primaryWebView else { return }
         let newCanGoBack = webView.canGoBack
         let newCanGoForward = webView.canGoForward
@@ -542,24 +539,24 @@ final class PageSession: NSObject, Identifiable {
 
     /// KVO on canGoBack/canGoForward gives real-time updates. A single delayed check catches
     /// WebKit's back-forward list settling asynchronously after a commit.
-    func updateNavigationStateEnhanced(source: String = "unknown") {
+    public func updateNavigationStateEnhanced(source: String = "unknown") {
         updateNavigationState()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
             self?.updateNavigationState()
         }
     }
 
-    func updateTitle(_ newTitle: String) {
+    public func updateTitle(_ newTitle: String) {
         let resolved = newTitle.isEmpty ? url.host ?? "New Tab" : newTitle
         guard resolved != title else { return }
         title = resolved
         controller?.pageTitleChanged(itemID: itemID, title: resolved)
-        ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.title])
+        controller?.tabEvents?.tabPropertiesChanged(self, properties: [.title])
     }
 
     // MARK: - Observation
 
-    func setupNavigationStateObservers(for webView: WKWebView) {
+    public func setupNavigationStateObservers(for webView: WKWebView) {
         if !navigationStateObservedWebViews.contains(webView) {
             webView.addObserver(self, forKeyPath: "canGoBack", options: [.new, .initial], context: nil)
             webView.addObserver(self, forKeyPath: "canGoForward", options: [.new, .initial], context: nil)
@@ -570,7 +567,7 @@ final class PageSession: NSObject, Identifiable {
         }
     }
 
-    func removeNavigationStateObservers(from webView: WKWebView) {
+    public func removeNavigationStateObservers(from webView: WKWebView) {
         if navigationStateObservedWebViews.contains(webView) {
             webView.removeObserver(self, forKeyPath: "canGoBack")
             webView.removeObserver(self, forKeyPath: "canGoForward")
@@ -579,7 +576,7 @@ final class PageSession: NSObject, Identifiable {
         }
     }
 
-    override func observeValue(
+    public override func observeValue(
         forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey: Any]?,
         context: UnsafeMutableRawPointer?
     ) {
@@ -607,7 +604,7 @@ final class PageSession: NSObject, Identifiable {
     // MARK: - Favicon
 
     /// Starts a favicon fetch when none has loaded yet, up to `maxFaviconRetries` failures.
-    func ensureFaviconLoaded() {
+    public func ensureFaviconLoaded() {
         guard !hasFavicon, !faviconFetchInFlight else { return }
         guard faviconFetchAttempts < Self.maxFaviconRetries else { return }
         faviconFetchInFlight = true
@@ -618,15 +615,15 @@ final class PageSession: NSObject, Identifiable {
     }
 
     /// Memory then disk cache, synchronously. Gives restored rows their favicon at once.
-    func restoreFaviconFromCache() {
+    public func restoreFaviconFromCache() {
         guard url.scheme == "http" || url.scheme == "https", let host = url.host else { return }
         if let cached = FaviconCache.shared.image(for: host) ?? FaviconCache.shared.imageFromDiskSync(for: host) {
-            favicon = SwiftUI.Image(nsImage: cached)
+            favicon = SwiftUI.Image(platformImage: cached)
             hasFavicon = true
         }
     }
 
-    func fetchAndSetFavicon(for url: URL) async {
+    public func fetchAndSetFavicon(for url: URL) async {
         let defaultFavicon = SwiftUI.Image(systemName: "globe")
         guard url.scheme == "http" || url.scheme == "https", url.host != nil else {
             favicon = defaultFavicon
@@ -635,7 +632,7 @@ final class PageSession: NSObject, Identifiable {
         let cacheKey = url.host ?? url.absoluteString
 
         if let cached = await FaviconCache.shared.cachedImage(for: cacheKey) {
-            favicon = SwiftUI.Image(nsImage: cached)
+            favicon = SwiftUI.Image(platformImage: cached)
             hasFavicon = true
             return
         }
@@ -645,7 +642,7 @@ final class PageSession: NSObject, Identifiable {
         // FaviconFinder parses HTML <link> tags, then falls back to /favicon.ico.
         if let nsImage = await Self.fetchFaviconImage(for: url) {
             FaviconCache.shared.store(nsImage, for: cacheKey)
-            favicon = SwiftUI.Image(nsImage: nsImage)
+            favicon = SwiftUI.Image(platformImage: nsImage)
             hasFavicon = true
             return
         }
@@ -654,7 +651,7 @@ final class PageSession: NSObject, Identifiable {
         if let rootFaviconURL = URL(string: "/favicon.ico", relativeTo: url)?.absoluteURL,
            let nsImage = await Self.downloadImage(from: rootFaviconURL) {
             FaviconCache.shared.store(nsImage, for: cacheKey)
-            favicon = SwiftUI.Image(nsImage: nsImage)
+            favicon = SwiftUI.Image(platformImage: nsImage)
             hasFavicon = true
             return
         }
@@ -663,7 +660,7 @@ final class PageSession: NSObject, Identifiable {
         favicon = defaultFavicon
     }
 
-    private static func fetchFaviconImage(for url: URL) async -> NSImage? {
+    private static func fetchFaviconImage(for url: URL) async -> PlatformImage? {
         do {
             let favicon = try await FaviconFinder(url: url)
                 .fetchFaviconURLs()
@@ -675,11 +672,11 @@ final class PageSession: NSObject, Identifiable {
         }
     }
 
-    private static func downloadImage(from url: URL) async -> NSImage? {
+    private static func downloadImage(from url: URL) async -> PlatformImage? {
         do {
             let (data, response) = try await URLSession.shared.data(from: url)
             guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else { return nil }
-            return NSImage(data: data)
+            return PlatformImage(data: data)
         } catch {
             return nil
         }
@@ -687,19 +684,19 @@ final class PageSession: NSObject, Identifiable {
 
     // MARK: - Context Menu
 
-    func deliverContextMenuPayload(_ payload: WebContextMenuPayload?) {
+    public func deliverContextMenuPayload(_ payload: WebContextMenuPayload?) {
         pendingContextMenuPayload = payload
-        if let webView = primaryWebView as? FocusableWKWebView {
+        if let webView = primaryWebView as? SessionWebView {
             webView.contextMenuPayloadDidUpdate(payload)
         }
     }
 
     // MARK: - Equality
 
-    override func isEqual(_ object: Any?) -> Bool {
+    public override func isEqual(_ object: Any?) -> Bool {
         guard let other = object as? PageSession else { return false }
         return itemID == other.itemID
     }
 
-    override var hash: Int { itemID.hashValue }
+    public override var hash: Int { itemID.hashValue }
 }

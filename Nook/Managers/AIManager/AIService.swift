@@ -7,9 +7,10 @@
 
 import AppKit
 import Foundation
-import NookSettings
 import OSLog
 import WebKit
+import NookSettings
+import NookWeb
 
 // MARK: - Tool Approval
 

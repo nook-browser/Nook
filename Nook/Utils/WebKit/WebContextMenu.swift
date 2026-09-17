@@ -6,159 +6,9 @@
 //
 
 import AppKit
-import NookTabsCore
 import WebKit
-
-enum WebContextMenuPayload {
-    case page(url: URL)
-    case textSelection(text: String)
-    case link(url: URL)
-    case image(resource: String)
-    case multiple([WebContextMenuPayload])
-    case ignored
-
-    init?(dictionary: [String: Any]) {
-        guard let rawInvocations = dictionary["invocations"] as? Int,
-              let params = dictionary["parameters"] as? [String: Any]
-        else {
-            return nil
-        }
-
-        var payloads: [WebContextMenuPayload] = []
-        let invocations = Invocation(rawValue: rawInvocations)
-
-        if invocations.contains(.ignored) {
-            self = .ignored
-            return
-        }
-
-        if invocations.contains(.page),
-           let href = dictionary["href"] as? String,
-           let url = WebContextMenuPayload.makeURL(from: href) {
-            payloads.append(.page(url: url))
-        }
-
-        if invocations.contains(.textSelection),
-           let contents = params["contents"] as? String {
-            payloads.append(.textSelection(text: contents))
-        }
-
-        if invocations.contains(.link),
-           let href = params["href"] as? String,
-           let url = WebContextMenuPayload.makeURL(from: href) {
-            payloads.append(.link(url: url))
-        }
-
-        if invocations.contains(.image),
-           let src = params["src"] as? String {
-            payloads.append(.image(resource: src))
-        }
-
-        guard !payloads.isEmpty else { return nil }
-        self = payloads.count == 1 ? payloads[0] : .multiple(payloads)
-    }
-
-    var linkURL: URL? {
-        switch self {
-        case .link(let url):
-            return url
-        case .multiple(let payloads):
-            return payloads.compactMap(\.linkURL).first
-        default:
-            return nil
-        }
-    }
-
-    var imageURL: URL? {
-        switch self {
-        case .image(let resource):
-            return WebContextMenuPayload.makeURLAllowingData(from: resource)
-        case .multiple(let payloads):
-            return payloads.compactMap(\.imageURL).first
-        default:
-            return nil
-        }
-    }
-
-    var imageSourceString: String? {
-        switch self {
-        case .image(let resource):
-            return resource
-        case .multiple(let payloads):
-            return payloads.compactMap(\.imageSourceString).first
-        default:
-            return nil
-        }
-    }
-
-    var textSelection: String? {
-        switch self {
-        case .textSelection(let text):
-            return text
-        case .multiple(let payloads):
-            return payloads.compactMap(\.textSelection).first
-        default:
-            return nil
-        }
-    }
-
-    var pageURL: URL? {
-        switch self {
-        case .page(let url):
-            return url
-        case .multiple(let payloads):
-            return payloads.compactMap(\.pageURL).first
-        default:
-            return nil
-        }
-    }
-
-    var shouldProvideCustomMenu: Bool {
-        switch self {
-        case .ignored:
-            return false
-        default:
-            return true
-        }
-    }
-
-    var containsImage: Bool {
-        switch self {
-        case .image:
-            return true
-        case .multiple(let payloads):
-            return payloads.contains { $0.containsImage }
-        default:
-            return false
-        }
-    }
-
-    private struct Invocation: OptionSet {
-        let rawValue: Int
-        static let page = Invocation(rawValue: 1 << 0)
-        static let textSelection = Invocation(rawValue: 1 << 1)
-        static let link = Invocation(rawValue: 1 << 2)
-        static let image = Invocation(rawValue: 1 << 3)
-        static let ignored = Invocation(rawValue: 1 << 4)
-    }
-
-    private static func makeURL(from string: String) -> URL? {
-        if let url = URL(string: string) {
-            return url
-        }
-        if let encoded = string.addingPercentEncoding(withAllowedCharacters: .urlFragmentAllowed) {
-            return URL(string: encoded)
-        }
-        return nil
-    }
-
-    private static func makeURLAllowingData(from string: String) -> URL? {
-        if string.hasPrefix("data:") {
-            return URL(string: string)
-        }
-        return makeURL(from: string)
-    }
-}
+import NookTabsCore
+import NookWeb
 
 enum WebContextMenuItem {
     case pageBack
@@ -377,7 +227,7 @@ extension FocusableWKWebView {
     /// Opens `url` in the background in the owning page's window and space. A private page's
     /// window is private, so the link stays in that window's in-memory tree.
     func openLinkInNewTab(_ url: URL) {
-        guard let session = owningSession, let tabs = session.browserManager?.tabs,
+        guard let session = owningSession, let tabs = session.controller,
               let window = tabs.window(for: session) else { return }
         let parent = tabs.spaceID(of: session.itemID).map { Parent.tabs(spaceID: $0) }
         tabs.open(url: url, in: window, placement: .background, parent: parent)

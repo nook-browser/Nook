@@ -8,6 +8,7 @@
 import AppKit
 import SwiftUI
 import WebKit
+import NookWeb
 
 struct NookCommands: Commands {
     let browserManager: BrowserManager

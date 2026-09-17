@@ -8,14 +8,15 @@
 
 import AppKit
 import Carbon
-import NookSettings
 import OSLog
 import Sparkle
 import SwiftUI
+import NookSettings
+import NookWeb
 
 @main
 struct NookApp: App {
-    @State private var windowRegistry = WindowRegistry()
+    @State private var windowRegistry: WindowRegistry
     @State private var webViewCoordinator = WebViewCoordinator()
     @State private var settingsManager: NookSettingsService
     @State private var keyboardShortcutManager = KeyboardShortcutManager()
@@ -32,7 +33,10 @@ struct NookApp: App {
     init() {
         let settings = NookSettingsService()
         _settingsManager = State(initialValue: settings)
-        _browserManager = StateObject(wrappedValue: BrowserManager(settings: settings))
+        let registry = WindowRegistry()
+        _windowRegistry = State(initialValue: registry)
+        _browserManager = StateObject(
+            wrappedValue: BrowserManager(settings: settings, windowRegistry: registry))
         let config = AIConfigService()
         _aiConfigService = State(initialValue: config)
         _aiService = State(initialValue: AIService(configService: config))

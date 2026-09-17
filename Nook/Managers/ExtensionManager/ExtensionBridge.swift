@@ -7,9 +7,10 @@
 
 import AppKit
 import Foundation
-import NookTabsCore
 import os
 import WebKit
+import NookTabsCore
+import NookWeb
 
 /// One regular browser window. Private windows never get an adapter.
 final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {

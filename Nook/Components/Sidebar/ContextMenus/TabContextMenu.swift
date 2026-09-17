@@ -6,8 +6,9 @@
 //
 
 import AppKit
-import NookTabsCore
 import SwiftUI
+import NookTabsCore
+import NookWeb
 
 /// Which view shows the tab. The item's section (favorites, pinned, tabs) comes from the tree.
 enum TabMenuContext {

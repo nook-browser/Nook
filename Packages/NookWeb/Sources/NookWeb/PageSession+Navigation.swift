@@ -5,7 +5,7 @@
 //  Navigation delegate, downloads and find in page for a PageSession.
 //
 
-import AppKit
+import OSLog
 import SwiftUI
 import WebKit
 import NookBlocker
@@ -19,7 +19,7 @@ extension PageSession: WKNavigationDelegate, WKDownloadDelegate {
         didStartProvisionalNavigation navigation: WKNavigation!
     ) {
         loadingState = .didStartProvisionalNavigation
-        ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.loading])
+        controller?.tabEvents?.tabPropertiesChanged(self, properties: [.loading])
 
         if let newURL = webView.url {
             // Only reset for actual URL changes, not just reloads
@@ -47,21 +47,21 @@ extension PageSession: WKNavigationDelegate, WKDownloadDelegate {
         didCommit navigation: WKNavigation!
     ) {
         loadingState = .didCommit
-        ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.loading])
+        controller?.tabEvents?.tabPropertiesChanged(self, properties: [.loading])
 
         if let newURL = webView.url {
             self.url = newURL
             controller?.pageCommitted(itemID: itemID, url: newURL)
-            browserManager?.navigateTabAcrossWindows(itemID, to: newURL)
+            controller?.sessionDelegate?.navigateAcrossWindows(itemID, to: newURL)
             // Update website shortcut detector with new URL
-            browserManager?.keyboardShortcutManager?.websiteShortcutDetector.updateCurrentURL(newURL)
+            controller?.sessionDelegate?.shortcutDetectorDidNavigate(to: newURL)
             // Grant extension access to the committed URL. This is critical for
             // server-side redirects (e.g. appstoreconnect.apple.com → idmsa.apple.com)
             // where decidePolicyFor only granted access to the initial URL, not the
             // redirect target. Without this, content scripts can't inject on the
             // redirected page and chrome.tabs.query() won't return the URL.
-            ExtensionManager.shared.grantExtensionAccessToURL(newURL)
-            ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
+            controller?.tabEvents?.grantAccess(to: newURL)
+            controller?.tabEvents?.tabPropertiesChanged(self, properties: [.URL])
         }
     }
 
@@ -71,7 +71,7 @@ extension PageSession: WKNavigationDelegate, WKDownloadDelegate {
         didFinish navigation: WKNavigation!
     ) {
         loadingState = .didFinish
-        ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.loading])
+        controller?.tabEvents?.tabPropertiesChanged(self, properties: [.loading])
 
         if let newURL = webView.url {
             self.url = newURL
@@ -79,23 +79,23 @@ extension PageSession: WKNavigationDelegate, WKDownloadDelegate {
             // decidePolicyFor only grants access to the initial navigation URL;
             // server-side redirects land here with a different URL that needs
             // its own grant for content scripts and chrome.tabs.query().
-            ExtensionManager.shared.grantExtensionAccessToURL(newURL)
-            ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
+            controller?.tabEvents?.grantAccess(to: newURL)
+            controller?.tabEvents?.tabPropertiesChanged(self, properties: [.URL])
 
             // Wake MV3 background workers so they can process the new page
             // (autofill detection, badge count updates, etc.)
-            ExtensionManager.shared.wakeBackgroundWorkers()
+            controller?.tabEvents?.wakeBackgroundWorkers()
 
             // Extension diagnostics: check content scripts, background worker, and messaging
             #if DEBUG
-            ExtensionManager.shared.diagnoseExtensionState(for: webView, url: newURL)
+            controller?.tabEvents?.diagnose(for: webView, url: newURL)
             #endif
             // The final URL after redirects.
             controller?.pageCommitted(itemID: itemID, url: newURL)
-            browserManager?.navigateTabAcrossWindows(itemID, to: newURL)
+            controller?.sessionDelegate?.navigateAcrossWindows(itemID, to: newURL)
 
             // Load saved zoom level for the new domain
-            browserManager?.loadZoomForTab(self.itemID)
+            controller?.sessionDelegate?.loadZoom(for: self.itemID)
 
             // CHROME WEB STORE INTEGRATION: Inject script after navigation
             injectWebStoreScriptIfNeeded(for: newURL, in: webView)
@@ -114,9 +114,9 @@ extension PageSession: WKNavigationDelegate, WKDownloadDelegate {
                 // Add to profile-aware history after title is updated
                 if let currentURL = webView.url {
                     let profile = self?.profile
-                    let profileId = profile?.id ?? self?.browserManager?.currentProfile?.id
+                    let profileId = profile?.id ?? self?.controller?.sessionDelegate?.currentProfile?.id
                     let isEphemeral = profile?.isEphemeral ?? false
-                    self?.browserManager?.historyManager.addVisit(
+                    self?.controller?.history?.addVisit(
                         url: currentURL,
                         title: title,
                         timestamp: Date(),
@@ -187,13 +187,13 @@ extension PageSession: WKNavigationDelegate, WKDownloadDelegate {
         webProcessCrashCount += 1
         lastWebProcessCrashDate = now
 
-        NSLog("[PageSession] WebContent process terminated for item %@ (crash #%d in window)", itemID.uuidString, webProcessCrashCount)
+        Self.log.error("WebContent process terminated for item \(self.itemID.uuidString, privacy: .public) (crash #\(self.webProcessCrashCount) in window)")
         loadingState = .idle
 
         // No window shows this tab: unload instead of respawning a process in the background
         // (often the system reclaiming memory). Selecting the tab restores its saved URL.
-        if let bm = browserManager, webView === primaryWebView {
-            var views = bm.webViewCoordinator?.getAllWebViews(for: itemID) ?? []
+        if webView === primaryWebView {
+            var views = controller?.webViews?.allWebViews(for: itemID) ?? []
             views.append(webView)
             if views.allSatisfy({ $0.window == nil }) {
                 controller?.unload(itemID)
@@ -206,7 +206,7 @@ extension PageSession: WKNavigationDelegate, WKDownloadDelegate {
         // Leave the view without a process; Reload (or unloading the tab) tries again.
         // Loading about:blank here would overwrite and persist the tab's real URL.
         guard webProcessCrashCount <= 4 else {
-            NSLog("[PageSession] Giving up on item %@ after %d consecutive crashes", itemID.uuidString, webProcessCrashCount)
+            Self.log.error("Giving up on item \(self.itemID.uuidString, privacy: .public) after \(self.webProcessCrashCount) consecutive crashes")
             return
         }
 
@@ -238,7 +238,7 @@ extension PageSession: WKNavigationDelegate, WKDownloadDelegate {
         // newer navigation superseded this one, isLoading is still true and that one owns `url`.
         if !webView.isLoading, let committed = webView.url, committed != url {
             url = committed
-            ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
+            controller?.tabEvents?.tabPropertiesChanged(self, properties: [.URL])
             controller?.pageCommitted(itemID: itemID, url: committed)
         }
 
@@ -255,11 +255,11 @@ extension PageSession: WKNavigationDelegate, WKDownloadDelegate {
         didReceive challenge: URLAuthenticationChallenge,
         completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) {
-        if let handled = browserManager?.authenticationManager.handleAuthenticationChallenge(
+        if controller?.sessionDelegate?.handleAuthenticationChallenge(
             challenge,
             for: self,
             completionHandler: completionHandler
-        ), handled {
+        ) == true {
             return
         }
 
@@ -277,7 +277,7 @@ extension PageSession: WKNavigationDelegate, WKDownloadDelegate {
             // $removeparam: restart the navigation without tracking parameters
             if navigationAction.navigationType != .backForward,
                (navigationAction.request.httpMethod ?? "GET") == "GET",
-               let stripped = browserManager?.contentBlockerManager.strippedTrackingParams(for: url, tab: self)
+               let stripped = controller?.blocker.strippedTrackingParams(for: url, tab: self)
             {
                 decisionHandler(.cancel)
                 webView.load(URLRequest(url: stripped))
@@ -286,14 +286,14 @@ extension PageSession: WKNavigationDelegate, WKDownloadDelegate {
 
             // Grant extension access to this URL BEFORE navigation starts
             // so content scripts can inject at document_start
-            ExtensionManager.shared.grantExtensionAccessToURL(url)
+            controller?.tabEvents?.grantAccess(to: url)
 
             // Setup content blocker scripts before navigation starts
-            browserManager?.contentBlockerManager.setupContentBlockerScripts(for: url, in: webView, tab: self)
+            controller?.blocker.setupContentBlockerScripts(for: url, in: webView, tab: self)
 
             // Inject SponsorBlock script (independent of content blocker)
-            browserManager?.sponsorBlockManager.injectScriptIfNeeded(for: url, in: webView)
-            if let settings = browserManager?.nookSettings {
+            controller?.sponsorBlock.injectScriptIfNeeded(for: url, in: webView)
+            if let settings = controller?.settings {
                 YouTubeTweaks.apply(for: url, in: webView, settings: settings)
                 SocialImageTweaks.apply(for: url, in: webView, settings: settings)
                 FacebookTweaks.apply(for: url, in: webView, settings: settings)
@@ -310,7 +310,7 @@ extension PageSession: WKNavigationDelegate, WKDownloadDelegate {
             decisionHandler(.cancel)
             RunLoop.current.perform { [weak self] in
                 guard let self else { return }
-                self.browserManager?.peekManager.presentExternalURL(url, from: self)
+                self.controller?.sessionDelegate?.presentPeek(url: url, from: self)
             }
             return
         }
@@ -327,7 +327,7 @@ extension PageSession: WKNavigationDelegate, WKDownloadDelegate {
             var destHost = url.host?.lowercased() ?? ""
             if destHost.hasPrefix("www.") { destHost = String(destHost.dropFirst(4)) }
             if !currentHost.isEmpty && !destHost.isEmpty && currentHost != destHost,
-               browserManager?.siteRoutingManager.applyRoute(url: url, from: self) == true {
+               controller?.siteRouting.applyRoute(url: url, from: self) == true {
                 decisionHandler(.cancel)
                 return
             }
@@ -367,7 +367,7 @@ extension PageSession: WKNavigationDelegate, WKDownloadDelegate {
         let suggestedFilename = navigationAction.request.url?.lastPathComponent ?? "download"
 
 
-        _ = browserManager?.downloadManager.addDownload(
+        controller?.sessionDelegate?.addDownload(
             download, originalURL: originalURL, suggestedFilename: suggestedFilename)
     }
 
@@ -380,7 +380,7 @@ extension PageSession: WKNavigationDelegate, WKDownloadDelegate {
         let suggestedFilename = navigationResponse.response.url?.lastPathComponent ?? "download"
 
 
-        _ = browserManager?.downloadManager.addDownload(
+        controller?.sessionDelegate?.addDownload(
             download, originalURL: originalURL, suggestedFilename: suggestedFilename)
     }
 
@@ -459,16 +459,16 @@ extension PageSession: WKNavigationDelegate, WKDownloadDelegate {
 
 // MARK: - Find in Page
 extension PageSession {
-    typealias FindResult = Result<(matchCount: Int, currentIndex: Int), Error>
-    typealias FindCompletion = @Sendable (FindResult) -> Void
+    public typealias FindResult = Result<(matchCount: Int, currentIndex: Int), Error>
+    public typealias FindCompletion = @Sendable (FindResult) -> Void
 
-    func findInPage(_ text: String, completion: @escaping FindCompletion) {
+    public func findInPage(_ text: String, completion: @escaping FindCompletion) {
         // Use the WebView that's actually visible in the current window
         let targetWebView: WKWebView?
-        if let browserManager = browserManager,
-            let activeWindowId = browserManager.windowRegistry?.activeWindow?.id
+        if let activeWindowId = controller?.windowRegistry.activeWindow?.id,
+            let found = controller?.webViews?.webView(for: self.itemID, in: activeWindowId)
         {
-            targetWebView = browserManager.getWebView(for: self.itemID, in: activeWindowId)
+            targetWebView = found
         } else {
             targetWebView = primaryWebView
         }
@@ -594,13 +594,13 @@ extension PageSession {
         }
     }
 
-    func findNextInPage(completion: @escaping FindCompletion) {
+    public func findNextInPage(completion: @escaping FindCompletion) {
         // Use the WebView that's actually visible in the current window
         let targetWebView: WKWebView?
-        if let browserManager = browserManager,
-            let activeWindowId = browserManager.windowRegistry?.activeWindow?.id
+        if let activeWindowId = controller?.windowRegistry.activeWindow?.id,
+            let found = controller?.webViews?.webView(for: self.itemID, in: activeWindowId)
         {
-            targetWebView = browserManager.getWebView(for: self.itemID, in: activeWindowId)
+            targetWebView = found
         } else {
             targetWebView = primaryWebView
         }
@@ -671,13 +671,13 @@ extension PageSession {
         }
     }
 
-    func findPreviousInPage(completion: @escaping FindCompletion) {
+    public func findPreviousInPage(completion: @escaping FindCompletion) {
         // Use the WebView that's actually visible in the current window
         let targetWebView: WKWebView?
-        if let browserManager = browserManager,
-            let activeWindowId = browserManager.windowRegistry?.activeWindow?.id
+        if let activeWindowId = controller?.windowRegistry.activeWindow?.id,
+            let found = controller?.webViews?.webView(for: self.itemID, in: activeWindowId)
         {
-            targetWebView = browserManager.getWebView(for: self.itemID, in: activeWindowId)
+            targetWebView = found
         } else {
             targetWebView = primaryWebView
         }
@@ -748,13 +748,13 @@ extension PageSession {
         }
     }
 
-    func clearFindInPage() {
+    public func clearFindInPage() {
         // Use the WebView that's actually visible in the current window
         let targetWebView: WKWebView?
-        if let browserManager = browserManager,
-            let activeWindowId = browserManager.windowRegistry?.activeWindow?.id
+        if let activeWindowId = controller?.windowRegistry.activeWindow?.id,
+            let found = controller?.webViews?.webView(for: self.itemID, in: activeWindowId)
         {
-            targetWebView = browserManager.getWebView(for: self.itemID, in: activeWindowId)
+            targetWebView = found
         } else {
             targetWebView = primaryWebView
         }

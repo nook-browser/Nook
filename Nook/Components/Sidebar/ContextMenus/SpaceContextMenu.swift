@@ -5,8 +5,9 @@
 //  Created by Aether on 15/11/2025.
 //
 
-import NookTabsCore
 import SwiftUI
+import NookTabsCore
+import NookWeb
 
 /// Shared context menu for spaces (used in SpacesList)
 struct SpaceContextMenu: View {

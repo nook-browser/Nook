@@ -6,8 +6,9 @@
 //
 
 import SwiftUI
-import NookDesign
 import WebKit
+import NookDesign
+import NookWeb
 
 struct NavigationHistoryContextMenu: View {
     let historyType: HistoryType

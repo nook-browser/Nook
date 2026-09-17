@@ -5,7 +5,7 @@
 //  Every user-facing change to tabs, folders, spaces and window selection.
 //
 
-import AppKit
+import Foundation
 import NookTabsCore
 import WebKit
 
@@ -16,7 +16,7 @@ extension TabsController {
     /// `.newTab` selects it, `.background` leaves selection alone and loads nothing,
     /// `.replaceCurrent` loads `url` in the selected page.
     @discardableResult
-    func open(url: URL, in window: BrowserWindowState, placement: Placement, parent: Parent? = nil) -> UUID? {
+    public func open(url: URL, in window: BrowserWindowState, placement: Placement, parent: Parent? = nil) -> UUID? {
         if placement == .replaceCurrent, let selected = window.selectedItemID, let session = ensureSession(for: selected) {
             session.load(url)
             select(selected, in: window)
@@ -34,7 +34,7 @@ extension TabsController {
 
     /// Wraps a web view created elsewhere (Peek, mini window) in a new item and session.
     @discardableResult
-    func adopt(webView: WKWebView, url: URL, title: String, in window: BrowserWindowState, placement: Placement) -> UUID? {
+    public func adopt(webView: WKWebView, url: URL, title: String, in window: BrowserWindowState, placement: Placement) -> UUID? {
         let owner = owner(of: window)
         let replaced = placement == .replaceCurrent ? window.selectedItemID : nil
         let source = tree(owner)
@@ -54,7 +54,7 @@ extension TabsController {
         }
         let session = PageSession(
             itemID: id, url: url, title: title, isPrivate: window.privateTree != nil,
-            controller: self, browserManager: browserManager, adoptedWebView: webView)
+            controller: self, adoptedWebView: webView)
         register(session, in: window)
         if placement != .background { select(id, in: window) }
         if let replaced, after == replaced { close(replaced) }
@@ -64,7 +64,7 @@ extension TabsController {
     /// A WebKit-created popup from `opener`: a new selected tab in the opener's window whose
     /// session owns `webView`. WebKit drives the popup's first navigation.
     @discardableResult
-    func adoptPopup(webView: FocusableWKWebView, url: URL?, opener: PageSession) -> UUID? {
+    public func adoptPopup(webView: WKWebView, url: URL?, opener: PageSession) -> UUID? {
         guard let window = window(for: opener), let spaceID = window.spaceID else { return nil }
         let id = UUID()
         let pageURL = url ?? URL(string: "about:blank")!
@@ -73,7 +73,7 @@ extension TabsController {
         }) != nil else { return nil }
         let session = PageSession(
             itemID: id, url: pageURL, title: "New Tab", isPrivate: window.privateTree != nil,
-            controller: self, browserManager: browserManager)
+            controller: self)
         session.isPopupHost = true
         register(session, in: window)
         session.installPopupWebView(webView)
@@ -95,7 +95,7 @@ extension TabsController {
 
     // MARK: - Selection
 
-    func select(_ itemID: UUID, in window: BrowserWindowState) {
+    public func select(_ itemID: UUID, in window: BrowserWindowState) {
         let owner = owner(of: window)
         let source = tree(owner)
         guard let item = source.item(itemID) else { return }
@@ -109,7 +109,7 @@ extension TabsController {
             window.spaceID = spaceID
         }
         guard let spaceID = window.spaceID else { return }
-        if movedSpace { browserManager?.windowSpaceChanged(window) }
+        if movedSpace { sessionDelegate?.windowSpaceChanged(window) }
         window.selectedItemBySpace[spaceID] = itemID
         window.emptiedSpaces.remove(spaceID)
         // The latest window to select a page takes its live view; others show a placeholder.
@@ -123,18 +123,18 @@ extension TabsController {
             session.loadWebViewIfNeeded()
             session.checkMediaState()
             if session !== previous, !session.isPrivate {
-                ExtensionManager.shared.notifyTabActivated(new: session, previous: previous)
+                tabEvents?.tabActivated(new: session, previous: previous)
             }
         }
         mirror(window)
         window.refreshCompositor()
     }
 
-    func selectNext(in window: BrowserWindowState) {
+    public func selectNext(in window: BrowserWindowState) {
         step(1, in: window)
     }
 
-    func selectPrevious(in window: BrowserWindowState) {
+    public func selectPrevious(in window: BrowserWindowState) {
         step(-1, in: window)
     }
 
@@ -147,25 +147,25 @@ extension TabsController {
     }
 
     /// 0-based over `displayOrder(in:)`.
-    func select(index: Int, in window: BrowserWindowState) {
+    public func select(index: Int, in window: BrowserWindowState) {
         let order = displayOrder(in: window)
         guard order.indices.contains(index) else { return }
         select(order[index], in: window)
     }
 
-    func selectLast(in window: BrowserWindowState) {
+    public func selectLast(in window: BrowserWindowState) {
         guard let last = displayOrder(in: window).last else { return }
         select(last, in: window)
     }
 
     /// Shows a space; its remembered selection (or first item) becomes selected. The space owns
     /// its login context, so this is also the data store, history and cookie switch.
-    func setSpace(_ spaceID: UUID, in window: BrowserWindowState) {
+    public func setSpace(_ spaceID: UUID, in window: BrowserWindowState) {
         let source = tree(owner(of: window))
         guard source.space(spaceID) != nil else { return }
         let changed = window.spaceID != spaceID
         window.spaceID = spaceID
-        if changed { browserManager?.windowSpaceChanged(window) }
+        if changed { sessionDelegate?.windowSpaceChanged(window) }
         let order = displayOrder(in: window)
         if let remembered = window.selectedItemBySpace[spaceID], order.contains(remembered) {
             select(remembered, in: window)
@@ -178,11 +178,11 @@ extension TabsController {
         }
     }
 
-    func selectNextSpace(in window: BrowserWindowState) {
+    public func selectNextSpace(in window: BrowserWindowState) {
         stepSpace(1, in: window)
     }
 
-    func selectPreviousSpace(in window: BrowserWindowState) {
+    public func selectPreviousSpace(in window: BrowserWindowState) {
         stepSpace(-1, in: window)
     }
 
@@ -198,7 +198,7 @@ extension TabsController {
 
     /// A pinned or favorite tab ends its page and keeps the item. Anything in the tabs section,
     /// and any folder, is removed into the reopen history.
-    func close(_ itemID: UUID) {
+    public func close(_ itemID: UUID) {
         guard let owner = owner(ofItem: itemID) else { return }
         let source = tree(owner)
         guard let item = source.item(itemID) else { return }
@@ -226,7 +226,7 @@ extension TabsController {
 
     /// Deletes an item and its subtree from the sidebar, pinned tabs and favorites included.
     /// Pages end; reopening the closed entry puts it back in its place.
-    func remove(_ itemID: UUID) {
+    public func remove(_ itemID: UUID) {
         guard let owner = owner(ofItem: itemID) else { return }
         let ids = tree(owner).subtree(of: itemID)
         moveSelectionOff(Set(ids))
@@ -247,18 +247,18 @@ extension TabsController {
         }
     }
 
-    func close(_ itemIDs: [UUID]) {
+    public func close(_ itemIDs: [UUID]) {
         for id in itemIDs { close(id) }
     }
 
-    func closeSelected(in window: BrowserWindowState) {
+    public func closeSelected(in window: BrowserWindowState) {
         guard let selected = window.selectedItemID else { return }
         close(selected)
     }
 
     /// Restores the newest closed entry and selects it. A private window reopens from its own
     /// in-memory history.
-    func reopenLastClosed(in window: BrowserWindowState) {
+    public func reopenLastClosed(in window: BrowserWindowState) {
         let owner = owner(of: window)
         let isPrivate = window.privateTree != nil
         guard let entry = isPrivate ? window.privateClosed.last : device.closed.last,
@@ -290,7 +290,7 @@ extension TabsController {
         }
     }
 
-    static let recentLimit = 30
+    public static let recentLimit = 30
 
     /// Before items disappear (or a pinned tab's page ends), every window selecting one returns
     /// to the item it selected before, else the next item in display order, else the previous.
@@ -341,7 +341,7 @@ extension TabsController {
 
     // MARK: - Move
 
-    func move(_ itemID: UUID, to parent: Parent, after: UUID?) {
+    public func move(_ itemID: UUID, to parent: Parent, after: UUID?) {
         guard let owner = owner(ofItem: itemID) else { return }
         let current = session(for: itemID)
         let wasSynced = tree(owner).scope(of: itemID) == .synced
@@ -354,7 +354,7 @@ extension TabsController {
         guard case .main = owner else { return }
         let isSynced = tree.scope(of: itemID) == .synced
         if current != nil {
-            ExtensionManager.shared.notifyTabMoved(itemID: itemID, from: oldIndex, in: oldWindow, pinnedChanged: wasSynced != isSynced)
+            tabEvents?.tabMoved(itemID: itemID, from: oldIndex, in: oldWindow, pinnedChanged: wasSynced != isSynced)
         }
         if wasSynced, !isSynced {
             for id in tree.subtree(of: itemID) { setOpenPage(id, nil) }
@@ -368,7 +368,7 @@ extension TabsController {
         for window in regularWindows { window.refreshCompositor() }
     }
 
-    func drop(_ itemID: UUID, section: Parent, rows: [Row], index: Int, intoFolder: Bool) {
+    public func drop(_ itemID: UUID, section: Parent, rows: [Row], index: Int, intoFolder: Bool) {
         let source = treeHolding(section)
         let target = source.dropTarget(section: section, rows: rows, index: index, intoFolder: intoFolder, dragged: itemID)
         if case .folder(let folderID) = target.parent { openFolder(folderID) }
@@ -376,19 +376,19 @@ extension TabsController {
     }
 
     /// Appends to a pinned section (`.pinned`) or favorites (`.favorites`).
-    func pin(_ itemID: UUID, to parent: Parent) {
+    public func pin(_ itemID: UUID, to parent: Parent) {
         move(itemID, to: parent, after: children(of: parent).last?.id)
     }
 
     /// Moves a pinned tab or favorite to the top of its space's tabs section.
-    func unpin(_ itemID: UUID) {
+    public func unpin(_ itemID: UUID) {
         let spaceID = self.spaceID(of: itemID)
             ?? allWindows.first(where: { $0.selectedItemID == itemID })?.spaceID
         guard let spaceID else { return }
         move(itemID, to: .tabs(spaceID: spaceID), after: nil)
     }
 
-    func rename(_ itemID: UUID, _ customTitle: String?) {
+    public func rename(_ itemID: UUID, _ customTitle: String?) {
         guard let owner = owner(ofItem: itemID) else { return }
         perform(owner, "rename") { try $0.rename(itemID, customTitle: customTitle) }
     }
@@ -396,7 +396,7 @@ extension TabsController {
     /// A copy of a tab showing its current page: next to it in the tabs section, or at the top of
     /// the window's tabs section for pinned tabs and favorites. The copy is selected.
     @discardableResult
-    func duplicate(_ itemID: UUID, in window: BrowserWindowState) -> UUID? {
+    public func duplicate(_ itemID: UUID, in window: BrowserWindowState) -> UUID? {
         guard let owner = owner(ofItem: itemID), let item = tree(owner).item(itemID),
               case .tab(let url, let pageTitle) = item.kind else { return nil }
         let page = session(for: itemID)
@@ -415,7 +415,7 @@ extension TabsController {
     // MARK: - Home URL
 
     /// Loads a synced tab's home URL in its page.
-    func resetToHome(_ itemID: UUID) {
+    public func resetToHome(_ itemID: UUID) {
         guard let item = item(itemID), let home = item.url, let owner = owner(ofItem: itemID),
               tree(owner).scope(of: itemID) == .synced else { return }
         if let page = session(for: itemID) {
@@ -426,12 +426,12 @@ extension TabsController {
     }
 
     /// Makes a synced tab's current page its home URL.
-    func setHomeToCurrent(_ itemID: UUID) {
+    public func setHomeToCurrent(_ itemID: UUID) {
         guard let current = session(for: itemID)?.url ?? device.openPages[itemID]?.url else { return }
         setHome(itemID, url: current)
     }
 
-    func setHome(_ itemID: UUID, url: URL) {
+    public func setHome(_ itemID: UUID, url: URL) {
         guard let owner = owner(ofItem: itemID) else { return }
         perform(owner, "setHome") { try $0.setURL(itemID, url) }
     }
@@ -439,7 +439,7 @@ extension TabsController {
     // MARK: - Folders
 
     @discardableResult
-    func createFolder(title: String, in parent: Parent, after: UUID?) -> UUID? {
+    public func createFolder(title: String, in parent: Parent, after: UUID?) -> UUID? {
         let owner: TabsController.Owner?
         switch parent {
         case .favorites(let spaceID), .pinned(let spaceID), .tabs(let spaceID): owner = self.owner(ofSpace: spaceID)
@@ -454,7 +454,7 @@ extension TabsController {
         return id
     }
 
-    func toggleFolder(_ folderID: UUID) {
+    public func toggleFolder(_ folderID: UUID) {
         if isOpen(folder: folderID) {
             setFolder(folderID, open: false)
         } else {
@@ -462,7 +462,7 @@ extension TabsController {
         }
     }
 
-    func setAllFolders(open: Bool, space spaceID: UUID) {
+    public func setAllFolders(open: Bool, space spaceID: UUID) {
         guard let owner = owner(ofSpace: spaceID) else { return }
         let source = tree(owner)
         let roots = source.children(of: .pinned(spaceID: spaceID)) + source.children(of: .tabs(spaceID: spaceID))
@@ -473,7 +473,7 @@ extension TabsController {
         }
     }
 
-    func openFolder(_ folderID: UUID) {
+    public func openFolder(_ folderID: UUID) {
         setFolder(folderID, open: true)
     }
 
@@ -481,7 +481,7 @@ extension TabsController {
 
     /// A new space with its own (empty) website data store, so it starts logged out.
     @discardableResult
-    func createSpace(name: String, icon: String, accentHex: String, after: UUID?) -> UUID? {
+    public func createSpace(name: String, icon: String, accentHex: String, after: UUID?) -> UUID? {
         let id = UUID()
         guard perform(.main, "createSpace", {
             $0.createSpace(id: id, name: name, icon: icon, accentHex: accentHex, after: after)
@@ -489,12 +489,12 @@ extension TabsController {
         return id
     }
 
-    func updateSpace(_ spaceID: UUID, name: String?, icon: String?, accentHex: String?) {
+    public func updateSpace(_ spaceID: UUID, name: String?, icon: String?, accentHex: String?) {
         guard let owner = owner(ofSpace: spaceID) else { return }
         perform(owner, "updateSpace") { try $0.updateSpace(spaceID, name: name, icon: icon, accentHex: accentHex) }
     }
 
-    func moveSpace(_ spaceID: UUID, after: UUID?) {
+    public func moveSpace(_ spaceID: UUID, after: UUID?) {
         guard let owner = owner(ofSpace: spaceID) else { return }
         perform(owner, "moveSpace") { try $0.moveSpace(spaceID, after: after) }
     }
@@ -510,7 +510,7 @@ extension TabsController {
 
     /// Deletes a space; its items go to the reopen history and its website data is cleared.
     /// Windows showing it move to another space.
-    func deleteSpace(_ spaceID: UUID) {
+    public func deleteSpace(_ spaceID: UUID) {
         guard let owner = owner(ofSpace: spaceID) else { return }
         let source = tree(owner)
         let ids = (source.children(of: .favorites(spaceID: spaceID))
@@ -547,14 +547,14 @@ extension TabsController {
     // MARK: - Unload
 
     /// Releases an item's web views; selection first moves off windows showing it.
-    func unload(_ itemID: UUID) {
+    public func unload(_ itemID: UUID) {
         guard let page = session(for: itemID) else { return }
         if isVisibleInAnyWindow(itemID) { moveSelectionOff([itemID]) }
         page.unload()
     }
 
     /// Unloads every page no window shows, except pages playing audio or in picture-in-picture.
-    func unloadAllHidden() {
+    public func unloadAllHidden() {
         for page in sessions where !page.isUnloaded && !isVisibleInAnyWindow(page.itemID)
             && !page.hasPlayingAudio && !page.hasPiPActive {
             page.unload()
@@ -564,7 +564,7 @@ extension TabsController {
     // MARK: - External Undo
 
     /// Applies a change built elsewhere (the tab organizer's undo) to the main tree.
-    func apply(_ change: Change) {
+    public func apply(_ change: Change) {
         let before = Set(tree.items.keys.filter { tree.item($0) != nil })
         moveSelectionOff(Set(change.items.compactMap { id, value in value == nil || value?.deletedAt != nil ? id : nil }))
         perform(.main, "apply", undoable: false) { tree in tree.apply(change) }

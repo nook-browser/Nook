@@ -7,8 +7,9 @@
 
 import AppKit
 import SwiftUI
-import NookDesign
 import WebKit
+import NookDesign
+import NookWeb
 
 enum TopBarMetrics {
     static let height: CGFloat = 40

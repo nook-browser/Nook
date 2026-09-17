@@ -7,8 +7,9 @@
 //  every controller it mints.
 //
 
-import NookBlocker
 import WebKit
+import NookBlocker
+import NookWeb
 
 extension BrowserManager: ContentBlockerHost {
     public var blockablePages: [any BlockablePage] { tabs.sessions }

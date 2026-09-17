@@ -5,14 +5,13 @@
 //  Script message handlers and injected page scripts for a PageSession.
 //
 
-import AppKit
 import SwiftUI
 import WebKit
 import NookTweaks
 
 extension PageSession {
     /// Script message handler names this session registers on each of its web views.
-    var messageHandlerNames: [String] {
+    public var messageHandlerNames: [String] {
         ["linkHover", "commandHover", "commandClick", "pipStateChange",
          "mediaStateChange_\(itemID.uuidString)", "backgroundColor_\(itemID.uuidString)",
          "historyStateDidChange", "NookIdentity", "nookShortcutDetect",
@@ -20,7 +19,7 @@ extension PageSession {
     }
 
     /// Per-document observers. Each script guards against a second install in the same document.
-    func injectPageObservers(into webView: WKWebView) {
+    public func injectPageObservers(into webView: WKWebView) {
         injectLinkHoverJavaScript(to: webView)
         injectPiPStateListener(to: webView)
         injectMediaDetection(to: webView)
@@ -289,7 +288,7 @@ extension PageSession {
     }
     
     func injectShortcutDetection(to webView: WKWebView) {
-        browserManager?.keyboardShortcutManager?.websiteShortcutDetector.configure(webView: webView)
+        controller?.sessionDelegate?.configureShortcutDetection(in: webView)
     }
 
     // MARK: - Chrome Web Store Integration
@@ -298,18 +297,7 @@ extension PageSession {
     /// Script and message handler both live in an isolated content world, so page scripts
     /// on any site (including the store itself) cannot call the install handler.
     func injectWebStoreScriptIfNeeded(for url: URL, in webView: WKWebView) {
-        guard let browserManager = browserManager,
-              WebStoreScriptHandler.store(for: url) != nil,
-              let script = BrowserConfiguration.webStoreInjectorScript()
-        else { return }
-
-        let ucc = webView.configuration.userContentController
-        let world = WebStoreScriptHandler.contentWorld
-        ucc.removeScriptMessageHandler(forName: WebStoreScriptHandler.handlerName, contentWorld: world)
-        let handler = WebStoreScriptHandler(browserManager: browserManager)
-        webStoreHandler = handler
-        ucc.add(handler, contentWorld: world, name: WebStoreScriptHandler.handlerName)
-        webView.evaluateJavaScript(script.source, in: nil, in: world, completionHandler: nil)
+        webStoreHandler = controller?.sessionDelegate?.installWebStoreScript(in: webView)
     }
 }
 
@@ -358,8 +346,8 @@ extension PageSession: WKScriptMessageHandler {
             if let dict = message.body as? [String: String],
                 let colorHex = dict["backgroundColor"]
             {
-                self.pageBackgroundColor = NSColor(hex: colorHex)
-                if let webView = self.primaryWebView, let color = NSColor(hex: colorHex) {
+                self.pageBackgroundColor = PlatformColor.fromHex(colorHex)
+                if let webView = self.primaryWebView, let color = PlatformColor.fromHex(colorHex) {
                     webView.underPageBackgroundColor = color
                     // Update sampled domain after successful extraction
                     if let currentURL = webView.url,
@@ -395,7 +383,7 @@ extension PageSession: WKScriptMessageHandler {
 
                     // The store coalesces writes, so SPA URL changes report directly.
                     controller?.pageCommitted(itemID: itemID, url: url)
-                    ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.URL])
+                    controller?.tabEvents?.tabPropertiesChanged(self, properties: [.URL])
                 }
             }
 
@@ -439,16 +427,16 @@ extension PageSession: WKScriptMessageHandler {
                     if let videoID = body["videoID"] as? String {
                         Task { @MainActor [weak self] in
                             guard let webView = message.webView else { return }
-                            let segments = await self?.browserManager?.sponsorBlockManager
+                            let segments = await self?.controller?.sponsorBlock
                                 .fetchSegments(for: videoID) ?? []
-                            self?.browserManager?.sponsorBlockManager
+                            self?.controller?.sponsorBlock
                                 .deliverSegments(segments, to: webView)
                         }
                     }
                 case "segment-skipped":
                     // Telemetry: report viewed segment to SponsorBlock
                     if let uuid = body["uuid"] as? String {
-                        browserManager?.sponsorBlockManager.reportViewedSegment(uuid: uuid)
+                        controller?.sponsorBlock.reportViewedSegment(uuid: uuid)
                     }
                 default:
                     break
@@ -472,10 +460,7 @@ extension PageSession: WKScriptMessageHandler {
         let shortcuts = Set(shortcutsString.split(separator: ",").map { String($0) })
         
         // Update the detector with detected shortcuts for this URL
-        browserManager?.keyboardShortcutManager?.websiteShortcutDetector.updateJSDetectedShortcuts(
-            for: url,
-            shortcuts: shortcuts
-        )
+        controller?.sessionDelegate?.updateDetectedShortcuts(for: url, shortcuts: shortcuts)
     }
 
     /// Command-click opens the link in a background tab of the window showing this page. A
@@ -501,12 +486,12 @@ extension PageSession: WKScriptMessageHandler {
         let requestId = (rawRequestId?.isEmpty == false ? rawRequestId! : UUID().uuidString)
 
 
-        guard let manager = browserManager else {
+        guard let delegate = controller?.sessionDelegate else {
             finishIdentityFlow(requestId: requestId, with: .failure(.unableToStart))
             return
         }
 
-        let identityRequest = AuthenticationManager.IdentityRequest(
+        let identityRequest = IdentityRequest(
             requestId: requestId,
             url: url,
             interactive: interactive,
@@ -514,12 +499,12 @@ extension PageSession: WKScriptMessageHandler {
             explicitCallbackScheme: providedScheme?.isEmpty == true ? nil : providedScheme
         )
 
-        manager.authenticationManager.beginIdentityFlow(identityRequest, from: self)
+        delegate.beginIdentityFlow(identityRequest, from: self)
     }
 
-    func finishIdentityFlow(
+    public func finishIdentityFlow(
         requestId: String,
-        with result: AuthenticationManager.IdentityFlowResult
+        with result: IdentityFlowResult
     ) {
         guard let webView else {
             return
