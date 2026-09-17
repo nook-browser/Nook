@@ -315,7 +315,7 @@ extension TabsController {
             // Only open tabs qualify: every tab in the tabs section, and pinned tabs or favorites
             // whose page is still open. With none left the window shows the empty space.
             let isOpen: (UUID) -> Bool = { id in
-                // A pinned page left open at quit has a saved open page but no session yet.
+                // A reopened page is recorded before its session exists.
                 source.scope(of: id) == .device || self.session(for: id) != nil || self.device.openPages[id] != nil
             }
             let recent = (window.recentItemsBySpace[spaceID] ?? []).reversed().filter { id in

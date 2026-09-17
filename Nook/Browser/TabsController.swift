@@ -70,6 +70,8 @@ final class TabsController {
         case .loaded, .restoredFromBackup:
             tree = loaded.tree
             device = loaded.device
+            // A quit ends every page, so pinned tabs and favorites start at their home URL again.
+            device.openPages = [:]
         }
         log.info("Tabs loaded: \(String(describing: loaded.outcome), privacy: .public), \(self.tree.items.count) items")
         if case .readOnly(let reason) = loaded.outcome {
