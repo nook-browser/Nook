@@ -55,26 +55,31 @@ kept outside this repo.
 ```
 Packages/
   NookTabsCore/   exists, Foundation only, unchanged
-  NookBlocker/    ContentBlockerManager, AdblockRustFFI, Resources
-  NookTweaks/     YouTube, Facebook, SocialImage, SponsorBlock, SiteRouting
+  NookSettings/   NookSettingsService and the value types it stores
   NookDesign/     design tokens, values resolved per platform
-  NookUI/         shared SwiftUI leaves: rows, menus, forms, toasts
-  NookWeb/        PageSession, TabsController, FaviconCache, Search, History, Download
-  NookSync/       CloudKit mirror of synced-scope items
+  NookBlocker/    ContentBlockerManager, AdblockRustFFI (xcframework), Resources
+  NookTweaks/     YouTube, Facebook, SocialImage, SponsorBlock, SiteRouting
+  NookWeb/        TabsController, PageSession, FaviconCache, History, Search,
+                  WindowRegistry, BrowserWindowState, FocusableWKWebView
+  NookUI/         shared SwiftUI leaves: rows, menus, settings tab bodies, toasts
+  NookSync/       CloudKit mirror of synced-scope items and settings (phase 4)
 Nook/             macOS app target: sidebar, windows, AppKit drag, hover
 NookiOS/          iOS app target: bottom bar, tab grid, split view, touch drag
 ```
 
 Dependency order is a straight line. `TabsCore` has no dependencies.
-`Blocker`, `Tweaks`, `Design`, and `Sync` depend only on `TabsCore`. `Web`
-depends on `Blocker` and `Tweaks`. `UI` depends on `Design` and `Web`. Both app
-targets sit on top.
+`Settings` and `Design` depend on nothing else. `Blocker` and `Tweaks` depend
+on `TabsCore` and `Settings`. `Web` depends on `Blocker`, `Tweaks`, `Design`
+and `Settings`. `UI` depends on `Design` and `Web`. Both app targets sit on
+top.
 
 The split earns its keep rather than being structure for its own sake.
 `NookBlocker` carries a Rust static library and a build script that nothing
-else should inherit. `NookTweaks` has zero dependencies and is the most
-unit-testable code in the project. `NookTabsCore` stays Foundation-only, which
-is why it already runs `swift test`.
+else should inherit. `NookTweaks` is the most unit-testable code in the
+project. `NookTabsCore` stays Foundation-only, which is why it already runs
+`swift test`. `NookSettings` is its own package because settings will sync
+across devices the way tabs do, so the model has to be Foundation-only with
+no UI types in it.
 
 ## Phase 1: replace AdGuard with adblock-rust
 
@@ -197,25 +202,88 @@ of this gate.
 
 ## Phase 2: extract the packages
 
-File moves plus one shim. No behavior change. The macOS app builds Release and
-runs identically at the end, verified by hand.
+File moves plus small seams. No behavior change. The macOS app builds Debug
+and Release (Developer ID signed, the CI entitlements recipe) and runs
+identically at the end, verified by hand. Decisions settled on 2026-09-17
+after surveying the tree:
+
+**Rust library.** `build.sh` emits `NookAdblock.xcframework` (macos-arm64 now,
+ios-arm64 and ios-arm64-simulator slices added in phase 3) with the header
+inside, committed to the repo and declared as a `binaryTarget`. The
+`HEADER_SEARCH_PATHS` and `LIBRARY_SEARCH_PATHS` entries leave the pbxproj.
+Git LFS is deferred; the repo accepts the growth for now.
+
+**Settings.** `NookSettingsService` (806 lines) moves into `NookSettings`
+with the value types it stores (`SiteRoutingRule`, `SponsorBlockCategory`,
+`AIProvider`, `StartupLoadMode`, `TabManagementMode`, `AppearanceMode`).
+`SettingsTabs` and `currentSettingsTab` stay in the app: window navigation
+state, never synced. Blocker and Tweaks import the concrete service rather
+than per-package protocols. Two facts for phase 4, recorded here so the
+package shape does not fight them later: API keys live in UserDefaults today
+and must move to Keychain before any sync backend exists, and per-device
+values (window frames, startup mode, last selected tab) need a local-only
+marker.
+
+**NookWeb seams.** `TabsController` and `PageSession` reach `browserManager`
+80 times across 19 members and `ExtensionManager.shared` 21 times. A single
+wide host protocol would only relocate the god object, so the seams are:
+
+- Concrete package types injected at init: `WindowRegistry`,
+  `ContentBlockerManager`, `SponsorBlockManager`, `SiteRoutingManager`,
+  `HistoryManager`, `NookSettingsService`.
+- `WebViewProvider`: the pooled `WebViewCoordinator` on macOS; iOS holds views
+  directly.
+- `PageSessionDelegate`: downloads, peek, auth, zoom, mute, shortcuts,
+  cross-window navigation, space change. `BrowserManager` conforms.
+- `TabEventObserver`: the six extension notifications. macOS registers
+  `ExtensionManager`; iOS registers nothing.
+- `AlertPresenter`: `NSAlert` and `NSOpenPanel` on macOS, `UIAlertController`
+  and `UIDocumentPicker` on iOS.
+- `PlatformImage` / `PlatformColor` typealiases.
+
+`MuteableWKWebView` (ObjC, reached through the bridging header today) becomes
+a C target inside `NookWeb`, since packages have no bridging header.
+`BrowserWindowState`, `WindowRegistry` and `FocusableWKWebView` move with
+the sessions that depend on them. `WebViewCoordinator` stays in the app.
 
 Most `NS` symbols in the share candidates are Foundation and already work on
-iOS. The actual shim surface:
+iOS. The AppKit surface:
 
 | Symbol | Where | Replacement |
 |---|---|---|
 | `NSImage`, `NSBitmapImageRep` | `FaviconCache`, `PageSession` | `typealias PlatformImage`, `UIImage.pngData()` |
 | `NSColor` | `SpaceRecord+UI`, `PageSession` x3 | `typealias PlatformColor` |
-| `NSAlert` | `TabsController`, `PageSession+UIDelegate` | protocol satisfied by each app target |
-| `NSOpenPanel` | `PageSession+UIDelegate` | same protocol, `UIDocumentPicker` on iOS |
+| `NSAlert` | `TabsController`, `PageSession+UIDelegate` | `AlertPresenter` |
+| `NSOpenPanel` | `PageSession+UIDelegate` | `AlertPresenter` |
 | `NSApplication`, `NSRunningApplication` | `TabsController` | macOS-only file |
+| `NSEvent`, `NSMenu`, `NSSavePanel` | `FocusableWKWebView` | `+macOS.swift` sibling |
 
-Roughly 400 to 600 lines touched across nine files.
+A file needing more than one `#if os` gets split into a shared file and a
+`+macOS.swift` sibling.
+
+**NookUI is built in this phase**, not deferred, so the seams above get a real
+consumer at once. It holds the tab and folder rows, the space dots, the
+favorites grid, the three context menu builders (taking `TabsController` plus
+a `TabActions` protocol in place of `browserManager`), the empty state, the
+find bar, toasts, and the settings tab bodies for General, Spaces, Ad
+Blocker, Air Traffic Control, YouTube and Social Media. Extensions, AI,
+Shortcuts and Advanced settings stay macOS. `UI` depends on `Web` so rows can
+take a `TabsController` directly, which is how they are written today.
+
+**Stays in the app.** `BrowserManager`, `WebViewCoordinator`, the drag
+system, sidebar chrome, extensions, AI, MLX, and `DownloadManager`.
+`DownloadManager` (656 lines, `NSWorkspace`, `NSSavePanel`, `NSScreen`) is
+being rewritten on `fix/download-memory`; once that lands it splits into a
+Foundation download core in `NookWeb` and a macOS presentation layer. That
+split is a tracked follow-up, not part of this phase.
+
+**The `public` pass.** Every type, initializer and member the app touches
+gains `public`. For `TabsController` and `PageSession` that is several hundred
+keyword changes, mechanical and behavior-free.
 
 `BlurEffectView` wraps `NSVisualEffectView` and needs a `UIVisualEffectView`
-twin. `nookGlassEffect` survives unchanged, since Liquid Glass exists on
-iOS 26.
+twin in phase 3. `nookGlassEffect` survives unchanged, since Liquid Glass
+exists on iOS 26.
 
 ## Phase 3: the iOS app
 
@@ -280,6 +348,16 @@ Files sees them.
 
 Sparkle is macOS-only and does not come along.
 
+### Open design items for this phase
+
+- **Folders and favorites on iPhone.** Both stay in v1, but the phone layout
+  for a five-deep folder tree and a favorites grid is undecided. Decide with
+  mockups before building the bottom bar.
+- **Settings visual pass.** The macOS settings window resembles System
+  Settings but does not feel built the same way. Phase 2 extracts the tab
+  bodies unchanged; the redesign that makes them match System Settings on
+  macOS and Settings.app on iOS happens here, once, in `NookUI`.
+
 ### Entitlements
 
 Apply for `com.apple.developer.web-browser` early. It is a request form to
@@ -339,3 +417,13 @@ files with 9 AppKit importers and would need substantial rework). AI chat and
 MCP. The MLX tab organizer. Split view. Peek. The command palette.
 Multi-window. Browser import. A JS evaluator for true procedural cosmetic
 filters. Scriptlet injection.
+
+**A custom video backend.** WKWebView's media stack is closed: WebCore plays
+`<video>` through its own AVFoundation backend inside the web content and GPU
+processes, the large sites feed bytes through Media Source Extensions rather
+than handing over a URL, and FairPlay sits on top for DRM. Apple exposes no
+API to substitute a media engine and the WebContent sandbox blocks hooking
+near it, so AetherEngine or any other player cannot take over page video. The
+only feasible cousin is "open in native player" for pages whose video has a
+plain MP4 or HLS URL, which covers none of the big sites and no DRM. Possible
+after phase 3; not part of the port.
