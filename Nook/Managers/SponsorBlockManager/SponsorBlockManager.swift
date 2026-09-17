@@ -78,7 +78,7 @@ final class SponsorBlockManager {
         // reload freeze this manager was blamed for.
         guard current != markedSource else { return }
 
-        let remaining = all.filter { !$0.source.hasPrefix(marker) }
+        let remaining = all.nookOwned.filter { !$0.source.hasPrefix(marker) }
         ucc.removeAllUserScripts()
         remaining.forEach { ucc.addUserScript($0) }
 

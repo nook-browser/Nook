@@ -262,7 +262,8 @@ final class ContentBlockerManager: NSObject {
         // `userScripts` is bridged lazily from WebKit's NSArray; evaluate everything we need from it
         // BEFORE removeAllUserScripts(), or the stale proxy traps on the next index read (Release-only crash).
         let all = ucc.userScripts
-        let others = all.filter { !$0.source.hasPrefix(marker) }
+        // Only Nook's own scripts are re-added; see WKUserScript+NookOwned.
+        let others = all.nookOwned.filter { !$0.source.hasPrefix(marker) }
         let current = all.first { $0.source.hasPrefix(marker) }?.source
 
         // Nothing changed, so leave the list alone. WKUserContentController has no
@@ -354,8 +355,9 @@ final class ContentBlockerManager: NSObject {
     private func removeOwnScripts(from ucc: WKUserContentController) {
         let markers = [AdvancedRulesEngine.scriptMarker, AdvancedRulesEngine.configScriptMarker]
         let all = ucc.userScripts
-        let remaining = all.filter { script in !markers.contains { script.source.hasPrefix($0) } }
-        guard remaining.count != all.count else { return }
+        let ours = all.nookOwned
+        let remaining = ours.filter { script in !markers.contains { script.source.hasPrefix($0) } }
+        guard remaining.count != ours.count else { return }
         ucc.removeAllUserScripts()
         remaining.forEach { ucc.addUserScript($0) }
     }

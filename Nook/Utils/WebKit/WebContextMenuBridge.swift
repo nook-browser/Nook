@@ -39,6 +39,7 @@ final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
 
     private static let handlerName = "contextMenuPayload"
     private static let scriptSource: String = """
+    // Nook Context Menu Bridge
     (function() {
         if (window.__nookContextMenuBridgeInstalled) { return; }
         window.__nookContextMenuBridgeInstalled = true;

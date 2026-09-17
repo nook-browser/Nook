@@ -90,7 +90,7 @@ enum YouTubeTweaks {
         let ucc = webView.configuration.userContentController
         // Read everything from the lazily bridged array before removeAllUserScripts() (Release-only trap).
         let all = ucc.userScripts
-        let others = all.filter { !$0.source.hasPrefix(marker) }
+        let others = all.nookOwned.filter { !$0.source.hasPrefix(marker) }
         let current = all.first { $0.source.hasPrefix(marker) }?.source
         guard current != source else { return }
 
