@@ -5,8 +5,9 @@
 //  Created by Claude on 26/03/2026.
 //
 
-import NookBlocker
 import SwiftUI
+
+import NookBlocker
 import NookDesign
 
 struct SettingsAdBlockerTab: View {

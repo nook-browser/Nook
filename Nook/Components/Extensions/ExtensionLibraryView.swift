@@ -3,13 +3,14 @@
 //  Nook
 //
 
-import NookBlocker
-import NookSettings
-import SwiftUI
-import NookDesign
 import AppKit
-import WebKit
 import os
+import SwiftUI
+import WebKit
+
+import NookBlocker
+import NookDesign
+import NookSettings
 
 struct ExtensionLibraryView: View {
     let browserManager: BrowserManager

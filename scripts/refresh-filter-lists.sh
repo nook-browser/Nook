@@ -1,9 +1,9 @@
 #!/bin/bash
-# Refresh the bundled filter-list snapshots in Nook/Managers/ContentBlockerManager/Resources.
+# Refresh the bundled filter-list snapshots in Packages/NookBlocker/Sources/NookBlocker/Resources.
 # Run before a release (CI does) so first-run protection ships with current lists.
 # Keep the URL/filename pairs in sync with FilterListManager.defaultLists.
 set -euo pipefail
-DEST="$(cd "$(dirname "$0")/.." && pwd)/Nook/Managers/ContentBlockerManager/Resources"
+DEST="$(cd "$(dirname "$0")/.." && pwd)/Packages/NookBlocker/Sources/NookBlocker/Resources"
 LISTS=(
   "easylist.txt|https://easylist.to/easylist/easylist.txt"
   "easyprivacy.txt|https://easylist.to/easylist/easyprivacy.txt"

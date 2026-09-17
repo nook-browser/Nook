@@ -5,10 +5,10 @@
 //  Created by Maciek Bagiński on 28/07/2025.
 //
 
-import NookBlocker
 import AppKit
 import Combine
 import CoreServices
+import NookBlocker
 import NookSettings
 import OSLog
 import Sparkle

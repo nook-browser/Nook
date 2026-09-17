@@ -42,7 +42,10 @@
 				ThirdParty/AdblockRustFFI/include/nook_adblock.h,
 				ThirdParty/AdblockRustFFI/include/module.modulemap,
 				ThirdParty/AdblockRustFFI/NookAdblock.xcframework,
+				ThirdParty/AdblockRustFFI/src/content_blocking_ffi.rs,
+				ThirdParty/AdblockRustFFI/src/cosmetic_ffi.rs,
 				ThirdParty/AdblockRustFFI/src/lib.rs,
+				ThirdParty/AdblockRustFFI/tests/no_overbroad_rules.rs,
 				ThirdParty/BigUIPaging/README.md,
 				ThirdParty/MuteableWKWebView/README.md,
 			);

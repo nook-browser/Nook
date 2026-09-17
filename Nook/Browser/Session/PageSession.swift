@@ -7,11 +7,11 @@
 //  the session reports committed URLs and titles to its TabsController.
 //
 
-import NookBlocker
 import AppKit
 import Combine
 import CoreAudio
 import FaviconFinder
+import NookBlocker
 import NookSettings
 import SwiftUI
 import WebKit

@@ -9,12 +9,12 @@
 //    --header "Authorization: Bearer $(cat ~/Library/Application\ Support/com.baingurley.nook/dev-mcp-token)"
 //
 
-import NookBlocker
 import AppKit
 import Foundation
 import Network
 import OSLog
 import WebKit
+import NookBlocker
 
 @MainActor
 final class DevMCPServer {

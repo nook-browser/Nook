@@ -5,9 +5,10 @@
 //  Created by Jonathan Caudill on 15/08/2025.
 //
 
-import NookSettings
 import SwiftUI
 import WebKit
+
+import NookSettings
 
 struct PrivacySettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager

@@ -5,10 +5,10 @@
 //  Navigation delegate, downloads and find in page for a PageSession.
 //
 
-import NookBlocker
 import AppKit
 import SwiftUI
 import WebKit
+import NookBlocker
 // MARK: - WKNavigationDelegate
 extension PageSession: WKNavigationDelegate, WKDownloadDelegate {
 

@@ -5,10 +5,10 @@
 //  Popups, OAuth windows, JavaScript panels, file upload and full screen for a PageSession.
 //
 
-import NookBlocker
 import AppKit
 import SwiftUI
 import WebKit
+import NookBlocker
 extension PageSession {
     func isLikelyOAuthOrExternalWindow(url: URL, windowFeatures: WKWindowFeatures) -> Bool {
         if OAuthDetector.isLikelyOAuthPopupURL(url) { return true }
