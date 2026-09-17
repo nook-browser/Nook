@@ -67,13 +67,21 @@ final class SponsorBlockManager {
         let ucc = webView.configuration.userContentController
 
         let marker = Self.scriptMarker
-        let remaining = ucc.userScripts.filter { !$0.source.hasPrefix(marker) }
-        if remaining.count != ucc.userScripts.count {
-            ucc.removeAllUserScripts()
-            remaining.forEach { ucc.addUserScript($0) }
-        }
-
         let markedSource = "\(marker)\n\(script)"
+
+        // Read everything off the lazily bridged array before removeAllUserScripts().
+        let all = ucc.userScripts
+        let current = all.first { $0.source.hasPrefix(marker) }?.source
+
+        // Already installed and unchanged. Re-adding it cost one addUserScript
+        // IPC per surviving script on every YouTube navigation, which is the
+        // reload freeze this manager was blamed for.
+        guard current != markedSource else { return }
+
+        let remaining = all.filter { !$0.source.hasPrefix(marker) }
+        ucc.removeAllUserScripts()
+        remaining.forEach { ucc.addUserScript($0) }
+
         let userScript = WKUserScript(
             source: markedSource,
             injectionTime: .atDocumentStart,

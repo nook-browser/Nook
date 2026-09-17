@@ -263,8 +263,16 @@ final class ContentBlockerManager: NSObject {
         // BEFORE removeAllUserScripts(), or the stale proxy traps on the next index read (Release-only crash).
         let all = ucc.userScripts
         let others = all.filter { !$0.source.hasPrefix(marker) }
-        let hadConfig = others.count != all.count
-        guard hadConfig || script != nil else { return }
+        let current = all.first { $0.source.hasPrefix(marker) }?.source
+
+        // Nothing changed, so leave the list alone. WKUserContentController has no
+        // remove-one API, so any edit costs one addUserScript IPC per surviving
+        // script. configUserScript never returns nil, so the old `script != nil`
+        // test was always true and this rewrote the whole list on every
+        // navigation, which froze redirect-heavy sites. The tweak managers have
+        // always compared content here; this one did not.
+        guard current != script?.source else { return }
+
         ucc.removeAllUserScripts()
         if let script { ucc.addUserScript(script) }
         others.forEach { ucc.addUserScript($0) }
