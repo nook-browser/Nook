@@ -17,7 +17,7 @@ import SwiftUI
 struct NookApp: App {
     @State private var windowRegistry = WindowRegistry()
     @State private var webViewCoordinator = WebViewCoordinator()
-    @State private var settingsManager = NookSettingsService()
+    @State private var settingsManager: NookSettingsService
     @State private var keyboardShortcutManager = KeyboardShortcutManager()
     @State private var aiConfigService: AIConfigService
     @State private var mcpManager = MCPManager()
@@ -27,9 +27,12 @@ struct NookApp: App {
 
     // TEMPORARY: BrowserManager will be phased out as a global singleton.
     // Eventually each manager (TabsController, etc.) will be independent and injected via environment.
-    @StateObject private var browserManager = BrowserManager()
+    @StateObject private var browserManager: BrowserManager
 
     init() {
+        let settings = NookSettingsService()
+        _settingsManager = State(initialValue: settings)
+        _browserManager = StateObject(wrappedValue: BrowserManager(settings: settings))
         let config = AIConfigService()
         _aiConfigService = State(initialValue: config)
         _aiService = State(initialValue: AIService(configService: config))

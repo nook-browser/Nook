@@ -5,6 +5,7 @@
 //  Created by Maciek Bagiński on 28/07/2025.
 //
 
+import NookBlocker
 import AppKit
 import Combine
 import CoreServices
@@ -421,8 +422,9 @@ class BrowserManager: ObservableObject {
         return entities.map { ($0.id, $0.name) }
     }
 
-    init() {
+    init(settings: NookSettingsService) {
         // Phase 1: initialize all stored properties
+        self.nookSettings = settings
         self.modelContext = Persistence.shared.container.mainContext
         self.extensionManager = ExtensionManager.shared
         let tabs = TabsController(legacyProfiles: Self.legacyProfileRecords(in: modelContext))
@@ -442,7 +444,7 @@ class BrowserManager: ObservableObject {
         self.compositorManager = TabCompositorManager()
         self.splitManager = SplitViewManager()
         self.gradientColorManager = GradientColorManager()
-        self.contentBlockerManager = ContentBlockerManager()
+        self.contentBlockerManager = ContentBlockerManager(settings: settings)
         self.sponsorBlockManager = SponsorBlockManager()
         self.findManager = FindManager()
         self.importManager = ImportManager()
@@ -463,7 +465,7 @@ class BrowserManager: ObservableObject {
                 .assign(to: &$isExtensionPopupActive)
         }
         self.gradientColorManager.setImmediate(.default)
-        self.contentBlockerManager.attach(browserManager: self)
+        self.contentBlockerManager.attach(host: self)
         self.sponsorBlockManager.browserManager = self
         // Note: tracking protection will be configured after settingsManager injection
 

@@ -5,6 +5,7 @@
 //  Created by Maciek Bagiński on 31/07/2025.
 //
 
+import NookBlocker
 import AppKit
 import SwiftUI
 import WebKit

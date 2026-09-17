@@ -3,6 +3,7 @@
 //  Nook
 //
 
+import NookBlocker
 import NookSettings
 import SwiftUI
 import NookDesign

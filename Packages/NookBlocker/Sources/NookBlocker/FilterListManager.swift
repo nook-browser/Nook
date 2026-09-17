@@ -12,9 +12,9 @@ import CryptoKit
 import OSLog
 
 @MainActor
-final class FilterListManager {
+public final class FilterListManager {
 
-    enum FilterListCategory: String, CaseIterable, Sendable {
+    public enum FilterListCategory: String, CaseIterable, Sendable {
         case ads = "Ads"
         case privacy = "Privacy"
         case malware = "Malware"
@@ -23,13 +23,13 @@ final class FilterListManager {
         case social = "Social"
     }
 
-    struct FilterList: Sendable {
-        let name: String
-        let url: URL
-        let filename: String
+    public struct FilterList: Sendable {
+        public let name: String
+        public let url: URL
+        public let filename: String
         let knownSizeRange: ClosedRange<Int>?  // Expected size range to detect gross tampering
-        let category: FilterListCategory
-        let isOptional: Bool
+        public let category: FilterListCategory
+        public let isOptional: Bool
 
         init(name: String, url: URL, filename: String, knownSizeRange: ClosedRange<Int>?, category: FilterListCategory = .ads, isOptional: Bool = false) {
             self.name = name
@@ -41,7 +41,7 @@ final class FilterListManager {
         }
     }
 
-    nonisolated static let defaultLists: [FilterList] = [
+    nonisolated public static let defaultLists: [FilterList] = [
         FilterList(name: "EasyList", url: URL(string: "https://easylist.to/easylist/easylist.txt")!, filename: "easylist.txt", knownSizeRange: 100_000...10_000_000, category: .ads),
         FilterList(name: "EasyPrivacy", url: URL(string: "https://easylist.to/easylist/easyprivacy.txt")!, filename: "easyprivacy.txt", knownSizeRange: 50_000...5_000_000, category: .privacy),
         FilterList(name: "Peter Lowe's", url: URL(string: "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=0&mimetype=plaintext")!, filename: "peter-lowes.txt", knownSizeRange: 10_000...2_000_000, category: .ads),
@@ -57,7 +57,7 @@ final class FilterListManager {
     /// Lists shipped only in the app bundle (no remote source). Resource name without extension.
     nonisolated static let bundledOnlyLists: [String] = ["nook-filters-default"]
 
-    nonisolated static let optionalLists: [FilterList] = [
+    nonisolated public static let optionalLists: [FilterList] = [
         // Annoyances
         FilterList(name: "AdGuard Annoyances", url: URL(string: "https://filters.adtidy.org/extension/ublock/filters/14.txt")!, filename: "adguard-annoyances.txt", knownSizeRange: 10_000...5_000_000, category: .annoyances, isOptional: true),
         FilterList(name: "uBlock Annoyances (cookies)", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/annoyances-cookies.txt")!, filename: "ublock-annoyances-cookies.txt", knownSizeRange: 1_000...2_000_000, category: .annoyances, isOptional: true),
@@ -88,7 +88,7 @@ final class FilterListManager {
     }
 
     /// Filenames of enabled optional filter lists (persisted externally via NookSettingsService)
-    nonisolated(unsafe) var enabledOptionalFilterListFilenames: Set<String> = []
+    nonisolated(unsafe) public var enabledOptionalFilterListFilenames: Set<String> = []
 
     private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "FilterListManager")
 
@@ -175,8 +175,8 @@ final class FilterListManager {
             if let content = loadCachedList(list) { contents.append(content) }
         }
         for name in Self.bundledOnlyLists {
-            if let path = Bundle.main.path(forResource: name, ofType: "txt"),
-               let content = try? String(contentsOfFile: path, encoding: .utf8) {
+            if let url = Bundle.module.url(forResource: name, withExtension: "txt", subdirectory: "Resources"),
+               let content = try? String(contentsOf: url, encoding: .utf8) {
                 contents.append(content)
             }
         }
@@ -236,8 +236,8 @@ final class FilterListManager {
         let bundleName = (list.filename as NSString).deletingPathExtension
         let bundleExt = (list.filename as NSString).pathExtension
         for name in [bundleName, bundleName + "-default"] {
-            if let bundlePath = Bundle.main.path(forResource: name, ofType: bundleExt),
-               let bundleContent = try? String(contentsOfFile: bundlePath, encoding: .utf8) {
+            if let bundleURL = Bundle.module.url(forResource: name, withExtension: bundleExt, subdirectory: "Resources"),
+               let bundleContent = try? String(contentsOf: bundleURL, encoding: .utf8) {
                 return bundleContent
             }
         }

@@ -5,6 +5,7 @@
 //  Popups, OAuth windows, JavaScript panels, file upload and full screen for a PageSession.
 //
 
+import NookBlocker
 import AppKit
 import SwiftUI
 import WebKit

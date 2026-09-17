@@ -5,6 +5,7 @@
 //  Created by Jonathan Caudill on 15/08/2025.
 //
 
+import NookSettings
 import SwiftUI
 import WebKit
 
@@ -348,5 +349,5 @@ struct PrivacySettingsView: View {
 
 #Preview {
     PrivacySettingsView()
-        .environmentObject(BrowserManager())
+        .environmentObject(BrowserManager(settings: NookSettingsService()))
 }

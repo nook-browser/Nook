@@ -7,6 +7,7 @@
 //  the session reports committed URLs and titles to its TabsController.
 //
 
+import NookBlocker
 import AppKit
 import Combine
 import CoreAudio

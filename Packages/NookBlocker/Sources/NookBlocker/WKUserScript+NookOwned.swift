@@ -24,12 +24,12 @@ import WebKit
 extension WKUserScript {
     /// Every user script Nook injects begins with a `// Nook …` comment.
     /// Anything else in the controller belongs to WebKit or to an extension.
-    static let nookOwnedPrefix = "// Nook"
+    public static let nookOwnedPrefix = "// Nook"
 
-    var isNookOwned: Bool { source.hasPrefix(Self.nookOwnedPrefix) }
+    public var isNookOwned: Bool { source.hasPrefix(Self.nookOwnedPrefix) }
 }
 
 extension Array where Element == WKUserScript {
     /// The subset safe to re-add after `removeAllUserScripts()`.
-    var nookOwned: [WKUserScript] { filter(\.isNookOwned) }
+    public var nookOwned: [WKUserScript] { filter(\.isNookOwned) }
 }

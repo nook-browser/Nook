@@ -9,6 +9,7 @@
 //    --header "Authorization: Bearer $(cat ~/Library/Application\ Support/com.baingurley.nook/dev-mcp-token)"
 //
 
+import NookBlocker
 import AppKit
 import Foundation
 import Network

@@ -8,7 +8,7 @@
 
 import Foundation
 
-enum OAuthDetector {
+public enum OAuthDetector {
 
     // MARK: - Known Provider Hosts
 
@@ -145,7 +145,7 @@ enum OAuthDetector {
     ///
     /// Use this when a false positive has a visible cost (e.g. triggering the assist banner,
     /// deciding that an OAuth tab's flow has NOT completed yet).
-    static func isLikelyOAuthURL(_ url: URL) -> Bool {
+    public static func isLikelyOAuthURL(_ url: URL) -> Bool {
         let host = (url.host ?? "").lowercased()
         let path = url.path.lowercased()
         let query = url.query?.lowercased() ?? ""
@@ -161,7 +161,7 @@ enum OAuthDetector {
     ///
     /// Use this when erring on the side of inclusion is fine (e.g. routing a popup to a
     /// miniwindow is a better UX even if we're occasionally wrong).
-    static func isLikelyOAuthPopupURL(_ url: URL) -> Bool {
+    public static func isLikelyOAuthPopupURL(_ url: URL) -> Bool {
         if isLikelyOAuthURL(url) { return true }
 
         let host = (url.host ?? "").lowercased()

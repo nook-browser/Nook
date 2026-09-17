@@ -20,19 +20,19 @@ import OSLog
 private let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "AdvancedRules")
 
 @MainActor
-final class AdvancedRulesEngine {
+public final class AdvancedRulesEngine {
 
     /// Prefix on every user script Nook's content blocker owns.
     static let scriptMarker = "// Nook Content Blocker\n"
     /// Prefix on the per-navigation main-frame configuration script.
     static let configScriptMarker = "// Nook Content Blocker Config\n"
     /// WKScriptMessageHandlerWithReply name the runtime uses for subframe lookups.
-    static let messageHandlerName = "nookAdvancedBlocking"
+    public static let messageHandlerName = "nookAdvancedBlocking"
 
     /// One adblock-rust engine, shared by cosmetic lookup and the dev MCP
     /// check_urls tool. Actor-isolated because the engine pointer is Send but
     /// not Sync.
-    let engine = BlockerEngine()
+    public let engine = BlockerEngine()
 
     // MARK: - Build
 
@@ -111,8 +111,10 @@ final class AdvancedRulesEngine {
         return scripts
     }()
 
-    private static func bundledSource(_ name: String) -> String? {
-        guard let url = Bundle.main.url(forResource: name, withExtension: "js") else { return nil }
+    /// Source of a script shipped inside NookBlocker's resource bundle.
+    /// Public because FacebookTweaks shares facebook-feed-prune.js with the blocker.
+    public nonisolated static func bundledSource(_ name: String) -> String? {
+        guard let url = Bundle.module.url(forResource: name, withExtension: "js", subdirectory: "Resources") else { return nil }
         return try? String(contentsOf: url, encoding: .utf8)
     }
 }

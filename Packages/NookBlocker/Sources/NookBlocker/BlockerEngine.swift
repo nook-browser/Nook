@@ -17,16 +17,17 @@
 //
 
 import Foundation
+import NookAdblockFFI
 import OSLog
 
 private let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "AdvancedRules")
 
 @MainActor
-final class BlockerEngine {
+public final class BlockerEngine {
 
     private var engine: UnsafeMutableRawPointer?
 
-    var isLoaded: Bool { engine != nil }
+    public var isLoaded: Bool { engine != nil }
 
     /// Build or rebuild from filter rules, replacing any previous engine.
     /// Construction runs off the main actor; only the finished pointer crosses back.
@@ -103,7 +104,7 @@ final class BlockerEngine {
     /// True when the request would be blocked. Used by the dev MCP `check_urls`
     /// tool; nothing in the browsing path calls this, because WebKit does the
     /// blocking itself from the compiled rule lists.
-    func matches(url: String, sourceURL: String, type: String) -> Bool {
+    public func matches(url: String, sourceURL: String, type: String) -> Bool {
         guard let engine else { return false }
         return url.withCString { u in
             sourceURL.withCString { s in

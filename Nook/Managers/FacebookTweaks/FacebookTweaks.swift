@@ -5,6 +5,7 @@
 //  Created by Claude on 16/09/2026.
 //
 
+import NookBlocker
 import Foundation
 import NookSettings
 import OSLog
@@ -20,10 +21,9 @@ enum FacebookTweaks {
     private static let marker = "// Nook Facebook Tweaks"
 
     private static let filter: String? = {
-        guard let url = Bundle.main.url(forResource: "facebook-feed-prune", withExtension: "js"),
-              let source = try? String(contentsOf: url, encoding: .utf8)
-        else {
-            fbTweaksLog.warning("Failed to load facebook-feed-prune.js from bundle")
+        // Shared with the content blocker, so it lives in NookBlocker's resource bundle.
+        guard let source = AdvancedRulesEngine.bundledSource("facebook-feed-prune") else {
+            fbTweaksLog.warning("Failed to load facebook-feed-prune.js from NookBlocker")
             return nil
         }
         return source

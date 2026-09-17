@@ -10,6 +10,7 @@
 //
 
 import Foundation
+import NookAdblockFFI
 import OSLog
 
 private let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "ContentBlocker")

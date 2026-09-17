@@ -5,6 +5,7 @@
 //  Created by Jonathan Caudill on 01/09/2025.
 //
 
+import NookBlocker
 import AppKit
 import Foundation
 import WebKit

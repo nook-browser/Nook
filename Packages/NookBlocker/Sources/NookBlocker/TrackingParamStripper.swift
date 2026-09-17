@@ -19,7 +19,7 @@
 
 import Foundation
 
-struct TrackingParamStripper {
+public struct TrackingParamStripper {
 
     fileprivate struct Rule {
         enum Param { case all, name(String), regex(NSRegularExpression) }
@@ -35,9 +35,9 @@ struct TrackingParamStripper {
     fileprivate var genericRules: [Rule] = []
     private(set) var ruleCount = 0
 
-    init() {}
+    public init() {}
 
-    init(rules lines: [String]) {
+    public init(rules lines: [String]) {
         for line in lines where line.contains("removeparam") {
             guard let rule = Self.parse(line) else { continue }
             ruleCount += 1
@@ -48,7 +48,7 @@ struct TrackingParamStripper {
     // MARK: - Apply
 
     /// URL without tracking parameters, or nil if nothing matched.
-    func strip(_ url: URL) -> URL? {
+    public func strip(_ url: URL) -> URL? {
         guard ruleCount > 0, let host = url.host?.lowercased(),
               var components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let items = components.queryItems, !items.isEmpty else { return nil }

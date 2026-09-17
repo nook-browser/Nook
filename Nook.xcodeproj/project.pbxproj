@@ -23,6 +23,7 @@
 		C0DE7AB50000000000000003 /* NookTabsCore in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE7AB50000000000000002 /* NookTabsCore */; };
 		C0DE7AB50000000000000013 /* NookSettings in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE7AB50000000000000012 /* NookSettings */; };
 		C0DE7AB50000000000000023 /* NookDesign in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE7AB50000000000000022 /* NookDesign */; };
+		C0DE7AB50000000000000033 /* NookBlocker in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE7AB50000000000000032 /* NookBlocker */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -140,6 +141,7 @@
 				C0DE7AB50000000000000003 /* NookTabsCore in Frameworks */,
 				C0DE7AB50000000000000013 /* NookSettings in Frameworks */,
 				C0DE7AB50000000000000023 /* NookDesign in Frameworks */,
+				C0DE7AB50000000000000033 /* NookBlocker in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -199,6 +201,7 @@
 				C0DE7AB50000000000000002 /* NookTabsCore */,
 				C0DE7AB50000000000000012 /* NookSettings */,
 				C0DE7AB50000000000000022 /* NookDesign */,
+				C0DE7AB50000000000000032 /* NookBlocker */,
 			);
 			productName = Pulse;
 			productReference = 7F8340FC2E37F39400674A5D /* Nook.app */;
@@ -236,6 +239,7 @@
 				C0DE7AB50000000000000001 /* XCLocalSwiftPackageReference "Packages/NookTabsCore" */,
 				C0DE7AB50000000000000011 /* XCLocalSwiftPackageReference "Packages/NookSettings" */,
 				C0DE7AB50000000000000021 /* XCLocalSwiftPackageReference "Packages/NookDesign" */,
+				C0DE7AB50000000000000031 /* XCLocalSwiftPackageReference "Packages/NookBlocker" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7F8340FD2E37F39400674A5D /* Products */;
@@ -427,18 +431,6 @@
 				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = YES;
 				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				HEADER_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/Nook/ThirdParty/AdblockRustFFI/NookAdblock.xcframework/macos-arm64/Headers",
-				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/Nook/ThirdParty/AdblockRustFFI/NookAdblock.xcframework/macos-arm64",
-				);
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					"-lnook_adblock",
-				);
 				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/Nook/Supporting Files/Nook-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 			};
@@ -488,18 +480,6 @@
 				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
 				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				HEADER_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/Nook/ThirdParty/AdblockRustFFI/NookAdblock.xcframework/macos-arm64/Headers",
-				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/Nook/ThirdParty/AdblockRustFFI/NookAdblock.xcframework/macos-arm64",
-				);
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					"-lnook_adblock",
-				);
 				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/Nook/Supporting Files/Nook-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 			};
@@ -540,6 +520,10 @@
 		C0DE7AB50000000000000021 /* XCLocalSwiftPackageReference "Packages/NookDesign" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NookDesign;
+		};
+		C0DE7AB50000000000000031 /* XCLocalSwiftPackageReference "Packages/NookBlocker" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NookBlocker;
 		};
 /* End XCLocalSwiftPackageReference section */
 
@@ -610,6 +594,10 @@
 		C0DE7AB50000000000000022 /* NookDesign */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = NookDesign;
+		};
+		C0DE7AB50000000000000032 /* NookBlocker */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NookBlocker;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
