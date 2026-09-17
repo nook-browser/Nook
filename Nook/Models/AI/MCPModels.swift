@@ -2,61 +2,26 @@
 //  MCPModels.swift
 //  Nook
 //
-//  MCP (Model Context Protocol) data models
+//  Runtime MCP (Model Context Protocol) types: tools, connection state and the
+//  JSON-RPC wire format. The persisted MCPServerConfig lives in NookSettings.
 //
 
 import Foundation
 
-// MARK: - MCP Server Configuration
-
-public enum MCPTransportType: Codable, Equatable {
-    case stdio(command: String, args: [String])
-    case sse(url: String)
-
-    public var displayName: String {
-        switch self {
-        case .stdio: return "Stdio"
-        case .sse: return "SSE"
-        }
-    }
-}
-
-public struct MCPServerConfig: Codable, Identifiable, Equatable {
-    public let id: String
-    public var name: String
-    public var transport: MCPTransportType
-    public var envVars: [String: String]
-    public var isEnabled: Bool
-
-    public init(
-        id: String = UUID().uuidString,
-        name: String,
-        transport: MCPTransportType,
-        envVars: [String: String] = [:],
-        isEnabled: Bool = true
-    ) {
-        self.id = id
-        self.name = name
-        self.transport = transport
-        self.envVars = envVars
-        self.isEnabled = isEnabled
-    }
-}
-
 // MARK: - MCP Tool
 
-public struct MCPTool: Identifiable, Equatable {
-    public let id: String
-    public let serverId: String
-    public let name: String
-    public let description: String
-    public let inputSchema: [String: Any]
+struct MCPTool: Identifiable, Equatable {
+    let id: String
+    let serverId: String
+    let name: String
+    let description: String
+    let inputSchema: [String: Any]
 
-    public var qualifiedName: String {
+    var qualifiedName: String {
         "\(serverId).\(name)"
     }
 
-    public init(serverId: String, name: String, description: String, inputSchema: [String: Any] = [:]) {
+    init(serverId: String, name: String, description: String, inputSchema: [String: Any] = [:]) {
         self.id = "\(serverId).\(name)"
         self.serverId = serverId
         self.name = name
@@ -64,20 +29,20 @@ public struct MCPTool: Identifiable, Equatable {
         self.inputSchema = inputSchema
     }
 
-    public static func == (lhs: MCPTool, rhs: MCPTool) -> Bool {
+    static func == (lhs: MCPTool, rhs: MCPTool) -> Bool {
         lhs.id == rhs.id && lhs.name == rhs.name && lhs.description == rhs.description
     }
 }
 
 // MARK: - MCP Connection State
 
-public enum MCPConnectionState: Equatable {
+enum MCPConnectionState: Equatable {
     case disconnected
     case connecting
     case connected
     case error(String)
 
-    public var displayName: String {
+    var displayName: String {
         switch self {
         case .disconnected: return "Disconnected"
         case .connecting: return "Connecting..."
@@ -86,7 +51,7 @@ public enum MCPConnectionState: Equatable {
         }
     }
 
-    public var isConnected: Bool {
+    var isConnected: Bool {
         if case .connected = self { return true }
         return false
     }
@@ -94,13 +59,13 @@ public enum MCPConnectionState: Equatable {
 
 // MARK: - JSON-RPC Types
 
-public struct JSONRPCRequest: Codable {
-    public let jsonrpc: String
-    public let id: Int
-    public let method: String
-    public let params: [String: MCPAnyCodable]?
+struct JSONRPCRequest: Codable {
+    let jsonrpc: String
+    let id: Int
+    let method: String
+    let params: [String: MCPAnyCodable]?
 
-    public init(id: Int, method: String, params: [String: MCPAnyCodable]? = nil) {
+    init(id: Int, method: String, params: [String: MCPAnyCodable]? = nil) {
         self.jsonrpc = "2.0"
         self.id = id
         self.method = method
@@ -108,29 +73,29 @@ public struct JSONRPCRequest: Codable {
     }
 }
 
-public struct JSONRPCResponse: Codable {
-    public let jsonrpc: String
-    public let id: Int?
-    public let result: MCPAnyCodable?
-    public let error: JSONRPCError?
+struct JSONRPCResponse: Codable {
+    let jsonrpc: String
+    let id: Int?
+    let result: MCPAnyCodable?
+    let error: JSONRPCError?
 }
 
-public struct JSONRPCError: Codable {
-    public let code: Int
-    public let message: String
-    public let data: MCPAnyCodable?
+struct JSONRPCError: Codable {
+    let code: Int
+    let message: String
+    let data: MCPAnyCodable?
 }
 
 // MARK: - MCPAnyCodable Helper
 
-public struct MCPAnyCodable: Codable, Equatable {
-    public let value: Any
+struct MCPAnyCodable: Codable, Equatable {
+    let value: Any
 
-    public init(_ value: Any) {
+    init(_ value: Any) {
         self.value = value
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         if container.decodeNil() {
             value = NSNull()
@@ -151,7 +116,7 @@ public struct MCPAnyCodable: Codable, Equatable {
         }
     }
 
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         switch value {
         case is NSNull:
@@ -173,7 +138,7 @@ public struct MCPAnyCodable: Codable, Equatable {
         }
     }
 
-    public static func == (lhs: MCPAnyCodable, rhs: MCPAnyCodable) -> Bool {
+    static func == (lhs: MCPAnyCodable, rhs: MCPAnyCodable) -> Bool {
         String(describing: lhs.value) == String(describing: rhs.value)
     }
 }

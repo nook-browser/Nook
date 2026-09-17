@@ -14,6 +14,7 @@
 //
 
 import Foundation
+import NookSettings
 import WebKit
 import OSLog
 

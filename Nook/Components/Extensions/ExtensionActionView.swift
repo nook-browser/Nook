@@ -5,6 +5,7 @@
 //  Clean ExtensionActionView using ONLY native WKWebExtension APIs
 //
 
+import NookSettings
 import SwiftUI
 import WebKit
 import AppKit
